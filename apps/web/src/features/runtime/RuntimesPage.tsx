@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/solid-query";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,8 +7,8 @@ import { Keyed, variant } from "#/base/dom.tsx";
 import { wallClockText } from "#/base/format.ts";
 import { useWorkAgents } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useRuntimes } from "#/infra/query.ts";
-import { A } from "#/ui/A.tsx";
+import { runtimesQuery, useQueryClient, ready, useRuntimes } from "#/infra/query.ts";
+import { Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { AgentFace } from "#/ui/Face.tsx";
@@ -42,11 +41,11 @@ export function RuntimesPage(props: { rest: string }) {
   const selected = () => list().find((r) => r.id === props.rest) ?? list()[0];
   return (
     <Show
-      when={!runtimes.error}
+      when={!runtimes.error()}
       fallback={
         <p class="p-8 text-sm text-berry">
           {t("web.runtime.noRuntimes")}
-          {reasonOf(runtimes.error)}
+          {reasonOf(runtimes.error())}
         </p>
       }
     >
@@ -101,7 +100,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   const client = useQueryClient();
   const refreshing = createAct();
   const inst = () => props.info.installation;
-  const keep = (got: RuntimeInfo) => client.setQueryData<RuntimeInfo[]>(["runtimes"], (all) => all?.map((r) => (r.id === got.id ? got : r)));
+  const keep = (got: RuntimeInfo) => client.setData(runtimesQuery(), (all) => (all ? { value: all.value.map((r) => (r.id === got.id ? got : r)) } : undefined));
   const refresh = () => {
     const id = props.info.id;
     return refreshing.run(async () => keep(await api.runtime.refresh({ id })));

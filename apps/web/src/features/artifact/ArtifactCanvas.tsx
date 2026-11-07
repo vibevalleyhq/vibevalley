@@ -59,8 +59,8 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
           </button>
         </Show>
       </header>
-      <Show when={artifact.error}>
-        <p class="p-3 text-sm text-berry">{reasonOf(artifact.error)}</p>
+      <Show when={artifact.error()}>
+        <p class="p-3 text-sm text-berry">{reasonOf(artifact.error())}</p>
       </Show>
       <Show when={shown()}>
         {(a) => (
@@ -81,7 +81,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
           </Show>
         )}
       </Show>
-      <Show when={artifact.isSuccess && artifact.data === undefined}>
+      <Show when={artifact.status() === "success" && artifact.data() === undefined}>
         <p class="p-3 text-sm text-muted">{t("web.artifact.page.gone")}</p>
       </Show>
     </section>

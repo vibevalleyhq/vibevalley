@@ -16,8 +16,8 @@ import { artifactHref } from "#/features/artifact/index.ts";
 import { drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "#/features/channel/index.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
+import { Link as A } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
-import { A } from "#/ui/A.tsx";
 import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 

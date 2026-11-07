@@ -1,11 +1,10 @@
-import { useQueryClient } from "@tanstack/solid-query";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
-import { ready, useAgentTemplates } from "#/infra/query.ts";
+import { useQueryClient, ready, useAgentTemplates } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { toast } from "#/ui/toasts.ts";
@@ -26,7 +25,7 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
     const updated = props.onUpdated;
     return act.run(async () => {
       const got = await api.agent.template.update({ agent });
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      await client.invalidate({ prefix: ["agents"] });
       updated(got);
       toast(t("web.agent.templates.updated"));
     });

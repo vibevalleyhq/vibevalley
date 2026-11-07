@@ -8,9 +8,8 @@ import { QuickSwitcher, switcher } from "#/features/channel/index.ts";
 import { waitingOnOwner } from "#/features/inbox/index.ts";
 import { NotesSearch } from "#/features/pkm/index.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
-import { useRouter } from "#/infra/router.ts";
+import { Link as A, NavLink, useMatches } from "#/infra/router.ts";
 import { useUpdates } from "#/infra/settings.ts";
-import { A } from "#/ui/A.tsx";
 import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
@@ -18,7 +17,7 @@ import { titleBar } from "#/ui/layout.tsx";
 import { ShortcutSheet } from "#/ui/ShortcutSheet.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
-import { type Place, placeOf, places, settingsPlace } from "./places";
+import { type Place, places, settingsPlace } from "./places";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -32,7 +31,7 @@ function PlaceIcon(props: { place: Place }) {
 /** name: none for the farm's face at the top, which is a picture of its own; a place's name sits under its icon so the rail reads without hovering. */
 function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; children: JSX.Element }) {
   return (
-    <A
+    <NavLink
       href={props.to}
       data-place={props.place}
       title={props.label}
@@ -59,7 +58,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
           </span>
         )}
       </Show>
-    </A>
+    </NavLink>
   );
 }
 
@@ -70,7 +69,7 @@ function RailIcon(props: { name: IconName }) {
 
 const railGroups = ["work", "setup", "reference"] as const;
 
-function Rail(props: { here?: Place | undefined }) {
+function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const frames = useFrames();
   const waiting = () => waitingOnOwner(frames.frame?.inbox ?? []);
   const settings = settingsPlace;
@@ -90,7 +89,7 @@ function Rail(props: { here?: Place | undefined }) {
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
-        <Slot to="/farm" place="farm" label={t("web.base.farm")}>
+        <Slot to="/farm" place="farm" label={t("web.base.farm")} current={props.farm}>
           <OrchestratorFace size={38} />
         </Slot>
       </div>
@@ -130,7 +129,7 @@ function Rail(props: { here?: Place | undefined }) {
         <Slot to={settings.path} place={settings.id} label={`${settings.label} · ${settings.hint}`} name={settings.label} current={props.here === settings}>
           <RailIcon name={settings.icon} />
         </Slot>
-        <Slot to="/farm" place="farm" label={t("web.base.farm")} name={t("web.base.farmShort")}>
+        <Slot to="/farm" place="farm" label={t("web.base.farm")} name={t("web.base.farmShort")} current={props.farm}>
           <RailIcon name="farm" />
         </Slot>
         <span role="status" data-testid="link" data-state={frames.link} title={linkWords[frames.link]} class="flex h-4 items-center">
@@ -180,8 +179,10 @@ function Desk(props: { place?: Place | undefined }) {
 }
 
 export function Shell(props: { children: JSX.Element }) {
-  const router = useRouter();
-  const here = () => placeOf(router.path().split("?")[0] ?? "");
+  const matches = useMatches();
+  const meta = () => matches().at(-1)?.meta;
+  const here = () => places.find((place) => place.id === meta()?.place);
+  const inFarm = () => meta()?.skin === "farm";
   // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {
@@ -193,17 +194,17 @@ export function Shell(props: { children: JSX.Element }) {
     return () => window.removeEventListener("keydown", key);
   });
   return (
-    // The interface size (Settings > Appearance) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
-    <div class="flex h-full [zoom:var(--workbench-zoom,1)]">
+    // The farm keeps integer art pixels; only workbench pages follow the interface zoom.
+    <div class={["flex h-full", !inFarm() && "[zoom:var(--workbench-zoom,1)]"]}>
       <QuickSwitcher />
       <NotesSearch />
       <ShortcutSheet />
-      <Rail here={here()} />
+      <Rail here={here()} farm={inFarm()} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <Show when={here()?.id !== "chat"}>
+        <Show when={!inFarm() && here()?.id !== "chat"}>
           <Desk place={here()} />
         </Show>
-        <div class="min-h-0 flex-1">{props.children}</div>
+        <div class="relative min-h-0 flex-1">{props.children}</div>
       </main>
     </div>
   );

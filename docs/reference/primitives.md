@@ -204,7 +204,6 @@
 | `spanText` | `format.ts` | How long, in round words: rounded relative duration. |
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
-| `TitleManifest` | `manifests.ts` |  |
 | `pinyinLoaded` | `search.ts` | Settles once pinyin matches too (tests wait on it). |
 | `spelled` | `search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
 | `matches` | `search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
@@ -229,11 +228,19 @@
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
 | `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
-| `useAgentProblems` | `agents.ts` | What the server says is wrong with each of these drafts (agent.validate), by id; empty until it answers. |
+| `useAgentProblems` | `agents.ts` |  |
 | `api` | `api.ts` | The page is served by the server it talks to: the same origin. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
 | `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's). a new one after. |
+| `useForm` | `form.ts` |  |
+| `createForm` | `form/form.ts` |  |
+| `formIssues` | `form/issues.ts` |  |
+| `at` | `form/paths.ts` |  |
+| `at` | `form/paths.ts` |  |
+| `replace` | `form/paths.ts` |  |
+| `replace` | `form/paths.ts` |  |
+| `immutable` | `form/paths.ts` |  |
 | `frames` | `frame.ts` |  |
 | `FramesContext` | `frame.ts` |  |
 | `createFrames` | `frame.ts` | The stream above as a store: each frame reconciles in by id, so only what changed updates. |
@@ -249,24 +256,62 @@
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
 | `reveal` | `opening.ts` |  |
-| `queries` | `query.ts` | REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. |
-| `refetchOnRelink` | `query.ts` | What changed while the state stream was lost reached no REST read either (they are invalidated by frames). |
-| `useQuery` | `query.ts` | REST reads never hold the state stream's frame: pending and failures are result values, and ready() selects data. |
-| `ready` | `query.ts` | A query's successful data once it has arrived, else `fallback` (including disabled and failed queries). |
+| `retryRead` | `query.ts` |  |
+| `refetchOnRelink` | `query.ts` |  |
+| `cursorsQuery` | `query.ts` |  |
+| `agentsQuery` | `query.ts` |  |
+| `templatesQuery` | `query.ts` |  |
+| `reposQuery` | `query.ts` |  |
+| `settingsQuery` | `query.ts` |  |
+| `runtimesQuery` | `query.ts` |  |
+| `achievementsQuery` | `query.ts` |  |
 | `useSprites` | `query.ts` |  |
-| `useAgents` | `query.ts` | Every profile, the orchestrator's too. |
-| `useAgentTemplates` | `query.ts` | The templates a profile installs from: the built-in ones, then those added on this machine. |
+| `useAgents` | `query.ts` |  |
+| `useAgentTemplates` | `query.ts` |  |
 | `useRepos` | `query.ts` |  |
 | `useSettings` | `query.ts` |  |
-| `useRuntimes` | `query.ts` | The runtimes on this machine; probed again every few minutes on the server. |
-| `RouterContext` | `router.ts` |  |
-| `useRouter` | `router.ts` |  |
-| `createRouter` | `router.ts` |  |
-| `useSearch` | `router.ts` | The query string of the path the page is at, read again when it moves. |
-| `saveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
+| `useRuntimes` | `query.ts` |  |
+| `waitForReads` | `query/activity.ts` |  |
+| `defineQuery` | `query/cache.ts` |  |
+| `createQueryClient` | `query/cache.ts` |  |
+| `queryDecoder` | `query/schema.ts` |  |
+| `useQueryClient` | `query/solid.tsx` |  |
+| `QueryProvider` | `query/solid.tsx` |  |
+| `useQuery` | `query/solid.tsx` |  |
+| `ready` | `query/solid.tsx` |  |
+| `useRouter` | `router/context.tsx` |  |
+| `Router` | `router/context.tsx` |  |
+| `useLocation` | `router/context.tsx` |  |
+| `useParams` | `router/context.tsx` |  |
+| `useSearchValues` | `router/context.tsx` |  |
+| `useSearch` | `router/context.tsx` |  |
+| `useSearchParams` | `router/context.tsx` |  |
+| `internalUrl` | `router/history.ts` |  |
+| `linkHref` | `router/history.ts` |  |
+| `browserHistory` | `router/history.ts` |  |
+| `memoryHistory` | `router/history.ts` |  |
+| `updateSearch` | `router/history.ts` |  |
+| `Link` | `router/link.tsx` |  |
+| `NavLink` | `router/link.tsx` |  |
+| `Navigate` | `router/link.tsx` |  |
+| `pathSegments` | `router/matching.ts` |  |
+| `route` | `router/matching.ts` |  |
+| `route` | `router/matching.ts` |  |
+| `route` | `router/matching.ts` |  |
+| `compareRoutes` | `router/matching.ts` |  |
+| `ambiguousRoutes` | `router/matching.ts` |  |
+| `useMatches` | `router/routes.tsx` |  |
+| `Routes` | `router/routes.tsx` |  |
+| `Outlet` | `router/routes.tsx` |  |
+| `searchParam` | `router/search.ts` |  |
+| `search` | `router/search.ts` |  |
+| `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
 | `answer` | `storyApi.ts` | What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls fail as a server that is not there would. |
 | `fakeFetch` | `storyApi.ts` |  |
+| `useTable` | `table.ts` |  |
+| `defineColumns` | `table/model.ts` |  |
+| `createTable` | `table/model.ts` |  |
 | `testFrames` | `testing.ts` |  |
 | `frameAt` | `testing.ts` | An empty farm's frame at this seq. |
 
@@ -283,7 +328,6 @@
 | `useAtom` | `atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
 | `onPage` | `atom.ts` | The atom held for the page's life, with a signal that only counts its changes. |
 | `defineAtom` | `atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
-| `useSearchParam` | `atom.ts` | A choice held in the address (`?name=value`), so a reload or a link shown to someone opens on it. |
 | `framesSource` | `atom.ts` |  |
 | `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. |
 | `framesAtom` | `atom.ts` | The state stream as an atom: subscribed to its source while anything reads it, so the stream stays open meanwhile. |

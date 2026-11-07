@@ -1,13 +1,13 @@
-import { useQueryClient } from "@tanstack/solid-query";
 import { For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { useNow } from "#/base/dom.tsx";
 import { momentText } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useQuery } from "#/infra/query.ts";
+import { defineQuery, retryRead, useQueryClient, ready, useQuery } from "#/infra/query.ts";
 import { type Act, createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
@@ -16,13 +16,15 @@ import { toast } from "#/ui/toasts.ts";
 
 const notes = [0, 1, 2, 3] as const;
 
+const lanQuery = defineQuery({ schema: S.LanStatus, key: () => ["lan"], fetch: (_: void, context) => api.lan.get(context), ...retryRead });
+
 export function LanPage() {
   const client = useQueryClient();
   // Polled: a device asking to pair shows up without a reload.
-  const status = useQuery(() => ({ queryKey: ["lan"], queryFn: () => api.lan.get(), refetchInterval: 1500 }));
+  const status = useQuery(lanQuery, { interval: () => 1500 });
   const act = createAct();
   /** The status an action answers with is the newest: shown at once rather than at the next poll. */
-  const keep = (status: LanStatus) => void client.setQueryData(["lan"], status);
+  const keep = (status: LanStatus) => client.setData(lanQuery(), () => ({ value: status }));
   const s = () => ready(status, undefined);
   return (
     <div class="flex max-w-3xl flex-col gap-3">
@@ -30,7 +32,7 @@ export function LanPage() {
         title={t("web.lan.lan.section.label")}
         action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>}
       >
-        <Show when={s()} fallback={<Quiet>{status.error ? reasonOf(status.error) : t("web.base.form.asking")}</Quiet>}>
+        <Show when={s()} fallback={<Quiet>{status.error() ? reasonOf(status.error()) : t("web.base.form.asking")}</Quiet>}>
           {(s) => (
             <>
               <Show

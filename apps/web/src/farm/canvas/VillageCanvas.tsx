@@ -1,5 +1,4 @@
-import { Schema } from "effect";
-import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
+import { createEffect, createMemo, createSignal, Show, snapshot, untrack } from "solid-js";
 // The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the DOM over it (store screen), and wears the tool's cursor.
 
 import { t } from "@vibevalley/i18n";
@@ -7,7 +6,6 @@ import type { Agent } from "@vibevalley/protocol";
 
 import { createExternal } from "#/base/external.ts";
 import { messageOf } from "#/base/format.ts";
-import { CursorManifest } from "#/base/manifests.ts";
 import { clickBed, openPlace } from "#/farm/commands.ts";
 import { commands, farmFrameOf } from "#/farm/frames.ts";
 import { farm, farmRepo, farmState, subscribeFarm } from "#/farm/store.ts";
@@ -16,7 +14,7 @@ import { beds } from "#/farm/world/plots.ts";
 import { textureProgress } from "#/farm/world/textures.ts";
 import { yardPlace } from "#/farm/world/world.ts";
 import { frames } from "#/infra/frame.ts";
-import { ready, useAgents, useQuery } from "#/infra/query.ts";
+import { cursorsQuery, ready, useAgents, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { spriteUrl } from "#/ui/pixel/atlas.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
@@ -31,11 +29,7 @@ export function VillageCanvas() {
   const agentsQuery = useAgents();
   // The scene asks for these every tick: the frame as sent, the profiles by id.
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
-  const hotspotsQuery = useQuery(() => ({
-    queryKey: ["cursors"],
-    queryFn: async () => Schema.decodeUnknownSync(CursorManifest)(await (await fetch("/cursors/cursors.json")).json()),
-    staleTime: Infinity,
-  }));
+  const hotspotsQuery = useQuery(cursorsQuery);
   const hotspots = () => ready(hotspotsQuery, undefined);
   // Drawn: the loading bar goes. Failed: it says why instead.
   const [drawn, setDrawn] = createSignal(false);
@@ -102,7 +96,7 @@ export function VillageCanvas() {
     (spots) => {
       let pressed = false;
       const apply = () => {
-        const s = farmState();
+        const s = untrack(farmState);
         const bed = s.hoverBed === undefined ? undefined : beds[s.hoverBed];
         const aim = bed ? commands.aim(bed).aim : undefined;
         const name = !aim

@@ -2,7 +2,7 @@ import { defaultOrchestrator, type VibeValleyApi } from "@vibevalley/protocol";
 
 import { composerOn, expect, tab, test, defaultChannel } from "./fixtures";
 
-const newChannel = (api: VibeValleyApi, name: string) => api.channel.create({ name });
+const newChannel = (api: VibeValleyApi, name: string) => api.channel.create({ name: `chat-${name}` });
 
 test("the default channel opens first, with the orchestrator resting", async ({ page, api }) => {
   const general = await defaultChannel(api);

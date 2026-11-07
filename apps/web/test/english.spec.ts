@@ -13,7 +13,7 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   const nav = page.getByRole("navigation", { name: "Workbench" });
   for (const label of ["Chat", "Tickets", "Artifacts", "Profiles", "Machines", "Repos", "Catalog", "Settings"])
     await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `, "u") })).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByTestId("link")).toHaveText("Connected");
   await expect(language.locator('[data-key="en"]')).toHaveAttribute("aria-pressed", "true");
 
   // The board's lanes are the page's words; a card's status is the server's, in the same language.

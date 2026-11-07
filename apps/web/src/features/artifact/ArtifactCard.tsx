@@ -1,24 +1,33 @@
+import { Schema } from "effect";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { ArtifactBody, ArtifactCard as Card, ArtifactListRequest } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
+import * as S from "@vibevalley/protocol/schema";
 
 import { api } from "#/infra/api.ts";
-import { useQuery } from "#/infra/query.ts";
-import { useRouter } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { defineQuery, retryRead, useQuery } from "#/infra/query.ts";
+import { useRouter, Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
 // Artifacts (docs/subsystems/artifact.md) are not in the frame.
 const fresh = 5_000;
 
-export const useArtifact = (id: () => string) =>
-  useQuery(() => ({ queryKey: ["artifacts", "one", id()], queryFn: () => api.artifact.get({ id: artifactId(id()) }), refetchInterval: fresh, retry: false }));
-
-export const useArtifacts = (q: () => ArtifactListRequest) =>
-  useQuery(() => ({ queryKey: ["artifacts", "list", q()], queryFn: () => api.artifact.list(q()), refetchInterval: fresh }));
+const artifactQuery = defineQuery({
+  schema: S.Artifact,
+  key: (id: string) => ["artifacts", "one", id],
+  fetch: (id, context) => api.artifact.get({ id: artifactId(id) }, context),
+});
+const artifactsQuery = defineQuery({
+  schema: Schema.mutable(Schema.Array(S.Artifact)),
+  key: (q: ArtifactListRequest) => ["artifacts", "list", q.channel ?? null, q.issue ?? null],
+  fetch: (q, context) => api.artifact.list(q, context),
+  ...retryRead,
+});
+export const useArtifact = (id: () => string) => useQuery(() => artifactQuery(id()), { interval: () => fresh });
+export const useArtifacts = (q: () => ArtifactListRequest) => useQuery(() => artifactsQuery(q()), { interval: () => fresh });
 
 /** Where an artifact is looked at; a version other than the latest is in the query string. */
 export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version != null && version !== 0 ? `?v=${version}` : ""}`;

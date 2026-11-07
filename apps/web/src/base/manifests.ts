@@ -14,4 +14,3 @@ export const SpriteManifest = Schema.Record(
   }),
 );
 export const CursorManifest = Schema.Record(Schema.String, Schema.Struct({ hx: Schema.Finite, hy: Schema.Finite }));
-export const TitleManifest = Schema.Record(Schema.String, Schema.Struct({ w: Schema.Finite, h: Schema.Finite }));

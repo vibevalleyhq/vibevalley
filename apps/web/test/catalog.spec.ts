@@ -28,8 +28,3 @@ test("the pointers and the sounds have shelves of their own", async ({ page }) =
   await page.getByTestId("catalog-search").fill("coin");
   await expect(page.getByTestId("sound")).not.toHaveCount(0);
 });
-
-test("a place the page does not know goes to the workbench", async ({ page }) => {
-  await page.goto("/nowhere-at-all");
-  await expect(page).toHaveURL(/\/chat$/u);
-});

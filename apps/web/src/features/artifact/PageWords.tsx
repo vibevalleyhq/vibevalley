@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type { Artifact, HtmlAnchor } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
-import { queries } from "#/infra/query.ts";
+import { useQueryClient } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
@@ -16,6 +16,7 @@ import { selectionOf } from "./shell";
 
 /** One version's frame: made again when another version is shown, so the words picked are always this version's. */
 export function PageWords(props: { artifact: Artifact; version: number; frame: HTMLIFrameElement }) {
+  const queries = useQueryClient();
   const router = useRouter();
   const [picked, setPicked] = createSignal<HtmlAnchor>();
   const [text, setText] = createSignal("");
@@ -41,7 +42,7 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: H
     const made = await act.run(() => api.artifact.html.edit({ id, version, anchor, text: words }));
     if (!made) return;
     setPicked(undefined);
-    void queries.invalidateQueries({ queryKey: ["artifacts"] });
+    void queries.invalidate({ prefix: ["artifacts"] });
     router.navigate(artifactHref(id), { replace: true });
     toast(t("web.artifact.edit.saved", { version: made.version }));
   };

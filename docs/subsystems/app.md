@@ -40,7 +40,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 - **乐观意图（`Intent`）等帧 `seq` 追上后才结算**：
   - 写操作带 `requestKey` 或 `sendKey` 叠加到当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息时才结算。
   - 失败意图保留在画面上供重试或放回；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
-- **一次性读取走 `infra/query.ts`**：由 TanStack Query 管理缓存与失效，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
+- **一次性读取走 `infra/query.ts`**：自有 Query client 管缓存与失效，结果先经 Schema 解码，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
 - **颜色收进语义调色板**：浅色/深色主题通过 `<html data-theme>` 切换，只用 `style.css` 语义色变量（`vibevalley/no-hex-color` 检查）；像素皮固定 `data-theme="light"`。
 
 ### 宿主与多端
@@ -78,12 +78,15 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 品牌名、像素进度条、芽叶精灵与状态文字集中在底部。服务启动期间进度未知，精灵原地等待；页面脚本、首帧、首批查询、图片和画布的实际完成推动填充。10%、30%、50%、70% 是启动阶段的权重，不是耗时比例；图片完成数推进 50–70%，画布的资源比例推进 70–95%，全部就绪才到 100%。精灵依次显示困倦、认真、期待和开心，超时或失败显示困惑。减少动效时停止循环和位移动画。
 
-开机图在工作台取得首帧和首批查询后退场，最多等待 2 秒；农场另等画布画好或报错，最多再等 15 秒。画布经 `data-opening` 与 `data-opening-progress` 声明等待、失败和资源比例，开屏不导入农场模块。超时、画布失败或活跃的初始查询失败都不报完成，交回页面自身的等待或错误状态；订阅、观察器和计时器在等待结束时释放。完成跳跃与 240 毫秒退场同时发生，不额外停留。没有「开始／继续」菜单，第一次打开同样直接进入应用。
+开机图在工作台取得首帧和首批查询后退场，最多等待 2 秒；农场另等画布画好或报错，最多再等 15 秒。画布经 `data-opening` 与 `data-opening-progress` 声明等待、失败和资源比例，开屏不导入农场模块。超时、画布失败或活跃的初始查询失败都不报完成，交回页面自身的等待或错误状态；订阅、观察器和计时器在等待结束或根作用域取消时释放。查询活动与失败通过根作用域的 Query client 读取，不另建全局缓存。完成跳跃与 240 毫秒退场同时发生，不额外停留。没有「开始／继续」菜单，第一次打开同样直接进入应用。
 
 **工作台路由**
 
 - `/` 打开默认页（`/chat` 或设备偏好的农场页），`/farm` 与 `/farm/<仓库>` 打开像素农场，`/pair` 为局域网配对页。
-- `Shell` 外框包含 `/chat`、`/issues`、`/artifacts`、`/pkm`、`/agents`、`/runtimes`、`/repos`、`/catalog`、`/settings`。
+- `Shell` 外框包含农场和 `/chat`、`/issues`、`/artifacts`、`/pkm`、`/agents`、`/runtimes`、`/repos`、`/catalog`、`/settings`。农场保留侧栏，不显示工作台页头；`/tree` 和 `/pair` 在外框之外。
+- `infra/router.ts` 提供 Router、对象路由表与 Outlet。共同布局跨页面保留，参数变化保留页面实例，需要重建的农场按仓库显式设 key。应用布局读 route meta，不自行拆 URL。匹配、History、参数与查询字符串的约定见 [Router](apps/web/src/infra/router/README.md)。
+- URL 查询字段只经 Router 更新；工单筛选由 Schema 读写，不再由 Atom 另存。未知页面、非法站内编码和不满足 Codec 的参数显示错误页，不默默跳到可写页面。
+- 无样式的 Query、Router、Form、Table 归 `infra`，数据契约使用 Effect Schema；视觉绑定归 `ui`。Form 管编辑版本、校验与明确的提交收据；Table 消费已解码的领域行，不拥有请求。字段、生命周期和受控状态的契约见 [页面基础设施](apps/web/src/infra/README.md)。
 
 **打包与自更新**
 

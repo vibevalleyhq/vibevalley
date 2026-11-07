@@ -1,11 +1,12 @@
-import { keepPreviousData } from "@tanstack/solid-query";
+import { Schema } from "effect";
 
 import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { createSettled } from "#/base/dom.tsx";
 
 import { api } from "./api";
-import { ready, useAgents, useQuery } from "./query";
+import { defineQuery, retryRead, ready, useAgents, useQuery } from "./query";
 
 /** The profiles work is sent to, the helpers; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
@@ -36,12 +37,16 @@ export function useAgent(id: () => string | undefined) {
 }
 
 /** What the server says is wrong with each of these drafts (agent.validate), by id; empty until it answers. */
+const problemsQuery = defineQuery({
+  schema: Schema.mutable(Schema.Array(S.AgentValidation)),
+  key: (input: { agents: readonly Agent[]; token: string }) => ["agent-check", input.token],
+  fetch: (input, context) => api.agent.validate({ agents: [...input.agents] }, context),
+  gcTime: 0,
+  ...retryRead,
+});
+
 export function useAgentProblems(agents: () => readonly Agent[]) {
   const settled = createSettled(agents);
-  const got = useQuery(() => ({
-    queryKey: ["agent-check", JSON.stringify(settled())],
-    queryFn: () => api.agent.validate({ agents: [...settled()] }),
-    placeholderData: keepPreviousData,
-  }));
+  const got = useQuery(() => problemsQuery({ agents: settled(), token: crypto.randomUUID() }));
   return (): Record<string, AgentProblem[]> => Object.fromEntries(ready(got, []).map((c) => [c.id, c.problems]));
 }

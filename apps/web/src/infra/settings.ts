@@ -5,13 +5,16 @@ import type { UpdateState } from "@vibevalley/protocol/host";
 
 import { api } from "./api";
 import { currentHost } from "./host";
-import { queries } from "./query";
+import { settingsQuery, useQueryClient } from "./query";
 
 /** Saves, and the settings the server answers with are the cached ones from then on. */
-export async function saveSettings(update: SettingsUpdate) {
-  const saved = await api.setting.update(update);
-  queries.setQueryData(["settings"], saved);
-  return saved;
+export function useSaveSettings() {
+  const client = useQueryClient();
+  return async (update: SettingsUpdate) => {
+    const saved = await api.setting.update(update);
+    client.setData(settingsQuery(), () => ({ value: saved }));
+    return saved;
+  };
 }
 
 /**

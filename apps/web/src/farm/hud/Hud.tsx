@@ -95,11 +95,14 @@ export function Hud() {
       <RepoSign />
       <Show when={shown()}>
         {(box) => (
-          <div class="absolute" style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px` }}>
+          <div
+            class="absolute inset-0"
+            style={box().w < 680 ? undefined : { left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px` }}
+          >
             <TopLeft />
-            <TopRight />
-            <BottomLeft />
-            <ToolBar />
+            <TopRight compact={box().w < 680} />
+            <BottomLeft compact={box().w < 680} />
+            <ToolBar compact={box().w < 680} />
           </div>
         )}
       </Show>
@@ -183,7 +186,7 @@ function TopLeft() {
   );
 }
 
-function TopRight() {
+function TopRight(props: { compact: boolean }) {
   const core = useCore();
   const router = useRouter();
   const unread = () => unreadTotal(core()?.chat);
@@ -192,7 +195,15 @@ function TopRight() {
     router.navigate(path);
   };
   return (
-    <div class="absolute flex items-start" style={{ right: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
+    <div
+      class="absolute flex flex-wrap items-start"
+      style={{
+        right: `${edge}px`,
+        left: props.compact ? `${edge}px` : undefined,
+        top: `${edge + (props.compact ? top + gap + titleBar.top : 0)}px`,
+        gap: `${gap}px`,
+      }}
+    >
       <HudTap label={t("web.farm.hud.treeHint")} testid="hud-tree" onClick={() => go("/tree")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-tree" size={20} />
@@ -243,13 +254,13 @@ function TopRight() {
   );
 }
 
-function BottomLeft() {
+function BottomLeft(props: { compact: boolean }) {
   const phoneOpen = useFarm((s) => s.phoneOpen);
   const box = useFarm((s) => s.screen?.shown);
   // The phone fits between the top row and the two buttons under it, inside the farm's box.
   const room = () => ({ w: (box()?.w ?? 0) - 2 * edge, h: (box()?.h ?? 0) - 2 * edge - top - 2 * bottom - 4 * gap });
   return (
-    <div class="absolute flex flex-col items-start" style={{ left: `${edge}px`, bottom: `${edge}px`, gap: `${gap}px` }}>
+    <div class="absolute flex flex-col items-start" style={{ left: `${edge}px`, bottom: `${edge + (props.compact ? bottom + gap : 0)}px`, gap: `${gap}px` }}>
       <Show when={phoneOpen()}>
         <Phone room={room()} />
       </Show>
@@ -259,7 +270,7 @@ function BottomLeft() {
   );
 }
 
-function ToolBar() {
+function ToolBar(props: { compact: boolean }) {
   const held = useFarm((s) => s.tool);
   return (
     <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={t("web.farm.hud.tools")}>
@@ -275,7 +286,7 @@ function ToolBar() {
               <span
                 class="box-border flex items-center justify-center gap-[3px] border-2 shadow-px-shade"
                 style={{
-                  width: "52px",
+                  width: props.compact ? "44px" : "52px",
                   height: `${bottom}px`,
                   background: held() === tool.id ? CardColors.held : CardColors.slot,
                   "border-color": CardColors.ink,

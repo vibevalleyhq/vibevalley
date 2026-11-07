@@ -1,7 +1,6 @@
 # src/farm
 
-The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
-shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/infra/frame.ts`); this folder
+像素农场在 `/farm` 和 `/farm/<仓库>`，位于应用 Shell 的内容区，侧栏始终可用。农场不显示工作台页头，保持整数像素，不随工作台字号缩放。窄屏 HUD 分行摆在内容区上下，不和侧栏或农具重叠；工作台入口去 `/issues`。 The farm is the server's (`useFrames()`, `useCore()` in `src/infra/frame.ts`); this folder
 only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `store.ts` and `frames.ts`
 (`useFarm`, `timeOfDay`, `commands`; the frames as they came are `infra/frame.ts`'s `rawFrame`) and the wiring in
 `world/load.ts` (the village), `tools.ts` (the keys), `phone/calls.ts` and `phone/pad.ts` (the phone's calls, the pad), and

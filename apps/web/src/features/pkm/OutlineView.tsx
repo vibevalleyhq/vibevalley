@@ -4,25 +4,26 @@ import { t } from "@vibevalley/i18n";
 import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibevalley/protocol";
 
 import { useTimeout } from "#/base/timer.ts";
-import { queries } from "#/infra/query.ts";
+import { useQueryClient } from "#/infra/query.ts";
 import { toast } from "#/ui/toasts.ts";
 
 import type { Around, EditAction, Focus } from "./editing";
 import { hasChildren, visibleBlocks } from "./outline";
 import { Editor, indentPx, newId, Row, Toolbar, type Writing } from "./OutlineEditor";
 import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "./selection";
-import { refreshVault } from "./vault";
+import { pkmPageQuery, refreshVault } from "./vault";
 import { PageWriter, pageServer } from "./writer";
 
 /** point: a block to show and light up (?b= in the address). */
 export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSummary[]; point?: string | undefined; onEditing: (on: boolean) => void }) {
+  const queries = useQueryClient();
   const slug = untrack(() => props.view.page.slug);
   const [blocks, setBlocks] = createSignal<PkmBlock[]>(untrack(() => props.view.page.blocks));
   const writer = new PageWriter(slug, untrack(blocks), pageServer, {
     changed: (b) => setBlocks(b),
     answered: (page) => {
-      queries.setQueryData<PkmPageView>(["pkm", "page", slug], (v) => (v ? { ...v, page } : v));
-      void refreshVault();
+      queries.setData(pkmPageQuery(slug), (v) => (v ? { value: { ...v.value, page } } : undefined));
+      void refreshVault(queries);
     },
     refused: (why) => toast(t("web.pkm.page.notSaved", { why }), "bad"),
   });
@@ -59,7 +60,7 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
     if (!done) return;
     void done.then(async (u) => {
       toast(u.undone ? t("web.pkm.page.undone", { what: u.what ?? "" }) : t("web.pkm.page.nothingToUndo"));
-      await queries.invalidateQueries({ queryKey: ["pkm"] });
+      await queries.invalidate({ prefix: ["pkm"] });
     });
   };
   const act = (a: EditAction | undefined) => {

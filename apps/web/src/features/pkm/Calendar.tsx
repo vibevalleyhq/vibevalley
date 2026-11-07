@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
+import { useQueryClient } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { defineStored } from "#/state/stored.ts";
 import { createAct } from "#/ui/act.ts";
@@ -38,6 +39,7 @@ export function Calendar(props: { pages: readonly PkmPageSummary[]; open: string
 }
 
 function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefined }) {
+  const queries = useQueryClient();
   const router = useRouter();
   const act = createAct();
   const today = dayKey(Date.now());
@@ -54,7 +56,7 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
     if (slug) return router.navigate(pkmHref(slug));
     void act.run(async () => {
       const page = await api.pkm.journal.open({ day });
-      void refreshVault();
+      void refreshVault(queries);
       router.navigate(pkmHref(page.slug));
     });
   };

@@ -5,7 +5,7 @@ import type { PkmPageSummary, PkmTier } from "@vibevalley/protocol";
 
 import { reasonOf } from "#/infra/api.ts";
 import { ready } from "#/infra/query.ts";
-import { A } from "#/ui/A.tsx";
+import { Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 

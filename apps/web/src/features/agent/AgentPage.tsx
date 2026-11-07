@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,9 +8,8 @@ import { aria } from "#/base/dom.tsx";
 import { TrajectoryList } from "#/features/session/index.ts";
 import { useAgentProblems } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useAgents, useRuntimes } from "#/infra/query.ts";
-import { useRouter, useSearch } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { agentsQuery, useQueryClient, ready, useAgents, useRuntimes } from "#/infra/query.ts";
+import { useRouter, useSearch, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { type Pose, randomLook, stagePoses } from "#/ui/cast.ts";
@@ -58,7 +56,7 @@ export function AgentPage(props: { id: string }) {
   const saved = () => loaded()?.find((a) => a.id === props.id);
   return (
     <Switch>
-      <Match when={agents.error}>
+      <Match when={agents.error()}>
         {(e) => (
           <p class="p-8 text-sm text-muted">
             {t("web.agent.noProfiles")}
@@ -68,7 +66,7 @@ export function AgentPage(props: { id: string }) {
       </Match>
       <Match when={!loaded() || (isNew() && !ready(runtimes, undefined))}>
         <p class="p-8 text-sm text-muted">
-          {isNew() && runtimes.error ? t("web.agent.noRuntimes", { why: reasonOf(runtimes.error) }) : t("web.agent.loading")}
+          {isNew() && runtimes.error() ? t("web.agent.noRuntimes", { why: reasonOf(runtimes.error()) }) : t("web.agent.loading")}
         </p>
       </Match>
       <Match when={!isNew() && !saved()}>
@@ -111,8 +109,8 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
     const body = { ...d, name: d.name.trim() || t("web.agent.unnamedAgent") };
     return saving.run(async () => {
       const got = isNew ? await api.agent.create(body) : await api.agent.update(body);
-      client.setQueryData<Agent[]>(["agents"], (list) => (list ? [...list.filter((a) => a.id !== got.id), got] : list));
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      client.setData(agentsQuery(), (record) => (record ? { value: [...record.value.filter((a) => a.id !== got.id), got] } : undefined));
+      await client.invalidate({ prefix: ["agents"] });
       setDraft(got);
       if (isNew) router.navigate(`/agents/${encodeURIComponent(got.id)}`);
     });
@@ -234,7 +232,7 @@ function DeleteButton(props: { agent: Agent }) {
     const id = props.agent.id;
     return act.run(async () => {
       await api.agent.delete({ id });
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      await client.invalidate({ prefix: ["agents"] });
       router.navigate("/agents");
     });
   };

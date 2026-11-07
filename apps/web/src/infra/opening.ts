@@ -1,5 +1,6 @@
 import { frames } from "./frame";
-import { queries } from "./query";
+import type { QueryClient } from "./query";
+import { waitForReads } from "./query/activity";
 
 type Phase = "connecting" | "reading" | "loading" | "ready" | "waiting" | "failed";
 type Report = (phase: Phase, progress?: number) => void;
@@ -28,17 +29,18 @@ function until(check: () => boolean, subscribe: (check: () => void) => () => voi
   });
 }
 
-async function limited(ms: number, run: (signal: AbortSignal) => Promise<boolean>): Promise<boolean> {
+async function limited(ms: number, signal: AbortSignal, run: (signal: AbortSignal) => Promise<boolean>): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
-    return await run(controller.signal);
+    return await run(AbortSignal.any([signal, controller.signal]));
   } finally {
     clearTimeout(timer);
+    controller.abort();
   }
 }
 
-async function pageReady(report: Report, signal: AbortSignal) {
+async function pageReady(client: QueryClient, report: Report, signal: AbortSignal) {
   report("connecting", 10);
   if (!(await until(() => !!frames.get().frame || frames.get().link === "lost", frames.subscribe, signal)) || !frames.get().frame) return false;
   report("reading", 30);
@@ -59,14 +61,8 @@ async function pageReady(report: Report, signal: AbortSignal) {
       ))
     )
       return false;
-    if (
-      !(await until(
-        () => queries.isFetching() === 0,
-        (check) => queries.getQueryCache().subscribe(check),
-        signal,
-      ))
-    )
-      return false;
+    await waitForReads(client, signal);
+    if (signal.aborted) return false;
     /* oxlint-enable eslint/no-await-in-loop */
   }
   report("loading", 50);
@@ -118,22 +114,19 @@ async function contentReady(report: Report, signal: AbortSignal) {
   return ready && document.querySelector('[data-opening="failed"]') === null;
 }
 
-export async function reveal() {
+export async function reveal(client: QueryClient, signal: AbortSignal) {
   const cover = document.getElementById("opening");
-  if (!cover) return;
+  if (!cover || signal.aborted) return;
   const report: Report = (phase, progress) => {
     cover.dataset.phase = phase;
     if (progress !== undefined) cover.dataset.progress = String(Math.round(Math.max(Number(cover.dataset.progress ?? 0), progress)));
     cover.dispatchEvent(new Event("opening-update"));
   };
-  const page = await limited(2000, (signal) => pageReady(report, signal));
-  const content = await limited(15_000, (signal) => contentReady(report, signal));
-  const failed =
-    document.querySelector('[data-opening="failed"]') !== null ||
-    queries
-      .getQueryCache()
-      .findAll({ type: "active" })
-      .some((query) => query.state.status === "error");
+  const page = await limited(2000, signal, (waiting) => pageReady(client, report, waiting));
+  if (signal.aborted) return;
+  const content = await limited(15_000, signal, (waiting) => contentReady(report, waiting));
+  if (signal.aborted) return;
+  const failed = document.querySelector('[data-opening="failed"]') !== null || client.hasActiveErrors();
   const phase = failed ? "failed" : page && content ? "ready" : "waiting";
   report(phase, phase === "ready" ? 100 : undefined);
   // Finish entrance animations underneath before uncovering the mounted page.

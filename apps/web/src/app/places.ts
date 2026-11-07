@@ -32,9 +32,3 @@ export const places: readonly Place[] = [
   { id: "catalog", label: t("web.base.place.catalog.label"), hint: t("web.base.place.catalog.hint"), icon: "catalog", path: "/catalog", group: "reference" },
   settingsPlace,
 ];
-
-/** The place a path is in (/orchestrator is the agents' too); undefined for the farm. */
-export function placeOf(path: string): Place | undefined {
-  if (path.startsWith("/orchestrator")) return places.find((p) => p.id === "agents");
-  return places.find((p) => path === p.path || path.startsWith(`${p.path}/`));
-}
