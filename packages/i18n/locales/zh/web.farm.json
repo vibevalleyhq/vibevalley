@@ -207,7 +207,6 @@
     "repos": "仓库",
     "catalog": "图鉴",
     "resume": "继续",
-    "home": "回到首页",
     "soundOn": "打开音效",
     "soundOff": "关闭音效",
     "elsewhere": "去别处",
@@ -491,15 +490,6 @@
     "moving": "搬东西进村 {done}/{total}",
     "lights": "点灯……",
     "entering": "进村"
-  },
-  "title": {
-    "start": "开始游戏",
-    "continue": "继续游戏",
-    "keyFirst": "先填钥匙：管家要 DeepSeek 的 API Key 才能干活，在设置里填上。",
-    "label": "码农场物语 首页",
-    "name": "码农场物语",
-    "tagline": "一群写代码的小动物，等你来派活",
-    "nothingToContinue": "还没有农场可以继续：先开始游戏。"
   },
   "debug": {
     "title": "调试台",

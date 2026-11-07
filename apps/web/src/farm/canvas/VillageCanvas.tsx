@@ -145,7 +145,11 @@ export function VillageCanvas() {
       </Show>
       <div ref={(el) => (host = el)} class="absolute inset-0" data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
-        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">{t("web.farm.canvas.noMap", { why: why() })}</p>}
+        {(why) => (
+          <p data-testid="village-error" data-opening="failed" class="absolute inset-0 grid place-items-center font-pixel text-cream-200">
+            {t("web.farm.canvas.noMap", { why: why() })}
+          </p>
+        )}
       </Show>
     </div>
   );
@@ -165,7 +169,7 @@ function Entering(props: { mapped: boolean }) {
     return done < total ? t("web.farm.canvas.moving", { done, total }) : t("web.farm.canvas.lights");
   };
   return (
-    <div class="absolute inset-0 grid place-items-center">
+    <div class="absolute inset-0 grid place-items-center" data-opening="pending" data-opening-progress={fill()}>
       <div class="flex flex-col items-center gap-2 font-pixel text-[12px] text-cream-100">
         <div
           role="progressbar"

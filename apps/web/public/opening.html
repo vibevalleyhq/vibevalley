@@ -1,12 +1,5 @@
 <!doctype html>
-<!--
-  What a window shows before the server has answered: the desktop app opens it from its files (file://) the moment it
-  starts and the server is still coming up. The part between the opening markers is also written into index.html
-  when the page is built (vite.config.ts), so the served page starts on the same bar until it is mounted (app/Root.tsx);
-  the farm's own bar (farm/canvas/VillageCanvas.tsx, Entering) takes over in the same place. Colors are the page's
-  tokens (style.css): the farm's ground, bark-900, leaf-500, cream-100, cream-200; the workbench's page, muted, line and
-  accent in either theme. Which one shows is worked out below from the address and the owner's choices.
--->
+<!-- The opening markers are inlined into index.html by vite.config.ts; Electron loads this file before its server starts. -->
 <html lang="zh-Hans">
   <head>
     <meta charset="UTF-8" />
@@ -31,172 +24,190 @@
         position: fixed;
         inset: 0;
         z-index: 2147483647;
-        display: grid;
-        place-items: center;
+        overflow: hidden;
+        background: #151413;
+        color: #f7e8c4;
+        font: 12px/1.5 "FusionPixel", "PingFang SC", sans-serif;
         user-select: none;
       }
+      #opening .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        image-rendering: pixelated;
+      }
+      #opening[data-scene="day"] .scene {
+        object-position: 65% center;
+      }
+      #opening::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 40%, #15141344 65%, #151413dd);
+      }
       #opening .column {
+        position: absolute;
+        z-index: 1;
+        bottom: max(32px, 6%);
+        left: 50%;
+        width: min(400px, calc(100% - 64px));
+        transform: translateX(-50%);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
-        max-width: 80vw;
+        gap: 16px;
+      }
+      #opening .brand {
+        margin: 0;
+        text-align: center;
+        white-space: nowrap;
+        font: 48px/1.2 "FusionPixel", monospace;
+        text-shadow: 3px 3px 0 #2f1f13;
+      }
+      #opening .runway {
+        position: relative;
+        width: 100%;
+        margin-top: 64px;
+        --progress: 0%;
       }
       #opening .bar {
         box-sizing: border-box;
-        position: relative;
-        overflow: hidden;
+        height: 20px;
+        padding: 3px;
+        border: 3px solid #2f1f13;
+        background: #292f20;
+        box-shadow: 0 0 0 2px #eedcb2, 0 5px 0 2px #2f1f13;
       }
       #opening .fill {
-        position: absolute;
-        animation: opening-walk 1.4s steps(14) infinite;
+        width: var(--progress);
+        height: 100%;
+        background: repeating-linear-gradient(90deg, #a4c66c 0 8px, #86ad50 8px 10px);
+        box-shadow: inset 0 2px #d9e5a2;
+        transition: width 180ms steps(8);
       }
+      #opening .sprite-position {
+        position: absolute;
+        left: clamp(32px, var(--progress), calc(100% - 32px));
+        bottom: 10px;
+        transform: translateX(-50%);
+        transition: left 180ms steps(8);
+        pointer-events: none;
+      }
+      #opening .sprite {
+        display: block;
+        width: 80px;
+        height: 96px;
+        background-size: 500% auto;
+        background-position: 0% center;
+        background-repeat: no-repeat;
+        image-rendering: pixelated;
+        animation: opening-breathe 1.4s steps(2) infinite;
+      }
+      #opening[data-mood="working"] .sprite { background-position-x: 25%; animation: opening-step 500ms steps(2) infinite; }
+      #opening[data-mood="excited"] .sprite { background-position-x: 50%; animation: opening-step 350ms steps(2) infinite; }
+      #opening[data-mood="happy"] .sprite { background-position-x: 75%; animation: opening-jump 240ms steps(4); }
+      #opening[data-mood="confused"] .sprite { background-position-x: 100%; animation: none; }
+      #opening .words { text-shadow: 1px 1px 0 #2f1f13; }
       #opening .problem {
+        box-sizing: border-box;
+        width: 100%;
+        max-height: 25vh;
+        padding: 12px;
+        overflow-y: auto;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
-        text-align: center;
+        text-align: left;
+        user-select: text;
+        background: #151413e6;
       }
-      /* The farm: the village's ground and its 进村 bar, which the farm's own takes over in the same place. */
-      #opening[data-look="farm"] {
-        background: #2b3320;
-        font: 12px "FusionPixel", "PingFang SC", sans-serif;
-        color: #eedcb2;
+      @keyframes opening-breathe { 50% { transform: translateY(2px); } }
+      @keyframes opening-step { 50% { transform: translateY(-3px); } }
+      @keyframes opening-jump { 50% { transform: translateY(-12px); } }
+      @media (max-width: 600px) {
+        #opening[data-scene="day"] .scene,
+        #opening[data-scene="night"] .scene { object-position: 80% center; }
+        #opening .brand { font-size: 36px; }
+        #opening .column { bottom: max(28px, env(safe-area-inset-bottom)); }
       }
-      #opening[data-look="farm"] .bar {
-        width: 256px;
-        height: 16px;
-        padding: 2px;
-        border: 2px solid #2f1f13;
-        background: #2f1f1399;
-        box-shadow: 2px 2px 0 0 #3a2a1899;
-      }
-      #opening[data-look="farm"] .fill {
-        top: 2px;
-        bottom: 2px;
-        width: 30%;
-        background: #74a046;
-      }
-      #opening[data-look="farm"] .face,
-      #opening[data-look="farm"] .problem {
-        color: #e2c995;
-      }
-      #opening[data-look="farm"] .face {
-        display: none;
-      }
-      /* The workbench: its own page, so a quick load shows nothing but the ground; only a slow one shows the face and a
-         bar, after a moment. */
-      #opening[data-look="desk"] {
-        background: #fcfcfb;
-        font: 12px -apple-system, "PingFang SC", sans-serif;
-        color: #5e5852;
-      }
-      #opening[data-look="desk"][data-theme="dark"] {
-        background: #151413;
-        color: #a9a49e;
-      }
-      #opening[data-look="desk"] .column {
-        gap: 12px;
-        opacity: 0;
-        animation: opening-in 240ms cubic-bezier(0.2, 0, 0, 1) 400ms forwards;
-      }
-      #opening[data-look="desk"] .face {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        image-rendering: pixelated;
-      }
-      #opening[data-look="desk"] .bar {
-        width: 120px;
-        height: 3px;
-        border-radius: 2px;
-        background: #1c191714;
-      }
-      #opening[data-look="desk"][data-theme="dark"] .bar {
-        background: #ecebe81a;
-      }
-      #opening[data-look="desk"] .fill {
-        top: 0;
-        bottom: 0;
-        width: 30%;
-        border-radius: 2px;
-        background: #567c31;
-        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      #opening[data-look="desk"][data-theme="dark"] .fill {
-        background: #7fae4f;
-      }
-      #opening .column:has(.problem) {
-        opacity: 1;
-        animation: none;
-      }
-      @keyframes opening-walk {
-        from {
-          left: -30%;
-        }
-        to {
-          left: 100%;
-        }
-      }
-      @keyframes opening-in {
-        to {
-          opacity: 1;
-        }
+      @media (max-height: 500px) {
+        #opening .brand { font-size: 24px; }
+        #opening .column { bottom: 24px; gap: 8px; }
+        #opening .runway { margin-top: 48px; }
+        #opening .sprite { width: 64px; height: 77px; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #opening .fill {
-          animation: none;
-          left: 2px;
-        }
-        #opening[data-look="desk"] .column {
-          animation-duration: 0s;
-        }
+        #opening .sprite { animation: none !important; }
+        #opening .sprite-position, #opening .fill { transition: none; }
       }
     </style>
     <div id="opening">
+      <img class="scene" alt="" fetchpriority="high" />
       <div class="column">
-        <img class="face" alt="" />
-        <div class="bar" role="progressbar"><div class="fill"></div></div>
+        <p class="brand"></p>
+        <div class="runway">
+          <span class="sprite-position" aria-hidden="true"><span class="sprite"></span></span>
+          <div class="bar" role="progressbar"><div class="fill"></div></div>
+        </div>
         <span class="words"></span>
       </div>
     </div>
     <script>
-      // The words are the catalogs' (packages/i18n, web.json's opening), written in by the build (apps/web vite.config.ts);
-      // the language is the served page's (data-locale) or the desktop app's (?locale=), Chinese when neither says.
-      const openingWords = "__OPENING_WORDS__";
-      const openingLocale = document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale");
-      const said = openingWords[openingLocale] ?? openingWords.zh;
-      document.querySelector("#opening .bar").setAttribute("aria-label", said.label);
-      document.querySelector("#opening .words").textContent = said.waking;
-      // Which page this is and how it looks, before any of its scripts: the farm's paths (and / when the owner opens on
-      // the farm, 设置 › 通用) or the workbench in its theme. The choices are state/prefs.ts's, under the same key; the
-      // theme goes on <html> now as state/appearance.ts would, so the page under the cover is already in it.
-      const openingPrefs = (() => {
-        try {
-          return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {};
-        } catch {
-          return {};
+      {
+        // The build replaces the catalog marker for both file:// and HTTP entry points.
+        const openingWords = "__OPENING_WORDS__";
+        const locale = document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale");
+        const said = openingWords[locale] ?? openingWords.zh;
+        const cover = document.getElementById("opening");
+        const bar = cover.querySelector(".bar");
+        const words = cover.querySelector(".words");
+        const runway = cover.querySelector(".runway");
+        cover.querySelector(".brand").textContent = said.name;
+        document.title = said.name;
+        bar.setAttribute("aria-label", said.label);
+        const paint = () => {
+          const phase = cover.dataset.phase;
+          const progress = Math.max(0, Math.min(100, Number(cover.dataset.progress ?? 0)));
+          runway.style.setProperty("--progress", progress + "%");
+          cover.dataset.mood = phase === "failed" || phase === "waiting" ? "confused" : phase === "ready" ? "happy" : progress >= 70 ? "excited" : progress > 0 ? "working" : "sleepy";
+          if (phase === "failed") bar.removeAttribute("role");
+          else if (progress > 0) {
+            bar.setAttribute("aria-valuemin", "0");
+            bar.setAttribute("aria-valuemax", "100");
+            bar.setAttribute("aria-valuenow", String(progress));
+          }
+          words.textContent = said[phase] ?? said.waking;
+        };
+        cover.addEventListener("opening-update", paint);
+        const prefs = (() => {
+          try { return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {}; }
+          catch { return {}; }
+        })();
+        const farm = /^\/(farm|tree)(\/|$)/.test(location.pathname) || (location.pathname === "/" && prefs.start === "farm");
+        const dark = prefs.theme === "dark" || (prefs.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        cover.dataset.look = farm ? "farm" : "desk";
+        cover.dataset.theme = dark ? "dark" : "light";
+        if (location.protocol !== "file:") document.documentElement.dataset.theme = cover.dataset.theme;
+        const hour = new Date().getHours();
+        const scene = hour >= 5 && hour < 10 ? "morning" : hour >= 10 && hour < 18 ? "day" : "night";
+        cover.dataset.scene = scene;
+        cover.dataset.phase = "starting";
+        // file:// resolves beside this page; nested server routes resolve from the root.
+        const root = location.protocol === "file:" ? "" : "/";
+        cover.querySelector(".scene").src = root + "brand/opening-" + scene + ".webp";
+        cover.querySelector(".sprite").style.backgroundImage = 'url("' + root + 'brand/opening-sprite.webp")';
+        const problem = location.pathname.endsWith("/opening.html") ? new URLSearchParams(location.search).get("problem") : null;
+        if (problem) cover.dataset.phase = "failed";
+        paint();
+        if (problem) {
+          words.className = "problem";
+          words.setAttribute("role", "alert");
+          words.textContent = said.cannotStart.replace("{why}", problem);
         }
-      })();
-      const openingFarm = /^\/(farm|tree)(\/|$)/.test(location.pathname) || (location.pathname === "/" && openingPrefs.start === "farm");
-      const openingDark = openingPrefs.theme === "dark" || (openingPrefs.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-      const openingCover = document.getElementById("opening");
-      openingCover.dataset.look = openingFarm ? "farm" : "desk";
-      openingCover.dataset.theme = openingDark ? "dark" : "light";
-      if (location.protocol !== "file:") document.documentElement.dataset.theme = openingCover.dataset.theme;
-      // From the app's files (the desktop app) the icons are beside this page; served, they are at the root.
-      document.querySelector("#opening .face").src = (location.protocol === "file:" ? "" : "/") + "icons/app-64.png";
-    </script>
-    <!-- /opening -->
-    <script>
-      // The desktop app comes back here with ?problem= when the server could not start: it says why in place of the bar.
-      const problem = new URLSearchParams(location.search).get("problem");
-      if (problem) {
-        document.querySelector("#opening .bar").remove();
-        const words = document.querySelector("#opening .words");
-        words.className = "problem";
-        words.setAttribute("role", "alert");
-        words.textContent = said.cannotStart.replace("{why}", problem);
       }
     </script>
+    <!-- /opening -->
   </body>
 </html>

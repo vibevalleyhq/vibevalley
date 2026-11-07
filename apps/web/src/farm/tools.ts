@@ -127,7 +127,6 @@ export function farmKeys() {
   onSettled(() => {
     const on = (down: boolean) => (e: KeyboardEvent) => {
       const s = farmState();
-      if (s.titleOpen) return;
       const key = farmKey({ key: e.key, down, meta: e.metaKey, control: e.ctrlKey, alt: e.altKey }, typing(), s.overlays.length > 0, s.tool);
       switch (key?.kind) {
         case undefined:

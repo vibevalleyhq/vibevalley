@@ -1,0 +1,5 @@
+Built-in image_gen edits of the first three approved concepts: valley at dawn, welcome through the gate, farm lights at night.
+
+Remove only the VibeValley lettering and decorative logo, replacing them with a seamless continuation of the adjacent sky. Preserve the original composition, framing, pixel-art style, colors, lighting, characters, buildings and crops. No text, letters, logos, UI, loading indicators or watermarks. Keep the full 16:9 image.
+
+Runtime assets: apps/web/public/brand/opening-morning.webp, opening-day.webp, opening-night.webp. Brand lettering and loading status are rendered by public/opening.html, never baked into these images.

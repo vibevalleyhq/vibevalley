@@ -7,7 +7,6 @@ import { expect, test } from "./fixtures";
 test.use({ farm: "composer-intent" });
 
 async function openFarmChat(page: Page) {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto("/farm/");
   // The farm chat is the farm phone's right screen: take the phone out and unfold it.
   await page.getByTestId("phone-button").click();

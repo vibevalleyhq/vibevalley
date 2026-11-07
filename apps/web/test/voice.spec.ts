@@ -1,9 +1,5 @@
 import { expect, test } from "./fixtures";
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 test("dictation waits for a transcriber to be set, and its key opens where one is set", async ({ page }) => {
   await page.goto("/chat");
   const dictate = page.getByTestId("composer").getByTestId("dictate");

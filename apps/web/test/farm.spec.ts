@@ -1,11 +1,6 @@
 import { expect, gate, test } from "./fixtures";
 
-// The title screen shows on a machine's first visit; these tests start past it.
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
-test("/ draws the farm on a canvas, without errors", async ({ page }) => {
+test("the first visit opens the farm directly, without a start menu", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
@@ -15,6 +10,8 @@ test("/ draws the farm on a canvas, without errors", async ({ page }) => {
   // At 1280 × 800 the village (384 × 256) is drawn three times over, with narrow bars.
   await expect(canvas).toHaveCSS("width", "1152px");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  await expect(page.locator("#opening")).toHaveCount(0);
+  await expect(page.getByTestId("title")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -30,9 +27,13 @@ test("while the village's pictures come in, a bar says how far; drawn, it goes",
   const bar = page.getByTestId("village-loading");
   await expect(bar).toBeVisible();
   await expect(bar).toHaveAttribute("aria-valuenow", /^\d+$/u);
+  await expect(page.locator("#opening")).toBeVisible();
+  await expect(page.locator("#opening")).toHaveAttribute("data-mood", "excited");
+  expect(Number(await page.locator("#opening").getAttribute("data-progress"))).toBeLessThan(100);
   pictures.open();
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect(bar).toHaveCount(0);
+  await expect(page.locator("#opening")).toHaveCount(0);
 });
 
 test("the farm links to the workbench, and the workbench back to the farm", async ({ page }) => {

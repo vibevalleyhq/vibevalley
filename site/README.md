@@ -18,7 +18,7 @@ vp run site:deploy    # 构建，再发到 Cloudflare
 
 ## 素材
 
-网页不另存一份游戏的图：场景照游戏的首页（`apps/web/src/farm/title/`）画，图从 `apps/web/public/` 直接引用，摆放的数在 `src/lib/scene.ts`；截图在 `docs/images/`，是 `apps/web` 的 Playwright 测试拍的（`test-results/*/`）。
+网页不另存一份游戏的图：场景的图从 `apps/web/public/` 直接引用，摆放的数在 `src/lib/scene.ts`；截图在 `docs/images/`，是 `apps/web` 的 Playwright 测试拍的（`test-results/*/`）。
 
 - 大图在构建时转成 WebP（`src/lib/images.ts`），只压官网的副本。
 - `src/lib/images.ts` 的清单要包含 `scene.ts` 的 `SHOWN`，缺了构建会报错。

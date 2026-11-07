@@ -8,10 +8,6 @@ import { buttons, composerOn, defaultChannel, expect, gate, test, withIssueSessi
 
 test.use({ farm: "farm-chat" });
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 async function openFarm(page: Page) {
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });

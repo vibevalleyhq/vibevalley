@@ -1,9 +1,5 @@
 import { expect, test } from "./fixtures";
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 test("the farm's tree button opens the tree, and its farm button comes back", async ({ page }) => {
   await page.goto("/farm/");
   await page.getByTestId("hud-tree").click();

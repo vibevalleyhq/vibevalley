@@ -10,7 +10,7 @@ only draws it and keeps the page's own state. Its Solid side reads the framework
 ## Its parts
 
 `FarmPage.tsx` mounts each part's one entry without props (`VillageCanvas`, `Hud`, `Panels`, `IssueView`,
-`TitleScreen`, `DebugPanel`): what they need comes from the store, the frame and the commands, so keep them
+`DebugPanel`): what they need comes from the store, the frame and the commands, so keep them
 prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving it the room it may take.
 
 | Part | Folder | Draws |
@@ -18,7 +18,7 @@ prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving 
 | The canvas | `canvas/` | the village on Pixi: the map, plots, walking helpers, the dog, light and life, bed effects |
 | The HUD and the panels | `hud/`, `panels/` | the bars, quota bottle, island cards, the effects layer; harvest, seed forms, achievements, warehouse, menu |
 | The chat and the plot | `chat/`, `issue/` | 田头 (with the call and dictation buttons, `features/voice`), a plot's issue and its work log |
-| The phone and the title | `phone/`, `title/` | the farm's phone and its games, the title screen |
+| The phone | `phone/` | the farm's phone and its games |
 | The debug console | `debug/` | ` opens it: the farm's calls, the clock, local effects, the frames seen |
 | The repo map | `map/` | not on `/`: the islands on the workbench's repos page, which `app/` hands to `features/repo` (`repoMap`, a `ReposSkin`) |
 
@@ -34,7 +34,6 @@ Which part draws which overlay (`FarmUi.overlays`):
 | `review` (harvest), `sow`, `water`, `panel`, `menu` | `Panels` |
 | the chat (`chatOpen` is the phone unfolded, `chatLarge`, `chatShown`) | `ChatWindow`, the unfolded phone's right screen (`Phone`) |
 | `phoneOpen` | `Phone` (its button sits in the HUD, which calls `farm.phoneOpen(true)`) |
-| `titleOpen` | `TitleScreen` (FarmPage mounts it only while open) |
 | `bedFx`, `rewards`, hover, names | the canvas draws bed FX over the plots and sets hover; the HUD's FX layer shows rewards |
 | the farm's toasts (`ui/pixel`'s `toasts`, `ToastViewport`) | the HUD's FX layer (it passes the medal `leading` and `kicker`) |
 
@@ -42,7 +41,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 
 The farm page's state is an atom of the page's (`defineAtom`, `state/atom.ts`): `farmState()` reads it anywhere and,
 read in a component or a computation, follows it; `useFarm(select)` is a slice that changes only when the
-slice does; `subscribeFarm(fn)` listens from plain code. What this machine keeps (the title seen, the farm entered last,
+slice does; `subscribeFarm(fn)` listens from plain code. What this machine keeps (the farm entered last,
 read by `farmRepo()` and `lastFarmRepo()`) is stored (`defineStored`, `state/stored.ts`). Changes only through
 `farm.*`:
 
@@ -57,7 +56,6 @@ read by `farmRepo()` and `lastFarmRepo()`) is stored (`defineStored`, `state/sto
 | `revealNames(on)` | Alt held: every name tag shows |
 | `chatOpen(open)`, `chatLarge(large)`, `showChat(channel \| undefined)` | the chat: unfolding takes the phone out, putting the phone away folds it; undefined is the general channel |
 | `phoneOpen(open)`, `friendsOpen(open)` | |
-| `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (stored as `vibevalley.title.seen`) |
 | `setRepo(repo)` | the farm on the page, set by the route; `/farm` opens it next (stored as `vibevalley.farm.repo`) |
 | `bedFx(bed, kind, text?)` | a bed's effect for 2.2 s (`water`, `spray`, `harvest`, `shovel`, `note`); the commands call it |
 | `reward(effect)` | a reward for 4 s; FarmPage pushes each frame's rewards |
@@ -119,4 +117,3 @@ Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.
 
 `vp test run src/farm` (the world parsed from the real `village.ldtk` and `sprites.json`, the framing, the cues);
 `test/farm.spec.ts` (Playwright on a real server: the canvas, the links; a screenshot at `test-results/farm.png`).
-Playwright tests on the farm start past the title screen (`localStorage` `vibevalley.title.seen` = `true`, the JSON of `true`).

@@ -31,14 +31,6 @@ export function Menu() {
       <PxButton tone="primary" data-testid="menu-resume" onClick={close}>
         {t("web.farm.menu.resume")}
       </PxButton>
-      <PxButton
-        onClick={() => {
-          close();
-          farm.showTitle();
-        }}
-      >
-        {t("web.farm.menu.home")}
-      </PxButton>
       <PxButton onClick={() => setMuted(!isMuted())}>{isMuted() ? t("web.farm.menu.soundOn") : t("web.farm.menu.soundOff")}</PxButton>
       <FarmSection title={t("web.farm.menu.elsewhere")}>
         <div class="flex flex-wrap gap-2">

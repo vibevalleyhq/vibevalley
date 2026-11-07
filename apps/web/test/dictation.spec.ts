@@ -15,7 +15,6 @@ async function countAudio(page: Page) {
         this.port.addEventListener("message", () => (window.heard = (window.heard ?? 0) + 1));
       }
     };
-    localStorage.setItem("vibevalley.title.seen", "true");
   });
 }
 
@@ -71,7 +70,6 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
 test("Esc while the box listens drops the recording: nothing is sent and the box is as it was", async ({ page, api }) => {
   // An address nothing answers at: a recording sent there would come back as a problem in the box.
   await api.setting.update({ dictation: { via: "own", url: "http://127.0.0.1:9/v1", model: "whisper" } });
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto("/chat");
   const dictate = page.getByTestId("dictate");
   await dictate.click();

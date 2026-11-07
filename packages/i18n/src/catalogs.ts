@@ -1513,7 +1513,21 @@ export const catalogs = {
       minutes: "{n} 分钟",
       join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", and: "{a}，{b}", clauses: "{a}；{b}", separator: "、" },
     },
-    web: { opening: { waking: "叫醒 VibeValley……", label: "叫醒 VibeValley", cannotStart: "VibeValley 起不来：{why}" } },
+    web: {
+      opening: {
+        name: "码农谷物语",
+        waking: "加载中……",
+        label: "正在加载码农谷物语",
+        cannotStart: "码农谷物语起不来：{why}",
+        starting: "正在唤醒农场……",
+        connecting: "正在连接……",
+        reading: "正在准备工作台……",
+        loading: "加载中……",
+        ready: "准备好了",
+        waiting: "还在等待连接……",
+        failed: "加载遇到问题",
+      },
+    },
     "web.agent": {
       newName: "新的 {runtime}",
       noProfiles: "问不到服务端的档案：",
@@ -2399,7 +2413,6 @@ export const catalogs = {
         repos: "仓库",
         catalog: "图鉴",
         resume: "继续",
-        home: "回到首页",
         soundOn: "打开音效",
         soundOff: "关闭音效",
         elsewhere: "去别处",
@@ -2611,15 +2624,6 @@ export const catalogs = {
         moving: "搬东西进村 {done}/{total}",
         lights: "点灯……",
         entering: "进村",
-      },
-      title: {
-        start: "开始游戏",
-        continue: "继续游戏",
-        keyFirst: "先填钥匙：管家要 DeepSeek 的 API Key 才能干活，在设置里填上。",
-        label: "码农场物语 首页",
-        name: "码农场物语",
-        tagline: "一群写代码的小动物，等你来派活",
-        nothingToContinue: "还没有农场可以继续：先开始游戏。",
       },
       debug: {
         title: "调试台",
@@ -5564,7 +5568,21 @@ export const catalogs = {
       minutes: "{n} min",
       join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", and: "{a}, {b}", clauses: "{a}; {b}", separator: ", " },
     },
-    web: { opening: { waking: "Waking VibeValley…", label: "Waking VibeValley", cannotStart: "VibeValley cannot start: {why}" } },
+    web: {
+      opening: {
+        name: "VibeValley",
+        waking: "Loading…",
+        label: "Loading VibeValley",
+        cannotStart: "VibeValley cannot start: {why}",
+        starting: "Waking the farm…",
+        connecting: "Connecting…",
+        reading: "Preparing your workspace…",
+        loading: "Loading…",
+        ready: "Ready",
+        waiting: "Still waiting for a connection…",
+        failed: "Unable to finish loading",
+      },
+    },
     "web.agent": {
       newName: "New {runtime}",
       noProfiles: "The server's profiles could not be read: ",
@@ -6491,7 +6509,6 @@ export const catalogs = {
         repos: "Repos",
         catalog: "Catalog",
         resume: "Resume",
-        home: "Back to the title",
         soundOn: "Sound on",
         soundOff: "Sound off",
         elsewhere: "Go elsewhere",
@@ -6730,15 +6747,6 @@ export const catalogs = {
         moving: "Moving into the village {done}/{total}",
         lights: "Lighting up…",
         entering: "Entering the village",
-      },
-      title: {
-        start: "New game",
-        continue: "Continue",
-        keyFirst: "Fill in the key first: the manager needs a DeepSeek API key to work. Fill it in under Settings.",
-        label: "VibeValley title screen",
-        name: "VibeValley",
-        tagline: "A crew of little animals who write code, waiting for your jobs",
-        nothingToContinue: "No farm to continue yet: start a new game first.",
       },
       debug: {
         title: "Debug console",
@@ -10671,7 +10679,6 @@ export interface Messages {
   "web.farm.menu.chat": undefined;
   "web.farm.menu.connectors": undefined;
   "web.farm.menu.elsewhere": undefined;
-  "web.farm.menu.home": undefined;
   "web.farm.menu.issues": undefined;
   "web.farm.menu.repos": undefined;
   "web.farm.menu.resume": undefined;
@@ -10920,13 +10927,6 @@ export interface Messages {
   "web.farm.sow.start": undefined;
   "web.farm.sow.toMap": undefined;
   "web.farm.sow.who": undefined;
-  "web.farm.title.continue": undefined;
-  "web.farm.title.keyFirst": undefined;
-  "web.farm.title.label": undefined;
-  "web.farm.title.name": undefined;
-  "web.farm.title.nothingToContinue": undefined;
-  "web.farm.title.start": undefined;
-  "web.farm.title.tagline": undefined;
   "web.farm.tool.bug.hint": undefined;
   "web.farm.tool.bug.label": undefined;
   "web.farm.tool.hand.hint": undefined;
@@ -11370,7 +11370,15 @@ export interface Messages {
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
   "web.opening.cannotStart": { readonly why: string | number };
+  "web.opening.connecting": undefined;
+  "web.opening.failed": undefined;
   "web.opening.label": undefined;
+  "web.opening.loading": undefined;
+  "web.opening.name": undefined;
+  "web.opening.reading": undefined;
+  "web.opening.ready": undefined;
+  "web.opening.starting": undefined;
+  "web.opening.waiting": undefined;
   "web.opening.waking": undefined;
   "web.orchestrator.looks.auntie.blurb": undefined;
   "web.orchestrator.looks.auntie.name": undefined;

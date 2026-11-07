@@ -1,7 +1,15 @@
 {
   "opening": {
-    "waking": "Waking VibeValley…",
-    "label": "Waking VibeValley",
-    "cannotStart": "VibeValley cannot start: {why}"
+    "name": "VibeValley",
+    "waking": "Loading…",
+    "label": "Loading VibeValley",
+    "cannotStart": "VibeValley cannot start: {why}",
+    "starting": "Waking the farm…",
+    "connecting": "Connecting…",
+    "reading": "Preparing your workspace…",
+    "loading": "Loading…",
+    "ready": "Ready",
+    "waiting": "Still waiting for a connection…",
+    "failed": "Unable to finish loading"
   }
 }

@@ -248,7 +248,7 @@
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
-| `reveal` | `opening.ts` | Once the page has mounted: takes the cover away when the page is ready, in one fade. |
+| `reveal` | `opening.ts` |  |
 | `queries` | `query.ts` | REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. |
 | `refetchOnRelink` | `query.ts` | What changed while the state stream was lost reached no REST read either (they are invalidated by frames). |
 | `useQuery` | `query.ts` | REST reads never hold the state stream's frame: pending and failures are result values, and ready() selects data. |

@@ -6,10 +6,6 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { expect, test } from "./fixtures";
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
   return new Promise<StateFrame>((resolve, reject) => {
