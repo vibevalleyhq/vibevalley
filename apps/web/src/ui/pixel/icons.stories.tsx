@@ -8,6 +8,7 @@ import { ActionGlyph, Marked, PhaseGlyph, SpriteIcon } from "./icons";
 import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
+  composed: (offset: number) => ({ marginLeft: offset, rotate: "90deg" }),
   iconsStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
@@ -48,6 +49,16 @@ export default stories({
   themes: ["light"],
   frame: storyFrame.pixel,
   stories: {
+    Composition: story({
+      args: { size: 24, offset: 12 },
+      controls: {
+        size: { kind: "number", min: 12, max: 48, step: 4 },
+        offset: { kind: "number", min: 0, max: 32, step: 4 },
+      },
+      render: (a) => (
+        <SpriteIcon name="button-next" size={a.size} label="Composed sprite" styles={viewStyles.composed(a.offset)} style={{ "margin-top": "8px" }} />
+      ),
+    }),
     Sprites: story({
       args: { size: 24 },
       controls: { size: { kind: "number", min: 12, max: 48, step: 4 } },

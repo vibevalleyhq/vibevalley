@@ -19,6 +19,7 @@ import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { aria, useNow } from "#/base/dom.tsx";
 import { tookText, wallClockText } from "#/base/format.ts";
 import { playBedFx } from "#/farm/commands.ts";
+import { farmGroup } from "#/farm/interaction.stylex.ts";
 import { tint } from "#/farm/panels/rows.tsx";
 import { farm, farmActWords, overlayOf, useFarm } from "#/farm/store.ts";
 import { useVillage } from "#/farm/world/load.ts";
@@ -50,8 +51,51 @@ import { useRouter } from "#/infra/router.ts";
 import { sendReplacing, useIntents } from "#/state/intent.ts";
 import { castPrefix, outfitLabel, speciesLabel } from "#/ui/cast.ts";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 const recipeStyles2 = stylex.create({
+  emptyCriterion: { height: "calc(var(--spacing) * 2.5)", width: "calc(var(--spacing) * 2.5)", borderStyle: "solid", borderWidth: "2px" },
+  criterion: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    textAlign: "left",
+  },
+  criterionBox: {
+    marginTop: "calc(var(--spacing) * .5)",
+    display: "flex",
+    height: "calc(var(--spacing) * 4)",
+    width: "calc(var(--spacing) * 4)",
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    backgroundColor: "var(--color-cream-50)",
+    borderColor: {
+      default: "var(--color-bark-400)",
+      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-bark-600)" },
+    },
+  },
+  fold: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    textAlign: "left",
+  },
+  foldOpen: { rotate: "90deg" },
+  foldLabel: {
+    fontSize: "13px",
+    color: {
+      default: "var(--color-bark-800)",
+      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-bark-900)" },
+    },
+  },
   issueBodySpan: {
     minWidth: "0",
     flex: "1",
@@ -886,7 +930,7 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             when={props.checking}
             fallback={
               <div {...stylex.attrs(viewStyles.criteriaDiv)}>
-                <span {...stylex.attrs(viewStyles.criteriaSpan)}>{mark(r()) ?? <span class="border-bark-300 h-2.5 w-2.5 border-2" />}</span>
+                <span {...stylex.attrs(viewStyles.criteriaSpan)}>{mark(r()) ?? <span {...styleProps(recipeStyles2.emptyCriterion)} />}</span>
                 <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
                   <span {...stylex.attrs(recipeStyles.plotDetailP)}>{r().text}</span>
                   <Show when={r().proof}>
@@ -903,9 +947,9 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
               aria-pressed={aria(ticked().has(i()))}
               aria-label={r().text}
               onClick={() => setTicked((was) => (was.has(i()) ? new Set([...was].filter((x) => x !== i())) : new Set([...was, i()])))}
-              class="group flex cursor-pointer items-start gap-2 py-0.5 text-left"
+              {...styleProps([farmGroup, recipeStyles2.criterion])}
             >
-              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 border-bark-400 bg-cream-50 group-hover:border-bark-600">
+              <span {...styleProps(recipeStyles2.criterionBox)}>
                 <Show when={ticked().has(i())}>
                   <SpriteIcon name="mark-check" size={12} label={t("web.farm.plot.ticked")} />
                 </Show>
@@ -929,15 +973,9 @@ function Fold(props: { label: string; children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   return (
     <div {...stylex.attrs(viewStyles.foldDiv)}>
-      <button
-        type="button"
-        data-testid="fold"
-        aria-expanded={aria(open())}
-        onClick={() => setOpen(!open())}
-        class="group flex w-full cursor-pointer items-center gap-1.5 py-2 text-left"
-      >
-        <SpriteIcon name="button-next" size={12} class={open() ? "rotate-90" : ""} />
-        <span class="text-[13px] text-bark-800 group-hover:text-bark-900">{props.label}</span>
+      <button type="button" data-testid="fold" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...styleProps([farmGroup, recipeStyles2.fold])}>
+        <SpriteIcon name="button-next" size={12} styles={open() && recipeStyles2.foldOpen} />
+        <span {...styleProps(recipeStyles2.foldLabel)}>{props.label}</span>
       </button>
       {/* Mounted with the dialog and only hidden while folded. */}
       <div {...stylex.attrs(viewStyles.foldDiv2)} hidden={!open()}>

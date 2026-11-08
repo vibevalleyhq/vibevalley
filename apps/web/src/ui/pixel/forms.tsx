@@ -5,7 +5,41 @@ import { t } from "@vibevalley/i18n";
 
 import { splitChips } from "./cells";
 import { SpriteIcon } from "./icons";
-import { pxFocus, pxStyle } from "./style";
+import { pxStyle } from "./style";
+
+const recipeStyles = stylex.create({
+  pxChipsInputButton: {
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    paddingInline: "var(--spacing)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    opacity: {
+      default: ".7",
+      "@media (hover:hover)": {
+        default: null,
+        ":enabled:hover": "1",
+      },
+    },
+    outlineStyle: {
+      default: "none",
+      ":focus-visible": "solid",
+    },
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineOffset: {
+      default: null,
+      ":focus-visible": "1px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--color-leaf-500)",
+    },
+  },
+});
 
 const viewStyles = stylex.create({
   box: {
@@ -77,7 +111,7 @@ export function PxChipsInput(props: {
               aria-label={t("web.ui.pixel.drop", { chip })}
               disabled={props.disabled}
               onClick={() => props.onChange(props.value.filter((c) => c !== chip))}
-              class={[pxFocus, "cursor-pointer px-1 py-0.5 opacity-70 enabled:hover:opacity-100 disabled:cursor-default"]}
+              {...stylex.attrs(recipeStyles.pxChipsInputButton)}
             >
               <SpriteIcon name="button-close" size={10} />
             </button>

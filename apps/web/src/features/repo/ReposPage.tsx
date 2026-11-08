@@ -20,9 +20,29 @@ import { dateText, type Recency, recencyOf, recencyText, since } from "./calenda
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
 
+const recipeStyles2 = stylex.create({
+  reposPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=48rem)": "row",
+    },
+    overflowY: {
+      default: "auto",
+      "@media (width>=48rem)": "hidden",
+    },
+    overflowX: {
+      default: null,
+      "@media (width>=48rem)": "hidden",
+    },
+  },
+});
+
 const recipeStyles = stylex.create({
   overviewSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-px-leaf-soft)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
@@ -171,7 +191,7 @@ const viewStyles = stylex.create({
   },
   overviewButton: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     padding: "var(--spacing)",
     backgroundColor: {
       default: null,
@@ -258,7 +278,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
   const [creating, setCreating] = createSignal(false);
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
-    <div class="flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+    <div {...stylex.attrs(recipeStyles2.reposPageDiv)}>
       <div {...stylex.attrs(viewStyles.reposPageDiv)}>
         <ListCard
           bare

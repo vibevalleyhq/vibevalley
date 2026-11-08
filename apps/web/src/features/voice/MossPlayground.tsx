@@ -12,6 +12,29 @@ import { Hint, Tip } from "#/ui/Tip.tsx";
 
 import { type MossLine, mossLine, type MossSetup } from "./mossLine";
 
+const recipeStyles = stylex.create({
+  mossLineViewP: {
+    maxWidth: "80%",
+    borderRadius: "var(--radius-lg)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  mossLineViewPVariant1Case1: {
+    backgroundColor: "var(--wb-hover)",
+  },
+  mossLineViewPVariant1Case2: {
+    backgroundColor: "var(--wb-ok-soft)",
+  },
+  mossLineViewPVariant2Case1: {
+    fontStyle: null,
+  },
+  mossLineViewPVariant2Case2: {
+    fontStyle: "italic",
+  },
+});
+
 const variantStyles = stylex.create({
   statSpan: {
     fontFamily: "var(--font-mono)",
@@ -297,7 +320,11 @@ export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossS
                   )}
                 >
                   <p
-                    class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "owner" ? "bg-ok-soft" : "bg-hover", { italic: !turn.done }]}
+                    {...stylex.attrs(
+                      recipeStyles.mossLineViewP,
+                      turn.who === "owner" ? recipeStyles.mossLineViewPVariant1Case2 : recipeStyles.mossLineViewPVariant1Case1,
+                      !turn.done ? recipeStyles.mossLineViewPVariant2Case2 : recipeStyles.mossLineViewPVariant2Case1,
+                    )}
                     data-done={turn.done ? "" : undefined}
                   >
                     {turn.text}

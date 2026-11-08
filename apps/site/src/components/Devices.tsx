@@ -157,7 +157,6 @@ export default function Devices(props: Props) {
     </Section>
   );
 }
-/** A device's place on the page, moving against the page by its rate while it crosses the screen. */
 function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JSX.Element }) {
   const ref = createScrollAnimation<HTMLDivElement>("self", ["start end", "end start"], () => [
     { keyframes: { transform: [`translateY(${600 * props.rate}px)`, `translateY(${-600 * props.rate}px)`] } },
@@ -168,7 +167,6 @@ function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JS
     </div>
   );
 }
-/** A Mac in the farm's colours: the screen in a dark frame, a strip of a base under it. */
 function Laptop(props: { shot: Shot; alt: string }) {
   return (
     <div>
@@ -189,7 +187,6 @@ function Laptop(props: { shot: Shot; alt: string }) {
     </div>
   );
 }
-/** A phone in the farm's colours: the screen in a thick dark frame. */
 function Phone(props: { shot: Shot; alt: string }) {
   return (
     <div {...stylex.attrs(viewStyles.phoneDiv)}>

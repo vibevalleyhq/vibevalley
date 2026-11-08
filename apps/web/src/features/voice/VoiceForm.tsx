@@ -68,7 +68,7 @@ const variantStyles = stylex.create({
     overflowY: "auto",
   },
   formSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "var(--text-xs)",

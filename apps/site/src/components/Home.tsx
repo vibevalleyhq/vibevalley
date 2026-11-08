@@ -42,9 +42,19 @@ export default function Home(props: { copy: Copy }) {
         />
         <Parade
           copy={props.copy.parade}
-          plots={Array.from({ length: 16 }, (_, index) => pixelArt(field[(index * 5) % field.length]!))}
+          plots={Array.from({ length: 16 }, (_, index) => {
+            const plot = field[(index * 5) % field.length];
+            if (plot === undefined) throw new RangeError(`Missing parade plot at index ${index}`);
+            return pixelArt(plot);
+          })}
           walkers={WALKERS.map((walker) => walker.frames)}
-          front={Array.from({ length: 12 }, (_, index) => titleArt[FRONT[index % FRONT.length]!]!)}
+          front={Array.from({ length: 12 }, (_, index) => {
+            const name = FRONT[index % FRONT.length];
+            if (name === undefined) throw new RangeError(`Missing parade foreground at index ${index}`);
+            const image = titleArt[name];
+            if (image === undefined) throw new Error(`Missing parade foreground image ${name}`);
+            return image;
+          })}
         />
         <Harvest
           copy={props.copy.harvest}

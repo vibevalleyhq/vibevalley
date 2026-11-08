@@ -16,6 +16,53 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Quiet } from "#/ui/layout.tsx";
+import { styleProps } from "#/ui/positioner.ts";
+
+const memoryStyles = stylex.create({
+  card: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  forget: {
+    flexShrink: "0",
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-berry)",
+      },
+    },
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover")]: 1,
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
 
 const recipeStyles2 = stylex.create({
   archivePanelPre: {
@@ -306,8 +353,6 @@ const viewStyles = stylex.create({
 
 /** Notes not tied to a repo. */
 const everywhere = "*";
-
-const item = "rounded-md border border-line bg-page";
 
 const memoryQuery = defineQuery({
   schema: S.MemoryList,
@@ -746,7 +791,7 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
     <div
       data-testid="memory"
       data-key={props.memory.id}
-      class={[item, "group flex items-start gap-2 px-3 py-2"]}
+      {...styleProps([stylex.defaultMarker(), memoryStyles.card])}
       data-faded={props.faded === true ? "" : undefined}
     >
       <div {...stylex.attrs(viewStyles.memoryItemDiv)}>
@@ -761,12 +806,7 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
         </span>
       </div>
       <Show when={props.onForget}>
-        <button
-          type="button"
-          data-testid="forget"
-          onClick={() => props.onForget?.()}
-          class="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-xs text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-berry focus-visible:opacity-100"
-        >
+        <button type="button" data-testid="forget" onClick={() => props.onForget?.()} {...styleProps(memoryStyles.forget)}>
           {t("web.memory.memory.forget")}
         </button>
       </Show>

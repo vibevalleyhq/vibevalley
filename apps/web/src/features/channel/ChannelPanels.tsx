@@ -17,15 +17,107 @@ import { Dialog } from "#/ui/Dialog.tsx";
 import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Select } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 
-import { channelIconButtonClass, orchestratorMoodLabels } from "./ChannelSidebar";
+import { channelIconButtonStyles, orchestratorMoodLabels } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
 import { notifyOptions } from "./Dialogs";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
+import { threadItem } from "./message.stylex";
 import { MessageList } from "./MessageList";
 import { chatPath, messagePath, threadOwnerOf, threadsIn, threadTitle, workbenchClock } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
+
+const threadStyles = stylex.create({
+  thread: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  action: {
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", threadItem)]: 1,
+      },
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  pinsDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: 30,
+    marginTop: "var(--spacing)",
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 96)",
+    width: "calc(var(--spacing) * 80)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 2)",
+    boxShadow: "var(--shadow-float)",
+  },
+  threadListDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: 30,
+    marginTop: "var(--spacing)",
+    display: "flex",
+    maxHeight: "28rem",
+    width: "calc(var(--spacing) * 96)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 2)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
 
 const recipeStyles = stylex.create({
   membersButton: {
@@ -300,7 +392,7 @@ const viewStyles = stylex.create({
     marginBlock: "var(--spacing)",
     minWidth: "0",
     flex: "1",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-focus)",
@@ -404,12 +496,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <div
-      role="dialog"
-      data-testid="pins"
-      aria-label={t("web.channel.pins.title")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 origin-top-right animate-pop-in flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
-    >
+    <div role="dialog" data-testid="pins" aria-label={t("web.channel.pins.title")} {...stylex.attrs(recipeStyles2.pinsDiv)}>
       <p {...stylex.attrs(viewStyles.pinsP)}>{t("web.channel.pins.title")}</p>
       <Show when={pinned()?.length === 0}>
         <p {...stylex.attrs(viewStyles.pinsP2)}>{t("web.channel.pins.none")}</p>
@@ -579,12 +666,7 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
     <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
   );
   return (
-    <div
-      role="dialog"
-      data-testid="thread-list"
-      aria-label={t("web.channel.threadList.title")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
-    >
+    <div role="dialog" data-testid="thread-list" aria-label={t("web.channel.threadList.title")} {...stylex.attrs(recipeStyles2.threadListDiv)}>
       <p {...stylex.attrs(viewStyles.membersP)}>{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
         <p data-testid="threads-empty" {...stylex.attrs(viewStyles.pinsP2)}>
@@ -631,7 +713,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       data-testid="thread"
       data-key={props.thread.id}
       data-archived={props.thread.archived !== undefined ? "" : undefined}
-      class="group/t flex items-center gap-1 rounded-md px-1 hover:bg-hover"
+      {...styleProps([threadItem, threadStyles.thread])}
     >
       <Show
         when={renaming()}
@@ -672,7 +754,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       </Show>
       <button
         type="button"
-        class={[channelIconButtonClass, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        {...styleProps([channelIconButtonStyles, threadStyles.action])}
         data-testid="thread-rename"
         aria-label={t("web.channel.threadList.rename", { title: props.title })}
         title={t("web.channel.threadList.rename", { title: props.title })}
@@ -685,7 +767,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       </button>
       <button
         type="button"
-        class={[channelIconButtonClass, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        {...styleProps([channelIconButtonStyles, threadStyles.action])}
         data-testid="thread-archive"
         aria-label={
           props.thread.archived !== undefined

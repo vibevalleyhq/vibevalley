@@ -25,6 +25,30 @@ import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";
 
+const recipeStyles2 = stylex.create({
+  composerDiv: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    transformOrigin: "bottom",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "var(--spacing)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
 const recipeStyles = stylex.create({
   composerDictationKey: {
     width: "calc(var(--spacing) * 7)",
@@ -177,7 +201,7 @@ const viewStyles = stylex.create({
   },
   quotedBlockRemove: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     padding: "calc(var(--spacing) * .5)",
     backgroundColor: {
       default: null,
@@ -430,12 +454,7 @@ export function Composer(props: {
   return (
     <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(viewStyles.composer)}>
       <Show when={box.offered().length > 0}>
-        <div
-          role="listbox"
-          aria-label={t("web.channel.composer.who")}
-          data-testid="mentions"
-          class="mb-1.5 flex origin-bottom animate-pop-in flex-col rounded-lg border border-line bg-page p-1 shadow-float"
-        >
+        <div role="listbox" aria-label={t("web.channel.composer.who")} data-testid="mentions" {...stylex.attrs(recipeStyles2.composerDiv)}>
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div

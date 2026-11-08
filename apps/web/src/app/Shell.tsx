@@ -20,6 +20,61 @@ import { Hint } from "#/ui/Tip.tsx";
 
 import { type Place, places, settingsPlace } from "./places";
 
+const recipeStyles = stylex.create({
+  slot: {
+    position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-lg)",
+    color: {
+      default: "var(--color-on-rail)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-on-rail) 65%, transparent)",
+      "@media (hover:hover)": { default: null, ":hover": "var(--color-on-rail)" },
+      ":is([aria-current=page])": "var(--color-on-rail)",
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-on-rail)",
+        "@supports (color:color-mix(in lab, red, red))": { default: null, ":hover": "color-mix(in oklab, var(--color-on-rail) 6%, transparent)" },
+      },
+    },
+    outlineStyle: { default: null, ":focus-visible": "solid" },
+    outlineWidth: { default: null, ":focus-visible": 2 },
+    outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
+  },
+  faceSlot: {
+    width: { default: "calc(var(--spacing) * 11)", "@media (width>=40rem)": "calc(var(--spacing) * 12)" },
+    height: { default: "calc(var(--spacing) * 11)", "@media (width>=40rem)": "calc(var(--spacing) * 12)" },
+  },
+  namedSlot: {
+    width: { default: "calc(var(--spacing) * 12)", "@media (width>=40rem)": "calc(var(--spacing) * 14)" },
+    height: { default: "calc(var(--spacing) * 12)", "@media (width>=40rem)": "calc(var(--spacing) * 14)" },
+  },
+  currentSlot: {
+    backgroundColor: "color-mix(in srgb, var(--color-on-rail) 9%, transparent)",
+  },
+  railSpan: {
+    display: "block",
+    height: "calc(var(--spacing) * 2)",
+    width: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+  },
+  railSpanState: {
+    backgroundColor: "var(--wb-faint)",
+  },
+  railSpanState2: {
+    backgroundColor: "var(--wb-berry)",
+  },
+  railSpanState3: {
+    backgroundColor: "var(--wb-leaf)",
+  },
+});
+
 const variantStyles2 = stylex.create({
   deskA: {
     display: "flex",
@@ -217,12 +272,11 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       aria-label={props.label}
       aria-current={props.current === true ? "page" : undefined}
       data-badge={props.badge !== undefined && props.badge > 0 ? props.badge : undefined}
-      class={[
-        "relative flex flex-col items-center justify-center gap-0.5 rounded-lg text-on-rail/65 hover:bg-on-rail/6 hover:text-on-rail focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:text-on-rail",
-        // The farm's face at the top is a square picture.
-        props.name === undefined ? "size-11 sm:size-12" : "size-12 sm:size-14",
-      ]}
-      style={props.current === true ? { background: "color-mix(in srgb, var(--color-on-rail) 9%, transparent)" } : undefined}
+      {...stylex.attrs(
+        recipeStyles.slot,
+        props.name === undefined ? recipeStyles.faceSlot : recipeStyles.namedSlot,
+        props.current === true && recipeStyles.currentSlot,
+      )}
     >
       {props.children}
       <Show when={props.name}>{(name) => <span {...stylex.attrs(viewStyles.slotSpan)}>{name()}</span>}</Show>
@@ -310,7 +364,10 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
         </Slot>
         <span role="status" data-testid="link" data-state={frames.link} title={linkWords[frames.link]} {...stylex.attrs(viewStyles.link)}>
           <span
-            class={["block h-2 w-2 rounded-full", frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"]}
+            {...stylex.attrs(
+              recipeStyles.railSpan,
+              frames.link === "open" ? recipeStyles.railSpanState3 : frames.link === "lost" ? recipeStyles.railSpanState2 : recipeStyles.railSpanState,
+            )}
             aria-hidden="true"
           />
           <span {...stylex.attrs(viewStyles.railSpan2)}>{linkWords[frames.link]}</span>

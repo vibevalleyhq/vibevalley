@@ -17,13 +17,90 @@ import { Icon } from "#/ui/Icon.tsx";
 import { Lightbox } from "#/ui/Lightbox.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
 import { MoreMenu } from "#/ui/MoreMenu.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 
 import { drafts } from "./composing";
 import { quickReactions, reactionOn, EmojiPicker } from "./EmojiPicker";
 import { useMessage } from "./follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
+import { messageRow } from "./message.stylex";
 import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messagePath } from "./places";
+
+const messageStyles = stylex.create({
+  reaction: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  revealReaction: {
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      [stylex.when.ancestor(":focus-within", messageRow)]: 1,
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", messageRow)]: 1,
+      },
+    },
+  },
+  toolbar: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -3)",
+    right: "calc(var(--spacing) * 2)",
+    zIndex: 10,
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * .5)",
+    boxShadow: "var(--shadow-float)",
+  },
+  openToolbar: {
+    display: "flex",
+  },
+  revealToolbar: {
+    display: {
+      default: "none",
+      [stylex.when.ancestor(":focus-within", messageRow)]: "flex",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", messageRow)]: "flex",
+      },
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  messageBodyDivVariant1Case1: {
+    overflow: null,
+    WebkitMaskImage: null,
+    maskImage: null,
+  },
+  messageBodyDivVariant1Case2: {
+    overflow: "hidden",
+    WebkitMaskImage: "linear-gradient(black 70%,transparent)",
+    maskImage: "linear-gradient(black 70%,transparent)",
+  },
+});
 
 const recipeStyles = stylex.create({
   messageToolsToolbarButton: {
@@ -33,7 +110,7 @@ const recipeStyles = stylex.create({
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -49,7 +126,7 @@ const recipeStyles = stylex.create({
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
   },
   messageToolsToolbarButtonVariant1Case1: {
     backgroundColor: {
@@ -346,7 +423,7 @@ const viewStyles = stylex.create({
     width: "calc(var(--spacing) * 16)",
     height: "calc(var(--spacing) * 16)",
     flexShrink: "0",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     objectFit: "cover",
   },
   reactionsDiv: {
@@ -492,7 +569,7 @@ export function MessageBody(props: { m: ChatMessage }) {
           ref={(el) => (box = el)}
           data-testid="message-body"
           data-folded={long() && !open() ? "" : undefined}
-          class={{ "overflow-hidden fold-fade": long() && !open() }}
+          {...stylex.attrs(long() && !open() ? recipeStyles2.messageBodyDivVariant1Case2 : recipeStyles2.messageBodyDivVariant1Case1)}
           style={long() && !open() ? { "max-height": `${foldPx}px` } : undefined}
         >
           <Markdown text={props.m.text} mentions />
@@ -672,10 +749,7 @@ function AddReaction(props: { m: ChatMessage }) {
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
         // Only on the message under the pointer or the focus, as the toolbar: every message has a 👀 to sit beside.
-        class={[
-          "flex cursor-pointer items-center rounded-full border border-line bg-page px-2 py-0.5 text-xs hover:bg-hover",
-          open() ? "" : "opacity-0 group-focus-within/m:opacity-100 group-hover/m:opacity-100 focus-visible:opacity-100",
-        ]}
+        {...styleProps([messageStyles.reaction, !open() && messageStyles.revealReaction])}
       >
         <Icon name="add" size={12} />
       </button>
@@ -723,10 +797,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       data-testid="message-tools"
       aria-label={t("web.channel.tools.label")}
       // Shown while hovered, and while something it opened is: the picker is outside the row.
-      class={[
-        "absolute -top-3 right-2 z-10 items-center gap-0.5 rounded-md border border-line bg-page p-0.5 shadow-float",
-        everyEmoji() || more() ? "flex" : "hidden group-focus-within/m:flex group-hover/m:flex",
-      ]}
+      {...styleProps([messageStyles.toolbar, everyEmoji() || more() ? messageStyles.openToolbar : messageStyles.revealToolbar])}
     >
       <Show when={picking()}>
         <div role="group" aria-label={t("web.channel.tools.pick")} {...stylex.attrs(viewStyles.messageToolsDiv)}>

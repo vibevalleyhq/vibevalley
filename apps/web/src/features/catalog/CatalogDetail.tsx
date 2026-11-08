@@ -12,9 +12,28 @@ import { useRouter } from "#/infra/router.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Card, Toggle } from "#/ui/layout.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { framesOf, type Picture, remakeOf } from "./shelves";
+
+const groundStyles = stylex.create({
+  grass: {
+    backgroundColor: "var(--color-catalog-grass)",
+    backgroundImage: "none",
+    backgroundSize: "auto",
+  },
+  night: {
+    backgroundColor: "var(--color-catalog-night)",
+    backgroundImage: "none",
+    backgroundSize: "auto",
+  },
+  check: {
+    backgroundColor: "var(--color-catalog-paper)",
+    backgroundImage: "repeating-conic-gradient(var(--color-catalog-check) 0% 25%, transparent 0% 50%)",
+    backgroundSize: "12px 12px",
+  },
+});
 
 const variantStyles2 = stylex.create({
   detailSliderRoot: {
@@ -74,7 +93,7 @@ const variantStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
   },
   detailButtonVariant: {
     boxShadow: "0 0 0 calc(2px + 0) var(--color-focus)",
@@ -93,7 +112,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     alignItems: "center",
     gap: "var(--spacing)",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "var(--text-xs)",
@@ -130,7 +149,7 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "1px",
@@ -152,9 +171,17 @@ const viewStyles = stylex.create({
     position: "relative",
   },
   detailSpan2: {
+    width: 12,
+    height: 12,
+    backgroundImage: "linear-gradient(var(--color-berry-500),var(--color-berry-500)), linear-gradient(var(--color-berry-500),var(--color-berry-500))",
+    backgroundPosition: "center, center",
+    backgroundSize: "100% 2px, 2px 100%",
+    backgroundRepeat: "no-repeat",
     position: "absolute",
   },
   detailSpan3: {
+    width: 10,
+    height: 10,
     position: "absolute",
     borderStyle: "solid",
     borderWidth: "2px",
@@ -250,12 +277,7 @@ export const grounds: { value: Ground; label: string }[] = [
   { value: "night", label: t("web.catalog.ground.night") },
 ];
 
-export const groundStyle = (g: Ground): JSX.CSSProperties =>
-  g === "grass"
-    ? { background: "#7a9a4a" }
-    : g === "night"
-      ? { background: "#22283a" }
-      : { "background-color": "#f3e9d2", "background-image": "repeating-conic-gradient(#e4d6b6 0% 25%, transparent 0% 50%)", "background-size": "12px 12px" };
+export const groundStyle = (g: Ground): stylex.StyleXStyles => groundStyles[g];
 
 /** Whole steps, so its pixels stay square. */
 export const fitScale = (p: Picture, box: number) => {
@@ -343,7 +365,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
   const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
     <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
-      <div {...stylex.attrs(viewStyles.detailDiv)} style={groundStyle(props.ground)}>
+      <div {...styleProps([viewStyles.detailDiv, groundStyle(props.ground)])}>
         <span {...stylex.attrs(viewStyles.detailSpan)} style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
           <Img p={shown()} scale={scale()} />
           <Show when={marks()}>
@@ -353,9 +375,6 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
               style={{
                 left: `${shown().ax * scale() - 6}px`,
                 top: `${shown().ay * scale() - 6}px`,
-                width: "12px",
-                height: "12px",
-                background: "linear-gradient(#c84a3a,#c84a3a) center/100% 2px no-repeat, linear-gradient(#c84a3a,#c84a3a) center/2px 100% no-repeat",
               }}
             />
             <Show when={headOf(shown())}>
@@ -363,7 +382,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                 <span
                   title={t("web.catalog.head")}
                   {...stylex.attrs(viewStyles.detailSpan3)}
-                  style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px`, width: "10px", height: "10px" }}
+                  style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px` }}
                 />
               )}
             </Show>
@@ -408,11 +427,11 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                         title={name}
                         aria-label={name}
                         onClick={() => router.navigate(`/catalog/${encodeURIComponent(name)}`)}
-                        {...stylex.attrs(
+                        {...styleProps([
                           variantStyles.detailButton,
                           playing() && i() === frame() % f().length ? variantStyles.detailButtonVariant : variantStyles.detailButtonVariant2,
-                        )}
-                        style={groundStyle(props.ground)}
+                          groundStyle(props.ground),
+                        ])}
                       >
                         <Img p={p()} scale={fitScale(p(), 38)} />
                       </button>
@@ -464,7 +483,7 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
   };
   return (
     <div data-testid="cursor" data-key={props.name} {...stylex.attrs(viewStyles.cursor)}>
-      <span {...stylex.attrs(viewStyles.cursorTileSpan)} style={groundStyle(props.ground)}>
+      <span {...styleProps([viewStyles.cursorTileSpan, groundStyle(props.ground)])}>
         <span {...stylex.attrs(viewStyles.detailSpan)} style={{ height: `${height}px`, width: `${widthPx()}px` }}>
           <img
             src={`/cursors/${props.name}@2x.png`}

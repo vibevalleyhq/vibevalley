@@ -30,6 +30,112 @@ import {
   spansOf,
 } from "./runs";
 
+const logStyles = stylex.create({
+  box: {
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  edge: {
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  faint: {
+    fontStyle: "italic",
+  },
+  line: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+  },
+  text: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  user: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 14%, transparent)",
+    },
+  },
+  memory: {
+    backgroundColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 15%, transparent)",
+    },
+  },
+  assistant: {
+    backgroundColor: "var(--wb-hover)",
+  },
+  retry: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 12%, transparent)",
+    },
+  },
+  usage: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 6%, transparent)",
+    },
+  },
+  error: {
+    backgroundColor: {
+      default: "var(--wb-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 10%, transparent)",
+    },
+  },
+  ink: {
+    color: "var(--wb-ink)",
+  },
+  muted: {
+    color: "var(--wb-muted)",
+  },
+  berry: {
+    color: "var(--wb-berry)",
+  },
+  duration: {
+    backgroundColor: {
+      default: "var(--timeline-color)",
+      "@media (hover: hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  foldedDiv: {
+    width: "100%",
+    overflow: "hidden",
+  },
+  foldedDivVariant1Case1: {
+    fontSize: null,
+    lineHeight: null,
+    whiteSpace: null,
+  },
+  foldedDivVariant1Case2: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    whiteSpace: "pre-wrap",
+  },
+  foldedDivVariant2Case1: {
+    WebkitMaskImage: null,
+    maskImage: null,
+  },
+  foldedDivVariant2Case2: {
+    WebkitMaskImage: "linear-gradient(black 70%,transparent)",
+    maskImage: "linear-gradient(black 70%,transparent)",
+  },
+});
+
 const recipeStyles = stylex.create({
   runStepsWorkLog: {
     marginTop: "calc(var(--spacing) * 1.5)",
@@ -430,8 +536,8 @@ function TimeBar(props: { run: RunView; end: number }) {
         {(s) => (
           <span
             title={`${spanLabel(s().step)} · ${tookText(s().ms)}\n${s().step.text.split("\n")[0]}`}
-            class="hover:!bg-ink"
-            style={{ "flex-grow": Math.max(1, Math.round((Math.max(s().ms, least()) / least()) * 10)), background: spanColor(s().step) }}
+            {...styleProps(logStyles.duration)}
+            style={{ "flex-grow": Math.max(1, Math.round((Math.max(s().ms, least()) / least()) * 10)), "--timeline-color": spanColor(s().step) }}
           />
         )}
       </For>
@@ -450,7 +556,11 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   return (
     <div {...stylex.attrs(viewStyles.foldedDiv)}>
       <div
-        class={["w-full overflow-hidden", { "text-base whitespace-pre-wrap": props.markdown !== true, "fold-fade": clamp() }]}
+        {...stylex.attrs(
+          recipeStyles2.foldedDiv,
+          props.markdown !== true ? recipeStyles2.foldedDivVariant1Case2 : recipeStyles2.foldedDivVariant1Case1,
+          clamp() ? recipeStyles2.foldedDivVariant2Case2 : recipeStyles2.foldedDivVariant2Case1,
+        )}
         style={clamp() ? { "max-height": `${props.lines * 22}px` } : undefined}
       >
         {props.markdown === true ? <Markdown text={props.text} /> : props.text}
@@ -464,10 +574,9 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   );
 }
 
-/** tint: the box's ground, a palette class (bg-wheat/14…), so it follows the theme. */
-function Box(props: { tint?: string; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
+function Box(props: { tint?: stylex.StyleXStyles; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
-    <div class={["rounded-md px-3 py-2", props.tint, { "border border-line": !(props.edge !== true), italic: !(props.faint !== true) }]}>
+    <div {...styleProps([logStyles.box, props.tint, props.edge === true && logStyles.edge, props.faint === true && logStyles.faint])}>
       <div {...stylex.attrs(viewStyles.boxDiv)}>
         <span {...stylex.attrs(viewStyles.boxSpan)}>{props.label}</span>
         <span {...stylex.attrs(viewStyles.boxSpan2)} />
@@ -478,11 +587,11 @@ function Box(props: { tint?: string; edge?: boolean; faint?: boolean; label: str
   );
 }
 
-function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: string; ink: string }) {
+function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: stylex.StyleXStyles; ink: stylex.StyleXStyles }) {
   return (
-    <div class={["flex items-start gap-2 rounded-md px-3 py-1.5", props.tint]}>
+    <div {...styleProps([logStyles.line, props.tint])}>
       <Icon name={props.mark} size={12} styles={[variantStyles2.lineIcon]} />
-      <span class={["min-w-0 flex-1 text-sm", props.ink]}>{props.step.text}</span>
+      <span {...styleProps([logStyles.text, props.ink])}>{props.step.text}</span>
       <When at={props.step.time} now={props.now} />
     </div>
   );
@@ -494,12 +603,12 @@ function Step(props: { step: SessionEvent; now: number }) {
   return (
     <Switch>
       <Match when={props.step.type === "user/message"}>
-        <Box tint="bg-wheat/14" label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
+        <Box tint={logStyles.user} label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={4} />
         </Box>
       </Match>
       <Match when={props.step.type === "memory/recalled"}>
-        <Box tint="bg-leaf/15" label={t("web.session.log.recalled")} step={props.step} now={props.now}>
+        <Box tint={logStyles.memory} label={t("web.session.log.recalled")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={3} />
         </Box>
       </Match>
@@ -509,7 +618,7 @@ function Step(props: { step: SessionEvent; now: number }) {
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/message"}>
-        <Box tint="bg-hover" label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
+        <Box tint={logStyles.assistant} label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={8} markdown />
         </Box>
       </Match>
@@ -517,13 +626,13 @@ function Step(props: { step: SessionEvent; now: number }) {
         <ToolStep step={props.step} now={props.now} />
       </Match>
       <Match when={props.step.type === "llm/retry"}>
-        <Line mark="retry" step={props.step} now={props.now} tint="bg-wheat/12" ink="text-ink" />
+        <Line mark="retry" step={props.step} now={props.now} tint={logStyles.retry} ink={logStyles.ink} />
       </Match>
       <Match when={props.step.type === "llm/usage"}>
-        <Line mark="spend" step={props.step} now={props.now} tint="bg-wheat/6" ink="text-muted" />
+        <Line mark="spend" step={props.step} now={props.now} tint={logStyles.usage} ink={logStyles.muted} />
       </Match>
       <Match when={props.step.type === "run/error"}>
-        <Line mark="warn" step={props.step} now={props.now} tint="bg-berry/10" ink="text-berry" />
+        <Line mark="warn" step={props.step} now={props.now} tint={logStyles.error} ink={logStyles.berry} />
       </Match>
     </Switch>
   );

@@ -3,9 +3,11 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 
@@ -198,7 +200,7 @@ export function BlocksGame(props: { big?: boolean }) {
             <span>
               {g()?.over === true ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
-              <span class="phone-blink">
+              <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", { what: g() && !g()!.over ? t("web.farm.phone.resume") : t("web.farm.phone.start") })}
               </span>
             </span>

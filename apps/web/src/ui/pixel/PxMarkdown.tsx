@@ -96,9 +96,8 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
 }
 
 /**
- * GitHub-flavoured, no raw HTML. With `mentions`, @w3, @管家, @主人 and @所有人 outside code are small tags. A link
- * goes to `onOpenLink` when given, else opens in a new tab. `reading`: long text in pxStyle.read at most 40 characters
- * a line; headings stay pixel, code stays mono. `styles` carries the colour.
+ * GitHub-flavoured, no raw HTML. `mentions`: @w3, @管家, @主人 and @所有人 outside code become tags.
+ * Links use `onOpenLink` when given, otherwise a new tab. `reading` limits lines to 40ch.
  */
 export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; styles?: stylex.StyleXStyles }) {
   const nodes = createMemo(() => render(props.mentions === true ? withMentions(props.text) : props.text, props.onOpenLink));

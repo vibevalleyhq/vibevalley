@@ -15,6 +15,7 @@ import { Button } from "#/ui/Button.tsx";
 import { highlight, type Tokens } from "#/ui/code/highlight.ts";
 import { Dialog } from "#/ui/Dialog.tsx";
 import { TextArea } from "#/ui/Field.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { actionOf, perform } from "./acts";
 import { type Lane } from "./cards";
@@ -23,6 +24,114 @@ import { useIssueChanges } from "./history";
 import { issueTitle } from "./issue";
 import { issueMove, sendMove } from "./moves";
 import { Note } from "./Sheet";
+
+const changeStyles = stylex.create({
+  files: {
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  kind: {
+    display: "flex",
+    width: "calc(var(--spacing) * 5)",
+    height: "calc(var(--spacing) * 5)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-sm)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  added: {
+    backgroundColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 20%, transparent)",
+    },
+    color: "var(--wb-accent)",
+  },
+  modified: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
+    },
+    color: "var(--wb-bark)",
+  },
+  deleted: {
+    backgroundColor: {
+      default: "var(--wb-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 15%, transparent)",
+    },
+    color: "var(--wb-berry)",
+  },
+  unknown: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  file: {
+    borderTopStyle: {
+      default: null,
+      ":not(:last-child)": "solid",
+    },
+    borderBottomStyle: {
+      default: null,
+      ":not(:last-child)": "solid",
+    },
+    borderTopWidth: {
+      default: null,
+      ":not(:last-child)": "0px",
+    },
+    borderBottomWidth: {
+      default: null,
+      ":not(:last-child)": "1px",
+    },
+    borderColor: {
+      default: null,
+      ":not(:last-child)": "var(--color-line)",
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  fileRowButton: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  fileRowButtonState: {
+    backgroundColor: null,
+    cursor: null,
+  },
+  fileRowButtonState2: {
+    backgroundColor: "var(--wb-hover)",
+    cursor: null,
+  },
+  fileRowButtonState3: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    cursor: "pointer",
+  },
+  fileRowButtonState4: {
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    cursor: "pointer",
+  },
+});
 
 const recipeStyles = stylex.create({
   patchDiv: {
@@ -122,7 +231,7 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
   },
   changesReviewSpan3: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontFamily: "var(--font-mono)",
@@ -142,7 +251,7 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
   },
   changesReviewSpan4: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
@@ -164,7 +273,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   changesHeadSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-selected)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -213,7 +322,7 @@ const viewStyles = stylex.create({
     color: "var(--color-accent)",
   },
   fileRowSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-berry)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
@@ -447,7 +556,7 @@ export function ChangesBody(props: { changes: Changes }) {
       <Show when={props.changes.files.length > 0}>
         <section>
           <h3 {...stylex.attrs(viewStyles.changesBodyH3)}>{t("web.issue.changes.files", { n: props.changes.files.length })}</h3>
-          <div class="divide-y divide-line overflow-hidden rounded-md border border-line">
+          <div {...styleProps(changeStyles.files)}>
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={props.changes.conflicts.includes(f.path)} />}</For>
           </div>
         </section>
@@ -464,14 +573,14 @@ function PlusMinus(props: { added: number; removed: number }) {
   );
 }
 
-const kindLook: Record<string, string> = { A: "bg-leaf/20 text-accent", M: "bg-wheat/20 text-bark", D: "bg-berry/15 text-berry" };
+const kindLook: Record<string, stylex.StyleXStyles> = { A: changeStyles.added, M: changeStyles.modified, D: changeStyles.deleted };
 
 function FileRow(props: { file: ChangedFile; conflict: boolean }) {
   const [open, setOpen] = createSignal(false);
   const kind = () => changeKind(props.file.status);
   const hasPatch = () => !!props.file.patch;
   return (
-    <div>
+    <div {...styleProps(changeStyles.file)}>
       <button
         type="button"
         data-testid="changed-file"
@@ -479,12 +588,18 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         disabled={!hasPatch()}
         aria-expanded={hasPatch() ? aria(open()) : undefined}
         onClick={() => setOpen(!open())}
-        class={["flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left", { "cursor-pointer hover:bg-hover": hasPatch(), "bg-hover": open() }]}
+        {...stylex.attrs(
+          recipeStyles2.fileRowButton,
+          hasPatch()
+            ? open()
+              ? recipeStyles2.fileRowButtonState4
+              : recipeStyles2.fileRowButtonState3
+            : open()
+              ? recipeStyles2.fileRowButtonState2
+              : recipeStyles2.fileRowButtonState,
+        )}
       >
-        <span
-          title={kind().label}
-          class={["flex size-5 shrink-0 items-center justify-center rounded text-xs font-semibold", kindLook[props.file.status] ?? "bg-selected"]}
-        >
+        <span title={kind().label} {...styleProps([changeStyles.kind, kindLook[props.file.status] ?? changeStyles.unknown])}>
           {kind().mark}
         </span>
         <span

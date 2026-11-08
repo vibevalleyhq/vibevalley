@@ -15,6 +15,7 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { Field, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
@@ -39,7 +40,16 @@ const variantStyles = stylex.create({
   },
 });
 
+const tile = 12;
+const tileGap = 3;
+
 const viewStyles = stylex.create({
+  calendarRows: { gap: tileGap },
+  calendarDay: { height: tile },
+  calendarWeek: { gap: tileGap, marginLeft: tileGap },
+  calendarFuture: { opacity: 0 },
+  calendarReady: { opacity: 1 },
+  calendarLoading: { opacity: 0.5 },
   statDiv: {
     display: "flex",
     minWidth: "calc(var(--spacing) * 18)",
@@ -112,7 +122,7 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-hover)",
   },
   codeCode: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-selected)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "1px",
@@ -340,8 +350,6 @@ function NotCounted(props: { reason: string }) {
 }
 
 const levelName = (level: number) => (level === 0 || level === 1 || level === 2 || level === 3 || level === 4 ? t(`web.repo.level.${level}`) : "");
-const tile = 12;
-const tileGap = 3;
 
 export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
   const [pointed, setPointed] = createSignal<CalendarDay>();
@@ -391,21 +399,20 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
               {...stylex.attrs(viewStyles.commitCalendarDiv5)}
               onMouseLeave={() => setPointed(undefined)}
             >
-              <div {...stylex.attrs(viewStyles.commitCalendarDiv6)} style={{ gap: `${tileGap}px` }}>
+              <div {...styleProps([viewStyles.commitCalendarDiv6, viewStyles.calendarRows])}>
                 <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.repo.rows.${i}`))}>
-                  {(d) => (
-                    <span {...stylex.attrs(viewStyles.commitCalendarSpan2)} style={{ height: `${tile}px` }}>
-                      {d}
-                    </span>
-                  )}
+                  {(d) => <span {...styleProps([viewStyles.commitCalendarSpan2, viewStyles.calendarDay])}>{d}</span>}
                 </For>
               </div>
               <For each={calendar().weeks}>
                 {(week) => (
-                  <div {...stylex.attrs(viewStyles.commitCalendarDiv7)} style={{ gap: `${tileGap}px`, "margin-left": `${tileGap}px` }}>
+                  <div {...styleProps([viewStyles.commitCalendarDiv7, viewStyles.calendarWeek])}>
                     <For each={week}>
                       {(d) => (
-                        <span onMouseEnter={() => setPointed(d)} style={{ opacity: d.future ? 0 : worked() ? 1 : 0.5 }}>
+                        <span
+                          onMouseEnter={() => setPointed(d)}
+                          {...styleProps(d.future ? viewStyles.calendarFuture : worked() ? viewStyles.calendarReady : viewStyles.calendarLoading)}
+                        >
                           <SpriteIcon name={`day-${d.level}`} size={tile} />
                         </span>
                       )}

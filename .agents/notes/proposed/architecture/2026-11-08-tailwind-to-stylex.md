@@ -14,6 +14,12 @@ This is an implementation plan, not a completion claim. The branch is `refactor/
 
 Use the official StyleX compiler for all CSS consumers and the installed Solid Vite plugin for the website's single-root pre-rendered documents. Complete the rendering and style-boundary gates before converting consumers.
 
+### Startup correction requested during acceptance
+
+The owner reports repeated loading screens and asks for simulated progress. Desktop currently navigates the visible loading document to another document containing the same loading screen. Keep a single native loading view above the real page across that navigation; the typed host bridge forwards actual loading phases and releases the view only after page readiness or an explicit waiting/error outcome. Browser and phone keep their inline cover. One shared opening script owns visual progress: it advances smoothly below completion while real work is pending, never decreases, stops on failure, and reaches 100% only on actual readiness. Do not add a minimum loading duration. The development launcher must complete its sole watch build before Electron starts.
+
+Acceptance covers an isolated real desktop cold start, refresh, failed server launch, continuous visible progress across the local-to-HTTP handoff, delayed browser readiness, reduced motion, and timeout/error outcomes. Existing desktop and opening regressions cover these behavior boundaries; the full migration receipt follows the correction.
+
 ## 道 — Principles and boundaries
 
 1. Preserve business behavior, routes, copy, artwork, themes, accessibility, and the observed animation sequences.
@@ -175,44 +181,44 @@ The 170-scene full capture was interrupted at the owner's request while still ru
 
 - [x] Locate all 23 contract findings and 10 helper-call findings in the scanner output; record their ownership below. These are findings, not 23 confirmed public APIs or 10 distinct helper functions.
 - [x] Trace each baseline contract's callers and distinguish actual style APIs, story data and native/externally owned attributes before converting or classifying it. The string-contract finding category is zero; remaining native interfaces and dynamic class producers still require review.
-- [ ] Convert workbench layout, status/icon/avatar and remaining UI contracts with all callers in the same batch. Start with `apps/web/src/ui/layout.tsx` (100 token occurrences at baseline).
+- [x] Convert workbench layout, status/icon/avatar and remaining UI contracts with all callers in the same batch. Start with `apps/web/src/ui/layout.tsx` (100 token occurrences at baseline).
 - [x] First layout slice: replace Card's class-string prop with typed StyleX composition and migrate all six skill/voice callers; preserve dynamic variables as object styles. Split, ListCard, ListRow, Toggle, SecretInput and TextLink are also converted; their consolidated acceptance is pending phase 6.
-- [ ] Convert pixel component contracts, starting with `apps/web/src/ui/pixel/choice.tsx` (88 occurrences); keep positioning and animation values under one owner.
-- [ ] Convert remaining app shell and web story styles; change each affected component's story alongside its API.
-- [ ] Resolve the Base UI finding without introducing styles into the unstyled package.
+- [x] Convert pixel component contracts, starting with `apps/web/src/ui/pixel/choice.tsx` (88 occurrences); keep positioning and animation values under one owner.
+- [x] Convert remaining app shell and web story styles; change each affected component's story alongside its API.
+- [x] Resolve the Base UI finding without introducing styles into the unstyled package.
 - [ ] Add coverage for dynamic object variables, refs, focus, disabled/data states and responsive composition. Reuse the proven boundaries during bulk conversion; execute the complete component/visual acceptance in phase 6.
 
 ### Phase 2 — Convert business pages (2,269 tokens / 61 files at baseline)
 
-- [ ] Channel: message parts (134 occurrences), message list (109), sidebar (102), and their remaining consumers.
-- [ ] Agent, runtime and connector: start with `AgentsPage.tsx` (115 occurrences).
-- [ ] Issue: detail, lists, board, completion and queued-work surfaces; preserve all state-specific layouts.
-- [ ] Artifact: start with `ArtifactsPage.tsx` (107 occurrences); include document, HTML sandbox, versions and reply controls.
-- [ ] Memory, orchestrator, repository, settings, inbox, knowledge and pairing: cover remaining inventory findings; start memory with `Memory.tsx` (86 occurrences).
+- [x] Channel: message parts (134 occurrences), message list (109), sidebar (102), and their remaining consumers.
+- [x] Agent, runtime and connector: start with `AgentsPage.tsx` (115 occurrences).
+- [x] Issue: detail, lists, board, completion and queued-work surfaces; preserve all state-specific layouts.
+- [x] Artifact: start with `ArtifactsPage.tsx` (107 occurrences); include document, HTML sandbox, versions and reply controls.
+- [x] Memory, orchestrator, repository, settings, inbox, knowledge and pairing: cover remaining inventory findings; start memory with `Memory.tsx` (86 occurrences).
 - [ ] Keep relevant domain integration tests and populated fixture scenarios current as callers change. Run their complete acceptance and isolated-server desktop/390px inspection in phase 6; empty states alone cannot close populated acceptance.
 
 ### Phase 3 — Convert farm and tree DOM (931 tokens / 30 files at baseline)
 
-- [ ] Farm issue surfaces: start with `farm/issue/IssueView.tsx` (163 occurrences).
-- [ ] Farm chat: start with `farm/chat/Messages.tsx` (157 occurrences).
-- [ ] Remaining farm overlays, dialogs, panels and responsive DOM; do not change Pixi drawing or game/business rules.
-- [ ] Tree panels and overlays; retain artwork, motion ownership and keyboard interactions.
+- [x] Farm issue surfaces: start with `farm/issue/IssueView.tsx` (163 occurrences).
+- [x] Farm chat: start with `farm/chat/Messages.tsx` (157 occurrences).
+- [x] Remaining farm overlays, dialogs, panels and responsive DOM; do not change Pixi drawing or game/business rules.
+- [x] Tree panels and overlays; retain artwork, motion ownership and keyboard interactions.
 - [ ] Verify populated states, both themes where supported, narrow/desktop geometry and reduced motion against the original baseline.
 
 ### Phase 4 — Finish website, viewer and remaining containers (644 tokens / 17 files at baseline)
 
-- [ ] Website Hero (167 occurrences): hour-dependent visibility, pressed controls, responsive layout and pre-hydration rules.
-- [ ] Remaining website sections and animation-related style boundaries; no property may have both Motion and StyleX writers.
-- [ ] Viewer filled-frame descendant contract and remaining layout classes; keep the identical catalogue fixture on both sides.
-- [ ] Design HTML and other web containers; migrate or justify each finding, not entire directories.
+- [x] Website Hero (167 occurrences): hour-dependent visibility, pressed controls, responsive layout and pre-hydration rules.
+- [x] Remaining website sections and animation-related style boundaries; no property may have both Motion and StyleX writers.
+- [x] Viewer filled-frame descendant contract and remaining layout classes; keep the identical catalogue fixture on both sides.
+- [x] Design HTML and other web containers; migrate or justify each finding, not entire directories.
 - [ ] Verify all three routes without JavaScript, metadata/assets/fonts, hydration identity, four hours, reverse scrolling, modal interruption/focus, resize, offscreen pause, unmount and reduced motion. Keep the single-root public-API architecture.
 
 ### Phase 5 — Remove Tailwind and enforce StyleX
 
-- [ ] Make design-token lint understand StyleX; test valid and invalid declarations before deleting utility-based enforcement.
-- [ ] Resolve all dynamic expressions and review inline ownership; each retained semantic class or plain-CSS rule needs a narrow classification.
-- [ ] Preserve required reset, font, token, rich-text and pre-hydration defaults independently of utility discovery.
-- [ ] Remove Tailwind plugins, dependencies, directives, class sorting and obsolete helpers; regenerate the root lockfile through the package manager.
+- [x] Make design-token lint understand StyleX; test valid and invalid declarations before deleting utility-based enforcement.
+- [x] Resolve all dynamic expressions and review inline ownership; each retained semantic class or plain-CSS rule needs a narrow classification.
+- [x] Preserve required reset, font, token, rich-text and pre-hydration defaults independently of utility discovery.
+- [x] Remove Tailwind plugins, dependencies, directives, class sorting and obsolete helpers; regenerate the root lockfile through the package manager.
 - [ ] Rebuild app, stories and site client/SSR outputs; require complete inventory coverage and zero forbidden findings. Do not treat a missing or stale graph as zero work.
 
 ### Phase 6 — Complete acceptance and deliver one PR
@@ -251,6 +257,7 @@ The ten baseline helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx
 | Cross-phase mechanical sweep: constants, maps and independent conditions | 3,199 / 123 → 2,021 / 108 | 229 expressions across 53 files; non-styling AST comparison passes; clean type/lint and production stories compilation | Implementation checkpoint; 18 contract findings remain; full acceptance pending phase 6 |
 | Pixel contracts, alpha fallbacks and remaining simple native patterns | 1,968 / 102 → 1,686 / 95 | Fresh working-tree starting scan; contract findings 18 → 11; 19 native expressions / 14 files and 9 caller expressions / 5 files; core and native non-styling AST proofs; 38 migration unit tests | Committed as `f54f809f`; browser and complete visual/live/host acceptance pending phase 6 |
 | Remaining string contracts, pixel rich text and token data | 1,686 / 95 → 1,544 / 92 | Contract findings 11 → 0; helpers 7 → 5; 12 mechanical caller expressions / 7 files; non-styling AST proof across 13 files; original rich-text declarations preserved in 25 scoped CSS rules | Implementation checkpoint; native boundaries, remaining classes and full acceptance still open |
+| Parallel source convergence across phases 1–5 | 985 / 62 → 0 / 0 | 214 expression-specific native ownership reviews; 353 tooling/lint tests pass; app, stories and site production compilers pass; refreshed inventory scans 2,839 files with only four stale-build-input findings after tooling/document edits | Source implementation complete; final formatted builds, full pixels, behavior and native hosts remain required |
 
 Card live inspection covers the new-skill and voice configuration forms at 1440×900 and 390×844. Desktop receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-IR07mx/result.json`. Narrow receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-bjJzVX/result.json`. Both record code 0, stopped true and no cleanup errors. The default narrow navigation leaves the cards below the fold; the inspected narrow card captures use the real settings-search control to filter navigation and then scroll to the card. This is scoped form evidence, not a default-state full-page comparison or final populated-data acceptance.
 

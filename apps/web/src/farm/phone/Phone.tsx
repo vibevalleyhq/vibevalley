@@ -13,6 +13,7 @@ import { voiceCall } from "#/features/voice/index.ts";
 import { useCore } from "#/infra/frame.ts";
 import { useRouter } from "#/infra/router.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneCalls, phoneState } from "./calls";
 import { BlocksGame } from "./games/BlocksGame";
@@ -25,6 +26,11 @@ import { type PadButton, padListening, pressPad } from "./pad";
 import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
 
 const viewStyles = stylex.create({
+  crossKey: { position: "absolute", width: "calc(var(--spacing) * 4)", height: "calc(var(--spacing) * 4)" },
+  crossUp: { top: 0, left: "calc(var(--spacing) * 4)" },
+  crossLeft: { top: "calc(var(--spacing) * 4)", left: 0 },
+  crossRight: { top: "calc(var(--spacing) * 4)", right: 0 },
+  crossDown: { bottom: 0, left: "calc(var(--spacing) * 4)" },
   phone: {
     pointerEvents: "auto",
     position: "relative",
@@ -477,7 +483,7 @@ function createPress(button: () => PadButton) {
   };
 }
 
-function CrossKey(props: { button: PadButton; label: string; at: string }) {
+function CrossKey(props: { button: PadButton; label: string; styles: stylex.StyleXStyles }) {
   const key = createPress(() => props.button);
   return (
     <button
@@ -487,8 +493,7 @@ function CrossKey(props: { button: PadButton; label: string; at: string }) {
       onPointerUp={key.onPointerUp}
       onPointerCancel={key.onPointerCancel}
       onPointerLeave={key.onPointerLeave}
-      class={["absolute size-4", props.at]}
-      style={{ background: key.down() ? "#1e140b" : bark }}
+      {...styleProps([viewStyles.crossKey, props.styles], { background: key.down() ? "#1e140b" : bark })}
     />
   );
 }
@@ -496,10 +501,10 @@ function CrossKey(props: { button: PadButton; label: string; at: string }) {
 function Cross() {
   return (
     <span {...stylex.attrs(viewStyles.crossSpan)}>
-      <CrossKey button="up" label={t("web.farm.phone.key.up")} at="top-0 left-4" />
-      <CrossKey button="left" label={t("web.farm.phone.key.left")} at="top-4 left-0" />
-      <CrossKey button="right" label={t("web.farm.phone.key.right")} at="top-4 right-0" />
-      <CrossKey button="down" label={t("web.farm.phone.key.down")} at="bottom-0 left-4" />
+      <CrossKey button="up" label={t("web.farm.phone.key.up")} styles={viewStyles.crossUp} />
+      <CrossKey button="left" label={t("web.farm.phone.key.left")} styles={viewStyles.crossLeft} />
+      <CrossKey button="right" label={t("web.farm.phone.key.right")} styles={viewStyles.crossRight} />
+      <CrossKey button="down" label={t("web.farm.phone.key.down")} styles={viewStyles.crossDown} />
       <i {...stylex.attrs(viewStyles.crossI)} style={{ background: bark }} />
     </span>
   );

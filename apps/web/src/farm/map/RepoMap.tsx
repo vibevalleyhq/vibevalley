@@ -48,6 +48,7 @@ import {
 } from "./islands";
 
 const recipeStyles = stylex.create({
+  enterIsland: { cursor: "pointer" },
   repoMapArt: {
     pointerEvents: "none",
     position: "absolute",
@@ -119,6 +120,7 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
   },
   repoMapDiv3: {
+    backgroundColor: "var(--color-px-map-paper)",
     position: "relative",
     minHeight: "0",
     flex: "1",
@@ -147,6 +149,14 @@ const viewStyles = stylex.create({
   gridDiv2: {
     position: "absolute",
     inset: "0",
+  },
+  gridColumns: {
+    backgroundImage: "repeating-linear-gradient(to right, transparent 0 62px, var(--color-px-map-grid) 62px 64px)",
+    maskImage: "repeating-linear-gradient(to bottom, black 0 4px, transparent 4px 8px)",
+  },
+  gridRows: {
+    backgroundImage: "repeating-linear-gradient(to bottom, transparent 0 62px, var(--color-px-map-grid) 62px 64px)",
+    maskImage: "repeating-linear-gradient(to right, black 0 4px, transparent 4px 8px)",
   },
   placedSpan: {
     position: "absolute",
@@ -318,7 +328,6 @@ const viewStyles = stylex.create({
 });
 
 const gap = 24;
-const parchment = "#ebd9ae";
 
 /** The islands as the farm stands now. */
 function useIslands(): () => Island[] {
@@ -386,7 +395,7 @@ function RepoMap() {
           </For>
         </span>
       </div>
-      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.repoMapDiv3)} style={{ background: parchment }}>
+      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.repoMapDiv3)}>
         <Grid />
         <Show when={atlas()}>{(a) => <Clouds atlas={a()} />}</Show>
         <Show when={atlas()?.has("map-compass") === true && width() >= 700 ? atlas() : undefined}>
@@ -432,23 +441,10 @@ function RepoMap() {
 
 /** A dashed line every 64 px, as the parchment's grid. */
 function Grid() {
-  const ink = "#c8a46e73";
   return (
     <div {...stylex.attrs(viewStyles.gridDiv)}>
-      <div
-        {...stylex.attrs(viewStyles.gridDiv2)}
-        style={{
-          background: `repeating-linear-gradient(to right, transparent 0 62px, ${ink} 62px 64px)`,
-          "mask-image": "repeating-linear-gradient(to bottom, #000 0 4px, transparent 4px 8px)",
-        }}
-      />
-      <div
-        {...stylex.attrs(viewStyles.gridDiv2)}
-        style={{
-          background: `repeating-linear-gradient(to bottom, transparent 0 62px, ${ink} 62px 64px)`,
-          "mask-image": "repeating-linear-gradient(to right, #000 0 4px, transparent 4px 8px)",
-        }}
-      />
+      <div {...styleProps([viewStyles.gridDiv2, viewStyles.gridColumns])} />
+      <div {...styleProps([viewStyles.gridDiv2, viewStyles.gridRows])} />
     </div>
   );
 }
@@ -676,7 +672,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
         data-key={props.island.repo}
         onClick={enter}
         aria-label={t("web.farm.map.enter", { repo: props.island.repo })}
-        class="group cursor-pointer"
+        {...styleProps(recipeStyles.enterIsland)}
       >
         <PixelCard
           center

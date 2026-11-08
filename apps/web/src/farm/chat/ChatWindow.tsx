@@ -37,6 +37,59 @@ import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
+const typingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
+
+const recipeStyles2 = stylex.create({
+  dotsSpan: {
+    height: "var(--spacing)",
+    width: "var(--spacing)",
+    animationName: { default: typingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "2s",
+    animationDelay: "0s",
+    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
+    animationIterationCount: "infinite",
+    animationDirection: "normal",
+    animationFillMode: "none",
+    animationPlayState: "running",
+    backgroundColor: "var(--color-bark-500)",
+  },
+  chatWindowSpan: {
+    marginLeft: "calc(var(--spacing) * .5)",
+    display: "inline-block",
+    height: "calc(var(--spacing) * 3)",
+    width: "calc(var(--spacing) * 1.5)",
+    animationName: { default: typingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "2s",
+    animationDelay: "0s",
+    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
+    animationIterationCount: "infinite",
+    animationDirection: "normal",
+    animationFillMode: "none",
+    animationPlayState: "running",
+    backgroundColor: "currentColor",
+    verticalAlign: "middle",
+  },
+  chatWindowDiv: {
+    display: "flex",
+    flexShrink: "0",
+    WebkitMaskImage: "linear-gradient(to right, transparent, black var(--fade-left), black calc(100% - var(--fade-right)), transparent)",
+    maskImage: "linear-gradient(to right, transparent, black var(--fade-left), black calc(100% - var(--fade-right)), transparent)",
+    animationName: "scroll-fade-x",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self x)",
+    gap: "calc(var(--spacing) * 1.5)",
+    overflowX: "auto",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+});
+
 const recipeStyles = stylex.create({
   chatWindowP: {
     display: "flex",
@@ -384,7 +437,7 @@ const phaseOf = (v: VoiceCall, s: SpaceState | undefined): ChatPhase => {
 function Dots() {
   return (
     <span {...stylex.attrs(viewStyles.dotsSpan)} aria-hidden="true">
-      <For each={[0, 1, 2]}>{(i) => <span class="h-1 w-1 animate-pulse bg-bark-500" style={{ "animation-delay": `${i * 0.2}s` }} />}</For>
+      <For each={[0, 1, 2]}>{(i) => <span {...stylex.attrs(recipeStyles2.dotsSpan)} style={{ "animation-delay": `${i * 0.2}s` }} />}</For>
     </span>
   );
 }
@@ -605,7 +658,7 @@ export function ChatWindow() {
                   >
                     <span {...stylex.attrs(viewStyles.chatWindowSpan3)}>{caption().text}</span>
                     <Show when={!caption().done}>
-                      <span class="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current align-middle" aria-hidden="true" />
+                      <span {...stylex.attrs(recipeStyles2.chatWindowSpan)} aria-hidden="true" />
                     </Show>
                   </ChatRow>
                 </div>
@@ -628,7 +681,7 @@ export function ChatWindow() {
           )}
         </Show>
         <Show when={showSuggestions()}>
-          <div class="flex shrink-0 scroll-fade-x gap-1.5 overflow-x-auto px-3 pb-2">
+          <div {...stylex.attrs(recipeStyles2.chatWindowDiv)}>
             <For each={suggestions}>
               {(line) => (
                 <button

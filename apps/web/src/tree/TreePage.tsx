@@ -15,6 +15,20 @@ import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
 
+const recipeStyles5 = stylex.create({
+  treePageDiv: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 3)",
+    left: "calc(var(--spacing) * 3)",
+  },
+  treePageDivVariant1Case1: {
+    display: null,
+  },
+  treePageDivVariant1Case2: {
+    display: "none",
+  },
+});
+
 const recipeStyles4 = stylex.create({
   treePageFilters: {
     minWidth: "220px",
@@ -203,7 +217,7 @@ export function TreePage() {
           </PxButton>
         </div>
       </Show>
-      <div class={["absolute top-3 left-3", { hidden: sky() }]}>
+      <div {...stylex.attrs(recipeStyles5.treePageDiv, sky() ? recipeStyles5.treePageDivVariant1Case2 : recipeStyles5.treePageDivVariant1Case1)}>
         <PxButton icon="icon-map" data-testid="tree-home" onClick={home}>
           {t("web.tree.farm")}
         </PxButton>

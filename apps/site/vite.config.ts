@@ -2,7 +2,6 @@ import { fileURLToPath } from "node:url";
 
 import solid from "@solidjs/vite-plugin";
 import stylex from "@stylexjs/unplugin";
-import tailwindcss from "@tailwindcss/vite";
 import { styleMigrationGraph } from "vibevalley/style-migration";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
@@ -11,7 +10,6 @@ export default defineConfig({
     lazyPlugins(() => [
       stylex.vite({ useCSSLayers: { before: ["theme", "base", "components"], after: ["utilities"], prefix: "stylex" }, sxPropName: false }),
       solid({ ssr: true, start: { renderMode: "async" } }),
-      tailwindcss(),
       styleMigrationGraph("site"),
     ]) ?? [],
   resolve: { alias: { "@game": fileURLToPath(new URL("../web/public", import.meta.url)) } },

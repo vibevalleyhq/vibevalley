@@ -1,116 +1,20 @@
 /* oxlint-disable no-await-in-loop -- A/A captures and lazy-hydration scroll positions must settle serially, without contention from another capture. */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
 import { arch, release } from "node:os";
 import { extname, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 
 import { chromium, type Browser } from "@playwright/test";
 
+import { buildEvidence, originalRevision, type FileEvidence } from "./style-migration-evidence";
 import { hash, migrationInputs, migrationOutput, migrationRoot, sourceInputs } from "./style-migration-inputs";
 import { comparePixels } from "./style-migration-pixels";
+import { staticScenes as scenes, type Scene } from "./style-migration-scenes";
 
-interface Scene {
-  id: string;
-  entry: "site" | "stories" | "viewer";
-  route: string;
-  width: number;
-  popup?: "select" | "menu" | "tooltip" | undefined;
-  viewerState?: "rest" | "input" | "hover";
-  link?: "primary" | "secondary";
-  linkState?: "hover" | "active" | "focus";
-}
-
-const scenes: Scene[] = [];
-for (const [name, route] of [
-  ["zh", "/"],
-  ["en", "/en/"],
-  ["404", "/404.html"],
-])
-  for (const width of [1440, 390]) {
-    if (name === undefined || route === undefined) throw new Error("Incomplete site scene");
-    scenes.push({ id: `site-${name}-${width}`, entry: "site", route, width });
-  }
-for (const [name, story] of [
-  ["button-states", "组件/工作台/Button:States"],
-  ["button-tones", "组件/工作台/Button:Tones"],
-  ["button-icons", "组件/工作台/Button:With icon"],
-  ["field-states", "组件/工作台/Field:States"],
-  ["field-text", "组件/工作台/Field:Text"],
-  ["field-long-text", "组件/工作台/Field:Long text"],
-  ["field-popup", "组件/工作台/Field:Select"],
-  ["menu-popup", "组件/工作台/MoreMenu:A place's other actions"],
-  ["menu-above", "组件/工作台/MoreMenu:Opening upwards, from a toolbar"],
-  ["tooltip", "组件/工作台/Tip:Hover"],
-  ["segmented-states", "组件/工作台/Segmented:States"],
-  ["segmented-disabled", "组件/工作台/Segmented:Playground"],
-  ["tabs-states", "组件/工作台/Tabs:States"],
-  ["tag-states", "组件/工作台/Tag:States"],
-  ["tag-tones", "组件/工作台/Tag:Tones"],
-  ["dot-tones", "组件/工作台/Tag:Dot tones"],
-  ["attachment-kinds", "组件/工作台/AttachmentTile:Kinds"],
-  ["checkbox-states", "组件/工作台/Checkbox:States"],
-  ["chips-values", "组件/工作台/Chips:Key and value"],
-  ["chips-words", "组件/工作台/Chips:Words"],
-  ["icon-button-states", "组件/工作台/IconButton:States"],
-  ["icon-button-kinds", "组件/工作台/IconButton:Kinds"],
-  ["agent-faces", "组件/工作台/Face:Agents"],
-  ["form-receipts", "组件/工作台/Form:Receipts"],
-  ["icon-catalog", "设计体系/图标:All"],
-  ["key-marks", "组件/工作台/KeyField:Marks"],
-  ["layout-card", "组件/工作台/layout:Card"],
-  ["layout-toggle", "组件/工作台/layout:Toggle states"],
-  ["layout-controls", "组件/工作台/layout:Controls"],
-  ["layout-list", "组件/工作台/layout:List card"],
-  ["layout-rows", "组件/工作台/layout:Row states"],
-  ["layout-empty", "组件/工作台/layout:Empty with a next step"],
-  ["markdown-message", "组件/工作台/Markdown:Message"],
-  ["data-table", "组件/工作台/DataTable:Local"],
-  ["agent-cards", "组件/帮工/档案卡:States"],
-  ["memory-states", "组件/记性/一条记性:States"],
-  ["messages-rich", "界面/频道/消息:Rich"],
-  ["messages-reports", "界面/频道/消息:Reports"],
-  ["issue-board", "界面/工单/看板:Board"],
-  ["issue-answer", "界面/工单/工单页:答案"],
-  ["runtime-details", "界面/农机/详情:能用"],
-  ["runtime-usage", "界面/农机/详情:快用完"],
-  ["pixel-marks", "组件/像素/icons:Marked"],
-  ["pixel-sprites", "组件/像素/icons:Sprites"],
-])
-  for (const theme of story?.startsWith("组件/像素/") === true ? ["light"] : ["light", "dark"])
-    for (const width of [400, 800]) {
-      if (name === undefined || story === undefined) throw new Error("Incomplete story scene");
-      scenes.push({
-        id: `${name}-${theme}-${width}`,
-        entry: "stories",
-        route: `/?${new URLSearchParams({ s: story, theme, w: String(width) })}`,
-        width: 1680,
-        popup: name === "field-popup" ? "select" : name.startsWith("menu-") ? "menu" : name === "tooltip" ? "tooltip" : undefined,
-      });
-    }
-for (const theme of ["light", "dark"])
-  for (const width of [390, 900])
-    scenes.push({
-      id: `layout-split-${theme}-${width}`,
-      entry: "stories",
-      route: `/?${new URLSearchParams({ s: "交互/列表和详情:Pick a row", theme, w: width === 390 ? "400" : "800" })}`,
-      width,
-    });
-for (const theme of ["light", "dark"])
-  for (const width of [1440, 900, 390])
-    for (const viewerState of width === 390 ? (["rest"] as const) : (["rest", "input", "hover"] as const))
-      scenes.push({
-        id: `viewer-${theme}-${width}-${viewerState}`,
-        entry: "viewer",
-        route: `/?${new URLSearchParams({ s: "Viewer/Controls:Inputs", theme, w: "400" })}`,
-        width,
-        viewerState,
-      });
-for (const link of ["primary", "secondary"] as const)
-  for (const linkState of ["hover", "active", "focus"] as const)
-    scenes.push({ id: `site-link-${link}-${linkState}`, entry: "site", route: "/", width: 1440, link, linkState });
 const viewerFiles = ["apps/web/test/migration/index.html", "apps/web/test/migration/viewer.tsx", "apps/web/test/migration/vite.config.ts"];
 const captureOptions = { locale: "en-US", timezoneId: "UTC", deviceScaleFactor: 1, clock: "2026-11-08T12:00:00.000Z", reducedMotion: "reduce" };
 const browserArgs = ["--disable-skia-runtime-opts", "--disable-partial-raster", "--num-raster-threads=1", "--force-color-profile=srgb"];
@@ -179,7 +83,11 @@ async function serve(root: string) {
 
 async function capture(browser: Browser, origin: string, scene: Scene, destination: string) {
   const { clock, ...contextOptions } = captureOptions;
-  const context = await browser.newContext({ ...contextOptions, reducedMotion: "reduce", viewport: { width: scene.width, height: 1000 } });
+  const context = await browser.newContext({
+    ...contextOptions,
+    reducedMotion: scene.reducedMotion ?? "reduce",
+    viewport: { width: scene.width, height: 1000 },
+  });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -256,6 +164,13 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       [...document.querySelectorAll<HTMLVideoElement>("video[src]")].every((video) => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
     );
     await page.waitForTimeout(1200);
+    if (scene.hour !== undefined) {
+      const index = ["morning", "day", "evening", "night"].indexOf(scene.hour);
+      const button = page.locator('#top [role="group"] button').nth(index);
+      await button.click();
+      await page.waitForFunction((hour) => document.documentElement.dataset.scene === hour, scene.hour);
+      await page.waitForTimeout(1200);
+    }
     if (scene.link !== undefined) {
       const link = page.locator(scene.link === "primary" ? '#top a[href="https://github.com/vibevalleyhq/vibevalley"]' : '#top a[href="#how"]');
       switch (scene.linkState) {
@@ -305,11 +220,13 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
 }
 
 const args = parseArgs({ options: { baseline: { type: "string" } } });
+await rm(resolve(migrationOutput, "visual-static.json"), { force: true });
 if (args.values.baseline === undefined) throw new Error("Fix: pass --baseline <clean original Git worktree>; static evidence is not the full migration gate.");
 const baseline = resolve(args.values.baseline);
 if (baseline === migrationRoot) throw new Error("The candidate cannot be its own baseline");
 if (execFileSync("git", ["status", "--porcelain"], { cwd: baseline, encoding: "utf8" }).trim() !== "") throw new Error("The baseline worktree must be clean");
 const beforeInputs = sourceInputs(baseline);
+if (beforeInputs.revision !== originalRevision) throw new Error(`Fix: use the approved original baseline ${originalRevision}, not a rewritten reference.`);
 for (const [cwd, command] of [
   [resolve(baseline, "site"), ["run", "build"]],
   [baseline, ["run", "--no-cache", "--filter", "@vibevalley/web", "build:stories"]],
@@ -339,10 +256,17 @@ for (const [host, output] of [
   execFileSync("vp", ["build", "--config", "test/migration/vite.config.ts"], {
     cwd: resolve(migrationRoot, "apps/web"),
     stdio: "inherit",
-    env: { ...process.env, VIBEVALLEY_MIGRATION_HOST: host, VIBEVALLEY_MIGRATION_OUTPUT: output },
+    env: {
+      ...process.env,
+      VIBEVALLEY_MIGRATION_HOST: host,
+      VIBEVALLEY_MIGRATION_OUTPUT: output,
+      VIBEVALLEY_MIGRATION_LEGACY_PLUGIN:
+        host === baseline ? createRequire(resolve(baseline, "apps/web/package.json")).resolve("@tailwindcss/vite") : undefined,
+    },
   });
 if (sourceInputs(baseline).digest !== beforeInputs.digest) throw new Error("Baseline sources changed while building the viewer fixture");
 const inputs = migrationInputs();
+const builds = buildEvidence();
 const outputs = Object.values(roots)
   .flatMap((entries) => Object.values(entries))
   .map((root) => ({ root, artifacts: artifacts(root) }));
@@ -355,6 +279,8 @@ const results: {
   stability?: Awaited<ReturnType<typeof comparePixels>>;
   comparison?: Awaited<ReturnType<typeof comparePixels>>;
   textEqual?: boolean;
+  visual?: { before: FileEvidence; repeat: FileEvidence; after: FileEvidence };
+  evidence?: FileEvidence[];
 }[] = [];
 const servers: Awaited<ReturnType<typeof serve>>[] = [];
 const browser = await chromium.launch({ args: browserArgs });
@@ -381,7 +307,15 @@ try {
       const after = await capture(browser, urls.after[scene.entry], scene, resolve(out, `${scene.id}-after.png`));
       const comparison = await comparePixels(before.path, after.path, resolve(out, `${scene.id}-diff.png`));
       const textEqual = before.textHash === after.textHash;
-      results.push({ id: scene.id, stability, comparison, textEqual, status: comparison.passed && textEqual ? "passed" : "failed" });
+      results.push({
+        id: scene.id,
+        stability,
+        comparison,
+        textEqual,
+        visual: { before, repeat, after },
+        evidence: [before, repeat, after],
+        status: comparison.passed && textEqual ? "passed" : "failed",
+      });
       console.info(`${scene.id}: ${comparison.changedPixels} changed pixels, text equal: ${textEqual}`);
     } catch (error) {
       results.push({ id: scene.id, status: "failed", error: String(error) });
@@ -402,6 +336,9 @@ await writeFile(
   `${JSON.stringify(
     {
       schemaVersion: 1,
+      kind: "static",
+      createdAt: new Date().toISOString(),
+      builds,
       scope: "static-site-component-frames-and-viewer-fixture",
       status,
       inputs,
@@ -421,11 +358,12 @@ await writeFile(
         executableHash: hash(readFileSync(chromium.executablePath())),
         ...captureOptions,
       },
-      expected: scenes,
+      expected: scenes.map((scene) => scene.id),
+      scenarios: scenes,
       executed: results,
       skipped: [],
       errors,
-      notCovered: ["live-workbench", "farm-and-tree-dom", "desktop-host", "mobile-host", "interactive-website-states"],
+      notCovered: ["live-workbench", "farm-and-tree-dom", "desktop-host", "mobile-host", "website-behavior"],
     },
     null,
     2,

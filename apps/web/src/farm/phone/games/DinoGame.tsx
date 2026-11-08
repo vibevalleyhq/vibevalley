@@ -3,9 +3,11 @@ import { createEffect, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 
@@ -226,7 +228,7 @@ export function DinoGame(props: { big?: boolean }) {
           <div {...stylex.attrs(viewStyles.dinoGameDiv4)}>
             <span {...stylex.attrs(viewStyles.dinoGameSpan2)} style={{ background: lcd.paper }}>
               {d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
-              <span class="phone-blink">
+              <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", { what: d()?.over === true ? t("web.farm.phone.again") : t("web.farm.phone.start") })}
               </span>
             </span>

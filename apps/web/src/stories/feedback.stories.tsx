@@ -9,6 +9,12 @@ import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 const variantStyles = stylex.create({
+  list: {
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "var(--color-line)",
+  },
   feedbackStoriesDiv: {
     display: "flex",
     flexDirection: "column",
@@ -20,6 +26,11 @@ const variantStyles = stylex.create({
     color: "var(--color-faint)",
   },
   feedbackStoriesLi: {
+    borderTopStyle: { default: null, ":not(:last-child)": "solid" },
+    borderBottomStyle: { default: null, ":not(:last-child)": "solid" },
+    borderTopWidth: { default: null, ":not(:last-child)": 0 },
+    borderBottomWidth: { default: null, ":not(:last-child)": 1 },
+    borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
@@ -70,7 +81,7 @@ export default stories({
                 </Empty>
               </Match>
               <Match when={a.state === "full"}>
-                <ul class="divide-y divide-line rounded-lg border border-line">
+                <ul {...stylex.attrs(variantStyles.list)}>
                   <For each={rows().length > 0 ? rows() : ["修好登录", "补齐看板的测试"]}>
                     {(r) => <li {...stylex.attrs(variantStyles.feedbackStoriesLi)}>{r}</li>}
                   </For>

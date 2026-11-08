@@ -16,7 +16,26 @@ import { Button } from "#/ui/Button.tsx";
 import { Field, Select, TextInput } from "#/ui/Field.tsx";
 import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "#/ui/layout.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 import { Qr } from "#/ui/Qr.tsx";
+
+const connectorStyles = stylex.create({
+  dot: {
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    flexShrink: "0",
+    borderRadius: "2147483647px",
+  },
+  connected: {
+    backgroundColor: "var(--wb-leaf)",
+  },
+  pending: {
+    backgroundColor: "var(--wb-wheat)",
+  },
+  offline: {
+    backgroundColor: "var(--color-cream-300)",
+  },
+});
 
 const recipeStyles = stylex.create({
   connectorCardSpan: {
@@ -192,7 +211,8 @@ const stateLabel: Record<ConnectorState, string> = {
   paused: t("web.connector.connectors.state.paused"),
 };
 
-const dot = (s: ConnectorState | undefined) => (s === "connected" ? "bg-leaf" : s === "pairing" || s === "paused" ? "bg-wheat" : "bg-cream-300");
+const dot = (s: ConnectorState | undefined): stylex.StyleXStyles =>
+  s === "connected" ? connectorStyles.connected : s === "pairing" || s === "paused" ? connectorStyles.pending : connectorStyles.offline;
 
 export function ConnectorsPage(props: { id?: string | undefined }) {
   const core = useCore();
@@ -217,7 +237,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
                 title={connectorLabel[c]}
                 line={lineOf(c)}
                 leading={<SpriteIcon name={`connector-${c}`} size={36} />}
-                trailing={<span class={["size-2 shrink-0 rounded-full", dot(of(c)?.state)]} aria-hidden="true" />}
+                trailing={<span {...styleProps([connectorStyles.dot, dot(of(c)?.state)])} aria-hidden="true" />}
               />
             )}
           </For>

@@ -147,7 +147,7 @@ const viewStyles = stylex.create({
   },
   templateCardSpan3: {
     flexShrink: "0",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",

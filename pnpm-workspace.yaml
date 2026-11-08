@@ -38,7 +38,6 @@ catalog:
   "@solidjs/web": "2.0.0-rc.21"
   "@stylexjs/stylex": "0.19.1"
   "@stylexjs/unplugin": "0.19.1"
-  "@tailwindcss/vite": "^4.3.4"
   "@types/node": "^26.6.6"
   "@vitest/browser-playwright": "5.1.0"
   agora-agents: "2.13.0"
@@ -62,7 +61,6 @@ catalog:
   pele: ^1.13.0
   shiki: ^4.6.0
   solid-js: "2.0.0-rc.21"
-  tailwindcss: "^4.3.4"
   tsrs: "0.21.0-ts7.1.0-beta"
   typescript: "^7.0.2"
   unified: "^11.0.5"

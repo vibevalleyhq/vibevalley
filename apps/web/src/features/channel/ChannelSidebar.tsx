@@ -21,6 +21,54 @@ import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 
+const recipeStyles3 = stylex.create({
+  sidebarDiv: {
+    flex: "1",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  directPickerDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: 30,
+    marginTop: "var(--spacing)",
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 80)",
+    width: "calc(var(--spacing) * 56)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "var(--spacing)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
 const recipeStyles2 = stylex.create({
   sessionRowButton: {
     display: "flex",
@@ -327,8 +375,34 @@ const viewStyles = stylex.create({
   },
 });
 
-export const channelIconButtonClass =
-  "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50";
+const channelStyles = stylex.create({
+  iconButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+});
+
+export const channelIconButtonStyles = channelStyles.iconButton;
 
 export const markOf = (c: Channel | undefined) => (c?.type === "direct" ? "@" : "#");
 
@@ -387,7 +461,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           <Icon name="search" size={16} />
         </button>
       </div>
-      <div class="flex-1 scroll-fade-y overflow-y-auto p-3">
+      <div {...stylex.attrs(recipeStyles3.sidebarDiv)}>
         <button type="button" data-testid="switcher-open" onClick={() => switcher.show()} {...stylex.attrs(viewStyles.switcherOpen)}>
           <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{t("web.channel.switcher.open")}</span>
           <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/u.test(navigator.userAgent) })}</span>
@@ -480,12 +554,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
     if (id !== undefined) props.onPicked(id);
   };
   return (
-    <div
-      role="menu"
-      data-testid="direct-picker"
-      aria-label={t("web.channel.direct.pick")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
-    >
+    <div role="menu" data-testid="direct-picker" aria-label={t("web.channel.direct.pick")} {...stylex.attrs(recipeStyles3.directPickerDiv)}>
       <p {...stylex.attrs(viewStyles.directPickerP)}>{t("web.channel.direct.pick")}</p>
       <Show when={all.status() === "success" && agents().length === 0}>
         <p {...stylex.attrs(viewStyles.directPickerP2)}>{t("web.channel.direct.none")}</p>

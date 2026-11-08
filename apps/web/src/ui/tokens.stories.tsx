@@ -7,6 +7,37 @@ import { stories, story } from "@vibevalley/stories";
 import { Button } from "./Button";
 import { styleProps } from "./positioner";
 
+const recipeStyles = stylex.create({
+  tokensStoriesSpan: {
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-accent)",
+  },
+  tokensStoriesSpan2: {
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".18s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-accent)",
+  },
+});
+
 const viewStyles = stylex.create({
   colour: (value: string) => ({ backgroundColor: value }),
   radius: (value: string) => ({ borderRadius: value }),
@@ -307,11 +338,11 @@ export default stories({
               {() => (
                 <div {...stylex.attrs(viewStyles.tokensStoriesDiv7)}>
                   <div {...stylex.attrs(viewStyles.curveDiv)}>
-                    <span class="size-10 animate-pop-in rounded-md bg-accent" />
+                    <span {...stylex.attrs(recipeStyles.tokensStoriesSpan)} />
                     <Name>pop-in</Name>
                   </div>
                   <div {...stylex.attrs(viewStyles.curveDiv)}>
-                    <span class="size-10 animate-fade-in rounded-md bg-accent" />
+                    <span {...stylex.attrs(recipeStyles.tokensStoriesSpan2)} />
                     <Name>fade-in</Name>
                   </div>
                 </div>

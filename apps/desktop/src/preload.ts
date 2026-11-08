@@ -21,6 +21,7 @@ const told = (sent: Promise<void>) => void sent.catch((e: unknown) => console.er
 
 const host: Host = {
   name: "desktop",
+  opening: (update) => main.call.opening(update),
   notify: (notice) => main.call.notify(notice),
   tray: (summary) => main.call.tray(summary),
   locale: (locale) => told(main.call.locale(locale)),

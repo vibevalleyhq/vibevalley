@@ -34,6 +34,35 @@ import { Hint } from "#/ui/Tip.tsx";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
+const recipeStyles = stylex.create({
+  staminaSpan: {
+    flex: "1",
+    borderRadius: "var(--radius-xs)",
+  },
+  staminaSpanState: {
+    backgroundColor: "var(--wb-line)",
+  },
+  staminaSpanState2: {
+    backgroundColor: "var(--wb-accent)",
+  },
+  staminaSpanState3: {
+    backgroundColor: "var(--wb-wheat)",
+  },
+  staminaSpanState4: {
+    backgroundColor: "var(--wb-berry)",
+  },
+  staminaSpanState5: {
+    backgroundColor: "var(--wb-bark)",
+  },
+});
+const recipeStylesChoices1 = {
+  plenty: recipeStyles.staminaSpanState2,
+  low: recipeStyles.staminaSpanState3,
+  gold: recipeStyles.staminaSpanState3,
+  empty: recipeStyles.staminaSpanState4,
+  unknown: recipeStyles.staminaSpanState5,
+};
+
 const variantStyles4 = stylex.create({
   supportCardIcon: {
     marginTop: "var(--spacing)",
@@ -73,7 +102,7 @@ const variantStyles = stylex.create({
   },
   usagePVariant2: {},
   supportCardSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "1px",
     fontSize: "var(--text-xs)",
@@ -206,7 +235,7 @@ const viewStyles = stylex.create({
   },
   modelsCardSpan2: {
     marginLeft: "calc(var(--spacing) * 2)",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-ok-soft)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -238,7 +267,6 @@ const capabilityLabel: Record<RuntimeCapability, string> = {
 };
 
 /** A cell's colour by how much is left: the palette's, so the bar follows the theme. */
-const levelInk = { plenty: "bg-accent", low: "bg-wheat", gold: "bg-wheat", empty: "bg-berry", unknown: "bg-bark" } as const;
 
 /** The quota as a row of cells, filled to what is left. */
 export function Stamina(props: { quota: Quota; cells?: number; width: number; height: number }) {
@@ -252,7 +280,7 @@ export function Stamina(props: { quota: Quota; cells?: number; width: number; he
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
-        {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-line"]} />}
+        {(i) => <span {...stylex.attrs(recipeStyles.staminaSpan, i < lit() ? recipeStylesChoices1[props.quota.level] : recipeStyles.staminaSpanState)} />}
       </For>
     </Meter.Root>
   );

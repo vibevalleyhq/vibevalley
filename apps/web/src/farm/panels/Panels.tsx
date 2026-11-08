@@ -23,6 +23,40 @@ import { Menu } from "./Menu";
 import { tint } from "./rows";
 import { SowForm, WaterForm } from "./SeedForms";
 
+const recipeStyles = stylex.create({
+  tileButton: {
+    display: "flex",
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "center",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    padding: "calc(var(--spacing) * 2.5)",
+    cursor: {
+      default: null,
+      ":enabled": "pointer",
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  tileButtonVariant1Case1: {
+    borderColor: "transparent",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":enabled:hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  tileButtonVariant1Case2: {
+    borderColor: "var(--color-leaf-500)",
+    backgroundColor: null,
+  },
+});
+
 const viewStyles = stylex.create({
   orchestratorLooksDiv: {
     display: "flex",
@@ -222,11 +256,7 @@ function Tile(props: { item: string; chosen: boolean; ready: boolean; onClick: (
       aria-pressed={aria(props.chosen)}
       disabled={!props.ready}
       onClick={() => props.onClick()}
-      class={[
-        // The border is always there and only coloured when chosen: choosing does not squeeze what is inside.
-        "flex w-full flex-col items-center border-2 p-2.5 enabled:cursor-pointer disabled:opacity-50",
-        props.chosen ? "border-leaf-500" : "border-transparent enabled:hover:bg-cream-200",
-      ]}
+      {...stylex.attrs(recipeStyles.tileButton, props.chosen ? recipeStyles.tileButtonVariant1Case2 : recipeStyles.tileButtonVariant1Case1)}
       style={{ background: props.chosen ? tint("#b4cb7c", 0.6) : undefined }}
     >
       {props.children}

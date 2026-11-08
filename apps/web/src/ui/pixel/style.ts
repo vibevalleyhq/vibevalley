@@ -1,32 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
 
-export const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" ");
-
-// One weight and no synthesised bold or italics: the pixel font has neither. Line heights are Tailwind's for each size.
-const pixel = "font-pixel font-normal [font-synthesis:none] tracking-normal";
-
-export const pxText = {
-  xs: `${pixel} text-[12px] leading-[1.3333]`,
-  fine: `${pixel} text-[12px] leading-[1.5]`,
-  sm: `${pixel} text-[12px] leading-[1.4286]`,
-  base: `${pixel} text-[12px] leading-[1.5]`,
-  lg: `${pixel} text-[24px] leading-[1.5556]`,
-  xl: `${pixel} text-[24px] leading-[1.4]`,
-  x2l: `${pixel} text-[24px] leading-[1.3333]`,
-  mono: "font-mono font-normal text-[12px] leading-[1.3333]",
-  /** What is read rather than said: a report, an issue's description. Labels and chat stay pixel. */
-  read: "font-sans font-normal text-[14px] leading-[1.7]",
-} as const;
-
-export const pxDrop = "shadow-[2px_2px_0_0_var(--color-px-drop)]";
-
-/** The pixel skin's one focus ring: a leaf line a pixel off the edge, only when the keyboard got there. */
-export const pxFocus = "outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-500 focus-visible:outline-solid";
-
-/** The 2 px cream-300 line inside a box: an inset shadow, so it takes no room from what is inside. */
-export const pxRing = "shadow-[inset_0_0_0_2px_var(--color-cream-300)]";
-
-/** Shared StyleX primitives for the pixel skin's type ladder, focus ring, inset lines, and window chrome. */
 export const pxStyle = stylex.create({
   window: {
     boxShadow:

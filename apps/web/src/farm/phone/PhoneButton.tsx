@@ -4,16 +4,19 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { aria } from "#/base/dom.tsx";
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { farm, useFarm } from "#/farm/store.ts";
 import { unreadTotal } from "#/features/channel/index.ts";
 import { useCore } from "#/infra/frame.ts";
 import { PixelCard } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneState } from "./calls";
 import { phoneCells } from "./lcd";
 
 const viewStyles = stylex.create({
+  trigger: { pointerEvents: "auto", position: "relative", cursor: "pointer" },
   phoneButtonSpan: {
     position: "absolute",
     top: "calc(var(--spacing) * -1.5)",
@@ -62,7 +65,7 @@ export function PhoneButton(props: { height: number }) {
               : t("web.farm.phone.phone")
       }
       aria-expanded={aria(open())}
-      class={["pointer-events-auto relative cursor-pointer", { "phone-shake": ringing() }]}
+      {...styleProps([viewStyles.trigger, ringing() && phoneAnimations.shake])}
       onClick={() => {
         playSound("open");
         farm.phoneOpen(!open());

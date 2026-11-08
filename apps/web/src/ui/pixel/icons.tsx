@@ -5,6 +5,7 @@ import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { Phase, SessionAction } from "@vibevalley/protocol";
 
 import { useInterval } from "#/base/timer.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 const variantStyles = stylex.create({
   bobSpan: {
@@ -18,6 +19,13 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  sprite: {
+    display: "inline-block",
+    flexShrink: 0,
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  size: (size: number) => ({ width: size, height: size }),
   phaseGlyphSpan: {
     display: "inline-block",
     flexShrink: "0",
@@ -34,7 +42,7 @@ const viewStyles = stylex.create({
 });
 
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */
-export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue; style?: JSX.CSSProperties }) {
+export function SpriteIcon(props: { name: string; size: number; label?: string; styles?: stylex.StyleXStyles; style?: JSX.CSSProperties }) {
   return (
     <img
       src={`/pixel/${props.name}.png`}
@@ -43,8 +51,7 @@ export function SpriteIcon(props: { name: string; size: number; label?: string; 
       alt={props.label ?? ""}
       aria-hidden={props.label ? undefined : "true"}
       draggable="false"
-      class={["inline-block shrink-0 object-contain [image-rendering:pixelated]", props.class]}
-      style={{ width: `${props.size}px`, height: `${props.size}px`, ...props.style }}
+      {...styleProps([viewStyles.sprite, props.styles, viewStyles.size(props.size)], props.style)}
     />
   );
 }

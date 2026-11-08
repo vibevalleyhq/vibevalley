@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import solid from "@solidjs/vite-plugin";
 import stylex from "@stylexjs/unplugin";
-import tailwindcss from "@tailwindcss/vite";
 import { styleMigrationGraph } from "vibevalley/style-migration";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
@@ -34,9 +33,9 @@ export default defineConfig({
       stylex.vite({
         useCSSLayers: { before: ["theme", "base", "components"], after: ["utilities"], prefix: "stylex" },
         sxPropName: false,
+        aliases: { "#/*": [join(import.meta.dirname, "src/*")] },
       }),
       solid(),
-      tailwindcss(),
       atRoot(),
       styleMigrationGraph("stories"),
     ]) ?? [],

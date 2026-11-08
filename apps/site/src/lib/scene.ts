@@ -2,7 +2,6 @@ import sizes from "@game/title/sprites.json";
 
 const SCENE = { w: 1536, h: 1024 } as const;
 
-/** The hours the site's scene goes through as the page scrolls: a whole day, dawn to night. */
 export type Scene = "morning" | "day" | "evening" | "night";
 export const SCENES: readonly Scene[] = ["morning", "day", "evening", "night"];
 
@@ -62,10 +61,8 @@ export const PUFF_SECONDS = 8;
 export const MANAGER = { x: 1327 / SCENE.w, bottom: 898 / SCENE.h, scale: 0.73 } as const;
 export const PET = { x: 1212 / SCENE.w, bottom: 918 / SCENE.h, scale: 0.59 } as const;
 
-/** The farmer's pose at each hour: stretching at dawn, shading his eyes at noon, at ease at dusk, a lantern at night. */
-export const managerOf = (scene: Scene) => sprite(`manager-${scene}` as SpriteName, MANAGER.scale);
+export const managerOf = (scene: Scene) => sprite(`manager-${scene}`, MANAGER.scale);
 
-/** The dog's frames (page.ts plays them: it sits and swishes its tail, looks back now and then, sleeps at night). */
 export const DOG = {
   sit: sprite("dog-sit", PET.scale),
   tail: sprite("dog-tail", PET.scale),

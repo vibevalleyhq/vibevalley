@@ -31,7 +31,7 @@ const styles = stylex.create({
   hint: {
     display: "inline-flex",
     cursor: "help",
-    borderRadius: "0.25rem",
+    borderRadius: "var(--radius-sm)",
     color: "var(--color-faint)",
     opacity: { default: 0.5, "@media (hover: hover)": { default: null, ":hover": 1 }, ":focus-visible": 1 },
     transitionProperty: "opacity",

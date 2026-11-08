@@ -22,7 +22,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 在哪 | `apps/web/src/ui`、`features/*`、`app` | `farm`、`tree`、`ui/pixel` |
 | 字 | 系统的中文字体（`font-sans`），13px 正文 | FusionPixel（`font-pixel`），只在 12、24px 清楚 |
 | 图标 | reicon 的线条图标（`ui/Icon.tsx` 的 `<Icon name>`），跟着字的颜色 | `public/pixel` 的贴图（`SpriteIcon`） |
-| 线和影 | 1px 的 `line`，`shadow-raise`、`shadow-float` | 2px 的树皮色框，`shadow-px` 和 `ui/pixel/style.ts` 的 `pxWindow`、`pxFrame` |
+| 线和影 | 1px 的 `line`，`shadow-raise`、`shadow-float` | 2px 的树皮色框，`shadow-px` 和 `ui/pixel/style.ts` 的 `pxStyle.window`、`pxStyle.frame` |
 | 动效 | 缓动和三档时长（下面「动效」） | `steps()` 走帧，一像素一像素地动 |
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
 | 令牌的检查 | `no-hex-color`、`design-tokens` | `no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
@@ -33,11 +33,11 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 像素皮不跟着主题换，但它的值和工作台一样有名字、只写在一处：
 
-- **颜色**按家族起名（`style.css` 的 `@theme`）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/cast.ts`），照原样。
-- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxText` 给；读的长文字（汇报、说明）用 `pxText.read`，是系统字体。
-- **框和影**：`pxWindow`（窗）、`pxFrame`（厚框）、`pxRing`（框里一圈 2px）、`pxInset`（凹下去的井）、`pxDrop` 和 `shadow-px`（浮在板子上的投影）、`shadow-px-shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
-- **焦点**只有一种：`pxFocus`，叶色的 2px 外框，离边一个像素。
-- **叶和麦上的字是树皮色**（`text-bark-900`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
+- **颜色**按家族起名（`style.css` 的 CSS 自定义属性）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/cast.ts`），照原样。
+- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxStyle` 给；读的长文字（汇报、说明）用 `pxStyle.read`，是系统字体。
+- **框和影**：`pxStyle.window`（窗）、`frame`（厚框）、`ring`（框里一圈 2px）、`drop`（浮在板子上的投影）、`shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
+- **焦点**只有一种：`pxStyle.focus`，叶色的 2px 外框，离边一个像素。
+- **叶和麦上的字是树皮色**（`var(--color-bark-900)`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
 - **动效**走帧：关键帧用 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
 ## 令牌
@@ -66,18 +66,18 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 代码的颜色也取自农场（`style.css` 的 `--shiki-*`，`ui/code` 的 Shiki 照它们着色）：关键字是莓、字符串是叶、数字和常量是水、函数是树皮、注释是 `faint`，浅色、深色各一套。
 
-浅底一定配好它的字（`Tag` 的 `tone` 带着字色），不要在浅色块上让字继承 `ink`：深色主题里会变成浅字浅底。透明度写成修饰（`bg-wheat/14`），不另起颜色。
+浅底一定配好它的字（`Tag` 的 `tone` 带着字色），不要在浅色块上让字继承 `ink`：深色主题里会变成浅字浅底。透明度用 `color-mix()` 与已有的调色板变量，不另起颜色。
 
 ### 圆角
 
-| 类 | 值 | 用在 |
+| 令牌 | 值 | 用在 |
 |---|---|---|
-| `rounded-xs` | 3px | 一行字里的标记：键帽、@ 名、角标、像素格 |
-| `rounded-sm` | 4px | 标签（`Tag`）、分段的选项 |
-| `rounded-md` | 6px | 控件：按钮、输入框、菜单项、小浮层 |
-| `rounded-lg` | 8px | 卡片、面板、看板的栏、对话框、菜单 |
-| `rounded-xl` | 12px | 大的浮层（工单详情）、栏上的格子 |
-| `rounded-full` | | 胶囊、头像、状态点、计数 |
+| `--radius-xs` | 3px | 一行字里的标记：键帽、@ 名、角标、像素格 |
+| `--radius-sm` | 4px | 标签（`Tag`）、分段的选项 |
+| `--radius-md` | 6px | 控件：按钮、输入框、菜单项、小浮层 |
+| `--radius-lg` | 8px | 卡片、面板、看板的栏、对话框、菜单 |
+| `--radius-xl` | 12px | 大的浮层（工单详情）、栏上的格子 |
+| `calc(infinity * 1px)` | | 胶囊、头像、状态点、计数 |
 
 套在一起时里面的圆角小一档（卡片 `lg` 里的按钮 `md`）。
 
@@ -85,73 +85,75 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | 高 | 用在 |
 |---|---|
-| `h-6`（24px） | 紧凑的：分段的选项、行内的小按钮 |
-| `h-7`（28px） | 默认：按钮（`Button`）、只有图标的按钮（`IconButton`，`size-7`） |
-| `h-8`（32px） | 输入框、选择框、带搜索的条 |
+| 24px | 紧凑的：分段的选项、行内的小按钮 |
+| 28px | 默认：按钮（`Button`）、只有图标的按钮（`IconButton`） |
+| 32px | 输入框、选择框、带搜索的条 |
 
-按钮里图标和字之间 `gap-1.5`，左右 `px-2.5`。一组控件放在一行时高度一样。
+按钮里图标和字之间 6px，左右内边距 10px，按 `--spacing` 的倍数写。一组控件放在一行时高度一样。
 
 ### 线和阴影
 
-- 线只有一种：1px 的 `border-line`；焦点是 `focus` 色的 2px 外框（`style.css` 的 `:focus-visible`，全页一条，组件里不再写一遍）；选中的输入框是 `border-focus`。
-- 阴影只有两档：`shadow-raise`（贴着表面的一层：分段选中的那项、看板上悬停的卡片）和 `shadow-float`（浮在页面上：菜单、浮层、对话框、toast）。自己的阴影只在要一条内描线时写（`shadow-[inset_0_2px_0_var(--color-accent)]`），颜色用调色板的变量。
+- 线只有一种：1px 的 `var(--color-line)`；焦点是 `focus` 色的 2px 外框（`style.css` 的 `:focus-visible`，全页一条，组件里不再写一遍）；选中的输入框是 `var(--color-focus)`。
+- 阴影只有两档：`var(--shadow-raise)`（贴着表面的一层：分段选中的那项、看板上悬停的卡片）和 `var(--shadow-float)`（浮在页面上：菜单、浮层、对话框、toast）。内描线或状态圈用调色板变量，沿用字色的圈用 `currentColor`。
 
 ### 字
 
-| 类 | 大小 / 行高 | 用在 |
+| 令牌 | 大小 / 行高 | 用在 |
 |---|---|---|
-| `text-2xs` | 11 / 14 | 只给计数、角标、键帽 |
-| `text-xs` | 12 / 16 | 时间、说明、栏名、次要的字 |
-| `text-sm` | 13 / 20 | 正文、按钮、列表（页面默认） |
-| `text-base` | 14 / 22 | 对话框和区块的标题 |
-| `text-lg` | 16 / 24 | 页面里的大标题 |
-| `text-xl` | 20 / 28 | 页面的名字 |
+| `--text-2xs` | 11 / 14 | 只给计数、角标、键帽 |
+| `--text-xs` | 12 / 16 | 时间、说明、栏名、次要的字 |
+| `--text-sm` | 13 / 20 | 正文、按钮、列表（页面默认） |
+| `--text-base` | 14 / 22 | 对话框和区块的标题 |
+| `--text-lg` | 16 / 24 | 页面里的大标题 |
+| `--text-xl` | 20 / 28 | 页面的名字 |
+| `--text-2xl` | 24 / 32 | 文档标题和已有的大标题 |
+| `--text-3xl` | 30 / 36 | 需要逐字辨认的配对码 |
 
-- 粗细三种：400 正文，500（`font-medium`）选中、标签，600（`font-semibold`）标题和名字。
-- 数字默认等宽（`body` 的 `tabular-nums`）：计数、时间、额度、钱对得齐，变的时候不跳。
-- 代码、id、分支、命令用 `font-mono`。
-- 中文的标点不挤压，一行的字不手动断；放不下用 `truncate`（单行）或 `line-clamp-2`，容器要有 `min-w-0`。
+- 粗细三种：400 正文，500（`--font-weight-medium`）选中、标签，600（`--font-weight-semibold`）标题和名字。
+- 数字默认等宽（`body` 的 `font-variant-numeric: tabular-nums`）：计数、时间、额度、钱对得齐，变的时候不跳。
+- 代码、id、分支、命令用 `var(--font-mono)`。
+- 中文的标点不挤压，一行的字不手动断；放不下用单行省略或两行截断，容器要有 `minWidth: 0`。
 
 ### 图标
 
-图标的大小只有一把梯子（`IconSize`，别的数编不过）：10px 是小记号（展开的箭头），`text-xs` 旁边配 12px，`text-sm` 的按钮配 14px，只有图标的按钮配 16px，页面头上配 20px，左边的导航栏和大的「新建」格子配 24px，空状态配 48px。图标和字竖着居中（`items-center`），多行的字配图标时对第一行（`items-start` 加 `mt-0.5`）。图标只从 `ui/icons.ts` 那张表里按意思取，一个意思一个图。
+图标的大小只有一把梯子（`IconSize`，别的数编不过）：10px 是小记号（展开的箭头），`--text-xs` 旁边配 12px，`--text-sm` 的按钮配 14px，只有图标的按钮配 16px，页面头上配 20px，左边的导航栏和大的「新建」格子配 24px，空状态配 48px。图标和字竖着居中，多行的字配图标时对第一行。图标只从 `ui/icons.ts` 那张表里按意思取，一个意思一个图。
 
 ### 动效
 
 | 令牌 | 值 | 用在 |
 |---|---|---|
-| `duration-120` | 120ms | 指针底下的：悬停、按下、展开的小箭头 |
-| （默认） | 180ms | 状态变化：颜色、显示隐藏、选中 |
-| `duration-280` | 280ms | 面板、抽屉、对话框的进出 |
-| `ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | 进来的和大多数变化（默认） |
-| `ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | 离开的 |
-| `ease-in-out` | `cubic-bezier(0.4, 0, 0.2, 1)` | 来回移动、变大小 |
-| `ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | 只给弹出来的小东西（一个角标、一个新标记） |
-| `animate-pop-in` | 280ms，98% 放大淡入 | 菜单、浮层、对话框、toast 进来 |
-| `animate-fade-in` | 180ms 淡入 | 提示（`Tip`）、对话框后面的暗幕 |
+| `transitionDuration: "120ms"` | 120ms | 指针底下的：悬停、按下、展开的小箭头 |
+| `var(--default-transition-duration)` | 180ms | 状态变化：颜色、显示隐藏、选中 |
+| `transitionDuration: "280ms"` | 280ms | 面板、抽屉、对话框的进出 |
+| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | 进来的和大多数变化（默认） |
+| `--ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | 离开的 |
+| `--ease-in-out` | `cubic-bezier(0.4, 0, 0.2, 1)` | 来回移动、变大小 |
+| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | 只给弹出来的小东西（一个角标、一个新标记） |
+| `pop-in` 关键帧 | 280ms，98% 放大淡入 | 菜单、浮层、对话框、toast 进来 |
+| `fade-in` 关键帧 | 180ms 淡入 | 提示（`Tip`）、对话框后面的暗幕 |
 
-- `transition-*` 只列要动的属性（`transition-[background-color,translate]`），不写时长就是 180ms 加 `ease-out`。
-- 按钮按下时下沉一个像素（`active:translate-y-px`，120ms）。
-- 弹出来的东西从它出来的地方长出来：下拉菜单 `origin-top-right`，输入框上面的菜单 `origin-bottom`。
-- 系统要求减少动效时，工作台的过渡和循环一律停下（`style.css` 的 `prefers-reduced-motion`）；像素皮的动画各自写了停法。
+- `transitionProperty` 只列要动的属性，如 `"background-color, translate"`；时长和缓动显式引用令牌。
+- 按钮按下时下沉一个像素，120ms。
+- 弹出来的东西从它出来的地方长出来：下拉菜单从右上，输入框上面的菜单从底部。
+- 系统要求减少动效时，工作台的过渡由 `style.css` 停下；组件与像素皮的循环动画各自声明停法。
 - 只动 `opacity`、`translate`、`scale`、颜色，不动会重新排版的属性（宽、高、`top`）。
 
 ### 层
 
-| 类 | 放什么 |
+| `zIndex` | 放什么 |
 |---|---|
-| `z-10` | 贴在内容上的：黏在顶上的栏头、悬停才出的工具条 |
-| `z-20` | 盖在页面上的面板：串的侧面板、工单的详情、拖进来的落点 |
-| `z-30` | 菜单、浮层、提示、手机上的抽屉 |
-| `z-40` | toast |
+| `10` | 贴在内容上的：黏在顶上的栏头、悬停才出的工具条 |
+| `20` | 盖在页面上的面板：串的侧面板、工单的详情、拖进来的落点 |
+| `30` | 菜单、浮层、提示、手机上的抽屉 |
+| `40` | toast |
 
 对话框用原生的 `<dialog>`，在浏览器的顶层，不排进来。
 
 ### 禁用、空、滚动
 
 - 滚动条和选中的字也取调色板（`style.css` 的 base 层）：细的、淡墨色、没有槽，深色主题里不是系统的浅灰条；选中的字是叶色。
-- 禁用一律 `disabled:opacity-50`，加 `disabled:cursor-default`；按下时不下沉。
-- 能滚的区域（不带边框和阴影的那一层）加 `scroll-fade-y`，横着滚的一排加 `scroll-fade-x`：还能往哪边滚，那边淡出 16px，滚到头就不淡。遮罩会连边框和阴影一起遮，所以加在里面那层，不加在带边框的浮层上。折起来的长字加 `fold-fade`，最后三成淡出，看得出还有。
+- 禁用一律在 `:disabled` 条件里写 `opacity: 0.5`、`cursor: "default"`；按下时不下沉。
+- 能滚的区域（不带边框和阴影的那一层）用滚动遮罩：还能往哪边滚，那边淡出 16px，滚到头就不淡；样式由组件声明，沿用 `style.css` 的滚动关键帧。遮罩会连边框和阴影一起遮，所以加在里面那层，不加在带边框的浮层上。折起来的长字最后三成淡出，看得出还有。
 - 消息列表离开最新的一屏，底上出一个胶囊：这期间别人说了几条，或「回到最新」；点了滚回底（减少动效时直接跳）。
 
 ### 打开和刷新
@@ -224,10 +226,10 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 6.2 侧边栏拖放重排 | 频道拖到另一个上排在它前面、进它的组 | 有 |
 | 6.3 多代理协作看板 | 工单看板、好几个管家、农场 | 有 |
 | 6.4 流式文本与滚动视口 | 管家说完整条才写进频道；消息倒着排，停在最新；离开时底上的胶囊数着新消息、点了回到最新 | 有 |
-| 6.5 容器查询与防挤压 | 工单页用 `@container`，`min-w-0`、`truncate` 的规矩；每处在 400px 和 720px 宽都不出界（`test/narrow.spec.ts`） | 有 |
+| 6.5 容器查询与防挤压 | 工单页用容器查询，子项允许缩到 `minWidth: 0`，长字省略；每处在 400px 和 720px 宽都不出界（`test/narrow.spec.ts`） | 有 |
 | 6.6 全键盘与无障碍 | Ctrl+K、Esc、全页的焦点框、每个图标按钮有名字；`?` 打开快捷键一览，和认键的是同一张表 | 有 |
 | 6.7 异常、限流与状态机 | 状态由服务端折好：额度、卡住的原因、重试、连接的小灯 | 有 |
-| 7.1 Tailwind 配置与基础 CSS | Tailwind v4 的 `@theme` 写在 `style.css`，没有单独的配置文件 | 有 |
+| 7.1 样式编译与基础 CSS | StyleX 编译组件样式；`style.css` 提供令牌、字体和明确归属的全局规则，`reset.css` 提供重置 | 有 |
 | 7.2 工程源码清单 | `apps/web/README.md`、[客户端](docs/subsystems/app.md) | 有 |
 | 7.3 资产、字体和音频 | `design/` 的出图和切图、FusionPixel、合成的音效、reicon | 有 |
 | 8.1–8.7 给 agent 的指南 | 本篇「给 agent 的速查」和 lint | 有 |

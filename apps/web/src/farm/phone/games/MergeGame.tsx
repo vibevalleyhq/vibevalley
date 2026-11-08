@@ -3,9 +3,11 @@ import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 
@@ -413,7 +415,7 @@ export function MergeGame() {
               <span>
                 {o()[0]}
                 <br />
-                <span class="phone-blink">{o()[1]}</span>
+                <span {...styleProps(phoneAnimations.blink)}>{o()[1]}</span>
               </span>
             </div>
           )}

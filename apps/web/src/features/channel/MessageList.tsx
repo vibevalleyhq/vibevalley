@@ -20,16 +20,124 @@ import { OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 import { Markdown } from "#/ui/Markdown.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { Tag, type TagTone } from "#/ui/Tag.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { chatSay, editingId, pendingLines, setEditingId } from "./composing";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
-import { dispatchRow, threadPreview } from "./message.stylex";
+import { dispatchRow, threadPreview, messageRow } from "./message.stylex";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
+
+const messageStyles = stylex.create({
+  row: {
+    position: "relative",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  continuation: {
+    paddingTop: "calc(var(--spacing) * .5)",
+  },
+  start: {
+    marginTop: "calc(var(--spacing) * 3)",
+    paddingTop: "var(--spacing)",
+  },
+  jump: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -3)",
+    right: "calc(var(--spacing) * 2)",
+    zIndex: 10,
+    display: {
+      default: "none",
+      [stylex.when.ancestor(":focus-within", messageRow)]: "block",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", messageRow)]: "block",
+      },
+    },
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  messageListButton: {
+    position: "absolute",
+    bottom: "calc(var(--spacing) * 3)",
+    left: "50%",
+    zIndex: 10,
+    display: "inline-flex",
+    translate: "calc(calc(1 / 2 * 100%) * -1) 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-ink)",
+    boxShadow: "var(--shadow-float)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  messageListDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    flexDirection: "column-reverse",
+    overflowY: "auto",
+  },
+});
 
 const recipeStyles = stylex.create({
   messageListDiv: {
@@ -155,7 +263,7 @@ const viewStyles = stylex.create({
   },
   messageListButton: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-xs)",
@@ -516,12 +624,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
     <div {...stylex.attrs(viewStyles.messageListRoot)}>
       <Show when={awayFrom() !== undefined}>
-        <button
-          type="button"
-          data-testid="to-latest"
-          onClick={toLatest}
-          class="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 animate-pop-in cursor-pointer items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 text-xs text-ink shadow-float transition-colors duration-120 hover:bg-hover"
-        >
+        <button type="button" data-testid="to-latest" onClick={toLatest} {...stylex.attrs(recipeStyles2.messageListButton)}>
           <Icon name="expand" size={12} styles={viewStyles.toLatestIcon} />
           {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
         </button>
@@ -529,7 +632,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       <div
         ref={(el) => (log = el)}
         onScroll={onScroll}
-        class="flex min-h-0 flex-1 scroll-fade-y flex-col-reverse overflow-y-auto"
+        {...stylex.attrs(recipeStyles2.messageListDiv)}
         role="log"
         aria-label={t("web.channel.messages.label")}
         data-testid="messages"
@@ -708,7 +811,7 @@ function Frame(props: {
   children: JSX.Element;
 }) {
   return (
-    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues === true ? "pt-0.5" : "mt-3 pt-1"]}>
+    <div {...styleProps([messageRow, messageStyles.row, props.continues === true ? messageStyles.continuation : messageStyles.start])}>
       {props.tools}
       <Show when={props.quote}>
         {(q) => (
@@ -834,11 +937,7 @@ export function MessageRow(props: {
       quote={props.m.replyTo !== undefined ? { channel: props.m.channel, number: props.m.replyTo } : undefined}
       tools={
         props.onJump ? (
-          <button
-            type="button"
-            onClick={() => props.onJump?.()}
-            class="absolute -top-3 right-2 z-10 hidden cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs shadow-float group-focus-within/m:block group-hover/m:block"
-          >
+          <button type="button" onClick={() => props.onJump?.()} {...styleProps(messageStyles.jump)}>
             {t("web.channel.more.jump")}
           </button>
         ) : props.m.deleted === undefined && !props.where ? (

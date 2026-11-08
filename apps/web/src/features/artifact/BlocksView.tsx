@@ -14,9 +14,174 @@ import { hexColor, swatches } from "#/ui/cast.ts";
 import { Checkbox } from "#/ui/Checkbox.tsx";
 import { AgentFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { knownTypes, plainOf } from "./blocks";
+import { blockRow } from "./blocks.stylex";
 import { BlockEditor, type EditBlock } from "./editor";
+
+const blockStyles = stylex.create({
+  row: {
+    display: "flex",
+    alignItems: "flex-start",
+    paddingBottom: "calc(var(--spacing) * .5)",
+  },
+  headingRow: {
+    paddingTop: "calc(var(--spacing) * 2.5)",
+  },
+  bodyRow: {
+    paddingTop: "calc(var(--spacing) * .5)",
+  },
+  content: {
+    display: "flex",
+    alignItems: "flex-start",
+  },
+  quote: {
+    borderLeftStyle: "solid",
+    borderLeftWidth: "3px",
+    borderColor: "var(--wb-line)",
+    paddingLeft: "calc(var(--spacing) * 3)",
+  },
+  code: {
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-code-bg)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    color: "var(--wb-code-ink)",
+  },
+  quoteButton: {
+    marginTop: "calc(var(--spacing) * .5)",
+    marginLeft: "var(--spacing)",
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 6)",
+    height: "calc(var(--spacing) * 6)",
+    flexShrink: "0",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: "var(--wb-muted)",
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", blockRow)]: 1,
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  title: {
+    fontSize: "var(--text-2xl)",
+    lineHeight: "calc(var(--spacing) * 8)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  heading: {
+    fontSize: "var(--text-xl)",
+    lineHeight: "calc(var(--spacing) * 7)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  subheading: {
+    fontSize: "var(--text-lg)",
+    lineHeight: "calc(var(--spacing) * 7)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  codeText: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "calc(var(--spacing) * 6)",
+  },
+  quoteText: {
+    fontSize: "var(--text-base)",
+    lineHeight: "calc(var(--spacing) * 6)",
+    color: "var(--wb-muted)",
+  },
+  completeText: {
+    fontSize: "var(--text-base)",
+    lineHeight: "calc(var(--spacing) * 6)",
+    color: "var(--wb-muted)",
+    textDecorationLine: "line-through",
+  },
+  bodyText: {
+    fontSize: "var(--text-base)",
+    lineHeight: "calc(var(--spacing) * 6)",
+  },
+  bold: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  italic: {
+    fontStyle: "italic",
+  },
+  inlineCode: {
+    borderRadius: "var(--radius-xs)",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "calc(var(--spacing) * .5)",
+    fontFamily: "var(--font-mono)",
+  },
+  strike: {
+    textDecorationLine: "line-through",
+  },
+  link: {
+    color: "var(--wb-water)",
+    textDecorationLine: "underline",
+  },
+  field: {
+    minHeight: "calc(var(--spacing) * 6)",
+    cursor: "text",
+    overflowWrap: "break-word",
+    whiteSpace: "pre-wrap",
+  },
+  editor: {
+    display: "block",
+    width: "100%",
+    resize: "none",
+    overflow: "hidden",
+    backgroundColor: "transparent",
+    outlineStyle: "none",
+    "::placeholder": {
+      color: "var(--wb-faint)",
+    },
+  },
+});
+
+const writingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
+
+const recipeStyles = stylex.create({
+  blockRowSpan: {
+    marginTop: "calc(var(--spacing) * .5)",
+    marginRight: "calc(var(--spacing) * 2.5)",
+    flexShrink: "0",
+    borderRadius: "var(--radius-sm)",
+  },
+  blockRowSpanVariant1Case1: {
+    width: "3px",
+    animationName: null,
+    animationDuration: null,
+    animationDelay: null,
+    animationTimingFunction: null,
+    animationIterationCount: null,
+    animationDirection: null,
+    animationFillMode: null,
+    animationPlayState: null,
+  },
+  blockRowSpanVariant1Case2: {
+    width: "var(--spacing)",
+    animationName: { default: writingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "2s",
+    animationDelay: "0s",
+    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
+    animationIterationCount: "infinite",
+    animationDirection: "normal",
+    animationFillMode: "none",
+    animationPlayState: "running",
+  },
+});
 
 const variantStyles = stylex.create({
   blocksViewArticle: {
@@ -569,7 +734,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
         return undefined;
     }
   };
-  const box = () => (r().type === "quote" ? "border-l-[3px] border-line pl-3" : r().type === "code" ? "rounded-md bg-code-bg px-3 py-2 text-code-ink" : "");
+  const box = () => (r().type === "quote" ? blockStyles.quote : r().type === "code" ? blockStyles.code : undefined);
   const kind = () =>
     !knownTypes.has(r().type) ? "unknown" : r().type === "divider" ? "divider" : r().type === "image" ? "image" : r().type === "issue_ref" ? "issue" : "text";
   return (
@@ -577,7 +742,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       data-block={r().block.id}
       data-type={r().type}
       data-writing={r().writing ? "" : undefined}
-      class={["group/row flex items-start pb-0.5", r().type === "heading" ? "pt-2.5" : "pt-0.5"]}
+      {...styleProps([blockRow, blockStyles.row, r().type === "heading" ? blockStyles.headingRow : blockStyles.bodyRow])}
     >
       <span {...stylex.attrs(viewStyles.blockRowSpan)}>
         <Show when={r().showFace}>
@@ -587,7 +752,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       <span
         title={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : t("web.artifact.blocks.wrote", { who: writer() })}
         aria-label={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : undefined}
-        class={["mt-0.5 mr-2.5 shrink-0 rounded-sm", r().writing ? "w-1 animate-pulse" : "w-[3px]"]}
+        {...stylex.attrs(recipeStyles.blockRowSpan, r().writing ? recipeStyles.blockRowSpanVariant1Case2 : recipeStyles.blockRowSpanVariant1Case1)}
         style={{ height: `${barHeight(r().type)}px`, background: authorColor(r().updatedBy, props.agent) }}
       />
       <span {...stylex.attrs(viewStyles.blockRowSpan2)} style={{ width: `${20 * r().depth}px` }} />
@@ -609,7 +774,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
             </Show>
           }
         >
-          <div class={["flex items-start", box()]}>
+          <div {...styleProps([blockStyles.content, box()])}>
             <Show when={mark() !== undefined}>
               <span {...stylex.attrs(viewStyles.blockRowSpan3)}>{mark()}</span>
             </Show>
@@ -628,7 +793,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           data-testid="artifact-quote-block"
           aria-label={t("web.artifact.canvas.quote")}
           title={t("web.artifact.canvas.quote")}
-          class="mt-0.5 ml-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-hover focus-visible:opacity-100"
+          {...styleProps(blockStyles.quoteButton)}
           onClick={() => props.onQuote?.({ id: r().block.id, rev: r().block.rev, type: r().type, text: r().text })}
         >
           <Icon name="chat" size={14} />
@@ -643,20 +808,16 @@ function Placeholder(props: { text: string }) {
 }
 
 /** A block's whole type: size, line height and weight from one place, so no two font sizes meet on one element. */
-function typeStyle(r: Row) {
+function typeStyle(r: Row): stylex.StyleXStyles {
   switch (r.type) {
     case "heading":
-      return (r.attrs.level ?? 1) <= 1
-        ? "text-2xl leading-8 font-semibold"
-        : r.attrs.level === 2
-          ? "text-xl leading-7 font-semibold"
-          : "text-lg leading-7 font-semibold";
+      return (r.attrs.level ?? 1) <= 1 ? blockStyles.title : r.attrs.level === 2 ? blockStyles.heading : blockStyles.subheading;
     case "code":
-      return "font-mono text-sm leading-6";
+      return blockStyles.codeText;
     case "quote":
-      return "text-base leading-6 text-muted";
+      return blockStyles.quoteText;
     default:
-      return r.type === "todo" && r.attrs.checked === true ? "text-base leading-6 text-muted line-through" : "text-base leading-6";
+      return r.type === "todo" && r.attrs.checked === true ? blockStyles.completeText : blockStyles.bodyText;
   }
 }
 
@@ -664,17 +825,17 @@ function Marked(props: { spans: readonly TextSpan[] }) {
   return (
     <For each={props.spans}>
       {(s) => {
-        const cls = {
-          "font-semibold": !(s.marks.bold !== true),
-          italic: !(s.marks.italic !== true),
-          "rounded-xs bg-hover px-0.5 font-mono": !(s.marks.code !== true),
-          "line-through": !(s.marks.strike !== true),
-          "text-water underline": !!s.marks.link,
-        };
+        const styles: stylex.StyleXStyles = [
+          s.marks.bold === true && blockStyles.bold,
+          s.marks.italic === true && blockStyles.italic,
+          s.marks.code === true && blockStyles.inlineCode,
+          s.marks.strike === true && blockStyles.strike,
+          !!s.marks.link && blockStyles.link,
+        ];
         return (
-          <Show when={s.marks.link} fallback={<span class={cls}>{s.t}</span>}>
+          <Show when={s.marks.link} fallback={<span {...styleProps(styles)}>{s.t}</span>}>
             {(link) => (
-              <a href={link()} target="_blank" rel="noreferrer" class={cls}>
+              <a href={link()} target="_blank" rel="noreferrer" {...styleProps(styles)}>
                 {s.t}
               </a>
             )}
@@ -700,7 +861,7 @@ function BlockField(props: { editor: BlockEditor; row: Row }) {
           aria-label={t("web.artifact.blocks.block", { id: props.row.block.id })}
           onFocus={() => setEditing(true)}
           onClick={() => setEditing(true)}
-          class={["min-h-6 cursor-text break-words whitespace-pre-wrap", typeStyle(props.row)]}
+          {...styleProps([blockStyles.field, typeStyle(props.row)])}
         >
           <Show
             when={props.row.text}
@@ -773,7 +934,7 @@ function Field(props: { editor: BlockEditor; row: Row; focusNow: boolean; onLeav
       onCompositionEnd={(e) => props.editor.composition(b(), false, e.currentTarget.value)}
       onInput={(e) => props.editor.edited(b(), e.currentTarget.value, e.currentTarget.selectionStart)}
       onKeyDown={key}
-      class={["block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-faint", typeStyle(props.row)]}
+      {...styleProps([blockStyles.editor, typeStyle(props.row)])}
     />
   );
 }

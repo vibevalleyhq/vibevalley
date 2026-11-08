@@ -1,4 +1,4 @@
-/** A picture in the field: its address, size, and the point it stands on (from apps/web/public/pixel/sprites.json). */
+/** ax/ay anchor the sprite's feet (apps/web/public/pixel/sprites.json). */
 export interface Art {
   src: string;
   w: number;
@@ -7,9 +7,7 @@ export interface Art {
   ay: number;
 }
 
-/** The helper's poses, and the things and plots it uses. */
 export type Pose = "side" | "side-1" | "side-2" | "up" | "read" | "work" | "tinker-1" | "tinker-2" | "hammer-1" | "hammer-2" | "cheer";
-export const POSES: readonly Pose[] = ["side", "side-1", "side-2", "up", "read", "work", "tinker-1", "tinker-2", "hammer-1", "hammer-2", "cheer"];
 export const THINGS = ["prop-board", "machine-seeder", "prop-table", "prop-crates", "machine-windmill", "machine-beehive", "machine-tractor"] as const;
 export const PLOTS = ["plot-empty", "plot-seeded", "plot-sprout", "plot-leafy", "plot-flowering", "plot-wheat"] as const;
 export const BUBBLES = [
@@ -32,10 +30,10 @@ export type StoryArt = Record<Pose | Thing | PlotStage | Bubble | (typeof MARKS)
 /** The field: how wide and high, where things stand (their feet) and where the helper walks. */
 export const FIELD = { w: 820, h: 132, stand: 96, path: 112 } as const;
 
-/** Where the helper starts, off to the left. */
+/** Initial x in field pixels. */
 export const START = 18;
 
-/** A step of the job (copy.how.steps, in order): where the helper works, its plot, its thing, and its plot's stages. */
+/** Steps follow copy.how.steps order. */
 export interface Place {
   /** Where the helper works (its feet on the path). */
   at: number;
@@ -46,9 +44,7 @@ export interface Place {
 }
 
 export const PLACES: readonly Place[] = [
-  // Say it: the owner's words on the board. the helper reads them.
   { at: 96, plot: 168, thing: { name: "prop-board", x: 96 }, stages: [[0, "plot-empty"]] },
-  // Sow it: seeds into the bare plot, beside the seeder.
   {
     at: 330,
     plot: 330,
@@ -59,7 +55,6 @@ export const PLACES: readonly Place[] = [
       [0.72, "plot-sprout"],
     ],
   },
-  // Grow it: hammering at the workbench, reading, searching, editing, running the tests, while the crop comes up.
   {
     at: 478,
     plot: 590,
@@ -70,7 +65,6 @@ export const PLACES: readonly Place[] = [
       [0.75, "plot-flowering"],
     ],
   },
-  // Harvest it: the wheat is in, the helper cheers, coins, and the job is stamped done.
   {
     at: 712,
     plot: 712,
@@ -82,14 +76,14 @@ export const PLACES: readonly Place[] = [
   },
 ];
 
-/** Further back, standing on the far grass: a windmill, the beehives, the tractor. Their x is in the back layer's own scroll. */
+/** x is measured in the back layer's own scroll space. */
 export const BACK: readonly { name: Thing; x: number }[] = [
   { name: "machine-windmill", x: 120 },
   { name: "machine-beehive", x: 300 },
   { name: "machine-tractor", x: 470 },
 ];
 
-/** In front of the camera: grass and ferns along the bottom, passing faster than the field. x in the front layer's scroll. */
+/** x is measured in the front layer's own scroll space. */
 export const NEAR: readonly { name: (typeof FRONT)[number]; x: number }[] = [
   { name: "fg-grass", x: 40 },
   { name: "fg-fern", x: 300 },
@@ -101,7 +95,6 @@ export const NEAR: readonly { name: (typeof FRONT)[number]; x: number }[] = [
 /** How fast each layer passes as the camera goes along, the field itself at 1. */
 export const PACE = { sky: 0.08, hills: 0.3, back: 0.55, field: 1, near: 1.4 } as const;
 
-/** Where the story is at a point of the scroll. */
 export interface Moment {
   /** The step, 0 to 3. */
   place: number;
@@ -118,8 +111,11 @@ export function momentAt(p: number): Moment {
   const q = Math.min(0.99999, Math.max(0, p)) * PLACES.length;
   const place = Math.floor(q);
   const local = q - place;
-  const from = place === 0 ? START : PLACES[place - 1]!.at;
-  const to = PLACES[place]!.at;
+  const previous = PLACES[place - 1];
+  const current = PLACES[place];
+  if (!current || (place !== 0 && !previous)) throw new RangeError(`Invalid story place ${place}`);
+  const from = previous ? previous.at : START;
+  const to = current.at;
   if (local < 0.3) {
     const k = local / 0.3;
     const eased = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
@@ -128,15 +124,19 @@ export function momentAt(p: number): Moment {
   return { place, working: true, work: (local - 0.3) / 0.7, x: to };
 }
 
-/** A plot's stage at a moment: bare until the helper gets there, then as the work goes, and as it was left once the helper has moved on. */
+/** Stage thresholds are ascending; a finished place keeps its last stage. */
 export function stageOf(i: number, now: Moment): PlotStage {
-  const stages = PLACES[i]!.stages;
+  const place = PLACES[i];
+  if (!place) throw new RangeError(`Invalid story place ${i}`);
+  const { stages } = place;
   if (now.place < i || (now.place === i && !now.working)) return stages[0][1];
   const work = now.place > i ? 1 : now.work;
-  return stages.findLast(([from]) => work >= from)![1];
+  const stage = stages.findLast(([from]) => work >= from);
+  if (!stage) throw new RangeError(`No stage for story place ${i} at work ${work}`);
+  return stage[1];
 }
 
-/** What the helper is doing at a place, by how far along the work is: its pose(s, taking turns) and what pops up over it. */
+/** Multiple poses play in alternating frames. */
 export function workAt(place: number, work: number): { poses: [Pose, ...Pose[]]; bubble?: Bubble | undefined } {
   switch (place) {
     case 0:
@@ -155,7 +155,6 @@ export function workAt(place: number, work: number): { poses: [Pose, ...Pose[]];
 /** The job the story grows, the same as the harvest list's: what its branch comes to. */
 export const JOB = { commits: 3, files: 4, plus: 142, minus: 12, tests: 18 } as const;
 
-/** Its branch at a moment of the story. */
 export function branchAt(now: Moment) {
   const work = now.place === 2 ? (now.working ? now.work : 0) : now.place > 2 ? 1 : 0;
   const typed = Math.min(1, work / 0.85);

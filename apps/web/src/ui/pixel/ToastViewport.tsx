@@ -6,12 +6,14 @@ import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { defineAtom } from "#/state/atom.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { SpriteIcon } from "./icons";
 import { pxStyle } from "./style";
 
 const recipeStyles = stylex.create({
   toastCardDiv: {
+    gridArea: "1 / 1",
     display: "flex",
     transformOrigin: "50%",
     touchAction: "none",
@@ -56,6 +58,27 @@ const recipeStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  stack: { display: "grid", width: "min(320px,100vw - 32px)" },
+  icon: {
+    display: "grid",
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+    flexShrink: 0,
+    placeItems: "center",
+  },
+  neutral: { backgroundColor: "var(--color-cream-200)" },
+  warning: {
+    backgroundColor: {
+      default: "var(--color-px-toast-warn)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-peach) 30%, transparent)",
+    },
+  },
+  error: {
+    backgroundColor: {
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
+    },
+  },
   toastViewportDiv: {
     pointerEvents: "none",
     position: "fixed",
@@ -171,7 +194,7 @@ export class ToastStore {
 
 export const toasts = new ToastStore();
 
-const tone: Record<string, string> = { warn: "bg-peach/30", error: "bg-berry/15" };
+const tone: Partial<Record<ToastType, stylex.StyleXStyles>> = { warn: viewStyles.warning, error: viewStyles.error };
 
 /** The stack of toasts, top centre over the page. The pointer over it holds their timeouts. */
 export function ToastViewport(props: {
@@ -185,13 +208,7 @@ export function ToastViewport(props: {
   return (
     // Only the cards take the pointer: around them (and with none shown) clicks go through to the page below.
     <div {...stylex.attrs(viewStyles.toastViewportDiv)} style={{ top: `${props.top ?? 12}px` }}>
-      <div
-        role="status"
-        aria-live="polite"
-        class="grid w-[min(320px,calc(100vw-32px))] [&>*]:[grid-area:1/1]"
-        onMouseEnter={() => store.pause()}
-        onMouseLeave={() => store.resume()}
-      >
+      <div role="status" aria-live="polite" {...stylex.attrs(viewStyles.stack)} onMouseEnter={() => store.pause()} onMouseLeave={() => store.resume()}>
         <For each={store.toasts} keyed={(t) => t.id}>
           {(t, i) => (
             <ToastCard
@@ -216,15 +233,17 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
   return (
     <div
       // The newest is drawn on top; those behind it shrink and step down.
-      style={{
-        "z-index": 100 - props.index,
-        transform: `translate(${drag().x}px, ${props.index * 9.6 + drag().y}px) scale(${1 - props.index * 0.05})`,
-      }}
-      {...stylex.attrs(
-        recipeStyles.toastCardDiv,
-        drag().x > 0 || drag().y > 0 ? recipeStyles.toastCardDivVariant1Case2 : recipeStyles.toastCardDivVariant1Case1,
-        props.hidden ? recipeStyles.toastCardDivVariant2Case2 : recipeStyles.toastCardDivVariant2Case1,
-        front() ? recipeStyles.toastCardDivVariant3Case2 : recipeStyles.toastCardDivVariant3Case1,
+      {...styleProps(
+        [
+          recipeStyles.toastCardDiv,
+          drag().x > 0 || drag().y > 0 ? recipeStyles.toastCardDivVariant1Case2 : recipeStyles.toastCardDivVariant1Case1,
+          props.hidden ? recipeStyles.toastCardDivVariant2Case2 : recipeStyles.toastCardDivVariant2Case1,
+          front() ? recipeStyles.toastCardDivVariant3Case2 : recipeStyles.toastCardDivVariant3Case1,
+        ],
+        {
+          "z-index": 100 - props.index,
+          transform: `translate(${drag().x}px, ${props.index * 9.6 + drag().y}px) scale(${1 - props.index * 0.05})`,
+        },
       )}
       onPointerDown={(e) => {
         from = { x: e.clientX, y: e.clientY };
@@ -246,7 +265,7 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
       <Show
         when={props.leading}
         fallback={
-          <span class={["grid size-10 shrink-0 place-items-center", tone[props.toast.type] ?? "bg-cream-200"]}>
+          <span {...stylex.attrs(viewStyles.icon, tone[props.toast.type] ?? viewStyles.neutral)}>
             <SpriteIcon name="icon-bell" size={32} />
           </span>
         }

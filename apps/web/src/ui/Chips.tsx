@@ -41,7 +41,7 @@ const viewStyles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * .5)",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
     paddingBlock: "1px",
     paddingRight: "calc(var(--spacing) * .5)",
@@ -51,7 +51,7 @@ const viewStyles = stylex.create({
   },
   chipsInputButton: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "var(--spacing)",
     color: {
       default: "var(--color-muted)",
@@ -103,7 +103,7 @@ const viewStyles = stylex.create({
   },
   keyValueEditorButton: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",

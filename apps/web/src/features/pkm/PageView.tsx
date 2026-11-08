@@ -25,6 +25,18 @@ import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
 
+const recipeStyles = stylex.create({
+  propsSpanState: {
+    color: "var(--wb-muted)",
+  },
+  propsSpanState2: {
+    color: "var(--wb-warn-ink)",
+  },
+  propsSpanState3: {
+    color: "var(--wb-berry)",
+  },
+});
+
 const variantStyles2 = stylex.create({
   shownA: {
     textDecorationLine: {
@@ -529,7 +541,9 @@ function Props(props: { view: PkmPageView }) {
               <span
                 data-testid="pkm-prop"
                 data-key="deadline"
-                class={[(d().left ?? 1) < 0 ? "text-berry" : (d().left ?? 99) <= 3 ? "text-warn-ink" : "text-muted"]}
+                {...stylex.attrs(
+                  (d().left ?? 1) < 0 ? recipeStyles.propsSpanState3 : (d().left ?? 99) <= 3 ? recipeStyles.propsSpanState2 : recipeStyles.propsSpanState,
+                )}
               >
                 <Switch fallback={t("web.pkm.props.deadline", { day: d().day })}>
                   <Match when={d().left !== undefined && (d().left ?? 0) < 0}>{t("web.pkm.props.overdue", { day: d().day, n: -(d().left ?? 0) })}</Match>

@@ -16,9 +16,51 @@ import { createAct } from "#/ui/act.ts";
 import { hexColor } from "#/ui/cast.ts";
 import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { AgentPage } from "./AgentPage";
 import { TemplatesPage } from "./TemplatesPage";
+
+const cardStyles = stylex.create({
+  portrait: (hat: string) => ({ backgroundImage: `radial-gradient(70% 70% at 50% 70%, ${hat}33, transparent)`, backgroundColor: "var(--color-hover)" }),
+  card: {
+    position: "relative",
+  },
+  toggle: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-side)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover")]: 1,
+      },
+    },
+  },
+});
 
 const recipeStyles2 = stylex.create({
   cardShellA: {
@@ -346,7 +388,7 @@ const viewStyles = stylex.create({
   },
   agentCardSpan4: {
     flexShrink: "0",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hat)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -375,7 +417,7 @@ const viewStyles = stylex.create({
     paddingTop: "calc(var(--spacing) * 3)",
   },
   agentCardSpan7: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -492,7 +534,7 @@ function CardShell(props: { agent: Agent; to: string; label: string; muted?: boo
       data-key={props.agent.id}
       data-role={props.agent.role}
       data-muted={props.muted === true ? "" : undefined}
-      class="group relative"
+      {...styleProps([stylex.defaultMarker(), cardStyles.card])}
     >
       <A
         href={props.to}
@@ -570,17 +612,14 @@ export function AgentCard(props: {
             act: props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"),
             name: props.agent.name,
           })}
-          class="cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium text-muted opacity-0 group-hover:opacity-100 hover:bg-side hover:text-ink focus-visible:opacity-100"
+          {...styleProps(cardStyles.toggle)}
         >
           {props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable")}
         </button>
       }
     >
       <div {...stylex.attrs(viewStyles.agentCardDiv)}>
-        <span
-          {...stylex.attrs(viewStyles.agentCardSpan)}
-          style={{ background: `radial-gradient(70% 70% at 50% 70%, ${hexColor(props.agent.look.hat)}33, transparent), var(--color-hover)` }}
-        >
+        <span {...styleProps([viewStyles.agentCardSpan, cardStyles.portrait(hexColor(props.agent.look.hat))])}>
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={68} muted={!props.agent.enabled} />
         </span>
         <span {...stylex.attrs(viewStyles.orchestratorCardSpan2)}>

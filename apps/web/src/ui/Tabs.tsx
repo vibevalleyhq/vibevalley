@@ -7,6 +7,7 @@ import { Link as A } from "#/infra/router.ts";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { styleProps } from "./positioner";
 import { lineTab } from "./tabs.stylex";
 
 interface TabItem<T extends string> {
@@ -68,7 +69,6 @@ const looks: Record<TabsLook, { list: stylex.StyleXStyles; tab: stylex.StyleXSty
   line: { list: styles.lineList, tab: styles.line },
 };
 
-/** The panels are the page's: it shows the one for `value`. */
 export function Tabs<T extends string>(props: {
   label: string;
   value: T;
@@ -77,7 +77,6 @@ export function Tabs<T extends string>(props: {
   look?: TabsLook;
   styles?: stylex.StyleXStyles;
 }) {
-  const list = () => stylex.props(looks[props.look ?? "pills"].list, props.styles);
   return (
     <Base.Root
       value={props.value}
@@ -86,7 +85,7 @@ export function Tabs<T extends string>(props: {
         if (item) props.onChange?.(item.value);
       }}
     >
-      <Base.List aria-label={props.label} class={list().className} style={list().style}>
+      <Base.List aria-label={props.label} {...styleProps([looks[props.look ?? "pills"].list, props.styles])}>
         <For each={props.items}>
           {(item) => (
             <Base.Tab

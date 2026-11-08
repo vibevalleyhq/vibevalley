@@ -15,9 +15,27 @@ import { Button } from "#/ui/Button.tsx";
 import { AgentFace } from "#/ui/Face.tsx";
 import { Card, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { quotaOf } from "./quota";
 import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } from "./RuntimeCards";
+
+const recipeStyles = stylex.create({
+  runtimesPageSpan: {
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+  },
+  runtimesPageSpanState: {
+    backgroundColor: "var(--wb-berry)",
+  },
+  runtimesPageSpanState2: {
+    backgroundColor: "var(--wb-faint)",
+  },
+  runtimesPageSpanState3: {
+    backgroundColor: "var(--wb-leaf)",
+  },
+});
 
 const variantStyles2 = stylex.create({
   detailA: {
@@ -71,6 +89,7 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  portrait: (hat: string) => ({ backgroundImage: `radial-gradient(70% 70% at 50% 70%, ${hat}33, var(--color-page))` }),
   runtimesPageP: {
     padding: "calc(var(--spacing) * 8)",
     fontSize: "var(--text-sm)",
@@ -141,7 +160,7 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
   },
   detailSpan2: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-ok-soft)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     color: "var(--color-ok-ink)",
@@ -150,7 +169,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
   },
   detailSpan4: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-bad-soft)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     color: "var(--color-berry)",
@@ -234,7 +253,17 @@ export function RuntimesPage(props: { rest: string }) {
                       }
                       trailing={
                         <span {...stylex.attrs(viewStyles.runtimesPageSpan)}>
-                          <span class={["size-2 rounded-full", ok() ? (r.settings.enabled ? "bg-leaf" : "bg-faint") : "bg-berry"]} aria-hidden="true" />
+                          <span
+                            {...stylex.attrs(
+                              recipeStyles.runtimesPageSpan,
+                              ok()
+                                ? r.settings.enabled
+                                  ? recipeStyles.runtimesPageSpanState3
+                                  : recipeStyles.runtimesPageSpanState2
+                                : recipeStyles.runtimesPageSpanState,
+                            )}
+                            aria-hidden="true"
+                          />
                           <Show when={ok() && quota().level !== "unknown"}>
                             <Stamina quota={quota()} width={60} height={7} />
                           </Show>
@@ -268,10 +297,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   return (
     <div {...stylex.attrs(viewStyles.detailDiv)}>
       <div {...stylex.attrs(viewStyles.detailDiv2)}>
-        <span
-          {...stylex.attrs(viewStyles.detailSpan)}
-          style={{ background: `radial-gradient(70% 70% at 50% 70%, ${props.info.preset.look.hat}33, var(--color-page))` }}
-        >
+        <span {...styleProps([viewStyles.detailSpan, viewStyles.portrait(props.info.preset.look.hat)])}>
           <span
             {...stylex.attrs(
               variantStyles.runtimesPageSpan,

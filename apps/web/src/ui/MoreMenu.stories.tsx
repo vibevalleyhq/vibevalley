@@ -4,6 +4,17 @@ import { stories, story } from "@vibevalley/stories";
 
 import { MoreMenu } from "./MoreMenu";
 
+const recipeStyles = stylex.create({
+  moreMenuStoriesDiv: {
+    display: "flex",
+    justifyContent: "flex-end",
+    paddingTop: "calc(var(--spacing) * 40)",
+    paddingRight: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+    paddingLeft: "calc(var(--spacing) * 4)",
+  },
+});
+
 const viewStyles = stylex.create({
   moreMenuStoriesDiv: {
     display: "flex",
@@ -33,7 +44,7 @@ export default stories({
     }),
     "Opening upwards, from a toolbar": story({
       render: () => (
-        <div class="flex justify-end p-4 pt-40">
+        <div {...stylex.attrs(recipeStyles.moreMenuStoriesDiv)}>
           <MoreMenu label="更多" side="top" items={[{ key: "copy-link", label: "复制链接", icon: "copy", onSelect: noop }]} />
         </div>
       ),

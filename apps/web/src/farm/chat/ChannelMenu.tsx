@@ -14,6 +14,7 @@ import { PxButton, PxTextInput, SpriteIcon } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
 const recipeStyles = stylex.create({
+  channelArrow: { rotate: "90deg" },
   channelMenuDiv: {
     position: "absolute",
     top: "100%",
@@ -210,7 +211,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         <Show when={elsewhere() > 0}>
           <span {...stylex.attrs(viewStyles.channelMenuSpan2)}>{elsewhere()}</span>
         </Show>
-        <SpriteIcon name="button-next" size={10} class="rotate-90" />
+        <SpriteIcon name="button-next" size={10} styles={recipeStyles.channelArrow} />
       </button>
       <Show when={open()}>
         <div {...stylex.attrs(recipeStyles.channelMenuDiv)} role="dialog" aria-label={t("web.farm.chat.channels")} data-testid="channels">

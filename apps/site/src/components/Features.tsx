@@ -4,7 +4,72 @@ import { createReveal } from "../animation/scroll";
 /** @jsxImportSource @solidjs/web */
 import type { Copy } from "../i18n/zh";
 import { FACTS } from "../lib/facts";
+import { featureCard } from "./features.stylex";
 import { CountUp, Heading, Section } from "./ui";
+
+const sceneStyles = stylex.create({
+  hoverIcon: {
+    animationName: { default: null, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", featureCard)]: "wiggle" } },
+    animationDuration: { default: null, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", featureCard)]: ".4s" } },
+    animationTimingFunction: { default: null, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", featureCard)]: "steps(4)" } },
+  },
+  card: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    padding: "22px",
+    transitionProperty: "translate",
+    transitionTimingFunction: "steps(2,end)",
+    transitionDuration: ".15s",
+    translate: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "0 calc(var(--spacing) * -1)",
+      },
+    },
+  },
+  cardIcon: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    width: "calc(var(--spacing) * 11)",
+    height: "calc(var(--spacing) * 11)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  runtime: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    paddingInline: "18px",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "1",
+  },
+  runtimeIcon: {
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+});
+
+const recipeStyles = stylex.create({
+  featuresSpan: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontSize: "13px",
+    lineHeight: "var(--leading-snug)",
+    textWrap: "balance",
+    color: "var(--color-bark-800)",
+  },
+});
 
 const viewStyles = stylex.create({
   runtimesHeading: { marginTop: "72px" },
@@ -76,9 +141,8 @@ const viewStyles = stylex.create({
 });
 interface Props {
   copy: Pick<Copy, "features" | "runtimes">;
-  /** Each card's icon. */
   icons: string[];
-  /** The machines, by name and pixel logo, VibeValley's own last. */
+  /** VibeValley's own runtime comes last. */
   runtimes: {
     name: string;
     logo: string;
@@ -97,14 +161,14 @@ export default function Features(props: Props) {
             <span {...stylex.attrs(viewStyles.featuresSpan)}>
               <CountUp to={f.n} />
             </span>
-            <span class="mt-1.5 text-[13px]/snug text-balance text-bark-800">{props.copy.features.tally[f.key]}</span>
+            <span {...stylex.attrs(recipeStyles.featuresSpan)}>{props.copy.features.tally[f.key]}</span>
           </li>
         ))}
       </ul>
       <div {...stylex.attrs(viewStyles.featuresDiv)}>
         {props.copy.features.items.map((f, i) => (
-          <article data-reveal={(i % 4) * 70} class="group panel p-[22px] transition-[translate] duration-150 ease-[steps(2)] hover:-translate-y-1">
-            <img loading="lazy" src={props.icons[i]} alt="" class="pixelated group-hover:animate-wiggle mb-3 size-11 object-contain" />
+          <article data-reveal={(i % 4) * 70} {...stylex.attrs(featureCard, sceneStyles.card)}>
+            <img loading="lazy" src={props.icons[i]} alt="" {...stylex.attrs(sceneStyles.cardIcon, sceneStyles.hoverIcon)} />
             <h3 {...stylex.attrs(viewStyles.featuresH3)}>{f.title}</h3>
             <p {...stylex.attrs(viewStyles.featuresP)}>{f.text}</p>
           </article>
@@ -116,8 +180,8 @@ export default function Features(props: Props) {
       </p>
       <div {...stylex.attrs(viewStyles.featuresDiv2)}>
         {props.runtimes.map((r, i) => (
-          <span data-reveal={i * 90} class="group panel flex items-center gap-3 px-[18px] py-3 font-pixel text-2xl/none">
-            <img loading="lazy" src={r.logo} alt="" class="pixelated group-hover:animate-wiggle size-10 object-contain" />
+          <span data-reveal={i * 90} {...stylex.attrs(featureCard, sceneStyles.runtime)}>
+            <img loading="lazy" src={r.logo} alt="" {...stylex.attrs(sceneStyles.runtimeIcon, sceneStyles.hoverIcon)} />
             {r.name}
           </span>
         ))}

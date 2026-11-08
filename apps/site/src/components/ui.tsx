@@ -65,9 +65,6 @@ const styles = stylex.create({
   },
 });
 
-export const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
-export const vars = (values: Record<`--${string}`, string | number>) => values;
-
 export function domAttrs(...values: readonly stylex.StyleXStyles[]) {
   const { className, ...attributes } = stylex.props(values);
   return { ...attributes, class: className };

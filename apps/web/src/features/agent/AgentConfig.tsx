@@ -156,7 +156,7 @@ const variantStyles = stylex.create({
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     borderStyle: "solid",
     borderWidth: "1px",
     backgroundColor: "var(--color-page)",
@@ -269,7 +269,7 @@ const viewStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 2)",
   },
   toolsSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-selected)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -312,7 +312,7 @@ const viewStyles = stylex.create({
   },
   toolsButton2: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",

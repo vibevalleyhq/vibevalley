@@ -22,6 +22,22 @@ import { issueMove, issueMoveOf, sendMove } from "./moves";
 import type { CriterionRow } from "./overview";
 import { Property } from "./Sheet";
 
+const recipeStyles2 = stylex.create({
+  workLogSpan: {
+    width: "calc(var(--spacing) * 12)",
+    flexShrink: "0",
+  },
+  workLogSpanState: {
+    color: "var(--wb-muted)",
+  },
+  workLogSpanState2: {
+    color: "var(--wb-water)",
+  },
+  workLogSpanState3: {
+    color: "var(--wb-berry)",
+  },
+});
+
 const recipeStyles = stylex.create({
   storySpan: {
     minWidth: "0",
@@ -405,7 +421,16 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
         {(e) => (
           <li {...stylex.attrs(viewStyles.workLogLi)}>
             <span {...stylex.attrs(viewStyles.workLogSpan)}>{wallClockText(e.time)}</span>
-            <span class={["w-12 shrink-0", e.type === "run/error" ? "text-berry" : e.type === "tool/call" ? "text-water" : "text-muted"]}>
+            <span
+              {...stylex.attrs(
+                recipeStyles2.workLogSpan,
+                e.type === "run/error"
+                  ? recipeStyles2.workLogSpanState3
+                  : e.type === "tool/call"
+                    ? recipeStyles2.workLogSpanState2
+                    : recipeStyles2.workLogSpanState,
+              )}
+            >
               {stepWord[e.type]}
             </span>
             <span {...stylex.attrs(variantStyles.workLogSpan)}>{e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}</span>

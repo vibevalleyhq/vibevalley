@@ -31,6 +31,101 @@ import type { BlockEditor } from "./editor";
 import { PageWords } from "./PageWords";
 import { shellPath } from "./shell";
 
+const recipeStyles3 = stylex.create({
+  artifactsPageA: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  artifactsPageAState: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  artifactsPageAState2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+      "@media (width>=64rem)": "var(--wb-selected)",
+    },
+  },
+  artifactsPageAState3: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  shownDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=80rem)": "row",
+    },
+    overflowY: {
+      default: "auto",
+      "@media (width>=80rem)": "hidden",
+    },
+    overflowX: {
+      default: null,
+      "@media (width>=80rem)": "hidden",
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  artifactsPageDiv: {
+    marginInline: "calc(var(--spacing) * -2)",
+    display: "flex",
+    minHeight: "0",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  shownDiv: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".18s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-bad-soft)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+});
+
 const recipeStyles = stylex.create({
   shownButton: {
     display: "flex",
@@ -523,7 +618,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
         <Show when={list().length > 0 && shown().length === 0}>
           <p {...stylex.attrs(viewStyles.artifactsPageP3)}>{t("web.artifact.page.nothingFound")}</p>
         </Show>
-        <div class="-mx-2 flex min-h-0 scroll-fade-y flex-col gap-2 overflow-y-auto px-2">
+        <div {...stylex.attrs(recipeStyles2.artifactsPageDiv)}>
           <For each={groups().filter((g) => g.rows.length > 0)}>
             {(g) => (
               <section data-testid="artifact-group" data-key={g.key} {...stylex.attrs(viewStyles.artifactGroup)}>
@@ -548,11 +643,14 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
                             data-key={a().id}
                             data-body={a().body}
                             aria-current={a().id === open() ? "page" : undefined}
-                            class={[
-                              "flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-120",
-                              // With no address, the first is open only where there is room to show it beside the list.
-                              a().id === id() ? "bg-selected" : a().id === open() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
-                            ]}
+                            {...stylex.attrs(
+                              recipeStyles3.artifactsPageA,
+                              a().id === id()
+                                ? recipeStyles3.artifactsPageAState3
+                                : a().id === open()
+                                  ? recipeStyles3.artifactsPageAState2
+                                  : recipeStyles3.artifactsPageAState,
+                            )}
                           >
                             <Icon name={bodyIcon[a().body]} size={16} styles={[variantStyles3.artifactsPageIcon2]} />
                             <span {...stylex.attrs(viewStyles.artifactsPageSpan2)}>
@@ -726,7 +824,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
       data-key={props.artifact.id}
       data-body={props.artifact.body}
       data-version={version()?.version}
-      class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden"
+      {...stylex.attrs(recipeStyles3.shownDiv)}
     >
       <section {...stylex.attrs(variantStyles.shownSection)}>
         {/* A page is shown as wide as there is room; written blocks read in a column. */}
@@ -776,7 +874,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               <div
                 role="group"
                 data-testid="artifact-delete"
-                class="mt-2 flex animate-fade-in flex-wrap items-center gap-2 rounded-md bg-bad-soft px-3 py-2"
+                {...stylex.attrs(recipeStyles2.shownDiv)}
                 onKeyDown={(e) => e.key === "Escape" && setAsking(false)}
               >
                 <span {...stylex.attrs(viewStyles.shownSpan)}>{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>

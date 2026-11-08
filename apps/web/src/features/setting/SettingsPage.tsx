@@ -20,6 +20,27 @@ import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
+const recipeStyles = stylex.create({
+  settingsPageDiv: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 5)",
+  },
+});
+
 const variantStyles = stylex.create({
   sectionLinkA: {
     display: "flex",
@@ -202,7 +223,7 @@ export function SettingsPage(props: { rest: string }) {
                 )}
               </For>
             </nav>
-            <div class="min-h-0 min-w-0 flex-1 scroll-fade-y overflow-y-auto p-5">
+            <div {...stylex.attrs(recipeStyles.settingsPageDiv)}>
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />

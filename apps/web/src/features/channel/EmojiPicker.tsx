@@ -6,6 +6,33 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, ownerId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
+const recipeStyles = stylex.create({
+  emojiPickerDiv: {
+    position: "fixed",
+    zIndex: 30,
+    display: "flex",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 2)",
+    color: "var(--wb-ink)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
 const viewStyles = stylex.create({
   emojiPickerP: {
     paddingInline: "var(--spacing)",
@@ -27,7 +54,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     fontFamily: "var(--font-sans)",
     fontSize: "var(--text-lg)",
     lineHeight: "var(--text-lg--line-height)",
@@ -301,7 +328,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
         data-testid="emoji-picker"
         aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
-        class="fixed z-30 flex animate-pop-in flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
+        {...stylex.attrs(recipeStyles.emojiPickerDiv)}
       >
         <For each={groups}>
           {(g) => (

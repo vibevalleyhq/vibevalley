@@ -1,5 +1,5 @@
 export const FACTS = [
-  // The machines in use: VibeValley's own, pi, claude, codex (.agents/notes/proposed/feature/2026-10-10-other-runtimes.md).
+  // VibeValley's own, pi, Claude Code, and Codex.
   { key: "machines", n: 4, icon: "machine-tractor" },
   // 7 species × 4 outfits (packages/protocol/src/shapes.ts).
   { key: "looks", n: 28, icon: "bear-farmer-side" },

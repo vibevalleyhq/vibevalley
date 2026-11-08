@@ -15,8 +15,20 @@ import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { FromTemplate } from "./FromTemplate";
+
+const profileStyles = stylex.create({
+  lookChoices: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(3,minmax(0,1fr))",
+      "@media (width>=40rem)": "repeat(6,minmax(0,1fr))",
+    },
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 const variantStyles2 = stylex.create({
   orchestratorProfileA: {
@@ -64,7 +76,7 @@ const variantStyles2 = stylex.create({
 const variantStyles = stylex.create({
   orchestratorProfileSpan: {
     flexShrink: "0",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
@@ -125,7 +137,7 @@ const viewStyles = stylex.create({
   },
   orchestratorProfileSpan4: {
     flexShrink: "0",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -315,7 +327,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
               const look = OrchestratorLookValues.find((l) => l === v);
               if (look) setLook(look);
             }}
-            class="grid grid-cols-3 gap-2 sm:grid-cols-6"
+            {...styleProps(profileStyles.lookChoices)}
           >
             <For each={orchestratorLooks}>
               {(look) => (

@@ -6,6 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
 
 import { Icon } from "#/ui/Icon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
@@ -13,6 +14,52 @@ import { type BoardCard, cardAgent, cardLook, cardMove, cardRepo, closedShown, t
 import { laneOrder, type Ordering } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
+
+const cardStyles = stylex.create({
+  card: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingTop: "calc(var(--spacing) * 2)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: "var(--default-transition-duration)",
+  },
+  selected: {
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-selected)",
+  },
+  idle: {
+    borderColor: {
+      default: "var(--wb-line)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--wb-ink) 18%, transparent)",
+        },
+      },
+    },
+    backgroundColor: "var(--wb-page)",
+    boxShadow: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--shadow-raise)",
+      },
+    },
+  },
+  dragging: {
+    opacity: ".4",
+  },
+  moving: {
+    opacity: ".7",
+  },
+});
 
 const recipeStyles = stylex.create({
   issueBoardDiv: {
@@ -491,11 +538,13 @@ function CardView(props: {
             props.onOpen(props.card.id);
           }
         }}
-        class={[
-          "group cursor-pointer rounded-lg border px-2.5 pt-2 pb-2 transition-colors",
-          props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-ink/18 hover:shadow-raise",
-          { "opacity-40": props.drag.dragging()?.id === props.card.id, "opacity-70": props.card.move?.state === "moving" },
-        ]}
+        {...styleProps([
+          stylex.defaultMarker(),
+          cardStyles.card,
+          props.selected ? cardStyles.selected : cardStyles.idle,
+          props.drag.dragging()?.id === props.card.id && cardStyles.dragging,
+          props.card.move?.state === "moving" && cardStyles.moving,
+        ])}
       >
         <Show when={where()}>
           <div {...stylex.attrs(viewStyles.cardViewDiv2)}>{where()}</div>

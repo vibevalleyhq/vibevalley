@@ -17,6 +17,44 @@ import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "#/ui/
 
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 
+const recipeStyles = stylex.create({
+  pinViewSpan: {
+    display: "block",
+    animationName: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "hop",
+    },
+    animationDuration: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "3.2s",
+    },
+    animationDelay: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "0s",
+    },
+    animationTimingFunction: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "step-end",
+    },
+    animationIterationCount: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "infinite",
+    },
+    animationDirection: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "normal",
+    },
+    animationFillMode: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "none",
+    },
+    animationPlayState: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "running",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   pinViewDiv: {
     position: "absolute",
@@ -97,7 +135,7 @@ function PinView(props: { pin: Pin }) {
       style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}
     >
       <Show when={props.pin.hop !== undefined} fallback={card()}>
-        <span class="block motion-safe:animate-[hop_3.2s_steps(1)_infinite]" style={{ "animation-delay": `${props.pin.hop}s` }}>
+        <span {...stylex.attrs(recipeStyles.pinViewSpan)} style={{ "animation-delay": `${props.pin.hop}s` }}>
           {card()}
         </span>
       </Show>

@@ -13,6 +13,18 @@ import { SecretInput } from "./layout";
 import { Hint } from "./Tip";
 
 const viewStyles = stylex.create({
+  rows: {
+    display: "flex",
+    flexDirection: "column",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "var(--color-line)",
+    backgroundColor: {
+      default: "var(--color-side)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-side) 60%, transparent)",
+    },
+  },
   settingsPageDiv: {
     display: "flex",
     maxWidth: "var(--container-3xl)",
@@ -144,7 +156,9 @@ export function SettingsGroup(props: { title?: string; note?: JSX.Element; child
           <span {...stylex.attrs(viewStyles.settingsGroupSpan)}>{props.note}</span>
         </div>
       </Show>
-      <div class="flex flex-col divide-y divide-line rounded-lg border border-line bg-side/60">{props.children}</div>
+      <div data-settings-rows {...stylex.attrs(viewStyles.rows)}>
+        {props.children}
+      </div>
     </section>
   );
 }

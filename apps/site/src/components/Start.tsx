@@ -8,6 +8,28 @@ import { createReveal } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
 import { Section } from "./ui";
 
+const sceneStyles = stylex.create({
+  warning: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 5)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-warn) !important",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    padding: "calc(var(--spacing) * 6)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  startSpan: {
+    color: "var(--color-wheat)",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  },
+});
+
 const viewStyles = stylex.create({
   startImg: {
     width: "calc(var(--spacing) * 12)",
@@ -153,7 +175,6 @@ interface Props {
   copy: Pick<Copy, "start" | "safety">;
   commands: string[];
   readme: string;
-  /** The warning's mark, the list's check, the copy button's icon. */
   icons: {
     warn: string;
     check: string;
@@ -165,7 +186,7 @@ export default function Start(props: Props) {
   return (
     <>
       <Section ref={root.set} id="start" alt title={props.copy.start.title}>
-        <div data-reveal role="note" class="panel bg-warn! flex items-start gap-5 p-6">
+        <div data-reveal role="note" {...stylex.attrs(sceneStyles.warning)}>
           <img loading="lazy" src={props.icons.warn} alt="" {...stylex.attrs(viewStyles.startImg)} />
           <div>
             <h3 {...stylex.attrs(viewStyles.startH3)}>{props.copy.safety.title}</h3>
@@ -199,7 +220,7 @@ export default function Start(props: Props) {
             <pre {...stylex.attrs(viewStyles.startPre)}>
               {props.commands.map((c) => (
                 <span {...stylex.attrs(viewStyles.startSpan)}>
-                  <span class="text-wheat select-none">$ </span>
+                  <span {...stylex.attrs(recipeStyles.startSpan)}>$ </span>
                   {c}
                 </span>
               ))}
@@ -216,7 +237,6 @@ export default function Start(props: Props) {
     </>
   );
 }
-/** Copies the commands; its label hops over to "copied" and back. */
 function CopyButton(props: { text: string; icon: string; check: string; label: string; done: string }) {
   const [copied, setCopied] = createSignal(false);
   let timer = 0;

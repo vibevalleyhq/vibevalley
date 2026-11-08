@@ -9,12 +9,86 @@ import { ready } from "#/infra/query.ts";
 import { Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { tierOrder } from "./outline";
 import { tierLabel } from "./PageView";
 import { notesSearch } from "./Search";
 import { tierHeading } from "./sidebar.stylex";
 import { pkmHref, usePkmRadar } from "./vault";
+
+const sidebarStyles = stylex.create({
+  row: {
+    display: "flex",
+    height: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingRight: "calc(var(--spacing) * 2)",
+  },
+  selected: {
+    backgroundColor: "var(--wb-selected)",
+    color: "var(--wb-ink)",
+  },
+  idle: {
+    color: "var(--wb-ink)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  nested: {
+    paddingLeft: "calc(var(--spacing) * 7.5)",
+  },
+  toggle: {
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  count: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  faint: {
+    color: "var(--wb-faint)",
+  },
+  overdue: {
+    color: "var(--wb-berry)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  sidebarDiv: {
+    marginInline: "calc(var(--spacing) * -2)",
+    display: "flex",
+    minHeight: "0",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+});
 
 const viewStyles = stylex.create({
   sidebarRoot: {
@@ -176,14 +250,14 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
         <span {...stylex.attrs(viewStyles.sidebarSpan)}>{t("web.pkm.list.find")}</span>
       </button>
       <div {...stylex.attrs(viewStyles.sidebarDiv)}>
-        <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} class={row(props.slug === undefined)}>
+        <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} {...styleProps(row(props.slug === undefined))}>
           <Icon name="calendar" size={14} styles={props.slug === undefined ? viewStyles.sidebarIconActive : viewStyles.sidebarIconFaint} />
           <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{t("web.pkm.list.today")}</span>
         </A>
         <Radar />
       </div>
       <Show when={props.error}>{(e) => <p {...stylex.attrs(viewStyles.sidebarP)}>{reasonOf(e())}</p>}</Show>
-      <div class="-mx-2 flex min-h-0 scroll-fade-y flex-col gap-4 overflow-y-auto px-2 pb-2" data-testid="pkm-list">
+      <div {...stylex.attrs(recipeStyles.sidebarDiv)} data-testid="pkm-list">
         <For each={tierOrder.filter((tier) => tier !== "journal" && listed(tier).length > 0)}>
           {(tier) => (
             <section data-testid="pkm-tier" data-key={tier} {...stylex.attrs(viewStyles.sidebarDiv)}>
@@ -207,7 +281,7 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
                           data-testid="pkm-row"
                           data-key={p().slug}
                           aria-current={p().slug === props.slug ? "page" : undefined}
-                          class={[row(p().slug === props.slug), "pl-7.5"]}
+                          {...styleProps([row(p().slug === props.slug), sidebarStyles.nested])}
                         >
                           <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{p().title}</span>
                           <Show when={p().open > 0}>
@@ -229,26 +303,31 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
   );
 }
 
-const row = (here: boolean) => [
-  "flex h-7 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-120",
-  here ? "bg-selected text-ink" : "text-ink hover:bg-hover",
-];
+const row = (here: boolean): stylex.StyleXStyles => [sidebarStyles.row, here ? sidebarStyles.selected : sidebarStyles.idle];
 
 function Radar() {
   const radar = usePkmRadar();
   const [which, setWhich] = createSignal<"stale" | "overdue">();
   const flip = (to: "stale" | "overdue") => setWhich((was) => (was === to ? undefined : to));
-  const look = (props: { icon: IconName; label: string; n: number; open?: boolean | undefined; tone?: string; testid: string; click: () => void }) => (
+  const look = (props: {
+    icon: IconName;
+    label: string;
+    n: number;
+    open?: boolean | undefined;
+    tone?: stylex.StyleXStyles;
+    testid: string;
+    click: () => void;
+  }) => (
     <button
       type="button"
       data-testid={props.testid}
       aria-expanded={props.open === undefined ? undefined : props.open ? "true" : "false"}
       onClick={() => props.click()}
-      class={[row(props.open === true), "cursor-pointer text-left"]}
+      {...styleProps([row(props.open === true), sidebarStyles.toggle])}
     >
       <Icon name={props.icon} size={14} styles={viewStyles.sidebarIconFaint} />
       <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{props.label}</span>
-      <span class={["text-xs tabular-nums", props.tone ?? "text-faint"]}>{props.n}</span>
+      <span {...styleProps([sidebarStyles.count, props.tone ?? sidebarStyles.faint])}>{props.n}</span>
     </button>
   );
   return (
@@ -279,7 +358,7 @@ function Radar() {
               <For each={r().stale} keyed={(s) => s.slug}>
                 {(s) => (
                   <li>
-                    <A href={pkmHref(s().slug)} class={[row(false), "pl-7.5"]}>
+                    <A href={pkmHref(s().slug)} {...styleProps([row(false), sidebarStyles.nested])}>
                       <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{s().title}</span>
                       <span {...stylex.attrs(viewStyles.radarSpan)}>{t("web.pkm.radar.days", { n: s().days })}</span>
                     </A>
@@ -295,7 +374,7 @@ function Radar() {
               n: r().overdue.length,
               open: which() === "overdue",
               // The one count that is a fault, in its colour.
-              tone: "text-berry",
+              tone: sidebarStyles.overdue,
               testid: "pkm-radar-overdue",
               click: () => flip("overdue"),
             })}

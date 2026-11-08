@@ -8,10 +8,42 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { TextArea } from "#/ui/Field.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 
 import { ActLines } from "./ActLines";
 import { createIssueActs } from "./acts";
+
+const familyStyles = stylex.create({
+  children: {
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  child: {
+    borderTopStyle: {
+      default: null,
+      ":not(:last-child)": "solid",
+    },
+    borderBottomStyle: {
+      default: null,
+      ":not(:last-child)": "solid",
+    },
+    borderTopWidth: {
+      default: null,
+      ":not(:last-child)": "0px",
+    },
+    borderBottomWidth: {
+      default: null,
+      ":not(:last-child)": "1px",
+    },
+    borderColor: {
+      default: null,
+      ":not(:last-child)": "var(--color-line)",
+    },
+  },
+});
 
 const viewStyles = stylex.create({
   familyDetailDiv: {
@@ -116,14 +148,14 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
         </div>
       </Show>
       <h2 {...stylex.attrs(viewStyles.familyDetailH2)}>{t("web.issue.family.children")}</h2>
-      <div class="divide-y divide-line rounded-lg border border-line">
+      <div {...styleProps(familyStyles.children)}>
         <For each={props.children}>
           {(child) => (
             <button
               type="button"
               data-testid="child-issue"
               data-issue={child.id}
-              {...stylex.attrs(viewStyles.childIssue)}
+              {...styleProps([viewStyles.childIssue, familyStyles.child])}
               onClick={() => props.onOpen(child.id)}
             >
               <span {...stylex.attrs(viewStyles.familyDetailSpan)}>#{child.number}</span>

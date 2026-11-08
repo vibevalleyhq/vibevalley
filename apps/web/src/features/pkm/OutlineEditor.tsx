@@ -11,6 +11,7 @@ import { api } from "#/infra/api.ts";
 import { useLatest } from "#/state/atom.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
+import { styleProps } from "#/ui/positioner.ts";
 import { typeMarks } from "#/ui/typedMarks.ts";
 
 import { Body } from "./Body";
@@ -32,6 +33,91 @@ import {
   saved,
 } from "./editing";
 import type { DropAt } from "./selection";
+
+const outlineStyles = stylex.create({
+  row: {
+    position: "relative",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-sm)",
+    paddingBlock: "1px",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".28s",
+  },
+  picked: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  lit: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
+    },
+  },
+  bullet: {
+    width: "calc(var(--spacing) * 1.5)",
+    height: "calc(var(--spacing) * 1.5)",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-muted)",
+  },
+  foldedBullet: {
+    boxShadow: "0 0 0 3px var(--color-line)",
+  },
+  expandedBullet: {
+    display: {
+      default: null,
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover")]: "none",
+      },
+    },
+  },
+  marker: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    width: "calc(var(--spacing) * 4)",
+    height: "calc(var(--spacing) * 4)",
+    flexShrink: "0",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-xs)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+  },
+  todo: {
+    borderColor: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: "var(--wb-page)",
+  },
+  waiting: {
+    borderColor: "var(--wb-wheat)",
+    color: "var(--wb-warn-ink)",
+  },
+  doing: {
+    borderColor: "var(--wb-wheat)",
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
+    },
+    color: "var(--wb-warn-ink)",
+  },
+  done: {
+    borderColor: "var(--wb-accent)",
+    backgroundColor: "var(--wb-accent)",
+    color: "var(--wb-page)",
+  },
+  canceled: {
+    borderColor: "var(--wb-line)",
+    color: "var(--wb-faint)",
+  },
+});
 
 const recipeStyles = stylex.create({
   rowDiv: {
@@ -257,14 +343,14 @@ export const newId = () => crypto.randomUUID();
 /** One level of the outline's indent, px. */
 export const indentPx = 20;
 
-const markerLook: Partial<Record<PkmMarker, { readonly checked: boolean | "mixed"; readonly icon?: IconName; readonly tone: string }>> = {
-  TODO: { checked: false, tone: "border-muted bg-page hover:border-ink" },
-  LATER: { checked: false, tone: "border-muted bg-page hover:border-ink" },
-  WAITING: { checked: false, icon: "wait", tone: "border-wheat text-warn-ink" },
-  DOING: { checked: "mixed", icon: "partly", tone: "border-wheat bg-wheat/20 text-warn-ink" },
-  NOW: { checked: "mixed", icon: "partly", tone: "border-wheat bg-wheat/20 text-warn-ink" },
-  DONE: { checked: true, icon: "ticked", tone: "border-accent bg-accent text-page" },
-  CANCELED: { checked: true, icon: "close", tone: "border-line text-faint" },
+const markerLook: Partial<Record<PkmMarker, { readonly checked: boolean | "mixed"; readonly icon?: IconName; readonly tone: stylex.StyleXStyles }>> = {
+  TODO: { checked: false, tone: outlineStyles.todo },
+  LATER: { checked: false, tone: outlineStyles.todo },
+  WAITING: { checked: false, icon: "wait", tone: outlineStyles.waiting },
+  DOING: { checked: "mixed", icon: "partly", tone: outlineStyles.doing },
+  NOW: { checked: "mixed", icon: "partly", tone: outlineStyles.doing },
+  DONE: { checked: true, icon: "ticked", tone: outlineStyles.done },
+  CANCELED: { checked: true, icon: "close", tone: outlineStyles.canceled },
 };
 
 export function Row(props: {
@@ -296,10 +382,7 @@ export function Row(props: {
       data-marker={props.block.marker}
       data-lit={props.lit ? "" : undefined}
       data-picked={props.picked ? "" : undefined}
-      class={[
-        "group relative flex items-start gap-1 rounded-sm py-px transition-colors duration-280",
-        props.picked ? "bg-selected" : props.lit ? "bg-wheat/20" : "",
-      ]}
+      {...styleProps([stylex.defaultMarker(), outlineStyles.row, props.picked ? outlineStyles.picked : props.lit ? outlineStyles.lit : undefined])}
       style={{ "padding-left": `${props.block.depth * indentPx}px` }}
       onDragOver={(e) => props.onDragOver(e, e.currentTarget.getBoundingClientRect())}
       onDrop={(e) => props.onDrop(e)}
@@ -330,7 +413,7 @@ export function Row(props: {
         onClick={() => props.onToggle()}
         {...stylex.attrs(viewStyles.pkmBullet)}
       >
-        <span class={["size-1.5 rounded-full bg-muted", props.parent ? (props.folded ? "ring-3 ring-line" : "group-hover:hidden") : ""]} />
+        <span {...styleProps([outlineStyles.bullet, props.parent && (props.folded ? outlineStyles.foldedBullet : outlineStyles.expandedBullet)])} />
         <Show when={props.parent && !props.folded}>
           <Icon name="choose" size={12} styles={viewStyles.expandedChevron} />
         </Show>
@@ -345,7 +428,7 @@ export function Row(props: {
             aria-label={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
             title={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
             onClick={() => props.onMarker(props.block.marker === "DONE" ? "TODO" : "DONE")}
-            class={["mt-1 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs border", look().tone]}
+            {...styleProps([outlineStyles.marker, look().tone])}
           >
             <Show when={look().icon}>{(icon) => <Icon name={icon()} size={10} />}</Show>
           </button>

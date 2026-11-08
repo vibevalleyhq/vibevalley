@@ -23,6 +23,28 @@ import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 
+const recipeStyles = stylex.create({
+  creatorDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: {
+      default: "auto",
+      "@media (width>=64rem)": "hidden",
+    },
+    paddingTop: "calc(var(--spacing) * 3)",
+    overflowX: {
+      default: null,
+      "@media (width>=64rem)": "hidden",
+    },
+  },
+});
+
 const variantStyles3 = stylex.create({
   problemsIcon: {
     marginTop: "var(--spacing)",
@@ -50,7 +72,7 @@ const variantStyles2 = stylex.create({
 const variantStyles = stylex.create({
   creatorSpan: {
     flexShrink: "0",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
@@ -425,7 +447,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
       <div {...stylex.attrs(viewStyles.creatorDiv4)}>
         {bar()}
         <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
-        <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-3 lg:flex-row lg:overflow-hidden">
+        <div {...stylex.attrs(recipeStyles.creatorDiv)}>
           <div {...stylex.attrs(viewStyles.creatorDiv5)}>
             <LookPanel draft={draft()} onChange={(look) => setDraft({ ...draft(), look })} />
           </div>

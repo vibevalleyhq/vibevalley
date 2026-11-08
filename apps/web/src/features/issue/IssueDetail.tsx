@@ -260,7 +260,7 @@ const viewStyles = stylex.create({
   },
   issueDetailButton: {
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     padding: "calc(var(--spacing) * .5)",
     backgroundColor: {
       default: null,

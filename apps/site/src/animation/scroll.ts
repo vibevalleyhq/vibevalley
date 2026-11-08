@@ -63,7 +63,10 @@ export function observeVisibility(ref: ElementSource) {
   onSettled(() => {
     const element = ref.get();
     if (!element) return;
-    const observer = new IntersectionObserver(([entry]) => element.toggleAttribute("data-off", !entry!.isIntersecting));
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry) throw new Error("Visibility observer received no entries");
+      element.toggleAttribute("data-off", !entry.isIntersecting);
+    });
     observer.observe(element);
     return () => observer.disconnect();
   });

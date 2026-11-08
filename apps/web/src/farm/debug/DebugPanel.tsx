@@ -16,6 +16,32 @@ import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "#
 import { achievementsQuery as achievementCatalog, ready, useQuery } from "#/infra/query.ts";
 import { createPixelAct } from "#/ui/pixel/index.ts";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
+
+const buttonStyles = stylex.create({
+  base: { height: "calc(var(--spacing) * 7)", cursor: "pointer", paddingInline: "calc(var(--spacing) * 2.5)", fontSize: "12px" },
+  plain: {
+    backgroundColor: { default: "var(--color-ink-800)", "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" } },
+    color: "var(--color-paper)",
+  },
+  hat: {
+    backgroundColor: "var(--color-hat)",
+    color: "var(--color-ink-950)",
+    filter: { default: null, "@media (hover:hover)": { default: null, ":hover": "brightness(110%)" } },
+  },
+  bad: {
+    backgroundColor: { default: "var(--color-berry-900)", "@media (hover:hover)": { default: null, ":hover": "var(--color-berry-800)" } },
+    color: "var(--color-paper)",
+  },
+  speed: {
+    backgroundColor: {
+      default: "var(--color-ink-800)",
+      "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" },
+      ":is([aria-pressed=true])": "var(--color-hat)",
+    },
+    color: { default: "var(--color-paper)", ":is([aria-pressed=true])": "var(--color-ink-950)" },
+  },
+});
 
 const recipeStyles = stylex.create({
   panelAside: {
@@ -205,8 +231,7 @@ function createLog() {
   return { entries, paused, setPaused, clear: () => setEntries([]) };
 }
 
-const btn = (tone: "plain" | "hat" | "bad" = "plain") =>
-  `h-7 cursor-pointer px-2.5 text-[12px] ${tone === "hat" ? "bg-hat text-ink-950 hover:brightness-110" : tone === "bad" ? "bg-berry-900 text-paper hover:bg-berry-800" : "bg-ink-800 text-paper hover:bg-ink-700"}`;
+const btn = (tone: "plain" | "hat" | "bad" = "plain") => styleProps([buttonStyles.base, buttonStyles[tone]]);
 
 function Section(props: { title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
@@ -241,7 +266,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(recipeStyles.panelAside)}>
       <header {...stylex.attrs(viewStyles.panelHeader)}>
         <span {...stylex.attrs(viewStyles.panelSpan)}>{t("web.farm.debug.title")}</span>
-        <button type="button" data-testid="debug-close" class={btn()} onClick={() => props.onClose()}>
+        <button type="button" data-testid="debug-close" {...btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
@@ -255,10 +280,10 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           }
         >
           <div {...stylex.attrs(viewStyles.panelDiv)}>
-            <button type="button" class={btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
+            <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
               {t("web.farm.debug.open")}
             </button>
-            <button type="button" class={btn()} onClick={() => void everyone("dismiss")}>
+            <button type="button" {...btn()} onClick={() => void everyone("dismiss")}>
               {t("web.farm.debug.dismiss")}
             </button>
           </div>
@@ -290,7 +315,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                   type="button"
                   data-key={speed}
                   aria-pressed={aria((speed === 0 && day().paused) || (!day().paused && day().speed === speed))}
-                  class={[btn(), "aria-pressed:bg-hat aria-pressed:text-ink-950"]}
+                  {...styleProps([buttonStyles.base, buttonStyles.speed])}
                   onClick={() => clock.setSpeed(speed)}
                 >
                   {label}
@@ -301,12 +326,12 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
           <div {...stylex.attrs(viewStyles.panelDiv)}>
-            <button type="button" data-testid="debug-level-up" class={btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
+            <button type="button" data-testid="debug-level-up" {...btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
               {t("web.farm.debug.levelUp")}
             </button>
             <button
               type="button"
-              class={btn()}
+              {...btn()}
               disabled={achievements().length === 0}
               onClick={() => {
                 const all = achievements();
@@ -340,14 +365,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
-                  <button type="button" class={btn("hat")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
+                  <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
                     {t("web.farm.tool.harvest.label")}
                   </button>
                 </Show>
-                <button type="button" class={btn()} onClick={() => void act.run(() => api.session.stop({ id: h.id }))}>
+                <button type="button" {...btn()} onClick={() => void act.run(() => api.session.stop({ id: h.id }))}>
                   {t("web.farm.debug.halt")}
                 </button>
-                <button type="button" class={btn("bad")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
+                <button type="button" {...btn("bad")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
                   {t("web.farm.debug.dismiss")}
                 </button>
               </div>
@@ -356,10 +381,10 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.all")}>
           <div {...stylex.attrs(viewStyles.panelDiv)}>
-            <button type="button" class={btn()} onClick={() => void everyone("stop")}>
+            <button type="button" {...btn()} onClick={() => void everyone("stop")}>
               {t("web.farm.debug.haltAll")}
             </button>
-            <button type="button" class={btn("bad")} onClick={() => void everyone("dismiss")}>
+            <button type="button" {...btn("bad")} onClick={() => void everyone("dismiss")}>
               {t("web.farm.debug.dismissAll")}
             </button>
           </div>
@@ -370,7 +395,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
               <div {...stylex.attrs(viewStyles.panelDiv4)}>
                 <For each={g.names}>
                   {(n) => (
-                    <button type="button" title={n} class={btn()} onClick={() => playSound(n)}>
+                    <button type="button" title={n} {...btn()} onClick={() => playSound(n)}>
                       {SOUND_LABEL[n]}
                     </button>
                   )}
@@ -383,15 +408,15 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           title={t("web.farm.debug.frames", { n: props.log.entries().length })}
           aside={
             <span {...stylex.attrs(viewStyles.panelDiv2)}>
-              <button type="button" class={btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
+              <button type="button" {...btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
                 {props.log.paused() ? t("web.farm.debug.resume") : t("web.farm.debug.pause")}
               </button>
-              <button type="button" class={btn()} onClick={() => props.log.clear()}>
+              <button type="button" {...btn()} onClick={() => props.log.clear()}>
                 {t("web.farm.debug.clear")}
               </button>
               <button
                 type="button"
-                class={btn()}
+                {...btn()}
                 onClick={() =>
                   void navigator.clipboard
                     .writeText(

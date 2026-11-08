@@ -6,7 +6,9 @@ import { parseAllDocuments } from "yaml";
 
 import { scanStyleDependencies } from "./style-migration-dependencies";
 import { hash, migrationInputs, migrationOutput, migrationRoot } from "./style-migration-inputs";
+import { ownedSemanticClasses, reviewedStyleKeys } from "./style-migration-ownership";
 import { migrationProgress } from "./style-migration-progress";
+import { inlineStyleReviews } from "./style-migration-reviews";
 import { scanStyleCss, scanStyleHtml, scanStyleSource, type StyleFinding } from "./style-migration-scan";
 
 const record = (input: unknown): Readonly<Record<string, unknown>> =>
@@ -42,7 +44,8 @@ for (const file of inputs.files) {
   const extension = extname(file.path);
   const absolute = resolve(migrationRoot, file.path);
   if (scriptExtensions.has(extension)) {
-    const scan = scanStyleSource(file.path, readFileSync(absolute, "utf8"));
+    const reviews = reviewedStyleKeys(inlineStyleReviews.filter((review) => review.path === file.path));
+    const scan = scanStyleSource(file.path, readFileSync(absolute, "utf8"), ownedSemanticClasses(file.path), reviews);
     coverage.push({ ...file, parser: "oxc", parsed: scan.parsed, expressions: scan.expressions });
     findings.push(...scan.findings);
     classifications.push(...scan.classifications.map((classification) => ({ ...classification, path: file.path })));
@@ -51,7 +54,7 @@ for (const file of inputs.files) {
     coverage.push({ ...file, parser: "lightningcss", parsed: !found.some((finding) => finding.category === "css-parse-error"), expressions: 0 });
     findings.push(...found);
   } else if (extension === ".html") {
-    const scan = scanStyleHtml(file.path, readFileSync(absolute, "utf8"));
+    const scan = scanStyleHtml(file.path, readFileSync(absolute, "utf8"), ownedSemanticClasses(file.path));
     coverage.push({ ...file, parser: "parse5", parsed: scan.parsed, expressions: scan.expressions });
     findings.push(...scan.findings);
     classifications.push(...scan.classifications.map((classification) => ({ ...classification, path: file.path })));
@@ -171,6 +174,8 @@ for (const expected of expectedGraphs) {
     add("missing-or-invalid-build-graph", path, String(error));
   }
 }
+
+for (const review of inlineStyleReviews) if (!maintained.has(review.path)) add("stale-inline-review", review.path, review.reason);
 
 if (coverage.filter((file) => file.parser === "oxc").length === 0) add("empty-source-scan", "", "No parsed source files");
 if (migrationInputs().digest !== inputs.digest) add("source-changed-during-inventory", "", "Fix: rerun against stable inputs.");

@@ -70,6 +70,11 @@ export default defineConfig({
       "notes:verify": "vpx scripts/agent-notes.ts",
       "migration:inventory": { command: "vpx scripts/style-migration.ts", cache: false },
       "migration:visual:static": { command: "vpx scripts/style-migration-static.ts", cache: false },
+      "migration:visual": { command: "vpx scripts/style-migration-visual.ts", cache: false },
+      "migration:behavior": { command: "vpx scripts/style-migration-behavior.ts", cache: false },
+      "migration:live": { command: "vpx scripts/style-migration-live.ts", cache: false },
+      "migration:host": { command: "vpx scripts/style-migration-host.ts", cache: false },
+      "migration:verify": { command: "vpx scripts/style-migration-verify.ts", cache: false },
       "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
       "site:build": { command: "vp run --filter @vibevalley/site build", cache: false },
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
@@ -133,8 +138,6 @@ export default defineConfig({
       customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
       groups: ["builtin", "external", "workspace", ["internal", "subpath"], ["parent", "sibling", "index"], "style", "unknown"],
     },
-    // Tailwind's own class order, from the page's stylesheet; cx(…) holds classes too.
-    sortTailwindcss: { stylesheet: "./apps/web/src/style.css", functions: ["cx"] },
   },
   lint: {
     ignorePatterns: ["apps/server/db/generated/**"],

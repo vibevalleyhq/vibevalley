@@ -2,6 +2,8 @@ import { transform } from "lightningcss";
 import { parse } from "parse5";
 import { parseSync } from "vite-plus";
 
+import { styleFingerprint } from "./style-migration-ownership";
+
 export interface StyleFinding {
   category: string;
   path: string;
@@ -35,7 +37,12 @@ const offsetOf = (node: Node) => (typeof node.start === "number" ? node.start : 
 const classNames = new Set(["class", "className", "classList"]);
 const legacyHelpers = new Set(["cx", "cn", "clsx", "classNames", "cva", "twMerge"]);
 
-export function scanStyleSource(path: string, text: string, semanticClasses: ReadonlySet<string> = new Set()): StyleScan {
+export function scanStyleSource(
+  path: string,
+  text: string,
+  semanticClasses: ReadonlySet<string> = new Set(),
+  reviewedStyles: ReadonlyMap<string, string> = new Map(),
+): StyleScan {
   const result: StyleScan = { parsed: true, expressions: 0, classifications: [], findings: [] };
   const finding = (category: string, node: Node, evidence?: string) =>
     result.findings.push({
@@ -60,7 +67,20 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
   const bindings = new Map<string, unknown[]>();
   const stylexNamespaces = new Set<string>();
   const stylexAttrs = new Set<string>();
+  const nativeComponents = new Set<string>();
+  const nativeStyleOffsets = new Set<number>();
+  const usedReviews = new Set<string>();
+  const parameterScopes: { start: number; end: number; parameters: Map<string, Node> }[] = [];
   walk(parsed.program, (node) => {
+    if (["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(String(node.type))) {
+      const parameters = new Map<string, Node>();
+      for (const input of childrenOf(node, "params")) {
+        const parameter = nodeOf(input);
+        const name = nameOf(parameter);
+        if (name !== undefined) parameters.set(name, nodeOf(nodeOf(parameter.typeAnnotation).typeAnnotation));
+      }
+      parameterScopes.push({ start: offsetOf(node), end: typeof node.end === "number" ? node.end : 0, parameters });
+    }
     if (node.type === "VariableDeclarator") {
       const name = nameOf(node.id);
       if (name !== undefined) bindings.set(name, [...(bindings.get(name) ?? []), node.init]);
@@ -72,6 +92,14 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
         finding("website-astro-import", node, source);
       if (path.startsWith("apps/site/") && source !== undefined && /^(?:react(?:$|[-/])|motion\/react(?:$|[-/]))/u.test(source))
         finding("website-react-import", node, source);
+      if (
+        path.startsWith("apps/mobile/") &&
+        ["react-native", "react-native-webview", "react-native-safe-area-context", "expo-camera", "expo-status-bar"].includes(source ?? "")
+      )
+        for (const value of childrenOf(node, "specifiers")) {
+          const local = nameOf(nodeOf(value).local);
+          if (local !== undefined) nativeComponents.add(local);
+        }
       if (source === "@stylexjs/stylex")
         for (const value of childrenOf(node, "specifiers")) {
           const specifier = nodeOf(value);
@@ -86,6 +114,22 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
           const local = nameOf(specifier.local);
           if (local !== undefined && ["styleProps", "positionerAttrs"].includes(nameOf(specifier.imported) ?? "")) stylexAttrs.add(local);
         }
+    }
+  });
+  const nativeAliases = new Set<string>();
+  for (const [name, values] of bindings) {
+    if (values.length !== 1) continue;
+    let value = nodeOf(values[0]);
+    while (["TSAsExpression", "TSSatisfiesExpression", "TSNonNullExpression"].includes(String(value.type))) value = nodeOf(value.expression);
+    if (value.type === "Identifier" && nativeComponents.has(nameOf(value) ?? "")) nativeAliases.add(name);
+  }
+  walk(parsed.program, (node) => {
+    if (node.type !== "JSXOpeningElement") return;
+    const name = nameOf(node.name);
+    if (name === undefined || (!nativeComponents.has(name) && !nativeAliases.has(name)) || (bindings.has(name) && !nativeAliases.has(name))) return;
+    for (const attribute of childrenOf(node, "attributes")) {
+      const attr = nodeOf(attribute);
+      if (attr.type === "JSXAttribute" && nameOf(attr.name) === "style") nativeStyleOffsets.add(offsetOf(attr));
     }
   });
   const attrsCall = (input: unknown): boolean => {
@@ -146,6 +190,17 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
           return;
         }
         const values = name === undefined ? undefined : bindings.get(name);
+        if (name !== undefined && values === undefined) {
+          const scope = parameterScopes
+            .filter((scope) => scope.start <= offsetOf(node) && scope.end >= offsetOf(node) && scope.parameters.has(name))
+            .toSorted((a, b) => b.start - a.start)[0];
+          const annotation = scope?.parameters.get(name);
+          const literals = annotation?.type === "TSUnionType" ? childrenOf(annotation, "types").map(nodeOf) : annotation ? [annotation] : [];
+          if (literals.length > 0 && literals.every((literal) => literal.type === "TSLiteralType" && typeof nodeOf(literal.literal).value === "string")) {
+            for (const literal of literals) classes(literal.literal, seen);
+            return;
+          }
+        }
         if (name === undefined || values?.length !== 1 || seen.has(name)) {
           finding("unresolved-class-binding", node);
           return;
@@ -192,8 +247,14 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
     }
     if (node.type === "JSXAttribute" && nameOf(node.name) === "style") {
       const value = nodeOf(nodeOf(node.value).expression);
+      const fingerprint = styleFingerprint(node);
+      const owner = reviewedStyles.get(fingerprint);
       if (value.type === "MemberExpression" && nameOf(value.property) === "style" && attrsCall(value.object)) classify(node, "stylex-inline-variables");
-      else finding("unreviewed-inline-style", node);
+      else if (nativeStyleOffsets.has(offsetOf(node))) classify(node, "react-native-style-boundary");
+      else if (owner !== undefined) {
+        usedReviews.add(fingerprint);
+        classify(node, `reviewed-native-style:${owner}`);
+      } else finding("unreviewed-inline-style", node);
     }
     if (node.type === "JSXSpreadAttribute" && attrsCall(node.argument)) classify(node, "stylex-attrs");
     if (node.type === "AssignmentExpression") {
@@ -245,6 +306,7 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
       else finding("unconverted-styled-contract", node);
     }
   });
+  for (const [fingerprint, owner] of reviewedStyles) if (!usedReviews.has(fingerprint)) finding("stale-inline-review", {}, owner);
   if (result.expressions === 0 && result.classifications.length === 0) classify({}, "parsed-non-style-source");
   return result;
 }

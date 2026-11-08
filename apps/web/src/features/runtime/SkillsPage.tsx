@@ -25,6 +25,27 @@ import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";
 
+const recipeStyles = stylex.create({
+  skillsPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: {
+      default: "auto",
+      "@media (width>=64rem)": "hidden",
+    },
+    overflowX: {
+      default: null,
+      "@media (width>=64rem)": "hidden",
+    },
+  },
+});
+
 const variantStyles = stylex.create({
   skillsPageA: {
     display: "inline-flex",
@@ -284,7 +305,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const open = () => shownInstalled() ?? first();
 
   return (
-    <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
+    <div {...stylex.attrs(recipeStyles.skillsPageDiv)}>
       <nav aria-label={t("web.runtime.library.book")} data-testid="skills-book" {...stylex.attrs(viewStyles.skillsBook)}>
         <h2 {...stylex.attrs(viewStyles.skillsPageH2)}>{t("web.runtime.library.book")}</h2>
         <TextInput

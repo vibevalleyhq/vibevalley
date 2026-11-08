@@ -13,6 +13,7 @@ import { channelOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus } from "#/base/dom.tsx";
 import { spentText } from "#/base/format.ts";
+import { farmGroup, farmMessage } from "#/farm/interaction.stylex.ts";
 import { farmClock, readsLong } from "#/farm/store.ts";
 import { artifactHref } from "#/features/artifact/index.ts";
 import { drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "#/features/channel/index.ts";
@@ -22,6 +23,55 @@ import { Link as A } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
 import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
+
+const recipeStyles3 = stylex.create({
+  textLink: {
+    marginTop: "var(--spacing)",
+    cursor: "pointer",
+    fontSize: "12px",
+    color: "var(--color-leaf-700)",
+    textDecorationLine: { default: null, "@media (hover:hover)": { default: null, ":hover": "underline" } },
+  },
+  ownTextLink: { color: "var(--color-cream-50)" },
+  dispatch: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  dispatchIcon: {
+    marginTop: "var(--spacing)",
+    opacity: { default: 0.6, "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: 1 } },
+  },
+  row: { position: "relative", display: "flex", alignItems: "flex-start", gap: "calc(var(--spacing) * 2)" },
+  firstRow: { paddingTop: "var(--spacing)" },
+  ownRow: { justifyContent: "flex-end" },
+  menuTrigger: {
+    cursor: "pointer",
+    padding: "calc(var(--spacing) * .5)",
+    opacity: {
+      default: 0,
+      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmMessage)]: 1 },
+      ":focus-visible": 1,
+      ":is([aria-expanded=true])": 1,
+    },
+  },
+  chatTextDivVariant1Case1: {
+    maxHeight: "117px",
+    overflow: "hidden",
+    WebkitMaskImage: "linear-gradient(black 70%,transparent)",
+    maskImage: "linear-gradient(black 70%,transparent)",
+  },
+  chatTextDivVariant1Case2: {
+    maxHeight: null,
+    overflow: null,
+    WebkitMaskImage: null,
+    maskImage: null,
+  },
+});
 
 const recipeStyles2 = stylex.create({
   messageMenuDiv: {
@@ -358,15 +408,15 @@ const viewStyles = stylex.create({
 });
 
 /** A message's text; a long one shows its first lines until opened. */
-function ChatText(props: { text: string; link?: string }) {
+function ChatText(props: { text: string; link?: stylex.StyleXStyles }) {
   const [open, setOpen] = createSignal(false);
   return (
     <Show when={readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
       <div {...stylex.attrs(viewStyles.chatTextDiv)}>
-        <div class={open() ? "" : "max-h-[117px] overflow-hidden fold-fade"}>
+        <div {...stylex.attrs(open() ? recipeStyles3.chatTextDivVariant1Case2 : recipeStyles3.chatTextDivVariant1Case1)}>
           <PxMarkdown text={props.text} mentions />
         </div>
-        <button type="button" onClick={() => setOpen(!open())} class={["mt-1 cursor-pointer text-[12px] hover:underline", props.link ?? "text-leaf-700"]}>
+        <button type="button" onClick={() => setOpen(!open())} {...styleProps([recipeStyles3.textLink, props.link])}>
           {open() ? t("web.farm.chat.less") : t("web.farm.chat.more")}
         </button>
       </div>
@@ -384,14 +434,14 @@ function DispatchNote(props: { text: string }) {
       aria-expanded={aria(open())}
       aria-label={open() ? t("web.farm.chat.foldDispatch") : t("web.farm.chat.unfoldDispatch")}
       onClick={() => setOpen(!open())}
-      class="group flex w-full cursor-pointer items-start gap-1.5 text-left"
+      {...styleProps([farmGroup, recipeStyles3.dispatch])}
     >
       <span {...stylex.attrs(viewStyles.dispatchNoteSpan)}>
         <Show when={open()} fallback={<span {...stylex.attrs(viewStyles.dispatchNoteSpan2)}>{props.text.replace(/\s+/gu, " ").trim()}</span>}>
           <PxMarkdown text={props.text} mentions />
         </Show>
       </span>
-      <SpriteIcon name={open() ? "button-collapse" : "button-enlarge"} size={12} class="mt-1 opacity-60 group-hover:opacity-100" />
+      <SpriteIcon name={open() ? "button-collapse" : "button-enlarge"} size={12} styles={recipeStyles3.dispatchIcon} />
     </button>
   );
 }
@@ -432,7 +482,7 @@ export function ChatRow(props: {
   children: JSX.Element;
 }) {
   return (
-    <div class={["group/m relative flex items-start gap-2", { "pt-1": props.first, "justify-end": props.mine }]}>
+    <div {...styleProps([farmMessage, recipeStyles3.row, props.first && recipeStyles3.firstRow, props.mine && recipeStyles3.ownRow])}>
       <Show when={props.mine}>{props.actions}</Show>
       <Show when={!props.mine}>
         <span {...stylex.attrs(viewStyles.chatRowSpan)}>{props.first ? props.face : null}</span>
@@ -486,7 +536,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
           setOpen(!open());
           setSure(false);
         }}
-        class="cursor-pointer p-0.5 opacity-0 group-hover/m:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
+        {...styleProps(recipeStyles3.menuTrigger)}
       >
         <SpriteIcon name="button-more" size={16} />
       </button>
@@ -657,7 +707,7 @@ export function ChatBubble(props: {
         <Show
           when={editing()}
           fallback={
-            <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
+            <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine && recipeStyles3.ownTextLink} />}>
               <DispatchNote text={props.m.text} />
             </Show>
           }

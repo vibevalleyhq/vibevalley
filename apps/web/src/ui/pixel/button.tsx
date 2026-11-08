@@ -1,27 +1,65 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { omit, Show } from "solid-js";
 
+import { styleProps } from "#/ui/positioner.ts";
+
 import { SpriteIcon } from "./icons";
-import { cx, pxDrop, pxFocus, pxText } from "./style";
+import { pxStyle } from "./style";
 
 export type PxTone = "plain" | "primary" | "danger" | "accent";
 export type PxSize = "md" | "sm" | "icon" | "custom";
 
-const tones: Record<PxTone, string> = {
-  plain: "bg-cream-50 enabled:hover:bg-cream-hover text-bark-900",
-  // Bark on leaf, as accent is bark on wheat: cream on leaf reads at 2.5:1, under WCAG AA.
-  primary: "bg-leaf-500 enabled:hover:bg-leaf-hover text-bark-900",
-  // berry at 95 %.
-  danger: "bg-berry enabled:hover:bg-berry-hover text-cream-50",
-  accent: "bg-wheat enabled:hover:bg-wheat-hover text-bark-900",
-};
+const styles = stylex.create({
+  button: {
+    display: "inline-flex",
+    flexShrink: 0,
+    cursor: { default: "pointer", ":disabled": "default" },
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    whiteSpace: "nowrap",
+    userSelect: "none",
+    opacity: { default: null, ":disabled": 0.45 },
+  },
+  plain: {
+    backgroundColor: { default: "var(--color-cream-50)", "@media (hover:hover)": { default: null, ":enabled:hover": "var(--color-cream-hover)" } },
+    color: "var(--color-bark-900)",
+  },
+  primary: {
+    backgroundColor: { default: "var(--color-leaf-500)", "@media (hover:hover)": { default: null, ":enabled:hover": "var(--color-leaf-hover)" } },
+    color: "var(--color-bark-900)",
+  },
+  danger: {
+    backgroundColor: { default: "var(--color-berry)", "@media (hover:hover)": { default: null, ":enabled:hover": "var(--color-berry-hover)" } },
+    color: "var(--color-cream-50)",
+  },
+  accent: {
+    backgroundColor: { default: "var(--color-wheat)", "@media (hover:hover)": { default: null, ":enabled:hover": "var(--color-wheat-hover)" } },
+    color: "var(--color-bark-900)",
+  },
+  bare: {
+    color: "var(--color-bark-900)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": { default: null, ":enabled:hover": "var(--color-cream-200)" },
+      ":enabled:active": "var(--color-cream-300)",
+    },
+  },
+  framed: {
+    borderStyle: "solid",
+    borderWidth: 2,
+    borderColor: "var(--color-bark-500)",
+    boxShadow: { default: "2px 2px 0 0 var(--color-px-drop)", ":enabled:active": "none" },
+    translate: { default: null, ":enabled:active": "2px 2px" },
+  },
+  md: { height: "calc(var(--spacing) * 9)", paddingInline: "calc(var(--spacing) * 4)" },
+  sm: { height: "calc(var(--spacing) * 7)", paddingInline: "calc(var(--spacing) * 2)" },
+  icon: { width: "calc(var(--spacing) * 9)", height: "calc(var(--spacing) * 9)" },
+});
 
-const sizes: Record<PxSize, string> = {
-  md: "h-9 px-4",
-  sm: "h-7 px-2",
-  icon: "size-9",
-  custom: "",
-};
+const tones: Record<PxTone, stylex.StyleXStyles> = { plain: styles.plain, primary: styles.primary, danger: styles.danger, accent: styles.accent };
+const sizes: Record<PxSize, stylex.StyleXStyles> = { md: styles.md, sm: styles.sm, icon: styles.icon, custom: undefined };
 
 /** Disabled without `onClick`. `label` names an icon button. */
 export function PxButton(
@@ -32,9 +70,11 @@ export function PxButton(
     icon?: string | undefined;
     label?: string;
     onClick?: ((e: MouseEvent) => void) | undefined;
-  } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick">,
+    styles?: stylex.StyleXStyles;
+    style?: JSX.CSSProperties;
+  } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick" | "class" | "style">,
 ) {
-  const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "class", "type");
+  const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "styles", "style", "type");
   // An icon alone is not framed: it sits inside a frame already (a window, a field, a card), and a ring per icon is a box in a box.
   const bare = () => (props.size ?? "md") === "icon" && (props.tone ?? "plain") === "plain";
   return (
@@ -44,22 +84,17 @@ export function PxButton(
       onClick={(e) => props.onClick?.(e)}
       disabled={props.disabled === true || props.onClick === undefined}
       aria-label={props.label}
-      class={[
-        pxText.sm,
-        "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap select-none",
-        pxFocus,
-        "disabled:cursor-default disabled:opacity-45",
-        sizes[props.size ?? "md"],
-        bare()
-          ? "text-bark-900 enabled:hover:bg-cream-200 enabled:active:bg-cream-300"
-          : cx(
-              tones[props.tone ?? "plain"],
-              "border-2 border-bark-500",
-              pxDrop,
-              "enabled:active:translate-x-[2px] enabled:active:translate-y-[2px] enabled:active:shadow-none",
-            ),
-        props.class,
-      ]}
+      {...styleProps(
+        [
+          pxStyle.sm,
+          styles.button,
+          pxStyle.focus,
+          sizes[props.size ?? "md"],
+          bare() ? styles.bare : [tones[props.tone ?? "plain"], styles.framed],
+          props.styles,
+        ],
+        props.style,
+      )}
     >
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={14} />}</Show>
       {props.children}

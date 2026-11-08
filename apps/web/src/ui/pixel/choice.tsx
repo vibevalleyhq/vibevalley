@@ -7,7 +7,83 @@ import { PxWindow } from "./base";
 import { type PickOption, pickItems } from "./cells";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
-import { pxFocus, pxRing, pxStyle, pxText } from "./style";
+import { pxStyle } from "./style";
+
+const recipeStyles2 = stylex.create({
+  pickChevron: { rotate: "90deg" },
+  pxSegmentedButton: {
+    height: "calc(var(--spacing) * 7)",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    whiteSpace: "nowrap",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-cream-300)",
+    outlineStyle: {
+      default: "none",
+      ":focus-visible": "solid",
+    },
+    fontSynthesis: "none",
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineOffset: {
+      default: null,
+      ":focus-visible": "1px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--color-leaf-500)",
+    },
+    translate: {
+      default: null,
+      ":enabled:active": "1px 1px",
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".35",
+    },
+  },
+  pxSegmentedButtonVariant1Case1: {
+    color: "var(--color-bark-800)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":enabled:hover": "var(--color-cream-300)",
+      },
+    },
+  },
+  pxSegmentedButtonVariant1Case2: {
+    color: "var(--color-bark-900)",
+    backgroundColor: "var(--color-leaf-500)",
+  },
+  pxPickSpan: {
+    flex: "1",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  pxPickSpanState: {
+    color: "var(--color-bark-800)",
+  },
+  pxPickSpanState2: {
+    color: "var(--color-leaf-700)",
+  },
+  pxPickSpanState3: {
+    color: "var(--color-bark-600)",
+  },
+});
 
 const recipeStyles = stylex.create({
   pxPickPxWindow: {
@@ -197,13 +273,10 @@ export function PxSegmented<T extends string | number | boolean>(props: {
             aria-pressed={aria(o.value === props.value)}
             disabled={o.disabled}
             onClick={() => props.onChange(o.value)}
-            class={[
-              pxText.xs,
-              pxRing,
-              pxFocus,
-              "h-7 cursor-pointer px-3 whitespace-nowrap enabled:active:translate-x-px enabled:active:translate-y-px disabled:cursor-default disabled:opacity-35",
-              o.value === props.value ? "bg-leaf-500 text-bark-900" : "text-bark-800 enabled:hover:bg-cream-300",
-            ]}
+            {...stylex.attrs(
+              recipeStyles2.pxSegmentedButton,
+              o.value === props.value ? recipeStyles2.pxSegmentedButtonVariant1Case2 : recipeStyles2.pxSegmentedButtonVariant1Case1,
+            )}
           >
             {o.label}
           </button>
@@ -290,7 +363,7 @@ export function PxPick(props: {
         <span {...stylex.attrs(viewStyles.pxPickValue, current().value === "" ? viewStyles.pxPickPlaceholder : viewStyles.pxPickSelected)}>
           {current().label}
         </span>
-        <SpriteIcon name="button-next" size={12} class="rotate-90" />
+        <SpriteIcon name="button-next" size={12} styles={recipeStyles2.pickChevron} />
       </button>
       <Show when={open()}>
         <PxWindow styles={[recipeStyles.pxPickPxWindow]}>
@@ -310,7 +383,16 @@ export function PxPick(props: {
                   }}
                   {...stylex.attrs(viewStyles.pxPickLi, i() === highlight() && viewStyles.pxPickLiActive)}
                 >
-                  <span class={[pxText.sm, "flex-1", o.value === "" ? "text-bark-600" : o.value === props.value ? "text-leaf-700" : "text-bark-800"]}>
+                  <span
+                    {...stylex.attrs(
+                      recipeStyles2.pxPickSpan,
+                      o.value === ""
+                        ? recipeStyles2.pxPickSpanState3
+                        : o.value === props.value
+                          ? recipeStyles2.pxPickSpanState2
+                          : recipeStyles2.pxPickSpanState,
+                    )}
+                  >
                     {o.label}
                   </span>
                   <Show when={o.detail}>

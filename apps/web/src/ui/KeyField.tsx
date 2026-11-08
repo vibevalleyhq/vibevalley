@@ -15,7 +15,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     alignItems: "center",
     gap: "calc(var(--spacing) * .5)",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
     whiteSpace: "nowrap",

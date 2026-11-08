@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
+import { reviewedStyleKeys } from "./style-migration-ownership";
 import { scanStyleCss, scanStyleHtml, scanStyleSource } from "./style-migration-scan";
 
 const source = (text: string, path = "apps/web/src/Fixture.tsx") => scanStyleSource(path, text);
@@ -128,4 +129,36 @@ test("unreviewed inline styles cannot disappear from inventory", () => {
 
 test("malformed stylesheets fail inventory", () => {
   expect(scanStyleCss("src/style.css", "not a stylesheet").map((finding) => finding.category)).toContain("css-parse-error");
+});
+
+test("reviewed native style boundaries survive formatting, not changed values or extra attributes", () => {
+  const reviews = reviewedStyleKeys([{ path: "screen.tsx", expression: "style={{ left: `${point.x}px` }}", reason: "Canvas-projected DOM position" }]);
+  const scan = (code: string) => scanStyleSource("screen.tsx", code, new Set(), reviews);
+  expect(scan("<div style={ {left:`${point.x}px`} } />").findings).toEqual([]);
+  expect(scan("<div style={{left:`${point.y}px`}} />").findings.map((finding) => finding.category)).toEqual(["unreviewed-inline-style", "stale-inline-review"]);
+  expect(scan('<div style={{left:`${point.x}px`}}><span style={{color:"red"}} /></div>').findings.map((finding) => finding.category)).toEqual([
+    "unreviewed-inline-style",
+  ]);
+  expect(scan("<div />").findings.map((finding) => finding.category)).toEqual(["stale-inline-review"]);
+});
+
+test("native mobile styles are classified by imported component, not file exemption", () => {
+  const text = 'import { View as NativeView } from "react-native"; <><NativeView style={{ flex: 1 }} /><div style={{ color: "red" }} /></>';
+  const mobile = source(text, "apps/mobile/src/Screen.tsx");
+  expect(mobile.classifications.map((classification) => classification.kind)).toContain("react-native-style-boundary");
+  expect(mobile.findings.map((finding) => finding.evidence)).toEqual(['style={{ color: "red" }}']);
+  expect(source(text).findings.filter((finding) => finding.category === "unreviewed-inline-style")).toHaveLength(2);
+  expect(source("<NativeView style={{flex:1}} />", "apps/mobile/src/Screen.tsx").findings.map((finding) => finding.category)).toContain(
+    "unreviewed-inline-style",
+  );
+});
+
+test("finite class parameters are checked within their function scope", () => {
+  const scan = (text: string) => scanStyleSource("rich.tsx", text, new Set(["code", "diagram"]));
+  expect(scan('function make(cls:"code"|"diagram"){element.className=cls}').findings).toEqual([]);
+  expect(scan('function make(cls:"code"|"flex"){element.className=cls}').findings.map((finding) => finding.evidence)).toEqual(["flex"]);
+  expect(scan('function make(cls:"code"|"diagram"){function nested(cls:string){element.className=cls}}').findings.map((finding) => finding.category)).toEqual([
+    "unresolved-class-binding",
+  ]);
+  expect(scan('function make(cls:"code"|"diagram"){} element.className=cls').findings.map((finding) => finding.category)).toEqual(["unresolved-class-binding"]);
 });

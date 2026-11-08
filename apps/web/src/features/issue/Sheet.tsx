@@ -13,6 +13,69 @@ import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";
 import { toneVar } from "./Marks";
 
+const recipeStyles2 = stylex.create({
+  issueSheetAside: {
+    display: "flex",
+    flexDirection: "column",
+    borderRadius: {
+      default: "var(--radius-lg)",
+      "@container (width>=760px)": "0",
+    },
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@container (width>=760px)": "transparent",
+    },
+    paddingTop: {
+      default: "calc(var(--spacing) * 3)",
+      "@container (width>=760px)": "0",
+    },
+    paddingRight: {
+      default: "calc(var(--spacing) * 3)",
+      "@container (width>=760px)": "0",
+    },
+    paddingBottom: {
+      default: "calc(var(--spacing) * 3)",
+      "@container (width>=760px)": "0",
+    },
+    paddingLeft: {
+      default: "calc(var(--spacing) * 3)",
+      "@container (width>=760px)": "calc(var(--spacing) * 5)",
+    },
+    width: {
+      default: null,
+      "@container (width>=760px)": "260px",
+    },
+    flexShrink: {
+      default: null,
+      "@container (width>=760px)": "0",
+    },
+    borderLeftStyle: {
+      default: null,
+      "@container (width>=760px)": "solid",
+    },
+    borderLeftWidth: {
+      default: null,
+      "@container (width>=760px)": "1px",
+    },
+    borderColor: {
+      default: null,
+      "@container (width>=760px)": "var(--wb-line)",
+    },
+  },
+  stagesSpanState: {
+    color: "var(--wb-faint)",
+    fontWeight: null,
+  },
+  stagesSpanState2: {
+    color: "var(--wb-accent)",
+    fontWeight: null,
+  },
+  stagesSpanState3: {
+    color: "var(--wb-ink)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+});
+
 const recipeStyles = stylex.create({
   issueSheetDiv: {
     marginTop: "calc(var(--spacing) * 4)",
@@ -204,9 +267,7 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
       {props.heading}
       <div {...stylex.attrs(recipeStyles.issueSheetDiv)}>
         <div {...stylex.attrs(viewStyles.issueSheetDiv2)}>{props.main}</div>
-        <aside class="flex flex-col rounded-lg bg-hover p-3 @min-[760px]:w-[260px] @min-[760px]:shrink-0 @min-[760px]:rounded-none @min-[760px]:border-l @min-[760px]:border-line @min-[760px]:bg-transparent @min-[760px]:py-0 @min-[760px]:pr-0 @min-[760px]:pl-5">
-          {props.side}
-        </aside>
+        <aside {...stylex.attrs(recipeStyles2.issueSheetAside)}>{props.side}</aside>
       </div>
     </div>
   );
@@ -296,7 +357,13 @@ export function Stages(props: { at: Stage }) {
               >
                 <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s] })} />
               </Show>
-              <span class={s === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}>{stageLabel[s]}</span>
+              <span
+                {...stylex.attrs(
+                  s === props.at ? recipeStyles2.stagesSpanState3 : i() < ati() ? recipeStyles2.stagesSpanState2 : recipeStyles2.stagesSpanState,
+                )}
+              >
+                {stageLabel[s]}
+              </span>
             </span>
           </div>
         )}

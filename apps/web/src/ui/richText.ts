@@ -76,7 +76,11 @@ interface RichOptions {
   readonly pixel?: boolean;
 }
 
-const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string) => {
+const el = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  cls: "code-block" | "code-head" | "code-lang" | "code-act" | "code-more" | "diagram" | "diagram-stage" | "diagram-error",
+  text?: string,
+) => {
   const e = document.createElement(tag);
   e.className = cls;
   if (text !== undefined) e.textContent = text;

@@ -6,9 +6,29 @@ import { t } from "@vibevalley/i18n";
 import type { PkmTransclusion } from "@vibevalley/protocol";
 
 import { Link as A } from "#/infra/router.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { type Piece, piecesOf } from "./outline";
 import { pkmHref } from "./vault";
+
+const bodyStyles = stylex.create({
+  body: {
+    whiteSpace: "pre-wrap",
+  },
+  heading: {
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  subheading: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  minorHeading: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+});
 
 const recipeStyles = stylex.create({
   bodyA: {
@@ -119,10 +139,10 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
   };
   const size = () => {
     const level = heading()?.[1]?.length;
-    return level === 1 ? "text-lg font-semibold" : level === 2 ? "text-base font-semibold" : level === 3 ? "font-semibold" : "";
+    return level === 1 ? bodyStyles.heading : level === 2 ? bodyStyles.subheading : level === 3 ? bodyStyles.minorHeading : undefined;
   };
   return (
-    <span class={["whitespace-pre-wrap", size()]}>
+    <span {...styleProps([bodyStyles.body, size()])}>
       <For each={piecesOf(shown())}>{(p) => drawn(p)}</For>
     </span>
   );

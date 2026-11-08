@@ -10,6 +10,29 @@ import { changeKind, patchLines, patchMarkOf } from "#/features/issue/index.ts";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
+const recipeStyles = stylex.create({
+  fileRowButton: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    cursor: {
+      default: null,
+      ":enabled": "pointer",
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":enabled:hover": "var(--color-cream-200)",
+      },
+    },
+  },
+});
+
 const variantStyles = stylex.create({
   fileRowSpan: {
     minWidth: "0",
@@ -164,7 +187,7 @@ export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         aria-expanded={props.file.patch ? aria(open()) : undefined}
         disabled={!props.file.patch}
         onClick={() => setOpen(!open())}
-        class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left enabled:cursor-pointer enabled:hover:bg-cream-200"
+        {...stylex.attrs(recipeStyles.fileRowButton)}
       >
         <span title={kind().label} {...stylex.attrs(viewStyles.fileRowSpan)} style={{ background: look().fill, color: look().ink }}>
           {kind().mark}

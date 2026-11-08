@@ -324,7 +324,7 @@ const glyphStyles = stylex.create({
 
 function Glyph(props: { icon: IconFunction; size?: number; styles?: stylex.StyleXStyles }) {
   return (
-    <span aria-hidden="true" {...stylex.attrs(glyphStyles.root, props.styles)}>
+    <span aria-hidden="true" {...styleProps(glyphStyles.root, props.styles)}>
       {props.icon({ size: props.size ?? 14 })}
     </span>
   );
@@ -444,8 +444,8 @@ export function StoriesApp(props: {
                       data-key={f().path}
                       aria-expanded={folderOpen(f().path, f().depth) ? "true" : "false"}
                       onClick={() => toggle(f().path, f().depth)}
-                      {...indentedRowAttrs(
-                        f().depth * 12 + 4,
+                      {...styleProps(
+                        viewerStyles.indent(f().depth * 12 + 4),
                         treeRow,
                         viewerStyles.folder,
                         f().depth === 0 ? viewerStyles.rootFolder : viewerStyles.nestedFolder,
@@ -475,7 +475,7 @@ export function StoriesApp(props: {
                       ev.preventDefault();
                       move({ key: s().entry.key });
                     }}
-                    {...indentedRowAttrs(s().depth * 12 + 20, viewerStyles.link)}
+                    {...styleProps(viewerStyles.link, viewerStyles.indent(s().depth * 12 + 20))}
                   >
                     {s().name}
                   </a>
@@ -536,6 +536,29 @@ const viewerStyles = stylex.create({
   row: { flexDirection: "row" },
   column: { flexDirection: "column" },
   responsive: { flexDirection: { default: "column", "@media (width >= 80rem)": "row" } },
+  frame: {
+    position: "relative",
+    display: "flex",
+    flexShrink: 0,
+    alignSelf: { default: "stretch", "@media (width >= 80rem)": "auto" },
+    overflow: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "var(--color-line)",
+    paddingTop: "calc(var(--spacing) * 8)",
+    paddingRight: "calc(var(--spacing) * 6)",
+    paddingBottom: "calc(var(--spacing) * 6)",
+    paddingLeft: "calc(var(--spacing) * 6)",
+    contain: "layout",
+    outlineStyle: "none",
+    outlineWidth: { default: null, ":focus-visible": 2 },
+    outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
+  },
+  fullFrame: { minWidth: 0, flexGrow: 1, flexBasis: "0%" },
+  filledFrame: { height: "36rem", flexDirection: "column" },
+  centeredFrame: { minHeight: "calc(var(--spacing) * 40)", alignItems: "center", justifyContent: "center" },
+  frameWidth: (width: string) => ({ width }),
   folder: {
     display: "flex",
     width: "100%",
@@ -638,13 +661,11 @@ const viewerStyles = stylex.create({
   },
 });
 
-function indentedRowAttrs(paddingLeft: number, ...values: readonly (stylex.StyleXStyles | typeof treeRow)[]) {
+function styleProps(...values: readonly (stylex.StyleXStyles | typeof treeRow)[]) {
   // attrs() kebab-cases custom property names too; object styles preserve the compiler's case-sensitive variables.
-  const { className, ...attributes } = stylex.props(values, viewerStyles.indent(paddingLeft));
+  const { className, ...attributes } = stylex.props(values);
   return { ...attributes, class: className };
 }
-
-const frameWidth = (w: Width) => (w === "full" ? undefined : `${w}px`);
 
 /** The open story: its arguments live here, so they start over when another story opens. */
 function Opened(props: {
@@ -657,7 +678,6 @@ function Opened(props: {
 }) {
   props.prepare?.();
   const story = props.entry.story;
-  const framePaint = () => stylex.props(props.entry.frame ?? viewStyles.frameDefault);
   const [args, setArgs] = createStore<Args>({ ...story.args });
   const set = (patch: Partial<Args>) =>
     setArgs((a) => {
@@ -763,13 +783,14 @@ function Opened(props: {
                 data-pseudo={mode() === "single" && props.view.pseudo !== "rest" ? props.view.pseudo : undefined}
                 tabindex="0"
                 aria-label={theme}
-                style={{ ...framePaint().style, width: frameWidth(props.view.width) }}
-                class={[
-                  "relative flex shrink-0 self-stretch overflow-auto rounded-lg border border-line p-6 pt-8 [contain:layout] outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
-                  framePaint().className,
-                  props.view.width === "full" && "min-w-0 flex-1 shrink",
-                  story.fill === true && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
-                ]}
+                data-story-fill={story.fill === true && mode() === "single" ? "true" : undefined}
+                {...styleProps(
+                  props.entry.frame ?? viewStyles.frameDefault,
+                  viewerStyles.frame,
+                  props.view.width === "full" && viewerStyles.fullFrame,
+                  story.fill === true && mode() === "single" ? viewerStyles.filledFrame : viewerStyles.centeredFrame,
+                  props.view.width !== "full" && viewerStyles.frameWidth(`${props.view.width}px`),
+                )}
               >
                 <span {...stylex.attrs(viewStyles.openedSpan2)}>
                   <Glyph icon={themeLook[theme].icon} size={12} />

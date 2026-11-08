@@ -6,12 +6,14 @@ import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
 import { aria } from "#/base/dom.tsx";
+import { farmGroup, phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { type CallPhase, createCall, voiceCall } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
 import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import type { GlyphCell } from "#/ui/pixel/PixelCard.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneState } from "./calls";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
@@ -19,6 +21,30 @@ import { MergeIcon } from "./games/MergeGame";
 import { lcd, phoneCells } from "./lcd";
 
 const variantStyles = stylex.create({
+  bigFace: { display: "grid", width: "72px", height: "72px", placeItems: "center" },
+  callRow: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  missedCall: { cursor: "pointer", backgroundColor: { default: null, "@media (hover:hover)": { default: null, ":hover": "var(--color-lcd-light)" } } },
+  app: { display: "flex", cursor: "pointer", flexDirection: "column", alignItems: "center", gap: "var(--spacing)" },
+  appIcon: {
+    position: "relative",
+    display: "grid",
+    width: "calc(var(--spacing) * 11)",
+    height: "calc(var(--spacing) * 11)",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-lcd-pale)",
+      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-lcd-pale-hover)" },
+    },
+    translate: { default: null, [stylex.when.ancestor(":active", farmGroup)]: "0 1px" },
+  },
   ringingScreenDiv: {
     display: "flex",
     minHeight: "0",
@@ -239,8 +265,10 @@ function CallerFace(props: { call: InboxItem; size: number }) {
 
 const BigFace = (props: { children: JSX.Element; shake?: boolean }) => (
   <span
-    class={["grid size-[72px] place-items-center", { "phone-shake": !(props.shake !== true) }]}
-    style={{ background: lcd.pale, "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}
+    {...styleProps([variantStyles.bigFace, !(props.shake !== true) && phoneAnimations.shake], {
+      background: lcd.pale,
+      "box-shadow": `inset 0 0 0 2px ${lcd.dark}`,
+    })}
   >
     {props.children}
   </span>
@@ -255,7 +283,7 @@ const SmallFace = (props: { children: JSX.Element }) => (
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
     <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} {...stylex.attrs(variantStyles.ringingScreenDiv)}>
-      <span class="phone-blink">{t("web.farm.phone.ringing")}</span>
+      <span {...styleProps(phoneAnimations.blink)}>{t("web.farm.phone.ringing")}</span>
       <span {...stylex.attrs(viewStyles.ringingScreenSpan)}>
         <BigFace shake>
           <CallerFace call={props.call} size={60} />
@@ -321,7 +349,6 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
       {text}
     </li>
   );
-  const row = "flex w-full items-center gap-2 px-2 py-1.5 text-left";
   const rule = { "border-bottom": `1px solid ${lcd.rule}` };
   return (
     <>
@@ -351,7 +378,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
             <Show when={phone().log.length > 0} fallback={empty(t("web.farm.phone.noCalls"))}>
               <For each={phone().log} keyed={(e) => `${e.call.id}-${e.at}`}>
                 {(e) => (
-                  <li data-testid="call-log" data-key={e().call.id} data-answered={e().answered ? "" : undefined} class={row} style={rule}>
+                  <li data-testid="call-log" data-key={e().call.id} data-answered={e().answered ? "" : undefined} {...styleProps(variantStyles.callRow, rule)}>
                     <SmallFace>
                       <CallerFace call={e().call} size={28} />
                     </SmallFace>
@@ -377,7 +404,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     data-key={c().id}
                     onClick={() => props.onAnswer(c())}
                     aria-label={t("shared.join.labeled", { label: c().who, text: c().words.label })}
-                    class={[row, "cursor-pointer hover:bg-lcd-light"]}
+                    {...styleProps([variantStyles.callRow, variantStyles.missedCall])}
                   >
                     <SmallFace>
                       <CallerFace call={c()} size={28} />
@@ -526,11 +553,8 @@ function AppGrid(props: { apps: readonly App[] }) {
     <div {...stylex.attrs(viewStyles.appGridDiv)}>
       <For each={props.apps}>
         {(a) => (
-          <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
-            <span
-              class="relative grid size-11 place-items-center bg-lcd-pale group-hover:bg-lcd-pale-hover group-active:translate-y-px"
-              style={{ "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}
-            >
+          <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} {...styleProps([farmGroup, variantStyles.app])}>
+            <span {...styleProps(variantStyles.appIcon, { "box-shadow": `inset 0 0 0 2px ${lcd.dark}` })}>
               {a.icon()}
               <Show when={a.badge?.()}>
                 <span {...stylex.attrs(viewStyles.appGridSpan)} style={{ background: declineRed, color: cream }}>

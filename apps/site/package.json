@@ -9,10 +9,8 @@
   "dependencies": {
     "@solidjs/web": "catalog:",
     "@stylexjs/stylex": "catalog:",
-    "@tailwindcss/vite": "catalog:",
     "motion": "catalog:",
-    "solid-js": "catalog:",
-    "tailwindcss": "catalog:"
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

@@ -9,6 +9,24 @@ import { createElementRef, createReveal, createScrollAnimation } from "../animat
 import type { Copy } from "../i18n/zh";
 import { Section, domAttrs } from "./ui";
 
+const sceneStyles = stylex.create({
+  dialogBackdrop: {
+    position: "fixed",
+    inset: "0",
+    zIndex: 50,
+    display: "grid",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-shade-80)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-shade) 80%, transparent)",
+    },
+    padding: {
+      default: "calc(var(--spacing) * 4)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 8)",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   tall: { gridRow: { default: null, "@media (width >= 64rem)": "span 2 / span 2" } },
   offset: { marginTop: { default: null, "@media (width >= 64rem)": "60px" } },
@@ -215,7 +233,7 @@ function Large(props: { shot: Shot; source: HTMLImageElement; label: string; ico
       aria-label={props.shot.caption}
       data-testid="screenshot-dialog"
       onClick={close}
-      class="bg-shade/80 fixed inset-0 z-50 grid place-items-center p-4 sm:p-8"
+      {...stylex.attrs(sceneStyles.dialogBackdrop)}
     >
       <figure onClick={(event) => event.stopPropagation()} {...stylex.attrs(viewStyles.largeFigure)}>
         <img ref={image.set} src={props.shot.src} alt={props.shot.caption} {...stylex.attrs(viewStyles.largeImg)} />

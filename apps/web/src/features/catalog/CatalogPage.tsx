@@ -13,11 +13,54 @@ import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { CursorTile, Detail, fitScale, type Ground, grounds, groundStyle, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
+
+const recipeStyles2 = stylex.create({
+  layoutDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+    overflowY: {
+      default: "auto",
+      "@media (width>=64rem)": "hidden",
+    },
+    overflowX: {
+      default: null,
+      "@media (width>=64rem)": "hidden",
+    },
+  },
+  layoutDiv2: {
+    flexShrink: "0",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingRight: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 3)",
+    paddingLeft: {
+      default: "calc(var(--spacing) * 3)",
+      "@media (width>=80rem)": "0",
+    },
+    order: {
+      default: null,
+      "@media (width>=80rem)": "9999",
+    },
+    width: {
+      default: null,
+      "@media (width>=80rem)": "calc(var(--spacing) * 88)",
+    },
+    overflowY: {
+      default: null,
+      "@media (width>=80rem)": "auto",
+    },
+  },
+});
 
 const recipeStyles = stylex.create({
   spritesSpan: {
@@ -321,10 +364,10 @@ function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
 function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.Element }) {
   return (
     // The shelves are the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
-    <div class="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+    <div {...stylex.attrs(recipeStyles2.layoutDiv)}>
       <div {...stylex.attrs(viewStyles.layoutDiv)}>{props.left}</div>
       <Show when={props.right}>
-        <div class="shrink-0 p-3 xl:order-last xl:w-88 xl:overflow-y-auto xl:pl-0">{props.right}</div>
+        <div {...stylex.attrs(recipeStyles2.layoutDiv2)}>{props.right}</div>
       </Show>
       <div {...stylex.attrs(variantStyles.layoutDiv)}>{props.children}</div>
     </div>
@@ -444,7 +487,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                     selected()?.name === p.name ? variantStyles.spritesButtonVariant3 : variantStyles.spritesButtonVariant2,
                                   )}
                                 >
-                                  <span {...stylex.attrs(viewStyles.spritesSpan3)} style={groundStyle(ground())}>
+                                  <span {...styleProps([viewStyles.spritesSpan3, groundStyle(ground())])}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
                                       <span {...stylex.attrs(recipeStyles.spritesSpan)}>{t("web.catalog.moves")}</span>

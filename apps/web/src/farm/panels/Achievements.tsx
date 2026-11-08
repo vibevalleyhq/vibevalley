@@ -14,6 +14,38 @@ import { createPixelAct, numberText, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { tint, Tinted } from "./rows";
 
+const recipeStyles3 = stylex.create({
+  medalFrame: { position: "absolute", inset: 0 },
+  doneStamp: { position: "absolute", right: "calc(var(--spacing) * -1.5)", bottom: "calc(var(--spacing) * -1)" },
+  titlePickerButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: {
+      default: "var(--color-cream-50)",
+      "@media (hover:hover)": {
+        default: null,
+        ":enabled:hover": "var(--color-cream-200)",
+      },
+    },
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingRight: "calc(var(--spacing) * 3)",
+    paddingLeft: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    cursor: {
+      default: null,
+      ":enabled": "pointer",
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".6",
+    },
+  },
+});
+
 const recipeStyles2 = stylex.create({
   standingTinted: {
     display: "flex",
@@ -374,7 +406,7 @@ function Medal(props: { a: Achievement; tier: number; size: number }) {
   };
   return (
     <span {...stylex.attrs(viewStyles.medalSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }}>
-      <SpriteIcon name={frame()} size={props.size} class="absolute inset-0" />
+      <SpriteIcon name={frame()} size={props.size} styles={recipeStyles3.medalFrame} />
       <img
         src={`/pixel/emblem-${props.a.id}.png`}
         onError={(ev) => (ev.currentTarget.src = "/pixel/emblem-wreath.png")}
@@ -516,7 +548,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
         disabled={earned().length === 0}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
-        class="flex items-center gap-2 border-2 border-cream-300 bg-cream-50 py-1.5 pr-3 pl-1.5 text-left enabled:cursor-pointer enabled:hover:bg-cream-200 disabled:opacity-60"
+        {...stylex.attrs(recipeStyles3.titlePickerButton)}
       >
         <Show when={worn() && title() ? { a: worn()!, tier: Math.round(title()!.tier) } : undefined} fallback={<SpriteIcon name="banner-title" size={48} />}>
           {(w) => <Medal a={w().a} tier={w().tier} size={32} />}
@@ -609,7 +641,7 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
                       {...stylex.attrs(variantStyles.starterImg, !ok() ? variantStyles.starterImgVariant : variantStyles.medalImgVariant2)}
                     />
                     <Show when={ok()}>
-                      <SpriteIcon name="stamp-done" size={20} label={t("web.farm.achievements.done")} class="absolute -right-1.5 -bottom-1" />
+                      <SpriteIcon name="stamp-done" size={20} label={t("web.farm.achievements.done")} styles={recipeStyles3.doneStamp} />
                     </Show>
                   </span>
                   <span {...stylex.attrs(viewStyles.starterSpan3)}>

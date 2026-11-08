@@ -6,11 +6,13 @@ import type { IssueStatus, Priority } from "@vibevalley/protocol";
 
 import { useAgent } from "#/infra/agents.ts";
 import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import type { BoardCard, Tone } from "./cards";
 import { cardAgent } from "./cards";
 
 const viewStyles = stylex.create({
+  flagTone: (tone: string) => ({ backgroundColor: `color-mix(in srgb, ${tone} 18%, transparent)` }),
   statusMarkSvg: {
     flexShrink: "0",
   },
@@ -26,7 +28,7 @@ const viewStyles = stylex.create({
     rotate: "-90deg",
   },
   flagChipSpan: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-2xs)",
     lineHeight: "calc(var(--spacing) * 4)",
@@ -197,11 +199,7 @@ export function NoFaceMark(props: { size?: number }) {
 
 /** A small flag on a card or row: only the things the owner should notice. */
 export function FlagChip(props: { text: string; tone: Tone }) {
-  return (
-    <span {...stylex.attrs(viewStyles.flagChipSpan)} style={{ background: `color-mix(in srgb, ${toneVar(props.tone)} 18%, transparent)` }}>
-      {props.text}
-    </span>
-  );
+  return <span {...styleProps([viewStyles.flagChipSpan, viewStyles.flagTone(toneVar(props.tone))])}>{props.text}</span>;
 }
 
 /** A helper's head by its id, its look read from the profiles. */

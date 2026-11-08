@@ -1,7 +1,7 @@
 import sizes from "@game/pixel/sprites.json";
 
 import { byName } from "./files";
-import { BUBBLES, FRONT, MARKS, PLOTS, POSES, THINGS, type Art, type StoryArt } from "./story";
+import type { Art, StoryArt } from "./story";
 
 const spriteSizes: Readonly<Record<string, { w: number; h: number; ax?: number; ay?: number } | undefined>> = sizes;
 
@@ -31,31 +31,62 @@ export function pixelArt(name: string): string {
   return url;
 }
 
-/** The helpers walking across the page: each its species and outfit, and its side frames in a step (step, stand, step, stand). */
+/** Frames in a step cycle: step, stand, step, stand. */
 export const WALKERS = ["bear-farmer", "rabbit-gardener", "fox-rain", "cat-winter", "owl-farmer", "hedgehog-gardener", "raccoon-rain"].map((look) => ({
   look,
   frames: ["side-1", "side", "side-2", "side"].map((f) => walkers[`${look}-${f}.png`] ?? ""),
 }));
 
-/** The machines a helper can drive, by their pixel logos. */
 export const RUNTIMES = [
   { name: "pi", logo: "logo-pi" },
   { name: "Claude Code", logo: "logo-claude" },
   { name: "Codex", logo: "logo-codex" },
 ] as const;
 
-/** A pixel sprite with its size and the point it stands on (sprites.json), for the field in How.tsx. */
+/** ax/ay locate the sprite's feet in sprites.json coordinates. */
 function pixelSprite(name: string): Art {
   const size = spriteSizes[name];
   if (!size) throw new Error(`no sprite size ${name}`);
   return { src: pixelArt(name), w: size.w, h: size.h, ax: size.ax ?? Math.round(size.w / 2), ay: size.ay ?? size.h - 1 };
 }
 
-/** Every picture the field in How.tsx draws. */
 export function storyArt(): StoryArt {
-  const art: Partial<StoryArt> = {};
-  for (const pose of POSES) art[pose] = pixelSprite(`bear-farmer-${pose}`);
-  for (const name of [...THINGS, ...PLOTS, ...BUBBLES, ...MARKS, ...FRONT]) art[name] = pixelSprite(name);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The loops fill each pose and every other StoryArt key from their name lists.
-  return art as StoryArt;
+  return {
+    side: pixelSprite("bear-farmer-side"),
+    "side-1": pixelSprite("bear-farmer-side-1"),
+    "side-2": pixelSprite("bear-farmer-side-2"),
+    up: pixelSprite("bear-farmer-up"),
+    read: pixelSprite("bear-farmer-read"),
+    work: pixelSprite("bear-farmer-work"),
+    "tinker-1": pixelSprite("bear-farmer-tinker-1"),
+    "tinker-2": pixelSprite("bear-farmer-tinker-2"),
+    "hammer-1": pixelSprite("bear-farmer-hammer-1"),
+    "hammer-2": pixelSprite("bear-farmer-hammer-2"),
+    cheer: pixelSprite("bear-farmer-cheer"),
+    "prop-board": pixelSprite("prop-board"),
+    "machine-seeder": pixelSprite("machine-seeder"),
+    "prop-table": pixelSprite("prop-table"),
+    "prop-crates": pixelSprite("prop-crates"),
+    "machine-windmill": pixelSprite("machine-windmill"),
+    "machine-beehive": pixelSprite("machine-beehive"),
+    "machine-tractor": pixelSprite("machine-tractor"),
+    "plot-empty": pixelSprite("plot-empty"),
+    "plot-seeded": pixelSprite("plot-seeded"),
+    "plot-sprout": pixelSprite("plot-sprout"),
+    "plot-leafy": pixelSprite("plot-leafy"),
+    "plot-flowering": pixelSprite("plot-flowering"),
+    "plot-wheat": pixelSprite("plot-wheat"),
+    "act-speaking_text": pixelSprite("act-speaking_text"),
+    "act-thinking": pixelSprite("act-thinking"),
+    "icon-seeds": pixelSprite("icon-seeds"),
+    "act-read_file": pixelSprite("act-read_file"),
+    "act-search": pixelSprite("act-search"),
+    "act-edit_file": pixelSprite("act-edit_file"),
+    "act-run_command": pixelSprite("act-run_command"),
+    "mark-check": pixelSprite("mark-check"),
+    "coins-stack": pixelSprite("coins-stack"),
+    "stamp-done": pixelSprite("stamp-done"),
+    "fg-grass": pixelSprite("fg-grass"),
+    "fg-fern": pixelSprite("fg-fern"),
+  };
 }

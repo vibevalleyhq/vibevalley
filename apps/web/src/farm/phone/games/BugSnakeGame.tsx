@@ -3,9 +3,11 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import {
   type BugSnake,
@@ -216,7 +218,7 @@ export function BugSnakeGame() {
             <span>
               {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />
-              <span class="phone-blink">
+              <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", {
                   what: g() && g()!.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
                 })}

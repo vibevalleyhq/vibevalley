@@ -7,6 +7,81 @@ import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 
+const recipeStyles3 = stylex.create({
+  lightboxDialog: {
+    margin: "auto",
+    width: "100%",
+    height: "100%",
+    maxHeight: "none",
+    maxWidth: "none",
+    animationName: {
+      default: "fade-in",
+      "@media (prefers-reduced-motion: reduce)": "none",
+      "::backdrop": "fade-in",
+    },
+    animationDuration: {
+      default: ".18s",
+      "::backdrop": ".18s",
+    },
+    animationDelay: {
+      default: "0s",
+      "::backdrop": "0s",
+    },
+    animationTimingFunction: {
+      default: "var(--ease-out)",
+      "::backdrop": "var(--ease-out)",
+    },
+    animationIterationCount: {
+      default: "1",
+      "::backdrop": "1",
+    },
+    animationDirection: {
+      default: "normal",
+      "::backdrop": "normal",
+    },
+    animationFillMode: {
+      default: "both",
+      "::backdrop": "both",
+    },
+    animationPlayState: {
+      default: "running",
+      "::backdrop": "running",
+    },
+    backgroundColor: {
+      default: "transparent",
+      "::backdrop": "var(--wb-scrim)",
+    },
+    padding: "0",
+    WebkitBackdropFilter: {
+      default: null,
+      "::backdrop": "blur(var(--blur-sm))",
+    },
+    backdropFilter: {
+      default: null,
+      "::backdrop": "blur(var(--blur-sm))",
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  lightboxImg: {
+    pointerEvents: "auto",
+    maxHeight: "calc(100% - 4rem)",
+    maxWidth: "100%",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    borderRadius: "var(--radius-lg)",
+    objectFit: "contain",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
 const recipeStyles = stylex.create({
   lightboxA: {
     display: "inline-flex",
@@ -106,17 +181,12 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
         if (e.key === "ArrowLeft") go(-1);
         if (e.key === "ArrowRight") go(1);
       }}
-      class="m-auto size-full max-h-none max-w-none animate-fade-in bg-transparent p-0 backdrop:animate-fade-in backdrop:bg-scrim backdrop:backdrop-blur-sm"
+      {...stylex.attrs(recipeStyles3.lightboxDialog)}
     >
       <Show when={shown()}>
         {(p) => (
           <div {...stylex.attrs(viewStyles.lightboxDiv)} onClick={() => props.onAt(undefined)}>
-            <img
-              src={p().src}
-              alt={p().name}
-              class="pointer-events-auto max-h-[calc(100%-4rem)] max-w-full animate-pop-in rounded-lg object-contain shadow-float"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <img src={p().src} alt={p().name} {...stylex.attrs(recipeStyles2.lightboxImg)} onClick={(e) => e.stopPropagation()} />
             <div {...stylex.attrs(viewStyles.lightboxDiv2)} onClick={(e) => e.stopPropagation()}>
               <Show when={count() > 1}>
                 <IconButton icon="previous" label={t("web.base.lightbox.prev")} onClick={() => go(-1)} />

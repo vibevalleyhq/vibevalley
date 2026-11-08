@@ -6,8 +6,8 @@ little of it the workbench uses, on the host's own Vite, StyleX compiler and tok
 
 The package knows no app. The host (`apps/web/src/stories.tsx`) collects its `*.stories.tsx`, gives the viewer what
 every story is drawn inside (`wrap`: a router, a query cache) and its stylesheet. Extracted styles use the host's public
-CSS properties (`--color-page`, `--color-line`, spacing and type tokens), not its private palette. During the migration,
-the remaining utility styles still require the host's Tailwind to scan `src/` here (`@source`).
+CSS properties (`--color-page`, `--color-line`, spacing and type tokens), not its private palette.
+The host imports `@vibevalley/stories/style.css` for the filled-frame descendant layout; component styles compile through StyleX.
 
 ## A stories file
 

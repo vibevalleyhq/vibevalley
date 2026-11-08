@@ -27,6 +27,63 @@ import {
 } from "../lib/story";
 import { Section, domAttrs } from "./ui";
 
+const sceneStyles = stylex.create({
+  finishedField: {
+    position: "relative",
+    marginBottom: "calc(var(--spacing) * 12)",
+    overflow: "hidden",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundImage: "var(--scene-field-background)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+  },
+  storyScene: {
+    position: "relative",
+    height: {
+      default: "264px",
+      "@media (width>=64rem)": "396px",
+    },
+    flexShrink: "0",
+    overflow: "hidden",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-story-sky)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+  },
+  sky: {
+    position: "absolute",
+    inset: "0",
+    backgroundImage: "var(--scene-story-background)",
+  },
+  cloud: {
+    position: "absolute",
+    left: "0",
+    height: "calc(var(--spacing) * 2.5)",
+    animationName: "title-cloud",
+    animationDuration: "160s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "infinite",
+    animationDirection: "normal",
+    animationFillMode: "none",
+    animationPlayState: "running",
+    borderRadius: "3px",
+    backgroundColor: {
+      default: "var(--color-cream-translucent)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-cream-50) 90%, transparent)",
+    },
+    boxShadow: "var(--shadow-story-cloud)",
+  },
+  ground: {
+    position: "absolute",
+    insetInline: "0",
+    bottom: "0",
+    backgroundImage: "var(--scene-field-background)",
+  },
+});
+
 const dotTones = stylex.create({
   base: { backgroundColor: "var(--color-bark-900)" },
   branch: { backgroundColor: "var(--color-leaf-500)" },
@@ -382,9 +439,8 @@ const viewStyles = stylex.create({
 });
 interface Props {
   copy: Copy["how"];
-  /** Each step's icon. */
   icons: string[];
-  /** The field's pictures (Home.astro, from lib/story.ts's lists). */
+  /** Keys match the pose and prop lists in lib/story.ts. */
   art: StoryArt;
 }
 export default function How(props: Props) {
@@ -404,7 +460,7 @@ function Finished(props: Props) {
   const grown = PLACES.map((_, i) => stageOf(i, { place: PLACES.length - 1, working: true, work: 1, x: 0 }));
   return (
     <div>
-      <div aria-hidden="true" class="shadow-hard-lg relative mb-12 overflow-hidden border-2 border-bark-900 bg-[linear-gradient(180deg,#8fbf5a,#76a046)]">
+      <div aria-hidden="true" {...stylex.attrs(sceneStyles.finishedField)}>
         <div {...stylex.attrs(viewStyles.finishedDiv)}>
           {grown.map((stage) => (
             <div {...stylex.attrs(viewStyles.finishedDiv2)}>
@@ -432,7 +488,7 @@ function Finished(props: Props) {
     </div>
   );
 }
-/** Two moments draw the same: the same step, the same pose and bubble, the same stages (the helper's place is not drawn by React). */
+// Position updates are imperative; only drawing state triggers reactive updates.
 const sameDrawing = (a: Moment, b: Moment) => a.place === b.place && a.working === b.working && Math.floor(a.work * 40) === Math.floor(b.work * 40);
 function Story(props: Props) {
   const track = createElementRef<HTMLDivElement>();
@@ -460,7 +516,7 @@ function Story(props: Props) {
     watch.observe(el);
     return () => watch.disconnect();
   });
-  // The helper's pose, drawn by hand (not by React), so it can change with every step it takes.
+  // Walking frames change without updating the reactive story state.
   let pose: {
     name: Pose;
     facing: 1 | -1;
@@ -483,19 +539,21 @@ function Story(props: Props) {
   createScrollPosition((p) => {
     const m = momentAt(p);
     // For those who ask for less motion, the helper is where the step is done, without the walk there.
-    const x = reducedMotion() ? PLACES[m.place]!.at : m.x;
+    const place = PLACES[m.place];
+    if (!place) throw new RangeError(`Invalid story place ${m.place}`);
+    const x = reducedMotion() ? place.at : m.x;
     const dx = x - at.get();
     at.set(x);
     camera.set(cameraFor(x));
     if (!reducedMotion() && !m.working && Math.abs(dx) > 0.01) {
       walked += Math.abs(dx);
-      show((["side-1", "side", "side-2", "side"] as const)[Math.floor(walked / 6) % 4]!, dx < 0 ? -1 : 1);
+      const frame = Math.floor(walked / 6) % 4;
+      show(frame === 0 ? "side-1" : frame === 2 ? "side-2" : "side", dx < 0 ? -1 : 1);
       window.clearTimeout(rest);
       rest = window.setTimeout(() => show("side"), 160);
     }
     setNow((before) => (sameDrawing(before, m) ? before : m));
   }, track);
-  // At work: the place's pose, or two taking turns.
   const work = createMemo(() => workAt(now().place, now().work));
   const poses = createMemo(() => (now().working ? work().poses.join(" ") : ""));
   createEffect(
@@ -507,7 +565,11 @@ function Story(props: Props) {
       let i = 0;
       show(turns[0], 1);
       if (turns.length < 2) return;
-      const timer = window.setInterval(() => show(turns[++i % turns.length]!, 1), 220);
+      const timer = window.setInterval(() => {
+        const next = turns[++i % turns.length];
+        if (next === undefined) throw new RangeError(`Invalid work animation frame ${i}`);
+        show(next, 1);
+      }, 220);
       return () => window.clearInterval(timer);
     },
   );
@@ -527,12 +589,7 @@ function Story(props: Props) {
       }}
     >
       <div {...stylex.attrs(viewStyles.storyDiv)}>
-        <div
-          ref={stage.set}
-          data-testid="how-stage"
-          aria-hidden="true"
-          class="shadow-hard-lg relative h-[264px] shrink-0 overflow-hidden border-2 border-bark-900 bg-[#9fc6d9] lg:h-[396px]"
-        >
+        <div ref={stage.set} data-testid="how-stage" aria-hidden="true" {...stylex.attrs(sceneStyles.storyScene)}>
           <div
             {...stylex.attrs(viewStyles.storyDiv2)}
             style={{
@@ -593,7 +650,6 @@ function Story(props: Props) {
     </div>
   );
 }
-/** The words for the step the story is at, with the four steps as marks along the top. */
 function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
   return (
     <div {...stylex.attrs(viewStyles.captionDiv)}>
@@ -618,15 +674,22 @@ function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
         exit={{ opacity: 0, x: -16 }}
         transition={{ duration: 0.24, ease: steps(4) }}
       >
-        {(index, ref) => (
-          <div ref={ref} {...stylex.attrs(viewStyles.captionDiv2)}>
-            <img src={props.icons[index]} alt="" {...stylex.attrs(viewStyles.captionImg)} />
-            <div>
-              <h3 {...stylex.attrs(viewStyles.captionH3)}>{props.copy.steps[index]!.title}</h3>
-              <p {...stylex.attrs(viewStyles.finishedP)}>{props.copy.steps[index]!.text}</p>
+        {(index, ref) => {
+          const step = createMemo(() => {
+            const value = props.copy.steps[index];
+            if (!value) throw new RangeError(`Missing story copy for step ${index}`);
+            return value;
+          });
+          return (
+            <div ref={ref} {...stylex.attrs(viewStyles.captionDiv2)}>
+              <img src={props.icons[index]} alt="" {...stylex.attrs(viewStyles.captionImg)} />
+              <div>
+                <h3 {...stylex.attrs(viewStyles.captionH3)}>{step().title}</h3>
+                <p {...stylex.attrs(viewStyles.finishedP)}>{step().text}</p>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        }}
       </Presence>
     </div>
   );
@@ -645,18 +708,17 @@ function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.
     </div>
   );
 }
-/** The sky, barely moving, with a cloud or two drifting across. */
 function Sky(props: { camera: MotionValue<number> }) {
   return (
     <>
-      <div class="absolute inset-0 bg-[linear-gradient(180deg,#7fb6dc_0%,#a9d2e6_45%,#d5ead9_70%)]" />
+      <div {...stylex.attrs(sceneStyles.sky)} />
       <Pass camera={props.camera} pace={PACE.sky}>
         {[
           { y: 8, w: 46, d: 70, delay: -10 },
           { y: 20, w: 30, d: 95, delay: -60 },
         ].map((c) => (
           <span
-            class="animate-cloud absolute left-0 h-2.5 rounded-[3px] bg-cream-50/90 shadow-[4px_3px_0_rgb(255_255_255/0.6),-5px_4px_0_rgb(255_255_255/0.5)]"
+            {...stylex.attrs(sceneStyles.cloud)}
             style={{
               top: `${c.y}px`,
               width: `${c.w}px`,
@@ -695,12 +757,11 @@ function Hills(props: { camera: MotionValue<number> }) {
     </>
   );
 }
-/** The field's ground: grass to the bottom, and the path the helper walks. */
 function Ground() {
   return (
     <>
       <div
-        class="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,#8fbf5a,#76a046)]"
+        {...stylex.attrs(sceneStyles.ground)}
         style={{
           top: `${74}px`,
         }}
@@ -725,7 +786,6 @@ function Sprite(props: { art: Art; x: number; y: number; styles?: stylex.StyleXS
     />
   );
 }
-/** One place: its thing, its plot at the stage the story has it at, and what turns up there. */
 function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Moment; art: StoryArt }) {
   const stage = createMemo(() => stageOf(props.index, props.now));
   const here = createMemo(() => props.now.place === props.index && props.now.working);
@@ -794,7 +854,6 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
     </>
   );
 }
-/** A bubble popping up at x, y with a picture in it. */
 function Pop(props: { art: Art; x: number; y: number; ref: (element: HTMLElement) => void }) {
   return (
     <div
@@ -822,12 +881,20 @@ function Pop(props: { art: Art; x: number; y: number; ref: (element: HTMLElement
 }
 /** Where the branch's marks sit across the picture (shares of its width). */
 const GIT = { fork: 0.16, commits: [0.36, 0.5, 0.64], join: 0.84 } as const;
-/** The job's branch at a moment of the story, as a git graph: main along the bottom. */
 function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string }) {
   const b = createMemo(() => branchAt(props.now));
   const lane = 30;
   const main = 74;
-  const head = createMemo(() => (b().merged ? GIT.join - 0.06 : b().commits > 0 ? GIT.commits[b().commits - 1]! : GIT.fork + 0.08));
+  const head = createMemo(() => {
+    const branch = b();
+    if (branch.merged) return GIT.join - 0.06;
+    if (branch.commits > 0) {
+      const commit = GIT.commits[branch.commits - 1];
+      if (commit === undefined) throw new RangeError(`Invalid branch commit count ${branch.commits}`);
+      return commit;
+    }
+    return GIT.fork + 0.08;
+  });
   const path = createMemo(() =>
     b().forked
       ? `M${GIT.fork * 100},${main} L${(GIT.fork + 0.06) * 100},${lane} L${head() * 100},${lane}${b().merged ? ` L${GIT.join * 100},${main}` : ""}`
@@ -892,7 +959,6 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
     </div>
   );
 }
-/** A commit on the graph: a square that pops on when it is made. */
 function Dot(props: { x: number; y: number; shown: boolean; tone: keyof typeof dotTones; large?: boolean }) {
   return (
     <Presence value={props.shown ? true : undefined} enter={{ scale: [0, 1] }} exit={{ scale: 0 }} transition={{ duration: 0.18, ease: steps(3) }}>

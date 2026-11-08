@@ -12,6 +12,44 @@ import { styleProps } from "#/ui/positioner.ts";
 
 import { dictation, type DictationPhase, insertDictated } from "./dictation";
 
+const recordingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
+
+const recipeStyles = stylex.create({
+  dictationBarSpan: {
+    display: "flex",
+    animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "2s",
+    animationDelay: "0s",
+    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
+    animationIterationCount: "infinite",
+    animationDirection: "normal",
+    animationFillMode: "none",
+    animationPlayState: "running",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  dictationBarSpan2: {
+    marginLeft: "var(--spacing)",
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    flexShrink: "0",
+    animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "2s",
+    animationDelay: "0s",
+    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
+    animationIterationCount: "infinite",
+    animationDirection: "normal",
+    animationFillMode: "none",
+    animationPlayState: "running",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-berry)",
+  },
+});
+
 const variantStyles = stylex.create({
   dictationBarSpan: {
     marginInline: "var(--spacing)",
@@ -25,8 +63,6 @@ const variantStyles = stylex.create({
     overflow: "hidden",
   },
 });
-
-const recordingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
 
 const viewStyles = stylex.create({
   mark: {
@@ -138,7 +174,7 @@ const viewStyles = stylex.create({
   dictationProblemButton: {
     flexShrink: "0",
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontWeight: "var(--font-weight-medium)",
@@ -154,7 +190,7 @@ const viewStyles = stylex.create({
   dictationProblemButton2: {
     flexShrink: "0",
     cursor: "pointer",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     padding: "calc(var(--spacing) * .5)",
     color: {
       default: "var(--color-muted)",
@@ -358,13 +394,13 @@ export function DictationBar(props: { dictating: Dictating }) {
       <Show
         when={listening()}
         fallback={
-          <span class="flex animate-pulse items-center gap-2 px-1 text-sm text-muted">
+          <span {...stylex.attrs(recipeStyles.dictationBarSpan)}>
             <Icon name="wait" size={14} />
             {t("web.voice.dictation.transcribing")}
           </span>
         }
       >
-        <span aria-hidden="true" class="ml-1 size-2 shrink-0 animate-pulse rounded-full bg-berry" />
+        <span aria-hidden="true" {...stylex.attrs(recipeStyles.dictationBarSpan2)} />
         <span {...stylex.attrs(viewStyles.dictationBarSpan)} role="timer" aria-label={t("web.voice.dictation.listening")}>
           {clock(elapsed())}
         </span>

@@ -14,6 +14,7 @@ import type { SceneHover } from "./Scene";
 import { type Ties, tiesOf } from "./sky";
 
 const recipeStyles2 = stylex.create({
+  lookUp: { marginTop: "auto", width: "100%" },
   panelPxWindow: {
     position: "absolute",
     display: "flex",
@@ -426,7 +427,7 @@ export function Panel(props: {
           </ul>
         </Show>
       </Section>
-      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" class="mt-auto w-full" onClick={props.onLookUp}>
+      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" styles={recipeStyles2.lookUp} onClick={props.onLookUp}>
         {t("web.tree.lookUp")}
       </PxButton>
     </PxWindow>

@@ -5,6 +5,7 @@ import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { styleProps } from "./positioner";
 
 const styles = stylex.create({
   track: {
@@ -107,7 +108,7 @@ export function Segmented<T extends string>(props: {
       class={stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted).class}
     >
       <Show when={thumb()}>
-        {(at) => <span aria-hidden="true" {...stylex.attrs(styles.thumb, moved() && styles.moved, styles.place(at().x, at().y, at().w, at().h))} />}
+        {(at) => <span aria-hidden="true" {...styleProps([styles.thumb, moved() && styles.moved, styles.place(at().x, at().y, at().w, at().h)])} />}
       </Show>
       <For each={props.options}>
         {(o) => (

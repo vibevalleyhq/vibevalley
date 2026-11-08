@@ -30,7 +30,7 @@ const recipeStyles2 = stylex.create({
     left: "0",
     display: "flex",
     width: "calc(var(--spacing) * 72)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 8px 24px var(--wb-float)",
+    boxShadow: "var(--shadow-float)",
     transitionProperty: "transform,translate,scale,rotate",
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: ".28s",

@@ -19,6 +19,8 @@ import { PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 import { HudCard } from "./HudCard";
 
 const recipeStyles = stylex.create({
+  expandArrow: { rotate: "90deg" },
+  collapseArrow: { rotate: "-90deg" },
   friendButton: {
     position: "relative",
     display: "flex",
@@ -399,7 +401,7 @@ export function Friends(props: { height: number }) {
           <Show when={busy() > 0}>
             <span {...stylex.attrs(viewStyles.friendsSpan4)}>{busy()}</span>
           </Show>
-          <SpriteIcon name="button-next" size={12} class={open() ? "-rotate-90" : "rotate-90"} />
+          <SpriteIcon name="button-next" size={12} styles={open() ? recipeStyles.collapseArrow : recipeStyles.expandArrow} />
         </HudCard>
         <Show when={stage()}>{(a) => <span {...stylex.attrs(viewStyles.friendsSpan5)} style={{ background: status[a()].dot }} />}</Show>
       </button>

@@ -10,6 +10,29 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 
+const recipeStyles = stylex.create({
+  displayMenuPopoverPopup: {
+    width: "min(340px,100vw - 24px)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 3)",
+    boxShadow: "var(--shadow-float)",
+    outlineStyle: "none",
+  },
+});
+
 const viewStyles = stylex.create({
   displayMenuDiv: {
     display: "flex",
@@ -68,11 +91,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner {...positionerAttrs()} align="end" sideOffset={6}>
-          <Popover.Popup
-            aria-label={t("web.issue.display.show")}
-            data-testid="display-menu"
-            class="w-[min(340px,calc(100vw-24px))] origin-top-right animate-pop-in rounded-lg border border-line bg-page p-3 shadow-float outline-none"
-          >
+          <Popover.Popup aria-label={t("web.issue.display.show")} data-testid="display-menu" {...stylex.attrs(recipeStyles.displayMenuPopoverPopup)}>
             <div {...stylex.attrs(viewStyles.displayMenuDiv)}>
               <span {...stylex.attrs(viewStyles.displayMenuSpan)}>{t("web.issue.display.group")}</span>
               <Segmented

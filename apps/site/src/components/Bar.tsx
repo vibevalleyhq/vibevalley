@@ -4,7 +4,70 @@ import { createSignal } from "solid-js";
 
 import { createScrollPosition } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
-import { cx } from "./ui";
+
+const sceneStyles = stylex.create({
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "1",
+    textShadow: "var(--text-shadow-soft)",
+  },
+  sectionLink: {
+    display: {
+      default: "none",
+      "@media (width>=860px)": "block",
+    },
+    borderBottomStyle: "solid",
+    borderBottomWidth: "2px",
+    borderColor: {
+      default: "transparent",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-wheat)",
+      },
+    },
+    paddingBlock: "var(--spacing)",
+    textShadow: "var(--text-shadow-soft)",
+  },
+  repositoryLink: {
+    borderBottomStyle: "solid",
+    borderBottomWidth: "2px",
+    borderColor: {
+      default: "transparent",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-wheat)",
+      },
+    },
+    paddingBlock: "var(--spacing)",
+    textShadow: "var(--text-shadow-soft)",
+  },
+  header: {
+    position: "fixed",
+    insetInline: "0",
+    top: "0",
+    zIndex: 20,
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 6)",
+    paddingInline: "clamp(16px,4vw,40px)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    color: "var(--color-cream-50)",
+    transitionProperty: "background-color,box-shadow",
+    transitionTimingFunction: "steps(3,end)",
+    transitionDuration: ".3s",
+  },
+  solid: {
+    backgroundColor: {
+      default: "var(--color-bar-solid)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 92%, transparent)",
+    },
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 2px 0 var(--color-bark-900)",
+  },
+});
 
 const viewStyles = stylex.create({
   barImg: {
@@ -57,23 +120,18 @@ export default function Bar(props: Props) {
   const [solid, setSolid] = createSignal(false);
   createScrollPosition((y) => setSolid(y > (document.getElementById("top")?.offsetHeight ?? innerHeight) - 80));
   return (
-    <header
-      class={cx(
-        "fixed inset-x-0 top-0 z-20 flex items-center gap-6 px-[clamp(16px,4vw,40px)] py-3 text-cream-50 transition-[background-color,box-shadow] duration-300 ease-[steps(3)]",
-        solid() && "bg-bark-900/92 shadow-[0_2px_0_var(--color-bark-900)]",
-      )}
-    >
-      <a class="text-shadow-soft flex items-center gap-2.5 font-pixel text-2xl/none" href={props.copy.home}>
+    <header {...stylex.attrs(sceneStyles.header, solid() && sceneStyles.solid)}>
+      <a {...stylex.attrs(sceneStyles.brand)} href={props.copy.home}>
         <img src="/gen/icon-64.png" alt="" width="32" height="32" {...stylex.attrs(viewStyles.barImg)} />
         {props.copy.name}
       </a>
       <nav aria-label={props.copy.title} {...stylex.attrs(viewStyles.barNav)}>
         {(["how", "features", "screens", "start"] as const).map((id) => (
-          <a href={`#${id}`} class="text-shadow-soft hidden border-b-2 border-transparent py-1 hover:border-wheat min-[860px]:block">
+          <a href={`#${id}`} {...stylex.attrs(sceneStyles.sectionLink)}>
             {props.copy.nav[id]}
           </a>
         ))}
-        <a href={props.github} class="text-shadow-soft border-b-2 border-transparent py-1 hover:border-wheat">
+        <a href={props.github} {...stylex.attrs(sceneStyles.repositoryLink)}>
           {props.copy.nav.github}
         </a>
       </nav>

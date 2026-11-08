@@ -31,6 +31,33 @@ import { toast } from "#/ui/toasts.ts";
 
 import { DeepseekForm } from "./DeepseekForm";
 
+const recipeStyles = stylex.create({
+  sourceMarkSpan: {
+    display: "block",
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+  },
+  sourceMarkSpanState: {
+    backgroundColor: "var(--wb-faint)",
+    borderStyle: null,
+    borderWidth: null,
+    borderColor: null,
+  },
+  sourceMarkSpanState2: {
+    backgroundColor: "var(--wb-leaf)",
+    borderStyle: null,
+    borderWidth: null,
+    borderColor: null,
+  },
+  sourceMarkSpanState3: {
+    backgroundColor: null,
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-faint)",
+  },
+});
+
 const variantStyles = stylex.create({
   sourceFieldTextInput: {
     fontFamily: "var(--font-mono)",
@@ -270,7 +297,16 @@ function SourceMark(props: { draft: SourceDraft }) {
         tabindex={0}
         {...stylex.attrs(viewStyles.sourceMark)}
       >
-        <span class={["block size-2 rounded-full", !props.draft.saved ? "border border-faint" : props.draft.saved.enabled ? "bg-leaf" : "bg-faint"]} />
+        <span
+          {...stylex.attrs(
+            recipeStyles.sourceMarkSpan,
+            !props.draft.saved
+              ? recipeStyles.sourceMarkSpanState3
+              : props.draft.saved.enabled
+                ? recipeStyles.sourceMarkSpanState2
+                : recipeStyles.sourceMarkSpanState,
+          )}
+        />
       </span>
     </Tip>
   );

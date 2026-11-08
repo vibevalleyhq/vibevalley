@@ -27,7 +27,7 @@ const recipeStyles = stylex.create({
   },
   stageSpan2: {
     maxWidth: "calc(var(--spacing) * 96)",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-avatar-soft-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
@@ -43,7 +43,7 @@ const recipeStyles = stylex.create({
     position: "absolute",
     top: "calc(var(--spacing) * 3)",
     right: "calc(var(--spacing) * 4)",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-avatar-soft-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
@@ -145,6 +145,7 @@ const viewStyles = stylex.create({
     imageRendering: "pixelated",
   },
   stageDiv: {
+    backgroundImage: "radial-gradient(60% 60% at 50% 45%, var(--color-agent-stage-center), var(--color-agent-stage-middle) 60%, var(--color-agent-stage-edge))",
     position: "relative",
     display: "flex",
     flex: "1",
@@ -159,6 +160,7 @@ const viewStyles = stylex.create({
     maxWidth: "100%",
   },
   stageImg: {
+    left: 192 - 288 * 0.62,
     position: "absolute",
     bottom: "calc(var(--spacing) * 6)",
     width: "calc(var(--spacing) * 72)",
@@ -272,15 +274,9 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const crop = () => stagePoses.find((p) => p.pose === props.pose)?.crop ?? "empty";
   return (
-    <div {...stylex.attrs(viewStyles.stageDiv)} style={{ background: "radial-gradient(60% 60% at 50% 45%, #c7dd9a, #9cc069 60%, #7ea64f)" }}>
+    <div {...stylex.attrs(viewStyles.stageDiv)}>
       <div {...stylex.attrs(viewStyles.stageDiv2)}>
-        <img
-          src={`/pixel/${cropSprite(crop())}.png`}
-          alt=""
-          {...stylex.attrs(viewStyles.stageImg)}
-          style={{ left: `${192 - 288 * 0.62}px` }}
-          onError={(e) => (e.currentTarget.style.display = "none")}
-        />
+        <img src={`/pixel/${cropSprite(crop())}.png`} alt="" {...stylex.attrs(viewStyles.stageImg)} onError={(e) => (e.currentTarget.style.display = "none")} />
         <div {...stylex.attrs(viewStyles.stageDiv3)}>
           <PoseSprite cast={cast()} pose={props.pose} height={224} />
         </div>

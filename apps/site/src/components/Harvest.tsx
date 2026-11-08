@@ -6,6 +6,99 @@ import type { Copy } from "../i18n/zh";
 import { JOB } from "../lib/story";
 import { CountUp } from "./ui";
 
+const sceneStyles = stylex.create({
+  field: {
+    position: "relative",
+    overflow: "hidden",
+    borderBlockStyle: "solid",
+    borderBlockWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundImage: "var(--scene-harvest-background)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "clamp(96px,13vw,170px)",
+  },
+  shade: {
+    position: "absolute",
+    inset: "0",
+    backgroundImage: "var(--scene-harvest-shade)",
+  },
+  title: {
+    fontSize: "clamp(40px,8vw,104px)",
+    lineHeight: "1.2",
+    textShadow: "var(--text-shadow-title)",
+  },
+  description: {
+    marginInline: "auto",
+    marginTop: "calc(var(--spacing) * 5)",
+    maxWidth: "34em",
+    fontSize: {
+      default: "var(--text-lg)",
+      "@media (width>=40rem)": "var(--text-xl)",
+    },
+    lineHeight: {
+      default: "var(--text-lg--line-height)",
+      "@media (width>=40rem)": "var(--text-xl--line-height)",
+    },
+    textWrap: "balance",
+    textShadow: "var(--text-shadow-thin)",
+  },
+  take: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-leaf-500)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-base)",
+    lineHeight: "1",
+    color: "var(--color-cream-50)",
+    boxShadow: "inset 2px 2px 0 var(--color-leaf-hover), 0 0 transparent, 0 0 transparent, 0 0 transparent, var(--shadow-hard-sm)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  harvestImg: {
+    width: {
+      default: "calc(var(--spacing) * 9)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 11)",
+    },
+    imageRendering: "pixelated",
+    animationName: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "title-float",
+    },
+    animationDuration: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "5s",
+    },
+    animationDelay: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "0s",
+    },
+    animationTimingFunction: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "ease-in-out",
+    },
+    animationIterationCount: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "infinite",
+    },
+    animationDirection: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "normal",
+    },
+    animationFillMode: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "none",
+    },
+    animationPlayState: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "running",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   harvestDiv: {
     position: "absolute",
@@ -177,13 +270,12 @@ const viewStyles = stylex.create({
   },
 });
 /** While the band crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
-const CROSSING = ["start end", "end start"] as ["start end", "end start"];
+const CROSSING: ["start end", "end start"] = ["start end", "end start"];
 interface Props {
   copy: Copy["harvest"];
   /** The ripe plots, the row behind and the row in front. */
   rows: [string[], string[]];
   coins: string;
-  /** The harvest list's icon and its check. */
   icons: {
     harvest: string;
     check: string;
@@ -195,12 +287,7 @@ export default function Harvest(props: Props) {
   const front = createScrollAnimation<HTMLDivElement>(ref, CROSSING, () => [{ keyframes: { transform: ["translateX(110px)", "translateX(-110px)"] } }]);
   observeVisibility(ref);
   return (
-    <section
-      ref={ref.set}
-      id="harvest"
-      aria-labelledby="harvest-title"
-      class="relative overflow-hidden border-y-2 border-bark-900 bg-[linear-gradient(180deg,#f6dc94_0%,#eab654_55%,#c98d32_100%)] px-4 py-[clamp(96px,13vw,170px)]"
-    >
+    <section ref={ref.set} id="harvest" aria-labelledby="harvest-title" {...stylex.attrs(sceneStyles.field)}>
       <div ref={back.set} aria-hidden="true" {...stylex.attrs(viewStyles.harvestDiv)}>
         {props.rows[0].map((src) => (
           <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.harvestImg)} />
@@ -211,8 +298,8 @@ export default function Harvest(props: Props) {
           <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.harvestImg2)} />
         ))}
       </div>
-      {/* A shade behind the words, so they read over the field. */}
-      <div aria-hidden="true" class="absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_50%,rgb(30_20_10/0.55),transparent_75%)]" />
+      {/* Keep the words readable over the field. */}
+      <div aria-hidden="true" {...stylex.attrs(sceneStyles.shade)} />
       <div {...stylex.attrs(viewStyles.harvestDiv3)}>
         <div aria-hidden="true" {...stylex.attrs(viewStyles.harvestDiv4)}>
           {[0, 1, 2].map((i) => (
@@ -220,19 +307,19 @@ export default function Harvest(props: Props) {
               loading="lazy"
               src={props.coins}
               alt=""
-              class="pixelated motion-safe:animate-float w-9 sm:w-11"
+              {...stylex.attrs(recipeStyles.harvestImg)}
               style={{
                 "animation-delay": `${i * -1.6}s`,
               }}
             />
           ))}
         </div>
-        <h2 id="harvest-title" data-reveal class="text-shadow-title text-[clamp(40px,8vw,104px)]/[1.2]">
+        <h2 id="harvest-title" data-reveal {...stylex.attrs(sceneStyles.title)}>
           {props.copy.title.map((line) => (
             <span {...stylex.attrs(viewStyles.harvestSpan)}>{line}</span>
           ))}
         </h2>
-        <p data-reveal={120} class="text-shadow-thin mx-auto mt-5 max-w-[34em] text-lg text-balance sm:text-xl">
+        <p data-reveal={120} {...stylex.attrs(sceneStyles.description)}>
           {props.copy.text}
         </p>
         <HarvestList copy={props.copy.card} icons={props.icons} />
@@ -240,7 +327,6 @@ export default function Harvest(props: Props) {
     </section>
   );
 }
-/** The story's job as the app's harvest list shows it. */
 function HarvestList(props: {
   copy: Copy["harvest"]["card"];
   icons: {
@@ -290,9 +376,7 @@ function HarvestList(props: {
           <img src={props.icons.check} alt="" {...stylex.attrs(viewStyles.harvestListImg2)} />
           {props.copy.clean}
         </span>
-        <span class="inset-shadow-lit shadow-hard-sm border-2 border-bark-900 bg-leaf-500 px-3 py-1.5 font-pixel text-base/none text-cream-50 inset-shadow-leaf-hover">
-          {props.copy.take}
-        </span>
+        <span {...stylex.attrs(sceneStyles.take)}>{props.copy.take}</span>
       </div>
     </div>
   );

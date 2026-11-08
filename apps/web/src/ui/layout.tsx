@@ -237,7 +237,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     color: {
       default: "var(--color-faint)",
       "@media (hover:hover)": {

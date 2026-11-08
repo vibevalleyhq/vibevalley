@@ -17,6 +17,7 @@ import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Quiet } from "#/ui/layout.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { createSessionEvents } from "./events";
 import {
@@ -35,6 +36,57 @@ import {
   type TrajectorySummary,
   waterfallOf,
 } from "./runs";
+
+const trajectoryStyles = stylex.create({
+  bar: {
+    position: "absolute",
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: {
+      default: "var(--timeline-color)",
+      "@media (hover: hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  round: {
+    position: "relative",
+  },
+  report: {
+    position: "absolute",
+    top: "0",
+    right: "0",
+    display: {
+      default: "none",
+      [stylex.when.ancestor(":focus-within")]: "flex",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover")]: "flex",
+      },
+    },
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
 
 const recipeStyles2 = stylex.create({
   toolDetailPre: {
@@ -64,7 +116,7 @@ const recipeStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     paddingInline: "var(--spacing)",
     paddingBlock: "1px",
     textAlign: "center",
@@ -366,7 +418,7 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
   },
   trajectoryListSpan4: {
-    borderRadius: ".25rem",
+    borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hat)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
@@ -791,8 +843,8 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
               title={b().label}
               aria-label={b().label}
               onClick={() => props.onPick(b().seq)}
-              class="absolute cursor-pointer rounded-sm hover:!bg-ink"
-              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, background: b().color }}
+              {...styleProps(trajectoryStyles.bar)}
+              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, "--timeline-color": b().color }}
             />
           )}
         </For>
@@ -818,15 +870,10 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
     props.onMarked(got.file);
   };
   return (
-    <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} class="group relative">
+    <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} {...styleProps([stylex.defaultMarker(), trajectoryStyles.round])}>
       {props.children}
       <Show when={!props.file && !writing()}>
-        <button
-          type="button"
-          data-testid="mark-wrong"
-          onClick={() => setWriting(true)}
-          class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
-        >
+        <button type="button" data-testid="mark-wrong" onClick={() => setWriting(true)} {...styleProps(trajectoryStyles.report)}>
           <Icon name="bug" size={12} />
           {t("web.session.trajectory.wrong")}
         </button>

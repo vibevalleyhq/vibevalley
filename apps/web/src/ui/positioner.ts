@@ -3,8 +3,8 @@ import * as stylex from "@stylexjs/stylex";
 
 const styles = stylex.create({ floating: { zIndex: 30 } });
 
-/** Composes StyleX rules into Solid's `class` and object `style`, preserving dynamic custom property names. */
-export function styleProps(values: stylex.StyleXStyles, inline?: JSX.CSSProperties) {
+/** Object styles preserve the compiler's case-sensitive custom property names. */
+export function styleProps(values: stylex.StyleXArray<stylex.StyleXStyles | stylex.CompiledStyles>, inline?: JSX.CSSProperties) {
   const { className, style, ...attributes } = stylex.props(values);
   return { ...attributes, class: className, style: inline === undefined ? style : { ...style, ...inline } };
 }

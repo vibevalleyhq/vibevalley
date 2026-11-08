@@ -86,14 +86,12 @@
         height: 100%;
         background: repeating-linear-gradient(90deg, #a4c66c 0 8px, #86ad50 8px 10px);
         box-shadow: inset 0 2px #d9e5a2;
-        transition: width 180ms steps(8);
       }
       #opening .sprite-position {
         position: absolute;
         left: clamp(32px, var(--progress), calc(100% - 32px));
         bottom: 10px;
         transform: translateX(-50%);
-        transition: left 180ms steps(8);
         pointer-events: none;
       }
       #opening .sprite {
@@ -140,7 +138,7 @@
       }
       @media (prefers-reduced-motion: reduce) {
         #opening .sprite { animation: none !important; }
-        #opening .sprite-position, #opening .fill { transition: none; }
+        #opening .sprite-position { left: 32px; }
       }
     </style>
     <div id="opening">
@@ -161,26 +159,79 @@
         const locale = document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale");
         const said = openingWords[locale] ?? openingWords.zh;
         const cover = document.getElementById("opening");
+        const nativeOpening = Boolean(window.vibevalleyHost?.opening);
+        cover.hidden = nativeOpening;
         const bar = cover.querySelector(".bar");
         const words = cover.querySelector(".words");
         const runway = cover.querySelector(".runway");
         cover.querySelector(".brand").textContent = said.name;
         document.title = said.name;
         bar.setAttribute("aria-label", said.label);
-        const paint = () => {
-          const phase = cover.dataset.phase;
-          const progress = Math.max(0, Math.min(100, Number(cover.dataset.progress ?? 0)));
-          runway.style.setProperty("--progress", progress + "%");
-          cover.dataset.mood = phase === "failed" || phase === "waiting" ? "confused" : phase === "ready" ? "happy" : progress >= 70 ? "excited" : progress > 0 ? "working" : "sleepy";
-          if (phase === "failed") bar.removeAttribute("role");
-          else if (progress > 0) {
-            bar.setAttribute("aria-valuemin", "0");
-            bar.setAttribute("aria-valuemax", "100");
-            bar.setAttribute("aria-valuenow", String(progress));
-          }
-          words.textContent = said[phase] ?? said.waking;
+        const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+        const started = performance.now();
+        let displayed = 0;
+        let frame;
+        let timer;
+        const stop = () => {
+          cancelAnimationFrame(frame);
+          clearTimeout(timer);
         };
+        const dispose = () => {
+          stop();
+          observer.disconnect();
+          cover.removeEventListener("opening-update", paint);
+          window.removeEventListener("pagehide", dispose);
+        };
+        const terminal = () => Boolean(cover.dataset.problem) || ["ready", "waiting", "failed"].includes(cover.dataset.phase);
+        const render = () => {
+          const phase = cover.dataset.phase;
+          runway.style.setProperty("--progress", displayed + "%");
+          cover.dataset.displayProgress = String(displayed);
+          cover.dataset.mood = phase === "failed" || phase === "waiting" ? "confused" : phase === "ready" ? "happy" : displayed >= 70 ? "excited" : displayed > 0 ? "working" : "sleepy";
+          bar.setAttribute("aria-valuemin", "0");
+          bar.setAttribute("aria-valuemax", "100");
+          bar.setAttribute("aria-valuenow", String(displayed));
+        };
+        const advance = () => {
+          const actual = Math.max(0, Math.min(99, Number(cover.dataset.progress ?? 0)));
+          const simulated = nativeOpening ? 0 : 3 + 87 * (1 - Math.exp(-(performance.now() - started) / 5000));
+          displayed = Math.max(displayed, actual, Math.round(simulated * 100) / 100);
+          render();
+        };
+        const tick = () => {
+          if (!cover.isConnected) return dispose();
+          if (terminal()) return stop();
+          advance();
+          schedule();
+        };
+        const schedule = () => {
+          if (nativeOpening || terminal() || displayed >= 90) return;
+          if (reducedMotion.matches) timer = setTimeout(tick, 1000);
+          else frame = requestAnimationFrame(tick);
+        };
+        const paint = () => {
+          if (!cover.isConnected) return dispose();
+          const problem = cover.dataset.problem;
+          if (problem) cover.dataset.phase = "failed";
+          const phase = cover.dataset.phase;
+          if (terminal()) {
+            stop();
+            if (phase === "ready") displayed = 100;
+            render();
+          } else advance();
+          if (phase === "failed") bar.removeAttribute("role");
+          words.textContent = problem ? said.cannotStart.replace("{why}", problem) : said[phase] ?? said.waking;
+          if (problem) {
+            words.className = "problem";
+            words.setAttribute("role", "alert");
+          }
+        };
+        const observer = new MutationObserver(() => {
+          if (!cover.isConnected) dispose();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
         cover.addEventListener("opening-update", paint);
+        window.addEventListener("pagehide", dispose);
         const prefs = (() => {
           try { return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {}; }
           catch { return {}; }
@@ -199,13 +250,9 @@
         cover.querySelector(".scene").src = root + "brand/opening-" + scene + ".webp";
         cover.querySelector(".sprite").style.backgroundImage = 'url("' + root + 'brand/opening-sprite.webp")';
         const problem = location.pathname.endsWith("/opening.html") ? new URLSearchParams(location.search).get("problem") : null;
-        if (problem) cover.dataset.phase = "failed";
+        if (problem) cover.dataset.problem = problem;
         paint();
-        if (problem) {
-          words.className = "problem";
-          words.setAttribute("role", "alert");
-          words.textContent = said.cannotStart.replace("{why}", problem);
-        }
+        schedule();
       }
     </script>
     <!-- /opening -->

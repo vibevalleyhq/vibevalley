@@ -10,9 +10,21 @@ import { styleProps } from "#/ui/positioner.ts";
 import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
-import { pxFocus, pxStyle } from "./style";
+import { pxStyle } from "./style";
 
 const viewStyles = stylex.create({
+  close: {
+    display: "grid",
+    width: "calc(var(--spacing) * 9)",
+    height: "calc(var(--spacing) * 9)",
+    flexShrink: 0,
+    cursor: "pointer",
+    placeItems: "center",
+    backgroundColor: { default: null, "@media (hover:hover)": { default: null, ":hover": "var(--color-cream-200)" } },
+  },
+  closeIcon: {
+    translate: { default: null, [stylex.when.ancestor(":active")]: "1px 1px" },
+  },
   modal: {
     margin: "auto",
     maxHeight: "none",
@@ -161,9 +173,9 @@ export function FarmDialog(props: {
             type="button"
             aria-label={t("web.ui.pixel.close")}
             onClick={() => props.onClose()}
-            class={["group grid size-9 shrink-0 cursor-pointer place-items-center hover:bg-cream-200", pxFocus]}
+            {...stylex.attrs(viewStyles.close, pxStyle.focus, stylex.defaultMarker())}
           >
-            <SpriteIcon name="button-close" size={18} class="group-active:translate-x-px group-active:translate-y-px" />
+            <SpriteIcon name="button-close" size={18} styles={viewStyles.closeIcon} />
           </button>
         </div>
         <div {...stylex.attrs(viewStyles.farmDialogRule)}>
