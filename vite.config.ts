@@ -68,6 +68,10 @@ export default defineConfig({
         "vpx scripts/primitives.ts --check",
       ],
       "notes:verify": "vpx scripts/agent-notes.ts",
+      "migration:inventory": { command: "vpx scripts/style-migration.ts", cache: false },
+      "migration:visual:static": { command: "vpx scripts/style-migration-static.ts", cache: false },
+      "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
+      "site:build": { command: "vp run --filter @vibevalley/site build", cache: false },
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/built-types.ts"],
@@ -122,8 +126,8 @@ export default defineConfig({
   staged: { "*": "vp check --fix --deny-warnings" },
   fmt: {
     printWidth: 160,
-    // site/ is its own project; the rest are written by tools or are data, and docs keep their compact tables.
-    ignorePatterns: ["site/**", "**/*.md", "apps/server/db/generated/**", "**/testdata/**", "apps/web/public/**", ".agents/**", "design/**"],
+    // Generated files and data keep their source format; docs keep their compact tables.
+    ignorePatterns: ["**/*.md", "apps/server/db/generated/**", "**/testdata/**", "apps/web/public/**", ".agents/**", "design/**"],
     // Imports from farthest to nearest: Node, packages, the workspace's own, this app's #/, then the same folder.
     sortImports: {
       customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
@@ -133,7 +137,7 @@ export default defineConfig({
     sortTailwindcss: { stylesheet: "./apps/web/src/style.css", functions: ["cx"] },
   },
   lint: {
-    ignorePatterns: ["site/**", "apps/server/db/generated/**"],
+    ignorePatterns: ["apps/server/db/generated/**"],
     // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults. Effect's own rules are effect:check's.
     plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
@@ -329,6 +333,8 @@ export default defineConfig({
         files: [
           // Written by scripts/i18n.ts gen from the catalogs.
           "packages/i18n/src/catalogs.ts",
+          // Astro's bilingual marketing copy has its own typed dictionaries.
+          "apps/site/src/i18n/**",
           "**/prompts.ts",
           "**/*.test.ts",
           "**/*.test.tsx",

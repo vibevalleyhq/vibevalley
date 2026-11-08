@@ -1,3 +1,4 @@
+@layer theme, base, components, stylex, utilities;
 @import "tailwindcss";
 
 /* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets

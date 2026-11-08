@@ -1,19 +1,12 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, globSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");
 
 /** The workspace's package.json files, as pnpm-workspace.yaml lists them (apps/*, packages/*) and the root's. */
-const manifests = [
-  "package.json",
-  ...["apps", "packages"].flatMap((dir) =>
-    readdirSync(join(root, dir), { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => `${dir}/${e.name}/package.json`),
-  ),
-];
+const manifests = ["package.json", ...globSync("{apps,packages}/*/package.json", { cwd: root })];
 
 test("every version the workspace uses is in pnpm-workspace.yaml's catalogs", () => {
   const written: string[] = [];
@@ -24,6 +17,14 @@ test("every version the workspace uses is in pnpm-workspace.yaml's catalogs", ()
         if (!spec.startsWith("catalog:") && !spec.startsWith("workspace:")) written.push(`${file} ${field} ${name}: ${spec}`);
   }
   expect(written, 'say "catalog:" and put the version in pnpm-workspace.yaml').toEqual([]);
+});
+
+test("regression: applications and libraries share the root workspace and lockfile", () => {
+  const nested = manifests
+    .filter((file) => file !== "package.json")
+    .flatMap((file) => ["pnpm-workspace.yaml", "pnpm-lock.yaml"].map((name) => join(dirname(file), name)))
+    .filter((file) => existsSync(join(root, file)));
+  expect(nested, "Fix: keep workspace configuration and the lockfile at the repository root. See docs/subsystems/foundation.md").toEqual([]);
 });
 
 test("every package is named @vibevalley/<its folder>, the root vibevalley", () => {

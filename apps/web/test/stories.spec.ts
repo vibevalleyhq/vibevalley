@@ -7,6 +7,44 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: StyleX variables survive Base UI positioning and reactive variants", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "Design/StyleX positioner:Dynamic", theme, w: "400" })}`);
+    const trigger = page.getByTestId("stylex-trigger");
+    await expect(trigger).toHaveAttribute("data-ref-forwarded", "true");
+    const before = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const positioner = page.getByTestId("stylex-positioner");
+    await expect(positioner).toHaveCSS("position", "fixed");
+    await expect(positioner).toHaveCSS("z-index", "30");
+    await expect(positioner).toHaveCSS("width", "200px");
+    await expect(page.getByTestId("stylex-resize")).toBeFocused();
+    const anchor = await trigger.boundingBox();
+    const popup = await positioner.boundingBox();
+    if (!anchor || !popup) throw new Error("Missing positioned geometry");
+    expect(Math.abs(popup.y - anchor.y - anchor.height - 6)).toBeLessThan(1);
+    await page.getByTestId("stylex-resize").click();
+    await expect(positioner).toHaveCSS("width", "280px");
+    await expect(trigger).not.toHaveCSS("background-color", before);
+    await page.keyboard.press("Escape");
+    await expect(positioner).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    const branch = page.locator(folder("Design"));
+    if ((await branch.getAttribute("aria-expanded")) === "false") await branch.click();
+    await expect(branch).toHaveAttribute("aria-expanded", "true");
+    const icon = branch.locator('span[aria-hidden="true"]').first();
+    await expect(icon).toHaveCSS("display", "flex");
+    await expect(icon).toHaveCSS("flex-shrink", "0");
+    await expect(icon).toHaveCSS("rotate", "90deg");
+    await branch.click();
+    await expect(branch).toHaveAttribute("aria-expanded", "false");
+    await expect(icon).toHaveCSS("rotate", "none");
+    check();
+  }
+});
+
 test("regression: schema routing rejects invalid params and repeated scalar search without falling through", async ({ page }) => {
   const check = diagnosticsOf(page);
   await page.goto(`/?${new URLSearchParams({ s: "交互/路由:Schema", theme: "light", w: "400" })}`);

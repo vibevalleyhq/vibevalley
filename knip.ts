@@ -39,6 +39,12 @@ const config: KnipConfig = {
       // src/style.css's @import "tailwindcss": knip reads no stylesheets.
       ignoreDependencies: ["tailwindcss"],
     },
+    "apps/site": {
+      entry: ["src/{App,Document}.tsx", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
+      project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
+      // The stylesheet imports Tailwind.
+      ignoreDependencies: ["tailwindcss"],
+    },
     "apps/desktop": {
       entry: ["src/main.ts", "src/preload.ts", "scripts/*.ts", "test/**/*.ts"],
       project: ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
@@ -68,7 +74,7 @@ const config: KnipConfig = {
   },
   // Programs on the machine, not packages: Xcode's swift, macOS's plutil and ditto, and the voice line's tunnel.
   ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared"],
-  // Swift, with its own tools. (site/ is not in the workspace: its own pnpm-workspace.yaml.)
+  // Swift, with its own tools.
   ignoreWorkspaces: ["apps/island"],
 };
 

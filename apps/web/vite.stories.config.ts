@@ -2,7 +2,9 @@ import { renameSync } from "node:fs";
 import { join } from "node:path";
 
 import solid from "@solidjs/vite-plugin";
+import stylex from "@stylexjs/unplugin";
 import tailwindcss from "@tailwindcss/vite";
+import { styleMigrationGraph } from "vibevalley/style-migration";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
@@ -15,14 +17,28 @@ const atRoot = (): Plugin => ({
       next();
     });
   },
-  writeBundle(options) {
-    const dir = options.dir ?? join(import.meta.dirname, "dist-stories");
-    renameSync(join(dir, "stories.html"), join(dir, "index.html"));
+  writeBundle: {
+    order: "pre",
+    sequential: true,
+    handler(options) {
+      const directory = options.dir ?? join(import.meta.dirname, "dist-stories");
+      renameSync(join(directory, "stories.html"), join(directory, "index.html"));
+    },
   },
 });
 
 export default defineConfig({
   worker: { format: "es" },
-  plugins: lazyPlugins(() => [solid(), tailwindcss(), atRoot()]) ?? [],
+  plugins:
+    lazyPlugins(() => [
+      stylex.vite({
+        useCSSLayers: { before: ["theme", "base", "components"], after: ["utilities"], prefix: "stylex" },
+        sxPropName: false,
+      }),
+      solid(),
+      tailwindcss(),
+      atRoot(),
+      styleMigrationGraph("stories"),
+    ]) ?? [],
   build: { outDir: "dist-stories", rollupOptions: { input: join(import.meta.dirname, "stories.html") } },
 });

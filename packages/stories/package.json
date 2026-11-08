@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
+    "@stylexjs/stylex": "catalog:",
     "axe-core": "catalog:",
     "reicon": "catalog:",
     "solid-js": "catalog:"

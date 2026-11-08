@@ -4,6 +4,7 @@ import { Popover } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "#/ui/Button.tsx";
+import { positionerAttrs } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
@@ -23,7 +24,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
         {t("web.issue.display.show")}
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner align="end" sideOffset={6} class="z-30">
+        <Popover.Positioner {...positionerAttrs()} align="end" sideOffset={6}>
           <Popover.Popup
             aria-label={t("web.issue.display.show")}
             data-testid="display-menu"

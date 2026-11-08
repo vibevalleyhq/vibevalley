@@ -4,6 +4,7 @@ import { Menu } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { positionerAttrs } from "./positioner";
 
 export interface MoreItem {
   /** Its data-key: what a test or a style finds it by. */
@@ -40,7 +41,7 @@ export function MoreMenu(props: {
         <Icon name="more" size={16} />
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Positioner side={props.side ?? "bottom"} align="end" class="z-30">
+        <Menu.Positioner {...positionerAttrs()} side={props.side ?? "bottom"} align="end">
           <Menu.Popup
             aria-label={props.label}
             class={[

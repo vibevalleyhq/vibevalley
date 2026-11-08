@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import {
   Accessibility,
   AngleRight,
@@ -29,6 +30,7 @@ import { A11yPanel, useAxe } from "./a11y";
 import type { Args, Axis, Control, Stories, Story } from "./format";
 import { forceStates, type PseudoState, pseudoStates, pseudoStyleId } from "./pseudo";
 import { type Entry, entries, isOpen, type Node, search, treeOf } from "./tree";
+import { treeRow } from "./tree.stylex";
 
 export type Theme = "light" | "dark" | "both";
 export const widths = ["full", "400", "720", "1280"] as const;
@@ -61,9 +63,20 @@ const widthLook: Record<Width, { icon: IconFunction; label: string }> = {
   "1280": { icon: Laptop, label: "Laptop, 1280 px" },
 };
 
-function Glyph(props: { icon: IconFunction; size?: number; class?: string }) {
+const glyphStyles = stylex.create({
+  root: { display: "inline-flex", flexShrink: 0 },
+  muted: { color: "var(--color-faint)" },
+  arrow: {
+    transitionProperty: "transform, translate, scale, rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: "var(--default-transition-duration)",
+    rotate: { default: null, [stylex.when.ancestor('[aria-expanded="true"]', treeRow)]: "90deg" },
+  },
+});
+
+function Glyph(props: { icon: IconFunction; size?: number; styles?: stylex.StyleXStyles }) {
   return (
-    <span aria-hidden="true" class={["inline-flex shrink-0", props.class]}>
+    <span aria-hidden="true" {...stylex.attrs(glyphStyles.root, props.styles)}>
       {props.icon({ size: props.size ?? 14 })}
     </span>
   );
@@ -185,13 +198,14 @@ export function StoriesApp(props: {
                       onClick={() => toggle(f().path, f().depth)}
                       style={{ "padding-left": `${f().depth * 12 + 4}px` }}
                       class={[
-                        "group flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left hover:bg-hover",
+                        stylex.attrs(treeRow).class,
+                        "flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left hover:bg-hover",
                         f().depth === 0 ? "mt-2 text-xs font-semibold" : "text-muted hover:text-ink",
                       ]}
                     >
-                      <Glyph icon={AngleRight} size={12} class="text-faint transition-transform group-aria-expanded:rotate-90" />
+                      <Glyph icon={AngleRight} size={12} styles={[glyphStyles.muted, glyphStyles.arrow]} />
                       <Show when={f().depth > 0}>
-                        <Glyph icon={Folder} size={14} class="text-faint" />
+                        <Glyph icon={Folder} size={14} styles={glyphStyles.muted} />
                       </Show>
                       <span class="truncate">{f().name}</span>
                     </button>

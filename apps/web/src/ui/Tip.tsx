@@ -4,13 +4,14 @@ import { Tooltip } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { positionerAttrs } from "./positioner";
 
 const delay = 300;
 
 function Bubble(props: { text: string }) {
   return (
     <Tooltip.Portal>
-      <Tooltip.Positioner class="z-30" sideOffset={6}>
+      <Tooltip.Positioner {...positionerAttrs()} sideOffset={6}>
         <Tooltip.Popup class="w-max max-w-72 animate-fade-in rounded-md bg-ink px-2 py-1 text-xs leading-snug font-normal whitespace-normal text-page shadow-float">
           {props.text}
         </Tooltip.Popup>

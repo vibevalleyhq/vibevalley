@@ -2,14 +2,18 @@
   "name": "vibevalley",
   "private": true,
   "type": "module",
+  "imports": {
+    "#migration-inputs": "./scripts/style-migration-inputs.ts"
+  },
+  "exports": {
+    "./style-migration": "./scripts/style-migration-graph.ts"
+  },
   "scripts": {
     "prepare": "vp config --hooks --no-agent && vp run packages:build",
     "golden:update": "vpx scripts/golden-update.ts",
     "desktop:dev": "vp run --filter @vibevalley/desktop dev",
     "notes:catalog": "vpx scripts/agent-notes.ts --write",
-    "site:check": "pnpm --dir site install && pnpm --dir site run check",
-    "site:build": "pnpm --dir site install && pnpm --dir site run build",
-    "site:deploy": "pnpm --dir site install && pnpm --dir site run deploy",
+    "site:deploy": "vp run --filter @vibevalley/site deploy",
     "package:mac": "vp run --filter @vibevalley/desktop package",
     "release": "vpx scripts/release.ts",
     "capabilities": "vpx scripts/capabilities.ts",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",
+    "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/desktop": "workspace:*",
     "@vibevalley/health": "workspace:*",
@@ -30,9 +35,13 @@
     "effect": "catalog:",
     "eslint-plugin-solid": "catalog:",
     "knip": "catalog:",
+    "lightningcss": "catalog:",
+    "parse5": "catalog:",
+    "sharp": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "yaml": "catalog:"
   },
   "packageManager": "pnpm@12.15.0"
 }

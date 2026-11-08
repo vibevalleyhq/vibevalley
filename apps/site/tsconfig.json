@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+    "paths": { "@game/*": ["../web/public/*"] }
+  },
+  "include": ["src", "scripts", "test", "vite.config.ts"],
+  "exclude": ["dist", ".test"]
+}

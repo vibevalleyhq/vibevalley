@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它派一个帮工（经 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动本机的编码 agent），在 `VIBEVALLEY_WORK_ROOT` 下，按档案设置在仓库目录或工单的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和帮工在群聊里说话。外面画成一座农场：仓库是岛，在做的工单是一块地，帮工在地上干活，群聊是田头（[概念](docs/concepts.md)）。整个仓库是 TypeScript：服务端 `apps/server`（Effect）、页面 `apps/web`（Solid 2）、桌面壳 `apps/desktop`（Electron），和官网 `site/`（Astro）；服务端和页面之间的契约（形状、接口、两边都跑的少数规则）在 `packages/protocol`。改 `apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它派一个帮工（经 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动本机的编码 agent），在 `VIBEVALLEY_WORK_ROOT` 下，按档案设置在仓库目录或工单的 worktree 里一轮一轮干活，主人看改动、合进主分支；主人、管家（替主人派活的 agent）和帮工在群聊里说话。外面画成一座农场：仓库是岛，在做的工单是一块地，帮工在地上干活，群聊是田头（[概念](docs/concepts.md)）。整个仓库是 TypeScript：服务端 `apps/server`（Effect）、页面 `apps/web`（Solid 2）、桌面壳 `apps/desktop`（Electron），和官网 `apps/site/`（Solid 2 静态生成）；服务端和页面之间的契约（形状、接口、两边都跑的少数规则）在 `packages/protocol`。改 `apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 
@@ -25,6 +25,7 @@ apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
+apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成，每个文档一个接管根）：图和像素字直接用 apps/web/public 的
 packages/protocol/         契约：一个概念一个文件夹 src/<概念>/（名字同服务端的模块），里面是形状（shapes.ts）、它们的 Schema（schema.ts）、
                            接口（api.ts），src/ 下同名的三个文件只汇总；订阅的 RPC（rpc.ts）和两边都跑的规则（src/rules）：服务端和页面都用；只有服务端跑的规则在 apps/server/src 各自的模块里。宿主接口（host.ts）：页面能
                            向桌面壳、手机壳要的东西（通知、托盘、全局快捷键、通话的线路），和手机壳的桥
@@ -45,7 +46,6 @@ packages/tsrs/             TypeScript 跑在 tsrs（TypeScript 7 的 Rust 移植
                            tsdk/ 是编辑器用的带 Effect 语言服务的 TypeScript
 packages/health/           仓库的体检：热点（改动次数乘行数）和逃生口（类型的、错误通道的）的棘轮；这个仓库的配置在 scripts/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面
-site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 apps/web/public 的
 design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
 .agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
@@ -87,7 +87,7 @@ vp run health                                                   # 看先改哪�
 vp run deadcode                                                 # 改完代码：knip 查没人用的文件、导出和依赖（knip.ts 写什么在跑），报出的照它说的删
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
 vp run docs:verify                                              # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接、旧名字
-vp run site:check && vp run site:build                          # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
+vp run site:check && vp run site:build                          # 改完 apps/site/：素材和静态生成测试，再构建到 apps/site/dist/client（只发布静态文件）
 ```
 
 Node 24（`.node-version` 定的那个，`vp` 和 CI 都照它；服务端、命令行和脚本都经 `vpx` 直接跑 `.ts`，桌面版的服务端是 `vp pack` 打的包），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。

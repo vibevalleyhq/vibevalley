@@ -1,5 +1,4 @@
-# The workspace: the apps and the shared packages. site/ is a project of its own (its Astro brings its own Vite), with its
-# own pnpm-workspace.yaml.
+# All apps and shared packages use this workspace, catalog, and lockfile.
 packages:
   - apps/*
   - packages/*
@@ -13,6 +12,11 @@ packages:
 catalogMode: strict
 
 catalog:
+  "@types/opentype.js": "^1.3.10"
+  motion: "^14.9.0"
+  opentype.js: "^2.0.0"
+  sharp: "0.35.5"
+  subset-font: "^2.9.0"
   "@ai-sdk/provider": "4.0.36"
   ai: "7.0.164"
   "@formatjs/intl-getcanonicallocales": "3.3.0"
@@ -32,6 +36,8 @@ catalog:
   "@playwright/test": "^1.64.1"
   "@solidjs/vite-plugin": "3.0.0-next.56"
   "@solidjs/web": "2.0.0-rc.21"
+  "@stylexjs/stylex": "0.19.1"
+  "@stylexjs/unplugin": "0.19.1"
   "@tailwindcss/vite": "^4.3.4"
   "@types/node": "^26.6.6"
   "@vitest/browser-playwright": "5.1.0"
@@ -66,6 +72,7 @@ catalog:
   vitest: "5.1.0"
   yaml: "^2.9.1"
   knip: 6.44.1
+  lightningcss: "1.33.0"
   parse5: 8.1.0
   undici: "8.12.3"
 
@@ -87,6 +94,11 @@ catalogs:
     react-native-webview: "14.0.1"
 
 overrides:
+  # The website uses only Motion's DOM entry, not its optional React adapters.
+  "motion>react": "-"
+  "motion>react-dom": "-"
+  "framer-motion>react": "-"
+  "framer-motion>react-dom": "-"
   "react-native-agora@4.6.4>base64-js": "catalog:"
   # One undici 8 for the server's dependencies: with two (oar's and Effect's), openai and pi-ai were installed once for
   # each, 33 MB more in the app. Electron's build tools keep their undici 6 and 7.

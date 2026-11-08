@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
+    "@stylexjs/stylex": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",
@@ -46,11 +47,13 @@
     "@axe-core/playwright": "catalog:",
     "@playwright/test": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
+    "@stylexjs/unplugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
+    "vibevalley": "workspace:*",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }

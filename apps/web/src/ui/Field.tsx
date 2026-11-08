@@ -4,6 +4,7 @@ import { For, omit } from "solid-js";
 import { Select as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
+import { positionerAttrs } from "./positioner";
 import { Hint } from "./Tip";
 
 const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
@@ -75,7 +76,7 @@ export function Select<V extends string>(props: {
         <Icon name="choose" size={12} class="shrink-0 text-muted" />
       </Base.Trigger>
       <Base.Portal>
-        <Base.Positioner class="z-30" sideOffset={4}>
+        <Base.Positioner {...positionerAttrs()} sideOffset={4}>
           <Base.Popup class="max-h-72 min-w-(--anchor-width) origin-top animate-pop-in overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float outline-none">
             <For each={all()}>
               {(o) => (
