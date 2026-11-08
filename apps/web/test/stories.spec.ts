@@ -7,10 +7,49 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: styled tabs retain keyboard selection, navigation and dynamic list styles", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Playground", theme, w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    const chat = frame.locator('[role="tab"][data-key="chat"]');
+    const issues = frame.locator('[role="tab"][data-key="issues"]');
+    await chat.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(issues).toBeFocused();
+    await expect(chat).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Enter");
+    await expect(issues).toHaveAttribute("aria-selected", "true");
+    await expect(issues).toHaveCSS("font-weight", "600");
+    await expect(chat).toHaveAttribute("aria-selected", "false");
+    await page.keyboard.press("Home");
+    await expect(chat).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(chat).toHaveAttribute("aria-selected", "true");
+
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Links", theme, w: "400" })}`);
+    await expect(issues).toHaveAttribute("href", "/tabs/issues");
+    await chat.focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Enter");
+    await expect(frame.getByTestId("tabs-location")).toHaveText("/tabs/issues");
+    await expect(issues).toHaveAttribute("aria-selected", "true");
+    await chat.click();
+    await expect(frame.getByTestId("tabs-location")).toHaveText("/tabs/chat");
+    await expect(chat).toHaveAttribute("aria-selected", "true");
+
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Sizing", theme, w: "400" })}`);
+    await expect(frame.getByRole("tablist")).toHaveCSS("width", "200px");
+    await frame.getByTestId("tabs-resize").click();
+    await expect(frame.getByRole("tablist")).toHaveCSS("width", "280px");
+    check();
+  }
+});
+
 test("regression: StyleX variables survive Base UI positioning and reactive variants", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {
-    await page.goto(`/?${new URLSearchParams({ s: "Design/StyleX positioner:Dynamic", theme, w: "400" })}`);
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Positioner:Dynamic", theme, w: "400" })}`);
     const trigger = page.getByTestId("stylex-trigger");
     await expect(trigger).toHaveAttribute("data-ref-forwarded", "true");
     const before = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor);
@@ -31,7 +70,7 @@ test("regression: StyleX variables survive Base UI positioning and reactive vari
     await page.keyboard.press("Escape");
     await expect(positioner).toHaveCount(0);
     await expect(trigger).toBeFocused();
-    const branch = page.locator(folder("Design"));
+    const branch = page.locator(folder("组件"));
     if ((await branch.getAttribute("aria-expanded")) === "false") await branch.click();
     await expect(branch).toHaveAttribute("aria-expanded", "true");
     const icon = branch.locator('span[aria-hidden="true"]').first();

@@ -64,6 +64,6 @@ function Positioned() {
 }
 
 export default stories({
-  title: "Design/StyleX positioner",
+  title: "组件/工作台/Positioner",
   stories: { Dynamic: story({ render: () => <Positioned /> }) },
 });

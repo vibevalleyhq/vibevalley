@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,6 +13,10 @@ import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";
+
+const styles = stylex.create({
+  tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "calc(var(--spacing) * 2)" },
+});
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },
@@ -76,7 +81,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
       value={at()}
       onChange={(v) => router.navigate(orchestratorHref(props.agent, v))}
       items={shown().map((x) => ({ value: x.id, label: x.label }))}
-      class="border-b border-line pb-2"
+      styles={styles.tabs}
     />
   );
   // The trajectory takes the whole content area, its rows scrolling under a fixed head; the other tabs are a column.

@@ -12,7 +12,7 @@ interface Options {
   initial?: boolean;
 }
 
-export function createPresence<T>(source: () => T | undefined, options: Options) {
+function createPresence<T>(source: () => T | undefined, options: Options) {
   const [current, setCurrent] = createSignal<T | undefined>(() => untrack(source));
   let element: HTMLElement | undefined;
   let cancel = () => {};

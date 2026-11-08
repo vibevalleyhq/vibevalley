@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -31,6 +32,16 @@ import { Segmented } from "#/ui/Segmented.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { Labeled } from "./AgentLook";
+
+const styles = stylex.create({
+  tabs: {
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+});
 
 const noSupport: RuntimeSupport = { steer: false, refused: {}, capabilities: [], inProcess: false };
 export const supportOf = (info: RuntimeInfo | undefined) => info?.support ?? noSupport;
@@ -70,7 +81,7 @@ export function ConfigTabs(props: {
         value={tab()}
         onChange={(v) => (v === "trajectories" ? props.onTrajectories() : setTab(v))}
         items={tabs().map(([value, label]) => ({ value, label }))}
-        class="border-b border-line px-3 py-2"
+        styles={styles.tabs}
       />
       <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <Switch>

@@ -199,6 +199,10 @@ The official StyleX compiler extracts the website section and heading styles, th
 
 The source/dependency scanners and exact pixel comparator have 33 passing tests. Dependency classification distinguishes oxfmt's optional Astro parser from website framework dependencies, without exempting a parser with another consumer. Inventory still fails on remaining Tailwind and incomplete or stale build evidence.
 
+### Tabs styling contract
+
+Tabs now composes typed StyleX styles instead of accepting a private class string. Its channel, orchestrator, agent configuration and story callers use local definitions. Selected appearance still follows Base UI's data attributes; line-tab icon states use a scoped marker. Browser regression coverage exercises keyboard focus/activation, link navigation and dynamic list width in both themes. All 12 component browser tests and all 26 `web:check` tasks pass. The 26 static visual scenarios retain zero differences. Real-server screenshots cover chat, orchestrator memory and the catalog at 1440×900 and 390×844; sandbox receipt `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-DF69Kb/result.json` records code 0 and successful cleanup. These screenshots verify those page layouts, not the outstanding full live-data comparison matrix.
+
 ## Alternatives considered
 
 - **Keep Astro with a local Solid renderer:** rejected by the owner after the delayed multi-root hydration failure. Do not keep this adapter as a second production route.

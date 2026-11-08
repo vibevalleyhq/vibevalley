@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -21,6 +22,10 @@ import { useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "./places";
 import { Crons, Sessions } from "./Tabs";
+
+const styles = stylex.create({
+  tabs: { flexShrink: 0, borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "calc(var(--spacing) * 3)" },
+});
 
 /** /chat is the general; /chat/<id> a channel, or a thread shown beside its channel. */
 export function ChatPage() {
@@ -255,7 +260,7 @@ function ChannelMain(props: {
           label: e.label,
           icon: e.icon,
         }))}
-        class="shrink-0 border-b border-line px-3"
+        styles={styles.tabs}
       />
       <Show when={tab() === "chat"}>
         <div class="flex min-h-0 flex-1">

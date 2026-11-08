@@ -40,7 +40,8 @@ const config: KnipConfig = {
       ignoreDependencies: ["tailwindcss"],
     },
     "apps/site": {
-      entry: ["src/{App,Document}.tsx", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
+      // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
+      entry: ["src/{App,Document}.tsx", "src/lib/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
       // The stylesheet imports Tailwind.
       ignoreDependencies: ["tailwindcss"],
