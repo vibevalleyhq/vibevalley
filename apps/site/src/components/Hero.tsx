@@ -15,9 +15,21 @@ import {
 } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
 import { CHIMNEY, CLOUDS, DOG, MANAGER, PET, PLANTS, PUFF_SECONDS, PUFFS, SCENES, SEEDS, firefliesOf, managerOf, pct, sprite, type Scene } from "../lib/scene";
-import { PixelLink, cx, vars } from "./ui";
+import { PixelLink, cx, domAttrs, vars } from "./ui";
 
 const viewStyles = stylex.create({
+  layer: { position: "absolute", inset: 0 },
+  framingLayer: { pointerEvents: "none" },
+  framingImage: {
+    filter: "var(--ground)",
+    transitionProperty: "filter",
+    transitionDuration: "0.9s",
+    transitionTimingFunction: "ease",
+    imageRendering: "pixelated",
+    position: "absolute",
+    maxWidth: "none",
+    userSelect: "none",
+  },
   heroSection: {
     position: "relative",
     height: "200svh",
@@ -155,13 +167,30 @@ const AT: Record<Scene, string> = { morning: "morning:opacity-100", day: "day:op
 /** The hour's own button looks pressed while the farm is at that hour. */
 const PRESSED: Record<Scene, string> = { morning: "morning:bg-wheat", day: "day:bg-wheat", evening: "evening:bg-wheat", night: "night:bg-wheat" };
 /** The plants in front of the camera that frame the village in the game (apps/web/src/farm/canvas): at the hero's corners, mostly past its edges. */
-const FRAME = [
-  { name: "branchLeft", className: "top-[-44px] left-[-60px] w-[206px] lg:top-[-66px] lg:left-[-90px] lg:w-[309px]" },
-  { name: "branchRight", className: "top-[-48px] right-[-52px] w-[194px] lg:top-[-72px] lg:right-[-78px] lg:w-[291px]" },
-  { name: "bushLeft", className: "bottom-[-72px] left-[-64px] w-[232px] lg:bottom-[-108px] lg:left-[-96px] lg:w-[348px]" },
-  { name: "bushRight", className: "right-[-68px] bottom-[-64px] w-[236px] lg:right-[-102px] lg:bottom-[-96px] lg:w-[354px]" },
-] as const;
-export type Frame = Record<(typeof FRAME)[number]["name"], string>;
+const framingStyles = stylex.create({
+  branchLeft: {
+    top: { default: "-44px", "@media (width >= 64rem)": "-66px" },
+    left: { default: "-60px", "@media (width >= 64rem)": "-90px" },
+    width: { default: "206px", "@media (width >= 64rem)": "309px" },
+  },
+  branchRight: {
+    top: { default: "-48px", "@media (width >= 64rem)": "-72px" },
+    right: { default: "-52px", "@media (width >= 64rem)": "-78px" },
+    width: { default: "194px", "@media (width >= 64rem)": "291px" },
+  },
+  bushLeft: {
+    bottom: { default: "-72px", "@media (width >= 64rem)": "-108px" },
+    left: { default: "-64px", "@media (width >= 64rem)": "-96px" },
+    width: { default: "232px", "@media (width >= 64rem)": "348px" },
+  },
+  bushRight: {
+    right: { default: "-68px", "@media (width >= 64rem)": "-102px" },
+    bottom: { default: "-64px", "@media (width >= 64rem)": "-96px" },
+    width: { default: "236px", "@media (width >= 64rem)": "354px" },
+  },
+});
+const FRAME = ["branchLeft", "branchRight", "bushLeft", "bushRight"] as const;
+export type Frame = Record<(typeof FRAME)[number], string>;
 /** The first screen of scrolling, while the scene holds on the screen (the hero is two screens high). */
 const HOLDING = ["start start", "end end"] as ["start start", "end end"];
 /** The second, while the scene goes up off the screen. */
@@ -449,15 +478,9 @@ export default function Hero(props: Props) {
             </Layer>
           </div>
           {/* In front of the camera, ahead of the page: the frame's plants, pushed out past the corners as the camera goes in. */}
-          <Layer lag={-0.08} zoom={1.3} origin="50% 50%" point={64} hero={root} px={px} py={py} className="pointer-events-none">
+          <Layer lag={-0.08} zoom={1.3} origin="50% 50%" point={64} hero={root} px={px} py={py} styles={viewStyles.framingLayer}>
             {FRAME.map((f) => (
-              <img
-                src={props.frame[f.name]}
-                alt=""
-                aria-hidden="true"
-                draggable={false}
-                class={cx("lit-ground pixelated absolute max-w-none select-none", f.className)}
-              />
+              <img src={props.frame[f]} alt="" aria-hidden="true" draggable={false} {...domAttrs(viewStyles.framingImage, framingStyles[f])} />
             ))}
           </Layer>
 
@@ -608,7 +631,7 @@ function Layer(props: {
   hero: ElementRef<HTMLElement>;
   px: MotionValue<number>;
   py: MotionValue<number>;
-  className?: string;
+  styles?: stylex.StyleXStyles;
   children: JSX.Element;
 }) {
   const away = createScrollAnimation<HTMLDivElement>(props.hero, LEAVING, () => [
@@ -618,7 +641,7 @@ function Layer(props: {
   const x = readMotion(props.px);
   const y = readMotion(props.py);
   return (
-    <div ref={away.set} class={cx("absolute inset-0", props.className)}>
+    <div ref={away.set} {...domAttrs(viewStyles.layer, props.styles)}>
       <div
         ref={closer.set}
         {...stylex.attrs(viewStyles.layerDiv)}

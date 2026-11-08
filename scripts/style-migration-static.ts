@@ -19,6 +19,8 @@ interface Scene {
   width: number;
   popup?: "select" | "menu" | "tooltip" | undefined;
   viewerState?: "rest" | "input" | "hover";
+  link?: "primary" | "secondary";
+  linkState?: "hover" | "active" | "focus";
 }
 
 const scenes: Scene[] = [];
@@ -89,6 +91,9 @@ for (const theme of ["light", "dark"])
         width,
         viewerState,
       });
+for (const link of ["primary", "secondary"] as const)
+  for (const linkState of ["hover", "active", "focus"] as const)
+    scenes.push({ id: `site-link-${link}-${linkState}`, entry: "site", route: "/", width: 1440, link, linkState });
 const viewerFiles = ["apps/web/test/migration/index.html", "apps/web/test/migration/viewer.tsx", "apps/web/test/migration/vite.config.ts"];
 const captureOptions = { locale: "en-US", timezoneId: "UTC", deviceScaleFactor: 1, clock: "2026-11-08T12:00:00.000Z", reducedMotion: "reduce" };
 const browserArgs = ["--disable-skia-runtime-opts", "--disable-partial-raster", "--num-raster-threads=1", "--force-color-profile=srgb"];
@@ -169,6 +174,7 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
     await page.clock.setFixedTime(new Date(clock));
     const response = await page.goto(`${origin}${scene.route}`, { waitUntil: "networkidle" });
     if (response?.status() !== 200) throw new Error(`Entry returned ${response?.status()}`);
+    if ((await page.evaluate(() => document.compatMode)) !== "CSS1Compat") throw new Error("Comparison entry must render in HTML standards mode");
     if (scene.entry === "site") {
       for (const island of await page.locator("astro-island").all()) {
         await island.evaluate((element) => element.querySelector(":scope > :not(link):not(style):not(script)")?.scrollIntoView({ block: "center" }));
@@ -233,6 +239,25 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       [...document.querySelectorAll<HTMLVideoElement>("video[src]")].every((video) => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
     );
     await page.waitForTimeout(1200);
+    if (scene.link !== undefined) {
+      const link = page.locator(scene.link === "primary" ? '#top a[href="https://github.com/vibevalleyhq/vibevalley"]' : '#top a[href="#how"]');
+      switch (scene.linkState) {
+        case "hover":
+          await link.hover();
+          break;
+        case "active":
+          await link.hover();
+          await page.mouse.down();
+          break;
+        case "focus":
+          await page.keyboard.press("Tab");
+          await link.focus();
+          break;
+        default:
+          throw new Error("Missing site link interaction state");
+      }
+      await page.waitForTimeout(1200);
+    }
     if (scene.entry === "viewer")
       await page.waitForFunction(() => {
         const count = document.querySelector('[data-testid="story-a11y"]')?.getAttribute("data-count");

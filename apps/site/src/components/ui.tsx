@@ -8,6 +8,31 @@ import { createElementRef, reducedMotion } from "../animation/scroll";
 import { colors, shadows } from "../styles/tokens.stylex";
 
 const styles = stylex.create({
+  link: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "var(--color-bark-900)",
+    paddingInline: "calc(var(--spacing) * 5)",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "1",
+    translate: { default: null, ":active": "calc(var(--spacing) * 0.5) calc(var(--spacing) * 0.5)" },
+  },
+  primary: {
+    backgroundColor: { default: "var(--color-leaf-500)", "@media (hover: hover)": { default: null, ":hover": "var(--color-leaf-hover)" } },
+    color: "var(--color-cream-50)",
+    boxShadow: { default: "inset 2px 2px 0 var(--color-leaf-hover), var(--shadow-hard)", ":active": "inset 2px 2px 0 var(--color-leaf-hover)" },
+  },
+  secondary: {
+    backgroundColor: { default: "var(--color-cream-50)", "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" } },
+    color: "var(--color-bark-900)",
+    boxShadow: { default: "var(--inset-shadow-lit), var(--shadow-hard)", ":active": "var(--inset-shadow-lit)" },
+  },
+  count: { fontVariantNumeric: "tabular-nums" },
   section: {
     position: "relative",
     paddingInline: "clamp(16px, 5vw, 64px)",
@@ -43,19 +68,15 @@ const styles = stylex.create({
 export const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
 export const vars = (values: Record<`--${string}`, string | number>) => values;
 
-export function PixelLink(props: { primary?: boolean; className?: string; children: JSX.Element } & JSX.AnchorHTMLAttributes<HTMLAnchorElement>) {
-  const rest = omit(props, "primary", "className", "children");
+export function domAttrs(...values: readonly stylex.StyleXStyles[]) {
+  const { className, ...attributes } = stylex.props(values);
+  return { ...attributes, class: className };
+}
+
+export function PixelLink(props: { primary?: boolean; children: JSX.Element } & Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "class" | "style">) {
+  const rest = omit(props, "primary", "children");
   return (
-    <a
-      class={cx(
-        "shadow-hard inline-flex items-center gap-2.5 border-2 border-bark-900 px-5 py-2.5 font-pixel text-2xl/none active:translate-0.5 active:shadow-none",
-        props.primary === true
-          ? "inset-shadow-lit bg-leaf-500 text-cream-50 inset-shadow-leaf-hover hover:bg-leaf-hover"
-          : "inset-shadow-lit bg-cream-50 text-bark-900 hover:bg-cream-hover",
-        props.className,
-      )}
-      {...rest}
-    >
+    <a {...stylex.attrs(styles.link, props.primary === true ? styles.primary : styles.secondary)} {...rest}>
       {props.children}
     </a>
   );
@@ -72,15 +93,15 @@ export function Section(props: { id: string; title: string; alt?: boolean; ref?:
   );
 }
 
-export function Heading(props: { id?: string; className?: string; children: JSX.Element }) {
+export function Heading(props: { id?: string; styles?: stylex.StyleXStyles; children: JSX.Element }) {
   return (
-    <h2 id={props.id} data-reveal class={cx(stylex.attrs(styles.heading).class, props.className)}>
+    <h2 id={props.id} data-reveal {...domAttrs(styles.heading, props.styles)}>
       {props.children}
     </h2>
   );
 }
 
-export function CountUp(props: { to: number; className?: string }) {
+export function CountUp(props: { to: number }) {
   const ref = createElementRef<HTMLSpanElement>();
   const [shown, setShown] = createSignal(() => props.to);
   onSettled(() => {
@@ -102,7 +123,7 @@ export function CountUp(props: { to: number; className?: string }) {
     };
   });
   return (
-    <span ref={ref.set} class={cx("tabular-nums", props.className)}>
+    <span ref={ref.set} {...stylex.attrs(styles.count)}>
       {shown()}
     </span>
   );

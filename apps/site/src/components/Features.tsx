@@ -7,6 +7,7 @@ import { FACTS } from "../lib/facts";
 import { CountUp, Heading, Section } from "./ui";
 
 const viewStyles = stylex.create({
+  runtimesHeading: { marginTop: "72px" },
   featuresUl: {
     marginBottom: "calc(var(--spacing) * 12)",
     display: "grid",
@@ -109,7 +110,7 @@ export default function Features(props: Props) {
           </article>
         ))}
       </div>
-      <Heading className="mt-[72px]">{props.copy.runtimes.title}</Heading>
+      <Heading styles={viewStyles.runtimesHeading}>{props.copy.runtimes.title}</Heading>
       <p data-reveal {...stylex.attrs(viewStyles.featuresP2)}>
         {props.copy.runtimes.text}
       </p>

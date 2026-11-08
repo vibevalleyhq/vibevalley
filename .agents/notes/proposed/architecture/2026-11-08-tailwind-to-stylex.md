@@ -231,6 +231,14 @@ These comparisons caught two issues that frame-only captures missed: StyleX 0.19
 
 The 156-scenario full comparison passes A/A and candidate captures with zero changed pixels and equal text; after the website pass, its six route/width comparisons also pass independently. All 16 component browser tests, 18 website production tests and 26 web-check tasks pass. These remain scoped receipts, not final migration acceptance; final canonical builds and the live/host matrix are still required.
 
+### Website style contracts
+
+Website headings, device and screenshot drift containers, scene layers and story sprites now compose typed StyleX styles. Pixel links and counters no longer expose unused class-string props. Story graph dots take a closed semantic tone rather than a utility string; their coordinates and sprite dimensions are StyleX variables forwarded as object styles. Foreground plant layouts no longer keep utility strings in scene descriptors. Motion still owns its inline transforms and presence lifecycle.
+
+The website comparison now also exercises primary and secondary links while hovered, pressed and keyboard-focused. The interaction is followed by the same settling interval on both sides before capture: without this, the original baseline itself showed unsettled scene pixels. All twelve website route/width/state scenarios pass A/A and candidate comparisons with zero changed pixels; the eighteen production behavior checks also pass.
+
+The fail-closed inventory found the new viewer fixture's missing doctype. Its document now declares standards mode, and every visual capture explicitly requires `CSS1Compat`; fixture mode must not silently differ from production. All fourteen viewer comparisons pass again in standards mode. The expanded 162-scenario run reached its last two scenes before the execution window interrupted it, so it has no accepted complete receipt. Full aggregate acceptance remains open.
+
 ## Alternatives considered
 
 - **Keep Astro with a local Solid renderer:** rejected by the owner after the delayed multi-root hydration failure. Do not keep this adapter as a second production route.

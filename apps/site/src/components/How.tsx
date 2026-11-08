@@ -25,9 +25,45 @@ import {
   type Pose,
   type StoryArt,
 } from "../lib/story";
-import { Section, cx } from "./ui";
+import { Section, domAttrs } from "./ui";
+
+const dotTones = stylex.create({
+  base: { backgroundColor: "var(--color-bark-900)" },
+  branch: { backgroundColor: "var(--color-leaf-500)" },
+  merge: { backgroundColor: "var(--color-wheat)" },
+});
 
 const viewStyles = stylex.create({
+  sprite: { imageRendering: "pixelated", position: "absolute", maxWidth: "none", transformOrigin: "bottom" },
+  spriteGeometry: (left: number, top: number, width: number, height: number) => ({ left, top, width, height }),
+  distantBuilding: { scale: "75% 75%", filter: "brightness(95%) saturate(75%)" },
+  distantDetail: { scale: "55% 55%", filter: "brightness(75%)" },
+  halfSize: { scale: "50% 50%" },
+  badge: {
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "var(--color-bark-900)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+  },
+  captionStep: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-base)",
+    lineHeight: "1",
+    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionDuration: "0.3s",
+    transitionTimingFunction: "steps(3)",
+  },
+  completed: { backgroundColor: "var(--color-leaf-500)", color: "var(--color-cream-50)" },
+  current: { backgroundColor: "var(--color-wheat)" },
+  waiting: { backgroundColor: "var(--color-cream-100)", color: "var(--color-bark-500)" },
+  forked: { backgroundColor: "var(--color-leaf-300)" },
+  pendingTests: { backgroundColor: "var(--color-cream-100)" },
+  count: { fontVariantNumeric: "tabular-nums" },
+  dot: { position: "absolute", translate: "-50% -50%", borderWidth: 2, borderStyle: "solid", borderColor: "var(--color-bark-900)" },
+  smallDot: { width: "calc(var(--spacing) * 3)", height: "calc(var(--spacing) * 3)" },
+  largeDot: { width: "calc(var(--spacing) * 4)", height: "calc(var(--spacing) * 4)" },
+  dotPosition: (left: string, top: number) => ({ left, top }),
   finishedDiv: {
     display: "grid",
     gridTemplateColumns: "repeat(4,minmax(0,1fr))",
@@ -509,7 +545,7 @@ function Story(props: Props) {
             <Hills camera={camera} />
             <Pass camera={camera} pace={PACE.back}>
               {BACK.map((b) => (
-                <Sprite art={props.art[b.name]} x={b.x} y={74} className="scale-75 brightness-95 saturate-75" />
+                <Sprite art={props.art[b.name]} x={b.x} y={74} styles={viewStyles.distantBuilding} />
               ))}
             </Pass>
             <Pass camera={camera} pace={PACE.field}>
@@ -546,7 +582,7 @@ function Story(props: Props) {
             <Pass camera={camera} pace={PACE.near}>
               {/* Low and small: they brush past the helper's feet, never over what it is doing. */}
               {NEAR.map((n) => (
-                <Sprite art={props.art[n.name]} x={n.x} y={FIELD.h + 30} className="scale-55 brightness-75" />
+                <Sprite art={props.art[n.name]} x={n.x} y={FIELD.h + 30} styles={viewStyles.distantDetail} />
               ))}
             </Pass>
           </div>
@@ -565,9 +601,10 @@ function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
         {props.copy.steps.map((s, i) => (
           <li
             aria-current={i === props.now.place ? "step" : undefined}
-            class={cx(
-              "border-2 border-bark-900 px-2 py-1 font-pixel text-base/none transition-colors duration-300 ease-[steps(3)]",
-              i < props.now.place ? "bg-leaf-500 text-cream-50" : i === props.now.place ? "bg-wheat" : "bg-cream-100 text-bark-500",
+            {...stylex.attrs(
+              viewStyles.badge,
+              viewStyles.captionStep,
+              i < props.now.place ? viewStyles.completed : i === props.now.place ? viewStyles.current : viewStyles.waiting,
             )}
           >
             {i + 1} {s.title}
@@ -679,18 +716,12 @@ function Ground() {
   );
 }
 /** A picture standing on the field at x, its feet at y. */
-function Sprite(props: { art: Art; x: number; y: number; className?: string }) {
+function Sprite(props: { art: Art; x: number; y: number; styles?: stylex.StyleXStyles }) {
   return (
     <img
       src={props.art.src}
       alt=""
-      class={cx("pixelated absolute max-w-none origin-bottom", props.className)}
-      style={{
-        left: `${props.x - props.art.ax}px`,
-        top: `${props.y - props.art.ay}px`,
-        width: `${props.art.w}px`,
-        height: `${props.art.h}px`,
-      }}
+      {...domAttrs(viewStyles.sprite, props.styles, viewStyles.spriteGeometry(props.x - props.art.ax, props.y - props.art.ay, props.art.w, props.art.h))}
     />
   );
 }
@@ -737,7 +768,7 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
               left: `${props.place.plot}px`,
             }}
           >
-            <Sprite art={props.art["coins-stack"]} x={0} y={0} className="scale-50" />
+            <Sprite art={props.art["coins-stack"]} x={0} y={0} styles={viewStyles.halfSize} />
           </div>
         )}
       </Presence>
@@ -756,7 +787,7 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
               top: `${FIELD.stand - 34}px`,
             }}
           >
-            <Sprite art={props.art["stamp-done"]} x={0} y={0} className="scale-50" />
+            <Sprite art={props.art["stamp-done"]} x={0} y={0} styles={viewStyles.halfSize} />
           </div>
         )}
       </Presence>
@@ -805,7 +836,7 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
   return (
     <div {...stylex.attrs(viewStyles.branchDiv)} aria-hidden="true">
       <div {...stylex.attrs(viewStyles.branchDiv2)}>
-        <span class={cx("border-2 border-bark-900 px-2 py-1", b().forked ? "bg-leaf-300" : "bg-cream-100 text-bark-500")}>
+        <span {...stylex.attrs(viewStyles.badge, b().forked ? viewStyles.forked : viewStyles.waiting)}>
           {props.copy.branch}
           <span {...stylex.attrs(viewStyles.branchSpan)}> · {props.copy.worktree}</span>
         </span>
@@ -815,7 +846,7 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
         <span {...stylex.attrs(viewStyles.branchSpan3)}>
           <span {...stylex.attrs(viewStyles.branchSpan4)}>+{b().plus}</span> <span {...stylex.attrs(viewStyles.branchSpan5)}>−{b().minus}</span>
         </span>
-        <span class={cx("border-2 border-bark-900 px-2 py-1 tabular-nums", b().tests === JOB.tests ? "bg-leaf-500 text-cream-50" : "bg-cream-100")}>
+        <span {...stylex.attrs(viewStyles.badge, viewStyles.count, b().tests === JOB.tests ? viewStyles.completed : viewStyles.pendingTests)}>
           {props.copy.tests} {b().tests}/{JOB.tests}
         </span>
       </div>
@@ -832,11 +863,11 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
         >
           main
         </span>
-        <Dot x={GIT.fork} y={main} shown={b().forked} tone="bg-bark-900" />
+        <Dot x={GIT.fork} y={main} shown={b().forked} tone="base" />
         {GIT.commits.map((x, i) => (
-          <Dot x={x} y={lane} shown={b().commits > i} tone="bg-leaf-500" />
+          <Dot x={x} y={lane} shown={b().commits > i} tone="branch" />
         ))}
-        <Dot x={GIT.join} y={main} shown={b().merged} tone="bg-wheat" large />
+        <Dot x={GIT.join} y={main} shown={b().merged} tone="merge" large />
         <Presence
           value={b().merged ? true : undefined}
           enter={{ opacity: [0, 1], y: [6, 0] }}
@@ -862,17 +893,18 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
   );
 }
 /** A commit on the graph: a square that pops on when it is made. */
-function Dot(props: { x: number; y: number; shown: boolean; tone: string; large?: boolean }) {
+function Dot(props: { x: number; y: number; shown: boolean; tone: keyof typeof dotTones; large?: boolean }) {
   return (
     <Presence value={props.shown ? true : undefined} enter={{ scale: [0, 1] }} exit={{ scale: 0 }} transition={{ duration: 0.18, ease: steps(3) }}>
       {(_, ref) => (
         <span
           ref={ref}
-          class={cx("absolute -translate-1/2 border-2 border-bark-900", props.large === true ? "size-4" : "size-3", props.tone)}
-          style={{
-            left: `${props.x * 100}%`,
-            top: `${props.y}px`,
-          }}
+          {...domAttrs(
+            viewStyles.dot,
+            props.large === true ? viewStyles.largeDot : viewStyles.smallDot,
+            dotTones[props.tone],
+            viewStyles.dotPosition(`${props.x * 100}%`, props.y),
+          )}
         />
       )}
     </Presence>

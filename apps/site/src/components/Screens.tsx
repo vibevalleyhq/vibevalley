@@ -7,9 +7,11 @@ import { createImageTransition } from "../animation/image";
 import { Presence } from "../animation/Presence";
 import { createElementRef, createReveal, createScrollAnimation } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
-import { Section, cx } from "./ui";
+import { Section, domAttrs } from "./ui";
 
 const viewStyles = stylex.create({
+  tall: { gridRow: { default: null, "@media (width >= 64rem)": "span 2 / span 2" } },
+  offset: { marginTop: { default: null, "@media (width >= 64rem)": "60px" } },
   screensDiv: {
     display: "grid",
     gridTemplateColumns: {
@@ -123,7 +125,7 @@ export default function Screens(props: Props) {
       <Section ref={root.set} id="screens" title={props.copy.title}>
         <div {...stylex.attrs(viewStyles.screensDiv)}>
           {props.shots.map((shot, i) => (
-            <Drift rate={DRIFT[i] ?? 0} className={cx(i === 0 && "lg:row-span-2", i === 1 && "lg:mt-[60px]")}>
+            <Drift rate={DRIFT[i] ?? 0} styles={[i === 0 && viewStyles.tall, i === 1 && viewStyles.offset]}>
               <figure data-reveal {...stylex.attrs(viewStyles.screensFigure)}>
                 <button
                   type="button"
@@ -162,12 +164,12 @@ export default function Screens(props: Props) {
   );
 }
 
-function Drift(props: { rate: number; className?: string; children: JSX.Element }) {
+function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JSX.Element }) {
   const ref = createScrollAnimation<HTMLDivElement>("self", ["start end", "end start"], () => [
     { keyframes: { transform: [`translateY(${600 * props.rate}px)`, `translateY(${-600 * props.rate}px)`] } },
   ]);
   return (
-    <div ref={ref.set} class={props.className}>
+    <div ref={ref.set} {...domAttrs(props.styles)}>
       {props.children}
     </div>
   );

@@ -4,9 +4,23 @@ import * as stylex from "@stylexjs/stylex";
 
 import { createReveal, createScrollAnimation } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
-import { Section, cx } from "./ui";
+import { Section, domAttrs } from "./ui";
 
 const viewStyles = stylex.create({
+  drift: { position: "relative" },
+  phone: {
+    width: { default: "42%", "@media (width >= 64rem)": "25%" },
+    maxWidth: "180px",
+    position: { default: "relative", "@media (width >= 64rem)": "absolute" },
+  },
+  chatPhone: {
+    right: { default: null, "@media (width >= 64rem)": "17%" },
+    bottom: { default: null, "@media (width >= 64rem)": "-4px" },
+  },
+  issuePhone: {
+    right: { default: null, "@media (width >= 64rem)": "-7%" },
+    bottom: { default: null, "@media (width >= 64rem)": "-44px" },
+  },
   devicesDiv: {
     display: "grid",
     alignItems: "center",
@@ -131,10 +145,10 @@ export default function Devices(props: Props) {
             <Laptop shot={props.mac} alt={props.copy.shots.mac} />
           </Drift>
           <div {...stylex.attrs(viewStyles.devicesDiv3)}>
-            <Drift rate={-0.06} className="w-[42%] max-w-[180px] lg:absolute lg:right-[17%] lg:bottom-[-4px] lg:w-[25%]">
+            <Drift rate={-0.06} styles={[viewStyles.phone, viewStyles.chatPhone]}>
               <Phone shot={props.phones[0]} alt={props.copy.shots.chat} />
             </Drift>
-            <Drift rate={-0.11} className="w-[42%] max-w-[180px] lg:absolute lg:right-[-7%] lg:bottom-[-44px] lg:w-[25%]">
+            <Drift rate={-0.11} styles={[viewStyles.phone, viewStyles.issuePhone]}>
               <Phone shot={props.phones[1]} alt={props.copy.shots.tickets} />
             </Drift>
           </div>
@@ -144,12 +158,12 @@ export default function Devices(props: Props) {
   );
 }
 /** A device's place on the page, moving against the page by its rate while it crosses the screen. */
-function Drift(props: { rate: number; className?: string; children: JSX.Element }) {
+function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JSX.Element }) {
   const ref = createScrollAnimation<HTMLDivElement>("self", ["start end", "end start"], () => [
     { keyframes: { transform: [`translateY(${600 * props.rate}px)`, `translateY(${-600 * props.rate}px)`] } },
   ]);
   return (
-    <div ref={ref.set} class={cx("relative", props.className)}>
+    <div ref={ref.set} {...domAttrs(viewStyles.drift, props.styles)}>
       {props.children}
     </div>
   );
