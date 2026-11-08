@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { stories, story } from "@vibevalley/stories";
 
 import { PxButton } from "./button";
+import { storyFrame } from "./story.stylex";
 import { ToastStore, ToastViewport } from "./ToastViewport";
 
 const viewStyles = stylex.create({
@@ -19,7 +20,7 @@ const store = new ToastStore();
 export default stories({
   title: "组件/像素/ToastViewport",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Toasts: story({
       fill: true,

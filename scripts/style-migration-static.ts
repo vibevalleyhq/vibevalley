@@ -14,10 +14,11 @@ import { comparePixels } from "./style-migration-pixels";
 
 interface Scene {
   id: string;
-  entry: "site" | "stories";
+  entry: "site" | "stories" | "viewer";
   route: string;
   width: number;
   popup?: "select" | "menu" | "tooltip" | undefined;
+  viewerState?: "rest" | "input" | "hover";
 }
 
 const scenes: Scene[] = [];
@@ -78,6 +79,17 @@ for (const [name, story] of [
         popup: name === "field-popup" ? "select" : name.startsWith("menu-") ? "menu" : name === "tooltip" ? "tooltip" : undefined,
       });
     }
+for (const theme of ["light", "dark"])
+  for (const width of [1440, 900, 390])
+    for (const viewerState of width === 390 ? (["rest"] as const) : (["rest", "input", "hover"] as const))
+      scenes.push({
+        id: `viewer-${theme}-${width}-${viewerState}`,
+        entry: "viewer",
+        route: `/?${new URLSearchParams({ s: "Viewer/Controls:Inputs", theme, w: "400" })}`,
+        width,
+        viewerState,
+      });
+const viewerFiles = ["apps/web/test/migration/index.html", "apps/web/test/migration/viewer.tsx", "apps/web/test/migration/vite.config.ts"];
 const captureOptions = { locale: "en-US", timezoneId: "UTC", deviceScaleFactor: 1, clock: "2026-11-08T12:00:00.000Z", reducedMotion: "reduce" };
 const browserArgs = ["--disable-skia-runtime-opts", "--disable-partial-raster", "--num-raster-threads=1", "--force-color-profile=srgb"];
 const mediaPath = "scripts/testdata/style-migration/attachment.mp4";
@@ -95,8 +107,7 @@ const mime: Record<string, string> = {
   ".avif": "image/avif",
 };
 
-function artifacts(root: string) {
-  if (!existsSync(resolve(root, "index.html"))) throw new Error(`Missing built entry: ${root}`);
+function filesUnder(root: string) {
   return readdirSync(root, { recursive: true, withFileTypes: true })
     .filter((file) => file.isFile())
     .map((file) => {
@@ -104,6 +115,11 @@ function artifacts(root: string) {
       return { path: relative(root, path), hash: hash(readFileSync(path)) };
     })
     .toSorted((a, b) => a.path.localeCompare(b.path));
+}
+
+function artifacts(root: string) {
+  if (!existsSync(resolve(root, "index.html"))) throw new Error(`Missing built entry: ${root}`);
+  return filesUnder(root);
 }
 
 async function serve(root: string) {
@@ -160,6 +176,20 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       }
       await page.waitForFunction(() => document.querySelectorAll("astro-island[ssr]").length === 0);
     } else await page.getByTestId("story-frame").waitFor({ state: "visible" });
+    if (scene.entry === "viewer") {
+      switch (scene.viewerState) {
+        case "input":
+          await page.locator('[data-testid="story-arg"][data-name="count"]').getByRole("spinbutton").fill("5");
+          break;
+        case "hover":
+          await page.locator('[data-testid="story-link"][data-key="Viewer/Controls:Inputs"]').hover();
+          break;
+        case "rest":
+          break;
+        default:
+          throw new Error("Missing viewer interaction state");
+      }
+    }
     const popupRole = scene.popup === "select" ? "listbox" : scene.popup === "menu" ? "menu" : "tooltip";
     if (scene.popup !== undefined) {
       const frame = page.getByTestId("story-frame");
@@ -203,7 +233,17 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       [...document.querySelectorAll<HTMLVideoElement>("video[src]")].every((video) => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
     );
     await page.waitForTimeout(1200);
-    const target = scene.entry === "site" ? page.locator("body") : scene.popup !== undefined ? page.getByRole(popupRole) : page.getByTestId("story-frame");
+    if (scene.entry === "viewer")
+      await page.waitForFunction(() => {
+        const count = document.querySelector('[data-testid="story-a11y"]')?.getAttribute("data-count");
+        return count !== undefined && count !== null && count !== "";
+      });
+    const target =
+      scene.entry === "site" || scene.entry === "viewer"
+        ? page.locator("body")
+        : scene.popup !== undefined
+          ? page.getByRole(popupRole)
+          : page.getByTestId("story-frame");
     const textHash = hash(await target.innerText());
     if (scene.entry === "site") await page.screenshot({ path: destination, fullPage: true, animations: "disabled" });
     else if (scene.popup !== undefined) {
@@ -236,11 +276,31 @@ for (const [cwd, command] of [
 ] satisfies [string, string[]][])
   execFileSync("vp", command, { cwd, stdio: "inherit" });
 if (sourceInputs(baseline).digest !== beforeInputs.digest) throw new Error("Baseline sources changed while building");
-const inputs = migrationInputs();
+const viewerRuntime = ["solid-js", "@solidjs/web"].map((name) => {
+  const before = filesUnder(resolve(baseline, "apps/web/node_modules", name));
+  const files = filesUnder(resolve(migrationRoot, "apps/web/node_modules", name));
+  if (hash(JSON.stringify(before)) !== hash(JSON.stringify(files))) throw new Error(`Viewer fixture runtime differs from the original: ${name}`);
+  return { name, files };
+});
 const roots = {
-  before: { site: resolve(baseline, "site/dist"), stories: resolve(baseline, "apps/web/dist-stories") },
-  after: { site: resolve(migrationRoot, "apps/site/dist/client"), stories: resolve(migrationRoot, "apps/web/dist-stories") },
+  before: { site: resolve(baseline, "site/dist"), stories: resolve(baseline, "apps/web/dist-stories"), viewer: resolve(migrationOutput, "viewer-before") },
+  after: {
+    site: resolve(migrationRoot, "apps/site/dist/client"),
+    stories: resolve(migrationRoot, "apps/web/dist-stories"),
+    viewer: resolve(migrationOutput, "viewer-after"),
+  },
 };
+for (const [host, output] of [
+  [baseline, roots.before.viewer],
+  [migrationRoot, roots.after.viewer],
+] as const)
+  execFileSync("vp", ["build", "--config", "test/migration/vite.config.ts"], {
+    cwd: resolve(migrationRoot, "apps/web"),
+    stdio: "inherit",
+    env: { ...process.env, VIBEVALLEY_MIGRATION_HOST: host, VIBEVALLEY_MIGRATION_OUTPUT: output },
+  });
+if (sourceInputs(baseline).digest !== beforeInputs.digest) throw new Error("Baseline sources changed while building the viewer fixture");
+const inputs = migrationInputs();
 const outputs = Object.values(roots)
   .flatMap((entries) => Object.values(entries))
   .map((root) => ({ root, artifacts: artifacts(root) }));
@@ -257,10 +317,10 @@ const results: {
 const servers: Awaited<ReturnType<typeof serve>>[] = [];
 const browser = await chromium.launch({ args: browserArgs });
 try {
-  const urls = { before: { site: "", stories: "" }, after: { site: "", stories: "" } };
+  const urls = { before: { site: "", stories: "", viewer: "" }, after: { site: "", stories: "", viewer: "" } };
   await Promise.all(
     (["before", "after"] as const).flatMap((side) =>
-      (["site", "stories"] as const).map(async (entry) => {
+      (["site", "stories", "viewer"] as const).map(async (entry) => {
         const server = await serve(roots[side][entry]);
         servers.push(server);
         urls[side][entry] = server.url;
@@ -300,12 +360,16 @@ await writeFile(
   `${JSON.stringify(
     {
       schemaVersion: 1,
-      scope: "static-site-and-component-frames",
+      scope: "static-site-component-frames-and-viewer-fixture",
       status,
       inputs,
       baseline: beforeInputs,
       outputs,
-      fixtures: [{ path: mediaPath, route: "/api/v1/attachment/a2", hash: hash(mediaFixture) }],
+      fixtures: [
+        { path: mediaPath, route: "/api/v1/attachment/a2", hash: hash(mediaFixture) },
+        ...viewerFiles.map((path) => ({ path, hash: hash(readFileSync(resolve(migrationRoot, path))) })),
+      ],
+      viewerRuntime,
       environment: {
         browserArgs,
         platform: process.platform,

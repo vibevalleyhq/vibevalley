@@ -139,6 +139,8 @@ test("regression: StyleX variables survive Base UI positioning and reactive vari
     const trigger = page.getByTestId("stylex-trigger");
     await expect(trigger).toHaveAttribute("data-ref-forwarded", "true");
     const before = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await expect(page.getByTestId("story-frame")).toHaveCSS("background-color", before);
+    await expect(page.getByTestId("story-frame")).toHaveCSS("width", "400px");
     await trigger.focus();
     await page.keyboard.press("Enter");
     const positioner = page.getByTestId("stylex-positioner");
@@ -166,6 +168,21 @@ test("regression: StyleX variables survive Base UI positioning and reactive vari
     await branch.click();
     await expect(branch).toHaveAttribute("aria-expanded", "false");
     await expect(icon).toHaveCSS("rotate", "none");
+    check();
+  }
+});
+
+test("regression: viewer rows retain indentation and selected hover precedence", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  const key = "组件/工作台/Positioner:Dynamic";
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: key, theme, w: "400" })}`);
+    await expect(page.locator(folder("组件"))).toHaveCSS("padding-left", "4px");
+    const link = page.locator(`[data-testid="story-link"][data-key="${key}"]`);
+    await expect(link).toHaveCSS("padding-left", "44px");
+    const selected = await link.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await link.hover();
+    await expect(link).toHaveCSS("background-color", selected);
     check();
   }
 });

@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { stories, story } from "@vibevalley/stories";
 
 import { PxField, PxTextArea, PxTextInput, PxTip } from "./field";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   fieldStoriesDiv: {
@@ -22,7 +23,7 @@ const viewStyles = stylex.create({
 export default stories({
   title: "组件/像素/field",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Text: story({
       args: { value: "", error: "", required: true, mono: false, disabled: false },

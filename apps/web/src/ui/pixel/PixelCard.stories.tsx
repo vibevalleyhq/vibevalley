@@ -6,6 +6,7 @@ import { stories, story } from "@vibevalley/stories";
 
 import { useAtlas } from "./atlas";
 import { AnimalFace, badgeColors, CardColors, PixelCard } from "./PixelCard";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   pixelCardStoriesDiv: {
@@ -21,7 +22,7 @@ const viewStyles = stylex.create({
 export default stories({
   title: "组件/像素/PixelCard",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Sign: story({
       note: "地头的木牌：一行行的字、图标和进度条。",

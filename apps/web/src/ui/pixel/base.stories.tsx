@@ -4,6 +4,7 @@ import { stories, story } from "@vibevalley/stories";
 
 import { DashedLine, PxCard, PxFrame, PxWindow } from "./base";
 import { PxButton } from "./button";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   baseStoriesDiv: {
@@ -14,7 +15,7 @@ const viewStyles = stylex.create({
 export default stories({
   title: "组件/像素/base",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Card: story({
       args: { title: "今天的收成", aside: "3 块地" },

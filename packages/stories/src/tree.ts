@@ -7,7 +7,7 @@ export interface Entry {
   readonly name: string;
   readonly story: Story;
   readonly themes: readonly ("light" | "dark")[];
-  readonly frame: string | undefined;
+  readonly frame: Stories["frame"];
 }
 
 export type Node =

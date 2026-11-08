@@ -32,6 +32,254 @@ import { forceStates, type PseudoState, pseudoStates, pseudoStyleId } from "./ps
 import { type Entry, entries, isOpen, type Node, search, treeOf } from "./tree";
 import { treeRow } from "./tree.stylex";
 
+const viewStyles = stylex.create({
+  frameDefault: { backgroundColor: "var(--color-page)", color: "var(--color-ink)" },
+  treeSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  storiesAppDiv: {
+    display: "flex",
+    height: "100dvh",
+    minHeight: "0",
+    backgroundColor: "var(--color-page)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-ink)",
+  },
+  storiesTree: {
+    display: "flex",
+    width: "calc(var(--spacing) * 72)",
+    flexShrink: "0",
+    flexDirection: "column",
+    borderRightStyle: "solid",
+    borderRightWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+  },
+  storiesAppDiv2: {
+    padding: "calc(var(--spacing) * 2)",
+  },
+  storiesAppLabel: {
+    display: "flex",
+    height: "calc(var(--spacing) * 8)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
+    },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    color: "var(--color-muted)",
+  },
+  storiesSearch: {
+    minWidth: "0",
+    flex: "1",
+    backgroundColor: "transparent",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-ink)",
+    outlineStyle: "none",
+  },
+  storiesAppDiv3: {
+    minHeight: "0",
+    flex: "1",
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+  },
+  storiesAppDiv4: {
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  storiesAppP: {
+    margin: "auto",
+    color: "var(--color-muted)",
+  },
+  openedMain: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  openedHeader: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  storyName: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  openedSpan: {
+    fontWeight: "var(--font-weight-normal)",
+    color: "var(--color-muted)",
+  },
+  openedP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  openedSpan2: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 2)",
+    left: "calc(var(--spacing) * 3)",
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-xs)",
+    backgroundColor: "var(--color-page)",
+    paddingInline: "var(--spacing)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  storyError: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    color: "var(--color-berry)",
+  },
+  openedPre: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    whiteSpace: "pre-wrap",
+  },
+  openedButton: {
+    alignSelf: "flex-start",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    color: "var(--color-ink)",
+  },
+  storyArgs: {
+    display: "flex",
+    width: "calc(var(--spacing) * 64)",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: "auto",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  openedDiv: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  openedH2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  storyReset: {
+    display: "flex",
+    width: "calc(var(--spacing) * 6)",
+    height: "calc(var(--spacing) * 6)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  storyGrid: {
+    borderCollapse: "separate",
+    borderSpacing: "0px 0px",
+    alignSelf: "flex-start",
+  },
+  storyCell: {
+    padding: "calc(var(--spacing) * 2)",
+    verticalAlign: "middle",
+  },
+  pickDiv: {
+    display: "flex",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    padding: "calc(var(--spacing) * .5)",
+  },
+  pickSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  storyCopyLink: {
+    display: "flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  storyArg: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  argControlLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 export type Theme = "light" | "dark" | "both";
 export const widths = ["full", "400", "720", "1280"] as const;
 export type Width = (typeof widths)[number];
@@ -196,18 +444,18 @@ export function StoriesApp(props: {
                       data-key={f().path}
                       aria-expanded={folderOpen(f().path, f().depth) ? "true" : "false"}
                       onClick={() => toggle(f().path, f().depth)}
-                      style={{ "padding-left": `${f().depth * 12 + 4}px` }}
-                      class={[
-                        stylex.attrs(treeRow).class,
-                        "flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left hover:bg-hover",
-                        f().depth === 0 ? "mt-2 text-xs font-semibold" : "text-muted hover:text-ink",
-                      ]}
+                      {...indentedRowAttrs(
+                        f().depth * 12 + 4,
+                        treeRow,
+                        viewerStyles.folder,
+                        f().depth === 0 ? viewerStyles.rootFolder : viewerStyles.nestedFolder,
+                      )}
                     >
                       <Glyph icon={AngleRight} size={12} styles={[glyphStyles.muted, glyphStyles.arrow]} />
                       <Show when={f().depth > 0}>
                         <Glyph icon={Folder} size={14} styles={glyphStyles.muted} />
                       </Show>
-                      <span class="truncate">{f().name}</span>
+                      <span {...stylex.attrs(viewStyles.treeSpan)}>{f().name}</span>
                     </button>
                     <Show when={folderOpen(f().path, f().depth)}>
                       <Tree nodes={f().children} />
@@ -227,8 +475,7 @@ export function StoriesApp(props: {
                       ev.preventDefault();
                       move({ key: s().entry.key });
                     }}
-                    style={{ "padding-left": `${s().depth * 12 + 20}px` }}
-                    class="block truncate rounded-md py-1 pr-2 hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium"
+                    {...indentedRowAttrs(s().depth * 12 + 20, viewerStyles.link)}
                   >
                     {s().name}
                   </a>
@@ -242,10 +489,10 @@ export function StoriesApp(props: {
   );
 
   return (
-    <div class="flex h-dvh min-h-0 bg-page text-sm text-ink">
-      <nav data-testid="stories-tree" aria-label="Stories" class="flex w-72 shrink-0 flex-col border-r border-line bg-side">
-        <div class="p-2">
-          <label class="flex h-8 items-center gap-2 rounded-md border border-line bg-page px-2 text-muted focus-within:border-focus">
+    <div {...stylex.attrs(viewStyles.storiesAppDiv)}>
+      <nav data-testid="stories-tree" aria-label="Stories" {...stylex.attrs(viewStyles.storiesTree)}>
+        <div {...stylex.attrs(viewStyles.storiesAppDiv2)}>
+          <label {...stylex.attrs(viewStyles.storiesAppLabel)}>
             <Glyph icon={Search} />
             <input
               type="search"
@@ -258,21 +505,143 @@ export function StoriesApp(props: {
                 const first = shown()[0];
                 if (e.key === "Enter" && first) move({ key: first.key });
               }}
-              class="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+              {...stylex.attrs(viewStyles.storiesSearch)}
             />
           </label>
         </div>
-        <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <div {...stylex.attrs(viewStyles.storiesAppDiv3)}>
           <Tree nodes={tree()} />
         </div>
-        <div class="border-t border-line px-3 py-2 text-2xs text-muted">{`${list.length} stories`}</div>
+        <div {...stylex.attrs(viewStyles.storiesAppDiv4)}>{`${list.length} stories`}</div>
       </nav>
 
-      <Show when={open()} keyed fallback={<p class="m-auto text-muted">No stories.</p>}>
+      <Show when={open()} keyed fallback={<p {...stylex.attrs(viewStyles.storiesAppP)}>No stories.</p>}>
         {(e: Entry) => <Opened entry={e} view={view()} move={move} wrap={props.wrap} locales={props.locales ?? []} prepare={props.prepare} />}
       </Show>
     </div>
   );
+}
+
+const viewerStyles = stylex.create({
+  canvas: {
+    display: "flex",
+    minHeight: 0,
+    flex: "1",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 4)",
+    overflow: "auto",
+    backgroundColor: "var(--color-hover)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  row: { flexDirection: "row" },
+  column: { flexDirection: "column" },
+  responsive: { flexDirection: { default: "column", "@media (width >= 80rem)": "row" } },
+  folder: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingBlock: "var(--spacing)",
+    paddingRight: "calc(var(--spacing) * 2)",
+    textAlign: "left",
+    backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
+  },
+  rootFolder: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  nestedFolder: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
+  indent: (paddingLeft: number) => ({ paddingLeft }),
+  link: {
+    display: "block",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    borderRadius: "var(--radius-md)",
+    paddingBlock: "var(--spacing)",
+    paddingRight: "calc(var(--spacing) * 2)",
+    backgroundColor: {
+      default: null,
+      "@media (hover: hover)": { default: null, ':hover:not([aria-current="page"])': "var(--color-hover)" },
+      ':is([aria-current="page"])': "var(--color-selected)",
+    },
+    fontWeight: { default: null, ':is([aria-current="page"])': "var(--font-weight-medium)" },
+  },
+  audit: {
+    display: "flex",
+    height: "calc(var(--spacing) * 8)",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" },
+      ':is([aria-pressed="true"])': "var(--color-ink)",
+    },
+    backgroundColor: { default: null, ':is([aria-pressed="true"])': "var(--color-selected)" },
+  },
+  count: { fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)" },
+  problem: { color: "var(--color-berry)" },
+  gridLabel: {
+    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingRight: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    fontWeight: "var(--font-weight-normal)",
+    color: "var(--color-muted)",
+  },
+  rowLabel: { paddingRight: "calc(var(--spacing) * 4)" },
+  choice: {
+    display: "flex",
+    height: "calc(var(--spacing) * 7)",
+    minWidth: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "var(--spacing)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" },
+      ':is([aria-checked="true"])': "var(--color-ink)",
+    },
+    backgroundColor: { default: null, ':is([aria-checked="true"])': "var(--color-selected)" },
+  },
+  field: {
+    height: "calc(var(--spacing) * 8)",
+    width: "100%",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: { default: "var(--color-line)", ":focus": "var(--color-focus)" },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+  },
+  longField: {
+    height: "auto",
+    paddingBlock: "var(--spacing)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+});
+
+function indentedRowAttrs(paddingLeft: number, ...values: readonly (stylex.StyleXStyles | typeof treeRow)[]) {
+  // attrs() kebab-cases custom property names too; object styles preserve the compiler's case-sensitive variables.
+  const { className, ...attributes } = stylex.props(values, viewerStyles.indent(paddingLeft));
+  return { ...attributes, class: className };
 }
 
 const frameWidth = (w: Width) => (w === "full" ? undefined : `${w}px`);
@@ -288,6 +657,7 @@ function Opened(props: {
 }) {
   props.prepare?.();
   const story = props.entry.story;
+  const framePaint = () => stylex.props(props.entry.frame ?? viewStyles.frameDefault);
   const [args, setArgs] = createStore<Args>({ ...story.args });
   const set = (patch: Partial<Args>) =>
     setArgs((a) => {
@@ -317,14 +687,14 @@ function Opened(props: {
 
   return (
     <>
-      <main class="flex min-w-0 flex-1 flex-col">
-        <header class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2">
-          <div class="flex min-w-0 flex-1 flex-col">
-            <h1 data-testid="story-name" class="truncate text-sm font-semibold">
-              <span class="font-normal text-muted">{`${props.entry.title.split("/").join(" / ")} / `}</span>
+      <main {...stylex.attrs(viewStyles.openedMain)}>
+        <header {...stylex.attrs(viewStyles.openedHeader)}>
+          <div {...stylex.attrs(viewStyles.openedMain)}>
+            <h1 data-testid="story-name" {...stylex.attrs(viewStyles.storyName)}>
+              <span {...stylex.attrs(viewStyles.openedSpan)}>{`${props.entry.title.split("/").join(" / ")} / `}</span>
               {props.entry.name}
             </h1>
-            <Show when={story.note}>{(note) => <p class="text-xs text-muted">{note()}</p>}</Show>
+            <Show when={story.note}>{(note) => <p {...stylex.attrs(viewStyles.openedP)}>{note()}</p>}</Show>
           </div>
           <Show when={grid}>
             <Pick label="View" testid="story-mode" value={mode()} options={["grid", "single"]} looks={modeLook} onChange={(m) => props.move({ mode: m })} />
@@ -370,20 +740,20 @@ function Opened(props: {
             aria-label="Accessibility"
             title={axe.count() === undefined ? "Accessibility: checking" : `Accessibility: ${axe.count()} found`}
             onClick={() => setAuditing(!auditing())}
-            class="flex h-8 items-center gap-1 rounded-md border border-line px-2 text-muted hover:text-ink aria-pressed:bg-selected aria-pressed:text-ink"
+            {...stylex.attrs(viewerStyles.audit)}
           >
             <Glyph icon={Accessibility} size={16} />
-            <span class={["font-mono text-xs", (axe.count() ?? 0) > 0 && "text-berry"]}>{axe.count() ?? "…"}</span>
+            <span {...stylex.attrs(viewerStyles.count, (axe.count() ?? 0) > 0 && viewerStyles.problem)}>{axe.count() ?? "…"}</span>
           </button>
           <CopyLink />
         </header>
         <div
           ref={(el) => (canvas = el)}
           data-testid="story-canvas"
-          class={[
-            "flex min-h-0 flex-1 items-start gap-4 overflow-auto bg-hover p-4",
-            props.view.width === "full" && mode() === "single" ? "flex-col xl:flex-row" : props.view.width === "full" ? "flex-col" : "flex-row",
-          ]}
+          {...stylex.attrs(
+            viewerStyles.canvas,
+            props.view.width === "full" && mode() === "single" ? viewerStyles.responsive : props.view.width === "full" ? viewerStyles.column : viewerStyles.row,
+          )}
         >
           <For each={themes()}>
             {(theme) => (
@@ -393,23 +763,23 @@ function Opened(props: {
                 data-pseudo={mode() === "single" && props.view.pseudo !== "rest" ? props.view.pseudo : undefined}
                 tabindex="0"
                 aria-label={theme}
-                style={{ width: frameWidth(props.view.width) }}
+                style={{ ...framePaint().style, width: frameWidth(props.view.width) }}
                 class={[
                   "relative flex shrink-0 self-stretch overflow-auto rounded-lg border border-line p-6 pt-8 [contain:layout] outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
-                  props.entry.frame ?? "bg-page text-ink",
+                  framePaint().className,
                   props.view.width === "full" && "min-w-0 flex-1 shrink",
                   story.fill === true && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
                 ]}
               >
-                <span class="absolute top-2 left-3 flex items-center gap-1 rounded-xs bg-page px-1 font-mono text-2xs text-muted">
+                <span {...stylex.attrs(viewStyles.openedSpan2)}>
                   <Glyph icon={themeLook[theme].icon} size={12} />
                   {theme}
                 </span>
                 <Errored
                   fallback={(err, reset) => (
-                    <div data-testid="story-error" role="alert" class="flex flex-col gap-2 text-berry">
-                      <pre class="font-mono text-xs whitespace-pre-wrap">{String(err())}</pre>
-                      <button type="button" class="self-start rounded-md border border-line px-2 py-1 text-ink" onClick={reset}>
+                    <div data-testid="story-error" role="alert" {...stylex.attrs(viewStyles.storyError)}>
+                      <pre {...stylex.attrs(viewStyles.openedPre)}>{String(err())}</pre>
+                      <button type="button" {...stylex.attrs(viewStyles.openedButton)} onClick={reset}>
                         Try again
                       </button>
                     </div>
@@ -429,15 +799,15 @@ function Opened(props: {
       </main>
 
       <Show when={names.length > 0}>
-        <aside data-testid="story-args" aria-label="Arguments" class="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-line bg-side p-3">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold text-muted">Arguments</h2>
+        <aside data-testid="story-args" aria-label="Arguments" {...stylex.attrs(viewStyles.storyArgs)}>
+          <div {...stylex.attrs(viewStyles.openedDiv)}>
+            <h2 {...stylex.attrs(viewStyles.openedH2)}>Arguments</h2>
             <button
               type="button"
               data-testid="story-reset"
               aria-label="Reset the arguments"
               title="Reset the arguments"
-              class="flex size-6 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+              {...stylex.attrs(viewStyles.storyReset)}
               onClick={() => set({ ...story.args })}
             >
               <Glyph icon={Restart} size={14} />
@@ -479,16 +849,15 @@ const cellsOf = (axis: Axis<Args> | undefined): Cell[] =>
 function Grid(props: { rows: Axis<Args> | undefined; cols: Axis<Args> | undefined; draw: (over: Partial<Args>) => JSX.Element }) {
   const rows = cellsOf(props.rows);
   const cols = cellsOf(props.cols);
-  const label = "px-2 py-1 text-left font-mono text-2xs font-normal text-muted";
   return (
-    <table data-testid="story-grid" class="border-separate border-spacing-0 self-start">
+    <table data-testid="story-grid" {...stylex.attrs(viewStyles.storyGrid)}>
       <Show when={props.cols !== undefined}>
         <thead>
           <tr>
             <Show when={props.rows !== undefined}>
               <td />
             </Show>
-            <For each={cols}>{(c) => <th class={label}>{c.label}</th>}</For>
+            <For each={cols}>{(c) => <th {...stylex.attrs(viewerStyles.gridLabel)}>{c.label}</th>}</For>
           </tr>
         </thead>
       </Show>
@@ -497,13 +866,17 @@ function Grid(props: { rows: Axis<Args> | undefined; cols: Axis<Args> | undefine
           {(r) => (
             <tr>
               <Show when={props.rows !== undefined}>
-                <th scope="row" class={[label, "pr-4"]}>
+                <th scope="row" {...stylex.attrs(viewerStyles.gridLabel, viewerStyles.rowLabel)}>
                   {r.label}
                 </th>
               </Show>
               <For each={cols}>
                 {(c) => (
-                  <td data-testid="story-cell" data-pseudo={(c.pseudo ?? r.pseudo) === "rest" ? undefined : (c.pseudo ?? r.pseudo)} class="p-2 align-middle">
+                  <td
+                    data-testid="story-cell"
+                    data-pseudo={(c.pseudo ?? r.pseudo) === "rest" ? undefined : (c.pseudo ?? r.pseudo)}
+                    {...stylex.attrs(viewStyles.storyCell)}
+                  >
                     {props.draw({ ...r.over, ...c.over })}
                   </td>
                 )}
@@ -525,7 +898,7 @@ function Pick<T extends string>(props: {
   onChange: (v: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={props.label} data-testid={props.testid} class="flex rounded-md border border-line p-0.5">
+    <div role="radiogroup" aria-label={props.label} data-testid={props.testid} {...stylex.attrs(viewStyles.pickDiv)}>
       <For each={props.options}>
         {(o) => (
           <button
@@ -536,10 +909,10 @@ function Pick<T extends string>(props: {
             title={props.looks[o].label}
             data-value={o}
             onClick={() => props.onChange(o)}
-            class="flex h-7 min-w-7 items-center justify-center rounded-sm px-1 text-muted hover:text-ink aria-checked:bg-selected aria-checked:text-ink"
+            {...stylex.attrs(viewerStyles.choice)}
           >
             <Show when={props.looks[o].text} fallback={<Glyph icon={props.looks[o].icon} size={16} />}>
-              {(text) => <span class="font-mono text-xs">{text()}</span>}
+              {(text) => <span {...stylex.attrs(viewStyles.pickSpan)}>{text()}</span>}
             </Show>
           </button>
         )}
@@ -563,14 +936,12 @@ function CopyLink() {
           setTimeout(() => setCopied(false), 1500);
         })
       }
-      class="flex size-8 items-center justify-center rounded-md border border-line text-muted hover:text-ink"
+      {...stylex.attrs(viewStyles.storyCopyLink)}
     >
       <Glyph icon={copied() ? Check : Link} size={16} />
     </button>
   );
 }
-
-const field = "h-8 w-full rounded-md border border-line bg-page px-2 text-sm outline-none focus:border-focus";
 
 /** Without a control, one follows the value's type. */
 function ArgControl(props: {
@@ -590,22 +961,22 @@ function ArgControl(props: {
       data-name={props.name}
       disabled={props.fixed}
       title={props.fixed ? "Set by the grid" : undefined}
-      class="flex flex-col gap-1 disabled:opacity-50"
+      {...stylex.attrs(viewStyles.storyArg)}
     >
       {(() => {
         const c = control();
         switch (c.kind) {
           case "boolean":
             return (
-              <label class="flex items-center gap-2">
+              <label {...stylex.attrs(viewStyles.argControlLabel)}>
                 <input type="checkbox" checked={props.value === true} onChange={(e) => props.onChange(e.currentTarget.checked)} />
-                <span class="font-mono text-xs">{props.name}</span>
+                <span {...stylex.attrs(viewStyles.pickSpan)}>{props.name}</span>
               </label>
             );
           case "number":
             return (
               <>
-                <label for={id} class="font-mono text-xs">
+                <label for={id} {...stylex.attrs(viewStyles.pickSpan)}>
                   {props.name}
                 </label>
                 <input
@@ -619,17 +990,17 @@ function ArgControl(props: {
                     const n = e.currentTarget.valueAsNumber;
                     if (Number.isFinite(n)) props.onChange(n);
                   }}
-                  class={field}
+                  {...stylex.attrs(viewerStyles.field)}
                 />
               </>
             );
           case "choice":
             return (
               <>
-                <label for={id} class="font-mono text-xs">
+                <label for={id} {...stylex.attrs(viewStyles.pickSpan)}>
                   {props.name}
                 </label>
-                <select id={id} value={String(props.value)} onChange={(e) => props.onChange(e.currentTarget.value)} class={field}>
+                <select id={id} value={String(props.value)} onChange={(e) => props.onChange(e.currentTarget.value)} {...stylex.attrs(viewerStyles.field)}>
                   <For each={c.options}>{(o) => <option value={o}>{o}</option>}</For>
                 </select>
               </>
@@ -637,7 +1008,7 @@ function ArgControl(props: {
           case "text":
             return (
               <>
-                <label for={id} class="font-mono text-xs">
+                <label for={id} {...stylex.attrs(viewStyles.pickSpan)}>
                   {props.name}
                 </label>
                 {c.long === true ? (
@@ -646,10 +1017,16 @@ function ArgControl(props: {
                     rows={6}
                     value={String(props.value)}
                     onInput={(e) => props.onChange(e.currentTarget.value)}
-                    class={[field, "h-auto py-1 font-mono text-xs"]}
+                    {...stylex.attrs(viewerStyles.field, viewerStyles.longField)}
                   />
                 ) : (
-                  <input id={id} type="text" value={String(props.value)} onInput={(e) => props.onChange(e.currentTarget.value)} class={field} />
+                  <input
+                    id={id}
+                    type="text"
+                    value={String(props.value)}
+                    onInput={(e) => props.onChange(e.currentTarget.value)}
+                    {...stylex.attrs(viewerStyles.field)}
+                  />
                 )}
               </>
             );

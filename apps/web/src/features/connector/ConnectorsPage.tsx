@@ -18,6 +18,127 @@ import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "#/
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import { Qr } from "#/ui/Qr.tsx";
 
+const viewStyles = stylex.create({
+  connectorsPageLi: {
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingTop: "var(--spacing)",
+    paddingBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  connectorsPageDiv: {
+    display: "flex",
+    maxWidth: "var(--container-3xl)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  connectorsPageUl: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  connectorsPageLi2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  connectorsPageSpan: {
+    marginTop: "calc(var(--spacing) * 2)",
+    width: "var(--spacing)",
+    height: "var(--spacing)",
+    flexShrink: "0",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-faint)",
+  },
+  rowDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  rowSpan: {
+    width: "calc(var(--spacing) * 28)",
+    flexShrink: "0",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  rowDiv2: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  connectorCardSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  connectorCardP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  connectorCardP2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  connectorCardP3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-berry)",
+  },
+  channelPickSpan: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  channelPickSpan2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+  qqLoginForm: {
+    display: "flex",
+    maxWidth: "var(--container-md)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  qqLoginA: {
+    textDecorationLine: "underline",
+  },
+  loginCodeDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 5)",
+  },
+  loginCodeDiv2: {
+    display: "flex",
+    width: "calc(var(--spacing) * 56)",
+    height: "calc(var(--spacing) * 56)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--color-white)",
+    padding: "calc(var(--spacing) * 2)",
+  },
+  loginCodeDiv3: {
+    display: "flex",
+    maxWidth: "var(--container-md)",
+    minWidth: "calc(var(--spacing) * 50)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  loginCodeForm: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),
   feishu: t("web.connector.connectors.label.feishu"),
@@ -63,7 +184,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
     <Split
       list={
         <ListCard title={t("web.connector.connectors.section.label")} label={t("web.connector.connectors.list")} testid="connectors">
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.connector.connectors.intro")}</li>
+          <li {...stylex.attrs(viewStyles.connectorsPageLi)}>{t("web.connector.connectors.intro")}</li>
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
@@ -80,7 +201,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
         </ListCard>
       }
     >
-      <div class="flex max-w-3xl flex-col gap-3">
+      <div {...stylex.attrs(viewStyles.connectorsPageDiv)}>
         <Show
           when={list()}
           fallback={
@@ -94,11 +215,11 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
           </Keyed>
         </Show>
         <Card title={t("web.connector.connectors.know")}>
-          <ul class="flex flex-col gap-1.5">
+          <ul {...stylex.attrs(viewStyles.connectorsPageUl)}>
             <For each={[...connectorNotes[selected()], connectorsAlways]}>
               {(n) => (
-                <li class="flex gap-2.5 text-sm">
-                  <span class="mt-2 size-1 shrink-0 rounded-full bg-faint" aria-hidden="true" />
+                <li {...stylex.attrs(viewStyles.connectorsPageLi2)}>
+                  <span {...stylex.attrs(viewStyles.connectorsPageSpan)} aria-hidden="true" />
                   {n}
                 </li>
               )}
@@ -112,9 +233,9 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div class="flex gap-3">
-      <span class="w-28 shrink-0 text-sm text-muted">{props.label}</span>
-      <div class="min-w-0 flex-1 text-sm">{props.children}</div>
+    <div {...stylex.attrs(viewStyles.rowDiv)}>
+      <span {...stylex.attrs(viewStyles.rowSpan)}>{props.label}</span>
+      <div {...stylex.attrs(viewStyles.rowDiv2)}>{props.children}</div>
     </div>
   );
 }
@@ -146,11 +267,13 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
   );
   const state = () => props.status.state;
   return (
-    <Card title={label()} action={<span class="text-sm text-muted">{stateLabel[state()]}</span>}>
+    <Card title={label()} action={<span {...stylex.attrs(viewStyles.connectorCardSpan)}>{stateLabel[state()]}</span>}>
       <Switch>
         <Match when={state() === "off"}>
           <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => void login({ appId, secret })} />}>
-            <p class="text-sm">{props.id === "weixin" ? t("web.connector.connectors.weixinIntro") : t("web.connector.connectors.feishuIntro")}</p>
+            <p {...stylex.attrs(viewStyles.connectorCardP)}>
+              {props.id === "weixin" ? t("web.connector.connectors.weixinIntro") : t("web.connector.connectors.feishuIntro")}
+            </p>
             <div>
               <Button tone="primary" data-testid="connector-login" disabled={busy()} onClick={() => void login()}>
                 {t("web.connector.connectors.scan", { app: label() })}
@@ -162,11 +285,11 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
           <LoginCode status={props.status} busy={busy()} app={label()} onRefresh={() => void login({ force: true })} onVerify={(code) => void verify(code)} />
         </Match>
         <Match when={state() === "pairing"}>
-          <p class="text-sm">{t("web.connector.connectors.pairing", { app: label() })}</p>
+          <p {...stylex.attrs(viewStyles.connectorCardP)}>{t("web.connector.connectors.pairing", { app: label() })}</p>
           <div>
             <span class="inline-block rounded-lg bg-hover px-4 py-2 font-mono text-3xl font-semibold tracking-[4px] select-all">{props.status.pairCode}</span>
           </div>
-          <p class="text-xs text-muted">{t("web.connector.connectors.pairingNote")}</p>
+          <p {...stylex.attrs(viewStyles.connectorCardP2)}>{t("web.connector.connectors.pairingNote")}</p>
           {disconnect()}
         </Match>
         <Match when={state() === "connected" || state() === "paused"}>
@@ -184,13 +307,13 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
               : t("web.connector.connectors.noPending")}
           </Row>
           <Show when={state() === "paused" ? props.status.pausedUntil : undefined}>
-            {(until) => <p class="text-sm text-berry">{t("web.connector.connectors.paused", { clock: wallClockText(until()) })}</p>}
+            {(until) => <p {...stylex.attrs(viewStyles.connectorCardP3)}>{t("web.connector.connectors.paused", { clock: wallClockText(until()) })}</p>}
           </Show>
           {disconnect()}
         </Match>
       </Switch>
       <Show when={props.status.error}>
-        <p class="text-sm text-berry">{props.status.error}</p>
+        <p {...stylex.attrs(viewStyles.connectorCardP3)}>{props.status.error}</p>
       </Show>
     </Card>
   );
@@ -216,7 +339,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
     await act.run(() => api.connector.channel.set({ id, channel }));
   };
   return (
-    <span class="flex flex-wrap items-center gap-2">
+    <span {...stylex.attrs(viewStyles.channelPickSpan)}>
       <Select
         styles={selectStyles.channel}
         label={t("web.connector.connectors.whichChannel")}
@@ -226,7 +349,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
         onChange={(v) => void move(v)}
       />
       <Show when={error()}>
-        <span class="text-xs text-berry">{error()}</span>
+        <span {...stylex.attrs(viewStyles.channelPickSpan2)}>{error()}</span>
       </Show>
     </span>
   );
@@ -238,15 +361,15 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
   const canLogin = () => !props.busy && appId().trim() !== "" && secret().trim() !== "";
   return (
     <form
-      class="flex max-w-md flex-col gap-3"
+      {...stylex.attrs(viewStyles.qqLoginForm)}
       onSubmit={(e) => {
         e.preventDefault();
         if (canLogin()) props.onLogin(appId().trim(), secret().trim());
       }}
     >
-      <p class="text-sm">
+      <p {...stylex.attrs(viewStyles.connectorCardP)}>
         {t("web.connector.connectors.qqBefore")}{" "}
-        <a class="underline" href="https://q.qq.com/" target="_blank" rel="noreferrer">
+        <a {...stylex.attrs(viewStyles.qqLoginA)} href="https://q.qq.com/" target="_blank" rel="noreferrer">
           {t("web.connector.connectors.qqPlatform")}
         </a>{" "}
         {t("web.connector.connectors.qqAfter")}
@@ -290,17 +413,17 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
           ? t("web.connector.connectors.digits")
           : "";
   return (
-    <div class="flex flex-wrap gap-5">
-      <div class="flex size-56 items-center justify-center rounded-md border border-line bg-white p-2">
-        <Show when={props.status.qr} fallback={<span class="text-xs text-muted">{t("web.connector.connectors.gettingQr")}</span>}>
+    <div {...stylex.attrs(viewStyles.loginCodeDiv)}>
+      <div {...stylex.attrs(viewStyles.loginCodeDiv2)}>
+        <Show when={props.status.qr} fallback={<span {...stylex.attrs(viewStyles.connectorCardP2)}>{t("web.connector.connectors.gettingQr")}</span>}>
           {(qr) => <Qr text={qr()} label={t("web.connector.connectors.qr", { app: props.app })} />}
         </Show>
       </div>
-      <div class="flex max-w-md min-w-50 flex-col gap-3">
-        <p class="text-sm">{say()}</p>
+      <div {...stylex.attrs(viewStyles.loginCodeDiv3)}>
+        <p {...stylex.attrs(viewStyles.connectorCardP)}>{say()}</p>
         <Show when={props.status.state === "verify"}>
           <form
-            class="flex gap-2"
+            {...stylex.attrs(viewStyles.loginCodeForm)}
             onSubmit={(e) => {
               e.preventDefault();
               if (!props.busy && code().trim()) props.onVerify(code().trim());
@@ -319,7 +442,7 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
         </Show>
         <Show when={props.status.qr}>
           {(qr) => (
-            <p class="text-xs text-muted">
+            <p {...stylex.attrs(viewStyles.connectorCardP2)}>
               {t("web.connector.connectors.cannotScan")}
               <TextLink href={qr()}>{qr()}</TextLink>
             </p>

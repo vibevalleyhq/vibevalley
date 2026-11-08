@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { stories, story } from "@vibevalley/stories";
 
 import { PxChipsInput } from "./forms";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   formsStoriesDiv: {
@@ -13,7 +14,7 @@ const viewStyles = stylex.create({
 export default stories({
   title: "组件/像素/forms",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Chips: story({
       args: { words: "frontend,urgent", disabled: false },

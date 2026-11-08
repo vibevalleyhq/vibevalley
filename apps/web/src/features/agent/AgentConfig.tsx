@@ -33,6 +33,184 @@ import { Tabs } from "#/ui/Tabs.tsx";
 
 import { Labeled } from "./AgentLook";
 
+const viewStyles = stylex.create({
+  runtimeChoiceSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  runtimeChoiceDiv: {
+    display: "grid",
+    gap: "calc(var(--spacing) * 1.5)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
+    },
+  },
+  runtimeChoiceSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+  },
+  supportSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  supportH3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  supportSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  supportSpan2: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  supportSpan3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  supportSpan4: {
+    fontFamily: "var(--font-mono)",
+    color: "var(--wb-ink)",
+  },
+  skillPickerDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  skillPickerSpan: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  skillPickerSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  toolsDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  toolsSpan: {
+    borderRadius: ".25rem",
+    backgroundColor: "var(--wb-selected)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  toolsSpan2: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  toolsButton: {
+    cursor: "pointer",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-berry)",
+      },
+    },
+  },
+  toolsDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  toolsDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 1.5)",
+  },
+  toolsButton2: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "1px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+  inventoryUl: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  inventoryLi: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  inventorySpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  inventorySpan2: {
+    maxWidth: "calc(var(--spacing) * 40)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
+
 const styles = stylex.create({
   tabs: {
     borderBottomWidth: 1,
@@ -183,8 +361,8 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   };
   return (
     <Labeled label={t("web.agent.machine")} tip={t("web.agent.machineTip")}>
-      <Show when={runtimes().length > 0} fallback={<span class="text-xs text-muted">{t("web.agent.readingMachines")}</span>}>
-        <div class="grid gap-1.5 sm:grid-cols-2">
+      <Show when={runtimes().length > 0} fallback={<span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{t("web.agent.readingMachines")}</span>}>
+        <div {...stylex.attrs(viewStyles.runtimeChoiceDiv)}>
           <For each={runtimes()}>
             {(info) => {
               const available = () => info.installation.status === "available";
@@ -214,7 +392,7 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   <span class={{ "opacity-50 grayscale": !ok() }}>
                     <RuntimeIcon runtime={info.id} size={32} />
                   </span>
-                  <span class="flex min-w-0 flex-col">
+                  <span {...stylex.attrs(viewStyles.runtimeChoiceSpan2)}>
                     <span class={["truncate text-sm", active() ? "font-semibold" : "font-medium"]}>{info.preset.label}</span>
                     <span class={["truncate text-xs", ok() ? "text-muted" : "text-berry"]}>{status()}</span>
                   </span>
@@ -276,19 +454,19 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
 function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
   const support = () => supportOf(props.info);
   return (
-    <section class="flex flex-col gap-1.5 rounded-lg border border-line p-3">
-      <h3 class="text-sm font-semibold">{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
-      <Show when={props.info} fallback={<span class="text-sm">{t("web.agent.readingMachines")}</span>}>
-        <span class="flex items-start gap-1.5 text-sm">
+    <section {...stylex.attrs(viewStyles.supportSection)}>
+      <h3 {...stylex.attrs(viewStyles.supportH3)}>{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
+      <Show when={props.info} fallback={<span {...stylex.attrs(viewStyles.supportSpan)}>{t("web.agent.readingMachines")}</span>}>
+        <span {...stylex.attrs(viewStyles.supportSpan2)}>
           <Icon name={support().steer ? "check" : "cross"} size={12} class="mt-1" />
           {support().steer ? t("web.agent.steer") : t("web.agent.noSteer")}
         </span>
-        <span class="text-sm">{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
+        <span {...stylex.attrs(viewStyles.supportSpan)}>{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
         <For each={Object.entries(support().refused)}>
           {([option, reason]) => (
-            <span class="text-sm text-muted">
+            <span {...stylex.attrs(viewStyles.supportSpan3)}>
               {t("web.agent.refuses")}
-              <span class="font-mono text-ink">{option}</span>
+              <span {...stylex.attrs(viewStyles.supportSpan4)}>{option}</span>
               {t("web.agent.colon")}
               {reason}
             </span>
@@ -355,7 +533,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
           </A>
         }
       >
-        <div class="flex flex-col gap-1.5">
+        <div {...stylex.attrs(viewStyles.skillPickerDiv)}>
           <For each={ready(all, [])}>
             {(s) => {
               const on = () => props.draft.skills.includes(s.id);
@@ -376,9 +554,9 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
                       <Icon name="check" size={12} />
                     </Show>
                   </span>
-                  <span class="flex flex-col">
-                    <span class="text-sm font-medium">{s.name}</span>
-                    <span class="text-xs text-muted">{s.description}</span>
+                  <span {...stylex.attrs(viewStyles.skillPickerSpan)}>
+                    <span {...stylex.attrs(viewStyles.skillPickerSpan2)}>{s.name}</span>
+                    <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{s.description}</span>
                   </span>
                 </button>
               );
@@ -422,23 +600,23 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         <div class={["flex flex-col gap-1.5", { "opacity-50": !!mcpRefused() }]}>
           <For each={props.draft.mcpServers}>
             {(s) => (
-              <div class="flex items-center gap-2 rounded-md border border-line px-3 py-2">
-                <span class="rounded bg-selected px-1.5 text-xs">{s.type}</span>
-                <span class="text-sm font-medium">{s.name}</span>
-                <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{mcpTarget(s)}</span>
+              <div {...stylex.attrs(viewStyles.toolsDiv)}>
+                <span {...stylex.attrs(viewStyles.toolsSpan)}>{s.type}</span>
+                <span {...stylex.attrs(viewStyles.skillPickerSpan2)}>{s.name}</span>
+                <span {...stylex.attrs(viewStyles.toolsSpan2)}>{mcpTarget(s)}</span>
                 <button
                   type="button"
                   disabled={!!mcpRefused()}
                   aria-label={t("web.agent.removeNamed", { name: s.name })}
                   onClick={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s.name) })}
-                  class="cursor-pointer text-xs text-muted hover:text-berry"
+                  {...stylex.attrs(viewStyles.toolsButton)}
                 >
                   {t("web.agent.remove")}
                 </button>
               </div>
             )}
           </For>
-          <div class="flex flex-wrap items-center gap-1.5">
+          <div {...stylex.attrs(viewStyles.toolsDiv2)}>
             <Segmented
               label={t("web.agent.mcpKind")}
               value={type()}
@@ -484,13 +662,13 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         />
         <Show when={!toolsRefused() ? props.runtime?.tools : undefined}>
           {(tools) => (
-            <div class="flex flex-wrap gap-1 pt-1.5">
+            <div {...stylex.attrs(viewStyles.toolsDiv3)}>
               <For each={tools().filter((tool) => !props.draft.disallowedTools.includes(tool.name))}>
                 {(tool) => (
                   <button
                     type="button"
                     onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool.name] })}
-                    class="cursor-pointer rounded border border-line bg-page px-1.5 py-px font-mono text-xs text-muted hover:bg-hover hover:text-ink"
+                    {...stylex.attrs(viewStyles.toolsButton2)}
                   >
                     + {tool.name}
                   </button>
@@ -511,14 +689,14 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
   return (
     <Switch
       fallback={
-        <ul class="flex flex-col gap-1">
+        <ul {...stylex.attrs(viewStyles.inventoryUl)}>
           <For each={props.entries}>
             {(e) => (
-              <li class="flex items-baseline gap-2">
+              <li {...stylex.attrs(viewStyles.inventoryLi)}>
                 <span class={["font-mono text-sm", { "text-muted line-through": e.enabled === false }]}>{e.name}</span>
-                <span class="min-w-0 flex-1 truncate text-xs text-muted">{e.description}</span>
+                <span {...stylex.attrs(viewStyles.inventorySpan)}>{e.description}</span>
                 <Show when={e.source}>
-                  <span class="max-w-40 truncate text-xs text-muted">{e.source}</span>
+                  <span {...stylex.attrs(viewStyles.inventorySpan2)}>{e.source}</span>
                 </Show>
               </li>
             )}
@@ -527,10 +705,10 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
       }
     >
       <Match when={!props.entries}>
-        <span class="text-xs text-muted">{t("web.agent.unreported")}</span>
+        <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{t("web.agent.unreported")}</span>
       </Match>
       <Match when={props.entries?.length === 0}>
-        <span class="text-xs text-muted">{t("web.agent.none")}</span>
+        <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{t("web.agent.none")}</span>
       </Match>
     </Switch>
   );

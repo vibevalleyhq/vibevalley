@@ -12,13 +12,129 @@ import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";
 import { toneVar } from "./Marks";
 
+const viewStyles = stylex.create({
+  issueSheetDiv: {
+    containerType: "inline-size",
+  },
+  issueSheetDiv2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  propertyDiv: {
+    display: "flex",
+    minHeight: "calc(var(--spacing) * 8)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  propertySpan: {
+    width: "calc(var(--spacing) * 16)",
+    flexShrink: "0",
+    color: "var(--wb-muted)",
+  },
+  propertyDiv2: {
+    minWidth: "0",
+    flex: "1",
+    overflowWrap: "break-word",
+  },
+  foldDiv: {
+    borderBottomStyle: {
+      default: "solid",
+      ":last-child": "solid",
+    },
+    borderBottomWidth: {
+      default: "1px",
+      ":last-child": "0",
+    },
+    borderColor: "var(--wb-line)",
+  },
+  foldButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+    textAlign: "left",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  foldSpan: {
+    flexShrink: "0",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  foldSpan2: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  foldDiv2: {
+    paddingBottom: "calc(var(--spacing) * 3)",
+    paddingLeft: "calc(var(--spacing) * 5)",
+  },
+  moreDiv: {
+    marginTop: "var(--spacing)",
+  },
+  moreButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+  sheetLabelDiv: {
+    marginTop: "calc(var(--spacing) * 6)",
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-muted)",
+  },
+  stagesDiv: {
+    display: "flex",
+    alignItems: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  stagesSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    whiteSpace: "nowrap",
+  },
+});
+
 /** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right. */
 export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; side: JSX.Element }) {
   return (
-    <div class="@container">
+    <div {...stylex.attrs(viewStyles.issueSheetDiv)}>
       {props.heading}
       <div class="mt-4 flex flex-col gap-4 @min-[760px]:flex-row @min-[760px]:items-start @min-[760px]:gap-6">
-        <div class="flex min-w-0 flex-1 flex-col">{props.main}</div>
+        <div {...stylex.attrs(viewStyles.issueSheetDiv2)}>{props.main}</div>
         <aside class="flex flex-col rounded-lg bg-hover p-3 @min-[760px]:w-[260px] @min-[760px]:shrink-0 @min-[760px]:rounded-none @min-[760px]:border-l @min-[760px]:border-line @min-[760px]:bg-transparent @min-[760px]:py-0 @min-[760px]:pr-0 @min-[760px]:pl-5">
           {props.side}
         </aside>
@@ -30,9 +146,9 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
 /** A label and its value, the label in a narrow muted column. */
 export function Property(props: { label: string; children: JSX.Element }) {
   return (
-    <div class="flex min-h-8 items-center gap-3 py-0.5 text-sm">
-      <span class="w-16 shrink-0 text-muted">{props.label}</span>
-      <div class="min-w-0 flex-1 break-words">{props.children}</div>
+    <div {...stylex.attrs(viewStyles.propertyDiv)}>
+      <span {...stylex.attrs(viewStyles.propertySpan)}>{props.label}</span>
+      <div {...stylex.attrs(viewStyles.propertyDiv2)}>{props.children}</div>
     </div>
   );
 }
@@ -41,22 +157,17 @@ export function Property(props: { label: string; children: JSX.Element }) {
 export function Fold(props: { label: string; summary?: string | undefined; open?: boolean; leading?: JSX.Element; children: JSX.Element }) {
   const [open, setOpen] = createSignal(untrack(() => props.open ?? false));
   return (
-    <div class="border-b border-line last:border-b-0">
-      <button
-        type="button"
-        aria-expanded={aria(open())}
-        onClick={() => setOpen(!open())}
-        class="flex w-full cursor-pointer items-center gap-2 py-2.5 text-left hover:bg-hover"
-      >
+    <div {...stylex.attrs(viewStyles.foldDiv)}>
+      <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.foldButton)}>
         <Icon name="expand" size={10} class={["transition-transform", { "rotate-90": open() }]} />
         {props.leading}
-        <span class="shrink-0 text-sm font-semibold">{props.label}</span>
+        <span {...stylex.attrs(viewStyles.foldSpan)}>{props.label}</span>
         <Show when={props.summary}>
-          <span class="min-w-0 truncate text-xs text-muted">{props.summary}</span>
+          <span {...stylex.attrs(viewStyles.foldSpan2)}>{props.summary}</span>
         </Show>
       </button>
       {/* Mounted with the page and only hidden while folded. */}
-      <div class="pb-3 pl-5" hidden={!open()}>
+      <div {...stylex.attrs(viewStyles.foldDiv2)} hidden={!open()}>
         {props.children}
       </div>
     </div>
@@ -67,20 +178,20 @@ export function Fold(props: { label: string; summary?: string | undefined; open?
 export function More(props: { children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   return (
-    <div class="mt-1">
-      <button type="button" onClick={() => setOpen(!open())} class="flex cursor-pointer items-center gap-1.5 py-1 text-xs text-muted hover:text-ink">
+    <div {...stylex.attrs(viewStyles.moreDiv)}>
+      <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.moreButton)}>
         <Icon name="expand" size={10} class={{ "rotate-90": open() }} />
         {open() ? t("web.issue.sheet.less") : t("web.issue.sheet.more")}
       </button>
       <Show when={open()}>
-        <div class="mt-1">{props.children}</div>
+        <div {...stylex.attrs(viewStyles.moreDiv)}>{props.children}</div>
       </Show>
     </div>
   );
 }
 
 export function SheetLabel(props: { children: JSX.Element }) {
-  return <div class="mt-6 mb-1.5 text-xs font-semibold text-muted">{props.children}</div>;
+  return <div {...stylex.attrs(viewStyles.sheetLabelDiv)}>{props.children}</div>;
 }
 
 /** A tinted box: the status, a conflict, nothing to merge. */
@@ -99,14 +210,14 @@ export function Note(props: { tone?: Tone; children: JSX.Element; class?: string
 export function Stages(props: { at: Stage }) {
   const ati = () => stages.indexOf(props.at);
   return (
-    <div class="flex items-center text-sm" aria-label={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
+    <div {...stylex.attrs(viewStyles.stagesDiv)} aria-label={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
       <For each={stages}>
         {(s, i) => (
           <div class={["flex items-center", { "flex-1": i() > 0 }]}>
             <Show when={i() > 0}>
               <div class={["mx-2 h-px flex-1", i() <= ati() ? "bg-leaf" : "bg-line"]} />
             </Show>
-            <span class="flex items-center gap-1.5 whitespace-nowrap">
+            <span {...stylex.attrs(viewStyles.stagesSpan)}>
               <Show when={i() < ati()} fallback={<span class={["size-2 rounded-full", s === props.at ? "bg-wheat" : "bg-line"]} />}>
                 <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s] })} />
               </Show>

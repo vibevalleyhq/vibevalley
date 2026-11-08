@@ -4,6 +4,7 @@ import { For } from "solid-js";
 import { stories, story } from "@vibevalley/stories";
 
 import { RuntimeIcon } from "./RuntimeIcon";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   runtimeIconStoriesDiv: {
@@ -18,7 +19,7 @@ const runtimes = ["claude", "codex", "pi", "cursor", "opencode", "kimi", "grok",
 export default stories({
   title: "组件/像素/RuntimeIcon",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Runtimes: story({
       args: { size: 24 },

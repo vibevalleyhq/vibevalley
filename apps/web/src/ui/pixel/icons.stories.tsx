@@ -5,6 +5,7 @@ import { SessionActionValues, type Phase, type SessionAction } from "@vibevalley
 import { stories, story } from "@vibevalley/stories";
 
 import { ActionGlyph, Marked, PhaseGlyph, SpriteIcon } from "./icons";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   iconsStoriesDiv: {
@@ -45,7 +46,7 @@ const phases: [string, Phase][] = [
 export default stories({
   title: "组件/像素/icons",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Sprites: story({
       args: { size: 24 },

@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { stories, story } from "@vibevalley/stories";
 
 import { PxMarkdown, PxReadText } from "./PxMarkdown";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   pxMarkdownStoriesDiv: {
@@ -29,7 +30,7 @@ const sample = [
 export default stories({
   title: "组件/像素/PxMarkdown",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Report: story({
       args: { text: sample, reading: false },

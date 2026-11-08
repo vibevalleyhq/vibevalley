@@ -5,6 +5,7 @@ import { stories, story } from "@vibevalley/stories";
 
 import { useAtlas } from "./atlas";
 import { CrossMark, EarnedMedal, TickMark } from "./glyphs";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   glyphsStoriesDiv: {
@@ -24,7 +25,7 @@ const achievements = ["first_try", "harvests", "night_owl", "steady", "thrifty",
 export default stories({
   title: "组件/像素/glyphs",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Marks: story({
       args: { size: 16 },

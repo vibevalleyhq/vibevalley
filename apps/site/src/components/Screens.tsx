@@ -1,5 +1,6 @@
-/** @jsxImportSource @solidjs/web */
 import type { JSX } from "@solidjs/web";
+/** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, onCleanup, onSettled } from "solid-js";
 
 import { createImageTransition } from "../animation/image";
@@ -7,6 +8,93 @@ import { Presence } from "../animation/Presence";
 import { createElementRef, createReveal, createScrollAnimation } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
 import { Section, cx } from "./ui";
+
+const viewStyles = stylex.create({
+  screensDiv: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(1,minmax(0,1fr))",
+      "@media (width>=64rem)": "minmax(0,1.4fr) minmax(0,1fr)",
+    },
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 7)",
+  },
+  screensFigure: {
+    margin: "0",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    padding: "calc(var(--spacing) * 2.5)",
+  },
+  screensButton: {
+    display: "block",
+    width: "100%",
+    cursor: "zoom-in",
+  },
+  screensImg: {
+    display: "block",
+    height: "auto",
+    width: "100%",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+  },
+  screensFigcaption: {
+    paddingInline: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 2.5)",
+    paddingBottom: "calc(var(--spacing) * .5)",
+    fontSize: "15px",
+    color: "var(--color-bark-800)",
+  },
+  largeFigure: {
+    position: "relative",
+    margin: "0",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    padding: "calc(var(--spacing) * 2.5)",
+  },
+  largeImg: {
+    display: "block",
+    height: "auto",
+    maxHeight: "80svh",
+    width: "auto",
+    maxWidth: "100%",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+  },
+  screenshotClose: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -4)",
+    right: "calc(var(--spacing) * -4)",
+    display: "grid",
+    width: "calc(var(--spacing) * 11)",
+    height: "calc(var(--spacing) * 11)",
+    cursor: "pointer",
+    placeItems: "center",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: {
+      default: "var(--color-cream-50)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-hover)",
+      },
+    },
+    boxShadow: "inset 2px 2px 0 var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 3px 3px 0 var(--color-drop)",
+  },
+  largeImg2: {
+    width: "calc(var(--spacing) * 6)",
+    height: "calc(var(--spacing) * 6)",
+    imageRendering: "pixelated",
+  },
+});
 
 interface Shot {
   src: string;
@@ -33,15 +121,15 @@ export default function Screens(props: Props) {
   return (
     <>
       <Section ref={root.set} id="screens" title={props.copy.title}>
-        <div class="grid grid-cols-1 items-start gap-7 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div {...stylex.attrs(viewStyles.screensDiv)}>
           {props.shots.map((shot, i) => (
             <Drift rate={DRIFT[i] ?? 0} className={cx(i === 0 && "lg:row-span-2", i === 1 && "lg:mt-[60px]")}>
-              <figure data-reveal class="panel m-0 p-2.5">
+              <figure data-reveal {...stylex.attrs(viewStyles.screensFigure)}>
                 <button
                   type="button"
                   data-testid={`screenshot-${i}`}
                   title={props.copy.open}
-                  class="block w-full cursor-zoom-in"
+                  {...stylex.attrs(viewStyles.screensButton)}
                   onClick={(event) => {
                     const source = event.currentTarget.querySelector("img");
                     if (source) setOpen({ shot, source });
@@ -56,10 +144,10 @@ export default function Screens(props: Props) {
                     decoding="async"
                     width={shot.width}
                     height={shot.height}
-                    class="block h-auto w-full border-2 border-bark-900"
+                    {...stylex.attrs(viewStyles.screensImg)}
                   />
                 </button>
-                <figcaption class="px-1 pt-2.5 pb-0.5 text-[15px] text-bark-800">{shot.caption}</figcaption>
+                <figcaption {...stylex.attrs(viewStyles.screensFigcaption)}>{shot.caption}</figcaption>
               </figure>
             </Drift>
           ))}
@@ -127,18 +215,18 @@ function Large(props: { shot: Shot; source: HTMLImageElement; label: string; ico
       onClick={close}
       class="bg-shade/80 fixed inset-0 z-50 grid place-items-center p-4 sm:p-8"
     >
-      <figure onClick={(event) => event.stopPropagation()} class="panel relative m-0 p-2.5">
-        <img ref={image.set} src={props.shot.src} alt={props.shot.caption} class="block h-auto max-h-[80svh] w-auto max-w-full border-2 border-bark-900" />
-        <figcaption class="px-1 pt-2.5 pb-0.5 text-[15px] text-bark-800">{props.shot.caption}</figcaption>
+      <figure onClick={(event) => event.stopPropagation()} {...stylex.attrs(viewStyles.largeFigure)}>
+        <img ref={image.set} src={props.shot.src} alt={props.shot.caption} {...stylex.attrs(viewStyles.largeImg)} />
+        <figcaption {...stylex.attrs(viewStyles.screensFigcaption)}>{props.shot.caption}</figcaption>
         <button
           ref={button.set}
           type="button"
           data-testid="screenshot-close"
           onClick={close}
           aria-label={props.label}
-          class="shadow-hard inset-shadow-lit absolute -top-4 -right-4 grid size-11 cursor-pointer place-items-center border-2 border-bark-900 bg-cream-50 hover:bg-cream-hover"
+          {...stylex.attrs(viewStyles.screenshotClose)}
         >
-          <img src={props.icon} alt="" class="pixelated size-6" />
+          <img src={props.icon} alt="" {...stylex.attrs(viewStyles.largeImg2)} />
         </button>
       </figure>
     </div>

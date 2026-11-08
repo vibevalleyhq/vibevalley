@@ -4,6 +4,7 @@ import { For } from "solid-js";
 import { stories, story } from "@vibevalley/stories";
 
 import { PxButton, type PxSize, type PxTone } from "./button";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   buttonStoriesDiv: {
@@ -19,7 +20,7 @@ const tones: PxTone[] = ["plain", "primary", "accent", "danger"];
 export default stories({
   title: "组件/像素/PxButton",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     States: story({
       args: { label: "派活", tone: "primary", disabled: false },

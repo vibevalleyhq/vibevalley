@@ -7,6 +7,7 @@ import { stories, story } from "@vibevalley/stories";
 import { positionerAttrs } from "./positioner";
 
 const styles = stylex.create({
+  frame: (backgroundColor: string) => ({ backgroundColor, color: "var(--color-ink)" }),
   trigger: {
     borderWidth: 1,
     borderStyle: "solid",
@@ -65,5 +66,6 @@ function Positioned() {
 
 export default stories({
   title: "组件/工作台/Positioner",
+  frame: styles.frame("var(--color-page)"),
   stories: { Dynamic: story({ render: () => <Positioned /> }) },
 });

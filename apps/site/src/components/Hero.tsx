@@ -1,5 +1,6 @@
-/** @jsxImportSource @solidjs/web */
 import type { JSX } from "@solidjs/web";
+/** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
 import { animate, springValue, type MotionValue } from "motion";
 import { createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
 
@@ -15,6 +16,140 @@ import {
 import type { Copy } from "../i18n/zh";
 import { CHIMNEY, CLOUDS, DOG, MANAGER, PET, PLANTS, PUFF_SECONDS, PUFFS, SCENES, SEEDS, firefliesOf, managerOf, pct, sprite, type Scene } from "../lib/scene";
 import { PixelLink, cx, vars } from "./ui";
+
+const viewStyles = stylex.create({
+  heroSection: {
+    position: "relative",
+    height: "200svh",
+    minHeight: "1120px",
+  },
+  heroDiv: {
+    containerType: "size",
+    position: "sticky",
+    top: "0",
+    isolation: "isolate",
+    height: "100svh",
+    minHeight: "560px",
+    overflow: "hidden",
+    backgroundColor: "var(--color-dusk)",
+  },
+  heroDiv2: {
+    containerType: "size",
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    aspectRatio: "3/2",
+    width: "max(108cqw,162cqh)",
+    translate: "calc(calc(1 / 2 * 100%) * -1) calc(calc(1 / 2 * 100%) * -1)",
+  },
+  heroImg: {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  heroSpan: {
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: "0",
+    width: "1px",
+    height: "1px",
+    margin: "-1px",
+    padding: "0",
+    position: "absolute",
+    overflow: "hidden",
+  },
+  heroSpan2: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+    display: "block",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "1",
+    color: "var(--color-wheat)",
+    textShadow: "2px 2px 0 var(--color-bark-900)",
+  },
+  heroDiv3: {
+    position: "absolute",
+    bottom: {
+      default: "calc(var(--spacing) * 5)",
+      "@media (width>=48rem)": "calc(var(--spacing) * 7)",
+    },
+    left: {
+      default: "calc(var(--spacing) * 4)",
+      "@media (width>=48rem)": "auto",
+    },
+    zIndex: "3",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+    color: "var(--color-cream-50)",
+    textShadow: "2px 2px 0 var(--color-bark-900)",
+    right: {
+      default: null,
+      "@media (width>=48rem)": "clamp(16px,4vw,40px)",
+    },
+  },
+  heroSpan3: {
+    display: {
+      default: "none",
+      "@media (width>=48rem)": "inline",
+    },
+  },
+  heroA: {
+    position: "absolute",
+    bottom: "22px",
+    left: "50%",
+    zIndex: "3",
+    display: {
+      default: "none",
+      "@media (width>=48rem)": "grid",
+    },
+    translate: "calc(calc(1 / 2 * 100%) * -1) 0",
+    justifyItems: "center",
+    gap: "var(--spacing)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+    color: "var(--color-cream-50)",
+    textShadow: "2px 2px 0 var(--color-bark-900)",
+  },
+  lineDiv: {
+    pointerEvents: "none",
+    position: "absolute",
+    inset: "0",
+    zIndex: "2",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: {
+      default: "flex-end",
+      "@media (width>=48rem)": "center",
+    },
+    paddingInline: "clamp(16px,6vw,96px)",
+    paddingTop: "calc(var(--spacing) * 24)",
+    paddingBottom: {
+      default: "calc(var(--spacing) * 28)",
+      "@media (width>=48rem)": "120px",
+    },
+    color: "var(--color-cream-50)",
+    opacity: "0",
+  },
+  lineSpan: {
+    display: "block",
+  },
+  layerDiv: {
+    position: "absolute",
+    inset: "0",
+  },
+  layerDiv2: {
+    position: "absolute",
+    inset: "0",
+    willChange: "transform",
+  },
+});
 /** A part that belongs to one hour shows at that hour (data-scene on <html>), fading in and out as the hour changes. */
 const AT: Record<Scene, string> = { morning: "morning:opacity-100", day: "day:opacity-100", evening: "evening:opacity-100", night: "night:opacity-100" };
 /** The hour's own button looks pressed while the farm is at that hour. */
@@ -158,10 +293,10 @@ export default function Hero(props: Props) {
   return (
     <>
       {/* Two screens high: the scene holds on the first screen of scrolling, and goes up off the screen on the second. */}
-      <section ref={root.set} id="top" aria-label={props.copy.name} class="relative h-[200svh] min-h-[1120px]">
-        <div onPointerMove={point} onPointerLeave={leave} class="bg-dusk [container-type:size] sticky top-0 isolate h-svh min-h-[560px] overflow-hidden">
+      <section ref={root.set} id="top" aria-label={props.copy.name} {...stylex.attrs(viewStyles.heroSection)}>
+        <div onPointerMove={point} onPointerLeave={leave} {...stylex.attrs(viewStyles.heroDiv)}>
           {/* The scene keeps its 3:2 and covers the hero, a little bigger, so the layers have room to part. */}
-          <div aria-hidden="true" class="[container-type:size] absolute top-1/2 left-1/2 aspect-3/2 w-[max(108cqw,calc(108cqh*1.5))] -translate-1/2">
+          <div aria-hidden="true" {...stylex.attrs(viewStyles.heroDiv2)}>
             {/* The farm: its picture, the smoke and the fireflies over it, the farmer and the dog on the hill. */}
             <Layer lag={0.5} zoom={1.06} origin="62% 60%" point={16} hero={root} px={px} py={py}>
               <div class="animate-pan absolute inset-0 origin-[60%_55%]">
@@ -178,7 +313,7 @@ export default function Hero(props: Props) {
                 <Comes hour="evening" src={props.backgrounds.evening} hero={root} />
                 <Comes hour="night" src={props.backgrounds.night} hero={root} />
                 <noscript>
-                  <img src={props.backgrounds.morning} alt="" class="pixelated absolute inset-0 size-full max-w-none" />
+                  <img src={props.backgrounds.morning} alt="" {...stylex.attrs(viewStyles.heroImg)} />
                 </noscript>
                 {PUFFS.map((p, i) => {
                   const s = sprite(p.sprite, p.scale);
@@ -338,7 +473,7 @@ export default function Hero(props: Props) {
           >
             <div class="motion-safe:animate-float">
               <h1 class="text-shadow-title text-[clamp(48px,7vw,96px)]">
-                <span class="sr-only">{props.copy.name}</span>
+                <span {...stylex.attrs(viewStyles.heroSpan)}>{props.copy.name}</span>
                 <span aria-hidden="true">
                   {[...props.copy.name].map((ch, i) => (
                     <span
@@ -351,7 +486,7 @@ export default function Hero(props: Props) {
                     </span>
                   ))}
                 </span>
-                <span class="mt-2.5 block text-2xl/none text-wheat text-shadow-ink">{props.copy.aka}</span>
+                <span {...stylex.attrs(viewStyles.heroSpan2)}>{props.copy.aka}</span>
               </h1>
             </div>
             <p
@@ -395,12 +530,8 @@ export default function Hero(props: Props) {
             <Line verse={props.copy.verses[h]} at={SAYS[h]} stays={h === "night"} hero={root} />
           ))}
 
-          <div
-            role="group"
-            aria-label={props.copy.hours}
-            class="absolute bottom-5 left-4 z-3 flex items-center gap-1.5 font-pixel text-lg/none text-cream-50 text-shadow-ink md:right-[clamp(16px,4vw,40px)] md:bottom-7 md:left-auto"
-          >
-            <span class="hidden md:inline">{props.copy.hours}</span>
+          <div role="group" aria-label={props.copy.hours} {...stylex.attrs(viewStyles.heroDiv3)}>
+            <span {...stylex.attrs(viewStyles.heroSpan3)}>{props.copy.hours}</span>
             {SCENES.map((s) => (
               <button
                 type="button"
@@ -413,11 +544,7 @@ export default function Hero(props: Props) {
               </button>
             ))}
           </div>
-          <a
-            ref={hint.set}
-            href="#parade"
-            class="absolute bottom-[22px] left-1/2 z-3 hidden -translate-x-1/2 justify-items-center gap-1 font-pixel text-lg/none text-cream-50 text-shadow-ink md:grid"
-          >
+          <a ref={hint.set} href="#parade" {...stylex.attrs(viewStyles.heroA)}>
             {props.copy.scroll}
             <img src={props.hint} alt="" class="pixelated motion-safe:animate-hint w-5 rotate-90" />
           </a>
@@ -463,13 +590,10 @@ function Line(props: { verse: string[]; at: [number, number, number, number]; st
         },
   ]);
   return (
-    <div
-      ref={seen.set}
-      class="pointer-events-none absolute inset-0 z-2 flex flex-col justify-end px-[clamp(16px,6vw,96px)] pt-24 pb-28 text-cream-50 opacity-0 md:justify-center md:pb-[120px]"
-    >
+    <div ref={seen.set} {...stylex.attrs(viewStyles.lineDiv)}>
       <p ref={rise.set} class="text-shadow-title font-pixel text-[clamp(34px,5.2vw,72px)]/[1.25]">
         {props.verse.map((half) => (
-          <span class="block">{half}</span>
+          <span {...stylex.attrs(viewStyles.lineSpan)}>{half}</span>
         ))}
       </p>
     </div>
@@ -497,13 +621,13 @@ function Layer(props: {
     <div ref={away.set} class={cx("absolute inset-0", props.className)}>
       <div
         ref={closer.set}
-        class="absolute inset-0"
+        {...stylex.attrs(viewStyles.layerDiv)}
         style={{
           "transform-origin": props.origin,
         }}
       >
         <div
-          class="absolute inset-0 will-change-transform"
+          {...stylex.attrs(viewStyles.layerDiv2)}
           style={{
             transform: `translate(${reducedMotion() ? 0 : -x() * props.point}px, ${reducedMotion() ? 0 : -y() * props.point * 0.6}px)`,
           }}

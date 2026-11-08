@@ -1,13 +1,38 @@
 /** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
+
 import type { Copy } from "../i18n/zh";
 import { GITHUB } from "../lib/links";
 
+const viewStyles = stylex.create({
+  footFooter: {
+    backgroundColor: "var(--color-bark-900)",
+    paddingInline: "clamp(16px,5vw,64px)",
+    paddingBlock: "calc(var(--spacing) * 10)",
+    fontSize: "15px",
+    color: "var(--color-cream-100)",
+  },
+  footSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "1",
+    color: "var(--color-cream-50)",
+  },
+  footImg: {
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+  },
+});
+
 export default function Foot(props: { copy: Copy }) {
   return (
-    <footer class="bg-bark-900 px-[clamp(16px,5vw,64px)] py-10 text-[15px] text-cream-100">
+    <footer {...stylex.attrs(viewStyles.footFooter)}>
       <div class="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-7 gap-y-[18px] *:[a]:text-cream-50 *:[a]:underline">
-        <span class="flex items-center gap-2.5 font-pixel text-2xl/none text-cream-50">
-          <img src="/gen/icon-64.png" alt="" width="40" height="40" class="size-10" />
+        <span {...stylex.attrs(viewStyles.footSpan)}>
+          <img src="/gen/icon-64.png" alt="" width="40" height="40" {...stylex.attrs(viewStyles.footImg)} />
           {props.copy.title}
         </span>
         <a href={GITHUB}>GitHub</a>

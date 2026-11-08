@@ -1,9 +1,52 @@
 /** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
 import { createSignal } from "solid-js";
 
 import { createScrollPosition } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
 import { cx } from "./ui";
+
+const viewStyles = stylex.create({
+  barImg: {
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+  },
+  barNav: {
+    marginLeft: "auto",
+    display: "flex",
+    gap: "calc(var(--spacing) * 5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+  },
+  barA: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-50)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-50)",
+      },
+    },
+    color: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-bark-900)",
+      },
+    },
+  },
+});
 
 interface Props {
   copy: Pick<Copy, "home" | "title" | "nav" | "other"> & { name: string };
@@ -21,10 +64,10 @@ export default function Bar(props: Props) {
       )}
     >
       <a class="text-shadow-soft flex items-center gap-2.5 font-pixel text-2xl/none" href={props.copy.home}>
-        <img src="/gen/icon-64.png" alt="" width="32" height="32" class="size-8 border-2 border-bark-900" />
+        <img src="/gen/icon-64.png" alt="" width="32" height="32" {...stylex.attrs(viewStyles.barImg)} />
         {props.copy.name}
       </a>
-      <nav aria-label={props.copy.title} class="ml-auto flex gap-5 font-pixel text-lg/none">
+      <nav aria-label={props.copy.title} {...stylex.attrs(viewStyles.barNav)}>
         {(["how", "features", "screens", "start"] as const).map((id) => (
           <a href={`#${id}`} class="text-shadow-soft hidden border-b-2 border-transparent py-1 hover:border-wheat min-[860px]:block">
             {props.copy.nav[id]}
@@ -35,7 +78,7 @@ export default function Bar(props: Props) {
         </a>
       </nav>
       <a
-        class="border-2 border-cream-50 px-2.5 py-1.5 font-pixel text-lg/none hover:bg-cream-50 hover:text-bark-900"
+        {...stylex.attrs(viewStyles.barA)}
         href={props.copy.other.href}
         hreflang={props.copy.other.href === "/" ? "zh-CN" : "en"}
         lang={props.copy.other.href === "/" ? "zh-CN" : "en"}

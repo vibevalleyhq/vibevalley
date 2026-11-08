@@ -219,6 +219,18 @@ The expanded capture exposed unstable rounded-ring rasterization in the original
 
 An AST comparison of all 162 converted files, removing only the new StyleX declarations/imports and reversing their class applications, finds no other semantic changes across 1,731 expressions. Integration checks also exposed an existing Ctrl+K test race, reproduced on the untouched original revision: opening before the first state frame highlights the notes fallback before channels arrive. The test now asserts the existing `link=open` state-frame handshake before opening; all original interaction assertions remain. Test/note edits after the visual run do not change production UI code, but final aggregate evidence must still rebuild against final inputs.
 
+### Previously touched features, viewer chrome and website native elements
+
+The next static pass converts 202 expressions in nine previously touched web feature files. Its AST comparison retains their existing StyleX declarations and removes only the new declarations and applications; no other semantic changes remain. The website pass converts 160 expressions in eleven components with the same proof, normalizing formatter-added parentheses around JSX. Website spacing and type defaults now have explicit owned declarations, and its theme values remain available independently of utility discovery.
+
+Story frame metadata now accepts `StyleXStyles`, not class strings. Thirteen pixel story files share one host-owned frame definition. The viewer forwards frame runtime variables as object styles while retaining its explicit preview width. Its tree, toolbar, grid labels, argument controls and canvas use local styles with public host tokens. The remaining filled-frame descendant layout contract has not yet been converted.
+
+A separate whole-viewer fixture supplies identical catalogue data to original and candidate package sources. This avoids comparing an intentionally changed production story count or hiding it from screenshots. Both builds use the same fixture and compiler configuration; the original and current Solid package files must match. The report records fixture hashes, runtime files and both output trees. Fourteen new scenes cover both themes, desktop and narrow widths, argument editing and selected-link hover, increasing the full static manifest to 156 scenarios.
+
+These comparisons caught two issues that frame-only captures missed: StyleX 0.19.1 `attrs()` kebab-cases case-sensitive custom property names, and a media-wrapped hover rule overrode the selected link. Tree indentation now uses object styles, and hover excludes the selected link. A new browser regression checks indentation and selected hover precedence in both themes. Dynamic styled boundaries must preserve object styles rather than assume serialized variables are safe.
+
+The 156-scenario full comparison passes A/A and candidate captures with zero changed pixels and equal text; after the website pass, its six route/width comparisons also pass independently. All 16 component browser tests, 18 website production tests and 26 web-check tasks pass. These remain scoped receipts, not final migration acceptance; final canonical builds and the live/host matrix are still required.
+
 ## Alternatives considered
 
 - **Keep Astro with a local Solid renderer:** rejected by the owner after the delayed multi-root hydration failure. Do not keep this adapter as a second production route.

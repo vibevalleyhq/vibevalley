@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { stories, story } from "@vibevalley/stories";
 
 import { PxPick, PxSegmented, PxSwitchField } from "./choice";
+import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   choiceStoriesDiv: {
@@ -22,7 +23,7 @@ const runtimes = [
 export default stories({
   title: "组件/像素/choice",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Segmented: story({
       args: { value: "day", block: false },

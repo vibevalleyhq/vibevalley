@@ -5,6 +5,7 @@ import type { InboxItem, InboxKind } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import type { CallPhase } from "#/features/voice/index.ts";
+import { storyFrame } from "#/ui/pixel/story.stylex.ts";
 
 import { lcd } from "./lcd";
 import { OrchestratorLine, RingingScreen } from "./screens";
@@ -44,7 +45,7 @@ const ring = (kind: InboxKind, label: string, text: string): InboxItem => ({
 export default stories({
   title: "界面/农场/电话",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     "Call the orchestrator": story({
       note: "打给管家的每一步：没打、在接、接通了管家还没来、在说、在挂，和没打通（原因写在屏上）。",

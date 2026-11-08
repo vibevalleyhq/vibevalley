@@ -1,9 +1,102 @@
-/** @jsxImportSource @solidjs/web */
 import type { JSX } from "@solidjs/web";
+/** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
 
 import { createReveal, createScrollAnimation } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
 import { Section, cx } from "./ui";
+
+const viewStyles = stylex.create({
+  devicesDiv: {
+    display: "grid",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 12)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=64rem)": "minmax(0,.85fr) minmax(0,1.15fr)",
+    },
+  },
+  devicesP: {
+    maxWidth: "36em",
+  },
+  devicesUl: {
+    marginTop: "calc(var(--spacing) * 6)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  devicesLi: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    paddingInline: "calc(var(--spacing) * 3.5)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+  },
+  devicesP2: {
+    marginTop: "calc(var(--spacing) * 5)",
+    fontSize: "15px",
+    color: "var(--color-bark-800)",
+  },
+  devicesDiv2: {
+    position: "relative",
+    marginInline: "auto",
+    width: "100%",
+    maxWidth: "640px",
+    paddingBottom: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 24)",
+    },
+  },
+  devicesDiv3: {
+    marginTop: {
+      default: "calc(var(--spacing) * 8)",
+      "@media (width>=64rem)": "0",
+    },
+    display: "flex",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 6)",
+  },
+  laptopDiv: {
+    borderStyle: "solid",
+    borderWidth: "6px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-bark-900)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+  },
+  laptopImg: {
+    display: "block",
+    height: "auto",
+    width: "100%",
+  },
+  laptopDiv2: {
+    marginInline: "-4%",
+    height: "calc(var(--spacing) * 3)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-300)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 3px 3px 0 var(--color-drop)",
+  },
+  phoneDiv: {
+    borderRadius: "18px",
+    borderStyle: "solid",
+    borderWidth: "7px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-bark-900)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+  },
+  phoneImg: {
+    display: "block",
+    height: "auto",
+    width: "100%",
+    borderRadius: "10px",
+  },
+});
 interface Shot {
   src: string;
   srcset: string;
@@ -19,25 +112,25 @@ export default function Devices(props: Props) {
   const root = createReveal<HTMLElement>();
   return (
     <Section ref={root.set} id="devices" title={props.copy.title}>
-      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+      <div {...stylex.attrs(viewStyles.devicesDiv)}>
         <div>
-          <p data-reveal class="max-w-[36em]">
+          <p data-reveal {...stylex.attrs(viewStyles.devicesP)}>
             {props.copy.text}
           </p>
-          <ul role="list" data-reveal class="mt-6 flex flex-wrap gap-3">
+          <ul role="list" data-reveal {...stylex.attrs(viewStyles.devicesUl)}>
             {props.copy.platforms.map((p) => (
-              <li class="panel px-3.5 py-2 font-pixel text-lg/none">{p}</li>
+              <li {...stylex.attrs(viewStyles.devicesLi)}>{p}</li>
             ))}
           </ul>
-          <p data-reveal class="mt-5 text-[15px] text-bark-800">
+          <p data-reveal {...stylex.attrs(viewStyles.devicesP2)}>
             {props.copy.note}
           </p>
         </div>
-        <div class="relative mx-auto w-full max-w-[640px] lg:pb-24">
+        <div {...stylex.attrs(viewStyles.devicesDiv2)}>
           <Drift rate={0.03}>
             <Laptop shot={props.mac} alt={props.copy.shots.mac} />
           </Drift>
-          <div class="mt-8 flex justify-center gap-6 lg:mt-0">
+          <div {...stylex.attrs(viewStyles.devicesDiv3)}>
             <Drift rate={-0.06} className="w-[42%] max-w-[180px] lg:absolute lg:right-[17%] lg:bottom-[-4px] lg:w-[25%]">
               <Phone shot={props.phones[0]} alt={props.copy.shots.chat} />
             </Drift>
@@ -65,7 +158,7 @@ function Drift(props: { rate: number; className?: string; children: JSX.Element 
 function Laptop(props: { shot: Shot; alt: string }) {
   return (
     <div>
-      <div class="shadow-hard-lg border-[6px] border-bark-900 bg-bark-900">
+      <div {...stylex.attrs(viewStyles.laptopDiv)}>
         <img
           loading="lazy"
           decoding="async"
@@ -75,17 +168,17 @@ function Laptop(props: { shot: Shot; alt: string }) {
           width={props.shot.width}
           height={props.shot.height}
           alt={props.alt}
-          class="block h-auto w-full"
+          {...stylex.attrs(viewStyles.laptopImg)}
         />
       </div>
-      <div class="shadow-hard mx-[-4%] h-3 border-2 border-bark-900 bg-cream-300" />
+      <div {...stylex.attrs(viewStyles.laptopDiv2)} />
     </div>
   );
 }
 /** A phone in the farm's colours: the screen in a thick dark frame. */
 function Phone(props: { shot: Shot; alt: string }) {
   return (
-    <div class="shadow-hard-lg rounded-[18px] border-[7px] border-bark-900 bg-bark-900">
+    <div {...stylex.attrs(viewStyles.phoneDiv)}>
       <img
         loading="lazy"
         decoding="async"
@@ -93,7 +186,7 @@ function Phone(props: { shot: Shot; alt: string }) {
         width={props.shot.width}
         height={props.shot.height}
         alt={props.alt}
-        class="block h-auto w-full rounded-[10px]"
+        {...stylex.attrs(viewStyles.phoneImg)}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 /** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
 import { steps } from "motion";
 import { createSignal, onCleanup } from "solid-js";
 
@@ -6,6 +7,148 @@ import { Presence } from "../animation/Presence";
 import { createReveal } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
 import { Section } from "./ui";
+
+const viewStyles = stylex.create({
+  startImg: {
+    width: "calc(var(--spacing) * 12)",
+    height: "calc(var(--spacing) * 12)",
+    flex: "none",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  startH3: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "var(--text-2xl--line-height)",
+    color: "var(--color-berry)",
+  },
+  startP: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  startP2: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  startDiv: {
+    marginTop: "calc(var(--spacing) * 7)",
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(1,minmax(0,1fr))",
+      "@media (width>=64rem)": "minmax(0,1fr) minmax(0,1.3fr)",
+    },
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 7)",
+  },
+  startDiv2: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    padding: "calc(var(--spacing) * 6)",
+  },
+  startH32: {
+    fontSize: "var(--text-2xl)",
+    lineHeight: "var(--text-2xl--line-height)",
+  },
+  startUl: {
+    marginTop: "calc(var(--spacing) * 3)",
+  },
+  startLi: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  startImg2: {
+    marginTop: "5px",
+    width: "calc(var(--spacing) * 5)",
+    height: "calc(var(--spacing) * 5)",
+    flex: "none",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  startDiv3: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  startPre: {
+    marginTop: "calc(var(--spacing) * 3.5)",
+    overflowX: "auto",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-bark-900)",
+    paddingInline: "calc(var(--spacing) * 5)",
+    paddingBlock: "18px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "1.8",
+    color: "var(--color-cream-50)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-bark-600)",
+  },
+  startSpan: {
+    display: "block",
+  },
+  startP3: {
+    marginTop: "calc(var(--spacing) * 3.5)",
+    fontSize: "15px",
+    color: "var(--color-bark-800)",
+  },
+  startA: {
+    textDecorationLine: "underline",
+  },
+  copyCommands: {
+    display: "inline-flex",
+    height: "calc(var(--spacing) * 8)",
+    cursor: "pointer",
+    alignItems: "center",
+    overflow: "hidden",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: {
+      default: "var(--color-cream-50)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "1",
+    color: "var(--color-bark-900)",
+  },
+  copyButtonSpan: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  copyButtonImg: {
+    width: "calc(var(--spacing) * 4)",
+    height: "calc(var(--spacing) * 4)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  copyButtonSpan2: {
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: "0",
+    width: "1px",
+    height: "1px",
+    margin: "-1px",
+    padding: "0",
+    position: "absolute",
+    overflow: "hidden",
+  },
+});
 interface Props {
   copy: Pick<Copy, "start" | "safety">;
   commands: string[];
@@ -23,28 +166,28 @@ export default function Start(props: Props) {
     <>
       <Section ref={root.set} id="start" alt title={props.copy.start.title}>
         <div data-reveal role="note" class="panel bg-warn! flex items-start gap-5 p-6">
-          <img loading="lazy" src={props.icons.warn} alt="" class="pixelated size-12 flex-none object-contain" />
+          <img loading="lazy" src={props.icons.warn} alt="" {...stylex.attrs(viewStyles.startImg)} />
           <div>
-            <h3 class="mb-1.5 text-2xl text-berry">{props.copy.safety.title}</h3>
-            <p class="text-base">{props.copy.safety.text}</p>
-            <p class="mt-2 text-base">{props.copy.safety.wip}</p>
+            <h3 {...stylex.attrs(viewStyles.startH3)}>{props.copy.safety.title}</h3>
+            <p {...stylex.attrs(viewStyles.startP)}>{props.copy.safety.text}</p>
+            <p {...stylex.attrs(viewStyles.startP2)}>{props.copy.safety.wip}</p>
           </div>
         </div>
-        <div class="mt-7 grid grid-cols-1 items-start gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-          <div data-reveal class="panel p-6">
-            <h3 class="text-2xl">{props.copy.start.needs}</h3>
-            <ul class="mt-3">
+        <div {...stylex.attrs(viewStyles.startDiv)}>
+          <div data-reveal {...stylex.attrs(viewStyles.startDiv2)}>
+            <h3 {...stylex.attrs(viewStyles.startH32)}>{props.copy.start.needs}</h3>
+            <ul {...stylex.attrs(viewStyles.startUl)}>
               {props.copy.start.list.map((item) => (
-                <li class="flex items-start gap-2.5 py-1.5 text-base">
-                  <img loading="lazy" src={props.icons.check} alt="" class="pixelated mt-[5px] size-5 flex-none object-contain" />
+                <li {...stylex.attrs(viewStyles.startLi)}>
+                  <img loading="lazy" src={props.icons.check} alt="" {...stylex.attrs(viewStyles.startImg2)} />
                   {item}
                 </li>
               ))}
             </ul>
           </div>
-          <div data-reveal class="panel p-6">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-2xl">{props.copy.start.build}</h3>
+          <div data-reveal {...stylex.attrs(viewStyles.startDiv2)}>
+            <div {...stylex.attrs(viewStyles.startDiv3)}>
+              <h3 {...stylex.attrs(viewStyles.startH32)}>{props.copy.start.build}</h3>
               <CopyButton
                 text={props.commands.join("\n")}
                 icon={props.icons.copy}
@@ -53,17 +196,17 @@ export default function Start(props: Props) {
                 done={props.copy.start.copied}
               />
             </div>
-            <pre class="mt-3.5 overflow-x-auto border-2 border-bark-900 bg-bark-900 px-5 py-[18px] font-mono text-sm/[1.8] text-cream-50 shadow-[inset_0_0_0_2px_var(--color-bark-600)]">
+            <pre {...stylex.attrs(viewStyles.startPre)}>
               {props.commands.map((c) => (
-                <span class="block">
+                <span {...stylex.attrs(viewStyles.startSpan)}>
                   <span class="text-wheat select-none">$ </span>
                   {c}
                 </span>
               ))}
             </pre>
-            <p class="mt-3.5 text-[15px] text-bark-800">
+            <p {...stylex.attrs(viewStyles.startP3)}>
               {props.copy.start.more}{" "}
-              <a href={props.readme} class="underline">
+              <a href={props.readme} {...stylex.attrs(viewStyles.startA)}>
                 {props.copy.start.readme}
               </a>
             </p>
@@ -99,7 +242,7 @@ function CopyButton(props: { text: string; icon: string; check: string; label: s
       data-testid="copy-commands"
       data-copied={copied() ? "true" : "false"}
       onClick={() => void copy()}
-      class="inline-flex h-8 cursor-pointer items-center overflow-hidden border-2 border-bark-900 bg-cream-50 px-2 font-pixel text-sm/none text-bark-900 hover:bg-cream-hover"
+      {...stylex.attrs(viewStyles.copyCommands)}
     >
       <Presence
         value={copied() ? "done" : "copy"}
@@ -109,13 +252,13 @@ function CopyButton(props: { text: string; icon: string; check: string; label: s
         transition={{ duration: 0.2, ease: steps(3) }}
       >
         {(value, ref) => (
-          <span ref={ref} class="inline-flex items-center gap-1.5">
-            <img src={value === "done" ? props.check : props.icon} alt="" class="pixelated size-4 object-contain" />
+          <span ref={ref} {...stylex.attrs(viewStyles.copyButtonSpan)}>
+            <img src={value === "done" ? props.check : props.icon} alt="" {...stylex.attrs(viewStyles.copyButtonImg)} />
             {value === "done" ? props.done : props.label}
           </span>
         )}
       </Presence>
-      <span class="sr-only" aria-live="polite">
+      <span {...stylex.attrs(viewStyles.copyButtonSpan2)} aria-live="polite">
         {copied() ? props.done : ""}
       </span>
     </button>

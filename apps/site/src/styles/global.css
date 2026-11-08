@@ -17,7 +17,20 @@
 @custom-variant evening (&:where(:root[data-scene='evening'] *));
 @custom-variant night (&:where(:root[data-scene='night'] *));
 
-@theme {
+@theme static {
+  --spacing: 0.25rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: calc(2 / 1.5);
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: calc(1.5 / 1);
+  --text-lg: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --text-xl: 1.25rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1 / 0.75);
   --color-cream-50: #f7e8c4;
   --color-cream-100: #eedcb2;
   --color-cream-200: #e2c995;

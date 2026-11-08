@@ -1,5 +1,6 @@
-/** @jsxImportSource @solidjs/web */
 import type { JSX } from "@solidjs/web";
+/** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
 import { steps, type MotionValue } from "motion";
 import { createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
 
@@ -25,6 +26,324 @@ import {
   type StoryArt,
 } from "../lib/story";
 import { Section, cx } from "./ui";
+
+const viewStyles = stylex.create({
+  finishedDiv: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+    alignItems: "flex-end",
+    gap: "22px",
+    paddingInline: {
+      default: "calc(var(--spacing) * 3)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 6)",
+      "@media (width>=64rem)": "0",
+    },
+    paddingTop: {
+      default: "calc(var(--spacing) * 6)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 8)",
+    },
+  },
+  finishedDiv2: {
+    display: "flex",
+    justifyContent: "center",
+  },
+  finishedImg: {
+    width: {
+      default: "68px",
+      "@media (width>=40rem)": "102px",
+      "@media (width>=64rem)": "136px",
+    },
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  finishedDiv3: {
+    position: "relative",
+    marginTop: "calc(var(--spacing) * 2)",
+    marginBottom: {
+      default: "calc(var(--spacing) * 3)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 4)",
+    },
+    height: {
+      default: "calc(var(--spacing) * 10)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 12)",
+    },
+    borderBlockStyle: "solid",
+    borderBlockWidth: "2px",
+    borderColor: "var(--color-path-edge)",
+    backgroundImage: "repeating-linear-gradient(90deg,var(--color-path) 0 22px,var(--color-path-groove) 22px 26px)",
+  },
+  finishedImg2: {
+    position: "absolute",
+    right: "4%",
+    bottom: "calc(var(--spacing) * 1.5)",
+    height: {
+      default: "calc(var(--spacing) * 14)",
+      "@media (width>=40rem)": "84px",
+      "@media (width>=64rem)": "calc(var(--spacing) * 28)",
+    },
+    width: "auto",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  finishedDiv4: {
+    marginBottom: "calc(var(--spacing) * 12)",
+  },
+  finishedOl: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(1,minmax(0,1fr))",
+      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
+      "@media (width>=64rem)": "repeat(4,minmax(0,1fr))",
+    },
+    gap: "22px",
+  },
+  finishedLi: {
+    position: "relative",
+    marginTop: {
+      default: "calc(var(--spacing) * 2.5)",
+      "@media (width>=40rem)": "0",
+    },
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    paddingInline: "22px",
+    paddingTop: "26px",
+    paddingBottom: "22px",
+  },
+  finishedSpan: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -4)",
+    left: "18px",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-leaf-500)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+    color: "var(--color-cream-50)",
+  },
+  finishedImg3: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    width: "calc(var(--spacing) * 14)",
+    height: "calc(var(--spacing) * 14)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  finishedH3: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "var(--text-2xl--line-height)",
+  },
+  finishedP: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    color: "var(--color-bark-800)",
+  },
+  howTrack: {
+    position: "relative",
+  },
+  storyDiv: {
+    position: "sticky",
+    top: "calc(var(--spacing) * 16)",
+    display: "flex",
+    height: "calc(100svh - 4rem)",
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 5)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+  storyDiv2: {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    transformOrigin: "0 0",
+  },
+  storyDiv3: {
+    position: "absolute",
+    top: "0",
+    left: "0",
+  },
+  storyImg: {
+    position: "absolute",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  captionDiv: {
+    position: "relative",
+    minHeight: "calc(var(--spacing) * 44)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    paddingInline: "calc(var(--spacing) * 5)",
+    paddingTop: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 5)",
+  },
+  captionOl: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  captionDiv2: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  captionImg: {
+    width: "calc(var(--spacing) * 12)",
+    height: "calc(var(--spacing) * 12)",
+    flex: "none",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  captionH3: {
+    marginBottom: "var(--spacing)",
+    fontSize: "var(--text-2xl)",
+    lineHeight: "var(--text-2xl--line-height)",
+  },
+  passDiv: {
+    position: "absolute",
+    inset: "0",
+  },
+  groundDiv: {
+    position: "absolute",
+    insetInline: "0",
+    borderBlockStyle: "solid",
+    borderBlockWidth: "1px",
+    borderColor: "var(--color-path-edge)",
+    backgroundImage: "repeating-linear-gradient(90deg,var(--color-path) 0 11px,var(--color-path-groove) 11px 13px)",
+  },
+  spotDiv: {
+    position: "absolute",
+  },
+  spotDiv2: {
+    position: "absolute",
+    top: "0",
+  },
+  popDiv: {
+    position: "absolute",
+    bottom: "0",
+    left: "0",
+    translate: "calc(calc(1 / 2 * 100%) * -1) 0",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * .5)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 1px 1px 0 var(--color-drop)",
+  },
+  popImg: {
+    display: "block",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  branchDiv: {
+    position: "relative",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  branchDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: {
+      default: "var(--text-sm)",
+      "@media (width>=40rem)": "var(--text-base)",
+    },
+    lineHeight: {
+      default: "1",
+      "@media (width>=40rem)": "1",
+    },
+  },
+  branchSpan: {
+    display: {
+      default: "none",
+      "@media (width>=40rem)": "inline",
+    },
+  },
+  branchSpan2: {
+    marginLeft: "auto",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  branchSpan3: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  branchSpan4: {
+    color: "var(--color-leaf-700)",
+  },
+  branchSpan5: {
+    color: "var(--color-berry)",
+  },
+  branchDiv3: {
+    position: "relative",
+    marginTop: "var(--spacing)",
+    height: "92px",
+  },
+  branchSvg: {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+  },
+  branchSpan6: {
+    position: "absolute",
+    left: "0",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "1",
+    color: "var(--color-bark-800)",
+  },
+  branchSpan7: {
+    position: "absolute",
+    display: "flex",
+    translate: "calc(calc(1 / 2 * 100%) * -1) 0",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-wheat)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "1",
+    whiteSpace: "nowrap",
+  },
+  branchImg: {
+    width: "calc(var(--spacing) * 3.5)",
+    height: "calc(var(--spacing) * 3.5)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+});
 interface Props {
   copy: Copy["how"];
   /** Each step's icon. */
@@ -50,27 +369,27 @@ function Finished(props: Props) {
   return (
     <div>
       <div aria-hidden="true" class="shadow-hard-lg relative mb-12 overflow-hidden border-2 border-bark-900 bg-[linear-gradient(180deg,#8fbf5a,#76a046)]">
-        <div class="grid grid-cols-4 items-end gap-[22px] px-3 pt-6 sm:px-6 sm:pt-8 lg:px-0">
+        <div {...stylex.attrs(viewStyles.finishedDiv)}>
           {grown.map((stage) => (
-            <div class="flex justify-center">
-              <img loading="lazy" src={props.art[stage].src} alt="" class="pixelated w-[68px] max-w-none sm:w-[102px] lg:w-[136px]" />
+            <div {...stylex.attrs(viewStyles.finishedDiv2)}>
+              <img loading="lazy" src={props.art[stage].src} alt="" {...stylex.attrs(viewStyles.finishedImg)} />
             </div>
           ))}
         </div>
-        <div class="border-path-edge relative mt-2 mb-3 h-10 border-y-2 bg-[repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_26px)] sm:mb-4 sm:h-12">
-          <img loading="lazy" src={props.art.cheer.src} alt="" class="pixelated absolute right-[4%] bottom-1.5 h-14 w-auto max-w-none sm:h-[84px] lg:h-28" />
+        <div {...stylex.attrs(viewStyles.finishedDiv3)}>
+          <img loading="lazy" src={props.art.cheer.src} alt="" {...stylex.attrs(viewStyles.finishedImg2)} />
         </div>
       </div>
-      <div class="mb-12">
+      <div {...stylex.attrs(viewStyles.finishedDiv4)}>
         <Branch copy={props.copy.git} now={{ place: PLACES.length - 1, working: true, work: 1, x: 0 }} check={props.art["mark-check"].src} />
       </div>
-      <ol role="list" class="grid grid-cols-1 gap-[22px] sm:grid-cols-2 lg:grid-cols-4">
+      <ol role="list" {...stylex.attrs(viewStyles.finishedOl)}>
         {props.copy.steps.map((s, i) => (
-          <li data-reveal={i * 80} class="panel relative mt-2.5 px-[22px] pt-[26px] pb-[22px] sm:mt-0">
-            <span class="absolute -top-4 left-[18px] border-2 border-bark-900 bg-leaf-500 px-2.5 py-1.5 font-pixel text-lg/none text-cream-50">{i + 1}</span>
-            <img loading="lazy" src={props.icons[i]} alt="" class="pixelated mb-3 size-14 object-contain" />
-            <h3 class="mb-1.5 text-2xl">{s.title}</h3>
-            <p class="text-base text-bark-800">{s.text}</p>
+          <li data-reveal={i * 80} {...stylex.attrs(viewStyles.finishedLi)}>
+            <span {...stylex.attrs(viewStyles.finishedSpan)}>{i + 1}</span>
+            <img loading="lazy" src={props.icons[i]} alt="" {...stylex.attrs(viewStyles.finishedImg3)} />
+            <h3 {...stylex.attrs(viewStyles.finishedH3)}>{s.title}</h3>
+            <p {...stylex.attrs(viewStyles.finishedP)}>{s.text}</p>
           </li>
         ))}
       </ol>
@@ -166,12 +485,12 @@ function Story(props: Props) {
       ref={track.set}
       data-testid="how-track"
       data-step={now().place}
-      class="relative"
+      {...stylex.attrs(viewStyles.howTrack)}
       style={{
         height: `${100 + PLACES.length * 80}svh`,
       }}
     >
-      <div class="sticky top-16 flex h-[calc(100svh-4rem)] flex-col justify-center gap-5 py-4">
+      <div {...stylex.attrs(viewStyles.storyDiv)}>
         <div
           ref={stage.set}
           data-testid="how-stage"
@@ -179,7 +498,7 @@ function Story(props: Props) {
           class="shadow-hard-lg relative h-[264px] shrink-0 overflow-hidden border-2 border-bark-900 bg-[#9fc6d9] lg:h-[396px]"
         >
           <div
-            class="absolute top-0 left-0 origin-top-left"
+            {...stylex.attrs(viewStyles.storyDiv2)}
             style={{
               width: `${FIELD.w}px`,
               height: `${FIELD.h}px`,
@@ -199,7 +518,7 @@ function Story(props: Props) {
                 <Spot place={place} index={i} now={now()} art={props.art} />
               ))}
               <div
-                class="absolute top-0 left-0"
+                {...stylex.attrs(viewStyles.storyDiv3)}
                 style={{
                   transform: `translate(${position()}px, ${FIELD.path}px)`,
                 }}
@@ -208,7 +527,7 @@ function Story(props: Props) {
                   ref={helper.set}
                   src={props.art.side.src}
                   alt=""
-                  class="pixelated absolute max-w-none"
+                  {...stylex.attrs(viewStyles.storyImg)}
                   style={{
                     left: `${-props.art.side.ax}px`,
                     top: `${-props.art.side.ay}px`,
@@ -241,8 +560,8 @@ function Story(props: Props) {
 /** The words for the step the story is at, with the four steps as marks along the top. */
 function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
   return (
-    <div class="panel relative min-h-44 px-5 pt-4 pb-5">
-      <ol role="list" class="mb-3 flex flex-wrap gap-2">
+    <div {...stylex.attrs(viewStyles.captionDiv)}>
+      <ol role="list" {...stylex.attrs(viewStyles.captionOl)}>
         {props.copy.steps.map((s, i) => (
           <li
             aria-current={i === props.now.place ? "step" : undefined}
@@ -263,11 +582,11 @@ function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
         transition={{ duration: 0.24, ease: steps(4) }}
       >
         {(index, ref) => (
-          <div ref={ref} class="flex items-start gap-4">
-            <img src={props.icons[index]} alt="" class="pixelated size-12 flex-none object-contain" />
+          <div ref={ref} {...stylex.attrs(viewStyles.captionDiv2)}>
+            <img src={props.icons[index]} alt="" {...stylex.attrs(viewStyles.captionImg)} />
             <div>
-              <h3 class="mb-1 text-2xl">{props.copy.steps[index]!.title}</h3>
-              <p class="text-base text-bark-800">{props.copy.steps[index]!.text}</p>
+              <h3 {...stylex.attrs(viewStyles.captionH3)}>{props.copy.steps[index]!.title}</h3>
+              <p {...stylex.attrs(viewStyles.finishedP)}>{props.copy.steps[index]!.text}</p>
             </div>
           </div>
         )}
@@ -280,7 +599,7 @@ function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.
   const value = readMotion(props.camera);
   return (
     <div
-      class="absolute inset-0"
+      {...stylex.attrs(viewStyles.passDiv)}
       style={{
         transform: `translateX(${-value() * props.pace}px)`,
       }}
@@ -327,12 +646,12 @@ function Hills(props: { camera: MotionValue<number> }) {
   return (
     <>
       <Pass camera={props.camera} pace={PACE.hills * 0.6}>
-        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
+        <svg {...stylex.attrs(viewStyles.passDiv)} width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
           <polygon points={band(60, 16, 70, 1)} fill="#8db5a0" />
         </svg>
       </Pass>
       <Pass camera={props.camera} pace={PACE.hills}>
-        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
+        <svg {...stylex.attrs(viewStyles.passDiv)} width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
           <polygon points={band(76, 10, 46, 3)} fill="#7aa95a" />
         </svg>
       </Pass>
@@ -350,7 +669,7 @@ function Ground() {
         }}
       />
       <div
-        class="border-path-edge absolute inset-x-0 border-y bg-[repeating-linear-gradient(90deg,var(--color-path)_0_11px,var(--color-path-groove)_11px_13px)]"
+        {...stylex.attrs(viewStyles.groundDiv)}
         style={{
           top: `${FIELD.path - 9}px`,
           height: `${14}px`,
@@ -387,7 +706,7 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
       <Sprite art={props.art[props.place.thing.name]} x={props.place.thing.x} y={FIELD.stand} />
       <div
         ref={plot.set}
-        class="absolute"
+        {...stylex.attrs(viewStyles.spotDiv)}
         style={{
           left: `${props.place.plot}px`,
           top: `${FIELD.stand}px`,
@@ -413,7 +732,7 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
         {(_, ref) => (
           <div
             ref={ref}
-            class="absolute top-0"
+            {...stylex.attrs(viewStyles.spotDiv2)}
             style={{
               left: `${props.place.plot}px`,
             }}
@@ -431,7 +750,7 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
         {(_, ref) => (
           <div
             ref={ref}
-            class="absolute"
+            {...stylex.attrs(viewStyles.spotDiv)}
             style={{
               left: `${props.place.plot + 24}px`,
               top: `${FIELD.stand - 34}px`,
@@ -449,18 +768,18 @@ function Pop(props: { art: Art; x: number; y: number; ref: (element: HTMLElement
   return (
     <div
       ref={props.ref}
-      class="absolute"
+      {...stylex.attrs(viewStyles.spotDiv)}
       style={{
         left: `${props.x}px`,
         top: `${props.y}px`,
         "transform-origin": "50% 100%",
       }}
     >
-      <div class="absolute bottom-0 left-0 -translate-x-1/2 border border-bark-900 bg-cream-50 p-0.5 shadow-[1px_1px_0_var(--color-drop)]">
+      <div {...stylex.attrs(viewStyles.popDiv)}>
         <img
           src={props.art.src}
           alt=""
-          class="pixelated block max-w-none"
+          {...stylex.attrs(viewStyles.popImg)}
           style={{
             width: `${Math.round(props.art.w * 0.55)}px`,
             height: `${Math.round(props.art.h * 0.55)}px`,
@@ -484,29 +803,29 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
       : "",
   );
   return (
-    <div class="panel relative px-4 pt-3 pb-2" aria-hidden="true">
-      <div class="flex flex-wrap items-center gap-2 font-pixel text-sm/none sm:text-base/none">
+    <div {...stylex.attrs(viewStyles.branchDiv)} aria-hidden="true">
+      <div {...stylex.attrs(viewStyles.branchDiv2)}>
         <span class={cx("border-2 border-bark-900 px-2 py-1", b().forked ? "bg-leaf-300" : "bg-cream-100 text-bark-500")}>
           {props.copy.branch}
-          <span class="hidden sm:inline"> · {props.copy.worktree}</span>
+          <span {...stylex.attrs(viewStyles.branchSpan)}> · {props.copy.worktree}</span>
         </span>
-        <span class="ml-auto border-2 border-bark-900 bg-cream-100 px-2 py-1 tabular-nums">
+        <span {...stylex.attrs(viewStyles.branchSpan2)}>
           {b().commits} {props.copy.commits}
         </span>
-        <span class="border-2 border-bark-900 bg-cream-100 px-2 py-1 tabular-nums">
-          <span class="text-leaf-700">+{b().plus}</span> <span class="text-berry">−{b().minus}</span>
+        <span {...stylex.attrs(viewStyles.branchSpan3)}>
+          <span {...stylex.attrs(viewStyles.branchSpan4)}>+{b().plus}</span> <span {...stylex.attrs(viewStyles.branchSpan5)}>−{b().minus}</span>
         </span>
         <span class={cx("border-2 border-bark-900 px-2 py-1 tabular-nums", b().tests === JOB.tests ? "bg-leaf-500 text-cream-50" : "bg-cream-100")}>
           {props.copy.tests} {b().tests}/{JOB.tests}
         </span>
       </div>
-      <div class="relative mt-1 h-[92px]">
-        <svg class="absolute inset-0 size-full" viewBox="0 0 100 92" preserveAspectRatio="none" shape-rendering="crispEdges">
+      <div {...stylex.attrs(viewStyles.branchDiv3)}>
+        <svg {...stylex.attrs(viewStyles.branchSvg)} viewBox="0 0 100 92" preserveAspectRatio="none" shape-rendering="crispEdges">
           <line x1="0" y1={main} x2="100" y2={main} stroke="var(--color-bark-900)" stroke-width="3" vector-effect="non-scaling-stroke" />
           {path() && <path d={path()} fill="none" stroke="var(--color-leaf-600)" stroke-width="3" vector-effect="non-scaling-stroke" />}
         </svg>
         <span
-          class="absolute left-0 font-pixel text-sm/none text-bark-800"
+          {...stylex.attrs(viewStyles.branchSpan6)}
           style={{
             top: `${main - 22}px`,
           }}
@@ -527,14 +846,14 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
           {(_, ref) => (
             <span
               ref={ref}
-              class="absolute flex -translate-x-1/2 items-center gap-1 border-2 border-bark-900 bg-wheat px-1.5 py-0.5 font-pixel text-sm/none whitespace-nowrap"
+              {...stylex.attrs(viewStyles.branchSpan7)}
               style={{
                 left: `${GIT.join * 100}%`,
                 top: `${main - 42}px`,
               }}
             >
               {props.copy.merged}
-              <img src={props.check} alt="" class="pixelated size-3.5 object-contain" />
+              <img src={props.check} alt="" {...stylex.attrs(viewStyles.branchImg)} />
             </span>
           )}
         </Presence>

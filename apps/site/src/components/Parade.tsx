@@ -1,6 +1,83 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { observeVisibility, createReveal, createScrollAnimation } from "../animation/scroll";
 /** @jsxImportSource @solidjs/web */
 import type { Copy } from "../i18n/zh";
+
+const viewStyles = stylex.create({
+  paradeDiv: {
+    position: "absolute",
+    bottom: "108px",
+    left: "-10%",
+    display: "flex",
+    width: "120%",
+    alignItems: "flex-end",
+    gap: "calc(var(--spacing) * 6)",
+  },
+  paradeImg: {
+    width: "102px",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  paradeDiv2: {
+    position: "absolute",
+    bottom: "38px",
+    height: "calc(var(--spacing) * 16)",
+    width: "100%",
+    borderBlockStyle: "solid",
+    borderBlockWidth: "2px",
+    borderColor: "var(--color-path-edge)",
+    backgroundImage: "repeating-linear-gradient(90deg,var(--color-path) 0 22px,var(--color-path-groove) 22px 26px)",
+  },
+  paradeDiv3: {
+    position: "absolute",
+    bottom: "-18px",
+    left: "-10%",
+    display: "flex",
+    width: "120%",
+    alignItems: "flex-end",
+    gap: "120px",
+  },
+  paradeImg2: {
+    width: "150px",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  paradeDiv4: {
+    position: "absolute",
+    insetInline: "0",
+    top: "22px",
+    zIndex: "2",
+    marginInline: "auto",
+    width: "min(760px,100% - 32px)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    paddingInline: "22px",
+    paddingBlock: "calc(var(--spacing) * 3.5)",
+    textAlign: "center",
+  },
+  paradeH2: {
+    fontSize: {
+      default: "var(--text-2xl)",
+      "@media (width>=40rem)": "30px",
+    },
+    lineHeight: "var(--text-2xl--line-height)",
+  },
+  paradeP: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontSize: {
+      default: "var(--text-sm)",
+      "@media (width>=40rem)": "var(--text-base)",
+    },
+    lineHeight: {
+      default: "var(--text-sm--line-height)",
+      "@media (width>=40rem)": "var(--text-base--line-height)",
+    },
+  },
+});
 /** While the section crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
 const CROSSING = ["start end", "end start"] as ["start end", "end start"];
 interface Props {
@@ -26,15 +103,12 @@ export default function Parade(props: Props) {
         aria-labelledby="parade-title"
         class="[container-type:inline-size] relative h-[400px] overflow-hidden border-y-2 border-bark-900 bg-[linear-gradient(180deg,#9fc6d9_0%,#cfe3d6_49%,#7fa84e_49%,#6b9241_100%)]"
       >
-        <div ref={back.set} aria-hidden="true" class="absolute bottom-[108px] left-[-10%] flex w-[120%] items-end gap-6">
+        <div ref={back.set} aria-hidden="true" {...stylex.attrs(viewStyles.paradeDiv)}>
           {props.plots.map((src) => (
-            <img loading="lazy" src={src} alt="" class="pixelated w-[102px] max-w-none" />
+            <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.paradeImg)} />
           ))}
         </div>
-        <div
-          aria-hidden="true"
-          class="border-path-edge absolute bottom-[38px] h-16 w-full border-y-2 bg-[repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_26px)]"
-        />
+        <div aria-hidden="true" {...stylex.attrs(viewStyles.paradeDiv2)} />
         {props.walkers.map((frames, i) => (
           <div
             aria-hidden="true"
@@ -57,16 +131,16 @@ export default function Parade(props: Props) {
             ))}
           </div>
         ))}
-        <div ref={near.set} aria-hidden="true" class="absolute bottom-[-18px] left-[-10%] flex w-[120%] items-end gap-[120px]">
+        <div ref={near.set} aria-hidden="true" {...stylex.attrs(viewStyles.paradeDiv3)}>
           {props.front.map((src) => (
-            <img loading="lazy" src={src} alt="" class="pixelated w-[150px] max-w-none" />
+            <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.paradeImg2)} />
           ))}
         </div>
-        <div data-reveal class="panel absolute inset-x-0 top-[22px] z-2 mx-auto w-[min(760px,calc(100%-32px))] px-[22px] py-3.5 text-center">
-          <h2 id="parade-title" class="text-2xl sm:text-[30px]">
+        <div data-reveal {...stylex.attrs(viewStyles.paradeDiv4)}>
+          <h2 id="parade-title" {...stylex.attrs(viewStyles.paradeH2)}>
             {props.copy.title}
           </h2>
-          <p class="mt-1.5 text-sm sm:text-base">{props.copy.text}</p>
+          <p {...stylex.attrs(viewStyles.paradeP)}>{props.copy.text}</p>
         </div>
       </section>
     </>
