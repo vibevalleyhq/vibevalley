@@ -15,6 +15,15 @@ import type { IconName } from "./icons";
 import { Hint } from "./Tip";
 
 const viewStyles = stylex.create({
+  card: {
+    display: "flex",
+    flexDirection: "column",
+    borderRadius: "var(--radius-lg)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+  },
   listRowSpan: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -189,9 +198,17 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
 }
 
 /** The open thing's card: a title, what sits beside it, and its body. */
-export function Card(props: { title?: JSX.Element; action?: JSX.Element; children: JSX.Element; class?: string; testid?: string; item?: string }) {
+export function Card(props: {
+  title?: JSX.Element;
+  action?: JSX.Element;
+  children: JSX.Element;
+  styles?: stylex.StyleXStyles;
+  testid?: string;
+  item?: string;
+}) {
+  const appearance = () => stylex.props(viewStyles.card, props.styles);
   return (
-    <section data-testid={props.testid} data-key={props.item} class={["flex flex-col rounded-lg border border-line bg-page", props.class]}>
+    <section data-testid={props.testid} data-key={props.item} class={appearance().className} style={appearance().style}>
       <Show when={props.title !== undefined}>
         <header {...stylex.attrs(viewStyles.cardHeader)}>
           <h2 {...stylex.attrs(viewStyles.cardH2)}>{props.title}</h2>

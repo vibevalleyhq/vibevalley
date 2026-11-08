@@ -172,6 +172,24 @@ test("regression: StyleX variables survive Base UI positioning and reactive vari
   }
 });
 
+test("regression: card styles preserve reactive dimensions and action focus", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/layout:Dynamic card", theme, w: "400" })}`);
+    const card = page.getByTestId("styled-card");
+    await expect(card).toHaveCSS("width", "240px");
+    await expect(card).toHaveCSS("max-width", "240px");
+    await expect(card).toHaveCSS("border-top-width", "1px");
+    const action = page.getByTestId("card-resize");
+    await action.focus();
+    await page.keyboard.press("Enter");
+    await expect(card).toHaveCSS("width", "320px");
+    await expect(card).toHaveCSS("max-width", "320px");
+    await expect(action).toBeFocused();
+    check();
+  }
+});
+
 test("regression: button style variables compose with forwarded native attributes", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {

@@ -53,6 +53,7 @@ import {
 } from "./VoiceVendorFields";
 
 const viewStyles = stylex.create({
+  voiceCard: { maxWidth: "var(--container-4xl)" },
   barP: {
     color: "var(--wb-berry)",
   },
@@ -288,7 +289,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               <Card
                 title={t("web.voice.voice.credentials")}
                 action={<OutLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
-                class="max-w-4xl"
+                styles={viewStyles.voiceCard}
               >
                 <Cols>
                   <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
@@ -318,7 +319,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               <Card
                 title={t("web.voice.voice.listen")}
                 action={<span {...stylex.attrs(viewStyles.formSpan2)}>{t("web.voice.voice.listenParts")}</span>}
-                class="max-w-4xl"
+                styles={viewStyles.voiceCard}
               >
                 <Cols>
                   <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
@@ -374,7 +375,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               <Card
                 title={t("web.voice.voice.think")}
                 action={<span {...stylex.attrs(viewStyles.formSpan2)}>{answerLabel[answer().vendor]}</span>}
-                class="max-w-4xl"
+                styles={viewStyles.voiceCard}
               >
                 <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
                   <Segmented
@@ -445,7 +446,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             </Show>
             <Show when={props.view === "dictation"}>
               {/* The page's title already says Dictation: the card has none of its own. */}
-              <Card class="max-w-4xl">
+              <Card styles={viewStyles.voiceCard}>
                 <div {...stylex.attrs(viewStyles.formDiv3)}>
                   <Segmented
                     label={t("web.voice.voice.dictationVia")}

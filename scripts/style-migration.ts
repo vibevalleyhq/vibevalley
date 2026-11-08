@@ -6,6 +6,7 @@ import { parseAllDocuments } from "yaml";
 
 import { scanStyleDependencies } from "./style-migration-dependencies";
 import { hash, migrationInputs, migrationOutput, migrationRoot } from "./style-migration-inputs";
+import { migrationProgress } from "./style-migration-progress";
 import { scanStyleCss, scanStyleHtml, scanStyleSource, type StyleFinding } from "./style-migration-scan";
 
 const record = (input: unknown): Readonly<Record<string, unknown>> =>
@@ -185,6 +186,7 @@ const report = {
   coverage,
   classifications,
   counts,
+  progress: migrationProgress(findings),
   findings,
 };
 await mkdir(migrationOutput, { recursive: true });
@@ -196,6 +198,7 @@ console.log(
       files: coverage.length,
       graphs: graphs.length,
       counts,
+      progress: report.progress,
       report: relative(migrationRoot, resolve(migrationOutput, "inventory.json")),
     },
     null,

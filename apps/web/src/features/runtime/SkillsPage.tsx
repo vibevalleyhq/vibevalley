@@ -26,6 +26,7 @@ import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";
 
 const viewStyles = stylex.create({
+  skillCard: { maxWidth: "var(--container-3xl)" },
   skillsBook: {
     display: "flex",
     flexShrink: "0",
@@ -318,7 +319,7 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
 /** Read-only: it lives with the runtime. */
 function InstalledCard(props: { skill: InstalledSkill; catalog: readonly RuntimeInfo[] }) {
   return (
-    <Card title={props.skill.name} class="max-w-3xl">
+    <Card title={props.skill.name} styles={viewStyles.skillCard}>
       <p {...stylex.attrs(viewStyles.installedCardP)}>{t("web.runtime.library.installedNote")}</p>
       <Show when={props.skill.description}>
         <p {...stylex.attrs(viewStyles.installedCardP2)}>{props.skill.description}</p>
@@ -387,7 +388,7 @@ function SkillEditor(props: { skill?: Skill }) {
     <Form form={form} testid="skill-form">
       <Card
         title={name.value() || t("web.runtime.library.newSkill")}
-        class="max-w-3xl"
+        styles={viewStyles.skillCard}
         action={
           <div {...stylex.attrs(viewStyles.skillEditorDiv)}>
             <Show when={skill}>

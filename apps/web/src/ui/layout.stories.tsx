@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { For } from "solid-js";
+import { createSignal, For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
@@ -9,6 +9,7 @@ import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } 
 import { Dot } from "./Tag";
 
 const viewStyles = stylex.create({
+  dynamicCard: (width: number) => ({ width, maxWidth: width }),
   layoutStoriesDiv: {
     width: "calc(var(--spacing) * 72)",
   },
@@ -63,6 +64,25 @@ export default stories({
           </Card>
         </div>
       ),
+    }),
+    "Dynamic card": story({
+      render: () => {
+        const [wide, setWide] = createSignal(false);
+        return (
+          <Card
+            testid="styled-card"
+            title="Card"
+            styles={viewStyles.dynamicCard(wide() ? 320 : 240)}
+            action={
+              <Button data-testid="card-resize" onClick={() => setWide(!wide())}>
+                Resize
+              </Button>
+            }
+          >
+            <Quiet>Content</Quiet>
+          </Card>
+        );
+      },
     }),
     "Toggle states": story({
       args: { checked: true, disabled: false },

@@ -110,7 +110,129 @@ Cover both app themes, representative component states, farm/tree DOM overlays, 
 
 A screenshot does not prove keyboard behavior, cleanup, hydration identity, or animation interruption. Include behavior results in `acceptance.json`; do not infer them from pixel equality.
 
-## 术 — Implementation sequence
+## 术 — Quantified backlog and phase TODOs
+
+### Measurement baseline
+
+The remaining-work baseline is commit `ab18831c`, measured with `vp run migration:inventory`. It contains **4,751 class-token occurrences in 151 distinct files**. Occurrences are not unique class names or lines of code. Findings overlap; do not add the rows below into a task total or convert token counts into an estimate of effort.
+
+| Finding | Baseline | Exit condition |
+|---|---:|---|
+| Files with class tokens | 151 | 0 |
+| Class-token occurrences | 4,751 | 0 |
+| Styled-contract findings | 23 | 0 unresolved |
+| Legacy-helper findings | 10 | 0 |
+| Dynamic class findings | 154 | 0 unresolved |
+| Unreviewed inline styles | 287 | 0 unreviewed; justified positioning/animation ownership may remain |
+| Tailwind CSS findings | 1,290 | 0 |
+| Dependency findings | 60 | 0; these are findings, not 60 distinct packages |
+| Tailwind imports / configurations | 4 / 1 | 0 / 0 |
+| Stale build-input findings | 4 | 0 against final sources |
+
+Dynamic findings are the sum of `unresolved-class-member`, `unknown-class-call`, `unresolved-class-binding`, `unknown-class-expression` and `unknown-class-template`. Generated CSS and dependency counts depend on build freshness and must be reported separately from source conversion. A previous intermediate scan had 6,538 class tokens: the reduction to this baseline is 1,787 (27.3%). That scan was already after migration started, so neither 27.3% nor its complement is an overall completion percentage.
+
+| Area | Baseline tokens | Baseline files | Phase |
+|---|---:|---:|---|
+| `apps/web/src/ui` | 800 | 34 | 1 |
+| `apps/web/src/app` | 49 | 2 | 1 |
+| `apps/web/src/stories` | 57 | 6 | 1 |
+| `packages/base-ui` | 1 | 1 | 1; classify without styling Base UI |
+| `apps/web/src/features` | 2,269 | 61 | 2 |
+| `apps/web/src/farm` | 846 | 28 | 3 |
+| `apps/web/src/tree` | 85 | 2 | 3 |
+| `apps/site` | 361 | 12 | 4 |
+| `packages/stories` | 66 | 2 | 4 |
+| `design` | 207 | 2 | 4 |
+| Other `apps/web` files | 10 | 1 | 4 |
+
+The baseline stays fixed. Update the execution ledger after each verified batch with before/after counts, touched areas, checks and remaining blockers. The inventory JSON is the current machine-readable source; unknown areas and categories must remain visible. Fewer findings do not establish visual or behavioral acceptance. Do not shrink the scanned scope to improve progress.
+
+### Phase 0 — Make progress reproducible
+
+- [x] Record a fixed source baseline, units, disjoint area totals and final exit conditions in this Note.
+- [x] Add area/token/distinct-file summaries to the existing inventory command and JSON without changing its acceptance verdict.
+- [x] Test repeated occurrences, overlapping findings, unknown areas/categories, path boundaries, deterministic ordering and reconciliation of totals.
+- [x] Run the inventory and record the first ledger row; expected verdict remains failed while migration is incomplete.
+
+### Phase 1 — Close shared styling contracts (907 tokens / 43 files at baseline)
+
+- [x] Locate all 23 contract findings and 10 helper-call findings in the scanner output; record their ownership below. These are findings, not 23 confirmed public APIs or 10 distinct helper functions.
+- [ ] Trace each contract's callers and distinguish actual style APIs, story data and native/externally owned attributes before converting or classifying it.
+- [ ] Convert workbench layout, status/icon/avatar and remaining UI contracts with all callers in the same batch. Start with `apps/web/src/ui/layout.tsx` (100 token occurrences at baseline).
+- [x] First layout slice: replace Card's class-string prop with typed StyleX composition and migrate all six skill/voice callers; preserve dynamic variables as object styles. Split, ListCard, ListRow, Toggle and the remaining layout styles are still open.
+- [ ] Convert pixel component contracts, starting with `apps/web/src/ui/pixel/choice.tsx` (88 occurrences); keep positioning and animation values under one owner.
+- [ ] Convert remaining app shell and web story styles; change each affected component's story alongside its API.
+- [ ] Resolve the Base UI finding without introducing styles into the unstyled package.
+- [ ] Prove dynamic object variables, refs, focus, disabled/data states and responsive composition in production component tests and exact fixtures before closing each batch.
+
+### Phase 2 — Convert business pages (2,269 tokens / 61 files at baseline)
+
+- [ ] Channel: message parts (134 occurrences), message list (109), sidebar (102), and their remaining consumers.
+- [ ] Agent, runtime and connector: start with `AgentsPage.tsx` (115 occurrences).
+- [ ] Issue: detail, lists, board, completion and queued-work surfaces; preserve all state-specific layouts.
+- [ ] Artifact: start with `ArtifactsPage.tsx` (107 occurrences); include document, HTML sandbox, versions and reply controls.
+- [ ] Memory, orchestrator, repository, settings, inbox, knowledge and pairing: cover remaining inventory findings; start memory with `Memory.tsx` (86 occurrences).
+- [ ] For each domain batch, run relevant integration tests and exact populated fixtures, then inspect isolated-server desktop and 390px screenshots. Empty states alone cannot close populated acceptance.
+
+### Phase 3 — Convert farm and tree DOM (931 tokens / 30 files at baseline)
+
+- [ ] Farm issue surfaces: start with `farm/issue/IssueView.tsx` (163 occurrences).
+- [ ] Farm chat: start with `farm/chat/Messages.tsx` (157 occurrences).
+- [ ] Remaining farm overlays, dialogs, panels and responsive DOM; do not change Pixi drawing or game/business rules.
+- [ ] Tree panels and overlays; retain artwork, motion ownership and keyboard interactions.
+- [ ] Verify populated states, both themes where supported, narrow/desktop geometry and reduced motion against the original baseline.
+
+### Phase 4 — Finish website, viewer and remaining containers (644 tokens / 17 files at baseline)
+
+- [ ] Website Hero (167 occurrences): hour-dependent visibility, pressed controls, responsive layout and pre-hydration rules.
+- [ ] Remaining website sections and animation-related style boundaries; no property may have both Motion and StyleX writers.
+- [ ] Viewer filled-frame descendant contract and remaining layout classes; keep the identical catalogue fixture on both sides.
+- [ ] Design HTML and other web containers; migrate or justify each finding, not entire directories.
+- [ ] Verify all three routes without JavaScript, metadata/assets/fonts, hydration identity, four hours, reverse scrolling, modal interruption/focus, resize, offscreen pause, unmount and reduced motion. Keep the single-root public-API architecture.
+
+### Phase 5 — Remove Tailwind and enforce StyleX
+
+- [ ] Make design-token lint understand StyleX; test valid and invalid declarations before deleting utility-based enforcement.
+- [ ] Resolve all dynamic expressions and review inline ownership; each retained semantic class or plain-CSS rule needs a narrow classification.
+- [ ] Preserve required reset, font, token, rich-text and pre-hydration defaults independently of utility discovery.
+- [ ] Remove Tailwind plugins, dependencies, directives, class sorting and obsolete helpers; regenerate the root lockfile through the package manager.
+- [ ] Rebuild app, stories and site client/SSR outputs; require complete inventory coverage and zero forbidden findings. Do not treat a missing or stale graph as zero work.
+
+### Phase 6 — Complete acceptance and deliver one PR
+
+- [ ] Finish immutable real-server fixture creation/restoration, including IDs, times, attachments and populated state; cover lazy modules, themes and interactions.
+- [ ] Complete the full canonical visual manifest with stable A/A and zero changed pixels. The interrupted 162-scene run is not an accepted receipt.
+- [ ] Complete desktop/mobile host, website animation and publishing checks; publish only the static client directory.
+- [ ] Implement `migration:verify`: derive its verdict from fresh inventory, complete visual/behavior receipts and required scenarios; fail on missing, stale, failed or skipped evidence.
+- [ ] Run final root, web, site, dead-code and documentation checks. Keep workflows unchanged.
+- [ ] Document lasting contracts in subsystem/package documentation, remove this proposed Note only after completion, and deliver one PR with evidence and explicit unverified items.
+
+### Contract triage queue
+
+| Owner | Contract findings | Definition files | Next action |
+|---|---:|---|---|
+| Workbench UI | 5 | `Checkbox.tsx`, `Form.tsx`, `Markdown.tsx`, `Tag.tsx`, `layout.tsx` | Trace callers and replace private style props; preserve rich-text semantic classes |
+| Pixel UI | 9 | `PxMarkdown.tsx` (2), `base.tsx` (3), `dialog.tsx` (1), `field.tsx` (3) | Replace class composition while preserving positioning, themed chrome and rich text |
+| Token stories | 1 | `ui/tokens.stories.tsx` | Migrate class-bearing story data; do not count this as a public component API |
+| Business features | 5 | `issue/Sheet.tsx` (1), `session/WorkLog.tsx` (1), `voice/DictationButton.tsx` (3) | Trace wrapper and render-prop forwarding before replacing contracts |
+| Farm | 2 | `farm/map/RepoMap.tsx`, `farm/panels/rows.tsx` | Coordinate with phase 3 DOM conversion |
+| Tree | 1 | `tree/TreePanel.tsx` | Coordinate with phase 3 overlay conversion |
+
+The ten helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Their definitions must be removed only after all callers are migrated. Card in `layout.tsx` is converted, reducing contract findings to 22. The next layout slice is Split/ListCard/ListRow and their responsive, bare and selected states; the queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
+
+### Execution ledger
+
+| Batch | Before → after tokens / files | Evidence | Status |
+|---|---|---|---|
+| Quantified baseline (`ab18831c`) | 4,751 / 151 | Inventory; source conversion and final acceptance still open | Recorded |
+| Phase 0: reproducible progress; phase 1: definition census | 4,751 / 151 → 4,751 / 151 | 37 scanner/dependency/pixel/progress tests pass; inventory emits reconciled area totals and still fails on remaining findings | Phase 0 complete; no style-conversion reduction claimed |
+| Phase 1: Card and six skill/voice callers | 4,751 / 151 → 4,739 / 151 | Contract findings 23 → 22; 18 component and 13 focused integration tests; 4 exact Card comparisons; 26 web-check tasks | Verified slice; phase 1 remains open |
+
+Card live inspection covers the new-skill and voice configuration forms at 1440×900 and 390×844. Desktop receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-IR07mx/result.json`. Narrow receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-bjJzVX/result.json`. Both record code 0, stopped true and no cleanup errors. The default narrow navigation leaves the cards below the fold; the inspected narrow card captures use the real settings-search control to filter navigation and then scroll to the card. This is scoped form evidence, not a default-state full-page comparison or final populated-data acceptance.
+
+The rendering and conversion constraints below remain prerequisites for each phase, not a second completion checklist.
+
+## Migration prerequisites
 
 ### 1. Record immutable baselines and inventory
 
