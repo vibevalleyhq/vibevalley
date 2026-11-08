@@ -12,15 +12,14 @@ type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly w
 
 const said = (r: MossVerifyResult) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
 
-export function MossVerify(props: { typed: () => string }) {
+export function MossVerify() {
   const [result, setResult] = createSignal<MossVerifyResult>();
   // A refusal is the mark's answer too, its reason on hover.
   const act = createAct((why) => setResult({ ok: false, why }));
   const check = () => {
-    const key = props.typed().trim();
     setResult(undefined);
     return act.run(async () => {
-      const r = await api.voice.moss.verify(key ? { key } : {});
+      const r = await api.voice.moss.verify();
       setResult(r.problem ? { ok: false, why: r.problem } : { ok: true });
     });
   };

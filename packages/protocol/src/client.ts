@@ -105,6 +105,51 @@ export class VibeValleyApi {
       this.call<T.SettingsStatus>("/api/v1/setting/update", a, options),
   };
 
+  readonly provider = {
+    get: (options?: { signal?: AbortSignal }): Promise<T.ProviderStatus> => this.call<T.ProviderStatus>("/api/v1/provider/get", undefined, options),
+    update: (a: T.ProviderUpdate, options?: { signal?: AbortSignal }): Promise<T.ProviderStatus> =>
+      this.call<T.ProviderStatus>("/api/v1/provider/update", a, options),
+    voice: {
+      list: (a: T.ProviderVoiceRequest, options?: { signal?: AbortSignal }): Promise<T.ProviderVoiceListing> =>
+        this.call<T.ProviderVoiceListing>("/api/v1/provider/voice/list", a, options),
+    },
+    model: {
+      list: (a: T.ProviderModelRequest, options?: { signal?: AbortSignal }): Promise<T.ProviderModelListing> =>
+        this.call<T.ProviderModelListing>("/api/v1/provider/model/list", a, options),
+    },
+  };
+
+  readonly media = {
+    input: {
+      create: (a: T.MediaInputRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
+        this.call<T.MediaInput>("/api/v1/media/input/create", a, options),
+      get: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> => this.call<T.MediaInput>("/api/v1/media/input/get", a, options),
+      list: (options?: { signal?: AbortSignal }): Promise<T.MediaInput[]> => this.call<T.MediaInput[]>("/api/v1/media/input/list", undefined, options),
+      delete: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/media/input/delete", a, options),
+      previewDelete: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/media/input/previewDelete", a, options),
+    },
+    image: {
+      create: (a: T.MediaImageRequest, options?: { signal?: AbortSignal }): Promise<T.MediaImageJob> =>
+        this.call<T.MediaImageJob>("/api/v1/media/image/create", a, options),
+    },
+    understanding: {
+      create: (a: T.MediaUnderstandingRequest, options?: { signal?: AbortSignal }): Promise<T.MediaUnderstandingJob> =>
+        this.call<T.MediaUnderstandingJob>("/api/v1/media/understanding/create", a, options),
+      previewCleanup: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/media/understanding/previewCleanup", a, options),
+      cleanup: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaUnderstandingJob> =>
+        this.call<T.MediaUnderstandingJob>("/api/v1/media/understanding/cleanup", a, options),
+    },
+    job: {
+      get: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaJob> => this.call<T.MediaJob>("/api/v1/media/job/get", a, options),
+      cancel: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaJob> => this.call<T.MediaJob>("/api/v1/media/job/cancel", a, options),
+      download: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaJob> =>
+        this.call<T.MediaJob>("/api/v1/media/job/download", a, options),
+      list: (options?: { signal?: AbortSignal }): Promise<T.MediaJob[]> => this.call<T.MediaJob[]>("/api/v1/media/job/list", undefined, options),
+    },
+  };
+
   readonly channel = {
     create: (a: T.ChannelRequest, options?: { signal?: AbortSignal }): Promise<string> => this.call<string>("/api/v1/channel/create", a, options),
     update: (a: { id: string } & T.ChannelUpdate, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/update", a, options),
@@ -197,8 +242,7 @@ export class VibeValleyApi {
     dictate: (a: T.DictateRequest, options?: { signal?: AbortSignal }): Promise<T.Dictated> => this.call<T.Dictated>("/api/v1/voice/dictate", a, options),
     moss: {
       /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
-      verify: (a: T.MossVerifyRequest, options?: { signal?: AbortSignal }): Promise<T.Validation> =>
-        this.call<T.Validation>("/api/v1/voice/moss/verify", a, options),
+      verify: (options?: { signal?: AbortSignal }): Promise<T.Validation> => this.call<T.Validation>("/api/v1/voice/moss/verify", undefined, options),
     },
     grant: {
       create: (options?: { signal?: AbortSignal }): Promise<T.AgoraGrant> => this.call<T.AgoraGrant>("/api/v1/voice/grant/create", undefined, options),

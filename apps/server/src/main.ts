@@ -13,6 +13,7 @@ import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
 import { loadConfig, pkmDir, reposDir, worktreesDir } from "./infra/config.ts";
 import { leaseHome } from "./infra/lease.ts";
+import { PublicHttp } from "./infra/publicHttp.ts";
 
 const { values: flags } = parseArgs({
   options: {
@@ -41,6 +42,9 @@ const main = Effect.gen(function* () {
   const loaded = yield* loadConfig(flags.config);
   const config = flags.web ? { ...loaded, web: flags.web } : loaded;
   const runtime = testRuntimesAsked ? yield* testRuntimes : undefined;
+  const network = testRuntimesAsked
+    ? (yield* Effect.promise(() => import("./testing/network.ts"))).network
+    : Layer.merge(FetchHttpClient.layer, PublicHttp.layer);
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(config.home, { recursive: true });
   const repos = reposDir(config);
@@ -83,7 +87,7 @@ const main = Effect.gen(function* () {
         ),
       )
     : farm;
-  return yield* Layer.launch(observed);
+  return yield* Layer.launch(observed.pipe(Layer.provide(network)));
 });
 
 NodeRuntime.runMain(main.pipe(Effect.scoped, Effect.provide(NodeServices.layer)));

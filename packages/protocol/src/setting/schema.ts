@@ -51,7 +51,7 @@ export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   dictation: Dictation,
   dictationKey: KeyStatus,
   dictationReady: Schema.Boolean,
-  mossKey: KeyStatus,
+  mossReady: Schema.Boolean,
   memorySources: Schema.mutable(Schema.Array(MemorySource)),
 });
 
@@ -77,6 +77,5 @@ export const SettingsUpdate: Codec<T.SettingsUpdate> = Schema.Struct({
   ttsKey: Schema.optionalKey(Schema.String),
   dictation: Schema.optionalKey(Dictation),
   dictationKey: Schema.optionalKey(Schema.String),
-  mossKey: Schema.optionalKey(Schema.String),
   memorySources: Schema.optionalKey(Schema.mutable(Schema.Array(MemorySourceUpdate))),
 });

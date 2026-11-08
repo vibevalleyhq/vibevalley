@@ -1,0 +1,68 @@
+import { Effect, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+
+import { readMossResponse } from "./response.ts";
+import { mossSpeechFormats } from "./speech-models.ts";
+
+export const AudioId = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u));
+const ErrorCode = Schema.Literals([
+  "voice_not_found",
+  "task_not_found",
+  "unsupported_stream",
+  "unsupported_for_stream",
+  "unsupported_with_async",
+  "unsupported_with_webhook",
+  "invalid_field_value",
+  "rate_limit_exceeded",
+  "concurrency_limit_exceeded",
+]);
+const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Struct({ code: ErrorCode }) }));
+export class MossAudioError extends Schema.TaggedError<MossAudioError, { readonly brand: unique symbol }>()("MossAudioError", {
+  reason: Schema.Literals(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
+  outcome: Schema.Literals(["NotSubmitted", "Rejected", "Unknown"]),
+  status: Schema.optionalKey(Schema.Int),
+  code: Schema.optionalKey(ErrorCode),
+}) {}
+
+const mimeTypes: Record<(typeof mossSpeechFormats)[number], readonly string[]> = {
+  mp3: ["audio/mpeg", "audio/mp3"],
+  wav: ["audio/wav", "audio/x-wav", "audio/wave"],
+  pcm: ["audio/pcm", "audio/l16", "application/octet-stream"],
+  flac: ["audio/flac", "audio/x-flac"],
+  aac: ["audio/aac", "audio/aacp"],
+  opus: ["audio/opus", "audio/ogg", "application/ogg"],
+};
+export const AudioResult = Schema.Struct({
+  url: Schema.URLFromString.check(
+    Schema.makeFilter((url) => url.href.length <= 8192 && url.protocol === "https:" && url.username === "" && url.password === "" && url.hash === ""),
+  ),
+  response_format: Schema.Literals(mossSpeechFormats),
+  content_type: Schema.String.check(Schema.isBetweenCodePoints(1, 256)),
+}).check(Schema.makeFilter((result) => mimeTypes[result.response_format].includes(result.content_type.split(";")[0]?.trim().toLowerCase() ?? "")));
+
+export const audioRequest = Effect.fnUntraced(
+  function* (key: string, request: HttpClientRequest.HttpClientRequest) {
+    if (!key.trim() || /\s/u.test(key)) return yield* new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+    const http = yield* HttpClient.HttpClient;
+    const response = yield* http.execute(request.pipe(HttpClientRequest.setHeaders({ authorization: `Bearer ${key}`, accept: "application/json" })));
+    const raw = yield* readMossResponse(response).pipe(
+      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(new MossAudioError({ reason: "TooLarge", outcome: "Unknown" }))),
+    );
+    if (response.status < 200 || response.status >= 300) {
+      const parsed = Schema.decodeOption(ErrorBody)(raw);
+      const code = parsed._tag === "Some" ? parsed.value.error.code : undefined;
+      return yield* new MossAudioError({
+        reason: "HttpStatus",
+        status: response.status,
+        outcome:
+          [400, 401, 403, 413, 422, 429].includes(response.status) || (response.status === 404 && (code === "voice_not_found" || code === "task_not_found"))
+            ? "Rejected"
+            : "Unknown",
+        ...(code !== undefined ? { code } : {}),
+      });
+    }
+    return raw;
+  },
+  Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
+  Effect.catchTag("HttpClientError", () => Effect.fail(new MossAudioError({ reason: "Network", outcome: "Unknown" }))),
+);

@@ -24,9 +24,8 @@ import { Button } from "#/ui/Button.tsx";
 import { Select, TextInput } from "#/ui/Field.tsx";
 import { IconLink, OutLink } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
-import { Card, Quiet, SecretInput } from "#/ui/layout.tsx";
+import { Card, Quiet, SecretInput, TextLink } from "#/ui/layout.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
-import { KeyRow, SettingsGroup } from "#/ui/settings.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
@@ -53,7 +52,7 @@ import {
 
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
-type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey" | "mossKey";
+type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey";
 
 /** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or dictation. */
 type LineView = "call" | "moss" | "dictation";
@@ -185,7 +184,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   const asr = () => draft().asr;
   const answer = () => draft().answer;
   const credentialsReady = () =>
-    answer().vendor === "moss" ? base().mossKey.source !== null : base().agoraAppId.source !== null && base().agoraAppCertificate.source !== null;
+    answer().vendor === "moss" ? base().mossReady : base().agoraAppId.source !== null && base().agoraAppCertificate.source !== null;
   const answerHint = () => {
     const source = base().deepseekApiKey.source;
     return answer().vendor === "orchestrator"
@@ -208,19 +207,10 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
         <div class="flex h-full min-h-0 flex-col gap-3">
           <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
             <Show when={props.view === "moss"}>
-              <SettingsGroup>
-                <KeyRow
-                  label="API Key"
-                  hint={t("web.voice.voice.moss.keyHint")}
-                  status={base().mossKey}
-                  value={secrets().mossKey ?? ""}
-                  onInput={(v) => setSecrets({ ...secrets(), mossKey: v })}
-                  removing={cleared().has("mossKey")}
-                  onRemove={remove("mossKey")}
-                  link={{ href: "https://platform.mosi.cn/", label: t("web.voice.voice.moss.console") }}
-                  after={<MossVerify typed={() => secrets().mossKey ?? ""} />}
-                />
-              </SettingsGroup>
+              <div class="flex flex-wrap items-center gap-3">
+                <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                <MossVerify />
+              </div>
             </Show>
             <Show when={props.view === "call"}>
               <div class="flex max-w-4xl items-center gap-2 px-1">
@@ -327,12 +317,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   />
                 </Labeled>
                 <Show when={answer().vendor === "moss"}>
-                  <Cols>
-                    {secret("mossKey", "MOSS API Key", () => base().mossKey, {
-                      href: "https://platform.mosi.cn/",
-                      label: t("web.voice.voice.moss.console"),
-                    })}
-                  </Cols>
+                  <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
                 </Show>
                 <Show when={variant(answer(), "vendor", "agora")}>
                   {(a) => (
@@ -408,14 +393,9 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Show
                   when={dictation().via === "own"}
                   fallback={
-                    <Cols>
-                      <div data-testid="dictation-moss-key" class="contents">
-                        {secret("mossKey", t("web.voice.voice.dictationMossKey"), () => base().mossKey, {
-                          href: "https://platform.mosi.cn/",
-                          label: t("web.voice.voice.moss.console"),
-                        })}
-                      </div>
-                    </Cols>
+                    <div data-testid="dictation-provider-link">
+                      <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                    </div>
                   }
                 >
                   <Cols>
@@ -449,7 +429,9 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </Card>
             </Show>
           </div>
-          <div class="max-w-4xl">{bar()}</div>
+          <Show when={props.view !== "moss"}>
+            <div class="max-w-4xl">{bar()}</div>
+          </Show>
         </div>
       }
     >

@@ -14,7 +14,7 @@ export const voiceHandlers = Effect.gen(function* () {
     "voice.call.hear": (body) => voice.heard(body.agentId, body.text, body.agent ?? "", body.sendKey ?? ""),
     "voice.call.say": (body) => voice.said(body.agentId, body.text),
     "voice.dictate": (body) => voice.dictate(body.audio, body.format),
-    "voice.moss.verify": (body) => voice.verifyMoss(body.key ?? ""),
+    "voice.moss.verify": () => voice.verifyMoss(),
     "voice.hear": (body) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
   };
   return done;

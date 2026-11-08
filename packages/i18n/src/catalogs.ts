@@ -274,6 +274,28 @@ export const catalogs = {
         runtime: { list: "列出全部农机", refresh: "重新探测一台农机", setting: { update: "改一台农机的设置：开关、路径、默认模型、预算" } },
         server: { health: { get: "服务端在不在、是哪个版本" } },
         session: { event: { list: "读一个帮工的轨迹，从早到晚" }, get: "看一个帮工", list: "列出帮工，可以只看一份档案的", stop: "停下帮工这一轮，帮工还在" },
+        media: {
+          understanding: {
+            create: "确认账号和上传许可后理解选中的本机输入",
+            cleanup: "清理已知远端文件，不重复理解请求",
+            previewCleanup: "预览远端清理和本机保留释放，不改变任何文件",
+          },
+          input: {
+            create: "为媒体输入预留有限的本机空间，不上传给供应商",
+            get: "查看本机的媒体输入",
+            list: "列出本机的媒体输入",
+            delete: "删除没有被任务保留的本机媒体输入",
+            previewDelete: "预览删除本机媒体输入，不实际改动",
+          },
+          image: { create: "创建生图任务，同一编号不重复生成" },
+          job: { get: "读取生成任务", list: "列出最近生成任务", cancel: "取消本机等待，不保证停止厂商计费", download: "只重试结果下载，不重新生成" },
+        },
+        provider: {
+          voice: { list: "查询指定 MOSS 账号的一页音色，不生成音频" },
+          get: "读取供应商连接和默认用途，密钥只显示提示",
+          update: "按版本保存供应商连接和默认用途",
+          model: { list: "查询已配置 MOSS 账号的可用模型，不发推理请求" },
+        },
         setting: { get: "看设置", update: "改设置", validate: "这些设置会被拒的第一处，不存" },
         skill: {
           create: "新建一个技能",
@@ -1069,6 +1091,67 @@ export const catalogs = {
       subscriptionTaken: "话题 {thread} 已归属于另一张工单",
       ambiguous: "这条输入同时对应多张工单，需要明确归属",
     },
+    "server.media": {
+      inputDeletePreview: "删除「{name}」的本机输入预留及未完成的上传。",
+      inputDeleteBytes: "没有其他输入保留这份本机文件时，删除文件。",
+      remoteAccountChanged: "这份远端文件属于另一条连接或凭据，没有用替换后的账号发送请求。",
+      remoteUploadUnknown: "远端上传结果尚未确认，或这次上传已结束，不会再次提交；供应商处可能仍有文件。",
+      remoteUploadRejected: "MOSS 拒绝了这次文件上传，没有自动重试。",
+      remoteCleanupFailed: "尚未确认远端文件已删除，记录会保留，可明确重试清理。",
+      cleanupPreview: "经原连接 {connection} 删除 {count} 份已知远端文件，不删除账号里不明来历的文件。",
+      cleanupReleasePreview: "解除本任务对本机输入的保留。未知上传可能仍有文件；这不会停止供应商处理，也不会重复推理。",
+      consentChanged: "图片与视频理解的连接已变化，请核对连接后重新确认上传。",
+      understandingUnknown: "理解结果尚未确认，供应商可能仍在处理或计费，没有重复提交。",
+      understandingRejected: "MOSS 拒绝了理解请求，没有重复提交。",
+      remoteUnresolved: "部分上传没有取得文件 ID。已知文件已清理，请在供应商后台核对这些文件名：{files}",
+      understandingPhase: {
+        queued: "排队中",
+        uploading: "上传到 MOSS",
+        generating: "理解中",
+        ready: "已完成",
+        incomplete: "结果已截断",
+        failed: "失败",
+        unknown: "结果未知",
+        canceled: "已停止等待",
+      },
+      cleanup: {
+        pending: "输入保留中，尚未清理",
+        running: "正在清理远端文件",
+        done: "远端文件清理完成",
+        blocked: "清理需要处理",
+        unknown: "未知上传可能仍有文件",
+      },
+      inputStorage: "无法保存或读取本机的媒体输入，请检查磁盘空间和权限。",
+      inputMissing: "这份媒体输入不存在、已过期或尚未上传完成。",
+      inputInvalid: "媒体输入不正确，请检查格式、大小和文件内容是否完整。",
+      inputQuota: "媒体输入最多预留 2 GiB、256 份文件，请先删除不用的输入。",
+      inputBusy: "这份输入暂不可用：可能正在上传、被任务保留、已经过期，或同时上传的数量已达上限。",
+      inputChanged: "已保存的输入不能换成另一份内容，请创建新的输入。",
+      inputTimeout: "上传到本机已超时，不完整的文件已删除，没有向供应商发起请求。",
+      inputDisconnected: "上传到本机已中断，不完整的文件已删除，没有向供应商发起请求。",
+      ownerRequired: "需要主人的委托才能提交生成，管家不会在自主巡查中发起可能计费的请求。",
+      invalid: "生图参数无效，请检查提示词、布局、尺寸和高级参数。",
+      missing: "找不到这次生成任务。",
+      corrupt: "生成任务记录无法读取，请保留本机数据后检查。",
+      reusedId: "同一个请求编号不能使用不同参数或来源；请明确创建新任务。",
+      busy: "最多同时保留 8 个在途任务，请等待完成或取消排队任务。",
+      downloadFailed: "图片下载或保存失败。可以只重试下载，不会重新生图。",
+      unknown: "没有收到完整生成结果，厂商可能仍在执行或已计费。未自动重新生成。",
+      rejected: "MOSS 拒绝了生成请求，请检查账号权限与输入后再创建新任务。",
+      canceled: "已停止本机等待；不代表厂商停止计算或停止计费。",
+      restarted: "服务端已重启，未重新提交生成请求。",
+      noDownload: "这次任务没有可重试的下载结果。",
+      phase: {
+        queued: "排队中",
+        generating: "生成中",
+        downloading: "下载中",
+        ready: "已保存",
+        failed: "生成失败",
+        unknown: "结果未知",
+        canceled: "已取消等待",
+        download_failed: "下载失败",
+      },
+    },
     "server.memory": {
       source: { local: "本地", nowledge: "Nowledge Mem", everos: "EverOS" },
       noUrl: "没填地址",
@@ -1116,6 +1199,32 @@ export const catalogs = {
       notedBy: "{text}（{name} 记）",
       noPageLike: "没有「{page}」这一页；最像的是 {like}",
       changedSince: "「{page}」在读出以后又被改过，没有写：重新读一次再改",
+    },
+    "server.provider": {
+      speechModel: "请选择支持的 Flash、Pro 语音模型或快照。",
+      speechUnbound: "请先在 AI 服务中选择语音生成连接与模型。",
+      voiceQuery: "音色分页参数无效，请在允许范围内选择偏移量或游标，不要同时使用。",
+      noKey: "请在 AI 服务中保存并启用这条 MOSS 连接，再查询可用模型。",
+      changed: "AI 服务设置已改变，请重新加载后再操作；未覆盖其他窗口的修改。",
+      limit: "最多保存 32 条供应商连接。",
+      id: "连接编号不能重复，只能包含 1–80 个字母、数字、下划线或连字符。",
+      name: "请填写 1–80 个字符的连接名称。",
+      key: "新密钥不能为空、含空白或超过 4096 个字符；要清除密钥请使用清除操作。",
+      bound: "默认用途引用的连接必须存在、已启用且已配置密钥。请先解除用途绑定，再删除、禁用或清除密钥。",
+      model: "所选模型尚未接入听写，请从支持的转写模型中选择。",
+      unbound: "请先在 AI 服务中选择默认听写连接和模型。",
+      understandingUnbound: "请先在 AI 服务中选择媒体理解连接和模型。",
+      understandingModel: "所选模型或快照不支持媒体理解。",
+      imageUnbound: "请先在 AI 服务中选择默认生图连接和模型。",
+      imageModel: "所选模型或快照尚未接入生图，请从支持的图像模型中选择。",
+      authentication: "MOSS API Key 无效或已过期，请更新凭据。",
+      forbidden: "MOSS 拒绝访问模型目录，请检查账号与 API Key 的权限。",
+      rateLimited: "MOSS 模型查询已限流，请稍后手动重试。",
+      httpStatus: "MOSS 模型查询失败（HTTP {status}），未自动重试。",
+      network: "无法读取 MOSS 模型目录，请检查网络后重试。",
+      timeout: "MOSS 模型查询超时，未自动重试。",
+      invalidResponse: "MOSS 模型目录的响应格式不符合接口约定。",
+      tooLarge: "MOSS 模型目录超过读取上限（1 MiB 或 1000 个模型），未返回不完整结果。",
     },
     "server.repo": {
       parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
@@ -1368,6 +1477,11 @@ export const catalogs = {
     },
     "server.tool": {
       labels: {
+        media_image_create: "提交生图",
+        media_job_get: "查看生成任务",
+        media_job_list: "查看最近生成任务",
+        media_job_cancel: "取消生成等待",
+        media_job_download: "重试图片下载",
         repo_list: "仓库",
         channel_list: "频道",
         channel_create: "开频道",
@@ -1439,10 +1553,9 @@ export const catalogs = {
         cut: "听写的回答读到一半断了：{why}",
         status: "听写的地址回了 {status}：{detail}",
         shape: "听写的地址回的不是 OpenAI 的转写格式",
-        noMossKey: "听写走 MOSS，还没填 MOSS 的 API Key：在「听写」里填上",
       },
       moss: {
-        noKey: "还没填 MOSS Live 的 API Key",
+        noKey: "请先在 AI 服务中为 MOSS Live 绑定已启用的连接",
         refused: "MOSS Live 不认这个 Key：{why}",
         unreachable: "连不上 MOSS Live：{why}",
         failed: "MOSS Live 没接通：{why}",
@@ -3141,6 +3254,71 @@ export const catalogs = {
         waiting: "等那台电脑上的主人点头……",
       },
     },
+    "web.media": {
+      title: "媒体",
+      image: "生成图片",
+      understanding: {
+        title: "理解图片与视频",
+        notice:
+          "选 1–5 张图片（每张不超过 30 MB）或一个视频（不超过 200 MB），不要混传。文件先存到这台电脑，经你确认后才发给下方的 MOSS 连接，可能产生费用。停止等待不代表供应商停止处理。",
+        configure: "请先在 AI 服务中选择图片与视频理解的连接。",
+        files: "本机图片或视频",
+        prompt: "想让模型说明什么？",
+        tokens: "最多输出多少 token",
+        consent: "我同意将这些文件和问题发送到上方的 MOSS 连接。",
+        stored: "已存到本机",
+        selected: "已选择，还未上传",
+        uploading: "正在将选中的文件保存到本机…",
+        stopUpload: "停止本机上传",
+        uploadFailed: "本机上传失败，这次提交尚未开始理解；请重试或重新选择文件。",
+        submit: "提交理解",
+        new: "新的理解请求",
+        newAsk: "开始新的请求？这可能再次上传并产生费用，不会找回先前未知的结果。",
+        pending: "已保留请求 ID；重复提交不会再次上传或推理。要换一个问题，请明确开始新的请求。",
+        history: "最近的理解任务",
+        truncated: "结果不完整，已收到的文字保留在下方。要增加输出上限，需要发起新请求，可能再次计费。",
+        usage: "供应商回报：输入 {input} token · 输出 {output} token · 总计 {total}",
+        save: "将文字存为稿子",
+        open: "打开保存的稿子",
+        cleanup: "清理远端文件",
+        cleanupAsk: "删除已知远端文件并释放本机输入的保留？供应商可能还在处理结果未知的请求。没有确认 ID 的上传可能仍有文件，需要人工核对；这不会重复理解。",
+      },
+      sourceOwner: "来源：主人",
+      sourceAgent: "来源：管家 {agent} · 频道 {channel}",
+      usage: "厂商报告：{images} 张 · {width} × {height}",
+      usageUnknown: "尚无厂商用量结果；不代表未计费。",
+      hint: "用 AI 服务中绑定的连接生成图片或理解选中的图片、视频，结果保存在本机。",
+      configure: "配置 AI 连接",
+      prompt: "提示词 / 布局 JSON",
+      format: "输入方式",
+      text: "文生图",
+      layout: "布局生图",
+      width: "宽度",
+      height: "高度",
+      advanced: "高级参数",
+      seed: "随机初值（可选）",
+      steps: "推理步数（可选）",
+      guidance: "引导系数（可选）",
+      negative: "负向提示词",
+      enhance: "增强提示词",
+      watermark: "保留可见水印",
+      generate: "提交生成",
+      resubmit: "重试同一提交",
+      new: "新建生成",
+      newAsk: "创建新的生成请求？新请求可能再次计费，不会恢复上一请求的未知结果。",
+      notice: "提交会把输入发送给 MOSS，可能产生费用。超时或取消等待不代表厂商停止计算；不会自动重新生成。",
+      pending: "这份输入已经提交。网络中断时可重试同一提交；要修改参数或再次生成，请明确新建生成。",
+      empty: "还没有生成任务。先配置生图连接，再提交提示词。",
+      history: "最近的生成任务",
+      cancel: "取消等待",
+      cancelAsk: "停止本机等待？厂商可能仍在生成或计费。",
+      retry: "只重试下载",
+      save: "保存图片",
+      channel: "发布到频道",
+      chooseChannel: "选择频道",
+      publish: "发布图片",
+      published: "已发布",
+    },
     "web.memory": {
       memory: {
         yours: "你记的",
@@ -3282,6 +3460,45 @@ export const catalogs = {
       backlinks: { title: "链到这里的 · {n}", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
       comments: { title: "评论 · {n}", count: "{n} 条评论", accept: "采纳", reject: "不要", accepted: "采纳了", rejected: "不要了", on: "「{span}」" },
       tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
+    },
+    "web.provider": {
+      speechSettings: "单人语音生成",
+      speechConnection: "语音生成连接",
+      speechModel: "语音生成模型",
+      speechNotice: "可独立选择 Flash 或 Pro。工作台尚未开放语音生成和流式播放，保存此设置不会生成音频。",
+      title: "AI 服务",
+      intro: "保存供应商连接，再为听写、MOSS Live 和生图选择连接。当前接入 MOSS；朗读尚未开放。",
+      words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 AI",
+      understandingSettings: "媒体理解配置",
+      understandingConnection: "媒体理解连接",
+      understandingModel: "理解模型 / 版本",
+      understandingNotice: "配置独立的连接和模型。在媒体页选择文件并明确确认上传；保存配置不会上传文件或发起推理。",
+      imageSettings: "生图配置",
+      imageConnection: "生图连接",
+      imageModel: "生图模型 / 版本",
+      imageModelHint: "稳定名称跟随供应商更新，带日期的快照固定模型版本。账号权限与实际效果仍需真实调用验证。",
+      imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
+      add: "添加 MOSS 连接",
+      reload: "重新加载",
+      reloadAsk: "放弃未保存的修改，读取最新设置？",
+      console: "MOSS 开放平台",
+      empty: "还没有供应商连接。添加 MOSS 连接后，可以配置默认用途。",
+      name: "连接名称",
+      enabled: "启用",
+      remove: "删除连接",
+      removeAsk: "从草稿中移除这条连接？保存后生效，仍被用途引用时不能保存。",
+      discover: "查询模型",
+      saveFirst: "先保存修改，再查询账号可用模型。",
+      discoveryHint: "只查询目录，不发推理请求；模型可见不代表推理已验证。",
+      noModels: "此账号返回的模型目录为空。",
+      bindings: "默认用途",
+      dictation: "听写连接",
+      model: "听写模型",
+      modelHint: "这里只列出产品已适配的普通转写模型；账号权限与实际效果仍需真实调用验证。",
+      unbound: "不使用",
+      liveHint: "现有 MOSS Live 实时线路使用这条连接的密钥，不会因更改听写模型而切换实时协议。",
+      bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
+      manage: "管理 AI 服务连接",
     },
     "web.repo": {
       title: "仓库",
@@ -3868,11 +4085,10 @@ export const catalogs = {
           stop: "停下 {name}",
           play: "试听 {name}",
         },
-        moss: { console: "MOSS 开放平台", verify: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
+        moss: { verify: "测一下能不能接通", checking: "在接…", ok: "接通了" },
         dictationVia: "听写走哪",
         dictationOwn: "自己的地址",
-        dictationMossIntro: "录音经服务端交给 MOSS 转写，用 MOSS Live 的同一把 Key。",
-        dictationMossKey: "API Key",
+        dictationMossIntro: "录音经服务端交给 AI 服务中选定的 MOSS 连接和听写模型。",
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -4271,6 +4487,33 @@ export const catalogs = {
           get: "Get a helper",
           list: "List helpers, one profile's if given",
           stop: "Stop a helper's round; the helper stays",
+        },
+        media: {
+          input: {
+            create: "Reserve bounded local storage for a media input without uploading to a provider",
+            get: "Read a local media input",
+            list: "List local media inputs",
+            delete: "Delete a local media input not retained by a task",
+            previewDelete: "Preview deleting a local media input without changing it",
+          },
+          understanding: {
+            create: "Understand selected local inputs with explicit account and upload approval",
+            cleanup: "Clean known remote files without repeating understanding",
+            previewCleanup: "Preview remote cleanup and local retention release without changing either",
+          },
+          image: { create: "Create an image task without resubmitting the same request ID" },
+          job: {
+            get: "Read a generation task",
+            list: "List recent generation tasks",
+            cancel: "Stop local waiting without guaranteeing provider cancellation",
+            download: "Retry result download without generating again",
+          },
+        },
+        provider: {
+          voice: { list: "Read one page of voices from the selected MOSS account without generating audio" },
+          get: "Read provider connections and default uses with masked credentials",
+          update: "Save provider connections and default uses at the expected revision",
+          model: { list: "Query available models for the configured MOSS account without inference" },
         },
         setting: { get: "Get the settings", update: "Update the settings", validate: "The first thing saving these settings would refuse, without saving" },
         skill: {
@@ -5112,6 +5355,68 @@ export const catalogs = {
       subscriptionTaken: "Thread {thread} already belongs to another issue",
       ambiguous: "This input matches multiple issues and needs an explicit owner",
     },
+    "server.media": {
+      inputDeletePreview: "Delete the local input reservation for {name} and any unfinished upload.",
+      inputDeleteBytes: "Delete the local file if no other input retains it.",
+      remoteAccountChanged: "This remote file belongs to a different connection or credential. No request was sent with a replacement account.",
+      remoteUploadUnknown:
+        "The remote upload outcome is unresolved, or this upload has already ended. It will not be submitted again; a remote file may still exist.",
+      remoteUploadRejected: "MOSS rejected this file upload. It was not retried.",
+      remoteCleanupFailed: "The remote file could not be confirmed deleted. Its record is retained for an explicit cleanup retry.",
+      cleanupPreview: "Delete {count} known remote files using their original connection {connection}; never delete unknown account files.",
+      cleanupReleasePreview: "Release this task's local input retention. Unknown uploads may remain; this does not stop vendor processing or repeat inference.",
+      consentChanged: "The selected understanding connection changed. Review the connection and explicitly approve uploading again.",
+      understandingUnknown: "The understanding result is unknown. The provider may still be processing or charging. The request was not repeated.",
+      understandingRejected: "MOSS rejected the understanding request. It was not repeated.",
+      remoteUnresolved: "Some uploads have no confirmed file ID. Known files were cleaned, but inspect these names in the provider console: {files}",
+      understandingPhase: {
+        queued: "Queued",
+        uploading: "Uploading to MOSS",
+        generating: "Understanding",
+        ready: "Completed",
+        incomplete: "Truncated result",
+        failed: "Failed",
+        unknown: "Outcome unknown",
+        canceled: "Waiting canceled",
+      },
+      cleanup: {
+        pending: "Inputs retained; cleanup pending",
+        running: "Cleaning remote files",
+        done: "Remote file cleanup complete",
+        blocked: "Cleanup needs attention",
+        unknown: "Unknown uploads may remain",
+      },
+      inputStorage: "The local media input could not be stored or read. Check disk space and permissions.",
+      inputMissing: "This media input is missing, expired, or not ready.",
+      inputInvalid: "Invalid media input. Check its format, size, and complete file contents.",
+      inputQuota: "Media input reservations are limited to 2 GiB and 256 files. Delete unused inputs before adding more.",
+      inputBusy: "This input is unavailable: it may be uploading, retained by a task, expired, or the concurrent upload limit has been reached.",
+      inputChanged: "A saved input cannot be replaced with different bytes. Create a new input instead.",
+      inputTimeout: "The local upload timed out. Its partial file was removed; no provider request was made.",
+      inputDisconnected: "The local upload was interrupted. Its partial file was removed; no provider request was made.",
+      ownerRequired: "Generation requires the owner's mandate. Autonomous patrols cannot submit potentially billable requests.",
+      invalid: "Invalid image parameters. Check the prompt, layout, dimensions and advanced options.",
+      missing: "This generation task was not found.",
+      corrupt: "The generation record cannot be read. Preserve local data before investigating.",
+      reusedId: "A request ID cannot be reused with different parameters or a different source. Explicitly create a new task.",
+      busy: "At most 8 tasks may be in flight. Wait for completion or cancel a queued task.",
+      downloadFailed: "Image download or saving failed. Retry only the download without generating again.",
+      unknown: "No complete generation result was received. The provider may still be working or have charged for it. Generation was not retried.",
+      rejected: "MOSS rejected the generation request. Check account access and input before creating a new task.",
+      canceled: "Local waiting stopped. This does not guarantee the provider stopped computing or charging.",
+      restarted: "The server restarted. Generation was not resubmitted.",
+      noDownload: "This task has no result available for a download retry.",
+      phase: {
+        queued: "Queued",
+        generating: "Generating",
+        downloading: "Downloading",
+        ready: "Saved",
+        failed: "Generation failed",
+        unknown: "Outcome unknown",
+        canceled: "Waiting canceled",
+        download_failed: "Download failed",
+      },
+    },
     "server.memory": {
       source: { local: "Local", nowledge: "Nowledge Mem", everos: "EverOS" },
       noUrl: "no address",
@@ -5161,6 +5466,32 @@ export const catalogs = {
       notedBy: "{text} (noted by {name})",
       noPageLike: 'There is no page "{page}"; the closest are {like}',
       changedSince: '"{page}" was changed after it was read and was not written: read it again, then edit',
+    },
+    "server.provider": {
+      speechModel: "Choose a supported Flash or Pro speech model or snapshot.",
+      speechUnbound: "Select a speech connection and model in AI services first.",
+      voiceQuery: "Voice pagination is invalid; use either an offset or a cursor within the supported bounds.",
+      noKey: "Save and enable this MOSS connection in AI services before listing available models.",
+      changed: "AI service settings changed. Reload before continuing; changes from another window were not overwritten.",
+      limit: "At most 32 provider connections can be saved.",
+      id: "Connection IDs must be unique and contain 1–80 letters, digits, underscores or hyphens.",
+      name: "Enter a connection name of 1–80 characters.",
+      key: "A replacement key must not be empty, contain whitespace or exceed 4096 characters. Use Clear to remove a key.",
+      bound: "A default binding requires an existing, enabled connection with credentials. Unbind it before deleting, disabling or clearing its key.",
+      model: "This model is not integrated for dictation. Choose a supported transcription model.",
+      unbound: "Choose a default dictation connection and model in AI services first.",
+      understandingUnbound: "Choose a media understanding connection and model in AI services first.",
+      understandingModel: "This model or snapshot is not supported for media understanding.",
+      imageUnbound: "Choose a default image generation connection and model in AI services first.",
+      imageModel: "This model or snapshot is not integrated for image generation. Choose a supported image model.",
+      authentication: "The MOSS API key is invalid or expired. Update the credentials.",
+      forbidden: "MOSS denied access to the model catalog. Check the account and API key permissions.",
+      rateLimited: "MOSS model queries are rate limited. Retry manually later.",
+      httpStatus: "MOSS model query failed (HTTP {status}). No automatic retry was made.",
+      network: "Could not read the MOSS model catalog. Check the network and retry.",
+      timeout: "The MOSS model query timed out. No automatic retry was made.",
+      invalidResponse: "The MOSS model catalog response does not match the API contract.",
+      tooLarge: "The MOSS model catalog exceeds the read limit (1 MiB or 1000 models). No incomplete result was returned.",
     },
     "server.repo": {
       parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
@@ -5424,6 +5755,11 @@ export const catalogs = {
     },
     "server.tool": {
       labels: {
+        media_image_create: "Submit image generation",
+        media_job_get: "Read a generation task",
+        media_job_list: "List recent generation tasks",
+        media_job_cancel: "Cancel generation waiting",
+        media_job_download: "Retry image download",
         repo_list: "Repos",
         channel_list: "Channels",
         channel_create: "Open a channel",
@@ -5495,10 +5831,9 @@ export const catalogs = {
         cut: "The dictation answer broke off halfway: {why}",
         status: "The dictation address answered {status}: {detail}",
         shape: "The dictation address did not answer in OpenAI's transcription format",
-        noMossKey: "Dictation goes through MOSS, and no MOSS API key is saved: add it under Dictation",
       },
       moss: {
-        noKey: "No MOSS Live API key yet",
+        noKey: "Bind an enabled connection to MOSS Live in AI services first",
         refused: "MOSS Live refused the key: {why}",
         unreachable: "Cannot reach MOSS Live: {why}",
         failed: "MOSS Live did not connect: {why}",
@@ -7315,6 +7650,76 @@ export const catalogs = {
         waiting: "Waiting for the owner on that computer to approve…",
       },
     },
+    "web.media": {
+      title: "Media",
+      image: "Image generation",
+      understanding: {
+        title: "Understand images and video",
+        notice:
+          "Select 1–5 images (up to 30 MB each), or one video (up to 200 MB); do not mix them. Files are first stored on this computer, then sent to the displayed MOSS connection after your approval. Charges may apply. Canceling does not guarantee that the provider stopped.",
+        configure: "Select an understanding connection in AI services first.",
+        files: "Local images or video",
+        prompt: "What should the model explain?",
+        tokens: "Maximum output tokens",
+        consent: "I approve sending these files and this prompt to the displayed MOSS connection.",
+        stored: "Stored locally",
+        selected: "Selected; not uploaded yet",
+        uploading: "Storing selected files on this computer…",
+        stopUpload: "Stop local upload",
+        uploadFailed: "Local upload failed. This submission has not started understanding; retry or select the files again.",
+        submit: "Submit understanding",
+        new: "New understanding request",
+        newAsk: "Start a new request? This may upload again and incur another charge. It will not recover an unknown earlier result.",
+        pending:
+          "The request ID is retained for retries. Repeating this submission does not upload or run inference again. A different question requires a new request.",
+        history: "Recent understanding tasks",
+        truncated:
+          "This result is incomplete. The retained text is shown below; increasing the output limit requires a new request and may incur another charge.",
+        usage: "Provider reported: {input} input tokens · {output} output tokens · {total} total",
+        save: "Save text as a document",
+        open: "Open saved document",
+        cleanup: "Clean remote files",
+        cleanupAsk:
+          "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding.",
+      },
+      sourceOwner: "Source: owner",
+      sourceAgent: "Source: orchestrator {agent} · channel {channel}",
+      usage: "Provider reported: {images} image(s) · {width} × {height}",
+      usageUnknown: "No provider usage result yet. This does not mean there was no charge.",
+      hint: "Generate images or understand selected images and video with the connections bound in AI services. Keep results locally.",
+      configure: "Configure AI connections",
+      prompt: "Prompt / layout JSON",
+      format: "Input format",
+      text: "Text to image",
+      layout: "Layout to image",
+      width: "Width",
+      height: "Height",
+      advanced: "Advanced options",
+      seed: "Seed (optional)",
+      steps: "Inference steps (optional)",
+      guidance: "Guidance scale (optional)",
+      negative: "Negative prompt",
+      enhance: "Enhance prompt",
+      watermark: "Keep visible watermark",
+      generate: "Submit generation",
+      resubmit: "Retry the same submission",
+      new: "New generation",
+      newAsk: "Create a new generation request? It may incur another charge and will not recover an unknown previous result.",
+      notice:
+        "Submission sends your input to MOSS and may incur charges. Timing out or canceling local waiting does not mean the provider stopped computing. Generation is never automatically retried.",
+      pending:
+        "This input has been submitted. Retry the same submission after a network interruption, or explicitly start a new generation to change parameters or generate again.",
+      empty: "No generation tasks yet. Configure an image connection, then submit a prompt.",
+      history: "Recent generation tasks",
+      cancel: "Cancel waiting",
+      cancelAsk: "Stop waiting locally? The provider may still be generating or charging.",
+      retry: "Retry download only",
+      save: "Save image",
+      channel: "Publish to channel",
+      chooseChannel: "Choose a channel",
+      publish: "Publish image",
+      published: "Published",
+    },
     "web.memory": {
       memory: {
         yours: "you remembered",
@@ -7489,6 +7894,49 @@ export const catalogs = {
         on: "“{span}”",
       },
       tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
+    },
+    "web.provider": {
+      speechSettings: "Single-speaker speech",
+      speechConnection: "Speech connection",
+      speechModel: "Speech model",
+      speechNotice:
+        "Choose a separate Flash or Pro binding. Speech generation and streaming playback are not yet available in the workspace; saving this setting does not generate audio.",
+      title: "AI services",
+      intro: "Save provider connections, then select one for dictation, MOSS Live and images. MOSS is supported; reading aloud is not available yet.",
+      words: "provider MOSS connection model key dictation image generation snapshot AI",
+      understandingSettings: "Media understanding settings",
+      understandingConnection: "Media understanding connection",
+      understandingModel: "Understanding model / version",
+      understandingNotice:
+        "Configure the independent connection and model. Select files and explicitly approve uploads on the Media page. Saving this configuration does not upload or run inference.",
+      imageSettings: "Image generation settings",
+      imageConnection: "Image generation connection",
+      imageModel: "Image model / version",
+      imageModelHint:
+        "Stable names follow provider updates; dated snapshots pin the model version. Account access and quality still require a real request to verify.",
+      imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
+      add: "Add MOSS connection",
+      reload: "Reload",
+      reloadAsk: "Discard unsaved changes and load the latest settings?",
+      console: "MOSS platform",
+      empty: "No provider connections yet. Add a MOSS connection to configure default uses.",
+      name: "Connection name",
+      enabled: "Enabled",
+      remove: "Delete connection",
+      removeAsk: "Remove this connection from the draft? Saving applies the change and requires unbinding its uses first.",
+      discover: "Query models",
+      saveFirst: "Save changes before querying the account's available models.",
+      discoveryHint: "Catalog only, no inference. A listed model has not been verified by inference.",
+      noModels: "This account returned an empty model catalog.",
+      bindings: "Default uses",
+      dictation: "Dictation connection",
+      model: "Dictation model",
+      modelHint: "Only integrated transcription models are offered. Account permission and quality still require a real request to verify.",
+      unbound: "Not in use",
+      liveHint: "The existing MOSS Live route uses this connection's key. Changing the dictation model does not change the realtime protocol.",
+      bindingHint:
+        "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
+      manage: "Manage AI service connections",
     },
     "web.repo": {
       title: "Repos",
@@ -8089,17 +8537,10 @@ export const catalogs = {
           stop: "Stop {name}",
           play: "Listen to {name}",
         },
-        moss: {
-          console: "MOSS platform",
-          verify: "Check that it connects",
-          checking: "Connecting…",
-          ok: "Connected",
-          keyHint: "A key from the MOSS platform, used only by this machine's server",
-        },
+        moss: { verify: "Check that it connects", checking: "Connecting…", ok: "Connected" },
         dictationVia: "Dictation goes to",
         dictationOwn: "Your own address",
-        dictationMossIntro: "The server hands recordings to MOSS, with the same key as MOSS Live.",
-        dictationMossKey: "API key",
+        dictationMossIntro: "The server transcribes recordings using the MOSS connection and dictation model selected in AI services.",
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -8564,6 +9005,19 @@ export interface Messages {
   "cli.op.lan.pairing.start": undefined;
   "cli.op.lan.pairing.stop": undefined;
   "cli.op.lan.update": undefined;
+  "cli.op.media.image.create": undefined;
+  "cli.op.media.input.create": undefined;
+  "cli.op.media.input.delete": undefined;
+  "cli.op.media.input.get": undefined;
+  "cli.op.media.input.list": undefined;
+  "cli.op.media.input.previewDelete": undefined;
+  "cli.op.media.job.cancel": undefined;
+  "cli.op.media.job.download": undefined;
+  "cli.op.media.job.get": undefined;
+  "cli.op.media.job.list": undefined;
+  "cli.op.media.understanding.cleanup": undefined;
+  "cli.op.media.understanding.create": undefined;
+  "cli.op.media.understanding.previewCleanup": undefined;
   "cli.op.memory.create": undefined;
   "cli.op.memory.delete": undefined;
   "cli.op.memory.list": undefined;
@@ -8595,6 +9049,10 @@ export interface Messages {
   "cli.op.pkm.source.get": undefined;
   "cli.op.pkm.source.update": undefined;
   "cli.op.pkm.undo": undefined;
+  "cli.op.provider.get": undefined;
+  "cli.op.provider.model.list": undefined;
+  "cli.op.provider.update": undefined;
+  "cli.op.provider.voice.list": undefined;
   "cli.op.repo.activity.get": undefined;
   "cli.op.repo.create": undefined;
   "cli.op.repo.language.list": undefined;
@@ -9238,6 +9696,59 @@ export interface Messages {
   "server.mailbox.ambiguous": undefined;
   "server.mailbox.notOwned": undefined;
   "server.mailbox.subscriptionTaken": { readonly thread: string | number };
+  "server.media.busy": undefined;
+  "server.media.canceled": undefined;
+  "server.media.cleanup.blocked": undefined;
+  "server.media.cleanup.done": undefined;
+  "server.media.cleanup.pending": undefined;
+  "server.media.cleanup.running": undefined;
+  "server.media.cleanup.unknown": undefined;
+  "server.media.cleanupPreview": { readonly connection: string | number; readonly count: string | number };
+  "server.media.cleanupReleasePreview": undefined;
+  "server.media.consentChanged": undefined;
+  "server.media.corrupt": undefined;
+  "server.media.downloadFailed": undefined;
+  "server.media.inputBusy": undefined;
+  "server.media.inputChanged": undefined;
+  "server.media.inputDeleteBytes": undefined;
+  "server.media.inputDeletePreview": { readonly name: string | number };
+  "server.media.inputDisconnected": undefined;
+  "server.media.inputInvalid": undefined;
+  "server.media.inputMissing": undefined;
+  "server.media.inputQuota": undefined;
+  "server.media.inputStorage": undefined;
+  "server.media.inputTimeout": undefined;
+  "server.media.invalid": undefined;
+  "server.media.missing": undefined;
+  "server.media.noDownload": undefined;
+  "server.media.ownerRequired": undefined;
+  "server.media.phase.canceled": undefined;
+  "server.media.phase.download_failed": undefined;
+  "server.media.phase.downloading": undefined;
+  "server.media.phase.failed": undefined;
+  "server.media.phase.generating": undefined;
+  "server.media.phase.queued": undefined;
+  "server.media.phase.ready": undefined;
+  "server.media.phase.unknown": undefined;
+  "server.media.rejected": undefined;
+  "server.media.remoteAccountChanged": undefined;
+  "server.media.remoteCleanupFailed": undefined;
+  "server.media.remoteUnresolved": { readonly files: string | number };
+  "server.media.remoteUploadRejected": undefined;
+  "server.media.remoteUploadUnknown": undefined;
+  "server.media.restarted": undefined;
+  "server.media.reusedId": undefined;
+  "server.media.understandingPhase.canceled": undefined;
+  "server.media.understandingPhase.failed": undefined;
+  "server.media.understandingPhase.generating": undefined;
+  "server.media.understandingPhase.incomplete": undefined;
+  "server.media.understandingPhase.queued": undefined;
+  "server.media.understandingPhase.ready": undefined;
+  "server.media.understandingPhase.unknown": undefined;
+  "server.media.understandingPhase.uploading": undefined;
+  "server.media.understandingRejected": undefined;
+  "server.media.understandingUnknown": undefined;
+  "server.media.unknown": undefined;
   "server.memory.coverage.everosAcross": undefined;
   "server.memory.coverage.everosAgent": undefined;
   "server.memory.coverage.failed": undefined;
@@ -9280,6 +9791,30 @@ export interface Messages {
   "server.pkm.notedBy": { readonly name: string | number; readonly text: string | number };
   "server.pkm.sameName": undefined;
   "server.pkm.summary": { readonly tldr: string | number };
+  "server.provider.authentication": undefined;
+  "server.provider.bound": undefined;
+  "server.provider.changed": undefined;
+  "server.provider.forbidden": undefined;
+  "server.provider.httpStatus": { readonly status: string | number };
+  "server.provider.id": undefined;
+  "server.provider.imageModel": undefined;
+  "server.provider.imageUnbound": undefined;
+  "server.provider.invalidResponse": undefined;
+  "server.provider.key": undefined;
+  "server.provider.limit": undefined;
+  "server.provider.model": undefined;
+  "server.provider.name": undefined;
+  "server.provider.network": undefined;
+  "server.provider.noKey": undefined;
+  "server.provider.rateLimited": undefined;
+  "server.provider.speechModel": undefined;
+  "server.provider.speechUnbound": undefined;
+  "server.provider.timeout": undefined;
+  "server.provider.tooLarge": undefined;
+  "server.provider.unbound": undefined;
+  "server.provider.understandingModel": undefined;
+  "server.provider.understandingUnbound": undefined;
+  "server.provider.voiceQuery": undefined;
   "server.repo.badGithub": undefined;
   "server.repo.badName": undefined;
   "server.repo.branchLeft": { readonly branch: string | number; readonly why: string | number };
@@ -9536,6 +10071,11 @@ export interface Messages {
   "server.tool.labels.issue_split": undefined;
   "server.tool.labels.issue_status_update": undefined;
   "server.tool.labels.issue_update": undefined;
+  "server.tool.labels.media_image_create": undefined;
+  "server.tool.labels.media_job_cancel": undefined;
+  "server.tool.labels.media_job_download": undefined;
+  "server.tool.labels.media_job_get": undefined;
+  "server.tool.labels.media_job_list": undefined;
   "server.tool.labels.memory_create": undefined;
   "server.tool.labels.memory_search": undefined;
   "server.tool.labels.remember": undefined;
@@ -9548,7 +10088,6 @@ export interface Messages {
   "server.voice.dictation.cut": { readonly why: string | number };
   "server.voice.dictation.empty": undefined;
   "server.voice.dictation.format": { readonly format: string | number };
-  "server.voice.dictation.noMossKey": undefined;
   "server.voice.dictation.shape": undefined;
   "server.voice.dictation.status": { readonly detail: string | number; readonly status: string | number };
   "server.voice.dictation.tooLong": undefined;
@@ -11358,6 +11897,66 @@ export interface Messages {
   "web.lan.pair.nameHint": undefined;
   "web.lan.pair.title": undefined;
   "web.lan.pair.waiting": undefined;
+  "web.media.advanced": undefined;
+  "web.media.cancel": undefined;
+  "web.media.cancelAsk": undefined;
+  "web.media.channel": undefined;
+  "web.media.chooseChannel": undefined;
+  "web.media.configure": undefined;
+  "web.media.empty": undefined;
+  "web.media.enhance": undefined;
+  "web.media.format": undefined;
+  "web.media.generate": undefined;
+  "web.media.guidance": undefined;
+  "web.media.height": undefined;
+  "web.media.hint": undefined;
+  "web.media.history": undefined;
+  "web.media.image": undefined;
+  "web.media.layout": undefined;
+  "web.media.negative": undefined;
+  "web.media.new": undefined;
+  "web.media.newAsk": undefined;
+  "web.media.notice": undefined;
+  "web.media.pending": undefined;
+  "web.media.prompt": undefined;
+  "web.media.publish": undefined;
+  "web.media.published": undefined;
+  "web.media.resubmit": undefined;
+  "web.media.retry": undefined;
+  "web.media.save": undefined;
+  "web.media.seed": undefined;
+  "web.media.sourceAgent": { readonly agent: string | number; readonly channel: string | number };
+  "web.media.sourceOwner": undefined;
+  "web.media.steps": undefined;
+  "web.media.text": undefined;
+  "web.media.title": undefined;
+  "web.media.understanding.cleanup": undefined;
+  "web.media.understanding.cleanupAsk": undefined;
+  "web.media.understanding.configure": undefined;
+  "web.media.understanding.consent": undefined;
+  "web.media.understanding.files": undefined;
+  "web.media.understanding.history": undefined;
+  "web.media.understanding.new": undefined;
+  "web.media.understanding.newAsk": undefined;
+  "web.media.understanding.notice": undefined;
+  "web.media.understanding.open": undefined;
+  "web.media.understanding.pending": undefined;
+  "web.media.understanding.prompt": undefined;
+  "web.media.understanding.save": undefined;
+  "web.media.understanding.selected": undefined;
+  "web.media.understanding.stopUpload": undefined;
+  "web.media.understanding.stored": undefined;
+  "web.media.understanding.submit": undefined;
+  "web.media.understanding.title": undefined;
+  "web.media.understanding.tokens": undefined;
+  "web.media.understanding.truncated": undefined;
+  "web.media.understanding.uploadFailed": undefined;
+  "web.media.understanding.uploading": undefined;
+  "web.media.understanding.usage": { readonly input: string | number; readonly output: string | number; readonly total: string | number };
+  "web.media.usage": { readonly height: string | number; readonly images: string | number; readonly width: string | number };
+  "web.media.usageUnknown": undefined;
+  "web.media.watermark": undefined;
+  "web.media.width": undefined;
   "web.memory.memory.all": undefined;
   "web.memory.memory.allRepos": undefined;
   "web.memory.memory.archiveIntro": undefined;
@@ -11553,6 +12152,43 @@ export interface Messages {
   "web.pkm.toolbar.outdent": undefined;
   "web.pkm.toolbar.todo": undefined;
   "web.pkm.toolbar.up": undefined;
+  "web.provider.add": undefined;
+  "web.provider.bindingHint": undefined;
+  "web.provider.bindings": undefined;
+  "web.provider.console": undefined;
+  "web.provider.dictation": undefined;
+  "web.provider.discover": undefined;
+  "web.provider.discoveryHint": undefined;
+  "web.provider.empty": undefined;
+  "web.provider.enabled": undefined;
+  "web.provider.imageConnection": undefined;
+  "web.provider.imageModel": undefined;
+  "web.provider.imageModelHint": undefined;
+  "web.provider.imageNotice": undefined;
+  "web.provider.imageSettings": undefined;
+  "web.provider.intro": undefined;
+  "web.provider.liveHint": undefined;
+  "web.provider.manage": undefined;
+  "web.provider.model": undefined;
+  "web.provider.modelHint": undefined;
+  "web.provider.name": undefined;
+  "web.provider.noModels": undefined;
+  "web.provider.reload": undefined;
+  "web.provider.reloadAsk": undefined;
+  "web.provider.remove": undefined;
+  "web.provider.removeAsk": undefined;
+  "web.provider.saveFirst": undefined;
+  "web.provider.speechConnection": undefined;
+  "web.provider.speechModel": undefined;
+  "web.provider.speechNotice": undefined;
+  "web.provider.speechSettings": undefined;
+  "web.provider.title": undefined;
+  "web.provider.unbound": undefined;
+  "web.provider.understandingConnection": undefined;
+  "web.provider.understandingModel": undefined;
+  "web.provider.understandingNotice": undefined;
+  "web.provider.understandingSettings": undefined;
+  "web.provider.words": undefined;
   "web.repo.add": undefined;
   "web.repo.all": undefined;
   "web.repo.allLine": undefined;
@@ -12170,7 +12806,6 @@ export interface Messages {
   "web.voice.voice.dictationModel": undefined;
   "web.voice.voice.dictationModelLabel": undefined;
   "web.voice.voice.dictationMossIntro": undefined;
-  "web.voice.voice.dictationMossKey": undefined;
   "web.voice.voice.dictationOwn": undefined;
   "web.voice.voice.dictationVia": undefined;
   "web.voice.voice.hex": undefined;
@@ -12189,8 +12824,6 @@ export interface Messages {
   "web.voice.voice.missing": undefined;
   "web.voice.voice.model": undefined;
   "web.voice.voice.moss.checking": undefined;
-  "web.voice.voice.moss.console": undefined;
-  "web.voice.voice.moss.keyHint": undefined;
   "web.voice.voice.moss.ok": undefined;
   "web.voice.voice.moss.verify": undefined;
   "web.voice.voice.nextCall": undefined;

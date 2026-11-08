@@ -19,7 +19,7 @@ import { sampleAgent } from "#/agent/seed.ts";
 import { Core } from "#/core/core.ts";
 import { type ServerConfig } from "#/infra/config.ts";
 import { platform } from "#/services.ts";
-import { testConfig, nextTurn, whenTrue } from "#/testing/layers.ts";
+import { offlineNetwork, testConfig, nextTurn, whenTrue } from "#/testing/layers.ts";
 import { allow, heard, refuse } from "#/testing/refuse.ts";
 
 import { piBalance } from "./pi.ts";
@@ -49,7 +49,8 @@ const notFound = async (id: string): Promise<T.RuntimeInfo> => ({
   checkedAt: Date.now(),
 });
 
-const world = (config: ServerConfig["Service"] = testConfig()) => Agent.layer.pipe(Layer.provideMerge(platform(config)));
+const world = (config: ServerConfig["Service"] = testConfig()) =>
+  Agent.layer.pipe(Layer.provideMerge(platform(config).pipe(Layer.provideMerge(offlineNetwork))));
 
 const makeRuntime = (options: RuntimeOptions) =>
   Effect.gen(function* () {

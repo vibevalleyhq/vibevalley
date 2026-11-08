@@ -13,6 +13,7 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 
 import { Core } from "#/core/core.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { Provider } from "#/provider/provider.ts";
 import { inboxStart } from "#/services.ts";
 import { NotAnswered } from "#/session/host.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -194,7 +195,7 @@ const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
         Layer.provideMerge(base),
       )
     : orchestrating;
-  return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(chosen));
+  return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(FetchHttpClient.layer), Layer.provideMerge(chosen));
 };
 
 /** A helper at work on an issue, and the issue, as the core has them. */
@@ -787,7 +788,7 @@ describe("voice", () => {
       expect((yield* Setting).status().dictationReady).toBe(false);
       expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
         _tag: "VoiceUnavailable",
-        reason: expect.stringContaining("MOSS 的 API Key"),
+        reason: expect.stringContaining("默认听写连接"),
         settings: "dictation",
       });
       yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: "", model: "" } }));
@@ -813,7 +814,16 @@ describe("voice", () => {
     };
     return Effect.gen(function* () {
       const setting = yield* Setting;
-      yield* Effect.orDie(setting.save({ mossKey: "sk-moss-test" }));
+      const provider = yield* Provider;
+      yield* provider.update({
+        revision: 0,
+        connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "sk-moss-test" }],
+        dictation: { connection: "moss", model: "moss-transcribe-1.0" },
+        understanding: null,
+        speech: null,
+        image: null,
+        live: null,
+      });
       expect(setting.status().dictation.via).toBe("moss");
       expect(setting.status().dictationReady).toBe(true);
       const voice = yield* Voice;
@@ -835,6 +845,18 @@ describe("voice", () => {
       expect(setting.status().dictation).toEqual({ via: "moss", url: "http://dictation.test/v1", model: "whisper-1" });
       yield* voice.dictate("AAAA", "wav");
       expect(sent[2]).toMatchObject({ url: "https://api.mosi.cn/v1/audio/transcriptions", auth: "Bearer sk-moss-test" });
+      yield* provider.update({
+        revision: 1,
+        connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true }],
+        dictation: { connection: "moss", model: "moss-transcribe-diarize-pro" },
+        understanding: null,
+        speech: null,
+        image: null,
+        live: null,
+      });
+      yield* voice.dictate("AAAA", "wav");
+      expect(sent[3]).toMatchObject({ auth: "Bearer sk-moss-test", model: "moss-transcribe-diarize-pro", format: "json" });
+      expect(sent).toHaveLength(4);
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, fetch));
   });
 
@@ -849,7 +871,15 @@ describe("voice", () => {
         _tag: "VoiceUnavailable",
         settings: "moss",
       });
-      yield* Effect.orDie(setting.save({ mossKey: "sk-moss-call-key" }));
+      yield* (yield* Provider).update({
+        revision: 0,
+        connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "sk-moss-call-key" }],
+        dictation: null,
+        image: null,
+        understanding: null,
+        speech: null,
+        live: "moss",
+      });
       const grant = yield* voice.session();
       expect(grant.appId).toBe("moss");
       const renewed = yield* voice.renew(grant.channel, grant.uid);

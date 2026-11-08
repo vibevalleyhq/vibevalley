@@ -1,5 +1,10 @@
 {
   "labels": {
+    "media_image_create": "Submit image generation",
+    "media_job_get": "Read a generation task",
+    "media_job_list": "List recent generation tasks",
+    "media_job_cancel": "Cancel generation waiting",
+    "media_job_download": "Retry image download",
     "repo_list": "Repos",
     "channel_list": "Channels",
     "channel_create": "Open a channel",

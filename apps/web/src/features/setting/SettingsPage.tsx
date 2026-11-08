@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { matches } from "#/base/search.ts";
 import { ConnectorsPage } from "#/features/connector/index.ts";
 import { LanPage } from "#/features/lan/index.ts";
+import { ProviderPage } from "#/features/provider/index.ts";
 import { SkillsPage } from "#/features/runtime/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
 import { Link as A, Navigate } from "#/infra/router.ts";
@@ -39,6 +40,7 @@ const sections: readonly Section[] = [
   { id: "general", group: "options", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
   { id: "appearance", group: "options", icon: "appearance", label: t("web.setting.nav.appearance"), words: t("web.setting.words.appearance") },
   { id: "models", group: "options", icon: "key", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
+  { id: "providers", group: "options", icon: "plug", label: t("web.provider.title"), words: t("web.provider.words") },
   { id: "memory", group: "helpers", icon: "memory", label: t("web.setting.nav.memory"), words: t("web.setting.words.memory") },
   { id: "skills", group: "helpers", icon: "skill", label: t("web.setting.nav.skills"), words: t("web.setting.words.skills") },
   { id: "call", group: "voice", icon: "call", label: t("web.setting.nav.call"), words: t("web.setting.words.call") },
@@ -67,7 +69,7 @@ export function SettingsPage(props: { rest: string }) {
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              class="relative flex shrink-0 flex-col gap-4 border-line p-3 md:w-(--pane-w) md:overflow-y-auto md:border-r"
+              class="relative flex max-h-56 shrink-0 flex-col gap-4 overflow-y-auto border-line p-3 md:max-h-none md:w-(--pane-w) md:border-r"
               style={{ "--pane-w": `${navWidth()}px` }}
             >
               <div class="hidden md:block">
@@ -111,6 +113,9 @@ export function SettingsPage(props: { rest: string }) {
                   <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")} action={<SettingsFile />}>
                     <SettingsForm part="deepseek" />
                   </Page>
+                </Match>
+                <Match when={section().id === "providers"}>
+                  <ProviderPage />
                 </Match>
                 <Match when={section().id === "about"}>
                   <AboutPage />

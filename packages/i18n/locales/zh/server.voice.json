@@ -40,11 +40,10 @@
     "unreachable": "听写的地址连不上：{why}",
     "cut": "听写的回答读到一半断了：{why}",
     "status": "听写的地址回了 {status}：{detail}",
-    "shape": "听写的地址回的不是 OpenAI 的转写格式",
-    "noMossKey": "听写走 MOSS，还没填 MOSS 的 API Key：在「听写」里填上"
+    "shape": "听写的地址回的不是 OpenAI 的转写格式"
   },
   "moss": {
-    "noKey": "还没填 MOSS Live 的 API Key",
+    "noKey": "请先在 AI 服务中为 MOSS Live 绑定已启用的连接",
     "refused": "MOSS Live 不认这个 Key：{why}",
     "unreachable": "连不上 MOSS Live：{why}",
     "failed": "MOSS Live 没接通：{why}",

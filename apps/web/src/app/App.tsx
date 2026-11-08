@@ -15,6 +15,7 @@ import { ChatPage, chatSay } from "#/features/channel/index.ts";
 import { Follow } from "#/features/inbox/index.ts";
 import { IssuesPage, issueSearch } from "#/features/issue/index.ts";
 import { PairPage } from "#/features/lan/index.ts";
+import { MediaPage } from "#/features/media/index.ts";
 import { OrchestratorPage } from "#/features/orchestrator/index.ts";
 import { PkmPage } from "#/features/pkm/index.ts";
 import { ReposPage, sortRepos } from "#/features/repo/index.ts";
@@ -101,6 +102,7 @@ const routes: readonly RouteDefinition[] = [
       page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),
       page("/repos", "repos", (rest) => <ReposPage rest={rest()} skin={repoMap} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
+      page("/media", "media", () => <MediaPage />),
       page("/artifacts", "artifacts", (rest) => <ArtifactsPage rest={rest()} say={chatSay} />),
       page("/pkm", "pkm", (rest) => <PkmPage rest={rest()} />),
     ],

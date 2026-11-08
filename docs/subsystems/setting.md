@@ -17,6 +17,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
+| `apps/server/src/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
 | `apps/server/src/setting/` | `setting.ts`、`saving.ts`、`keys.ts`、`memorySources.ts`、`voice.ts` 与黄金数据 `testdata/` |
 | `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
 | `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`） |
@@ -73,6 +74,10 @@
 
 - **全部服务端模块**：注入 `ServerConfig` 读取静态参数。
 - **管家、农机、语音与记性（`orchestrator`、`runtime`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
+
+### 供应商配置
+
+Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置与供应商修改共用一把锁，完整覆盖读、写盘与内存替换。`SettingsStatus` 只给出 `dictationReady`、`mossReady` 等本机配置状态；连接及脱敏凭据经 Provider 接口读取。版本冲突、用途引用和密钥更新语义见 [AI 服务](docs/subsystems/provider.md)。
 
 ## 为什么这样
 

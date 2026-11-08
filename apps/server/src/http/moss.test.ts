@@ -5,11 +5,10 @@ import { Effect, Layer } from "effect";
 
 import { mossLinePath } from "@vibevalley/protocol";
 
+import { app } from "#/testing/http.ts";
 import { testConfig, whenTrue } from "#/testing/layers.ts";
 import { quietApp } from "#/testing/world.ts";
 import type { MossTransport } from "#/voice/moss.ts";
-
-import { app } from "./app.ts";
 
 /** A MOSS that attaches a session when asked and sends audio back as it came; it keeps the key it was given. */
 const echo = () => {
@@ -70,7 +69,7 @@ describe("a page's line to MOSS Live", () => {
     Effect.gen(function* () {
       const address = yield* farm(echo().transport);
       expect((yield* upgrade(address, { origin: "http://elsewhere.example" })).status).toBe(403);
-      expect(yield* upgrade(address)).toEqual({ status: 409, body: "还没填 MOSS Live 的 API Key" });
+      expect(yield* upgrade(address)).toEqual({ status: 409, body: "请先在 AI 服务中为 MOSS Live 绑定已启用的连接" });
     }).pipe(Effect.scoped),
   );
 
@@ -81,10 +80,18 @@ describe("a page's line to MOSS Live", () => {
       yield* Effect.promise(() =>
         // The test calls the server as the page does, through the platform's own fetch.
         // @effect-diagnostics-next-line globalFetchInEffect:off
-        fetch(`http://${address}/api/v1/setting/update`, {
+        fetch(`http://${address}/api/v1/provider/update`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ mossKey: "sk-test-key" }),
+          body: JSON.stringify({
+            revision: 0,
+            connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "sk-test-key" }],
+            dictation: null,
+            understanding: null,
+            speech: null,
+            image: null,
+            live: "moss",
+          }),
         }),
       );
       const got: (string | number)[] = [];

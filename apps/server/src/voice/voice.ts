@@ -9,7 +9,7 @@ import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, t
 import { type ApiError } from "@vibevalley/protocol/api";
 import { decodeMossFrame } from "@vibevalley/provider/moss";
 import { type MossLink, type MossTransport, verifyMoss } from "@vibevalley/provider/moss/server";
-import { mossTranscription, transcriptionModel, TranscriptionRequestError } from "@vibevalley/provider/transcription";
+import { transcriptionModel, TranscriptionRequestError } from "@vibevalley/provider/transcription";
 
 import { messageOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -19,6 +19,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, callbackLog } from "#/infra/log.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { Provider } from "#/provider/provider.ts";
 import { type AgoraCredentials, Setting } from "#/setting/setting.ts";
 
 import {
@@ -129,8 +130,8 @@ export class Voice extends Context.Service<
     readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
     readonly said: (agentId: string, text: string) => Effect.Effect<void, ApiError>;
     readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
-    /** Whether MOSS Live takes the key given, or the saved one: the reason it does not, in the owner's words. */
-    readonly verifyMoss: (key: string) => Effect.Effect<Validation>;
+    /** Checks the connection bound to MOSS Live without sending audio. */
+    readonly verifyMoss: () => Effect.Effect<Validation>;
     /** Why a page cannot have a line to MOSS Live now (no key saved), in the owner's words; undefined when it can. */
     readonly mossProblem: () => string | undefined;
     /** A page's line to MOSS Live (moss.ts relay), with the saved key, until either side closes. */
@@ -171,6 +172,7 @@ const make = (options: VoiceOptions = {}) =>
     const core = yield* Core;
     const inbox = yield* Inbox;
     const settings = yield* Setting;
+    const provider = yield* Provider;
     const chat = yield* Channel;
     const ingress = yield* Ingress;
     const response = yield* Orchestrator;
@@ -306,7 +308,7 @@ const make = (options: VoiceOptions = {}) =>
         const channel = newChannel(yield* Clock.currentTimeMillis);
         const uid = newUid();
         if (currentVoice.answer.vendor === "moss") {
-          if (settings.mossKey() === "") return yield* Effect.fail(unavailable(t("server.voice.moss.noKey"), "moss"));
+          if (provider.liveKey() === "") return yield* Effect.fail(unavailable(t("server.voice.moss.noKey"), "moss"));
           if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
           prune();
           grants.set(keyOf(channel, uid), {
@@ -355,7 +357,7 @@ const make = (options: VoiceOptions = {}) =>
         if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
         if (g.starting || g.agent) return yield* Effect.fail(unavailable(t("server.voice.connecting")));
         if (g.kind === "moss") {
-          if (settings.mossKey() === "") return yield* Effect.fail(unavailable(t("server.voice.moss.noKey"), "moss"));
+          if (provider.liveKey() === "") return yield* Effect.fail(unavailable(t("server.voice.moss.noKey"), "moss"));
           if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
           const voice = settings.voice();
           const id = `moss-${channel}`;
@@ -531,8 +533,8 @@ const make = (options: VoiceOptions = {}) =>
             message: "vibevalley: voice: the orchestrator's spoken words were not kept",
           });
       }),
-      verifyMoss: Effect.fn("Voice.verifyMoss")(function* (given) {
-        const key = given.trim() || settings.mossKey();
+      verifyMoss: Effect.fn("Voice.verifyMoss")(function* () {
+        const key = provider.liveKey();
         if (key === "") return { problem: t("server.voice.moss.noKey") };
         const r = yield* verifyMoss(key, options.moss);
         switch (r.kind) {
@@ -548,9 +550,9 @@ const make = (options: VoiceOptions = {}) =>
             return { problem: t("server.voice.moss.silent") };
         }
       }),
-      mossProblem: () => (settings.mossKey() === "" ? t("server.voice.moss.noKey") : undefined),
+      mossProblem: () => (provider.liveKey() === "" ? t("server.voice.moss.noKey") : undefined),
       mossLine: Effect.fn("Voice.mossLine")(function* (page) {
-        return yield* relay(page, settings.mossKey(), options.moss, {
+        return yield* relay(page, provider.liveKey(), options.moss, {
           onOpen: (link, sendToPage) => {
             const target = { link, sendToPage };
             activeMoss = target;
@@ -604,12 +606,9 @@ const make = (options: VoiceOptions = {}) =>
         });
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
-        const d = settings.dictation();
-        if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
-        if (d.via === "moss" && d.key === "") return yield* Effect.fail(unavailable(t("server.voice.dictation.noMossKey"), "dictation"));
-        const { url, model } = d.via === "moss" ? mossTranscription : d;
+        const connection = yield* provider.transcription().pipe(Effect.mapError((error) => unavailable(error.reason, "dictation")));
         const input = yield* transcriptionAudio(audio64, given).pipe(Effect.mapError(mapTranscriptionFailure));
-        const selected = yield* transcriptionModel({ url, model, key: d.key }, input.format).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+        const selected = yield* transcriptionModel(connection, input.format).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
         const result = yield* transcribeAudio(selected, input.audio).pipe(Effect.mapError(mapTranscriptionFailure));
         return { text: result.text };
       }, Effect.scoped),

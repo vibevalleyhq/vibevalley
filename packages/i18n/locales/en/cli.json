@@ -413,6 +413,35 @@
       "list": "List helpers, one profile's if given",
       "stop": "Stop a helper's round; the helper stays"
     },
+    "media": {
+      "input": {
+        "create": "Reserve bounded local storage for a media input without uploading to a provider",
+        "get": "Read a local media input",
+        "list": "List local media inputs",
+        "delete": "Delete a local media input not retained by a task",
+        "previewDelete": "Preview deleting a local media input without changing it"
+      },
+      "understanding": {
+        "create": "Understand selected local inputs with explicit account and upload approval",
+        "cleanup": "Clean known remote files without repeating understanding",
+        "previewCleanup": "Preview remote cleanup and local retention release without changing either"
+      },
+      "image": { "create": "Create an image task without resubmitting the same request ID" },
+      "job": {
+        "get": "Read a generation task",
+        "list": "List recent generation tasks",
+        "cancel": "Stop local waiting without guaranteeing provider cancellation",
+        "download": "Retry result download without generating again"
+      }
+    },
+    "provider": {
+      "voice": { "list": "Read one page of voices from the selected MOSS account without generating audio" },
+      "get": "Read provider connections and default uses with masked credentials",
+      "update": "Save provider connections and default uses at the expected revision",
+      "model": {
+        "list": "Query available models for the configured MOSS account without inference"
+      }
+    },
     "setting": {
       "get": "Get the settings",
       "update": "Update the settings",

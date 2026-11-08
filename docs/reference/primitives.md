@@ -118,14 +118,19 @@
 | `Database` | `db.ts` | The database as an SqlClient, with the schema in place and foreign keys on. |
 | `causeMessage` | `db.ts` | What the database said, from under the SqlError around it. |
 | `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. |
+| `fileBlob` | `files.ts` |  |
 | `NotWritten` | `files.ts` |  |
-| `writeOnce` | `files.ts` | Writes a file named by its bytes (their hash), making its folder: the same bytes are the same file, so one already |
+| `writeOnce` | `files.ts` |  |
 | `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
 | `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
 | `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being done), and the caller carries on. |
+| `publicIpv4` | `publicHttp.ts` |  |
+| `publicLookup` | `publicHttp.ts` |  |
+| `publicHttps` | `publicHttp.ts` |  |
+| `PublicHttp` | `publicHttp.ts` |  |
 | `timeHere` | `time.ts` | The Clock of the service that asks, as a Time. |
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
@@ -159,11 +164,14 @@
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
 | `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |
+| `app` | `http.ts` |  |
 | `starter` | `layers.ts` | A built-in template as a farm whose agent.starters names it has it: under the template's own id. |
 | `testConfig` | `layers.ts` |  |
 | `testDatabase` | `layers.ts` |  |
 | `offline` | `layers.ts` | An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. |
+| `offlineNetwork` | `layers.ts` |  |
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
+| `network` | `network.ts` |  |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds. |
 | `allow` | `refuse.ts` |  |
 | `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |
@@ -255,6 +263,7 @@
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
+| `uploadMediaInput` | `media.ts` |  |
 | `reveal` | `opening.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
@@ -262,6 +271,7 @@
 | `agentsQuery` | `query.ts` |  |
 | `templatesQuery` | `query.ts` |  |
 | `reposQuery` | `query.ts` |  |
+| `providerQuery` | `query.ts` |  |
 | `settingsQuery` | `query.ts` |  |
 | `runtimesQuery` | `query.ts` |  |
 | `achievementsQuery` | `query.ts` |  |

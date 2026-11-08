@@ -323,7 +323,21 @@ export const blockLine = (b: T.Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${
 export const memoryWhere = (m: T.Memory) => (m.repo ? "仓库 " + m.repo : "所有仓库");
 
 /** The orchestrator's tools' descriptions, shown to the model alongside each name and parameters (tool.ts). */
+const mediaDescriptions = {
+  create:
+    "替主人提交一次生图任务。只有主人明确要生成图片时使用；提示词会发给 MOSS，可能计费。id 用新的唯一请求编号，网络中断后重试必须保持同一编号和全部参数；不要为了重试换编号。text 为文生图，layout 为布局 JSON，尺寸须为 256–2048 的 16 倍数且总像素不超过 2097152。不支持参考图编辑。返回排队中的任务，不等生图结束；不要密集轮询。用主人的语言回答。",
+  get: "读取一次生图任务；ready 才有本机附件，unknown 表示厂商可能仍在执行或已计费，不要自动重新生成。用主人的语言回答。",
+  list: "查看最近 100 次生图任务，包括本机附件、状态和可用操作。用主人的语言回答。",
+  cancel: "停止生图任务的本机等待，不保证厂商停止计算或计费。只有主人要取消时使用。用主人的语言回答。",
+  download: "只重试已经生成结果的下载和本机保存，不会重新生图；只有 canRetryDownload 为真才使用。用主人的语言回答。",
+};
+
 export const descriptions = {
+  "media.image.create": mediaDescriptions.create,
+  "media.job.get": mediaDescriptions.get,
+  "media.job.cancel": mediaDescriptions.cancel,
+  "media.job.download": mediaDescriptions.download,
+  "media.job.list": mediaDescriptions.list,
   "repo.list": "列出工作目录下的仓库（每个文件夹是一个仓库），以及是不是 git 仓库。",
   "channel.list": "列出频道：名字、哪个是默认的、是做什么的、默认仓库。频道是安排活的地方。",
   "session.list": "列出在场的所有帮工：在做什么、上一轮的结果。",

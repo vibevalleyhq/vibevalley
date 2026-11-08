@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { Effect, Layer, Option, Stream } from "effect";
-import { HttpClient } from "effect/http";
+import { FetchHttpClient, HttpClient } from "effect/http";
 
 import { type Agent, defaultOrchestrator, type SpaceState } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
@@ -12,6 +12,7 @@ import { builtInDir, profileOf, templateFrom } from "#/agent/template.ts";
 import { Core } from "#/core/core.ts";
 import { defaults, ServerConfig } from "#/infra/config.ts";
 import { Database } from "#/infra/db.ts";
+import { PublicHttp } from "#/infra/publicHttp.ts";
 import { afterRealTime } from "#/infra/time.ts";
 
 export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
@@ -52,6 +53,20 @@ export const offline = Layer.succeed(
   HttpClient.HttpClient,
   HttpClient.make((request) => Effect.die(new Error(`no network in tests: ${request.method} ${request.url}`))),
 );
+
+const loopback = Layer.effect(
+  HttpClient.HttpClient,
+  Effect.gen(function* () {
+    const http = yield* HttpClient.HttpClient;
+    return HttpClient.make((request) =>
+      /^https?:\/\/(?:127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/u.test(request.url)
+        ? http.execute(request).pipe(Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }))
+        : Effect.die(new Error("External HTTP is disabled in server tests")),
+    );
+  }),
+).pipe(Layer.provide(FetchHttpClient.layer));
+
+export const offlineNetwork = Layer.merge(loopback, Layer.effect(PublicHttp, HttpClient.HttpClient).pipe(Layer.provide(offline)));
 
 /** What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. */
 export const whenState = <A>(pick: (state: SpaceState) => A | undefined | false, what: string | (() => string), ms = 5_000) =>

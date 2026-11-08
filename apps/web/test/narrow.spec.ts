@@ -1,7 +1,20 @@
 import { expect, test } from "./fixtures";
 
 // Every place of the workbench fits a phone's width and a narrow window. What does not fit truncates, folds or wraps inside its own box.
-const places = ["/chat", "/issues", "/artifacts", "/agents", "/agents/templates", "/runtimes", "/repos", "/catalog", "/settings/general", "/orchestrator"];
+const places = [
+  "/chat",
+  "/issues",
+  "/artifacts",
+  "/media",
+  "/agents",
+  "/agents/templates",
+  "/runtimes",
+  "/repos",
+  "/catalog",
+  "/settings/general",
+  "/settings/providers",
+  "/orchestrator",
+];
 
 /** The outermost elements past the window's right edge (fixed ones are placed against the window on purpose). */
 const pastTheEdge = () => {

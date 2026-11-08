@@ -132,6 +132,11 @@ const blockDeleteParameters = Schema.Struct({
 
 /** The orchestrator's, by endpoint. */
 export const parameters = {
+  "media.image.create": S.MediaImageRequest,
+  "media.job.get": S.MediaJobRequest,
+  "media.job.cancel": S.MediaJobRequest,
+  "media.job.download": S.MediaJobRequest,
+  "media.job.list": Schema.Struct({}),
   "artifact.content.get": artifactRead,
   "artifact.create": Schema.Struct({
     ...artifactText,

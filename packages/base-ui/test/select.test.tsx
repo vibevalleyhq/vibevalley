@@ -1,4 +1,5 @@
-import { expect, test } from "vite-plus/test";
+import { createSignal } from "solid-js";
+import { expect, test, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
 import { Select } from "../src/index";
@@ -82,6 +83,41 @@ test("from the keyboard: ArrowDown opens, arrows stop at the ends and pass disab
   await userEvent.keyboard("{Enter}");
   await settle();
   expect(chose).toEqual(["codex"]);
+});
+
+test("regression: opening snapshots selection without untracked reads or later focus theft", async () => {
+  const warnings = vi.spyOn(console, "warn");
+  try {
+    mount(() => {
+      const [value, setValue] = createSignal("codex");
+      return (
+        <>
+          {view([], {
+            get value() {
+              return value();
+            },
+          })}
+          <button data-testid="change" onClick={() => setValue("pi")} />
+        </>
+      );
+    });
+    await userEvent.click($("[data-testid=trigger]"));
+    await settle();
+    expect(focused()).toBe("codex");
+    await userEvent.keyboard("{ArrowDown}");
+    expect(focused()).toBe("claude");
+    $("[data-testid=change]").click();
+    await settle();
+    expect($("[data-testid=value]").textContent).toBe("Pi");
+    expect(focused()).toBe("claude");
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click($("[data-testid=trigger]"));
+    await settle();
+    expect(focused()).toBe("pi");
+    expect(warnings.mock.calls.flat().join("\n")).not.toContain("STRICT_READ_UNTRACKED");
+  } finally {
+    warnings.mockRestore();
+  }
 });
 
 test("Escape closes without picking, and a controlled select shows only its owner's value", async () => {

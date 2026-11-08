@@ -1,5 +1,5 @@
 import { Portal as SolidPortal, type JSX } from "@solidjs/web";
-import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show } from "solid-js";
+import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show, untrack } from "solid-js";
 
 import { type Align, createAnchored, type Side } from "./anchored";
 import { createControllable } from "./controllable";
@@ -140,7 +140,8 @@ export function focusWhenPlaced(c: FloatingParts, popup: Accessor<HTMLElement | 
   createEffect(
     () => (c.placed() ? popup() : undefined),
     (el) => {
-      if (el) target(el).focus({ preventScroll: true });
+      // The target is an opening-time snapshot; value changes must not steal focus again.
+      if (el) untrack(() => target(el)).focus({ preventScroll: true });
     },
   );
 }

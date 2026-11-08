@@ -8,9 +8,11 @@ import type { Endpoint } from "./endpoint";
 import { type GameHandlers, gameEndpoints } from "./game/api";
 import { actCommand, type IssueHandlers, issueEndpoints } from "./issue/api";
 import { type LanHandlers, lanEndpoints } from "./lan/api";
+import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
 import { type PkmHandlers, pkmEndpoints } from "./pkm/api";
+import { type ProviderHandlers, providerEndpoints } from "./provider/api";
 import { type RepoHandlers, repoEndpoints } from "./repo/api";
 import { type RuntimeHandlers, runtimeEndpoints } from "./runtime/api";
 import { type SessionHandlers, sessionEndpoints } from "./session/api";
@@ -31,6 +33,8 @@ export type { LanHandlers } from "./lan/api";
 export type { MemoryHandlers } from "./memory/api";
 export type { OrchestratorHandlers } from "./orchestrator/api";
 export type { PkmHandlers } from "./pkm/api";
+export type { ProviderHandlers } from "./provider/api";
+export type { MediaHandlers } from "./media/api";
 export type { RepoHandlers } from "./repo/api";
 export type { RuntimeHandlers } from "./runtime/api";
 export type { SessionHandlers } from "./session/api";
@@ -43,6 +47,8 @@ export interface Handlers<R = never>
     CoreHandlers<R>,
     OrchestratorHandlers<R>,
     SettingHandlers<R>,
+    ProviderHandlers<R>,
+    MediaHandlers<R>,
     ChannelHandlers<R>,
     CronHandlers<R>,
     VoiceHandlers<R>,
@@ -62,6 +68,8 @@ export const endpoints: readonly Endpoint[] = [
   ...coreEndpoints,
   ...orchestratorEndpoints,
   ...settingEndpoints,
+  ...providerEndpoints,
+  ...mediaEndpoints,
   ...channelEndpoints,
   ...cronEndpoints,
   ...voiceEndpoints,

@@ -82,16 +82,13 @@
       "play": "Listen to {name}"
     },
     "moss": {
-      "console": "MOSS platform",
       "verify": "Check that it connects",
       "checking": "Connecting…",
-      "ok": "Connected",
-      "keyHint": "A key from the MOSS platform, used only by this machine's server"
+      "ok": "Connected"
     },
     "dictationVia": "Dictation goes to",
     "dictationOwn": "Your own address",
-    "dictationMossIntro": "The server hands recordings to MOSS, with the same key as MOSS Live.",
-    "dictationMossKey": "API key"
+    "dictationMossIntro": "The server transcribes recordings using the MOSS connection and dictation model selected in AI services."
   },
   "choices": {
     "area": {

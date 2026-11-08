@@ -144,8 +144,6 @@ export const SettingsUpdateVoice: Codec<T.SettingsUpdateVoice> = Schema.Struct({
   idleSeconds: Schema.optionalKey(Schema.Finite),
 });
 
-export const MossVerifyRequest: Codec<T.MossVerifyRequest> = Schema.Struct({ key: Schema.optionalKey(Schema.String) });
-
 const renewRequestFields = { channel: Schema.String, uid: Schema.String };
 
 export const VoiceGrantRenew: Codec<T.VoiceGrantRenew> = Schema.Struct(renewRequestFields);

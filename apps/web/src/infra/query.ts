@@ -57,6 +57,12 @@ export const reposQuery = defineQuery({
   fetch: (_: void, context) => api.repo.list(context),
   ...retryRead,
 });
+export const providerQuery = defineQuery({
+  schema: S.ProviderStatus,
+  key: () => ["providers"],
+  fetch: (_: void, context) => api.provider.get(context),
+  ...retryRead,
+});
 export const settingsQuery = defineQuery({
   schema: S.SettingsStatus,
   key: () => ["settings"],

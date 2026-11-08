@@ -6,10 +6,9 @@ import { artifactPath, ownerId } from "@vibevalley/protocol";
 import { Artifact } from "#/artifact/artifact.ts";
 import { htmlPolicy } from "#/artifact/policy.ts";
 import { remoteMay } from "#/lan/lan.ts";
+import { app } from "#/testing/http.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { quietApp } from "#/testing/world.ts";
-
-import { app } from "./app.ts";
 
 const farm = Effect.gen(function* () {
   let address = "";

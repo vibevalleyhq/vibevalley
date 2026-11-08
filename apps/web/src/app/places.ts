@@ -24,6 +24,7 @@ export const settingsPlace: Place = {
 export const places: readonly Place[] = [
   { id: "chat", label: t("web.base.place.chat.label"), hint: t("web.base.place.chat.hint"), icon: "chat", path: "/chat", group: "work" },
   { id: "issues", label: t("web.base.place.issues.label"), hint: t("web.base.place.issues.hint"), icon: "issues", path: "/issues", group: "work" },
+  { id: "media", label: t("web.media.title"), hint: t("web.media.hint"), icon: "media", path: "/media", group: "work" },
   { id: "artifacts", label: t("web.artifact.place.label"), hint: t("web.artifact.place.hint"), icon: "artifacts", path: "/artifacts", group: "work" },
   { id: "pkm", label: t("web.pkm.place.label"), hint: t("web.pkm.place.hint"), icon: "notes", path: "/pkm", group: "work" },
   { id: "agents", label: t("web.base.place.agents.label"), hint: t("web.base.place.agents.hint"), icon: "agents", path: "/agents", group: "setup" },

@@ -11,9 +11,11 @@ import { cronHandlers } from "./handlers/cron.ts";
 import { gameHandlers } from "./handlers/game.ts";
 import { issueHandlers } from "./handlers/issue.ts";
 import { lanHandlers } from "./handlers/lan.ts";
+import { mediaHandlers } from "./handlers/media.ts";
 import { memoryHandlers } from "./handlers/memory.ts";
 import { orchestratorHandlers } from "./handlers/orchestrator.ts";
 import { pkmHandlers } from "./handlers/pkm.ts";
+import { providerHandlers } from "./handlers/provider.ts";
 import { repoHandlers } from "./handlers/repo.ts";
 import { runtimeHandlers } from "./handlers/runtime.ts";
 import { sessionHandlers } from "./handlers/session.ts";
@@ -32,6 +34,8 @@ export const handlers = Effect.gen(function* () {
     ...(yield* repoHandlers),
     ...(yield* channelHandlers),
     ...(yield* settingHandlers),
+    ...(yield* providerHandlers),
+    ...(yield* mediaHandlers),
     ...(yield* agentHandlers),
     ...(yield* memoryHandlers),
     ...(yield* runtimeHandlers),

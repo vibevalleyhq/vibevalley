@@ -10,12 +10,30 @@
 | `./transcription` | Effect 作用域内的 `TranscriptionModelV4` 工厂，使用 `@ai-sdk/provider@4.0.36`；显式接收 endpoint/model/key/格式，无重试或 URL 下载 |
 | `./moss` | MOSS 帧 Schema、PCM/tagged-v1 编码；浏览器可用 |
 | `./moss/server` | MOSS 显式鉴权连接和握手 |
+| `./moss/image` | `prepareMossImage` 校验参数；`generateMossImage` 显式凭据提交一次生成，返回 URL，不重试、不下载 |
+| `./moss/image-models` | 已适配的生图模型与官方快照；配置选择和生图协议使用同一列表，不从账号目录猜能力 |
+| `./moss/files` | 显式凭据上传 Blob、按 ID 查询和删除、分页列出文件；不隐式重试或删除，不接收服务器路径 |
+| `./moss/understanding`、`./moss/understanding-models` | Responses 协议与显式 VL 模型目录；图片组或单视频加文本，保留不完整文本和厂商 Token 用量 |
+| `./moss/speech`、`./moss/speech-models` | Flash／Pro 及官方快照、语言与格式目录；整段 URL 结果或异步 task ID，不下载、不轮询、不冒充流式 |
+| `./moss/audio-tasks` | 按 ID 读取一次音频任务；区分排队、执行、失败及音频／转写结果，不重新提交 |
+| `./moss/voices` | 查询指定凭据的一页音色，保留游标；不自动翻页，不创建或删除音色 |
+| `./moss/models` | 显式凭据查询 MOSS 账号模型目录；固定官方地址、不跟重定向、不重试，15 秒覆盖响应体，限制 1 MiB / 1000 条；只返回 ID 与归属，不猜能力 |
 | `./agora/server` | 声网 SDK 客户端、RTC token 和协议错误 |
 | `./agora/captions` | 声网字幕包解码与分片；浏览器可用 |
 
 DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具 ID 和拒绝细节。它是单一的专有适配器，不是通用语言 SDK；AI 层负责 agent 历史重放和消息折叠。为什么不直接换官方适配器，见 [模型边界](docs/subsystems/brain.md#模型边界)。
 
 转写保留 `response_format=json`、`dictation.<format>`、六种格式与 120 秒请求头超时；响应体保留独立的失败通道。作用域内的 FiberSet 将 Core 的 Promise 调用接到调用者的 Effect 服务，测试时钟和取消可到达 HTTP 客户端。默认 OpenAI 适配器的 verbose 格式不是这个接口的契约，因此这里实现上游模型接口。结果保留响应头、原始正文和 usage；缺失的时长、语言和时间戳不猜。
+
+生图协议 `src/moss/image.ts` 接受显式 Key 与文生图或布局输入，固定官方端点，返回单张图片 URL 和用量，不下载文件。请求及响应体共用 900 秒上限，JSON 响应限制 1 MiB；不跟随重定向、不重试。错误区分未提交、明确拒绝和结果未知，只有白名单错误码能跨出边界。任务和本地资产的接入见[生图任务](docs/subsystems/media.md)；调用者必须持久化结果 URL 后独立下载，不能因下载失败重新提交生成。
+
+媒体理解协议只向固定的 `/v1/responses` 提交一次；最多五图或一个视频，支持 file ID 或 HTTPS URL，不支持内联 Base64、流式或异步提交。模型输出 `incomplete` 时仍保留正文，并明确其状态。180 秒覆盖请求与响应体，响应最多 1 MiB；本地指令上限 64000 个 Unicode 码点，规范化 URL 上限 8192 字符，不把这些保护上限称为厂商限制。文件协议 `moss/files.ts` 接受不超过 512 MB 的非空 Blob（可由文件支持，不转成 ArrayBuffer 或 Base64），由 HTTP 客户端生成 multipart boundary；300 秒覆盖请求和响应体，响应最多 1 MiB。文件查询与删除核对回执 ID，上传核对字节数和用途；未知状态原样保留，不推断就绪。路径参数不能跳出文件端点。删除是显式操作，超时与取消可能已留下远端文件，不能假装已经清理。
+
+服务端的用途绑定、输入存储、任务与主人页面由 [Media](docs/subsystems/media.md) 管理，本包不承接上传许可或文件寿命。协议和隔离程序使用替身验证，不代表真实账号的理解效果；管家发起理解的授权入口仍在计划中。
+
+单人 TTS 只向固定 `/v1/audio/speech` 提交一次，显式传 Key、模型、文字、voice ID 和格式。Flash／Pro 稳定 ID 与官方快照共用目录；Pro 不接受 language 或 pause 标签，Flash 的 language 使用完整英文名称。文本本地上限 10000 个 Unicode 码点，期望时长本地保护上限 3600 秒，不把这些上限称为官方能力保证。同步强制 `delivery_method=url`、`stream=false`，返回经校验的格式、MIME 和 HTTPS URL；异步仅返回 task ID。300 秒覆盖提交和响应体，JSON 最多 1 MiB，不重试、不跟随重定向。缺失的采样率、用量和时长不猜；应用尚未接通生成、下载或播放，PCM 流式不在这两个提交函数里。
+
+音频任务查询与音色分页只读一次，30 秒覆盖响应体，JSON 最多 1 MiB。任务 ID 不能跳出固定路径，回执 ID、更新时间、格式/MIME 和转写片段起止范围均校验；FAILED 与查询失败分开。音色每页最多 150 条，offset 和 after 互斥，保留不透明游标与空名称，不从列表推断模型兼容性或音色就绪状态。配置绑定与 owner-only 音色目录接口见 [AI 服务](docs/subsystems/provider.md)，音色设计、克隆和管理尚未接通。
 
 浏览器只导入纯协议子路径，不导入服务端工厂。`ask_orchestrator`、页面中继、设置到厂商配置的组装及 RTC 设备由应用负责。实时内核的保留边界见 [语音](docs/subsystems/voice.md#为什么这样)。
 

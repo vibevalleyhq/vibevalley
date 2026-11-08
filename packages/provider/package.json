@@ -35,6 +35,46 @@
       "types": "./dist/moss.d.ts",
       "default": "./src/moss.ts"
     },
+    "./moss/speech": {
+      "types": "./dist/moss/speech.d.ts",
+      "default": "./src/moss/speech.ts"
+    },
+    "./moss/speech-models": {
+      "types": "./dist/moss/speech-models.d.ts",
+      "default": "./src/moss/speech-models.ts"
+    },
+    "./moss/audio-tasks": {
+      "types": "./dist/moss/audio-tasks.d.ts",
+      "default": "./src/moss/audio-tasks.ts"
+    },
+    "./moss/voices": {
+      "types": "./dist/moss/voices.d.ts",
+      "default": "./src/moss/voices.ts"
+    },
+    "./moss/image": {
+      "types": "./dist/moss/image.d.ts",
+      "default": "./src/moss/image.ts"
+    },
+    "./moss/image-models": {
+      "types": "./dist/moss/image-models.d.ts",
+      "default": "./src/moss/image-models.ts"
+    },
+    "./moss/files": {
+      "types": "./dist/moss/files.d.ts",
+      "default": "./src/moss/files.ts"
+    },
+    "./moss/understanding": {
+      "types": "./dist/moss/understanding.d.ts",
+      "default": "./src/moss/understanding.ts"
+    },
+    "./moss/understanding-models": {
+      "types": "./dist/moss/understanding-models.d.ts",
+      "default": "./src/moss/understanding-models.ts"
+    },
+    "./moss/models": {
+      "types": "./dist/moss/models.d.ts",
+      "default": "./src/moss/models.ts"
+    },
     "./moss/server": {
       "types": "./dist/moss/server.d.ts",
       "default": "./src/moss/server.ts"

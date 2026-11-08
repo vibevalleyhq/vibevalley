@@ -1,5 +1,10 @@
 {
   "labels": {
+    "media_image_create": "提交生图",
+    "media_job_get": "查看生成任务",
+    "media_job_list": "查看最近生成任务",
+    "media_job_cancel": "取消生成等待",
+    "media_job_download": "重试图片下载",
     "repo_list": "仓库",
     "channel_list": "频道",
     "channel_create": "开频道",

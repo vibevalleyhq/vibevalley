@@ -41,6 +41,37 @@
 | `setting.validate` | 这些设置会被拒的第一处，不存 | `/api/v1/setting/validate` | ✓ | ✓ |   |   |
 | `setting.update` | 改设置 | `/api/v1/setting/update` | ✓ |   |   |   |
 
+## provider
+
+
+
+| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|---|
+| `provider.get` | 读取供应商连接和默认用途，密钥只显示提示 | `/api/v1/provider/get` | ✓ |   |   |   |
+| `provider.update` | 按版本保存供应商连接和默认用途 | `/api/v1/provider/update` | ✓ |   |   |   |
+| `provider.voice.list` | 查询指定 MOSS 账号的一页音色，不生成音频 | `/api/v1/provider/voice/list` | ✓ |   |   |   |
+| `provider.model.list` | 查询已配置 MOSS 账号的可用模型，不发推理请求 | `/api/v1/provider/model/list` | ✓ |   |   |   |
+
+## media
+
+
+
+| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|---|
+| `media.input.create` | 为媒体输入预留有限的本机空间，不上传给供应商 | `/api/v1/media/input/create` | ✓ |   |   |   |
+| `media.input.get` | 查看本机的媒体输入 | `/api/v1/media/input/get` | ✓ |   |   |   |
+| `media.input.list` | 列出本机的媒体输入 | `/api/v1/media/input/list` | ✓ |   |   |   |
+| `media.input.delete` | 删除没有被任务保留的本机媒体输入 | `/api/v1/media/input/delete` | ✓ |   |   |   |
+| `media.input.previewDelete` | 预览删除本机媒体输入，不实际改动 | `/api/v1/media/input/previewDelete` | ✓ |   |   |   |
+| `media.image.create` | 创建生图任务，同一编号不重复生成 | `/api/v1/media/image/create` | ✓ |   | ✓ |   |
+| `media.understanding.create` | 确认账号和上传许可后理解选中的本机输入 | `/api/v1/media/understanding/create` | ✓ |   |   |   |
+| `media.understanding.previewCleanup` | 预览远端清理和本机保留释放，不改变任何文件 | `/api/v1/media/understanding/previewCleanup` | ✓ |   |   |   |
+| `media.understanding.cleanup` | 清理已知远端文件，不重复理解请求 | `/api/v1/media/understanding/cleanup` | ✓ |   |   |   |
+| `media.job.get` | 读取生成任务 | `/api/v1/media/job/get` | ✓ |   | ✓ |   |
+| `media.job.cancel` | 取消本机等待，不保证停止厂商计费 | `/api/v1/media/job/cancel` | ✓ |   | ✓ |   |
+| `media.job.download` | 只重试结果下载，不重新生成 | `/api/v1/media/job/download` | ✓ |   | ✓ |   |
+| `media.job.list` | 列出最近生成任务 | `/api/v1/media/job/list` | ✓ |   | ✓ |   |
+
 ## channel
 
 频道和私聊，和里面的消息
@@ -90,7 +121,7 @@
 | 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|---|
 | `voice.hear` | 交上正在通的那通电话里听到的一句 | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
-| `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ | ✓ |   |   |
+| `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ |   |   |   |
 | `voice.grant.create` | 拿通话用的声网令牌 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
 | `voice.grant.renew` | 给通话换新的声网令牌 | `/api/v1/voice/grant/renew` | ✓ | ✓ |   |   |
 | `voice.call.start` | 开始和管家通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |

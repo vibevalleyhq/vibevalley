@@ -4,6 +4,7 @@ import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/s
 import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
 import type { InboxItem } from "../inbox/shapes";
 import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes";
+import type { MediaJob, FactMediaChanged } from "../media/shapes";
 import type { RuntimeInfo } from "../runtime/shapes";
 import type {
   FactSessionToolChanged,
@@ -36,6 +37,7 @@ export interface ServerReady {
 export interface SpaceState {
   call: CallState;
   callReason: string;
+  media?: MediaJob[];
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
   sessions: Session[];
   /** The farm's pixel-only station and step history, by session; no business rule reads it. */
@@ -89,7 +91,8 @@ export type Fact =
   | FactIssueRemoved
   | FactCronChanged
   | FactCronRemoved
-  | FactConnectorChanged;
+  | FactConnectorChanged
+  | FactMediaChanged;
 
 /** Told apart by `type`. */
 export type ServerEvent = Fact | ServerEventSnapshot | ServerEventStep | ServerEventNotice | ServerEventRuntime;
