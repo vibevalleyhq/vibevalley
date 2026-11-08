@@ -1,33 +1,72 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { hexClass, offTokens } from "./design-tokens.ts";
+import { hexColor, offTokens } from "./design-tokens.ts";
 
-describe("the workbench's design ladders", () => {
-  it("take the tokens and the values on the ladders", () => {
-    expect(offTokens("rounded-md rounded-xs text-2xs text-sm duration-120 duration-280 ease-out z-30 -z-10 disabled:opacity-50")).toEqual([]);
-    expect(offTokens("shadow-raise shadow-float shadow-[inset_0_2px_0_var(--color-accent)] hover:shadow-raise")).toEqual([]);
+describe("the workbench's StyleX design ladders", () => {
+  it.each([
+    ["borderRadius", "var(--radius-md)"],
+    ["borderTopLeftRadius", 0],
+    ["borderRadius", "var(--radius-sm) 0"],
+    ["borderRadius", "calc(infinity * 1px)"],
+    ["borderRadius", "2147483647px"],
+    ["fontSize", "var(--text-2xs)"],
+    ["fontSize", "var(--text-2xl)"],
+    ["fontSize", "var(--text-3xl)"],
+    ["fontSize", "inherit"],
+    ["transitionDuration", "120ms, 0.18s, 280ms"],
+    ["transitionDuration", "var(--default-transition-duration)"],
+    ["transitionTimingFunction", "var(--ease-out)"],
+    ["transitionTimingFunction", "var(--default-transition-timing-function)"],
+    ["transition", "none"],
+    ["zIndex", -10],
+    ["zIndex", "auto"],
+    ["boxShadow", "var(--shadow-float)"],
+    ["boxShadow", "inset 0 2px 0 var(--color-accent)"],
+    ["boxShadow", "0 0 0 1px currentColor"],
+    ["boxShadow", "none"],
+  ])("accepts %s: %s", (property, value) => {
+    expect(offTokens(property, value)).toBeUndefined();
   });
 
-  it("name each value off them, in order, behind any variant", () => {
-    expect(offTokens("rounded-[10px] md:text-[11px] hover:duration-150 z-50 disabled:opacity-40 ease-[cubic-bezier(0,0,1,1)]")).toEqual([
-      "radius",
-      "type",
-      "motion",
-      "layer",
-      "disabled",
-      "motion",
-    ]);
-    expect(offTokens("shadow-[0_1px_2px_black] rounded-t-[3px] z-[5]")).toEqual(["shadow", "radius", "layer"]);
+  it.each([
+    ["borderRadius", "7px", "radius"],
+    ["borderEndStartRadius", 4, "radius"],
+    ["borderRadius", "var(--made-up-radius)", "radius"],
+    ["fontSize", "11px", "type"],
+    ["fontSize", "var(--text-7xl)", "type"],
+    ["transitionDuration", "150ms", "motion"],
+    ["transitionDuration", "var(--duration-whatever)", "motion"],
+    ["transitionDuration", "120ms, 2s", "motion"],
+    ["transitionTimingFunction", "cubic-bezier(0,0,1,1)", "motion"],
+    ["transition", "color 150ms ease", "motion"],
+    ["zIndex", 999, "layer"],
+    ["zIndex", -50, "layer"],
+    ["boxShadow", "0 1px 2px black", "shadow"],
+    ["boxShadow", "var(--arbitrary)", "shadow"],
+  ])("rejects %s: %s as %s", (property, value, kind) => {
+    expect(offTokens(property, value)).toBe(kind);
   });
 
-  it("do not read a word that only looks like a class", () => {
-    expect(offTokens("the run took duration-150 minutes")).toEqual(["motion"]);
-    expect(offTokens("max-z-50 notrounded-[1px]")).toEqual([]);
+  it("checks disabled opacity only in that state", () => {
+    expect(offTokens("opacity", 0.4)).toBeUndefined();
+    expect(offTokens("opacity", 0.5, true)).toBeUndefined();
+    expect(offTokens("opacity", 0.4, true)).toBe("disabled");
   });
 
-  it("find a colour anywhere inside a class's brackets", () => {
-    expect(hexClass.test("bg-[#e3efd2]")).toBe(true);
-    expect(hexClass.test("shadow-[0_1px_2px_#2f1f1326]")).toBe(true);
-    expect(hexClass.test("bg-wheat/14 shadow-[inset_0_2px_0_var(--color-accent)]")).toBe(false);
+  it("leaves scene geometry and living-state animation periods alone", () => {
+    for (const property of ["width", "height", "top", "left", "translate", "gap", "animationDuration"]) {
+      expect(offTokens(property, "37px")).toBeUndefined();
+    }
+  });
+
+  it("finds hex paint, including gradients and shadows, but not URL fragments or content", () => {
+    expect(hexColor("color", "#e3efd2")).toBe(true);
+    expect(hexColor("boxShadow", "0 1px 2px #2f1f1326")).toBe(true);
+    expect(hexColor("backgroundImage", "linear-gradient(#abc, var(--color-page))")).toBe(true);
+    expect(hexColor(undefined, "#abcd")).toBe(true);
+    expect(hexColor("color", "var(--color-ink)")).toBe(false);
+    expect(hexColor("backgroundImage", "url('/art.svg#abc')")).toBe(false);
+    expect(hexColor("content", "'#abc'")).toBe(false);
+    expect(hexColor("color", "#abcde")).toBe(false);
   });
 });

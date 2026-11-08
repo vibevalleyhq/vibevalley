@@ -1,0 +1,7 @@
+@layer story-layout {
+  /* Story roots are arbitrary host DOM; only the frame's direct children fill it. */
+  [data-story-fill="true"] > * {
+    min-height: 0;
+    flex: 1;
+  }
+}

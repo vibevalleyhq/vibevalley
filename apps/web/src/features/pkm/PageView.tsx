@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
@@ -23,6 +24,330 @@ import { daysUntil, dayKey, titleFor } from "./days";
 import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
+
+const recipeStyles = stylex.create({
+  propsSpanState: {
+    color: "var(--wb-muted)",
+  },
+  propsSpanState2: {
+    color: "var(--wb-warn-ink)",
+  },
+  propsSpanState3: {
+    color: "var(--wb-berry)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  shownA: {
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  backlinkRowA: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  shownDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=80rem)": "row",
+    },
+    overflowY: "auto",
+    alignItems: {
+      default: null,
+      "@media (width>=80rem)": "flex-start",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  pkmDay: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  shownH2: {
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  shownArticle: {
+    marginInline: "auto",
+    display: "flex",
+    width: "100%",
+    maxWidth: "var(--container-3xl)",
+    minWidth: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+  pkmRail: {
+    marginInline: {
+      default: "auto",
+      "@media (width>=80rem)": "0",
+    },
+    display: "flex",
+    width: {
+      default: "100%",
+      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+    },
+    maxWidth: "var(--container-3xl)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 5)",
+    borderTopStyle: {
+      default: "solid",
+      "@media (width>=80rem)": "solid",
+    },
+    borderTopWidth: {
+      default: "1px",
+      "@media (width>=80rem)": "0",
+    },
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+    position: {
+      default: null,
+      "@media (width>=80rem)": "sticky",
+    },
+    top: {
+      default: null,
+      "@media (width>=80rem)": "0",
+    },
+    maxHeight: {
+      default: null,
+      "@media (width>=80rem)": "100%",
+    },
+    flexShrink: {
+      default: null,
+      "@media (width>=80rem)": "0",
+    },
+    overflowY: {
+      default: null,
+      "@media (width>=80rem)": "auto",
+    },
+    borderLeftStyle: {
+      default: null,
+      "@media (width>=80rem)": "solid",
+    },
+    borderLeftWidth: {
+      default: null,
+      "@media (width>=80rem)": "1px",
+    },
+  },
+  headerDiv: {
+    display: {
+      default: null,
+      "@media (width>=64rem)": "none",
+    },
+  },
+  headerDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  pkmTitle: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xl)",
+    lineHeight: "calc(var(--spacing) * 8)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  headerP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  pkmProps: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  propsDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  pkmProp: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  pkmProp2: {
+    color: "var(--color-muted)",
+  },
+  pkmProp3: {
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-hover)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  pkmPropsMore: {
+    cursor: "pointer",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  propsDl: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  commentsH2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  pkmComment: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    padding: "calc(var(--spacing) * 2.5)",
+  },
+  pkmCommentAt: {
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "left",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  commentCardP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  pkmDiff: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    whiteSpace: "pre-wrap",
+  },
+  commentCardDel: {
+    backgroundColor: "var(--color-bad-soft)",
+    color: "var(--color-berry)",
+  },
+  commentCardIns: {
+    backgroundColor: "var(--color-ok-soft)",
+    color: "var(--color-ok-ink)",
+    textDecorationLine: "none",
+  },
+  commentCardDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 1.5)",
+    alignSelf: "flex-end",
+  },
+  backlinksP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  backlinksDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  backlinksH3: {
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  pkmBacklink: {
+    display: "flex",
+    flexDirection: "column",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  contentsDiv: {
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+});
 
 /** A tier as a group of pages (the sidebar's heads): Projects. */
 export const tierLabel = (tier: PkmTier) => t(`web.pkm.tier.${tier}`);
@@ -72,9 +397,9 @@ function Shown(props: {
     <Show
       when={!props.compact}
       fallback={
-        <article data-testid="pkm-day" data-key={page().slug} class="flex flex-col gap-2">
-          <h2 class="text-lg font-semibold">
-            <A href={pkmHref(page().slug)} class="hover:underline">
+        <article data-testid="pkm-day" data-key={page().slug} {...stylex.attrs(viewStyles.pkmDay)}>
+          <h2 {...stylex.attrs(viewStyles.shownH2)}>
+            <A href={pkmHref(page().slug)} {...stylex.attrs(variantStyles2.shownA)}>
               {titleFor(page().title, props.summary?.day)}
             </A>
           </h2>
@@ -82,17 +407,13 @@ function Shown(props: {
         </article>
       }
     >
-      <div data-testid="pkm-page" data-key={page().slug} class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:items-start">
-        <article class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4 px-4 py-4">
+      <div data-testid="pkm-page" data-key={page().slug} {...stylex.attrs(variantStyles.shownDiv)}>
+        <article {...stylex.attrs(viewStyles.shownArticle)}>
           <Header view={props.view} summary={props.summary} />
           {outline()}
         </article>
         <Show when={rail.get()}>
-          <aside
-            aria-label={t("web.pkm.rail.label")}
-            data-testid="pkm-rail"
-            class="mx-auto flex w-full max-w-3xl flex-col gap-5 border-t border-line px-4 py-4 xl:sticky xl:top-0 xl:mx-0 xl:max-h-full xl:w-72 xl:shrink-0 xl:overflow-y-auto xl:border-t-0 xl:border-l"
-          >
+          <aside aria-label={t("web.pkm.rail.label")} data-testid="pkm-rail" {...stylex.attrs(viewStyles.pkmRail)}>
             <Calendar pages={props.pages} open={props.summary?.day} />
             <Comments view={props.view} />
             <Backlinks view={props.view} pages={props.pages} />
@@ -146,14 +467,14 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
     { key: "undo", label: t("web.pkm.page.undo"), icon: "undo", onSelect: () => void undo() },
   ];
   return (
-    <header class="flex flex-col gap-2">
-      <div class="lg:hidden">
+    <header {...stylex.attrs(viewStyles.pkmDay)}>
+      <div {...stylex.attrs(viewStyles.headerDiv)}>
         <Button icon="back" onClick={() => router.navigate("/pkm")}>
           {t("web.pkm.list.today")}
         </Button>
       </div>
-      <div class="flex items-center gap-2">
-        <h1 data-testid="pkm-title" class="min-w-0 flex-1 truncate text-xl leading-8 font-semibold">
+      <div {...stylex.attrs(viewStyles.headerDiv2)}>
+        <h1 data-testid="pkm-title" {...stylex.attrs(viewStyles.pkmTitle)}>
           {titleFor(page().title, props.summary?.day)}
         </h1>
         <Select
@@ -175,7 +496,7 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
       </div>
       <Props view={props.view} />
       <Show when={page().tldr}>
-        <p class="text-sm text-muted">{page().tldr}</p>
+        <p {...stylex.attrs(viewStyles.headerP)}>{page().tldr}</p>
       </Show>
     </header>
   );
@@ -205,11 +526,11 @@ function Props(props: { view: PkmPageView }) {
   };
   return (
     <Show when={entries().length > 0}>
-      <div data-testid="pkm-props" class="flex flex-col gap-1.5">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <div data-testid="pkm-props" {...stylex.attrs(viewStyles.pkmProps)}>
+        <div {...stylex.attrs(viewStyles.propsDiv)}>
           <Show when={value("status")}>
             {(s) => (
-              <span data-testid="pkm-prop" data-key="status" class="inline-flex items-center gap-1.5">
+              <span data-testid="pkm-prop" data-key="status" {...stylex.attrs(viewStyles.pkmProp)}>
                 <Dot tone={statusTone(s())} />
                 {s()}
               </span>
@@ -220,7 +541,9 @@ function Props(props: { view: PkmPageView }) {
               <span
                 data-testid="pkm-prop"
                 data-key="deadline"
-                class={[(d().left ?? 1) < 0 ? "text-berry" : (d().left ?? 99) <= 3 ? "text-warn-ink" : "text-muted"]}
+                {...stylex.attrs(
+                  (d().left ?? 1) < 0 ? recipeStyles.propsSpanState3 : (d().left ?? 99) <= 3 ? recipeStyles.propsSpanState2 : recipeStyles.propsSpanState,
+                )}
               >
                 <Switch fallback={t("web.pkm.props.deadline", { day: d().day })}>
                   <Match when={d().left !== undefined && (d().left ?? 0) < 0}>{t("web.pkm.props.overdue", { day: d().day, n: -(d().left ?? 0) })}</Match>
@@ -232,7 +555,7 @@ function Props(props: { view: PkmPageView }) {
           </Show>
           <For each={["area", "areas"].filter((k) => value(k))}>
             {(k) => (
-              <span data-testid="pkm-prop" data-key={k} class="text-muted">
+              <span data-testid="pkm-prop" data-key={k} {...stylex.attrs(viewStyles.pkmProp2)}>
                 {t("web.pkm.props.area")} <Body text={value(k) ?? ""} refs={props.view.transclusions} />
               </span>
             )}
@@ -244,23 +567,23 @@ function Props(props: { view: PkmPageView }) {
               .filter(Boolean)}
           >
             {(tag) => (
-              <span data-testid="pkm-prop" data-key="tags" class="rounded-full bg-hover px-2 py-0.5 text-xs">
+              <span data-testid="pkm-prop" data-key="tags" {...stylex.attrs(viewStyles.pkmProp3)}>
                 <Body text={tag.startsWith("#") || tag.startsWith("[[") ? tag : `[[${tag}]]`} refs={props.view.transclusions} />
               </span>
             )}
           </For>
           <Show when={rest().length > 0}>
-            <button type="button" data-testid="pkm-props-more" onClick={() => setAll((a) => !a)} class="cursor-pointer text-xs text-muted hover:text-ink">
+            <button type="button" data-testid="pkm-props-more" onClick={() => setAll((a) => !a)} {...stylex.attrs(viewStyles.pkmPropsMore)}>
               {all() ? t("web.pkm.props.fewer") : t("web.pkm.props.more", { n: rest().length })}
             </button>
           </Show>
         </div>
         <Show when={all()}>
-          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+          <dl {...stylex.attrs(viewStyles.propsDl)}>
             <For each={rest()} keyed={([k]) => k}>
               {(entry) => (
                 <>
-                  <dt class="text-muted">{entry()[0]}</dt>
+                  <dt {...stylex.attrs(viewStyles.pkmProp2)}>{entry()[0]}</dt>
                   <dd data-testid="pkm-prop" data-key={entry()[0]}>
                     <Body text={entry()[1]} refs={props.view.transclusions} />
                   </dd>
@@ -278,8 +601,8 @@ function Comments(props: { view: PkmPageView }) {
   const bodyOf = (block: string) => props.view.page.blocks.find((b) => b.id === block)?.body ?? "";
   return (
     <Show when={props.view.comments.length > 0}>
-      <section data-testid="pkm-comments" class="flex flex-col gap-2">
-        <h2 class="text-xs font-semibold text-muted">{t("web.pkm.comments.title", { n: props.view.comments.length })}</h2>
+      <section data-testid="pkm-comments" {...stylex.attrs(viewStyles.pkmDay)}>
+        <h2 {...stylex.attrs(viewStyles.commentsH2)}>{t("web.pkm.comments.title", { n: props.view.comments.length })}</h2>
         <For each={props.view.comments} keyed={(c) => c.id}>
           {(c) => <CommentCard comment={c()} body={bodyOf(c().block)} slug={props.view.page.slug} />}
         </For>
@@ -307,28 +630,28 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
       data-testid="pkm-comment"
       data-key={props.comment.id}
       data-status={props.comment.status}
-      class="flex flex-col gap-1.5 rounded-lg border border-line p-2.5"
+      {...stylex.attrs(viewStyles.pkmComment)}
     >
       <button
         type="button"
         data-testid="pkm-comment-at"
         onClick={() => router.navigate(pkmHref(props.slug, props.comment.block), { replace: true })}
-        class="cursor-pointer truncate text-left text-xs text-muted hover:text-ink"
+        {...stylex.attrs(viewStyles.pkmCommentAt)}
       >
         {t("web.pkm.comments.on", { span: props.comment.span ?? props.body })}
       </button>
-      <p class="text-sm">{props.comment.body}</p>
+      <p {...stylex.attrs(viewStyles.commentCardP)}>{props.comment.body}</p>
       <Show when={props.comment.suggested}>
         {(s) => (
-          <p data-testid="pkm-diff" class="text-sm whitespace-pre-wrap">
+          <p data-testid="pkm-diff" {...stylex.attrs(viewStyles.pkmDiff)}>
             <For each={wordDiff(props.body, s())}>
               {(d) => (
                 <Switch fallback={<span>{d.text}</span>}>
                   <Match when={d.kind === "del"}>
-                    <del class="bg-bad-soft text-berry">{d.text}</del>
+                    <del {...stylex.attrs(viewStyles.commentCardDel)}>{d.text}</del>
                   </Match>
                   <Match when={d.kind === "add"}>
-                    <ins class="bg-ok-soft text-ok-ink no-underline">{d.text}</ins>
+                    <ins {...stylex.attrs(viewStyles.commentCardIns)}>{d.text}</ins>
                   </Match>
                 </Switch>
               )}
@@ -336,7 +659,7 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
           </p>
         )}
       </Show>
-      <div class="flex gap-1.5 self-end">
+      <div {...stylex.attrs(viewStyles.commentCardDiv)}>
         <Show when={props.comment.suggested}>
           <Button tone="primary" icon="check" data-testid="pkm-accept" disabled={act.busy()} onClick={() => void resolve(true)}>
             {t("web.pkm.comments.accept")}
@@ -358,13 +681,13 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
     return b.projects.length + b.journals.length + b.areas.length + b.archives.length;
   };
   return (
-    <section data-testid="pkm-backlinks" class="flex flex-col gap-2">
-      <h2 class="text-xs font-semibold text-muted">{t("web.pkm.backlinks.title", { n: count() })}</h2>
-      <Show when={count() > 0} fallback={<p class="text-xs text-faint">{t("web.pkm.backlinks.none")}</p>}>
+    <section data-testid="pkm-backlinks" {...stylex.attrs(viewStyles.pkmDay)}>
+      <h2 {...stylex.attrs(viewStyles.commentsH2)}>{t("web.pkm.backlinks.title", { n: count() })}</h2>
+      <Show when={count() > 0} fallback={<p {...stylex.attrs(viewStyles.backlinksP)}>{t("web.pkm.backlinks.none")}</p>}>
         <For each={backlinkGroups.filter((g) => props.view.backlinks[g].length > 0)}>
           {(g) => (
-            <div class="flex flex-col gap-0.5">
-              <h3 class="text-2xs text-faint">{t(`web.pkm.backlinks.${g}`)}</h3>
+            <div {...stylex.attrs(viewStyles.backlinksDiv)}>
+              <h3 {...stylex.attrs(viewStyles.backlinksH3)}>{t(`web.pkm.backlinks.${g}`)}</h3>
               <For each={props.view.backlinks[g]} keyed={(l) => l.block}>
                 {(l) => <BacklinkRow link={l()} refs={props.view.transclusions} day={props.pages.find((p) => p.slug === l().page)?.day} />}
               </For>
@@ -379,12 +702,12 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
 /** The page and path are the link to the block; the body's own links stay links (an anchor cannot hold another). */
 function BacklinkRow(props: { link: PkmBacklink; refs: PkmPageView["transclusions"]; day: string | undefined }) {
   return (
-    <div data-testid="pkm-backlink" data-key={props.link.block} class="flex flex-col rounded-md px-2 py-1.5 hover:bg-hover">
-      <A href={pkmHref(props.link.page, props.link.block)} data-testid="pkm-backlink-page" class="truncate text-xs text-muted hover:text-ink hover:underline">
+    <div data-testid="pkm-backlink" data-key={props.link.block} {...stylex.attrs(viewStyles.pkmBacklink)}>
+      <A href={pkmHref(props.link.page, props.link.block)} data-testid="pkm-backlink-page" {...stylex.attrs(variantStyles2.backlinkRowA)}>
         {titleFor(props.link.pageTitle, props.day)}
         <Show when={props.link.path}> › {props.link.path}</Show>
       </A>
-      <span class="text-sm">
+      <span {...stylex.attrs(viewStyles.commentCardP)}>
         <Body text={props.link.body} refs={props.refs} />
       </span>
     </div>
@@ -396,8 +719,8 @@ function Contents(props: { view: PkmPageView }) {
   const tops = () => props.view.page.blocks.filter((b) => b.depth === 0 && b.body.trim() !== "");
   return (
     <Show when={tops().length >= 3}>
-      <section data-testid="pkm-contents" class="flex flex-col gap-0.5">
-        <h2 class="text-xs font-semibold text-muted">{t("web.pkm.rail.contents")}</h2>
+      <section data-testid="pkm-contents" {...stylex.attrs(viewStyles.backlinksDiv)}>
+        <h2 {...stylex.attrs(viewStyles.commentsH2)}>{t("web.pkm.rail.contents")}</h2>
         <For each={tops()} keyed={(b) => b.id}>
           {(b) => (
             <div
@@ -406,7 +729,7 @@ function Contents(props: { view: PkmPageView }) {
               data-key={b().id}
               onClick={() => router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
               onKeyDown={(e) => e.key === "Enter" && router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
-              class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs text-muted hover:bg-hover hover:text-ink"
+              {...stylex.attrs(viewStyles.contentsDiv)}
             >
               {/* A heading's #s come off: the list is one size. */}
               <Body text={(b().body.split("\n")[0] ?? "").replace(/^#+\s*/u, "")} refs={props.view.transclusions} />

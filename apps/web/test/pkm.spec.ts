@@ -79,12 +79,15 @@ test("the search lists pages and blocks by page and opens one at its block", asy
   expect(violations.map((v) => v.id)).toEqual([]);
 });
 
-test("/pkm opens on today's journal to write in, and the calendar opens a day", async ({ page }) => {
+test("regression: /pkm marks today's journal and the calendar opens a day", async ({ page }) => {
   await page.goto("/pkm");
   const today = page.getByTestId("pkm-day").first();
   await expect(today.getByTestId("pkm-block")).toHaveCount(1);
   const calendar = page.getByTestId("pkm-calendar");
   await expect(calendar.locator("[data-journal]")).toHaveCount(1);
+  const currentDay = calendar.locator("[data-journal]");
+  const accent = await currentDay.locator('[aria-hidden="true"]').evaluate((element) => getComputedStyle(element).backgroundColor);
+  await expect(currentDay).toHaveCSS("box-shadow", `${accent} 0px 0px 0px 1px`);
   await calendar.getByTestId("pkm-calendar-previous").click();
   await calendar.locator('[data-testid="pkm-day-cell"]').nth(10).click();
   await expect(page).toHaveURL(/\/pkm\/\d{4}_\d{2}_\d{2}$/u);

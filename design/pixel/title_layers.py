@@ -2,7 +2,7 @@
 """Cut what moves over the title screen out of its sheets (gen.sh title-clouds title-smoke title-dandelion
 title-plants): magenta off, each cell trimmed to what is drawn. They keep the scale they were drawn at, the title
 pictures' own (an art pixel is four image pixels, on a 1536 x 1024 scene), so the page places them on the scene in
-the scene's own coordinates (site/src/lib/scene.ts). Writes apps/web/public/title/<name>.png and sprites.json
+the scene's own coordinates (apps/site/src/lib/scene.ts). Writes apps/web/public/title/<name>.png and sprites.json
 (each sprite's width and height).
 
 Run from design/pixel: python3 title_layers.py

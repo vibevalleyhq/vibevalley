@@ -1,46 +1,58 @@
-/** The workbench's design tokens as its classes may name them (docs/style/design.md): what a class string writes off the ladders. */
-
-/** A token kind, as the rule's message names what to use instead. */
 export type TokenKind = "radius" | "type" | "motion" | "layer" | "disabled" | "shadow";
 
-/** The durations on the ladder: 120 under the pointer, 180 the default, 280 a panel or a dialog; 0 is none. */
 const durations = new Set([0, 120, 180, 280]);
-/** The layers: 10 lies on content, 20 a panel over a page, 30 a menu, a popover or a tip, 40 a toast. */
 const layers = new Set([0, 10, 20, 30, 40]);
+const globalValues = new Set(["inherit", "initial", "unset", "revert", "revert-layer"]);
+const radius = /^(?:0(?:px)?|50%|9999px|2147483647px|var\(--radius-(?:xs|sm|md|lg|xl)\))$/u;
+const typeSize = /^var\(--text-(?:2xs|xs|sm|base|lg|xl|2xl|3xl)\)$/u;
+const easing = /^var\(--(?:ease-(?:out|in|in-out|spring)|default-transition-timing-function)\)$/u;
+const palette = /var\(--(?:color|shadow)-[\w-]+\s*[,)]|\bcurrentcolor\b/iu;
 
-// A class starts the string, follows a space, or follows a variant (hover:, md:, aria-[…]:).
-const start = String.raw`(?:^|[\s:])`;
-const checks: readonly { readonly kind: TokenKind; readonly pattern: RegExp; readonly off?: (m: RegExpExecArray) => boolean }[] = [
-  { kind: "radius", pattern: new RegExp(`${start}rounded(?:-[a-z]+)?-\\[`, "gu") },
-  { kind: "type", pattern: new RegExp(`${start}text-\\[\\d`, "gu") },
-  { kind: "motion", pattern: new RegExp(`${start}(?:ease|duration|delay)-\\[`, "gu") },
-  { kind: "motion", pattern: new RegExp(`${start}duration-(\\d+)\\b`, "gu"), off: (m) => !durations.has(Number(m[1])) },
-  { kind: "layer", pattern: new RegExp(`${start}-?z-(\\d+)\\b`, "gu"), off: (m) => !layers.has(Number(m[1])) },
-  { kind: "layer", pattern: new RegExp(`${start}z-\\[`, "gu") },
-  { kind: "disabled", pattern: new RegExp(`${start}disabled:opacity-(\\d+)\\b`, "gu"), off: (m) => m[1] !== "50" },
-  // A shadow of its own is drawn with the palette's variables (an inset accent line), never a colour written in.
-  { kind: "shadow", pattern: new RegExp(`${start}shadow-\\[([^\\]]*)\\]`, "gu"), off: (m) => !m[1]!.includes("var(") },
-];
-
-/** Each token a class string writes off its ladder, in order. */
-export function offTokens(classes: string): TokenKind[] {
-  const found: { at: number; kind: TokenKind }[] = [];
-  for (const c of checks) {
-    c.pattern.lastIndex = 0;
-    for (let m = c.pattern.exec(classes); m; m = c.pattern.exec(classes)) if (!c.off || c.off(m)) found.push({ at: m.index, kind: c.kind });
-  }
-  return found.toSorted((a, b) => a.at - b.at).map((f) => f.kind);
+function duration(value: string): boolean {
+  if (value === "var(--default-transition-duration)") return true;
+  const match = /^(\d*\.?\d+)(ms|s)?$/u.exec(value);
+  return !!match && durations.has(Number(match[1]) * (match[2] === "s" ? 1000 : 1));
 }
 
-/** What to write instead, by kind. */
+/** Geometry is not a design ladder: coordinates, sizes and animation paths belong to their scene. */
+export function offTokens(property: string, value: string | number, disabled = false): TokenKind | undefined {
+  const text = String(value).trim();
+  if (globalValues.has(text)) return undefined;
+  if (/^border(?:TopLeft|TopRight|BottomLeft|BottomRight|StartStart|StartEnd|EndStart|EndEnd)?Radius$/u.test(property)) {
+    if (text === "calc(infinity * 1px)") return undefined;
+    return text.split(/[\s/]+/u).every((part) => radius.test(part)) ? undefined : "radius";
+  }
+  if (property === "fontSize") return typeSize.test(text) ? undefined : "type";
+  if (property === "transitionDuration" || property === "transitionDelay") {
+    return text.split(",").every((part) => duration(part.trim())) ? undefined : "motion";
+  }
+  if (property === "transitionTimingFunction") return text.split(",").every((part) => easing.test(part.trim())) ? undefined : "motion";
+  if (property === "transition") return text === "none" ? undefined : "motion";
+  if (property === "zIndex") return text === "auto" || layers.has(Math.abs(Number(text))) ? undefined : "layer";
+  if (property === "opacity" && disabled) return Number(text) === 0.5 ? undefined : "disabled";
+  if (property === "boxShadow") return text === "none" || palette.test(text) ? undefined : "shadow";
+  return undefined;
+}
+
 export const tokenAdvice: Record<TokenKind, string> = {
-  radius: "a corner on the ladder: rounded-xs (a mark in a line), rounded-md (a control), rounded-lg (a card, a panel, a dialog), rounded-xl, rounded-full",
-  type: "a size on the ladder: text-2xs (counts, badges, key caps), text-xs, text-sm, text-base, text-lg, text-xl",
-  motion: "the motion tokens: duration-120 (hover, press), the default 180, duration-280 (panels, dialogs); ease-out, ease-in, ease-in-out, ease-spring",
-  layer: "a layer: z-10 (on content), z-20 (a panel over the page), z-30 (a menu, a popover, a tip), z-40 (a toast)",
-  disabled: "disabled:opacity-50, the one disabled look",
-  shadow: "shadow-raise (on its surface) or shadow-float (over the page); a shadow of its own uses the palette's variables",
+  radius: "a named corner such as borderRadius: 'var(--radius-md)' (xs/sm/md/lg/xl); 0 for square corners or 'calc(infinity * 1px)' for pills",
+  type: "fontSize: 'var(--text-sm)' from the host's named type tokens (2xs through 3xl); reserve 2xl/3xl for document titles and pairing codes",
+  motion:
+    "transition longhands with 120ms (hover/press), 180ms (state), 280ms (panel), or 0; transitionTimingFunction: 'var(--ease-out)' (in/in-out/spring for other motion)",
+  layer: "zIndex: 10 (on content), 20 (panel), 30 (menu/popover/tip), or 40 (toast)",
+  disabled: "opacity: { default: null, ':disabled': 0.5 }, the one disabled look",
+  shadow: "boxShadow: 'var(--shadow-raise)' or 'var(--shadow-float)'; an inset line uses var(--color-accent)",
 };
 
-/** A colour written into a class anywhere inside its brackets (bg-[#e3efd2], shadow-[0_1px_2px_#2f1f1326]). */
-export const hexClass = /-\[[^\]]*#[0-9a-fA-F]{3,8}\b[^\]]*\]/u;
+/** URL fragments identify assets, not colours; content and arbitrary business strings are not paint. */
+export function hexColor(property: string | undefined, value: string): boolean {
+  if (
+    property !== undefined &&
+    !property.startsWith("--") &&
+    !/^(?:.*Color|color|background(?:Image)?|maskImage|border(?:Top|Right|Bottom|Left|Block|Inline|BlockStart|BlockEnd|InlineStart|InlineEnd)?|outline|boxShadow|textShadow|fill|stroke|filter|backdropFilter|textDecoration|columnRule)$/u.test(
+      property,
+    )
+  )
+    return false;
+  return /#(?:[\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})\b/iu.test(value.replace(/url\([^)]*\)/giu, ""));
+}

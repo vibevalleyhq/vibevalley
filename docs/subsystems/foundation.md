@@ -37,10 +37,10 @@
 ### 仓库和包
 
 - **单一语言与运行器**：全仓使用 TypeScript，开发与测试用 `vpx` 直接运行源码，桌面版服务端用 `vp pack` 打包为 `dist/main.mjs`。
-- **依赖版本唯一**：所有版本集中在 `pnpm-workspace.yaml` 的 `catalog` 中，各包写 `catalog:`，由 `scripts/catalog.test.ts` 检查。
+- **依赖版本集中**：所有应用（含 `apps/site`）与共享包使用根 workspace 和同一份锁文件。版本集中在 `pnpm-workspace.yaml` 的 catalog 中，各包写 `catalog:` 或具名 catalog，由 `scripts/catalog.test.ts` 检查。Expo 的版本放在 `expo`；不保留应用自己的 workspace 或锁文件。
 - **开启全局虚拟存储**：`enableGlobalVirtualStore` 让新 worktree 直接硬链全局包，几秒内完成安装。
 - **跨包走包名，包内跨目录走 `#/`**：跨包导入必须写 `@vibevalley/*`，`apps/server` 与 `apps/web` 跨目录导入写 `#/` 和 `#db/`（由 `no-cross-package-path` 与 `parent-import` 规则检查）。
-- **包导出分离类型与源码**：`packages/*` 的 `exports` 将 `types` 指向 `dist/*.d.ts`（`vp run packages:build` 生成，`scripts/built-types.ts` 检查），`default` 指向源码。
+- **包导出分离类型与源码**：`packages/*` 的代码导出将 `types` 指向 `dist/*.d.ts`（`vp run packages:build` 生成，`scripts/built-types.ts` 检查），`default` 指向源码；`.css` 导出直接指向 `src/` 下存在的样式表，不伪造类型声明。
 - **严格可选属性**：开启 `exactOptionalPropertyTypes`，对外对象用 `omitUndefined` 清理未定义键（[代码风格](docs/style/code.md#没有值)）。
 
 ### 模块和服务

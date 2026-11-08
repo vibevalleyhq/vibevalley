@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 
@@ -16,6 +17,7 @@ import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Quiet } from "#/ui/layout.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { createSessionEvents } from "./events";
 import {
@@ -35,6 +37,408 @@ import {
   waterfallOf,
 } from "./runs";
 
+const trajectoryStyles = stylex.create({
+  bar: {
+    position: "absolute",
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: {
+      default: "var(--timeline-color)",
+      "@media (hover: hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  round: {
+    position: "relative",
+  },
+  report: {
+    position: "absolute",
+    top: "0",
+    right: "0",
+    display: {
+      default: "none",
+      [stylex.when.ancestor(":focus-within")]: "flex",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover")]: "flex",
+      },
+    },
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  toolDetailPre: {
+    fontFamily: "var(--font-mono)",
+    whiteSpace: "pre-wrap",
+    WebkitUserSelect: "text",
+    userSelect: "text",
+  },
+});
+
+const recipeStyles = stylex.create({
+  rowSpan: {
+    width: "calc(var(--spacing) * 15)",
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    paddingTop: "calc(var(--spacing) * .5)",
+    paddingLeft: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  rowSpan2: {
+    marginTop: "1px",
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "var(--spacing)",
+    paddingBlock: "1px",
+    textAlign: "center",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  rowSpanVariant1Case1: {
+    width: "calc(var(--spacing) * 22)",
+    marginLeft: null,
+  },
+  rowSpanVariant1Case2: {
+    width: "78px",
+    marginLeft: "calc(var(--spacing) * 2.5)",
+  },
+  waterfallViewDiv: {
+    display: "flex",
+    width: "calc(var(--spacing) * 15)",
+    flexShrink: "0",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    paddingLeft: "calc(var(--spacing) * 2)",
+  },
+});
+
+const variantStyles3 = stylex.create({
+  rowIcon: {
+    marginTop: "var(--spacing)",
+    marginRight: "var(--spacing)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  trajectoryTextInput: {
+    width: {
+      default: "calc(var(--spacing) * 36)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 56)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  rowDiv: {
+    borderRadius: "var(--radius-md)",
+    paddingBlock: "3px",
+    paddingRight: "calc(var(--spacing) * 2)",
+  },
+  rowDivVariant: {
+    backgroundColor: {
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 35%, transparent)",
+    },
+  },
+  rowDivVariant2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  rowSpan: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  rowSpanVariant: {
+    color: "var(--color-berry)",
+  },
+  rowSpanVariant2: {},
+  toolLineSpan: {
+    fontFamily: "var(--font-mono)",
+  },
+  trajectoryListButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    flexDirection: "column",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  trajectoryListButtonVariant: {
+    backgroundColor: "var(--color-selected)",
+  },
+});
+
+const viewStyles = stylex.create({
+  headSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  trajectoryLogDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  trajectoryDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: "column",
+  },
+  trajectoryDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  trajectoryDiv3: {
+    minWidth: "0",
+    flex: "1",
+  },
+  trajectoryDiv4: {
+    marginTop: "calc(var(--spacing) * 2)",
+    minHeight: "0",
+    flex: "1",
+    overflowY: "auto",
+    borderBlockStyle: "solid",
+    borderBlockWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingBlock: "var(--spacing)",
+  },
+  stepsEmpty: {
+    paddingTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  trajectoryP: {
+    paddingTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  rowButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "flex-start",
+    textAlign: "left",
+  },
+  rowSpan: {
+    width: "calc(var(--spacing) * 2)",
+    flexShrink: "0",
+  },
+  rowSpan2: {
+    display: "block",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  rowSpan3: {
+    whiteSpace: "pre-wrap",
+  },
+  rowSpan4: {
+    flexShrink: "0",
+    paddingTop: "calc(var(--spacing) * .5)",
+    paddingLeft: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  toolLineSpan: {
+    fontFamily: "var(--font-mono)",
+    color: "var(--color-muted)",
+  },
+  toolDetailDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    paddingTop: "var(--spacing)",
+    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingLeft: "164px",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  toolDetailSpan: {
+    color: "var(--color-muted)",
+  },
+  waterfallViewDiv: {
+    display: "flex",
+  },
+  waterfallViewSpan: {
+    fontSize: "var(--text-2xs)",
+    lineHeight: "1",
+    color: "var(--color-muted)",
+  },
+  waterfallViewDiv2: {
+    position: "relative",
+    minWidth: "0",
+    flex: "1",
+    overflow: "hidden",
+  },
+  waterfallViewDiv3: {
+    position: "absolute",
+    insetInline: "0",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hover)",
+  },
+  markableDiv: {
+    marginBlock: "calc(var(--spacing) * .5)",
+    marginRight: "calc(var(--spacing) * 2)",
+    marginLeft: "164px",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 12%, transparent)",
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  markableForm: {
+    marginBlock: "var(--spacing)",
+    marginRight: "calc(var(--spacing) * 2)",
+    marginLeft: "164px",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  markSubmit: {
+    height: "calc(var(--spacing) * 7)",
+    flexShrink: "0",
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--color-accent)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-page)",
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  markableButton: {
+    height: "calc(var(--spacing) * 7)",
+    flexShrink: "0",
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  trajectoryListDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=48rem)": "row",
+    },
+    gap: "calc(var(--spacing) * 3)",
+  },
+  trajectoryListUl: {
+    display: "flex",
+    maxHeight: {
+      default: "calc(var(--spacing) * 33)",
+      "@media (width>=48rem)": "none",
+    },
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    overflowY: "auto",
+    width: {
+      default: null,
+      "@media (width>=48rem)": "calc(var(--spacing) * 60)",
+    },
+  },
+  trajectoryListSpan: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  trajectoryListSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  trajectoryListSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  trajectoryListSpan4: {
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hat)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-bark-900)",
+  },
+  trajectoryListSpan5: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  trajectoryListDiv2: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+  },
+});
+
 /** Saves the model turn its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
@@ -45,7 +449,7 @@ const laneNames: Record<Lane, string> = {
 };
 
 // Usage is not a step of the work: the page's own hover ground, with the theme's ink, in either theme.
-const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "var(--wb-hover)" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
+const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "var(--color-hover)" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
 
 const lightInk = "#fffaf0";
 const darkInk = "#2f1f13";
@@ -60,7 +464,7 @@ const luminance = (hex: string) => {
 
 /** The words on a fill: whichever ink stands out more from it (WCAG's ratio), so a mid-tone fill gets the readable one. */
 function inkOn(fill: string) {
-  if (!/^#[0-9a-f]{6}$/iu.test(fill)) return "var(--wb-ink)";
+  if (!/^#[0-9a-f]{6}$/iu.test(fill)) return "var(--color-ink)";
   const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   const l = luminance(fill);
   return ratio(l, luminance(lightInk)) >= ratio(l, luminance(darkInk)) ? lightInk : darkInk;
@@ -93,7 +497,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
   const now = useNow();
   const head = () =>
     props.title ? (
-      <span class="truncate text-sm font-semibold" title={props.about}>
+      <span {...stylex.attrs(viewStyles.headSpan)} title={props.about}>
         {props.title}
       </span>
     ) : undefined;
@@ -101,7 +505,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
     <Show
       when={steps().length > 0}
       fallback={
-        <div class="flex flex-col gap-2">
+        <div {...stylex.attrs(viewStyles.trajectoryLogDiv)}>
           {head()}
           <Quiet>{props.empty ?? t("web.session.trajectory.quiet")}</Quiet>
         </div>
@@ -188,14 +592,14 @@ export function Trajectory(props: {
   const toggle = (n: number) => setOpen((o) => (o.has(n) ? new Set([...o].filter((x) => x !== n)) : new Set([...o, n])));
 
   return (
-    <div class="flex h-full min-h-0 flex-col">
-      <div class="flex items-center gap-3 pb-2">
-        <div class="min-w-0 flex-1">{props.head}</div>
+    <div {...stylex.attrs(viewStyles.trajectoryDiv)}>
+      <div {...stylex.attrs(viewStyles.trajectoryDiv2)}>
+        <div {...stylex.attrs(viewStyles.trajectoryDiv3)}>{props.head}</div>
         <TextInput
           data-testid="trajectory-search"
           aria-label={t("web.session.trajectory.search")}
           placeholder={t("web.session.trajectory.searchHint")}
-          class="w-36 sm:w-56"
+          styles={variantStyles2.trajectoryTextInput}
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
@@ -211,7 +615,7 @@ export function Trajectory(props: {
       />
       <div
         ref={(el) => (scroller = el)}
-        class="mt-2 min-h-0 flex-1 overflow-y-auto border-y border-line py-1"
+        {...stylex.attrs(viewStyles.trajectoryDiv4)}
         onScroll={(e) => {
           const el = e.currentTarget;
           atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
@@ -220,7 +624,7 @@ export function Trajectory(props: {
         <Show
           when={rows().length > 0}
           fallback={
-            <p data-testid="steps-empty" class="pt-2 text-sm text-muted">
+            <p data-testid="steps-empty" {...stylex.attrs(viewStyles.stepsEmpty)}>
               {t("web.session.trajectory.noMatch")}
             </p>
           }
@@ -256,13 +660,10 @@ export function Trajectory(props: {
           </For>
         </Show>
       </div>
-      <p class="pt-2 text-xs text-muted">{summaryText(summaryOf(props.steps, end()))}</p>
+      <p {...stylex.attrs(viewStyles.trajectoryP)}>{summaryText(summaryOf(props.steps, end()))}</p>
     </div>
   );
 }
-
-const gutterW = "w-15";
-const tagW = "w-22";
 
 function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el: HTMLElement) => void; onToggle: () => void }) {
   const step = () => props.spec.step;
@@ -275,28 +676,28 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
       ref={(el) => props.refTo(el)}
       data-testid="step"
       data-type={step().type}
-      class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}
+      {...stylex.attrs(variantStyles.rowDiv, props.marked ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}
     >
       <button
         type="button"
         aria-label={`${props.spec.tag} ${oneLine(step().text).trim()}`}
         aria-expanded={aria(props.open)}
         onClick={() => props.onToggle()}
-        class="flex w-full cursor-pointer items-start text-left"
+        {...stylex.attrs(viewStyles.rowButton)}
       >
-        <span class={[gutterW, "shrink-0 truncate pt-0.5 pl-2 text-xs text-muted"]}>{props.spec.gutter}</span>
+        <span {...stylex.attrs(recipeStyles.rowSpan)}>{props.spec.gutter}</span>
         <span
-          class={["mt-px shrink-0 truncate rounded px-1 py-px text-center text-xs font-medium", sub() ? "ml-2.5 w-[78px]" : tagW]}
+          {...stylex.attrs(recipeStyles.rowSpan2, sub() ? recipeStyles.rowSpanVariant1Case2 : recipeStyles.rowSpanVariant1Case1)}
           style={{ background: sub() && fill().startsWith("#") ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
         >
           {props.spec.tag}
         </span>
-        <span class="w-2 shrink-0" />
+        <span {...stylex.attrs(viewStyles.rowSpan)} />
         <Show when={failed() && tool()}>
-          <Icon name="cross" size={12} class="mt-1 mr-1" />
+          <Icon name="cross" size={12} styles={[variantStyles3.rowIcon]} />
         </Show>
-        <span class={["min-w-0 flex-1 text-sm", { "text-berry": failed() }]}>
-          <Switch fallback={<span class="block truncate">{oneLine(step().text).trim()}</span>}>
+        <span {...stylex.attrs(variantStyles.rowSpan, failed() ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
+          <Switch fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{oneLine(step().text).trim()}</span>}>
             <Match when={tool()}>
               <ToolLine step={step()} />
             </Match>
@@ -304,12 +705,12 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
               <Markdown text={step().text} />
             </Match>
             <Match when={props.open}>
-              <span class="whitespace-pre-wrap">{step().text}</span>
+              <span {...stylex.attrs(viewStyles.rowSpan3)}>{step().text}</span>
             </Match>
           </Switch>
         </span>
         <Show when={props.spec.when}>
-          <span class="shrink-0 pt-0.5 pl-2 text-xs text-faint">{props.spec.when}</span>
+          <span {...stylex.attrs(viewStyles.rowSpan4)}>{props.spec.when}</span>
         </Show>
       </button>
       <Show when={props.open && tool()}>
@@ -324,13 +725,19 @@ function ToolLine(props: { step: SessionEvent }) {
   const args = () => oneLine(props.step.input ?? "").trim();
   const out = () => oneLine(props.step.output ?? "").trim();
   return (
-    <span class="block truncate">
+    <span {...stylex.attrs(viewStyles.rowSpan2)}>
       {farmToolText(props.step.text) ?? props.step.text}
       <Show when={args()}>
-        <span class="font-mono text-muted"> {args()}</span>
+        <span {...stylex.attrs(viewStyles.toolLineSpan)}> {args()}</span>
       </Show>
       {" → "}
-      <Switch fallback={<span class={["font-mono", { "text-berry": props.step.ok === false }]}>{out()}</span>}>
+      <Switch
+        fallback={
+          <span {...stylex.attrs(variantStyles.toolLineSpan, props.step.ok === false ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
+            {out()}
+          </span>
+        }
+      >
         <Match when={props.step.ok === undefined}>{t("web.session.trajectory.pending")}</Match>
         <Match when={!out()}>{t("web.session.trajectory.noOutput")}</Match>
       </Switch>
@@ -341,8 +748,8 @@ function ToolLine(props: { step: SessionEvent }) {
 function ToolDetail(props: { step: SessionEvent }) {
   const input = () => readableInput(props.step);
   return (
-    <div class="flex flex-col gap-1 pt-1 pb-1.5 pl-[164px] text-xs">
-      <span class="text-muted">
+    <div {...stylex.attrs(viewStyles.toolDetailDiv)}>
+      <span {...stylex.attrs(viewStyles.toolDetailSpan)}>
         {[
           ...(props.step.tool ? [t("web.session.trajectory.tool", { name: props.step.tool })] : []),
           props.step.ok === undefined
@@ -353,15 +760,19 @@ function ToolDetail(props: { step: SessionEvent }) {
         ].join(" · ")}
       </span>
       <Show when={input()}>
-        <span class="text-muted">{t("web.session.trajectory.input")}</span>
-        <pre class="font-mono whitespace-pre-wrap select-text">{input()}</pre>
+        <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.input")}</span>
+        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{input()}</pre>
       </Show>
-      <span class="text-muted">{t("web.session.trajectory.output")}</span>
+      <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.output")}</span>
       <Show
         when={props.step.output}
-        fallback={<span class="text-muted">{props.step.ok === undefined ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</span>}
+        fallback={
+          <span {...stylex.attrs(viewStyles.toolDetailSpan)}>
+            {props.step.ok === undefined ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}
+          </span>
+        }
       >
-        <pre class="font-mono whitespace-pre-wrap select-text">{props.step.output}</pre>
+        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{props.step.output}</pre>
       </Show>
     </div>
   );
@@ -417,13 +828,13 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
     });
   });
   return (
-    <div class="flex" style={{ height: `${lane * 3 + gap * 2}px` }}>
-      <div class={[gutterW, "flex shrink-0 flex-col justify-between pl-2"]}>
-        <For each={lanes}>{(l) => <span class="text-2xs leading-none text-muted">{laneNames[l]}</span>}</For>
+    <div {...stylex.attrs(viewStyles.waterfallViewDiv)} style={{ height: `${lane * 3 + gap * 2}px` }}>
+      <div {...stylex.attrs(recipeStyles.waterfallViewDiv)}>
+        <For each={lanes}>{(l) => <span {...stylex.attrs(viewStyles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
       </div>
-      <div ref={(el) => (box = el)} class="relative min-w-0 flex-1 overflow-hidden">
+      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.waterfallViewDiv2)}>
         <For each={[0, 1, 2]}>
-          {(i) => <div class="absolute inset-x-0 rounded-sm bg-hover" style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
+          {(i) => <div {...stylex.attrs(viewStyles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
         </For>
         <For each={bars()} keyed={false}>
           {(b) => (
@@ -432,8 +843,8 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
               title={b().label}
               aria-label={b().label}
               onClick={() => props.onPick(b().seq)}
-              class="absolute cursor-pointer rounded-sm hover:!bg-ink"
-              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, background: b().color }}
+              {...styleProps(trajectoryStyles.bar)}
+              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, "--timeline-color": b().color }}
             />
           )}
         </For>
@@ -459,28 +870,23 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
     props.onMarked(got.file);
   };
   return (
-    <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} class="group relative">
+    <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} {...styleProps([stylex.defaultMarker(), trajectoryStyles.round])}>
       {props.children}
       <Show when={!props.file && !writing()}>
-        <button
-          type="button"
-          data-testid="mark-wrong"
-          onClick={() => setWriting(true)}
-          class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
-        >
+        <button type="button" data-testid="mark-wrong" onClick={() => setWriting(true)} {...styleProps(trajectoryStyles.report)}>
           <Icon name="bug" size={12} />
           {t("web.session.trajectory.wrong")}
         </button>
       </Show>
       <Show when={props.file}>
-        <div title={props.file} class="my-0.5 mr-2 ml-[164px] flex items-center gap-1.5 rounded-md bg-berry/12 px-2 py-1 text-xs">
+        <div title={props.file} {...stylex.attrs(viewStyles.markableDiv)}>
           <Icon name="bug" size={12} />
           {t("web.session.trajectory.marked")}
         </div>
       </Show>
       <Show when={writing()}>
         <form
-          class="my-1 mr-2 ml-[164px] flex items-center gap-1.5"
+          {...stylex.attrs(viewStyles.markableForm)}
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -495,20 +901,10 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
             value={want()}
             onInput={(e) => setWant(e.currentTarget.value)}
           />
-          <button
-            type="submit"
-            data-testid="mark-submit"
-            disabled={busy() || !want().trim()}
-            class="h-7 shrink-0 cursor-pointer rounded-md bg-accent px-2.5 text-sm text-page disabled:opacity-50"
-          >
+          <button type="submit" data-testid="mark-submit" disabled={busy() || !want().trim()} {...stylex.attrs(viewStyles.markSubmit)}>
             {t("web.base.write")}
           </button>
-          <button
-            type="button"
-            disabled={busy()}
-            onClick={() => setWriting(false)}
-            class="h-7 shrink-0 cursor-pointer rounded-md border border-line px-2.5 text-sm"
-          >
+          <button type="button" disabled={busy()} onClick={() => setWriting(false)} {...stylex.attrs(viewStyles.markableButton)}>
             {t("web.base.form.never")}
           </button>
         </form>
@@ -537,8 +933,8 @@ export function TrajectoryList(props: { agent: string }) {
     <Show when={list()} fallback={<Quiet>{heads.error() ? reasonOf(heads.error()) : t("web.base.reading")}</Quiet>}>
       {(all) => (
         <Show when={all().length > 0} fallback={<Quiet>{t("web.session.trajectory.neverSent")}</Quiet>}>
-          <div class="flex h-full min-h-0 flex-col gap-3 md:flex-row">
-            <ul aria-label={t("web.session.trajectory.sent")} class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
+          <div {...stylex.attrs(viewStyles.trajectoryListDiv)}>
+            <ul aria-label={t("web.session.trajectory.sent")} {...stylex.attrs(viewStyles.trajectoryListUl)}>
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
                   const ended = () => {
@@ -557,23 +953,23 @@ export function TrajectoryList(props: { agent: string }) {
                         type="button"
                         aria-current={h().id === open()?.id ? "true" : undefined}
                         onClick={() => setPicked(h().id)}
-                        class={[
-                          "flex w-full cursor-pointer flex-col rounded-md px-2.5 py-1.5 text-left",
-                          h().id === open()?.id ? "bg-selected" : "hover:bg-hover",
-                        ]}
+                        {...stylex.attrs(
+                          variantStyles.trajectoryListButton,
+                          h().id === open()?.id ? variantStyles.trajectoryListButtonVariant : variantStyles.rowDivVariant2,
+                        )}
                       >
-                        <span class="flex flex-wrap items-center gap-2">
-                          <span class="text-sm font-medium">{h().name}</span>
+                        <span {...stylex.attrs(viewStyles.trajectoryListSpan)}>
+                          <span {...stylex.attrs(viewStyles.trajectoryListSpan2)}>{h().name}</span>
                           <Show when={h().repo}>
-                            <span class="text-xs text-muted">{h().repo}</span>
+                            <span {...stylex.attrs(viewStyles.trajectoryListSpan3)}>{h().repo}</span>
                           </Show>
                           <Show when={ended() === undefined}>
-                            <span class="rounded bg-hat px-1.5 text-xs text-bark-900">{t("web.session.trajectory.here")}</span>
+                            <span {...stylex.attrs(viewStyles.trajectoryListSpan4)}>{t("web.session.trajectory.here")}</span>
                           </Show>
                         </span>
-                        <span class="text-xs text-muted">{sentText()}</span>
+                        <span {...stylex.attrs(viewStyles.trajectoryListSpan3)}>{sentText()}</span>
                         <Show when={h().brief}>
-                          <span class="truncate text-xs">{oneLine(h().brief).trim()}</span>
+                          <span {...stylex.attrs(viewStyles.trajectoryListSpan5)}>{oneLine(h().brief).trim()}</span>
                         </Show>
                       </button>
                     </li>
@@ -581,7 +977,7 @@ export function TrajectoryList(props: { agent: string }) {
                 }}
               </For>
             </ul>
-            <div class="min-h-0 min-w-0 flex-1">
+            <div {...stylex.attrs(viewStyles.trajectoryListDiv2)}>
               <Show when={open()} fallback={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>

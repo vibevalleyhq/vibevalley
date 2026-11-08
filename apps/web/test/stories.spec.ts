@@ -7,6 +7,516 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: checked and mixed checkboxes retain the hover border without losing their fill", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Checkbox:Placement", theme, w: "400" })}`);
+    const box = page.getByTestId("checkbox-placement");
+    const resting = await box.evaluate((element) => getComputedStyle(element).borderTopColor);
+    await box.hover();
+    await box.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+    const hovered = await box.evaluate((element) => getComputedStyle(element).borderTopColor);
+    expect(hovered).not.toBe(resting);
+    for (const indeterminate of [false, true]) {
+      await page.locator('[data-testid="story-arg"][data-name="checked"]').getByRole("checkbox").setChecked(!indeterminate);
+      await page.locator('[data-testid="story-arg"][data-name="indeterminate"]').getByRole("checkbox").setChecked(indeterminate);
+      await expect(box).toHaveAttribute("aria-checked", indeterminate ? "mixed" : "true");
+      await box.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+      const before = await box.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { border: style.borderTopColor, fill: style.backgroundColor };
+      });
+      await box.hover();
+      await expect(box).toHaveCSS("border-top-color", hovered);
+      await expect(box).toHaveCSS("background-color", before.fill);
+      await page.mouse.move(0, 0);
+      await expect(box).toHaveCSS("border-top-color", before.border);
+    }
+    check();
+  }
+});
+
+test("regression: pixel rich text preserves nodes while typography and clamp variables change", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/像素/PxMarkdown:Composition", theme: "light", w: "500" })}`);
+  const frame = page.getByTestId("pixel-rich-composition");
+  const markdown = frame.locator("[data-pixel-markdown]");
+  const heading = markdown.locator("h1");
+  const original = await heading.elementHandle();
+  const plain = frame.locator(":scope > p");
+  await expect(markdown).toHaveCSS("margin-left", "4px");
+  await expect(plain).toHaveCSS("-webkit-line-clamp", "2");
+  await expect(markdown.getByRole("link")).toHaveAttribute("target", "_blank");
+  await expect(markdown.getByRole("link")).toHaveAttribute("rel", "noreferrer");
+  await page.locator('[data-testid="story-arg"][data-name="reading"]').getByRole("checkbox").check();
+  await expect(heading).toHaveCSS("font-size", "24px");
+  expect(await heading.evaluate((current, before) => current === before, original)).toBe(true);
+  await page.locator('[data-testid="story-arg"][data-name="indent"]').getByRole("spinbutton").fill("16");
+  await expect(markdown).toHaveCSS("margin-left", "16px");
+  await expect(plain).toHaveCSS("margin-left", "16px");
+  await page.locator('[data-testid="story-arg"][data-name="maxLines"]').getByRole("spinbutton").fill("3");
+  await expect(plain).toHaveCSS("-webkit-line-clamp", "3");
+  check();
+});
+
+test("regression: dictation surface hover retains the recording fill and object variables", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/语音/听写:Composition", theme, w: "400" })}`);
+    const button = page.getByTestId("dictate");
+    await expect(button).toHaveCSS("margin-left", "4px");
+    const rest = await button.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(rest).not.toBe("rgba(0, 0, 0, 0)");
+    await button.hover();
+    await expect(button).not.toHaveCSS("background-color", rest);
+    await page.mouse.move(0, 0);
+    await expect(button).toHaveCSS("background-color", rest);
+    await page.locator('[data-testid="story-arg"][data-name="indent"]').getByRole("spinbutton").fill("16");
+    await expect(button).toHaveCSS("margin-left", "16px");
+    await page.locator('[data-testid="story-arg"][data-name="recording"]').getByRole("checkbox").uncheck();
+    await expect(button).toHaveAttribute("data-state", "idle");
+    await expect(button).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    check();
+  }
+});
+
+test("regression: work log composition keeps run separators and mounted folds", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "界面/执行/干活的经过:Composition", theme: "light", w: "600" })}`);
+  const log = page.getByTestId("work-log-composition").locator(":scope > div");
+  const runs = log.locator(":scope > div");
+  await expect(runs).toHaveCount(2);
+  await expect(runs.first()).toHaveCSS("border-bottom-width", "1px");
+  await expect(runs.last()).toHaveCSS("border-bottom-width", "0px");
+  const original = await runs.first().elementHandle();
+  await page.locator('[data-testid="story-arg"][data-name="maxHeight"]').getByRole("spinbutton").fill("320");
+  await expect(log).toHaveCSS("max-height", "320px");
+  expect(await runs.first().evaluate((current, before) => current === before, original)).toBe(true);
+  check();
+});
+
+test("regression: pixel windows and fields preserve composed variables, editing and node identity", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/像素/base:Composition", theme: "light", w: "500" })}`);
+  const window = page.getByTestId("pixel-window-composition");
+  const input = page.getByTestId("pixel-input-composition");
+  const area = window.locator("textarea");
+  const original = await input.elementHandle();
+  await expect(window).toHaveCSS("width", "300px");
+  await expect(window).toHaveCSS("margin-top", "8px");
+  await expect(input.locator("..")).toHaveCSS("margin-left", "4px");
+  await input.fill("登");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(input).toHaveValue("登录页");
+  await expect(area).toHaveValue("登录页");
+  await page.getByTestId("resize-pixel-composition").click();
+  await expect(window).toHaveCSS("width", "360px");
+  await expect(input.locator("..")).toHaveCSS("margin-left", "16px");
+  await expect(area.locator("..")).toHaveCSS("margin-left", "16px");
+  expect(await input.evaluate((current, before) => current === before, original)).toBe(true);
+  await expect(area).toHaveCSS("line-height", "17.1432px");
+  await page.locator('[data-testid="story-arg"][data-name="reading"]').getByRole("checkbox").check();
+  await expect(area).toHaveCSS("line-height", "23.8px");
+  await page.locator('[data-testid="story-arg"][data-name="disabled"]').getByRole("checkbox").check();
+  await expect(input).toBeDisabled();
+  await expect(area).toBeDisabled();
+  await expect(input.locator("..")).toHaveCSS("opacity", "0.5");
+  check();
+});
+
+test("regression: icon buttons retain keyboard selection and disabled styling", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/IconButton:Playground", theme, w: "400" })}`);
+    const button = page.getByTestId("icon-button-control");
+    await button.focus();
+    await page.keyboard.press("Space");
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await page.locator('[data-testid="story-arg"][data-name="disabled"]').getByRole("checkbox").check();
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveCSS("opacity", "0.5");
+    check();
+  }
+});
+
+test("regression: markdown styling preserves rendered nodes and link behavior", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Markdown:Composition", theme, w: "400" })}`);
+    const wrapper = page.getByTestId("markdown-composition");
+    const markdown = wrapper.locator(":scope > div");
+    const link = wrapper.getByRole("link");
+    const original = await link.elementHandle();
+    await expect(markdown).toHaveCSS("max-width", "240px");
+    await expect(link).toHaveCSS("text-decoration-line", "underline");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noreferrer noopener");
+    await page.getByTestId("resize-markdown").click();
+    await expect(markdown).toHaveCSS("max-width", "320px");
+    expect(await link.evaluate((current, before) => current === before, original)).toBe(true);
+    check();
+  }
+});
+
+test("regression: icon composition preserves semantic tones and object style variables", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "设计体系/图标:Composition", theme, w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    await expect(frame.getByRole("img")).toHaveCount(3);
+    const reference = frame.getByRole("img", { name: "Reference", exact: true });
+    const composed = frame.getByRole("img", { name: "Composed", exact: true });
+    const document = frame.getByRole("img", { name: "Document", exact: true });
+    for (const icon of [reference, composed, document]) {
+      await expect(icon.locator("svg")).toHaveAttribute("aria-hidden", "true");
+      await expect(icon.locator("svg")).toHaveAttribute("focusable", "false");
+    }
+    const tone = await reference.evaluate((element) => getComputedStyle(element).color);
+    await expect(composed).toHaveCSS("color", tone);
+    await expect(document).not.toHaveCSS("color", tone);
+    await expect(composed).toHaveCSS("margin-left", "12px");
+    const move = frame.getByRole("button", { name: "Move", exact: true });
+    await expect(move.getByRole("img")).toHaveCount(0);
+    await expect(move.locator("svg")).toHaveAttribute("aria-hidden", "true");
+    await move.click();
+    await expect(composed).toHaveCSS("margin-left", "28px");
+    await expect(document).toHaveCSS("margin-left", "28px");
+    await expect(composed).toHaveCSS("color", tone);
+    check();
+  }
+});
+
+test("regression: key-value stories preserve the full canvas and editing controls", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Chips:Key and value", theme, w: "full" })}`);
+    await expect(page.getByTestId("story-args")).toHaveCount(0);
+    const frame = page.getByTestId("story-frame");
+    await expect(frame).toHaveCSS("width", "1360px");
+    await expect(frame.getByTestId("pair-value").first()).toHaveValue("development");
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Chips:Value controls", theme, w: "400" })}`);
+    const value = page.locator('[data-testid="pair-value"][data-key="NODE_ENV"]');
+    const original = await value.elementHandle();
+    await value.fill("production");
+    await expect(value).toHaveValue("production");
+    await expect(value).toBeFocused();
+    expect(await value.evaluate((current, before) => current === before, original)).toBe(true);
+    await page.getByTestId("new-pair-name").fill("CI");
+    await page.getByTestId("new-pair-value").fill("1");
+    await page.getByTestId("new-pair-add").click();
+    await expect(page.locator('[data-testid="pair-value"][data-key="CI"]')).toHaveValue("1");
+    const disabled = page.locator('[data-testid="story-arg"][data-name="disabled"]').getByRole("checkbox");
+    await disabled.check();
+    for (const control of await frame.locator("input, button").all()) await expect(control).toBeDisabled();
+    await disabled.uncheck();
+    await expect(value).toBeEnabled();
+    await expect(value).toHaveValue("production");
+    await frame.getByRole("button", { name: /CI/u }).click();
+    await expect(page.locator('[data-testid="pair-value"][data-key="CI"]')).toHaveCount(0);
+    check();
+  }
+});
+
+test("regression: text controls retain object styles, dynamic variables and input identity", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Field:Dynamic controls", theme, w: "400" })}`);
+    const input = page.getByTestId("dynamic-input");
+    const textarea = page.getByTestId("dynamic-textarea");
+    const original = await input.elementHandle();
+    await expect(input).toHaveCSS("max-width", "240px");
+    await expect(textarea).toHaveCSS("max-width", "240px");
+    await expect(input).toHaveCSS("height", "48px");
+    await expect(textarea).toHaveCSS("height", "80px");
+    await input.fill("changed");
+    await expect(textarea).toHaveValue("changed");
+    await page.getByTestId("resize-controls").dispatchEvent("click");
+    await expect(input).toHaveCSS("max-width", "320px");
+    await expect(textarea).toHaveCSS("max-width", "320px");
+    await expect(input).toBeFocused();
+    expect(await input.evaluate((current, before) => current === before, original)).toBe(true);
+    await page.keyboard.press("Tab");
+    await expect(textarea).toBeFocused();
+    await textarea.fill("edited");
+    await expect(input).toHaveValue("edited");
+    check();
+  }
+});
+
+test("regression: migrated popups disable their animations for reduced motion", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const [story, kind, animation] of [
+    ["Field:Select", "select", "pop-in"],
+    ["MoreMenu:A place's other actions", "menu", "pop-in"],
+    ["Tip:Hover", "tooltip", "fade-in"],
+  ] as const) {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(`/?${new URLSearchParams({ s: `组件/工作台/${story}`, theme: "light", w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    switch (kind) {
+      case "select":
+        await frame.getByRole("combobox").click();
+        break;
+      case "menu":
+        await frame.locator('button[aria-haspopup="menu"]').click();
+        break;
+      case "tooltip":
+        await frame.locator('span[tabindex="0"]').first().focus();
+        break;
+    }
+    const popup = page.getByRole(kind === "select" ? "listbox" : kind);
+    await expect(popup).toBeVisible();
+    await expect(popup).toHaveCSS("animation-name", "none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(popup).toHaveCSS("animation-name", animation);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(popup).toHaveCSS("animation-name", "none");
+    check();
+  }
+});
+
+test("regression: segmented StyleX geometry follows selection and block resizing", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Segmented:Playground", theme, w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    const board = frame.locator('button[data-key="board"]');
+    const thumb = frame.getByRole("group").locator('span[aria-hidden="true"]');
+    await expect(frame.locator('button[data-key="farm"]')).toBeDisabled();
+    await board.click();
+    await expect(board).toHaveAttribute("aria-pressed", "true");
+    const distance = async () => {
+      const a = await thumb.boundingBox();
+      const b = await board.boundingBox();
+      if (a === null || b === null) throw new Error("Missing segmented geometry");
+      return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.width - b.width), Math.abs(a.height - b.height));
+    };
+    await expect.poll(distance).toBeLessThan(0.5);
+    await page.locator('[data-testid="story-arg"][data-name="block"]').getByRole("checkbox").check();
+    await expect.poll(distance).toBeLessThan(0.5);
+    await board.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(frame.locator('button[data-key="list"]')).toBeFocused();
+    check();
+  }
+});
+
+test("regression: styled selects retain choices, disabled items and keyboard focus", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Field:Select", theme, w: "400" })}`);
+    const trigger = page.getByTestId("story-frame").getByRole("combobox");
+    await trigger.focus();
+    await page.keyboard.press("ArrowDown");
+    const popup = page.getByRole("listbox");
+    await expect(popup).toBeVisible();
+    await expect(popup.locator('[data-key="pi"]')).toHaveAttribute("aria-disabled", "true");
+    await popup.locator('[data-key="claude"]').click();
+    await expect(trigger).toHaveAttribute("data-value", "claude");
+    await expect(popup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(popup).toBeVisible();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Enter");
+    await expect(trigger).toHaveAttribute("data-value", "");
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await page.keyboard.press("Escape");
+    await expect(popup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    check();
+  }
+});
+
+test("regression: styled tabs retain keyboard selection, navigation and dynamic list styles", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Playground", theme, w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    const chat = frame.locator('[role="tab"][data-key="chat"]');
+    const issues = frame.locator('[role="tab"][data-key="issues"]');
+    await page.mouse.move(0, 0);
+    const selectedBackground = await chat.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await issues.hover();
+    const hoverBackground = await issues.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(hoverBackground).not.toBe(selectedBackground);
+    await chat.hover();
+    await expect(chat).toHaveCSS("background-color", selectedBackground);
+    await chat.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(issues).toBeFocused();
+    await expect(chat).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Enter");
+    await expect(issues).toHaveAttribute("aria-selected", "true");
+    await expect(issues).toHaveCSS("font-weight", "600");
+    await issues.hover();
+    await expect(issues).toHaveCSS("background-color", selectedBackground);
+    await expect(chat).toHaveAttribute("aria-selected", "false");
+    await page.keyboard.press("Home");
+    await expect(chat).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(chat).toHaveAttribute("aria-selected", "true");
+
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:States", theme, w: "400" })}`);
+    await page.mouse.move(0, 0);
+    const pills = page.getByTestId("story-grid").locator("tbody tr").first();
+    await expect(pills.locator('[data-testid="story-cell"]:not([data-pseudo]) [data-selected]')).toHaveCSS("background-color", selectedBackground);
+    for (const key of ["chat", "issues"]) {
+      await expect(pills.locator(`[data-pseudo="hover"] [role="tab"][data-key="${key}"]`)).toHaveCSS("background-color", hoverBackground);
+    }
+
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Links", theme, w: "400" })}`);
+    await expect(issues).toHaveAttribute("href", "/tabs/issues");
+    await chat.focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Enter");
+    await expect(frame.getByTestId("tabs-location")).toHaveText("/tabs/issues");
+    await expect(issues).toHaveAttribute("aria-selected", "true");
+    await chat.click();
+    await expect(frame.getByTestId("tabs-location")).toHaveText("/tabs/chat");
+    await expect(chat).toHaveAttribute("aria-selected", "true");
+
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Sizing", theme, w: "400" })}`);
+    await expect(frame.getByRole("tablist")).toHaveCSS("width", "200px");
+    await frame.getByTestId("tabs-resize").click();
+    await expect(frame.getByRole("tablist")).toHaveCSS("width", "280px");
+    check();
+  }
+});
+
+test("regression: StyleX variables survive Base UI positioning and reactive variants", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Positioner:Dynamic", theme, w: "400" })}`);
+    const trigger = page.getByTestId("stylex-trigger");
+    await expect(trigger).toHaveAttribute("data-ref-forwarded", "true");
+    const before = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await expect(page.getByTestId("story-frame")).toHaveCSS("background-color", before);
+    await expect(page.getByTestId("story-frame")).toHaveCSS("width", "400px");
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const positioner = page.getByTestId("stylex-positioner");
+    await expect(positioner).toHaveCSS("position", "fixed");
+    await expect(positioner).toHaveCSS("z-index", "30");
+    await expect(positioner).toHaveCSS("width", "200px");
+    await expect(page.getByTestId("stylex-resize")).toBeFocused();
+    const anchor = await trigger.boundingBox();
+    const popup = await positioner.boundingBox();
+    if (!anchor || !popup) throw new Error("Missing positioned geometry");
+    expect(Math.abs(popup.y - anchor.y - anchor.height - 6)).toBeLessThan(1);
+    await page.getByTestId("stylex-resize").click();
+    await expect(positioner).toHaveCSS("width", "280px");
+    await expect(trigger).not.toHaveCSS("background-color", before);
+    await page.keyboard.press("Escape");
+    await expect(positioner).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    const branch = page.locator(folder("组件"));
+    if ((await branch.getAttribute("aria-expanded")) === "false") await branch.click();
+    await expect(branch).toHaveAttribute("aria-expanded", "true");
+    const icon = branch.locator('span[aria-hidden="true"]').first();
+    await expect(icon).toHaveCSS("display", "flex");
+    await expect(icon).toHaveCSS("flex-shrink", "0");
+    await expect(icon).toHaveCSS("rotate", "90deg");
+    await branch.click();
+    await expect(branch).toHaveAttribute("aria-expanded", "false");
+    await expect(icon).toHaveCSS("rotate", "none");
+    check();
+  }
+});
+
+test("regression: split layouts retain breakpoint borders, bare cards and selected hover", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/layout:Split boundaries", theme, w: "800" })}`);
+    const split = page.getByTestId("split-boundaries").locator(":scope > div");
+    const list = split.locator(":scope > div").first();
+    const card = page.getByTestId("split-list");
+    await expect(split).toHaveCSS("flex-direction", "row");
+    await expect(list).toHaveCSS("width", "280px");
+    await expect(list).toHaveCSS("border-right-width", "1px");
+    await expect(list).toHaveCSS("border-bottom-width", "0px");
+    await expect(card).toHaveCSS("border-top-width", "0px");
+    await expect(card.locator("header")).toHaveCSS("height", "32px");
+    const selected = card.getByTestId("list-row").first();
+    const other = card.getByTestId("list-row").nth(1);
+    await expect(selected).toHaveAttribute("aria-current", "page");
+    const resting = await selected.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await selected.hover();
+    const hovered = await selected.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await other.hover();
+    await expect(other).toHaveCSS("background-color", hovered);
+    await expect(selected).toHaveCSS("background-color", resting);
+    await page.setViewportSize({ width: 767, height: 900 });
+    await expect(split).toHaveCSS("flex-direction", "column");
+    await expect(list).toHaveCSS("border-right-width", "0px");
+    await expect(list).toHaveCSS("border-bottom-width", "1px");
+    await page.setViewportSize({ width: 768, height: 900 });
+    await expect(split).toHaveCSS("flex-direction", "row");
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.getByTestId("story-arg").and(page.locator('[data-name="edge"]')).getByRole("checkbox").uncheck();
+    await expect(split).toHaveCSS("gap", "12px");
+    await expect(card).toHaveCSS("border-top-width", "1px");
+    await expect(card.locator("header")).toHaveCSS("height", "40px");
+    check();
+  }
+});
+
+test("regression: card styles preserve reactive dimensions and action focus", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/layout:Dynamic card", theme, w: "400" })}`);
+    const card = page.getByTestId("styled-card");
+    await expect(card).toHaveCSS("width", "240px");
+    await expect(card).toHaveCSS("max-width", "240px");
+    await expect(card).toHaveCSS("border-top-width", "1px");
+    const action = page.getByTestId("card-resize");
+    await action.focus();
+    await page.keyboard.press("Enter");
+    await expect(card).toHaveCSS("width", "320px");
+    await expect(card).toHaveCSS("max-width", "320px");
+    await expect(action).toBeFocused();
+    check();
+  }
+});
+
+test("regression: button style variables compose with forwarded native attributes", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Button:Dynamic styles", theme, w: "400" })}`);
+    const button = page.getByTestId("button-style-vars");
+    await expect(button).toHaveCSS("width", "200px");
+    await expect(button).toHaveCSS("max-width", "200px");
+    await expect(button).toHaveCSS("margin-left", "12px");
+    await expect(page.getByTestId("button-native-style")).toHaveCSS("margin-left", "12px");
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveCSS("width", "280px");
+    await expect(button).toHaveCSS("max-width", "280px");
+    await expect(button).toBeFocused();
+    check();
+  }
+});
+
+test("regression: viewer rows retain indentation and selected hover precedence", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  const key = "组件/工作台/Positioner:Dynamic";
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: key, theme, w: "400" })}`);
+    await expect(page.locator(folder("组件"))).toHaveCSS("padding-left", "4px");
+    const link = page.locator(`[data-testid="story-link"][data-key="${key}"]`);
+    await expect(link).toHaveCSS("padding-left", "44px");
+    const selected = await link.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await link.hover();
+    await expect(link).toHaveCSS("background-color", selected);
+    check();
+  }
+});
+
 test("regression: schema routing rejects invalid params and repeated scalar search without falling through", async ({ page }) => {
   const check = diagnosticsOf(page);
   await page.goto(`/?${new URLSearchParams({ s: "交互/路由:Schema", theme: "light", w: "400" })}`);

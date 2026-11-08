@@ -6,10 +6,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./style.css": "./src/StoriesApp.css"
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
+    "@stylexjs/stylex": "catalog:",
     "axe-core": "catalog:",
     "reicon": "catalog:",
     "solid-js": "catalog:"

@@ -1,12 +1,70 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
+
+const variantStyles = stylex.create({
+  dinoGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingInline: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 3)",
+  },
+});
+
+const viewStyles = stylex.create({
+  dinoGameDiv: {
+    display: "flex",
+    width: "100%",
+    paddingInline: "var(--spacing)",
+  },
+  dinoGameSpan: {
+    marginLeft: "auto",
+    fontVariantNumeric: "tabular-nums",
+  },
+  dinoGameDiv2: {
+    marginTop: "var(--spacing)",
+    width: "100%",
+    paddingInline: "var(--spacing)",
+    textAlign: "right",
+    fontVariantNumeric: "tabular-nums",
+  },
+  dinoGameDiv3: {
+    position: "relative",
+    marginTop: "calc(var(--spacing) * 2)",
+  },
+  dinoGameCanvas: {
+    display: "block",
+    imageRendering: "pixelated",
+  },
+  dinoGameDiv4: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    textAlign: "center",
+  },
+  dinoGameSpan2: {
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  dinoGameP: {
+    marginTop: "auto",
+    marginBottom: "calc(var(--spacing) * 2)",
+    textAlign: "center",
+    lineHeight: "1.625",
+  },
+});
 
 const best = kept(0);
 
@@ -148,36 +206,36 @@ export function DinoGame(props: { big?: boolean }) {
     return now ? dinoScore(now) : 0;
   };
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
-      <div class="flex w-full px-1">
+    <div {...stylex.attrs(variantStyles.dinoGameDiv)}>
+      <div {...stylex.attrs(viewStyles.dinoGameDiv)}>
         <span>{t("web.farm.phone.game.dino")}</span>
-        <span class="ml-auto tabular-nums">
+        <span {...stylex.attrs(viewStyles.dinoGameSpan)}>
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div class="mt-1 w-full px-1 text-right tabular-nums">{five(score())}</div>
-      <div class="relative mt-2" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(viewStyles.dinoGameDiv2)}>{five(score())}</div>
+      <div {...stylex.attrs(viewStyles.dinoGameDiv3)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
           ref={(el) => (canvas = el)}
           width={dinoWidth}
           height={dinoHeight}
           role="img"
           aria-label={t("web.farm.phone.dino.road")}
-          class="block [image-rendering:pixelated]"
+          {...stylex.attrs(viewStyles.dinoGameCanvas)}
           style={{ width: `${dinoWidth * zoom()}px`, height: `${dinoHeight * zoom()}px` }}
         />
         <Show when={!playing()}>
-          <div class="absolute inset-0 grid place-items-center text-center">
-            <span class="px-2" style={{ background: lcd.paper }}>
+          <div {...stylex.attrs(viewStyles.dinoGameDiv4)}>
+            <span {...stylex.attrs(viewStyles.dinoGameSpan2)} style={{ background: lcd.paper }}>
               {d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
-              <span class="phone-blink">
+              <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", { what: d()?.over === true ? t("web.farm.phone.again") : t("web.farm.phone.start") })}
               </span>
             </span>
           </div>
         </Show>
       </div>
-      <p class="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
+      <p {...stylex.attrs(viewStyles.dinoGameP)} style={{ color: lcd.dark }}>
         {t("web.farm.phone.dino.help")}
         <br />
         {t("web.farm.phone.dino.help2")}

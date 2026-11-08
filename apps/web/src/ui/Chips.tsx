@@ -1,8 +1,143 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";
+const viewStyles = stylex.create({
+  box: {
+    display: "flex",
+    minHeight: "calc(var(--spacing) * 8)",
+    width: "100%",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus-within": "var(--color-focus)" },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "var(--spacing)",
+  },
+  disabledBox: { opacity: 0.5 },
+  field: {
+    height: "calc(var(--spacing) * 8)",
+    minWidth: 0,
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus": "var(--color-focus)" },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: { default: null, "::placeholder": "var(--color-faint)" },
+  },
+  valueField: { flex: 1 },
+  nameField: { width: "calc(var(--spacing) * 40)" },
+  chipsInputSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hover)",
+    paddingBlock: "1px",
+    paddingRight: "calc(var(--spacing) * .5)",
+    paddingLeft: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  chipsInputButton: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "var(--spacing)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-berry)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-selected)",
+      },
+    },
+  },
+  chipsInputInput: {
+    height: "calc(var(--spacing) * 6)",
+    minWidth: "calc(var(--spacing) * 24)",
+    flex: "1",
+    backgroundColor: "transparent",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--color-faint)",
+    },
+  },
+  keyValueEditorStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  keyValueEditorDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  keyValueEditorSpan: {
+    width: "calc(var(--spacing) * 40)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  keyValueEditorButton: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-berry)",
+      },
+    },
+  },
+  newPairAdd: {
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+});
 
 /** Words as chips: enter (or a comma) adds the typed one, backspace on an empty box takes the last off. */
 export function ChipsInput(props: { value: readonly string[]; onChange: (v: string[]) => void; placeholder?: string; label: string; disabled?: boolean }) {
@@ -13,17 +148,17 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
     setText("");
   };
   return (
-    <div class={[box, { "opacity-50": !(props.disabled !== true) }]}>
+    <div {...stylex.attrs(viewStyles.box, props.disabled === true && viewStyles.disabledBox)}>
       <For each={props.value}>
         {(v) => (
-          <span class="flex items-center gap-0.5 rounded bg-hover py-px pr-0.5 pl-1.5 text-xs">
+          <span {...stylex.attrs(viewStyles.chipsInputSpan)}>
             {v}
             <button
               type="button"
               disabled={props.disabled}
               aria-label={t("web.base.chips.drop", { v })}
               onClick={() => props.onChange(props.value.filter((x) => x !== v))}
-              class="cursor-pointer rounded px-1 text-muted hover:bg-selected hover:text-berry"
+              {...stylex.attrs(viewStyles.chipsInputButton)}
             >
               ×
             </button>
@@ -44,7 +179,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
             add();
           } else if (e.key === "Backspace" && text() === "" && props.value.length > 0) props.onChange(props.value.slice(0, -1));
         }}
-        class="h-6 min-w-24 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-faint"
+        {...stylex.attrs(viewStyles.chipsInputInput)}
       />
     </div>
   );
@@ -55,22 +190,21 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
   const [key, setKey] = createSignal("");
   const [val, setVal] = createSignal("");
   const rows = () => Object.entries(props.value);
-  const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2 font-mono text-sm outline-none placeholder:text-faint focus:border-focus";
   return (
-    <div class={["flex flex-col gap-1.5", { "opacity-50": !(props.disabled !== true) }]}>
+    <div {...stylex.attrs(viewStyles.keyValueEditorStack, props.disabled === true && viewStyles.disabledBox)}>
       {/* By name: a keystroke makes new pairs, and a row made again would lose its input's focus. */}
       <For each={rows()} keyed={([k]) => k}>
         {(row) => {
           const k = () => row()[0];
           return (
-            <div class="flex items-center gap-1.5">
-              <span class="w-40 truncate font-mono text-sm">{k()}</span>
+            <div {...stylex.attrs(viewStyles.keyValueEditorDiv)}>
+              <span {...stylex.attrs(viewStyles.keyValueEditorSpan)}>{k()}</span>
               <input
                 data-testid="pair-value"
                 data-key={k()}
                 aria-label={t("web.base.chips.valueOf", { k: k() })}
                 disabled={props.disabled}
-                class={[field, "flex-1"]}
+                {...stylex.attrs(viewStyles.field, viewStyles.valueField)}
                 value={row()[1]}
                 onInput={(e) => props.onChange({ ...props.value, [k()]: e.currentTarget.value })}
               />
@@ -79,7 +213,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
                 disabled={props.disabled}
                 aria-label={t("web.base.chips.removeKey", { k: k() })}
                 onClick={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
-                class="cursor-pointer rounded px-1.5 text-xs text-muted hover:text-berry"
+                {...stylex.attrs(viewStyles.keyValueEditorButton)}
               >
                 {t("web.base.chips.remove")}
               </button>
@@ -88,7 +222,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         }}
       </For>
       <form
-        class="flex items-center gap-1.5"
+        {...stylex.attrs(viewStyles.keyValueEditorDiv)}
         onSubmit={(e) => {
           e.preventDefault();
           if (!key().trim()) return;
@@ -102,7 +236,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           aria-label={t("web.base.chips.name")}
           disabled={props.disabled}
           placeholder="NAME"
-          class={[field, "w-40"]}
+          {...stylex.attrs(viewStyles.field, viewStyles.nameField)}
           value={key()}
           onInput={(e) => setKey(e.currentTarget.value)}
         />
@@ -111,16 +245,11 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           aria-label={t("web.base.chips.value")}
           disabled={props.disabled}
           placeholder={t("web.base.chips.valueHint")}
-          class={[field, "flex-1"]}
+          {...stylex.attrs(viewStyles.field, viewStyles.valueField)}
           value={val()}
           onInput={(e) => setVal(e.currentTarget.value)}
         />
-        <button
-          type="submit"
-          data-testid="new-pair-add"
-          disabled={props.disabled === true || key().trim() === ""}
-          class="h-7 cursor-pointer rounded-md border border-line px-2.5 text-sm hover:bg-hover disabled:opacity-50"
-        >
+        <button type="submit" data-testid="new-pair-add" disabled={props.disabled === true || key().trim() === ""} {...stylex.attrs(viewStyles.newPairAdd)}>
           {t("web.base.chips.add")}
         </button>
       </form>

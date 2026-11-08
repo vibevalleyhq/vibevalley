@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -15,7 +16,96 @@ import { Empty } from "#/ui/layout.tsx";
 import { chatPath, sessionThreadOf } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
 
-const card = "rounded-lg border border-line bg-page p-3";
+const recipeStyles = stylex.create({
+  sessionsDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  cronCardDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  cronCardDivVariant1Case1: {
+    borderStyle: "solid",
+  },
+  cronCardDivVariant1Case2: {
+    borderStyle: "dashed",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  cronCardIcon: {
+    marginTop: "calc(var(--spacing) * .5)",
+  },
+});
+
+const variantStyles = stylex.create({
+  sessionsDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+});
+
+const viewStyles = stylex.create({
+  sessionsDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  sessionsSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  sessionsSpan2: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  sessionsSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  sessionsSpan4: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  sessionsSpan5: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  cronCardSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  cronCardDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
 export function Sessions(props: { channel: Channel }) {
@@ -32,25 +122,25 @@ export function Sessions(props: { channel: Channel }) {
         </Empty>
       }
     >
-      <div class="flex flex-col gap-3 overflow-y-auto p-4">
+      <div {...stylex.attrs(viewStyles.sessionsDiv)}>
         <For each={sessions()}>
           {(h) => {
             const thread = () => sessionThreadOf(core()?.chat, h);
             return (
-              <div class={[card, "flex items-center gap-3"]}>
+              <div {...stylex.attrs(recipeStyles.sessionsDiv)}>
                 <HelperFace agent={h.agent} runtime={h.runtime} size={36} />
-                <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="truncate text-sm">
-                    <span class="font-semibold">{h.name}</span>
-                    <span class="text-xs text-muted">
+                <div {...stylex.attrs(variantStyles.sessionsDiv)}>
+                  <span {...stylex.attrs(viewStyles.sessionsSpan)}>
+                    <span {...stylex.attrs(viewStyles.sessionsSpan2)}>{h.name}</span>
+                    <span {...stylex.attrs(viewStyles.sessionsSpan3)}>
                       {"  "}@{h.id} {h.repo ?? ""}
                       {h.branch ? ` · ${h.branch}` : ""}
                     </span>
                   </span>
-                  <span class="truncate text-sm">{h.brief}</span>
-                  <span class="flex items-center gap-1 text-xs text-muted">
+                  <span {...stylex.attrs(viewStyles.sessionsSpan)}>{h.brief}</span>
+                  <span {...stylex.attrs(viewStyles.sessionsSpan4)}>
                     <PhaseGlyph phase={h.phase} />
-                    <span class="truncate">{phaseText(h, now())}</span>
+                    <span {...stylex.attrs(viewStyles.sessionsSpan5)}>{phaseText(h, now())}</span>
                   </span>
                 </div>
                 <Show when={thread()}>
@@ -81,7 +171,7 @@ export function Crons(props: { channel: Channel }) {
         </Empty>
       }
     >
-      <div class="flex flex-col gap-3 overflow-y-auto p-4">
+      <div {...stylex.attrs(viewStyles.sessionsDiv)}>
         <For each={crons()}>{(s) => <CronCard s={s} />}</For>
       </div>
     </Show>
@@ -120,24 +210,27 @@ export function CronCard(props: { s: CronView }) {
     <div
       data-testid="cron"
       data-key={props.s.id}
-      class={[card, "flex items-start gap-3", { "border-dashed": !(props.s.enabled || props.s.pending) }]}
+      {...stylex.attrs(
+        recipeStyles.cronCardDiv,
+        !(props.s.enabled || props.s.pending) ? recipeStyles.cronCardDivVariant1Case2 : recipeStyles.cronCardDivVariant1Case1,
+      )}
       aria-label={t("web.channel.crons.label", { name: props.s.name })}
     >
-      <Icon name="clock" size={20} class="mt-0.5" />
-      <div class="flex min-w-0 flex-1 flex-col">
-        <span class="text-sm">
-          <span class="font-semibold">{props.s.name}</span>
-          <span class="text-xs text-muted">
+      <Icon name="clock" size={20} styles={[variantStyles2.cronCardIcon]} />
+      <div {...stylex.attrs(variantStyles.sessionsDiv)}>
+        <span {...stylex.attrs(viewStyles.cronCardSpan)}>
+          <span {...stylex.attrs(viewStyles.sessionsSpan2)}>{props.s.name}</span>
+          <span {...stylex.attrs(viewStyles.sessionsSpan3)}>
             {"  "}
             {meta()}
           </span>
         </span>
-        <span class="text-sm">{props.s.text}</span>
+        <span {...stylex.attrs(viewStyles.cronCardSpan)}>{props.s.text}</span>
       </div>
       <Show
         when={props.s.pending}
         fallback={
-          <div class="flex gap-2">
+          <div {...stylex.attrs(viewStyles.cronCardDiv)}>
             <Button
               tone={props.s.enabled ? "primary" : "plain"}
               data-testid="cron-toggle"
@@ -165,7 +258,7 @@ export function CronCard(props: { s: CronView }) {
           </div>
         }
       >
-        <div class="flex gap-2">
+        <div {...stylex.attrs(viewStyles.cronCardDiv)}>
           <Button tone="primary" icon="check" aria-label={t("web.channel.crons.approveWhich", { name: props.s.name })} onClick={() => void setEnabled(true)}>
             {t("web.channel.crons.approve")}
           </Button>

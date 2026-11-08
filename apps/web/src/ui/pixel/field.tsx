@@ -1,20 +1,111 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { aria } from "#/base/dom.tsx";
 import { spelled } from "#/base/search.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
-import { cx, pxRing, pxText } from "./style";
+import { pxStyle } from "./style";
+
+const recipeStyles = stylex.create({
+  pxTextInputPxWindow: {
+    position: "absolute",
+    top: "100%",
+    left: "-2px",
+    zIndex: 20,
+    marginTop: "calc(var(--spacing) * 1.5)",
+    maxHeight: "calc(var(--spacing) * 60)",
+    maxWidth: "calc(var(--spacing) * 80)",
+    minWidth: "calc(var(--spacing) * 40)",
+    overflowY: "auto",
+    padding: "var(--spacing)",
+  },
+});
+
+const viewStyles = stylex.create({
+  tip: {
+    cursor: "help",
+    textDecorationLine: "underline",
+    WebkitTextDecorationColor: "var(--color-bark-600)",
+    textDecorationColor: "var(--color-bark-600)",
+    textDecorationStyle: "dotted",
+    textDecorationThickness: "2px",
+  },
+  inputBox: {
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-bark-500)", ":focus-within": "var(--color-leaf-500)" },
+    backgroundColor: "var(--color-cream-input)",
+  },
+  input: {
+    position: "relative",
+    display: "flex",
+    height: "calc(var(--spacing) * 9)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    color: "var(--color-bark-900)",
+  },
+  well: { backgroundColor: "var(--color-cream-100)" },
+  disabled: { opacity: 0.5 },
+  area: { display: "flex", paddingInline: "calc(var(--spacing) * 3)", paddingBlock: "calc(var(--spacing) * 2)" },
+  control: {
+    minWidth: 0,
+    flex: "1",
+    backgroundColor: "transparent",
+    color: "var(--color-bark-900)",
+    caretColor: "var(--color-bark-900)",
+    outlineStyle: "none",
+    "::placeholder": { color: "var(--color-bark-500)" },
+  },
+  areaControl: { resize: "none" },
+  suggestion: { cursor: "pointer", paddingInline: "calc(var(--spacing) * 2.5)", paddingBlock: "calc(var(--spacing) * 1.5)", color: "var(--color-bark-800)" },
+  highlighted: { backgroundColor: "var(--color-cream-200)" },
+  pxFieldDiv: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  pxFieldDiv2: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  pxFieldLabel: {
+    minWidth: "0",
+    flex: "1",
+    color: "var(--color-bark-600)",
+  },
+  pxFieldAside: {
+    color: "var(--color-bark-500)",
+  },
+  pxFieldSpan: {
+    color: "var(--color-leaf-300)",
+  },
+  pxFieldSpan2: {
+    color: "var(--color-bark-500)",
+  },
+  pxFieldNote: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+  },
+  pxFieldHint: {
+    color: "var(--color-bark-500)",
+  },
+  pxFieldError: {
+    color: "var(--color-berry)",
+  },
+});
 
 /** `label` with a dotted underline that shows `tip` on hover; the bare label without one. */
-export function PxTip(props: { tip?: string | undefined; children: JSX.Element; class?: string }) {
+export function PxTip(props: { tip?: string | undefined; children: JSX.Element; styles?: stylex.StyleXStyles }) {
   return (
-    <Show when={props.tip} fallback={<span class={props.class}>{props.children}</span>}>
-      <span title={props.tip} class={cx("cursor-help underline decoration-bark-600 decoration-dotted decoration-2", props.class)}>
+    <Show when={props.tip} fallback={<span {...styleProps(props.styles)}>{props.children}</span>}>
+      <span title={props.tip} {...styleProps([viewStyles.tip, props.styles])}>
         {props.children}
       </span>
     </Show>
@@ -42,32 +133,33 @@ export function PxField(props: {
   const bound = () => typeof props.children === "function" || props.id !== undefined;
   const note = () => (props.error ? props.error : props.hint);
   return (
-    <div class="flex flex-col">
-      <div class="mb-1.5 flex items-baseline gap-2">
-        <label for={bound() ? target() : undefined} class={[pxText.xs, "min-w-0 flex-1 text-bark-600"]}>
+    <div {...stylex.attrs(viewStyles.pxFieldDiv)}>
+      <div {...stylex.attrs(viewStyles.pxFieldDiv2)}>
+        <label for={bound() ? target() : undefined} {...stylex.attrs(pxStyle.xs, viewStyles.pxFieldLabel)}>
           <PxTip tip={props.tip}>{props.label}</PxTip>
           <Show when={props.required}>
-            <span class="text-leaf-300"> *</span>
+            <span {...stylex.attrs(viewStyles.pxFieldSpan)}> *</span>
           </Show>
           <Show when={props.optional}>
-            <span class="text-bark-500">{t("web.ui.pixel.optional")}</span>
+            <span {...stylex.attrs(viewStyles.pxFieldSpan2)}>{t("web.ui.pixel.optional")}</span>
           </Show>
         </label>
         <Show when={props.aside != null}>
-          <div class={[pxText.xs, "text-bark-500"]}>{props.aside}</div>
+          <div {...stylex.attrs(pxStyle.xs, viewStyles.pxFieldAside)}>{props.aside}</div>
         </Show>
       </div>
       {typeof props.children === "function" ? props.children(target()) : props.children}
       <Show when={note() != null && note() !== ""}>
-        <div class={[pxText.xs, "mt-1.5 leading-[1.625]", props.error ? "text-berry" : "text-bark-500"]} role={props.error ? "alert" : undefined}>
+        <div
+          {...stylex.attrs(pxStyle.xs, viewStyles.pxFieldNote, props.error ? viewStyles.pxFieldError : viewStyles.pxFieldHint)}
+          role={props.error ? "alert" : undefined}
+        >
           {note()}
         </div>
       </Show>
     </div>
   );
 }
-
-const inputBox = "border-2 border-bark-500 bg-cream-input focus-within:border-leaf-500";
 
 /** Controlled. `suggestions` are offered while typing, those containing what is typed. */
 export function PxTextInput(props: {
@@ -88,7 +180,7 @@ export function PxTextInput(props: {
   icon?: string;
   id?: string;
   ref?: (el: HTMLInputElement) => void;
-  class?: string;
+  styles?: stylex.StyleXStyles;
   testid?: string;
 }) {
   const listId = createUniqueId();
@@ -104,19 +196,19 @@ export function PxTextInput(props: {
     setOpen(false);
     setHighlight(-1);
   };
-  const font = () => (props.mono === true ? pxText.mono : pxText.sm);
+  const font = () => (props.mono === true ? pxStyle.mono : pxStyle.sm);
   let input: HTMLInputElement | undefined;
   onSettled(() => {
     if (props.autoFocus === true) input?.focus();
   });
   return (
     <div
-      class={[
-        "relative flex h-9 items-center gap-2 px-3 text-bark-900",
-        props.well === true ? cx("bg-cream-100", pxRing) : inputBox,
-        { "opacity-50": !(props.disabled !== true) },
-        props.class,
-      ]}
+      {...styleProps([
+        viewStyles.input,
+        props.well === true ? [viewStyles.well, pxStyle.ring] : viewStyles.inputBox,
+        props.disabled === true && viewStyles.disabled,
+        props.styles,
+      ])}
     >
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={14} />}</Show>
       <input
@@ -156,10 +248,10 @@ export function PxTextInput(props: {
           } else return;
           e.preventDefault();
         }}
-        class={[font(), "min-w-0 flex-1 bg-transparent text-bark-900 caret-bark-900 outline-none placeholder:text-bark-500"]}
+        {...stylex.attrs(font(), viewStyles.control)}
       />
       <Show when={shown().length > 0}>
-        <PxWindow class="absolute top-full left-[-2px] z-20 mt-1.5 max-h-60 max-w-80 min-w-40 overflow-y-auto p-1">
+        <PxWindow styles={[recipeStyles.pxTextInputPxWindow]}>
           <ul id={listId} role="listbox" aria-label={props.label}>
             <For each={shown()}>
               {(s, i) => (
@@ -173,7 +265,7 @@ export function PxTextInput(props: {
                     pick(s);
                   }}
                   onMouseEnter={() => setHighlight(i())}
-                  class={[font(), "cursor-pointer px-2.5 py-1.5 text-bark-800", { "bg-cream-200": i() === highlight() }]}
+                  {...stylex.attrs(font(), viewStyles.suggestion, i() === highlight() && viewStyles.highlighted)}
                 >
                   {s}
                 </li>
@@ -195,7 +287,7 @@ export function PxTextArea(props: {
   disabled?: boolean;
   readOnly?: boolean;
   mono?: boolean;
-  /** A long text being written (an issue's description): in pxText.read, as it is read. */
+  /** A long text being written (an issue's description): in pxStyle.read, as it is read. */
   reading?: boolean;
   label?: string;
   autoFocus?: boolean;
@@ -203,7 +295,7 @@ export function PxTextArea(props: {
   selection?: readonly [number, number] | undefined;
   id?: string;
   ref?: (el: HTMLTextAreaElement) => void;
-  class?: string;
+  styles?: stylex.StyleXStyles;
 }) {
   let area: HTMLTextAreaElement | undefined;
   let typed = untrack(() => props.value);
@@ -220,7 +312,7 @@ export function PxTextArea(props: {
     if (props.autoFocus === true) area?.focus();
   });
   return (
-    <div class={["flex px-3 py-2", inputBox, { "opacity-50": !(props.disabled !== true) }, props.class]}>
+    <div {...styleProps([viewStyles.area, viewStyles.inputBox, props.disabled === true && viewStyles.disabled, props.styles])}>
       <textarea
         ref={(t) => {
           area = t;
@@ -237,10 +329,7 @@ export function PxTextArea(props: {
           typed = e.currentTarget.value;
           props.onChange(e.currentTarget.value);
         }}
-        class={[
-          props.reading === true ? pxText.read : cx(props.mono === true ? pxText.mono : pxText.sm, "leading-[1.625]"),
-          "min-w-0 flex-1 resize-none bg-transparent text-bark-900 caret-bark-900 outline-none placeholder:text-bark-500",
-        ]}
+        {...stylex.attrs(props.reading === true ? pxStyle.read : props.mono === true ? pxStyle.mono : pxStyle.sm, viewStyles.control, viewStyles.areaControl)}
       />
     </div>
   );

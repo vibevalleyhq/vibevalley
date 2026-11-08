@@ -1,0 +1,28 @@
+{
+  "name": "@vibevalley/site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assets": "vpx scripts/prepare.ts",
+    "deploy": "vp run build && vp dlx wrangler@4 deploy"
+  },
+  "dependencies": {
+    "@solidjs/web": "catalog:",
+    "@stylexjs/stylex": "catalog:",
+    "motion": "catalog:",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@solidjs/vite-plugin": "catalog:",
+    "@stylexjs/unplugin": "catalog:",
+    "@types/node": "catalog:",
+    "@types/opentype.js": "catalog:",
+    "opentype.js": "catalog:",
+    "sharp": "catalog:",
+    "subset-font": "catalog:",
+    "vibevalley": "workspace:*",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

@@ -24,6 +24,9 @@
   h2 small { font-family: system-ui, sans-serif; font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 10px; }
   .lead { color: var(--muted); margin: 0 0 14px; max-width: 860px; }
   .card { background: var(--card); border: 2px solid var(--edge); box-shadow: 2px 2px 0 var(--drop); padding: 16px; }
+  .card > h4.pixel { margin: 0 0 6px; font-weight: 400; }
+  .card-copy { margin: 0; font-size: 13px; color: var(--muted); }
+  .detail-cards { margin-top: 14px; }
   .grid { display: grid; gap: 14px; }
   .g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
   .g3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
@@ -97,8 +100,10 @@
   .aside .plot img.who { position: absolute; left: 50%; bottom: 26px; transform: translateX(-30%); height: 96px; }
   .aside .plot img.who2 { position: absolute; left: 14px; bottom: 16px; height: 70px; }
   .aside small { display: block; color: var(--muted); font-size: 12px; }
+  .aside > b.pixel { font-weight: 400; }
   .need { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--wheat-soft); border: 2px solid var(--wheat); }
   .need img { width: 40px; }
+  .need > div { flex: 1; }
   .need b { font-family: Pixel, sans-serif; font-weight: 400; font-size: 18px; }
   .need p { margin: 0; font-size: 13px; color: var(--muted); }
   .btn { display: inline-block; font-family: Pixel, sans-serif; padding: 4px 14px; border: 2px solid var(--edge); background: var(--card); box-shadow: 2px 2px 0 var(--drop); font-size: 14px; }
@@ -205,7 +210,7 @@
       <div class="hand"><img class="px" src="../../apps/web/public/pixel/bear-farmer-work.png"><b>Claude 师傅</b><span>主种：改代码</span><span class="hoe">拿着锄头</span></div>
       <div class="hand"><img class="px" src="../../apps/web/public/pixel/fox-rain-read.png"><b>Codex 老匠</b><span>帮手：@ 来写测试</span><span>等锄头传过来</span></div>
       <div class="hand"><img class="px" src="../../apps/web/public/pixel/hedgehog-gardener-worry.png"><b>Pi 实验员</b><span>看地的：验收</span><span>插了 3 面小旗</span></div>
-      <div class="hand"><img class="px" src="../../apps/web/public/pixel/manager-auntie.png" style="height:72px"><b>管家</b><span>拉人、分活、催</span><span>站在田埂上</span></div>
+      <div class="hand"><img class="px" src="../../apps/web/public/pixel/manager-auntie.png"><b>管家</b><span>拉人、分活、催</span><span>站在田埂上</span></div>
     </div>
     <p class="note">每一轮干活标着是谁干的，收成清单里每个提交带着名字，账本按人记功劳。锄头传了几次、现在在谁手上，地块详情里看得到。</p>
   </div>
@@ -219,16 +224,16 @@
     <div class="card gate"><h4>派一个看地的</h4><p>另一个帮工读工单的验收标准和改动，逐条打勾，挑出来的每条是一棵草。</p></div>
     <div class="card gate"><h4>必须你点头</h4><p>最重：检查和看地的都过了，还要你点「验收通过」才结果。上线、改数据这类。</p></div>
   </div>
-  <div class="grid g2" style="margin-top:14px">
+  <div class="grid g2 detail-cards">
     <div class="card">
-      <h4 class="pixel" style="margin:0 0 6px;font-weight:400">验收标准（聊清楚时写下）</h4>
+      <h4 class="pixel">验收标准（聊清楚时写下）</h4>
       <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-check.png">命令行能用 <code>issue status</code> 挪状态</div>
       <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-check.png">不许的转换被拒，并说为什么</div>
       <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-cross.png">看板拖卡调同一个接口</div>
       <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-warn.png">文档跟着改了（看地的拿不准，交给你）</div>
     </div>
     <div class="card">
-      <h4 class="pixel" style="margin:0 0 6px;font-weight:400">没过验收：三棵草</h4>
+      <h4 class="pixel">没过验收：三棵草</h4>
       <ul class="weeds">
         <li class="pulled"><img class="px" src="../../apps/web/public/pixel/icon-weed.png">IssueStatus 的错误没带原因 — 已修，拔掉了</li>
         <li><img class="px" src="../../apps/web/public/pixel/icon-weed.png">看板拖到「处理中」还在调旧的 start</li>
@@ -255,7 +260,7 @@
           <img class="px who" src="../../apps/web/public/pixel/bear-farmer-work.png">
           <img class="px who2" src="../../apps/web/public/pixel/hedgehog-gardener-worry.png">
         </div>
-        <b class="pixel" style="font-weight:400">抽穗了</b>
+        <b class="pixel">抽穗了</b>
         <small>第 3 块地 · 第 4 季</small>
         <small>Claude 师傅拿着锄头 · Pi 实验员在验收</small>
         <small>花了 ¥3.20 · 用时 48 分</small>
@@ -263,7 +268,7 @@
       <div>
         <div class="need">
           <img class="px" src="../../apps/web/public/pixel/icon-scarecrow.png">
-          <div style="flex:1"><b>这块地现在需要你：验收</b><p>检查全过；看地的打了 3 个勾、1 个拿不准，交给你看。</p></div>
+          <div><b>这块地现在需要你：验收</b><p>检查全过；看地的打了 3 个勾、1 个拿不准，交给你看。</p></div>
           <span class="btn go">验收通过</span>
           <span class="btn no">没过，写意见</span>
         </div>
@@ -283,14 +288,14 @@
       </div>
     </div>
   </div>
-  <div class="grid g2" style="margin-top:14px">
+  <div class="grid g2 detail-cards">
     <div class="card">
-      <h4 class="pixel" style="margin:0 0 6px;font-weight:400">不是代码活的地</h4>
-      <p style="margin:0;font-size:13px;color:var(--muted)">比如「写本周周报」「查一下为什么昨天账单变高」。没有 worktree、没有分支、没有锄头；「安排活」那块只列谁在干；验收默认「你看一眼」，收获就是关上。地还在岛上，只是岛上没有它的篱笆院子。</p>
+      <h4 class="pixel">不是代码活的地</h4>
+      <p class="card-copy">比如「写本周周报」「查一下为什么昨天账单变高」。没有 worktree、没有分支、没有锄头；「安排活」那块只列谁在干；验收默认「你看一眼」，收获就是关上。地还在岛上，只是岛上没有它的篱笆院子。</p>
     </div>
     <div class="card">
-      <h4 class="pixel" style="margin:0 0 6px;font-weight:400">「需要你」只放一件事</h4>
-      <p style="margin:0;font-size:13px;color:var(--muted)">缺肥：回答问题；干裂：浇水或叫停；长虫：杀虫；等验收（你来验）：验收通过 / 写意见；结果：收获；冲突：让它解决。没有要你做的，这块就不出现。这一条由服务端算（和手机来电是同一份规则），客户端只画。</p>
+      <h4 class="pixel">「需要你」只放一件事</h4>
+      <p class="card-copy">缺肥：回答问题；干裂：浇水或叫停；长虫：杀虫；等验收（你来验）：验收通过 / 写意见；结果：收获；冲突：让它解决。没有要你做的，这块就不出现。这一条由服务端算（和手机来电是同一份规则），客户端只画。</p>
     </div>
   </div>
 </section>

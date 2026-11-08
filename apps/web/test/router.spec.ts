@@ -25,7 +25,8 @@ test("regression: the farm stays inside the same application shell across naviga
   const original = await rail.elementHandle();
   await rail.locator('[data-place="farm"]').first().click();
   await expect(page).toHaveURL(/\/farm\/router-farm$/u);
-  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+  // farm.spec.ts owns scene readiness across navigation; the shell must work while textures load.
+  await expect(page.getByTestId("farm")).toBeVisible();
   expect(await rail.evaluate((current, previous) => current === previous, original)).toBe(true);
   await expect(rail.locator('[data-place="farm"]').first()).toHaveAttribute("aria-current", "page");
   const bounds = await page.getByTestId("farm").boundingBox();
@@ -37,9 +38,16 @@ test("regression: the farm stays inside the same application shell across naviga
   await expect(page.getByTestId("issue-search")).toBeVisible();
   expect(await rail.evaluate((current, previous) => current === previous, original)).toBe(true);
   await page.goBack();
-  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+  await expect(page).toHaveURL(/\/farm\/router-farm$/u);
+  await expect(page.getByTestId("farm")).toBeVisible();
+  expect(await rail.evaluate((current, previous) => current === previous, original)).toBe(true);
+  await expect(rail.locator('[data-place="farm"]').first()).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("desk")).toHaveCount(0);
   await page.goForward();
+  await expect(page).toHaveURL(/\/issues$/u);
   await expect(page.getByTestId("issue-search")).toBeVisible();
+  expect(await rail.evaluate((current, previous) => current === previous, original)).toBe(true);
+  await expect(rail.locator('[data-place="issues"]')).toHaveAttribute("aria-current", "page");
 });
 
 test("regression: changing an issue parameter preserves its page and unsaved filter", async ({ page, api }) => {

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,15 +17,465 @@ import { Dialog } from "#/ui/Dialog.tsx";
 import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Select } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 
-import { channelHeadClass, channelIconButtonClass, orchestratorMoodLabels } from "./ChannelSidebar";
+import { channelIconButtonStyles, orchestratorMoodLabels } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
 import { notifyOptions } from "./Dialogs";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
+import { threadItem } from "./message.stylex";
 import { MessageList } from "./MessageList";
 import { chatPath, messagePath, threadOwnerOf, threadsIn, threadTitle, workbenchClock } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
+
+const threadStyles = stylex.create({
+  thread: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  action: {
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", threadItem)]: 1,
+      },
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  pinsDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: 30,
+    marginTop: "var(--spacing)",
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 96)",
+    width: "calc(var(--spacing) * 80)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 2)",
+    boxShadow: "var(--shadow-float)",
+  },
+  threadListDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: 30,
+    marginTop: "var(--spacing)",
+    display: "flex",
+    maxHeight: "28rem",
+    width: "calc(var(--spacing) * 96)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 2)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  membersButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  threadPaneHeader: {
+    display: "flex",
+    height: "66px",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  threadListIcon: {
+    opacity: ".6",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: "var(--default-transition-duration)",
+  },
+  threadListIconVariant: {
+    rotate: "90deg",
+  },
+  threadListIconVariant2: {},
+});
+
+const variantStyles = stylex.create({
+  pinsSpan: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "block",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  farmSearchBodySpan: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
+
+const viewStyles = stylex.create({
+  pinsP: {
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  pinsP2: {
+    paddingInline: "var(--spacing)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  pinsFailed: {
+    paddingInline: "var(--spacing)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  pin: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  pinsSpan: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  pinsSpan2: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  pinsSpan3: {
+    color: "var(--color-muted)",
+  },
+  members: {
+    display: {
+      default: "none",
+      "@media (width>=48rem)": "flex",
+    },
+    width: "calc(var(--spacing) * 60)",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    overflowY: "auto",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  membersP: {
+    paddingInline: "var(--spacing)",
+    paddingBottom: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  membersDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "var(--spacing)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  membersSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-selected)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  membersSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  membersSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  membersSpan4: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  membersSpan5: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  membersP2: {
+    paddingInline: "var(--spacing)",
+    paddingTop: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  threadPaneSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadPaneSpan2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  threadPaneSpan3: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  threadsArchived: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    paddingInline: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  threadItemButton: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    cursor: "pointer",
+    flexDirection: "column",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingLeft: "var(--spacing)",
+    textAlign: "left",
+  },
+  threadItemSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  threadItemSpan2: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  threadItemSpan3: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  threadName: {
+    marginBlock: "var(--spacing)",
+    minWidth: "0",
+    flex: "1",
+    borderRadius: "var(--radius-sm)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-focus)",
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+  },
+  farmSearchBodyDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  farmSearchBodyLabel: {
+    display: "flex",
+    height: "calc(var(--spacing) * 9)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  farmSearchInput: {
+    minWidth: "0",
+    flex: "1",
+    backgroundColor: "transparent",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--color-faint)",
+    },
+  },
+  farmSearchBodyP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  farmSearchBodyP2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  searchFailed: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  farmSearchBodyDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  searchHit: {
+    display: "flex",
+    cursor: "pointer",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  farmSearchBodySpan: {
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-accent)",
+  },
+});
 
 const bad = (reason: string) => toast(reason, "bad");
 
@@ -45,19 +496,14 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <div
-      role="dialog"
-      data-testid="pins"
-      aria-label={t("web.channel.pins.title")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 origin-top-right animate-pop-in flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
-    >
-      <p class="px-1 text-xs font-semibold text-muted">{t("web.channel.pins.title")}</p>
+    <div role="dialog" data-testid="pins" aria-label={t("web.channel.pins.title")} {...stylex.attrs(recipeStyles2.pinsDiv)}>
+      <p {...stylex.attrs(viewStyles.pinsP)}>{t("web.channel.pins.title")}</p>
       <Show when={pinned()?.length === 0}>
-        <p class="px-1 py-2 text-sm text-muted">{t("web.channel.pins.none")}</p>
+        <p {...stylex.attrs(viewStyles.pinsP2)}>{t("web.channel.pins.none")}</p>
       </Show>
       <Show when={failed()}>
         {(why) => (
-          <p data-testid="pins-failed" class="px-1 py-2 text-sm text-berry">
+          <p data-testid="pins-failed" {...stylex.attrs(viewStyles.pinsFailed)}>
             {t("web.channel.pins.failed", { why: why() })}
           </p>
         )}
@@ -68,17 +514,17 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
             type="button"
             data-testid="pin"
             data-key={m().id}
-            class="cursor-pointer rounded-md px-2 py-1.5 text-left hover:bg-hover"
+            {...stylex.attrs(viewStyles.pin)}
             onClick={() => {
               router.navigate(messagePath(channelOf(core()?.chat, m().channel), m().number));
               untrack(() => props.onPick)();
             }}
           >
-            <span class="flex items-baseline gap-2 text-xs">
-              <span class="font-semibold">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
-              <span class="text-muted">{workbenchClock(m().at)}</span>
+            <span {...stylex.attrs(viewStyles.pinsSpan)}>
+              <span {...stylex.attrs(viewStyles.pinsSpan2)}>{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
+              <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(m().at)}</span>
             </span>
-            <span class="line-clamp-3 block text-sm">{m().text}</span>
+            <span {...stylex.attrs(variantStyles.pinsSpan)}>{m().text}</span>
           </button>
         )}
       </For>
@@ -100,38 +546,32 @@ export function Members(props: { channel: Channel }) {
     return (core()?.sessions ?? []).filter((h) => h.role === "worker" && (h.channel ?? fallback) === props.channel.id);
   };
   return (
-    <aside
-      aria-label={t("web.channel.members.title")}
-      data-testid="members"
-      class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex"
-    >
-      <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
-      <div class="flex items-center gap-2 px-1 py-1 text-sm">
-        <span class="flex size-7 items-center justify-center rounded-full bg-selected text-xs font-semibold text-muted">
-          {t("web.channel.members.owner").slice(0, 1)}
-        </span>
+    <aside aria-label={t("web.channel.members.title")} data-testid="members" {...stylex.attrs(viewStyles.members)}>
+      <p {...stylex.attrs(viewStyles.membersP)}>{t("web.channel.members.title")}</p>
+      <div {...stylex.attrs(viewStyles.membersDiv)}>
+        <span {...stylex.attrs(viewStyles.membersSpan)}>{t("web.channel.members.owner").slice(0, 1)}</span>
         {t("web.channel.members.owner")}
       </div>
-      <div data-testid="member-orchestrator" data-key={here()} class="flex items-center gap-2 px-1 py-1 text-sm">
+      <div data-testid="member-orchestrator" data-key={here()} {...stylex.attrs(viewStyles.membersDiv)}>
         <OrchestratorFace size={28} agent={here()} />
-        <span class="flex min-w-0 flex-1 flex-col">
-          <span class="truncate">{nameOf(here())}</span>
-          <span class="truncate text-xs text-muted">{t("web.channel.members.looksAfter")}</span>
+        <span {...stylex.attrs(viewStyles.membersSpan2)}>
+          <span {...stylex.attrs(viewStyles.membersSpan3)}>{nameOf(here())}</span>
+          <span {...stylex.attrs(viewStyles.membersSpan4)}>{t("web.channel.members.looksAfter")}</span>
         </span>
-        <span class="text-xs text-muted">{orchestratorMoodLabels[orchestratorMood(core(), here())]}</span>
+        <span {...stylex.attrs(viewStyles.membersSpan5)}>{orchestratorMoodLabels[orchestratorMood(core(), here())]}</span>
       </div>
       <For each={helpers()} keyed={(h) => h.id}>
         {(h) => (
-          <div class="flex items-center gap-2 px-1 py-1 text-sm">
+          <div {...stylex.attrs(viewStyles.membersDiv)}>
             <HelperFace agent={h().agent} runtime={h().runtime} size={28} />
-            <span class="flex min-w-0 flex-1 flex-col">
-              <span class="truncate">{h().name}</span>
-              <span class="truncate text-xs text-muted">{phaseText(h(), now())}</span>
+            <span {...stylex.attrs(viewStyles.membersSpan2)}>
+              <span {...stylex.attrs(viewStyles.membersSpan3)}>{h().name}</span>
+              <span {...stylex.attrs(viewStyles.membersSpan4)}>{phaseText(h(), now())}</span>
             </span>
             <PhaseGlyph phase={h().phase} />
             <button
               type="button"
-              class={[channelIconButtonClass, "size-6"]}
+              {...stylex.attrs(recipeStyles.membersButton)}
               aria-label={t("web.channel.direct.open", { name: h().name })}
               title={t("web.channel.direct.open", { name: h().name })}
               onClick={() => {
@@ -145,11 +585,15 @@ export function Members(props: { channel: Channel }) {
         )}
       </For>
       <Show when={props.channel.type !== "direct" && helpers().length === 0}>
-        <p class="px-1 pt-1 text-xs text-muted">{t("web.channel.members.none")}</p>
+        <p {...stylex.attrs(viewStyles.membersP2)}>{t("web.channel.members.none")}</p>
       </Show>
     </aside>
   );
 }
+
+const selectStyles = stylex.create({
+  notifications: { width: "calc(var(--spacing) * 28)", fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)" },
+});
 
 export function ThreadPane(props: { thread: Channel; point: number | undefined; onClose: () => void }) {
   const core = useCore();
@@ -166,25 +610,25 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         : t("web.channel.replies", { n: props.thread.replies });
   };
   return (
-    <section aria-label={t("web.channel.thread")} class="flex min-w-0 flex-1 flex-col">
-      <header class={[channelHeadClass, "gap-2.5 px-4"]}>
-        <span class="flex size-8 shrink-0 items-center justify-center">
+    <section aria-label={t("web.channel.thread")} {...stylex.attrs(viewStyles.membersSpan2)}>
+      <header {...stylex.attrs(recipeStyles.threadPaneHeader)}>
+        <span {...stylex.attrs(viewStyles.threadPaneSpan)}>
           <Show when={session()} fallback={<Icon name="thread" size={16} />}>
             {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
           </Show>
         </span>
-        <div class="flex min-w-0 flex-1 flex-col">
-          <span class="truncate text-sm font-semibold">{threadTitle(props.thread, core()?.issues, sessions())}</span>
-          <span class="flex items-center gap-1 text-xs text-muted">
+        <div {...stylex.attrs(viewStyles.membersSpan2)}>
+          <span {...stylex.attrs(viewStyles.threadPaneSpan2)}>{threadTitle(props.thread, core()?.issues, sessions())}</span>
+          <span {...stylex.attrs(viewStyles.threadPaneSpan3)}>
             <Show when={session()}>{(s) => <PhaseGlyph phase={s().phase} />}</Show>
-            <span class="truncate">{status()}</span>
+            <span {...stylex.attrs(viewStyles.membersSpan3)}>{status()}</span>
           </span>
         </div>
         <Select
           label={t("web.channel.threadList.notify")}
           value={props.thread.notify ?? "all"}
           options={notifyOptions()}
-          class="w-28 text-xs"
+          styles={selectStyles.notifications}
           testid="thread-notify"
           state={markState(notifies.list(), (n) => n.id === props.thread.id)}
           onChange={(v) => {
@@ -193,7 +637,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         />
         <button
           type="button"
-          class={channelIconButtonClass}
+          {...stylex.attrs(recipeStyles.membersButton)}
           aria-label={t("web.channel.closeThread")}
           title={t("web.channel.closeThread")}
           onClick={() => props.onClose()}
@@ -222,15 +666,10 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
     <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
   );
   return (
-    <div
-      role="dialog"
-      data-testid="thread-list"
-      aria-label={t("web.channel.threadList.title")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
-    >
-      <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</p>
+    <div role="dialog" data-testid="thread-list" aria-label={t("web.channel.threadList.title")} {...stylex.attrs(recipeStyles2.threadListDiv)}>
+      <p {...stylex.attrs(viewStyles.membersP)}>{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
-        <p data-testid="threads-empty" class="px-1 py-2 text-sm text-muted">
+        <p data-testid="threads-empty" {...stylex.attrs(viewStyles.pinsP2)}>
           {t("web.channel.threadList.none")}
         </p>
       </Show>
@@ -240,10 +679,14 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
           type="button"
           data-testid="threads-archived"
           aria-expanded={aria(showArchived())}
-          class="mt-1 flex cursor-pointer items-center gap-1 px-1 text-left text-xs text-muted hover:text-ink"
+          {...stylex.attrs(viewStyles.threadsArchived)}
           onClick={() => setShowArchived(!showArchived())}
         >
-          <Icon name="expand" size={10} class={["opacity-60 transition-transform", { "rotate-90": showArchived() }]} />
+          <Icon
+            name="expand"
+            size={10}
+            styles={[variantStyles2.threadListIcon, showArchived() ? variantStyles2.threadListIconVariant : variantStyles2.threadListIconVariant2]}
+          />
           {t("web.channel.threadList.archived", { n: archived().length })}
         </button>
         <Show when={showArchived()}>
@@ -270,20 +713,20 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       data-testid="thread"
       data-key={props.thread.id}
       data-archived={props.thread.archived !== undefined ? "" : undefined}
-      class="group/t flex items-center gap-1 rounded-md px-1 hover:bg-hover"
+      {...styleProps([threadItem, threadStyles.thread])}
     >
       <Show
         when={renaming()}
         fallback={
-          <button type="button" class="flex min-w-0 flex-1 cursor-pointer flex-col py-1.5 pl-1 text-left" onClick={() => props.onOpen()}>
-            <span class="flex items-center gap-1.5 text-sm">
+          <button type="button" {...stylex.attrs(viewStyles.threadItemButton)} onClick={() => props.onOpen()}>
+            <span {...stylex.attrs(viewStyles.threadItemSpan)}>
               <Icon name="thread" size={14} />
-              <span class="min-w-0 flex-1 truncate font-medium">{props.title}</span>
-              <span class="shrink-0 text-xs text-muted">{t("web.channel.replies", { n: props.thread.replies })}</span>
+              <span {...stylex.attrs(viewStyles.threadItemSpan2)}>{props.title}</span>
+              <span {...stylex.attrs(viewStyles.threadItemSpan3)}>{t("web.channel.replies", { n: props.thread.replies })}</span>
             </span>
             <Show when={props.thread.last}>
               {(m) => (
-                <span class="truncate text-xs text-muted">
+                <span {...stylex.attrs(viewStyles.membersSpan4)}>
                   {t("shared.join.labeled", { label: m().from === ownerId ? t("web.channel.messages.owner") : m().name, text: m().text })}
                 </span>
               )}
@@ -306,12 +749,12 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             }
           }}
           onBlur={save}
-          class="my-1 min-w-0 flex-1 rounded border border-focus bg-page px-2 py-1 text-sm outline-none"
+          {...stylex.attrs(viewStyles.threadName)}
         />
       </Show>
       <button
         type="button"
-        class={[channelIconButtonClass, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        {...styleProps([channelIconButtonStyles, threadStyles.action])}
         data-testid="thread-rename"
         aria-label={t("web.channel.threadList.rename", { title: props.title })}
         title={t("web.channel.threadList.rename", { title: props.title })}
@@ -324,7 +767,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       </button>
       <button
         type="button"
-        class={[channelIconButtonClass, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        {...styleProps([channelIconButtonStyles, threadStyles.action])}
         data-testid="thread-archive"
         aria-label={
           props.thread.archived !== undefined
@@ -371,8 +814,8 @@ function FarmSearchBody(props: { onClose: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <div class="flex flex-col gap-3">
-      <label class="flex h-9 items-center gap-2 rounded-md border border-line px-2 focus-within:border-focus">
+    <div {...stylex.attrs(viewStyles.farmSearchBodyDiv)}>
+      <label {...stylex.attrs(viewStyles.farmSearchBodyLabel)}>
         <Icon name="search" size={16} />
         <input
           ref={autofocus()}
@@ -381,24 +824,24 @@ function FarmSearchBody(props: { onClose: () => void }) {
           onInput={(e) => setText(e.currentTarget.value)}
           placeholder={t("web.channel.farmSearch.hint")}
           aria-label={t("web.channel.farmSearch.title")}
-          class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+          {...stylex.attrs(viewStyles.farmSearchInput)}
         />
       </label>
-      <p class="text-xs text-faint">{t("web.channel.farmSearch.filters")}</p>
+      <p {...stylex.attrs(viewStyles.farmSearchBodyP)}>{t("web.channel.farmSearch.filters")}</p>
       <Show when={search()?.state === "waiting"}>
-        <p class="text-sm text-muted">{t("web.channel.farmSearch.searching")}</p>
+        <p {...stylex.attrs(viewStyles.farmSearchBodyP2)}>{t("web.channel.farmSearch.searching")}</p>
       </Show>
       <Show when={failed()}>
         {(why) => (
-          <p data-testid="search-failed" class="text-sm text-berry">
+          <p data-testid="search-failed" {...stylex.attrs(viewStyles.searchFailed)}>
             {t("web.channel.farmSearch.failed", { why: why() })}
           </p>
         )}
       </Show>
       <Show when={hits()?.length === 0 && text().trim() !== ""}>
-        <p class="text-sm text-muted">{t("web.channel.farmSearch.none")}</p>
+        <p {...stylex.attrs(viewStyles.farmSearchBodyP2)}>{t("web.channel.farmSearch.none")}</p>
       </Show>
-      <div role="list" aria-label={t("web.channel.messages.label")} class="flex flex-col gap-0.5">
+      <div role="list" aria-label={t("web.channel.messages.label")} {...stylex.attrs(viewStyles.farmSearchBodyDiv2)}>
         <For each={hits() ?? []} keyed={(h) => h.message.id}>
           {(h) => (
             <button
@@ -406,18 +849,18 @@ function FarmSearchBody(props: { onClose: () => void }) {
               role="listitem"
               data-testid="search-hit"
               data-key={h().message.id}
-              class="flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-hover"
+              {...stylex.attrs(viewStyles.searchHit)}
               onClick={() => {
                 router.navigate(messagePath(channelOf(core()?.chat, h().message.channel), h().message.number));
                 untrack(() => props.onClose)();
               }}
             >
-              <span class="flex items-baseline gap-2 text-xs">
-                <span class="font-semibold text-accent">{h().address}</span>
-                <span class="font-semibold">{h().message.from === ownerId ? t("web.channel.messages.owner") : h().message.name}</span>
-                <span class="text-muted">{workbenchClock(h().message.at)}</span>
+              <span {...stylex.attrs(viewStyles.pinsSpan)}>
+                <span {...stylex.attrs(viewStyles.farmSearchBodySpan)}>{h().address}</span>
+                <span {...stylex.attrs(viewStyles.pinsSpan2)}>{h().message.from === ownerId ? t("web.channel.messages.owner") : h().message.name}</span>
+                <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(h().message.at)}</span>
               </span>
-              <span class="line-clamp-2 text-sm">{h().message.text}</span>
+              <span {...stylex.attrs(variantStyles.farmSearchBodySpan)}>{h().message.text}</span>
             </button>
           )}
         </For>

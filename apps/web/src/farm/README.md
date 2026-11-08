@@ -109,8 +109,8 @@ the API and then plays the bed's effect. Parent and child issues use the workben
 Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.json`,
 `/cursors/<name>.png` and `/cursors/cursors.json` (CSS cursor hotspots `hx`, `hy`),
 `/fonts/fusion-pixel-12px-proportional-zh_hans.otf` (the `font-pixel` family; sharp at 12 and 24 px),
-`/title/`. The farm's colours are Tailwind tokens in `src/style.css` (`bg-cream-100`, `border-bark-900`, `text-leaf-600`,
-`shadow-px`…).
+`/title/`. The farm's colours are CSS custom properties in `src/style.css` (`--color-cream-100`, `--color-bark-900`,
+`--color-leaf-600`, `--shadow-px`…), consumed by StyleX.
 
 ## Tests
 

@@ -2,11 +2,12 @@
 
 Stories for Solid 2 parts, after Storybook: a part's states drawn one by one with made-up arguments, in a viewer with a
 tree, a canvas and an arguments panel. Storybook's Solid renderer is for Solid 1 and brings its own build; this is the
-little of it the workbench uses, on the host's own Vite, Tailwind and tokens.
+little of it the workbench uses, on the host's own Vite, StyleX compiler and tokens.
 
 The package knows no app. The host (`apps/web/src/stories.tsx`) collects its `*.stories.tsx`, gives the viewer what
-every story is drawn inside (`wrap`: a router, a query cache) and its stylesheet; the viewer is drawn with the host's
-token classes (`bg-page`, `border-line`…), so the host's Tailwind scans `src/` here (`@source`).
+every story is drawn inside (`wrap`: a router, a query cache) and its stylesheet. Extracted styles use the host's public
+CSS properties (`--color-page`, `--color-line`, spacing and type tokens), not its private palette.
+The host imports `@vibevalley/stories/style.css` for the filled-frame descendant layout; component styles compile through StyleX.
 
 ## A stories file
 
@@ -39,8 +40,9 @@ export default stories({
 | `fill` | Lay it out as a pane fills its space, not centred at its own size. |
 | `grid` | Every state at once: `rows` and `cols`, each an argument and its values (`["tone", tones]`) or `"pseudo"` (rest, hover, focus, pressed). Shown first; the single view is a switch away. Its arguments are greyed in the panel while the grid is up. |
 
-A file may say `themes: ["light"]` and `frame: "<classes>"` for parts with colours of their own (the pixel skin), drawn on
-their own ground in their one theme.
+A file may say `themes: ["light"]` and `frame: styles.paper` for parts with colours of their own (the pixel skin), drawn on
+their own ground in their one theme. `frame` takes typed StyleX styles, including runtime variables; the viewer keeps their
+object styles while applying the selected frame width. The web host shares its pixel frame in `ui/pixel/story.stylex.ts`.
 
 ## Titles and the tree
 

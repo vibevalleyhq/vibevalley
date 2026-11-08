@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -7,6 +8,33 @@ import { farm } from "#/farm/store.ts";
 import { webRoutes, yardPlaces } from "#/farm/world/world.ts";
 import { useRouter } from "#/infra/router.ts";
 import { FarmSection, PxButton } from "#/ui/pixel/index.ts";
+
+const viewStyles = stylex.create({
+  menuDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  menuDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  menuDiv3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "var(--spacing)",
+    fontSize: "12px",
+    color: "var(--color-bark-800)",
+  },
+  menuSpan: {
+    color: "var(--color-bark-900)",
+  },
+  menuSpan2: {
+    color: "var(--color-bark-500)",
+  },
+});
 
 const elsewhere = [
   { label: t("web.farm.menu.chat"), to: "/chat" },
@@ -27,24 +55,24 @@ export function Menu() {
     router.navigate(to);
   };
   return (
-    <div class="flex flex-col gap-2">
+    <div {...stylex.attrs(viewStyles.menuDiv)}>
       <PxButton tone="primary" data-testid="menu-resume" onClick={close}>
         {t("web.farm.menu.resume")}
       </PxButton>
       <PxButton onClick={() => setMuted(!isMuted())}>{isMuted() ? t("web.farm.menu.soundOn") : t("web.farm.menu.soundOff")}</PxButton>
       <FarmSection title={t("web.farm.menu.elsewhere")}>
-        <div class="flex flex-wrap gap-2">
+        <div {...stylex.attrs(viewStyles.menuDiv2)}>
           <For each={elsewhere.filter((p) => webRoutes.includes(p.to))}>{(p) => <PxButton onClick={() => go(p.to)}>{p.label}</PxButton>}</For>
           <PxButton onClick={() => go("/issues")}>{t("web.farm.menu.issues")}</PxButton>
         </div>
       </FarmSection>
       <FarmSection title={t("web.farm.menu.yard")}>
-        <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-bark-800">
+        <div {...stylex.attrs(viewStyles.menuDiv3)}>
           <For each={yardPlaces}>
             {(p) => (
               <span>
-                <span class="text-bark-900">{p.label}</span>
-                <span class="text-bark-500"> · {p.hint}</span>
+                <span {...stylex.attrs(viewStyles.menuSpan)}>{p.label}</span>
+                <span {...stylex.attrs(viewStyles.menuSpan2)}> · {p.hint}</span>
               </span>
             )}
           </For>

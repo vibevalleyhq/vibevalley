@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,6 +9,18 @@ import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
 import { flashFor, kept, type TreeFilter } from "./memories";
 import type { MemoryItem, MemoryKind, MemoryTree } from "./mock";
 import { constellation, hash01, type Star, starsOf, tiesOf } from "./sky";
+
+const viewStyles = stylex.create({
+  memoryScene: {
+    position: "absolute",
+    inset: "0",
+    display: "block",
+    width: "100%",
+    height: "100%",
+    touchAction: "none",
+    imageRendering: "pixelated",
+  },
+});
 
 export interface SceneHover {
   readonly item: MemoryItem;
@@ -599,12 +612,6 @@ export function Scene(props: {
   });
 
   return (
-    <canvas
-      ref={(el) => (canvas = el)}
-      role="img"
-      aria-label={t("web.tree.scene")}
-      data-testid="memory-scene"
-      class="absolute inset-0 block size-full touch-none [image-rendering:pixelated]"
-    />
+    <canvas ref={(el) => (canvas = el)} role="img" aria-label={t("web.tree.scene")} data-testid="memory-scene" {...stylex.attrs(viewStyles.memoryScene)} />
   );
 }

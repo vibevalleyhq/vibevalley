@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -17,6 +18,56 @@ import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { channelName } from "./places";
+
+const viewStyles = stylex.create({
+  formForm: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  formP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  formDiv: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 3)",
+    paddingTop: "calc(var(--spacing) * 2)",
+  },
+  channelSettingsFormDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 5)",
+  },
+  channelDangerDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingTop: "calc(var(--spacing) * 4)",
+  },
+  channelDangerDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  channelDangerDiv3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  channelDangerP: {
+    color: "var(--color-muted)",
+  },
+  channelDangerUl: {
+    listStyleType: "disc",
+    paddingLeft: "calc(var(--spacing) * 5)",
+  },
+});
 
 function RepoInput(props: { value: string; onChange: (v: string) => void }) {
   const repos = useRepos();
@@ -48,7 +99,7 @@ function Form(props: {
   const ok = () => props.ready ?? true;
   return (
     <form
-      class="flex flex-col gap-4"
+      {...stylex.attrs(viewStyles.formForm)}
       onSubmit={(e) => {
         e.preventDefault();
         if (ok() && !props.busy) void props.onSubmit();
@@ -57,12 +108,12 @@ function Form(props: {
       {props.children}
       <Show when={props.error}>
         {(error) => (
-          <p role="alert" class="text-sm text-berry">
+          <p role="alert" {...stylex.attrs(viewStyles.formP)}>
             {error()}
           </p>
         )}
       </Show>
-      <div class="flex justify-end gap-3 pt-2">
+      <div {...stylex.attrs(viewStyles.formDiv)}>
         <Button data-testid="cancel" onClick={() => props.onCancel()}>
           {t("web.channel.dialog.cancel")}
         </Button>
@@ -227,7 +278,7 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
     if ((await form.save()) !== undefined) props.onClose();
   };
   return (
-    <div class="flex flex-col gap-5">
+    <div {...stylex.attrs(viewStyles.channelSettingsFormDiv)}>
       <Form submit={t("web.channel.dialog.save")} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
         <Show when={top()}>
           <Field label={t("web.channel.manage.name")} hint={t("web.channel.dialog.nameHint")}>
@@ -296,8 +347,8 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
     });
   };
   return (
-    <div class="flex flex-col gap-2 border-t border-line pt-4">
-      <div class="flex flex-wrap items-center gap-2">
+    <div {...stylex.attrs(viewStyles.channelDangerDiv)}>
+      <div {...stylex.attrs(viewStyles.channelDangerDiv2)}>
         <Button data-testid="channel-archive" disabled={busy()} onClick={() => void act("archive")} title={t("web.channel.manage.archiveHint")}>
           {props.channel.archived !== undefined ? t("web.channel.manage.unarchive") : t("web.channel.manage.archive")}
         </Button>
@@ -316,15 +367,15 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
       </div>
       <Show when={does()}>
         {(lines) => (
-          <div class="text-sm">
-            <p class="text-muted">{t("web.channel.manage.removeWill")}</p>
-            <ul class="list-disc pl-5">
+          <div {...stylex.attrs(viewStyles.channelDangerDiv3)}>
+            <p {...stylex.attrs(viewStyles.channelDangerP)}>{t("web.channel.manage.removeWill")}</p>
+            <ul {...stylex.attrs(viewStyles.channelDangerUl)}>
               <For each={lines()}>{(line) => <li>{line}</li>}</For>
             </ul>
           </div>
         )}
       </Show>
-      <Show when={error()}>{(e) => <p class="text-sm text-berry">{e()}</p>}</Show>
+      <Show when={error()}>{(e) => <p {...stylex.attrs(viewStyles.formP)}>{e()}</p>}</Show>
     </div>
   );
 }

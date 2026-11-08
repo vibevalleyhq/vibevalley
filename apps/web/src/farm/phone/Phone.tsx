@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,6 +13,7 @@ import { voiceCall } from "#/features/voice/index.ts";
 import { useCore } from "#/infra/frame.ts";
 import { useRouter } from "#/infra/router.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneCalls, phoneState } from "./calls";
 import { BlocksGame } from "./games/BlocksGame";
@@ -22,6 +24,168 @@ import { SokobanGame } from "./games/SokobanGame";
 import { lcd } from "./lcd";
 import { type PadButton, padListening, pressPad } from "./pad";
 import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
+
+const viewStyles = stylex.create({
+  crossKey: { position: "absolute", width: "calc(var(--spacing) * 4)", height: "calc(var(--spacing) * 4)" },
+  crossUp: { top: 0, left: "calc(var(--spacing) * 4)" },
+  crossLeft: { top: "calc(var(--spacing) * 4)", left: 0 },
+  crossRight: { top: "calc(var(--spacing) * 4)", right: 0 },
+  crossDown: { bottom: 0, left: "calc(var(--spacing) * 4)" },
+  phone: {
+    pointerEvents: "auto",
+    position: "relative",
+    paddingInline: "10px",
+    paddingTop: "10px",
+    paddingBottom: "calc(var(--spacing) * 3)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+    fontVariantNumeric: "tabular-nums",
+  },
+  handsetDiv: {
+    marginInline: "auto",
+    marginBottom: "calc(var(--spacing) * 2)",
+    height: "var(--spacing)",
+    width: "calc(var(--spacing) * 10)",
+    backgroundColor: "var(--color-bark-950)",
+  },
+  handsetDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    padding: "2px",
+  },
+  handsetDiv3: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+  },
+  phoneHome: {
+    cursor: "pointer",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  handsetSpan: {
+    marginLeft: "auto",
+  },
+  handsetDiv4: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+  },
+  handsetDiv5: {
+    display: "flex",
+    minHeight: "0",
+    flexShrink: "0",
+    flexDirection: "column",
+    overflow: "hidden",
+  },
+  handsetI: {
+    display: "block",
+    width: "2px",
+    flexShrink: "0",
+  },
+  handsetDiv6: {
+    minHeight: "0",
+    flexShrink: "0",
+  },
+  pad: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingInline: "var(--spacing)",
+  },
+  handsetSpan2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  phoneChat: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 16)",
+    left: "100%",
+    display: "flex",
+    width: "calc(var(--spacing) * 8)",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+    fontSize: "13px",
+    lineHeight: "15px",
+    color: "var(--color-cream-50)",
+    translate: {
+      default: null,
+      ":active": "1px 0",
+    },
+  },
+  unfoldTabSpan: {
+    display: "block",
+    width: "calc(var(--spacing) * 2.5)",
+    height: "calc(var(--spacing) * 2.5)",
+    backgroundColor: "var(--color-berry)",
+    boxShadow: "inset 0 0 0 2px var(--color-px-dent)",
+  },
+  signalSpan: {
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "1px",
+  },
+  signalI: {
+    display: "block",
+    width: "2px",
+  },
+  batterySpan: {
+    display: "flex",
+    alignItems: "center",
+  },
+  batteryI: {
+    position: "relative",
+    display: "block",
+    height: "calc(var(--spacing) * 2)",
+    width: "14px",
+  },
+  batteryI2: {
+    position: "absolute",
+    top: "2px",
+    right: "2px",
+    display: "block",
+    width: "var(--spacing)",
+    height: "var(--spacing)",
+  },
+  batteryI3: {
+    display: "block",
+    height: "var(--spacing)",
+    width: "2px",
+  },
+  crossSpan: {
+    position: "relative",
+    display: "block",
+    width: "calc(var(--spacing) * 12)",
+    height: "calc(var(--spacing) * 12)",
+  },
+  crossI: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 4)",
+    left: "calc(var(--spacing) * 4)",
+    width: "calc(var(--spacing) * 4)",
+    height: "calc(var(--spacing) * 4)",
+  },
+  abKeyButton: {
+    display: "grid",
+    width: "calc(var(--spacing) * 6)",
+    height: "calc(var(--spacing) * 6)",
+    placeItems: "center",
+    lineHeight: "1",
+    color: "var(--color-cream-50)",
+  },
+});
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
 
@@ -192,7 +356,7 @@ function Handset(props: {
       aria-label={t("web.farm.phone.label")}
       data-testid="phone"
       data-screen={props.screen}
-      class="pointer-events-auto relative px-[10px] pt-[10px] pb-3 font-pixel text-[12px] leading-[1.5] tabular-nums"
+      {...stylex.attrs(viewStyles.phone)}
       style={{
         width: `${width()}px`,
         background: body,
@@ -201,9 +365,12 @@ function Handset(props: {
         color: lcd.ink,
       }}
     >
-      <div class="mx-auto mb-2 h-1 w-10 bg-bark-950" />
-      <div class="flex flex-col p-[2px]" style={{ height: `${screen()}px`, background: lcd.paper, "box-shadow": `${outline}, inset 3px 3px 0 0 #a8bd78` }}>
-        <div class="flex items-center gap-1 px-1.5 py-0.5" style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
+      <div {...stylex.attrs(viewStyles.handsetDiv)} />
+      <div
+        {...stylex.attrs(viewStyles.handsetDiv2)}
+        style={{ height: `${screen()}px`, background: lcd.paper, "box-shadow": `${outline}, inset 3px 3px 0 0 #a8bd78` }}
+      >
+        <div {...stylex.attrs(viewStyles.handsetDiv3)} style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
           <Signal />
           {/* The phone has no keys outside a game: its name in the status bar goes back to the home screen. */}
           <button
@@ -212,35 +379,35 @@ function Handset(props: {
             data-testid="phone-home"
             title={t("web.farm.phone.homeHint")}
             onClick={() => props.onHome()}
-            class="cursor-pointer hover:underline"
+            {...stylex.attrs(viewStyles.phoneHome)}
           >
             {t("web.farm.phone.brand")}
           </button>
-          <span class="ml-auto">
+          <span {...stylex.attrs(viewStyles.handsetSpan)}>
             {two(now().getHours())}:{two(now().getMinutes())}
           </span>
           <Battery />
         </div>
-        <div class="flex min-h-0 flex-1">
+        <div {...stylex.attrs(viewStyles.handsetDiv4)}>
           <Show when={!(props.unfolded && props.narrow)}>
-            <div class="flex min-h-0 shrink-0 flex-col overflow-hidden" style={{ width: `${appsWidth()}px` }}>
+            <div {...stylex.attrs(viewStyles.handsetDiv5)} style={{ width: `${appsWidth()}px` }}>
               {props.children}
             </div>
           </Show>
           <Show when={props.unfolded}>
             <Show when={!props.narrow}>
-              <i class="block w-[2px] shrink-0" style={{ background: lcd.dark }} aria-hidden="true" />
+              <i {...stylex.attrs(viewStyles.handsetI)} style={{ background: lcd.dark }} aria-hidden="true" />
             </Show>
-            <div class="min-h-0 shrink-0" style={{ width: `${chatWidth()}px` }}>
+            <div {...stylex.attrs(viewStyles.handsetDiv6)} style={{ width: `${chatWidth()}px` }}>
               {props.chat}
             </div>
           </Show>
         </div>
       </div>
       <Show when={pad()}>
-        <div data-testid="pad" class="mt-2 flex items-center justify-between px-1">
+        <div data-testid="pad" {...stylex.attrs(viewStyles.pad)}>
           <Cross />
-          <span class="flex gap-2">
+          <span {...stylex.attrs(viewStyles.handsetSpan2)}>
             <AbKey button="b" label="B" />
             <AbKey button="a" label="A" />
           </span>
@@ -266,12 +433,12 @@ function UnfoldTab(props: { unread: number }) {
         playSound("open");
         farm.chatOpen(true);
       }}
-      class="absolute top-16 left-full flex w-8 cursor-pointer flex-col items-center gap-0.5 py-2.5 text-[13px] leading-[15px] text-cream-50 active:translate-x-px"
+      {...stylex.attrs(viewStyles.phoneChat)}
       style={{ background: body, "box-shadow": `${outline}, inset -3px -3px 0 0 #4a321e, 3px 4px 0 0 #1e140a73` }}
     >
       <For each={[...t("web.farm.phone.chatTab")]}>{(c) => <span>{c}</span>}</For>
       <Show when={props.unread > 0}>
-        <span class="block size-2.5 bg-berry shadow-[inset_0_0_0_2px_var(--color-px-dent)]" />
+        <span {...stylex.attrs(viewStyles.unfoldTabSpan)} />
       </Show>
     </button>
   );
@@ -279,19 +446,19 @@ function UnfoldTab(props: { unread: number }) {
 
 function Signal() {
   return (
-    <span class="flex items-end gap-px" aria-hidden="true">
-      <For each={[3, 5, 7, 9]}>{(h) => <i class="block w-[2px]" style={{ height: `${h}px`, background: lcd.ink }} />}</For>
+    <span {...stylex.attrs(viewStyles.signalSpan)} aria-hidden="true">
+      <For each={[3, 5, 7, 9]}>{(h) => <i {...stylex.attrs(viewStyles.signalI)} style={{ height: `${h}px`, background: lcd.ink }} />}</For>
     </span>
   );
 }
 
 function Battery() {
   return (
-    <span class="flex items-center" aria-hidden="true">
-      <i class="relative block h-2 w-[14px]" style={{ background: lcd.ink }}>
-        <i class="absolute top-[2px] right-[2px] block size-1" style={{ background: lcd.light }} />
+    <span {...stylex.attrs(viewStyles.batterySpan)} aria-hidden="true">
+      <i {...stylex.attrs(viewStyles.batteryI)} style={{ background: lcd.ink }}>
+        <i {...stylex.attrs(viewStyles.batteryI2)} style={{ background: lcd.light }} />
       </i>
-      <i class="block h-1 w-[2px]" style={{ background: lcd.ink }} />
+      <i {...stylex.attrs(viewStyles.batteryI3)} style={{ background: lcd.ink }} />
     </span>
   );
 }
@@ -316,7 +483,7 @@ function createPress(button: () => PadButton) {
   };
 }
 
-function CrossKey(props: { button: PadButton; label: string; at: string }) {
+function CrossKey(props: { button: PadButton; label: string; styles: stylex.StyleXStyles }) {
   const key = createPress(() => props.button);
   return (
     <button
@@ -326,20 +493,19 @@ function CrossKey(props: { button: PadButton; label: string; at: string }) {
       onPointerUp={key.onPointerUp}
       onPointerCancel={key.onPointerCancel}
       onPointerLeave={key.onPointerLeave}
-      class={["absolute size-4", props.at]}
-      style={{ background: key.down() ? "#1e140b" : bark }}
+      {...styleProps([viewStyles.crossKey, props.styles], { background: key.down() ? "#1e140b" : bark })}
     />
   );
 }
 
 function Cross() {
   return (
-    <span class="relative block size-12">
-      <CrossKey button="up" label={t("web.farm.phone.key.up")} at="top-0 left-4" />
-      <CrossKey button="left" label={t("web.farm.phone.key.left")} at="top-4 left-0" />
-      <CrossKey button="right" label={t("web.farm.phone.key.right")} at="top-4 right-0" />
-      <CrossKey button="down" label={t("web.farm.phone.key.down")} at="bottom-0 left-4" />
-      <i class="absolute top-4 left-4 size-4" style={{ background: bark }} />
+    <span {...stylex.attrs(viewStyles.crossSpan)}>
+      <CrossKey button="up" label={t("web.farm.phone.key.up")} styles={viewStyles.crossUp} />
+      <CrossKey button="left" label={t("web.farm.phone.key.left")} styles={viewStyles.crossLeft} />
+      <CrossKey button="right" label={t("web.farm.phone.key.right")} styles={viewStyles.crossRight} />
+      <CrossKey button="down" label={t("web.farm.phone.key.down")} styles={viewStyles.crossDown} />
+      <i {...stylex.attrs(viewStyles.crossI)} style={{ background: bark }} />
     </span>
   );
 }
@@ -354,7 +520,7 @@ function AbKey(props: { button: PadButton; label: string }) {
       onPointerUp={key.onPointerUp}
       onPointerCancel={key.onPointerCancel}
       onPointerLeave={key.onPointerLeave}
-      class="grid size-6 place-items-center leading-none text-cream-50"
+      {...stylex.attrs(viewStyles.abKeyButton)}
       style={{
         transform: key.down() ? "translateY(1px)" : undefined,
         background: "#c84a3a",

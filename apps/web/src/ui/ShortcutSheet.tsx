@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -5,6 +6,56 @@ import { t } from "@vibevalley/i18n";
 import { inField, keyCap, pressed, shortcutPlaces, shortcuts } from "#/base/shortcuts.ts";
 
 import { Dialog } from "./Dialog";
+
+const viewStyles = stylex.create({
+  kbdKbd: {
+    minWidth: "calc(var(--spacing) * 6)",
+    borderRadius: "var(--radius-xs)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-hover)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    textAlign: "center",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "calc(var(--spacing) * 5)",
+    color: "var(--color-ink)",
+  },
+  shortcutsDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  shortcutPlace: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  shortcutsH3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  shortcutsDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  shortcutsSpan: {
+    flex: "1",
+  },
+  shortcutsSpan2: {
+    display: "flex",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+});
 
 /** Every shortcut, by where it works, drawn from base/shortcuts.ts: ? off a text field opens it. */
 export function ShortcutSheet() {
@@ -27,21 +78,26 @@ export function ShortcutSheet() {
 }
 
 export function Kbd(props: { children: string }) {
-  return <kbd class="min-w-6 rounded-xs border border-line bg-hover px-1.5 text-center font-mono text-2xs leading-5 text-ink">{props.children}</kbd>;
+  return <kbd {...stylex.attrs(viewStyles.kbdKbd)}>{props.children}</kbd>;
 }
 
 export function Shortcuts() {
   return (
-    <div class="flex flex-col gap-4">
+    <div {...stylex.attrs(viewStyles.shortcutsDiv)}>
       <For each={shortcutPlaces}>
         {(place) => (
-          <section aria-label={t(`web.base.shortcuts.place.${place}`)} data-testid="shortcut-place" data-key={place} class="flex flex-col gap-1">
-            <h3 class="text-xs font-semibold text-muted">{t(`web.base.shortcuts.place.${place}`)}</h3>
+          <section
+            aria-label={t(`web.base.shortcuts.place.${place}`)}
+            data-testid="shortcut-place"
+            data-key={place}
+            {...stylex.attrs(viewStyles.shortcutPlace)}
+          >
+            <h3 {...stylex.attrs(viewStyles.shortcutsH3)}>{t(`web.base.shortcuts.place.${place}`)}</h3>
             <For each={shortcuts.filter((s) => s.place === place)}>
               {(s) => (
-                <div class="flex items-center gap-3 py-0.5 text-sm">
-                  <span class="flex-1">{t(`web.base.shortcuts.say.${s.id}`)}</span>
-                  <span class="flex shrink-0 items-center gap-1">
+                <div {...stylex.attrs(viewStyles.shortcutsDiv2)}>
+                  <span {...stylex.attrs(viewStyles.shortcutsSpan)}>{t(`web.base.shortcuts.say.${s.id}`)}</span>
+                  <span {...stylex.attrs(viewStyles.shortcutsSpan2)}>
                     <For each={s.keys}>{(key) => <Kbd>{keyCap(key)}</Kbd>}</For>
                   </span>
                 </div>

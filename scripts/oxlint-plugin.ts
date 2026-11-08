@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 
 import { definePlugin, defineRule, type ESTree, type Context, type Scope } from "vite-plus/lint/plugins";
 
-import { hexClass, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
+import { hexColor, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
 
 /** Diagnostics include a replacement rather than only a prohibition; the named See path is checked by tests. */
 export const says = (wrong: string, fix: string, see: string) => `${wrong}. Fix: ${fix}. See ${see}`;
@@ -143,25 +143,183 @@ const noCopySelector = defineRule({
   },
 });
 
+function styleBinding(node: Extract<ESTree.Node, { type: "Identifier" }>, context: Context) {
+  for (let scope: Scope | null = context.sourceCode.getScope(node); scope; scope = scope.upper) {
+    const variable = scope.set.get(node.name);
+    if (variable) return variable.defs[0];
+  }
+  return undefined;
+}
+
+function styleKey(node: ESTree.Node): string | undefined {
+  return node.type === "Identifier" ? node.name : node.type === "Literal" && typeof node.value === "string" ? node.value : undefined;
+}
+
+function stylexApi(node: ESTree.Node, context: Context, seen = new Set<ESTree.Node>()): string | undefined {
+  if (seen.has(node)) return undefined;
+  seen.add(node);
+  if (node.type === "MemberExpression") {
+    const owner = stylexApi(node.object, context, seen);
+    const key = styleKey(node.property);
+    return owner !== undefined && key !== undefined ? [owner, key].filter(Boolean).join(".") : undefined;
+  }
+  if (node.type !== "Identifier") return undefined;
+  const definition = styleBinding(node, context);
+  if (definition?.type === "ImportBinding" && definition.parent?.type === "ImportDeclaration") {
+    if (definition.parent.source.value !== "@stylexjs/stylex") return undefined;
+    const imported = definition.node.type === "ImportSpecifier" ? styleKey(definition.node.imported) : "";
+    return imported === "default" ? "" : imported;
+  }
+  if (definition?.type !== "Variable" || definition.parent?.type !== "VariableDeclaration" || definition.parent.kind !== "const") return undefined;
+  const binding = definition.node;
+  if (binding.type !== "VariableDeclarator" || binding.init === null) return undefined;
+  if (binding.id.type === "Identifier") return stylexApi(binding.init, context, seen);
+  if (binding.id.type === "ObjectPattern" && stylexApi(binding.init, context, seen) === "") {
+    const property = binding.id.properties.find((p) => p.type === "Property" && p.value.type === "Identifier" && p.value.name === node.name);
+    return property?.type === "Property" ? styleKey(property.key) : undefined;
+  }
+  return undefined;
+}
+
+type StyleValue = { node: ESTree.Node; property: string | undefined; value: string | number; disabled: boolean };
+
+/** Walk only values returned to StyleX, not selectors, function tests, asset names or unrelated literals. */
+function stylexValues(context: Context, inspect: (value: StyleValue) => void) {
+  function visit(node: ESTree.Node, depth: number, property: string | undefined, disabled: boolean, seen: Set<ESTree.Node>) {
+    if (seen.has(node)) return;
+    seen.add(node);
+    switch (node.type) {
+      case "Identifier": {
+        const definition = styleBinding(node, context);
+        if (
+          definition?.type === "Variable" &&
+          definition.parent?.type === "VariableDeclaration" &&
+          definition.parent.kind === "const" &&
+          definition.node.type === "VariableDeclarator" &&
+          definition.node.id.type === "Identifier" &&
+          definition.node.init !== null
+        ) {
+          visit(definition.node.init, depth, property, disabled, seen);
+        }
+        break;
+      }
+      case "ObjectExpression":
+        for (const entry of node.properties) {
+          if (entry.type === "SpreadElement") visit(entry.argument, depth, property, disabled, seen);
+          else {
+            const key = styleKey(entry.key);
+            const pseudoElement = key?.startsWith("::") === true;
+            const inDisabled = key !== undefined && /:disabled\b/u.test(key.replace(/:not\([^)]*\)/gu, ""));
+            visit(
+              entry.value,
+              depth === 1 && pseudoElement ? 1 : Math.max(0, depth - 1),
+              depth === 1 && !pseudoElement ? key : property,
+              disabled || inDisabled,
+              seen,
+            );
+          }
+        }
+        break;
+      case "ArrowFunctionExpression":
+      case "FunctionExpression":
+        if (node.body !== null) visit(node.body, depth, property, disabled, seen);
+        break;
+      case "BlockStatement":
+        for (const statement of node.body) visit(statement, depth, property, disabled, seen);
+        break;
+      case "ReturnStatement":
+        if (node.argument) visit(node.argument, depth, property, disabled, seen);
+        break;
+      case "IfStatement":
+        visit(node.consequent, depth, property, disabled, seen);
+        if (node.alternate) visit(node.alternate, depth, property, disabled, seen);
+        break;
+      case "ConditionalExpression":
+        visit(node.consequent, depth, property, disabled, seen);
+        visit(node.alternate, depth, property, disabled, seen);
+        break;
+      case "LogicalExpression":
+        visit(node.left, depth, property, disabled, seen);
+        visit(node.right, depth, property, disabled, seen);
+        break;
+      case "CallExpression": {
+        const api = stylexApi(node.callee, context);
+        if (api === "firstThatWorks" || api?.startsWith("types.") === true) {
+          for (const argument of node.arguments) visit(argument, depth, property, disabled, seen);
+        }
+        break;
+      }
+      case "ArrayExpression":
+        for (const element of node.elements) if (element) visit(element, depth, property, disabled, seen);
+        break;
+      case "TSAsExpression":
+      case "TSSatisfiesExpression":
+      case "TSNonNullExpression":
+      case "ParenthesizedExpression":
+        visit(node.expression, depth, property, disabled, seen);
+        break;
+      case "Literal":
+        if (typeof node.value === "string" || typeof node.value === "number") inspect({ node, property, value: node.value, disabled });
+        break;
+      case "UnaryExpression":
+        if ((node.operator === "-" || node.operator === "+") && node.argument.type === "Literal" && typeof node.argument.value === "number") {
+          inspect({ node, property, value: node.argument.value * (node.operator === "-" ? -1 : 1), disabled });
+        }
+        break;
+      case "TemplateLiteral":
+        inspect({ node, property, value: node.quasis.map((q) => q.value.cooked ?? q.value.raw).join("${}"), disabled });
+        for (const expression of node.expressions) visit(expression, depth, property, disabled, seen);
+        break;
+      default:
+        break;
+    }
+    seen.delete(node);
+  }
+  return {
+    CallExpression(node: ESTree.CallExpression) {
+      const api = stylexApi(node.callee, context);
+      let index = 0;
+      let depth: number;
+      switch (api) {
+        case "create":
+        case "keyframes":
+        case "viewTransitionClass":
+          depth = 2;
+          break;
+        case "positionTry":
+          depth = 1;
+          break;
+        case "createTheme":
+          index = 1;
+          depth = 0;
+          break;
+        case "defineVars":
+        case "defineConsts":
+          depth = 0;
+          break;
+        default:
+          return;
+      }
+      const argument = node.arguments[index];
+      if (argument) visit(argument, depth, undefined, false, new Set());
+    },
+  };
+}
+
 const noHexColor = defineRule({
   meta: {
     messages: {
       hex: says(
-        "a colour written into a class stays as it is when the theme changes (设置 › 外观)",
-        "use the palette's name for what it is for (`bg-ok-soft`, `text-warn-ink`, `bg-ink/20`…); a new purpose gets a new name in style.css, in both themes",
+        "a colour written into a style stays as it is when the theme changes (设置 › 外观)",
+        "use a host palette reference such as var(--color-ok-soft) or var(--color-ink); a new purpose gets a name in style.css, in both themes",
         "apps/web/src/style.css",
       ),
     },
   },
   create(context) {
-    return {
-      Literal(node) {
-        if (typeof node.value === "string" && hexClass.test(node.value)) context.report({ node, messageId: "hex" });
-      },
-      TemplateLiteral(node) {
-        if (node.quasis.some((q) => hexClass.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "hex" });
-      },
-    };
+    return stylexValues(context, ({ node, property, value }) => {
+      if (typeof value === "string" && hexColor(property, value)) context.report({ node, messageId: "hex" });
+    });
   },
 });
 
@@ -176,15 +334,11 @@ const designTokens = defineRule({
     ),
   },
   create(context) {
-    return {
-      Literal(node) {
-        if (typeof node.value === "string") for (const kind of new Set(offTokens(node.value))) context.report({ node, messageId: kind });
-      },
-      TemplateLiteral(node) {
-        const text = node.quasis.map((q) => q.value.cooked ?? q.value.raw).join(" ");
-        for (const kind of new Set(offTokens(text))) context.report({ node, messageId: kind });
-      },
-    };
+    return stylexValues(context, ({ node, property, value, disabled }) => {
+      if (property === undefined) return;
+      const kind = offTokens(property, value, disabled);
+      if (kind) context.report({ node, messageId: kind });
+    });
   },
 });
 

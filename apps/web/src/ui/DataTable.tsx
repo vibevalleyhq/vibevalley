@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { For, Show, type Accessor } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,6 +10,95 @@ import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
+
+const viewStyles = stylex.create({
+  dataTableDiv: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  dataTableDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  dataTableSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  dataTableP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  dataTableDiv3: {
+    minWidth: "0",
+    overflowX: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+  },
+  dataTableTable: {
+    minWidth: "100%",
+    textAlign: "left",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  dataTableCaption: {
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: "0",
+    width: "1px",
+    height: "1px",
+    margin: "-1px",
+    padding: "0",
+    position: "absolute",
+    overflow: "hidden",
+  },
+  dataTableThead: {
+    backgroundColor: "var(--color-hover)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  dataTableTh: {
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  dataTableTh2: {
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  dataTableTbodyStale: {
+    opacity: ".6",
+  },
+  tableRow: {
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+  },
+  dataTableTd: {
+    padding: "calc(var(--spacing) * 3)",
+    color: "var(--color-muted)",
+  },
+  dataTableDiv4: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+});
 
 export type TableCells<T, K extends string> = {
   readonly [P in K]: { readonly id: P; readonly header: () => string; readonly render: (row: Accessor<T>) => JSX.Element };
@@ -34,13 +124,13 @@ export function DataTable<T, K extends string>(props: {
     table().setSort(current?.column === id ? (current.direction === "asc" ? { column: id, direction: "desc" } : undefined) : { column: id, direction: "asc" });
   };
   return (
-    <div class="flex min-w-0 flex-col gap-2" data-testid={props.testid ?? "data-table"} data-stale={table().stale() ? "true" : "false"}>
+    <div {...stylex.attrs(viewStyles.dataTableDiv)} data-testid={props.testid ?? "data-table"} data-stale={table().stale() ? "true" : "false"}>
       <Show when={props.columnControls}>
-        <div class="flex flex-wrap items-center gap-3 text-xs text-muted" role="group" aria-label={t("web.base.table.columns")}>
+        <div {...stylex.attrs(viewStyles.dataTableDiv2)} role="group" aria-label={t("web.base.table.columns")}>
           <For each={table().allColumns} keyed={(column) => column.id}>
             {(column) => (
               <Show when={column().hideable}>
-                <span class="flex items-center gap-1.5">
+                <span {...stylex.attrs(viewStyles.dataTableSpan)}>
                   <Checkbox
                     testid="table-column"
                     data-key={column().id}
@@ -56,17 +146,17 @@ export function DataTable<T, K extends string>(props: {
         </div>
       </Show>
       <Show when={table().stale()}>
-        <p role="status" class="text-sm text-muted">
+        <p role="status" {...stylex.attrs(viewStyles.dataTableP)}>
           {t("web.base.table.stale")}
         </p>
       </Show>
-      <div class="min-w-0 overflow-x-auto rounded-lg border border-line">
-        <table class="min-w-full text-left text-sm">
-          <caption class="sr-only">{props.caption}</caption>
-          <thead class="bg-hover text-xs text-muted">
+      <div {...stylex.attrs(viewStyles.dataTableDiv3)}>
+        <table {...stylex.attrs(viewStyles.dataTableTable)}>
+          <caption {...stylex.attrs(viewStyles.dataTableCaption)}>{props.caption}</caption>
+          <thead {...stylex.attrs(viewStyles.dataTableThead)}>
             <tr>
               <Show when={props.selection}>
-                <th scope="col" class="px-3 py-2">
+                <th scope="col" {...stylex.attrs(viewStyles.dataTableTh)}>
                   <Checkbox
                     testid="table-select-page"
                     label={t("web.base.table.selectPage")}
@@ -82,7 +172,7 @@ export function DataTable<T, K extends string>(props: {
                   <th
                     scope="col"
                     data-column={column().id}
-                    class="px-3 py-2 font-medium"
+                    {...stylex.attrs(viewStyles.dataTableTh2)}
                     aria-sort={table().sorting()?.column === column().id ? (table().sorting()?.direction === "asc" ? "ascending" : "descending") : "none"}
                   >
                     <Show when={column().compareRows} fallback={props.cells[column().id].header()}>
@@ -96,17 +186,17 @@ export function DataTable<T, K extends string>(props: {
               </For>
             </tr>
           </thead>
-          <tbody inert={table().stale()} class={table().stale() ? "opacity-60" : ""}>
+          <tbody inert={table().stale()} {...stylex.attrs(table().stale() && viewStyles.dataTableTbodyStale)}>
             <For each={table().rows()} keyed={(row) => row.id}>
               {(row) => (
                 <tr
                   data-testid="table-row"
                   data-key={row().id}
                   data-selected={table().selection().has(row().id) ? "true" : "false"}
-                  class="border-t border-line"
+                  {...stylex.attrs(viewStyles.tableRow)}
                 >
                   <Show when={props.selection}>
-                    <td class="px-3 py-2">
+                    <td {...stylex.attrs(viewStyles.dataTableTh)}>
                       <Checkbox
                         testid="table-select-row"
                         label={t("web.base.table.selectRow", { id: row().id })}
@@ -117,7 +207,7 @@ export function DataTable<T, K extends string>(props: {
                   </Show>
                   <For each={table().columns()} keyed={(column) => column.id}>
                     {(column) => (
-                      <td data-column={column().id} class="px-3 py-2">
+                      <td data-column={column().id} {...stylex.attrs(viewStyles.dataTableTh)}>
                         {props.cells[column().id].render(() => row().original)}
                       </td>
                     )}
@@ -127,7 +217,7 @@ export function DataTable<T, K extends string>(props: {
             </For>
             <Show when={table().rows().length === 0 && !table().stale()}>
               <tr>
-                <td colspan={table().columns().length + (props.selection === true ? 1 : 0)} class="p-3 text-muted">
+                <td colspan={table().columns().length + (props.selection === true ? 1 : 0)} {...stylex.attrs(viewStyles.dataTableTd)}>
                   {t("web.base.table.empty")}
                 </td>
               </tr>
@@ -136,7 +226,7 @@ export function DataTable<T, K extends string>(props: {
         </table>
       </div>
       <Show when={table().page().index > 0 || table().hasNext()}>
-        <div class="flex items-center justify-end gap-2 text-xs text-muted">
+        <div {...stylex.attrs(viewStyles.dataTableDiv4)}>
           <IconButton
             testid="table-previous"
             icon="previous"

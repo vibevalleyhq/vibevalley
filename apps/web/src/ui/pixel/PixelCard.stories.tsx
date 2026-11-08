@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { SpeciesValues } from "@vibevalley/protocol";
@@ -5,11 +6,23 @@ import { stories, story } from "@vibevalley/stories";
 
 import { useAtlas } from "./atlas";
 import { AnimalFace, badgeColors, CardColors, PixelCard } from "./PixelCard";
+import { storyFrame } from "./story.stylex";
+
+const viewStyles = stylex.create({
+  pixelCardStoriesDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  pixelCardStoriesDiv2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 export default stories({
   title: "组件/像素/PixelCard",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
     Sign: story({
       note: "地头的木牌：一行行的字、图标和进度条。",
@@ -40,7 +53,7 @@ export default stories({
     }),
     Badges: story({
       render: () => (
-        <div class="flex gap-3">
+        <div {...stylex.attrs(viewStyles.pixelCardStoriesDiv)}>
           <For each={Object.entries(badgeColors)}>
             {([tone, [paper, ink]]) => <PixelCard paper={paper} ink={ink} rows={[[{ kind: "words", text: tone, color: ink }]]} />}
           </For>
@@ -55,7 +68,7 @@ export default stories({
         return (
           <Show when={atlas()}>
             {(atlas) => (
-              <div class="flex gap-2">
+              <div {...stylex.attrs(viewStyles.pixelCardStoriesDiv2)}>
                 <For each={SpeciesValues}>{(s) => <AnimalFace atlas={atlas()} look={`${s}-farmer`} size={a.size} />}</For>
               </div>
             )}

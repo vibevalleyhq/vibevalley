@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,13 +15,321 @@ import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { FarmSearch, Members, Pins, ThreadList, ThreadPane } from "./ChannelPanels";
-import { channelHeadClass, channelIconButtonClass, markOf, Sidebar } from "./ChannelSidebar";
+import { markOf, Sidebar } from "./ChannelSidebar";
 import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "./places";
 import { Crons, Sessions } from "./Tabs";
+
+const recipeStyles2 = stylex.create({
+  chatDiv: {
+    position: "absolute",
+    insetBlock: "0",
+    left: "0",
+    display: "flex",
+    width: "calc(var(--spacing) * 72)",
+    boxShadow: "var(--shadow-float)",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".28s",
+    translate: {
+      default: null,
+      "@starting-style": "-100% 0",
+    },
+  },
+  chatDiv2: {
+    position: {
+      default: "absolute",
+      "@media (width>=64rem)": "relative",
+    },
+    inset: "0",
+    zIndex: {
+      default: 20,
+      "@media (width>=64rem)": "auto",
+    },
+    display: "flex",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".18s",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "var(--pane-w)",
+    },
+    flexShrink: {
+      default: null,
+      "@media (width>=64rem)": "0",
+    },
+    translate: {
+      default: null,
+      "@starting-style": "100% 0",
+    },
+  },
+});
+
+const recipeStyles = stylex.create({
+  channelMainHeader: {
+    display: "flex",
+    height: "66px",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+  },
+  channelMainButton: {
+    display: {
+      default: "inline-flex",
+      "@media (width>=48rem)": "none",
+    },
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelMainButton2: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelMainButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  channelMainButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-selected)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  channelMainButton3: {
+    display: {
+      default: "inline-flex",
+      "@media not all and (width>=48rem)": "none",
+    },
+    width: "auto",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelMainButton4: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  chatDiv: {
+    position: "relative",
+    display: "flex",
+    height: "100%",
+    overflow: "hidden",
+  },
+  chatDiv2: {
+    display: {
+      default: "none",
+      "@media (width>=48rem)": "flex",
+    },
+    width: "calc(var(--spacing) * 72)",
+    flexShrink: "0",
+  },
+  chatDiv3: {
+    position: "absolute",
+    inset: "0",
+    zIndex: "30",
+    display: {
+      default: null,
+      "@media (width>=48rem)": "none",
+    },
+  },
+  chatDiv4: {
+    position: "absolute",
+    inset: "0",
+    backgroundColor: "var(--color-scrim)",
+  },
+  chatDiv5: {
+    display: {
+      default: "none",
+      "@media (width>=64rem)": "block",
+    },
+  },
+  chatDiv6: {
+    position: {
+      default: "absolute",
+      "@media (width>=64rem)": "relative",
+    },
+    inset: "0",
+    zIndex: {
+      default: "20",
+      "@media (width>=64rem)": "auto",
+    },
+    display: "flex",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "520px",
+    },
+    flexShrink: {
+      default: null,
+      "@media (width>=64rem)": "0",
+    },
+  },
+  channelMainSection: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  channelMainSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--color-selected)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  channelMainH1: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  channelMainP: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  channelMainLabel: {
+    display: "flex",
+    height: "calc(var(--spacing) * 8)",
+    width: "calc(var(--spacing) * 48)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  messageSearch: {
+    minWidth: "0",
+    flex: "1",
+    backgroundColor: "transparent",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--color-faint)",
+    },
+  },
+  channelMainDiv: {
+    position: "relative",
+  },
+  channelMainDiv2: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+  },
+});
+
+const styles = stylex.create({
+  tabs: { flexShrink: 0, borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "calc(var(--spacing) * 3)" },
+});
 
 /** /chat is the general; /chat/<id> a channel, or a thread shown beside its channel. */
 export function ChatPage() {
@@ -67,12 +376,12 @@ function Chat() {
     <Sidebar channel={channel()} thread={thread()} onNew={() => setCreating(true)} onSearch={() => setSearching(true)} onPick={() => setDrawer(false)} />
   );
   return (
-    <div class="relative flex h-full overflow-hidden">
-      <div class="hidden w-72 shrink-0 md:flex">{sidebar()}</div>
+    <div {...stylex.attrs(viewStyles.chatDiv)}>
+      <div {...stylex.attrs(viewStyles.chatDiv2)}>{sidebar()}</div>
       <Show when={drawer()}>
-        <div class="absolute inset-0 z-30 md:hidden">
-          <div class="absolute inset-0 bg-scrim" onClick={() => setDrawer(false)} />
-          <div class="absolute inset-y-0 left-0 flex w-72 shadow-float transition-transform duration-280 starting:-translate-x-full">{sidebar()}</div>
+        <div {...stylex.attrs(viewStyles.chatDiv3)}>
+          <div {...stylex.attrs(viewStyles.chatDiv4)} onClick={() => setDrawer(false)} />
+          <div {...stylex.attrs(recipeStyles2.chatDiv)}>{sidebar()}</div>
         </div>
       </Show>
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
@@ -92,11 +401,8 @@ function Chat() {
       </Show>
       <Show when={thread()}>
         {(shown) => (
-          <div
-            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0 starting:translate-x-full"
-            style={{ "--pane-w": `${threadWidth()}px` }}
-          >
-            <div class="hidden lg:block">
+          <div {...stylex.attrs(recipeStyles2.chatDiv2)} style={{ "--pane-w": `${threadWidth()}px` }}>
+            <div {...stylex.attrs(viewStyles.chatDiv5)}>
               <Splitter pane="thread" side="left" width={threadWidth()} min={320} max={720} label={t("web.channel.threadWidth")} />
             </div>
             <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
@@ -105,7 +411,7 @@ function Chat() {
       </Show>
       <Show when={artifact()}>
         {(id) => (
-          <div class="absolute inset-0 z-20 flex border-l border-line bg-page lg:relative lg:z-auto lg:w-[520px] lg:shrink-0">
+          <div {...stylex.attrs(viewStyles.chatDiv6)}>
             <ArtifactCanvas id={id()} onClose={closeArtifact} onQuote={(block) => quote(id(), block)} />
           </div>
         )}
@@ -144,22 +450,22 @@ function ChannelMain(props: {
   const about = () =>
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
-    <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
-      <header data-testid="channel-head" data-key={props.channel?.id} class={[channelHeadClass, "gap-3 px-4"]}>
-        <button type="button" class={[channelIconButtonClass, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
+    <section {...stylex.attrs(viewStyles.channelMainSection)} aria-label={channelLabel(props.channel)}>
+      <header data-testid="channel-head" data-key={props.channel?.id} {...stylex.attrs(recipeStyles.channelMainHeader)}>
+        <button type="button" {...stylex.attrs(recipeStyles.channelMainButton)} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={20} />
         </button>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-selected text-lg font-semibold text-muted">{markOf(props.channel)}</span>
-        <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
+        <span {...stylex.attrs(viewStyles.channelMainSpan)}>{markOf(props.channel)}</span>
+        <div {...stylex.attrs(viewStyles.channelMainSection)}>
+          <h1 {...stylex.attrs(viewStyles.channelMainH1)} title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
-            <p class="truncate text-xs text-muted">{about()}</p>
+            <p {...stylex.attrs(viewStyles.channelMainP)}>{about()}</p>
           </Show>
         </div>
         <Show when={search() !== undefined}>
-          <label class="flex h-8 w-48 items-center gap-1.5 rounded-md border border-line px-2 focus-within:border-focus">
+          <label {...stylex.attrs(viewStyles.channelMainLabel)}>
             <Icon name="search" size={14} />
             <input
               ref={autofocus()}
@@ -169,13 +475,16 @@ function ChannelMain(props: {
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
               placeholder={t("web.channel.findHint")}
               aria-label={t("web.channel.find")}
-              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+              {...stylex.attrs(viewStyles.messageSearch)}
             />
           </label>
         </Show>
         <button
           type="button"
-          class={[channelIconButtonClass, { "bg-selected": search() !== undefined }]}
+          {...stylex.attrs(
+            recipeStyles.channelMainButton2,
+            search() !== undefined ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+          )}
           data-testid="message-search-toggle"
           aria-label={t("web.channel.findMessages")}
           aria-pressed={aria(search() !== undefined)}
@@ -189,10 +498,13 @@ function ChannelMain(props: {
         </button>
         <Show when={props.channel?.type === "channel" ? props.channel : undefined}>
           {(c) => (
-            <div class="relative">
+            <div {...stylex.attrs(viewStyles.channelMainDiv)}>
               <button
                 type="button"
-                class={[channelIconButtonClass, { "bg-selected": threadsOpen() }]}
+                {...stylex.attrs(
+                  recipeStyles.channelMainButton2,
+                  threadsOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+                )}
                 data-testid="threads-toggle"
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
@@ -207,10 +519,13 @@ function ChannelMain(props: {
             </div>
           )}
         </Show>
-        <div class="relative">
+        <div {...stylex.attrs(viewStyles.channelMainDiv)}>
           <button
             type="button"
-            class={[channelIconButtonClass, { "bg-selected": pinsOpen() }]}
+            {...stylex.attrs(
+              recipeStyles.channelMainButton2,
+              pinsOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+            )}
             data-testid="pins-toggle"
             aria-label={t("web.channel.pins.open")}
             aria-expanded={aria(pinsOpen())}
@@ -225,7 +540,10 @@ function ChannelMain(props: {
         <button
           type="button"
           // The members panel is beside the list, which a phone has no room for.
-          class={[channelIconButtonClass, "w-auto px-2 text-sm max-md:hidden", { "bg-selected": membersOpen() }]}
+          {...stylex.attrs(
+            recipeStyles.channelMainButton3,
+            membersOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+          )}
           data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
@@ -235,7 +553,7 @@ function ChannelMain(props: {
         </button>
         <button
           type="button"
-          class={channelIconButtonClass}
+          {...stylex.attrs(recipeStyles.channelMainButton4)}
           data-testid="channel-settings-open"
           aria-label={t("web.channel.settings")}
           title={t("web.channel.settings")}
@@ -255,10 +573,10 @@ function ChannelMain(props: {
           label: e.label,
           icon: e.icon,
         }))}
-        class="shrink-0 border-b border-line px-3"
+        styles={styles.tabs}
       />
       <Show when={tab() === "chat"}>
-        <div class="flex min-h-0 flex-1">
+        <div {...stylex.attrs(viewStyles.channelMainDiv2)}>
           <FileDrop channel={props.channel}>
             <MessageList
               channel={props.channel}

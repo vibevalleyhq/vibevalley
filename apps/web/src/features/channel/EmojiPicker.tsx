@@ -1,9 +1,72 @@
 import { Portal } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { For, onSettled, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, ownerId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
+
+const recipeStyles = stylex.create({
+  emojiPickerDiv: {
+    position: "fixed",
+    zIndex: 30,
+    display: "flex",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 2)",
+    color: "var(--wb-ink)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
+const viewStyles = stylex.create({
+  emojiPickerP: {
+    paddingInline: "var(--spacing)",
+    paddingBottom: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  emojiPickerDiv: {
+    display: "grid",
+    gridTemplateColumns: "repeat(8,minmax(0,1fr))",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  emojiPickerButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-sm)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+});
 
 /** What pressing an emoji on a message asks for: the owner's reaction off when it is on the message now, else on. */
 export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(ownerId) ?? false);
@@ -265,13 +328,13 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
         data-testid="emoji-picker"
         aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
-        class="fixed z-30 flex animate-pop-in flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
+        {...stylex.attrs(recipeStyles.emojiPickerDiv)}
       >
         <For each={groups}>
           {(g) => (
             <section aria-label={groupName(g.id)}>
-              <p class="px-1 pb-1 text-xs font-semibold text-muted">{groupName(g.id)}</p>
-              <div class="grid grid-cols-8 gap-0.5">
+              <p {...stylex.attrs(viewStyles.emojiPickerP)}>{groupName(g.id)}</p>
+              <div {...stylex.attrs(viewStyles.emojiPickerDiv)}>
                 <For each={g.emoji}>
                   {(e) => (
                     <button
@@ -281,7 +344,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
                       // Keeps the focus, and with it a box's caret, where it was.
                       onMouseDown={(ev) => ev.preventDefault()}
                       onClick={() => props.onPick(e)}
-                      class="inline-flex size-8 cursor-pointer items-center justify-center rounded font-sans text-lg hover:bg-hover"
+                      {...stylex.attrs(viewStyles.emojiPickerButton)}
                     >
                       {e}
                     </button>

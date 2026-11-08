@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { Combobox } from "@vibevalley/base-ui";
@@ -17,6 +18,82 @@ import { Dialog } from "#/ui/Dialog.tsx";
 
 import { chatPath, type SwitchTarget, switchTargets } from "./places";
 import { Count } from "./presence";
+
+const variantStyles2 = stylex.create({
+  switcherBodyComboboxInput: {
+    height: "calc(var(--spacing) * 10)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":focus": "var(--color-focus)",
+    },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    outlineStyle: "none",
+  },
+  switcherBodyComboboxPopup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  switcherBodyComboboxEmpty: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  switcherBodyComboboxItem: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    backgroundColor: {
+      default: null,
+      ":is([data-highlighted])": "var(--color-selected)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  switcherBodySpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  switcherBodySpanVariant: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  switcherBodySpanVariant2: {},
+});
+
+const viewStyles = stylex.create({
+  switcherBodyDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  switcherBodySpan: {
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+});
 
 const shown = defineAtom(false);
 
@@ -67,16 +144,16 @@ function SwitcherBody(props: { onClose: () => void }) {
   };
   return (
     <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>
-      <div class="flex flex-col gap-2">
+      <div {...stylex.attrs(viewStyles.switcherBodyDiv)}>
         <Combobox.Input
           ref={autofocus()}
           data-testid="switcher-input"
           aria-label={t("web.channel.switcher.title")}
           placeholder={t("web.channel.switcher.hint")}
-          class="h-10 rounded-md border border-line bg-page px-3 text-base outline-none focus:border-focus"
+          {...stylex.attrs(variantStyles2.switcherBodyComboboxInput)}
         />
-        <Combobox.Popup aria-label={t("web.channel.switcher.title")} class="flex flex-col gap-0.5">
-          <Combobox.Empty class="px-2 py-2 text-sm text-muted">{t("web.channel.switcher.none")}</Combobox.Empty>
+        <Combobox.Popup aria-label={t("web.channel.switcher.title")} {...stylex.attrs(variantStyles2.switcherBodyComboboxPopup)}>
+          <Combobox.Empty {...stylex.attrs(variantStyles2.switcherBodyComboboxEmpty)}>{t("web.channel.switcher.none")}</Combobox.Empty>
           <For each={targets()} keyed={(t) => `${t.kind}:${t.id}`}>
             {(t) => (
               <Combobox.Item
@@ -88,10 +165,17 @@ function SwitcherBody(props: { onClose: () => void }) {
                   e.preventDefault();
                   go(t());
                 }}
-                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 data-highlighted:bg-selected"
+                {...stylex.attrs(variantStyles2.switcherBodyComboboxItem)}
               >
-                <span class={["min-w-0 flex-1 truncate text-sm", { "font-semibold": t().unread > 0 }]}>{t().label}</span>
-                <span class="shrink-0 truncate text-xs text-muted">{t().hint}</span>
+                <span
+                  {...stylex.attrs(
+                    variantStyles.switcherBodySpan,
+                    t().unread > 0 ? variantStyles.switcherBodySpanVariant : variantStyles.switcherBodySpanVariant2,
+                  )}
+                >
+                  {t().label}
+                </span>
+                <span {...stylex.attrs(viewStyles.switcherBodySpan)}>{t().hint}</span>
                 <Show when={t().unread > 0}>
                   <Count n={t().unread} />
                 </Show>

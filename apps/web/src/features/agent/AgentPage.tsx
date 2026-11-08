@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -21,6 +22,270 @@ import { ConfigTabs, supportOf } from "./AgentConfig";
 import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
+
+const recipeStyles = stylex.create({
+  creatorDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: {
+      default: "auto",
+      "@media (width>=64rem)": "hidden",
+    },
+    paddingTop: "calc(var(--spacing) * 3)",
+    overflowX: {
+      default: null,
+      "@media (width>=64rem)": "hidden",
+    },
+  },
+});
+
+const variantStyles3 = stylex.create({
+  problemsIcon: {
+    marginTop: "var(--spacing)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  agentPageA: {
+    textDecorationLine: "underline",
+  },
+  creatorA: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  creatorSpan: {
+    flexShrink: "0",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  creatorSpanVariant: {
+    backgroundColor: "var(--color-hat)",
+    color: "var(--color-bark-900)",
+  },
+  creatorSpanVariant2: {
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
+  },
+  creatorDiv: {
+    display: "flex",
+    minHeight: "calc(var(--spacing) * 104)",
+    flex: "1",
+    flexDirection: "column",
+    overflow: "hidden",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+  },
+  creatorButton: {
+    height: "calc(var(--spacing) * 6)",
+    cursor: "pointer",
+    borderRadius: "2147483647px",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  creatorButtonVariant: {
+    backgroundColor: "var(--color-ink)",
+    color: "var(--color-page)",
+  },
+  creatorButtonVariant2: {
+    backgroundColor: {
+      default: "var(--color-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-selected)",
+      },
+    },
+  },
+  problemsLi: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  problemsLiVariant: {
+    color: "var(--color-berry)",
+  },
+  problemsLiVariant2: {
+    color: "var(--color-warn-ink)",
+  },
+});
+
+const viewStyles = stylex.create({
+  agentPageP: {
+    padding: "calc(var(--spacing) * 8)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  profileBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+  },
+  barSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-faint)",
+  },
+  barSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  barSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  barSpan4: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  creatorDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+  },
+  creatorDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  creatorButton: {
+    cursor: "pointer",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  creatorSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  creatorDiv3: {
+    minHeight: "0",
+    flex: "1",
+  },
+  creatorDiv4: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: "column",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+  },
+  creatorDiv5: {
+    flexShrink: "0",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    padding: "calc(var(--spacing) * 4)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 76)",
+    },
+    overflowY: {
+      default: null,
+      "@media (width>=64rem)": "auto",
+    },
+  },
+  creatorDiv6: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  creatorDiv7: {
+    display: "flex",
+    flexShrink: "0",
+    flexDirection: "column",
+    overflow: "hidden",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 108)",
+    },
+  },
+  problemsP: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-ok-ink)",
+  },
+  problemsUl: {
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 40)",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    overflowY: "auto",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+  },
+});
 
 function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
   const info = catalog.find((r) => r.id === runtime);
@@ -58,21 +323,21 @@ export function AgentPage(props: { id: string }) {
     <Switch>
       <Match when={agents.error()}>
         {(e) => (
-          <p class="p-8 text-sm text-muted">
+          <p {...stylex.attrs(viewStyles.agentPageP)}>
             {t("web.agent.noProfiles")}
             {reasonOf(e())}
           </p>
         )}
       </Match>
       <Match when={!loaded() || (isNew() && !ready(runtimes, undefined))}>
-        <p class="p-8 text-sm text-muted">
+        <p {...stylex.attrs(viewStyles.agentPageP)}>
           {isNew() && runtimes.error() ? t("web.agent.noRuntimes", { why: reasonOf(runtimes.error()) }) : t("web.agent.loading")}
         </p>
       </Match>
       <Match when={!isNew() && !saved()}>
-        <p data-testid="agent-missing" class="p-8 text-sm text-muted">
+        <p data-testid="agent-missing" {...stylex.attrs(viewStyles.agentPageP)}>
           {t("web.agent.noSuch")}
-          <A href="/agents" class="underline">
+          <A href="/agents" {...stylex.attrs(variantStyles2.agentPageA)}>
             {t("web.agent.backToAll")}
           </A>
         </p>
@@ -117,22 +382,18 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   };
 
   const bar = () => (
-    <div
-      data-testid="profile-bar"
-      data-state={isNew ? "new" : dirty() ? "dirty" : "saved"}
-      class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3"
-    >
-      <A href="/agents" data-testid="back" class="text-sm text-muted hover:underline">
+    <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(viewStyles.profileBar)}>
+      <A href="/agents" data-testid="back" {...stylex.attrs(variantStyles2.creatorA)}>
         {t("web.agent.all")}
       </A>
-      <span class="text-sm text-faint">/</span>
-      <span class="flex min-w-0 flex-1 items-center gap-3">
-        <span class="truncate text-lg font-semibold">{draft().name || t("web.agent.unnamed")}</span>
-        <span class={["shrink-0 rounded px-1.5 text-xs", isNew || dirty() ? "bg-hat text-bark-900" : "bg-hover text-muted"]}>
+      <span {...stylex.attrs(viewStyles.barSpan)}>/</span>
+      <span {...stylex.attrs(viewStyles.barSpan2)}>
+        <span {...stylex.attrs(viewStyles.barSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
+        <span {...stylex.attrs(variantStyles.creatorSpan, isNew || dirty() ? variantStyles.creatorSpanVariant : variantStyles.creatorSpanVariant2)}>
           {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
         </span>
       </span>
-      <span class="flex flex-wrap items-center gap-2">
+      <span {...stylex.attrs(viewStyles.barSpan4)}>
         <Show when={props.saved}>
           {(saved) => (
             <>
@@ -167,39 +428,39 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
     <Show
       when={!trajectories()}
       fallback={
-        <div class="flex h-full min-h-0 flex-col gap-3 px-4 pb-4">
+        <div {...stylex.attrs(viewStyles.creatorDiv)}>
           {bar()}
-          <div class="flex items-center gap-3">
-            <button type="button" class="cursor-pointer text-sm text-muted hover:underline" onClick={() => setTrajectories(false)}>
+          <div {...stylex.attrs(viewStyles.creatorDiv2)}>
+            <button type="button" {...stylex.attrs(viewStyles.creatorButton)} onClick={() => setTrajectories(false)}>
               {t("web.agent.backToProfile")}
             </button>
-            <span class="text-sm font-semibold" title={t("web.agent.trajectoriesHint")}>
+            <span {...stylex.attrs(viewStyles.creatorSpan)} title={t("web.agent.trajectoriesHint")}>
               {t("web.agent.trajectories")}
             </span>
           </div>
-          <div class="min-h-0 flex-1">
+          <div {...stylex.attrs(viewStyles.creatorDiv3)}>
             <TrajectoryList agent={draft().id} />
           </div>
         </div>
       }
     >
-      <div class="flex h-full min-h-0 flex-col px-4 pb-4">
+      <div {...stylex.attrs(viewStyles.creatorDiv4)}>
         {bar()}
         <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
-        <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-3 lg:flex-row lg:overflow-hidden">
-          <div class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-76 lg:overflow-y-auto">
+        <div {...stylex.attrs(recipeStyles.creatorDiv)}>
+          <div {...stylex.attrs(viewStyles.creatorDiv5)}>
             <LookPanel draft={draft()} onChange={(look) => setDraft({ ...draft(), look })} />
           </div>
-          <div class="flex min-h-104 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-page">
+          <div {...stylex.attrs(variantStyles.creatorDiv)}>
             <Stage draft={draft()} pose={pose()} />
-            <div class="flex flex-wrap justify-center gap-1.5 p-3">
+            <div {...stylex.attrs(viewStyles.creatorDiv6)}>
               <For each={stagePoses}>
                 {(p) => (
                   <button
                     type="button"
                     aria-pressed={aria(pose() === p.pose)}
                     onClick={() => setPose(p.pose)}
-                    class={["h-6 cursor-pointer rounded-full px-2.5 text-xs", pose() === p.pose ? "bg-ink text-page" : "bg-hover hover:bg-selected"]}
+                    {...stylex.attrs(variantStyles.creatorButton, pose() === p.pose ? variantStyles.creatorButtonVariant : variantStyles.creatorButtonVariant2)}
                   >
                     {p.label}
                   </button>
@@ -207,7 +468,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
               </For>
             </div>
           </div>
-          <div class="flex shrink-0 flex-col overflow-hidden rounded-lg border border-line bg-page lg:w-108">
+          <div {...stylex.attrs(viewStyles.creatorDiv7)}>
             <ConfigTabs
               draft={draft()}
               runtime={runtime()}
@@ -244,17 +505,17 @@ function Problems(props: { problems: AgentProblem[] }) {
     <Show
       when={props.problems.length > 0}
       fallback={
-        <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-ok-ink">
+        <p {...stylex.attrs(viewStyles.problemsP)}>
           <Icon name="check" size={12} />
           {t("web.agent.fine")}
         </p>
       }
     >
-      <ul aria-label={t("web.agent.problems")} class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
+      <ul aria-label={t("web.agent.problems")} {...stylex.attrs(viewStyles.problemsUl)}>
         <For each={props.problems}>
           {(i) => (
-            <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-warn-ink"]}>
-              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} class="mt-1" />
+            <li {...stylex.attrs(variantStyles.problemsLi, i.level === "error" ? variantStyles.problemsLiVariant : variantStyles.problemsLiVariant2)}>
+              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} styles={[variantStyles3.problemsIcon]} />
               {i.level === "error" ? t("web.agent.cannot") : ""}
               {i.text}
             </li>

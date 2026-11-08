@@ -1,12 +1,79 @@
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { Popover } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "#/ui/Button.tsx";
+import { positionerAttrs } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
+
+const recipeStyles = stylex.create({
+  displayMenuPopoverPopup: {
+    width: "min(340px,100vw - 24px)",
+    transformOrigin: "100% 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 3)",
+    boxShadow: "var(--shadow-float)",
+    outlineStyle: "none",
+  },
+});
+
+const viewStyles = stylex.create({
+  displayMenuDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  displayMenuSpan: {
+    width: "calc(var(--spacing) * 10)",
+    flexShrink: "0",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  displayMenuDiv2: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  displayMenuP: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--leading-relaxed)",
+    whiteSpace: "pre-line",
+    color: "var(--color-muted)",
+  },
+  displayReset: {
+    marginTop: "calc(var(--spacing) * 2)",
+    cursor: "pointer",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
 
 /** Display: a small panel under its button with how the list groups and how both views order. */
 export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) => void }) {
@@ -23,14 +90,10 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
         {t("web.issue.display.show")}
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner align="end" sideOffset={6} class="z-30">
-          <Popover.Popup
-            aria-label={t("web.issue.display.show")}
-            data-testid="display-menu"
-            class="w-[min(340px,calc(100vw-24px))] origin-top-right animate-pop-in rounded-lg border border-line bg-page p-3 shadow-float outline-none"
-          >
-            <div class="flex items-center gap-2">
-              <span class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.group")}</span>
+        <Popover.Positioner {...positionerAttrs()} align="end" sideOffset={6}>
+          <Popover.Popup aria-label={t("web.issue.display.show")} data-testid="display-menu" {...stylex.attrs(recipeStyles.displayMenuPopoverPopup)}>
+            <div {...stylex.attrs(viewStyles.displayMenuDiv)}>
+              <span {...stylex.attrs(viewStyles.displayMenuSpan)}>{t("web.issue.display.group")}</span>
               <Segmented
                 label={t("web.issue.display.group")}
                 testid="grouping"
@@ -40,8 +103,8 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
                 options={groupings.map((g) => ({ value: g, label: groupingLabel[g] }))}
               />
             </div>
-            <div class="mt-2.5 flex items-center gap-2">
-              <span class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.order")}</span>
+            <div {...stylex.attrs(viewStyles.displayMenuDiv2)}>
+              <span {...stylex.attrs(viewStyles.displayMenuSpan)}>{t("web.issue.display.order")}</span>
               <Segmented
                 label={t("web.issue.display.order")}
                 testid="ordering"
@@ -52,14 +115,14 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
               />
             </div>
             <Show when={notes().length > 0}>
-              <p class="mt-2.5 text-xs leading-relaxed whitespace-pre-line text-muted">{notes().join("\n")}</p>
+              <p {...stylex.attrs(viewStyles.displayMenuP)}>{notes().join("\n")}</p>
             </Show>
             <Show when={changed()}>
               <button
                 type="button"
                 data-testid="display-reset"
                 onClick={() => props.onChange({ ...props.look, grouping: defaultLook.grouping, ordering: defaultLook.ordering })}
-                class="mt-2 cursor-pointer text-sm text-water hover:underline"
+                {...stylex.attrs(viewStyles.displayReset)}
               >
                 {t("web.issue.display.reset")}
               </button>

@@ -1,8 +1,25 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { RuntimeBadge } from "./RuntimeBadge";
+
+const viewStyles = stylex.create({
+  runtimeBadgeStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  runtimeBadgeStoriesSpan: {
+    position: "relative",
+    display: "inline-block",
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hover)",
+  },
+});
 
 const runtimes = ["claude", "codex", "pi", "cursor", "opencode", "kimi", "grok", "antigravity", "dsh", "unknown"];
 
@@ -14,10 +31,10 @@ export default stories({
       args: { size: 16 },
       controls: { size: { kind: "number", min: 10, max: 24 } },
       render: (a) => (
-        <div class="flex flex-wrap gap-4">
+        <div {...stylex.attrs(viewStyles.runtimeBadgeStoriesDiv)}>
           <For each={runtimes}>
             {(runtime) => (
-              <span class="relative inline-block size-10 rounded-sm bg-hover">
+              <span {...stylex.attrs(viewStyles.runtimeBadgeStoriesSpan)}>
                 <RuntimeBadge runtime={runtime} size={a.size} />
               </span>
             )}

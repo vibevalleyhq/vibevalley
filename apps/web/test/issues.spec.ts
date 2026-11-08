@@ -14,8 +14,19 @@ test("native parent issues show child navigation and can merge without a parent 
   const repo = await api.repo.create({ name: "native-family" });
   const parent = await api.issue.create({ title: "父子工单验收", repo: repo.name, agent: "docs" });
   await api.issue.split({ id: parent.id, tasks: [{ id: "clock", brief: "写打卡并提交", check: "test -f clock.ts" }] });
-  await expect.poll(async () => (await api.issue.get({ id: parent.id })).status).toBe("in_review");
   const child = (await api.issue.history.list()).find((row) => row.issue.parent === parent.id)!.issue;
+  await test.step("Prepare a checked child merged into its parent", async () => {
+    await expect
+      .poll(
+        async () => {
+          const current = await api.issue.get({ id: child.id });
+          return { status: current.status, delivered: current.delivered };
+        },
+        { timeout: 20_000 },
+      )
+      .toEqual({ status: "done", delivered: "merged_into_parent" });
+  });
+  await expect.poll(async () => (await api.issue.get({ id: parent.id })).status).toBe("in_review");
   await page.goto("/issues");
   await expect(card(lane(page, "waiting"), parent.id)).toBeVisible();
   await card(lane(page, "waiting"), parent.id).click();

@@ -1,28 +1,137 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { For, omit } from "solid-js";
 
 import { Select as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
+import { positionerAttrs, styleProps } from "./positioner";
 import { Hint } from "./Tip";
 
-const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
+const styles = stylex.create({
+  box: {
+    width: "100%",
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus": "var(--color-focus)" },
+    backgroundColor: "var(--color-page)",
+    paddingLeft: "calc(var(--spacing) * 2.5)",
+    paddingRight: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: { default: null, "::placeholder": "var(--color-faint)" },
+  },
+  input: { height: "calc(var(--spacing) * 8)" },
+  textarea: { resize: "vertical" },
+  label: { display: "flex", flexDirection: "column", gap: "var(--spacing)" },
+  caption: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-muted)",
+  },
+  trigger: {
+    display: "flex",
+    minWidth: 0,
+    cursor: { default: "pointer", ":disabled": "default" },
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    textAlign: "left",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    opacity: { default: null, ":disabled": 0.5 },
+  },
+  control: { height: "calc(var(--spacing) * 7)", paddingInline: "calc(var(--spacing) * 2)" },
+  field: { height: "calc(var(--spacing) * 8)", paddingInline: "calc(var(--spacing) * 2.5)" },
+  quiet: {
+    borderColor: {
+      default: "transparent",
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-line)" },
+      ":is([data-popup-open])": "var(--color-line)",
+    },
+    backgroundColor: {
+      default: "transparent",
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-page)" },
+      ":is([data-popup-open])": "var(--color-page)",
+    },
+  },
+  filter: {
+    borderColor: "color-mix(in oklab, var(--color-accent) 40%, transparent)",
+    backgroundColor: {
+      default: "color-mix(in oklab, var(--color-accent) 8%, transparent)",
+      "@media (hover: hover)": { default: null, ":hover": "color-mix(in oklab, var(--color-accent) 12%, transparent)" },
+    },
+  },
+  normal: {
+    borderColor: { default: "var(--color-line)", ":is([data-popup-open])": "var(--color-focus)" },
+    backgroundColor: { default: "var(--color-page)", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
+  },
+  value: { minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  chevron: { flexShrink: 0, color: "var(--color-muted)" },
+  popup: {
+    maxHeight: "calc(var(--spacing) * 72)",
+    minWidth: "var(--anchor-width)",
+    transformOrigin: "top",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "280ms",
+    animationTimingFunction: "var(--ease-out)",
+    animationFillMode: "both",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    padding: "var(--spacing)",
+    boxShadow: "var(--shadow-float)",
+    outlineStyle: "none",
+  },
+  item: {
+    display: "flex",
+    height: "calc(var(--spacing) * 7)",
+    cursor: { default: "pointer", ":is([data-disabled])": "default" },
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    opacity: { default: null, ":is([data-disabled])": 0.5 },
+    backgroundColor: { default: null, ":is([data-highlighted])": "var(--color-hover)" },
+    fontWeight: { default: null, ":is([data-selected])": "var(--font-weight-medium)" },
+  },
+  indicator: { display: "flex", flexShrink: 0, color: "var(--color-accent)" },
+});
 
-export function TextInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
-  const rest = omit(props, "class");
-  return <input {...rest} class={[box, "h-8", props.class]} />;
+type ControlAppearance = { styles?: stylex.StyleXStyles; style?: JSX.CSSProperties | undefined };
+export type TextInputProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "class" | "style"> & ControlAppearance;
+
+export function TextInput(props: TextInputProps) {
+  const rest = omit(props, "styles", "style");
+  return <input {...rest} {...styleProps([styles.box, styles.input, props.styles], props.style)} />;
 }
 
-export function TextArea(props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const rest = omit(props, "class");
-  return <textarea {...rest} class={[box, "resize-y", props.class]} />;
+export function TextArea(props: Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "class" | "style"> & ControlAppearance) {
+  const rest = omit(props, "styles", "style");
+  return <textarea {...rest} {...styleProps([styles.box, styles.textarea, props.styles], props.style)} />;
 }
 
 /** A label over its control; what it means is behind an info icon beside the label. */
 export function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
-    <label class="flex flex-col gap-1">
-      <span class="flex items-center gap-1.5 text-xs font-medium text-muted">
+    <label {...stylex.attrs(styles.label)}>
+      <span {...stylex.attrs(styles.caption)}>
         {props.label}
         {props.hint && <Hint text={props.hint} />}
       </span>
@@ -39,7 +148,7 @@ export function Select<V extends string>(props: {
   placeholder?: ("" extends V ? string : never) | undefined;
   label: string;
   /** Placement only: width, margins. */
-  class?: string;
+  styles?: stylex.StyleXStyles;
   testid?: string | undefined;
   quiet?: boolean;
   /** A filter that narrows: tinted while a value other than "" is chosen. */
@@ -60,33 +169,24 @@ export function Select<V extends string>(props: {
         data-state={props.state}
         aria-busy={props.state === "pending" ? "true" : undefined}
         aria-label={props.label}
-        class={[
-          "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left text-sm outline-none disabled:cursor-default disabled:opacity-50",
-          props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
-          props.quiet === true
-            ? "border-transparent bg-transparent hover:border-line hover:bg-page data-popup-open:border-line data-popup-open:bg-page"
-            : props.filter === true && props.value !== ""
-              ? "border-accent/40 bg-accent/8 hover:bg-accent/12"
-              : "border-line bg-page hover:bg-hover data-popup-open:border-focus",
-          props.class,
-        ]}
+        {...styleProps([
+          styles.trigger,
+          props.size === "control" ? styles.control : styles.field,
+          props.quiet === true ? styles.quiet : props.filter === true && props.value !== "" ? styles.filter : styles.normal,
+          props.styles,
+        ])}
       >
-        <Base.Value class="min-w-0 flex-1 truncate" placeholder={props.placeholder} />
-        <Icon name="choose" size={12} class="shrink-0 text-muted" />
+        <Base.Value class={stylex.attrs(styles.value).class} placeholder={props.placeholder} />
+        <Icon name="choose" size={12} styles={styles.chevron} />
       </Base.Trigger>
       <Base.Portal>
-        <Base.Positioner class="z-30" sideOffset={4}>
-          <Base.Popup class="max-h-72 min-w-(--anchor-width) origin-top animate-pop-in overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float outline-none">
+        <Base.Positioner {...positionerAttrs()} sideOffset={4}>
+          <Base.Popup class={stylex.attrs(styles.popup).class}>
             <For each={all()}>
               {(o) => (
-                <Base.Item
-                  value={o.value}
-                  data-key={o.value}
-                  disabled={o.disabled}
-                  class="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-sm outline-none data-disabled:cursor-default data-disabled:opacity-50 data-highlighted:bg-hover data-selected:font-medium"
-                >
-                  <span class="min-w-0 flex-1 truncate">{o.label}</span>
-                  <Base.ItemIndicator class="flex shrink-0 text-accent">
+                <Base.Item value={o.value} data-key={o.value} disabled={o.disabled} class={stylex.attrs(styles.item).class}>
+                  <span {...stylex.attrs(styles.value)}>{o.label}</span>
+                  <Base.ItemIndicator class={stylex.attrs(styles.indicator).class}>
                     <Icon name="ticked" size={14} />
                   </Base.ItemIndicator>
                 </Base.Item>

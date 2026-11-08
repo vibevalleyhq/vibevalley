@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,6 +9,52 @@ import { ready, useAgents, useSprites } from "#/infra/query.ts";
 
 import { castPrefix } from "./cast";
 import { RuntimeBadge } from "./RuntimeBadge";
+
+const viewStyles = stylex.create({
+  agentFaceWrap: {
+    position: "relative",
+    display: "inline-block",
+    flexShrink: "0",
+  },
+  agentFaceBox: {
+    position: "relative",
+    display: "block",
+    height: "100%",
+    width: "100%",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-px-leaf-wash)",
+  },
+  agentFaceMuted: {
+    opacity: ".6",
+    filter: "grayscale(100%)",
+  },
+  agentFaceImg: {
+    position: "absolute",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  orchestratorFaceSpan: {
+    position: "relative",
+    display: "inline-block",
+    flexShrink: "0",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "#cfe6f5",
+  },
+  ownerFaceSpan: {
+    display: "inline-flex",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-selected)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+});
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */
 export function AgentFace(props: { agentId: string; runtime?: string | undefined; look?: Look | undefined; size?: number; muted?: boolean | undefined }) {
@@ -25,18 +72,15 @@ export function AgentFace(props: { agentId: string; runtime?: string | undefined
     return { name, left: size() / 2 - cx * k, top: size() / 2 - cy * k, width: sp.w * k, height: sp.h * k };
   };
   return (
-    <span class="relative inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }}>
-      <span
-        class={["relative block h-full w-full overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !(props.muted !== true) }]}
-        aria-hidden="true"
-      >
+    <span {...stylex.attrs(viewStyles.agentFaceWrap)} style={{ width: `${size()}px`, height: `${size()}px` }}>
+      <span {...stylex.attrs(viewStyles.agentFaceBox, props.muted === true && viewStyles.agentFaceMuted)} aria-hidden="true">
         <Show when={cut()}>
           {(c) => (
             <img
               src={`/pixel/${c().name}.png`}
               alt=""
               draggable="false"
-              class="absolute max-w-none [image-rendering:pixelated]"
+              {...stylex.attrs(viewStyles.agentFaceImg)}
               style={{ left: `${c().left}px`, top: `${c().top}px`, width: `${c().width}px`, height: `${c().height}px` }}
             />
           )}
@@ -64,18 +108,14 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
     return { name, left: (size() - sp.w * k) / 2, top: size() * 0.04, width: sp.w * k, height: sp.h * k };
   };
   return (
-    <span
-      class="relative inline-block shrink-0 overflow-hidden rounded-sm bg-[#cfe6f5]"
-      style={{ width: `${size()}px`, height: `${size()}px` }}
-      aria-hidden="true"
-    >
+    <span {...stylex.attrs(viewStyles.orchestratorFaceSpan)} style={{ width: `${size()}px`, height: `${size()}px` }} aria-hidden="true">
       <Show when={cut()}>
         {(c) => (
           <img
             src={`/pixel/${c().name}.png`}
             alt=""
             draggable="false"
-            class="absolute max-w-none [image-rendering:pixelated]"
+            {...stylex.attrs(viewStyles.agentFaceImg)}
             style={{ left: `${c().left}px`, top: `${c().top}px`, width: `${c().width}px`, height: `${c().height}px` }}
           />
         )}
@@ -89,7 +129,7 @@ export function OwnerFace(props: { size?: number }) {
   return (
     <span
       // The owner is who reads the page: their mark is quiet, the helpers' faces are what is looked for.
-      class="inline-flex shrink-0 items-center justify-center rounded-sm bg-selected text-xs font-semibold text-muted"
+      {...stylex.attrs(viewStyles.ownerFaceSpan)}
       style={{ width: `${props.size ?? 24}px`, height: `${props.size ?? 24}px` }}
       aria-hidden="true"
     >

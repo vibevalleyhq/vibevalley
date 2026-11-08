@@ -1,10 +1,13 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import {
   type BugSnake,
@@ -17,6 +20,68 @@ import {
   type SnakeHeading,
   steerBugSnake,
 } from "./bugSnake";
+
+const recipeStyles = stylex.create({
+  bugSnakeGameDiv: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-lcd-panel)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
+    },
+    textAlign: "center",
+  },
+});
+
+const variantStyles = stylex.create({
+  bugSnakeGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingInline: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 3)",
+  },
+});
+
+const viewStyles = stylex.create({
+  bugSnakeGameDiv: {
+    display: "flex",
+    width: "100%",
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  bugSnakeGameSpan: {
+    marginLeft: "auto",
+    fontVariantNumeric: "tabular-nums",
+  },
+  bugSnakeGameDiv2: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    width: "100%",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  bugSnakeGameSpan2: {
+    marginLeft: "auto",
+  },
+  bugSnakeGameDiv3: {
+    position: "relative",
+    marginTop: "calc(var(--spacing) * 2)",
+  },
+  bugSnakeGameCanvas: {
+    display: "block",
+    imageRendering: "pixelated",
+  },
+  bugSnakeGameP: {
+    marginTop: "auto",
+    marginBottom: "calc(var(--spacing) * 2)",
+    textAlign: "center",
+    lineHeight: "1.625",
+  },
+});
 
 const game = kept<BugSnake | undefined>(undefined);
 const best = kept(0);
@@ -127,33 +192,33 @@ export function BugSnakeGame() {
 
   const score = () => g()?.score ?? 0;
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
-      <div class="flex w-full px-2">
+    <div {...stylex.attrs(variantStyles.bugSnakeGameDiv)}>
+      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv)}>
         <span>{t("web.farm.phone.game.bugs")}</span>
-        <span class="ml-auto tabular-nums">
+        <span {...stylex.attrs(viewStyles.bugSnakeGameSpan)}>
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div class="mt-1 flex w-full px-2 tabular-nums">
+      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv2)}>
         <span>{t("web.farm.phone.bugs.tally", { seeds: g()?.eaten ?? 0, bugs: g()?.bugs ?? 0 })}</span>
-        <span class="ml-auto">{five(score())}</span>
+        <span {...stylex.attrs(viewStyles.bugSnakeGameSpan2)}>{five(score())}</span>
       </div>
-      <div class="relative mt-2" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv3)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
           ref={(el) => (canvas = el)}
           width={width}
           height={height}
           role="img"
           aria-label={t("web.farm.phone.bugs.field")}
-          class="block [image-rendering:pixelated]"
+          {...stylex.attrs(viewStyles.bugSnakeGameCanvas)}
           style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
         <Show when={!g() || g()!.over !== undefined || !playing()}>
-          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
+          <div {...stylex.attrs(recipeStyles.bugSnakeGameDiv)}>
             <span>
               {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />
-              <span class="phone-blink">
+              <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", {
                   what: g() && g()!.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
                 })}
@@ -162,7 +227,7 @@ export function BugSnakeGame() {
           </div>
         </Show>
       </div>
-      <p class="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
+      <p {...stylex.attrs(viewStyles.bugSnakeGameP)} style={{ color: lcd.dark }}>
         {t("web.farm.phone.bugs.help")}
         <br />
         {t("web.farm.phone.bugs.help2")}

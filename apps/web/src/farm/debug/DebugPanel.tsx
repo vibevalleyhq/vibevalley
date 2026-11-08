@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { clockText } from "@vibevalley/engine/clock";
@@ -15,6 +16,166 @@ import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "#
 import { achievementsQuery as achievementCatalog, ready, useQuery } from "#/infra/query.ts";
 import { createPixelAct } from "#/ui/pixel/index.ts";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
+
+const buttonStyles = stylex.create({
+  base: { height: "calc(var(--spacing) * 7)", cursor: "pointer", paddingInline: "calc(var(--spacing) * 2.5)", fontSize: "12px" },
+  plain: {
+    backgroundColor: { default: "var(--color-ink-800)", "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" } },
+    color: "var(--color-paper)",
+  },
+  hat: {
+    backgroundColor: "var(--color-hat)",
+    color: "var(--color-ink-950)",
+    filter: { default: null, "@media (hover:hover)": { default: null, ":hover": "brightness(110%)" } },
+  },
+  bad: {
+    backgroundColor: { default: "var(--color-berry-900)", "@media (hover:hover)": { default: null, ":hover": "var(--color-berry-800)" } },
+    color: "var(--color-paper)",
+  },
+  speed: {
+    backgroundColor: {
+      default: "var(--color-ink-800)",
+      "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" },
+      ":is([aria-pressed=true])": "var(--color-hat)",
+    },
+    color: { default: "var(--color-paper)", ":is([aria-pressed=true])": "var(--color-ink-950)" },
+  },
+});
+
+const recipeStyles = stylex.create({
+  panelAside: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 2)",
+    right: "calc(var(--spacing) * 2)",
+    bottom: "calc(var(--spacing) * 2)",
+    zIndex: "50",
+    display: "flex",
+    width: "380px",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflow: "hidden",
+    backgroundColor: {
+      default: "var(--color-px-debug-surface)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink-950) 96%, transparent)",
+    },
+    padding: "calc(var(--spacing) * 3)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "12px",
+    color: "var(--color-paper)",
+    boxShadow: "var(--shadow-px)",
+  },
+});
+
+const variantStyles = stylex.create({
+  panelDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+  },
+});
+
+const viewStyles = stylex.create({
+  sectionSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-ink-700)",
+    paddingTop: "calc(var(--spacing) * 2)",
+  },
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "11px",
+    letterSpacing: "var(--tracking-wide)",
+    color: "var(--color-ink-300)",
+  },
+  sectionSpan: {
+    flex: "1",
+  },
+  panelHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  panelSpan: {
+    flex: "1",
+    fontSize: "13px",
+    color: "var(--color-hat)",
+  },
+  panelDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  panelInput: {
+    accentColor: "var(--color-hat)",
+  },
+  panelDiv2: {
+    display: "flex",
+    gap: "var(--spacing)",
+  },
+  panelSpan2: {
+    color: "var(--color-ink-300)",
+  },
+  panelDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  panelButton: {
+    minWidth: "0",
+    flex: "1",
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "left",
+    color: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hat)",
+      },
+    },
+  },
+  panelDiv4: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+  },
+  panelOl: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  debugFrame: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  panelSpan3: {
+    width: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    textAlign: "right",
+    color: "var(--color-ink-500)",
+  },
+  panelSpan4: {
+    width: "calc(var(--spacing) * 12)",
+    flexShrink: "0",
+    color: "var(--color-hat)",
+  },
+  panelSpan5: {
+    minWidth: "0",
+    wordBreak: "break-all",
+    color: "var(--color-ink-100)",
+  },
+});
 
 const keep = 2000;
 
@@ -70,14 +231,13 @@ function createLog() {
   return { entries, paused, setPaused, clear: () => setEntries([]) };
 }
 
-const btn = (tone: "plain" | "hat" | "bad" = "plain") =>
-  `h-7 cursor-pointer px-2.5 text-[12px] ${tone === "hat" ? "bg-hat text-ink-950 hover:brightness-110" : tone === "bad" ? "bg-berry-900 text-paper hover:bg-berry-800" : "bg-ink-800 text-paper hover:bg-ink-700"}`;
+const btn = (tone: "plain" | "hat" | "bad" = "plain") => styleProps([buttonStyles.base, buttonStyles[tone]]);
 
 function Section(props: { title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} class="flex flex-col gap-1.5 border-t border-ink-700 pt-2">
-      <header class="flex items-center gap-2 text-[11px] tracking-wide text-ink-300">
-        <span class="flex-1">{props.title}</span>
+    <section aria-label={props.title} {...stylex.attrs(viewStyles.sectionSection)}>
+      <header {...stylex.attrs(viewStyles.sectionHeader)}>
+        <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.title}</span>
         {props.aside}
       </header>
       {props.children}
@@ -103,18 +263,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
-    <aside
-      aria-label={t("web.farm.debug.title")}
-      data-testid="debug"
-      class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-ink-950/96 p-3 font-mono text-[12px] text-paper shadow-px"
-    >
-      <header class="flex items-center gap-2">
-        <span class="flex-1 text-[13px] text-hat">{t("web.farm.debug.title")}</span>
-        <button type="button" data-testid="debug-close" class={btn()} onClick={() => props.onClose()}>
+    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(recipeStyles.panelAside)}>
+      <header {...stylex.attrs(viewStyles.panelHeader)}>
+        <span {...stylex.attrs(viewStyles.panelSpan)}>{t("web.farm.debug.title")}</span>
+        <button type="button" data-testid="debug-close" {...btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
-      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <div {...stylex.attrs(variantStyles.panelDiv)}>
         <Section
           title={t("web.farm.debug.call")}
           aside={
@@ -123,11 +279,11 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <div class="flex gap-1.5">
-            <button type="button" class={btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
+          <div {...stylex.attrs(viewStyles.panelDiv)}>
+            <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
               {t("web.farm.debug.open")}
             </button>
-            <button type="button" class={btn()} onClick={() => void everyone("dismiss")}>
+            <button type="button" {...btn()} onClick={() => void everyone("dismiss")}>
               {t("web.farm.debug.dismiss")}
             </button>
           </div>
@@ -141,9 +297,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             step={0.005}
             value={day().tod}
             onInput={(e) => clock.setTimeOfDay(Number(e.currentTarget.value))}
-            class="accent-hat"
+            {...stylex.attrs(viewStyles.panelInput)}
           />
-          <div class="flex gap-1">
+          <div {...stylex.attrs(viewStyles.panelDiv2)}>
             <For
               each={
                 [
@@ -159,7 +315,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                   type="button"
                   data-key={speed}
                   aria-pressed={aria((speed === 0 && day().paused) || (!day().paused && day().speed === speed))}
-                  class={[btn(), "aria-pressed:bg-hat aria-pressed:text-ink-950"]}
+                  {...styleProps([buttonStyles.base, buttonStyles.speed])}
                   onClick={() => clock.setSpeed(speed)}
                 >
                   {label}
@@ -169,13 +325,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </div>
         </Section>
         <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
-          <div class="flex gap-1.5">
-            <button type="button" data-testid="debug-level-up" class={btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
+          <div {...stylex.attrs(viewStyles.panelDiv)}>
+            <button type="button" data-testid="debug-level-up" {...btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
               {t("web.farm.debug.levelUp")}
             </button>
             <button
               type="button"
-              class={btn()}
+              {...btn()}
               disabled={achievements().length === 0}
               onClick={() => {
                 const all = achievements();
@@ -200,23 +356,23 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.helpers", { n: sessions().length })}>
           <Show when={sessions().length === 0}>
-            <span class="text-ink-300">{t("web.farm.debug.nobody")}</span>
+            <span {...stylex.attrs(viewStyles.panelSpan2)}>{t("web.farm.debug.nobody")}</span>
           </Show>
           <For each={sessions()}>
             {(h) => (
-              <div class="flex flex-wrap items-center gap-1.5">
-                <button type="button" class="min-w-0 flex-1 cursor-pointer truncate text-left hover:text-hat" onClick={() => farm.select(h.id)}>
+              <div {...stylex.attrs(viewStyles.panelDiv3)}>
+                <button type="button" {...stylex.attrs(viewStyles.panelButton)} onClick={() => farm.select(h.id)}>
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
-                  <button type="button" class={btn("hat")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
+                  <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
                     {t("web.farm.tool.harvest.label")}
                   </button>
                 </Show>
-                <button type="button" class={btn()} onClick={() => void act.run(() => api.session.stop({ id: h.id }))}>
+                <button type="button" {...btn()} onClick={() => void act.run(() => api.session.stop({ id: h.id }))}>
                   {t("web.farm.debug.halt")}
                 </button>
-                <button type="button" class={btn("bad")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
+                <button type="button" {...btn("bad")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
                   {t("web.farm.debug.dismiss")}
                 </button>
               </div>
@@ -224,11 +380,11 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </For>
         </Section>
         <Section title={t("web.farm.debug.all")}>
-          <div class="flex gap-1.5">
-            <button type="button" class={btn()} onClick={() => void everyone("stop")}>
+          <div {...stylex.attrs(viewStyles.panelDiv)}>
+            <button type="button" {...btn()} onClick={() => void everyone("stop")}>
               {t("web.farm.debug.haltAll")}
             </button>
-            <button type="button" class={btn("bad")} onClick={() => void everyone("dismiss")}>
+            <button type="button" {...btn("bad")} onClick={() => void everyone("dismiss")}>
               {t("web.farm.debug.dismissAll")}
             </button>
           </div>
@@ -236,10 +392,10 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <For each={SOUND_GROUPS}>
           {(g) => (
             <Section title={g.title}>
-              <div class="flex flex-wrap gap-1">
+              <div {...stylex.attrs(viewStyles.panelDiv4)}>
                 <For each={g.names}>
                   {(n) => (
-                    <button type="button" title={n} class={btn()} onClick={() => playSound(n)}>
+                    <button type="button" title={n} {...btn()} onClick={() => playSound(n)}>
                       {SOUND_LABEL[n]}
                     </button>
                   )}
@@ -251,16 +407,16 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <Section
           title={t("web.farm.debug.frames", { n: props.log.entries().length })}
           aside={
-            <span class="flex gap-1">
-              <button type="button" class={btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
+            <span {...stylex.attrs(viewStyles.panelDiv2)}>
+              <button type="button" {...btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
                 {props.log.paused() ? t("web.farm.debug.resume") : t("web.farm.debug.pause")}
               </button>
-              <button type="button" class={btn()} onClick={() => props.log.clear()}>
+              <button type="button" {...btn()} onClick={() => props.log.clear()}>
                 {t("web.farm.debug.clear")}
               </button>
               <button
                 type="button"
-                class={btn()}
+                {...btn()}
                 onClick={() =>
                   void navigator.clipboard
                     .writeText(
@@ -277,13 +433,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <ol class="flex flex-col gap-0.5">
+          <ol {...stylex.attrs(viewStyles.panelOl)}>
             <For each={props.log.entries().slice(-200).toReversed()} keyed={(e) => e.seq}>
               {(e) => (
-                <li data-testid="debug-frame" data-type={e().type} class="flex gap-2">
-                  <span class="w-8 shrink-0 text-right text-ink-500">{e().seq}</span>
-                  <span class="w-12 shrink-0 text-hat">{e().type}</span>
-                  <span class="min-w-0 break-all text-ink-100">{e().summary}</span>
+                <li data-testid="debug-frame" data-type={e().type} {...stylex.attrs(viewStyles.debugFrame)}>
+                  <span {...stylex.attrs(viewStyles.panelSpan3)}>{e().seq}</span>
+                  <span {...stylex.attrs(viewStyles.panelSpan4)}>{e().type}</span>
+                  <span {...stylex.attrs(viewStyles.panelSpan5)}>{e().summary}</span>
                 </li>
               )}
             </For>

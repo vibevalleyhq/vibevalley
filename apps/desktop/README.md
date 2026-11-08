@@ -28,6 +28,9 @@ test/              Playwright starting the whole app with temporary home and Ele
 The desktop test passes Electron's `--user-data-dir` before the app starts. Its single-instance lock, browser storage
 and farm files belong to the temporary directories, so the owner's desktop app can stay open during the test.
 
+Development starts one Vite watch build and waits for its first complete bundle before launching Electron. Later
+builds still reload the page; there is no second initial build that reloads the app during startup.
+
 ```bash
 vp run dev        # from the repository root: vp run desktop:dev; builds the page, rebuilds it on change (the window reloads) and restarts the server when its code changes
 vp run test       # the main process's rules (src/*.test.ts), also in vp run web:check

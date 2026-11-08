@@ -107,8 +107,8 @@ apps/server/       TypeScript 服务端（Effect v4、SQLite）：src/ 按概念
 apps/cli/          命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端
 apps/web/          页面（Solid 2）：农场、像素村、田头、工单、稿子、笔记、配置页、语音；服务端在 / 提供
 apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
+apps/site/         官网 vibevalley.dev（Solid 2 静态生成）
 packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、命令行、页面和两个壳都 import 它
-site/              官网 vibevalley.dev（Astro）
 design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
 docs/              文档：现在怎么用、怎么开发、各部分怎么工作
 .agents/notes/     Agent Notes：每个设计决策为什么这样做、放弃了什么

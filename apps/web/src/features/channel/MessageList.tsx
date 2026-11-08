@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -19,15 +20,503 @@ import { OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 import { Markdown } from "#/ui/Markdown.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { Tag, type TagTone } from "#/ui/Tag.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { chatSay, editingId, pendingLines, setEditingId } from "./composing";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
+import { dispatchRow, threadPreview, messageRow } from "./message.stylex";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
+
+const messageStyles = stylex.create({
+  row: {
+    position: "relative",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  continuation: {
+    paddingTop: "calc(var(--spacing) * .5)",
+  },
+  start: {
+    marginTop: "calc(var(--spacing) * 3)",
+    paddingTop: "var(--spacing)",
+  },
+  jump: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -3)",
+    right: "calc(var(--spacing) * 2)",
+    zIndex: 10,
+    display: {
+      default: "none",
+      [stylex.when.ancestor(":focus-within", messageRow)]: "block",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", messageRow)]: "block",
+      },
+    },
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    boxShadow: "var(--shadow-float)",
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  messageListButton: {
+    position: "absolute",
+    bottom: "calc(var(--spacing) * 3)",
+    left: "50%",
+    zIndex: 10,
+    display: "inline-flex",
+    translate: "calc(calc(1 / 2 * 100%) * -1) 0",
+    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".28s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-ink)",
+    boxShadow: "var(--shadow-float)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  messageListDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    flexDirection: "column-reverse",
+    overflowY: "auto",
+  },
+});
+
+const recipeStyles = stylex.create({
+  messageListDiv: {
+    borderRadius: "var(--radius-md)",
+    transitionProperty: "opacity,translate,background-color",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".28s",
+  },
+  messageListDivVariant1Case1: {
+    translate: null,
+    opacity: null,
+  },
+  messageListDivVariant1Case2: {
+    translate: {
+      default: null,
+      "@starting-style": "0 calc(var(--spacing) * 2)",
+    },
+    opacity: {
+      default: null,
+      "@starting-style": "0",
+    },
+  },
+  messageListDivVariant2Case1: {
+    backgroundColor: null,
+  },
+  messageListDivVariant2Case2: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 25%, transparent)",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  messageListRoot: {
+    position: "relative",
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  toLatestIcon: {
+    rotate: "90deg",
+  },
+  pendingSending: {
+    opacity: ".6",
+  },
+  dayLineDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  dayLineNew: {
+    color: "var(--color-berry)",
+  },
+  dayLineNormal: {
+    color: "var(--color-muted)",
+  },
+  dayLineSpan: {
+    height: "1px",
+    flex: "1",
+  },
+  dayLineRuleNew: {
+    backgroundColor: "var(--color-berry)",
+  },
+  dayLineRuleNormal: {
+    backgroundColor: "var(--color-line)",
+  },
+  dispatchRow: { display: "flex", alignItems: "flex-start", gap: "calc(var(--spacing) * 1.5)" },
+  dispatchA: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  dispatchIcon: { opacity: { default: 0.5, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", dispatchRow)]: 1 } } },
+  threadIcon: { opacity: { default: 0.6, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", threadPreview)]: 1 } } },
+  threadButton: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    width: "100%",
+    maxWidth: "var(--container-xl)",
+    cursor: "pointer",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-lg)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus-visible": "var(--color-focus)" },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    textAlign: "left",
+    backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
+  },
+  messageListDiv: {
+    display: "flex",
+    flexDirection: "column",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+  },
+  messageListDiv2: {
+    display: "flex",
+    justifyContent: "center",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  messageListSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  messageListButton: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-faint)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  messageListDiv3: {
+    marginBottom: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  messagesFailed: {
+    paddingBlock: "calc(var(--spacing) * 8)",
+    textAlign: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  messagesEmpty: {
+    paddingBlock: "calc(var(--spacing) * 8)",
+    textAlign: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  messageListP: {
+    paddingInline: "calc(var(--spacing) * 6)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    textAlign: "center",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--leading-relaxed)",
+    color: "var(--color-muted)",
+  },
+  messageListDiv4: {
+    display: "flex",
+    height: "calc(var(--spacing) * 5)",
+    alignItems: "center",
+  },
+  pendingLinesP: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    overflowWrap: "break-word",
+    whiteSpace: "pre-wrap",
+  },
+  pendingLinesDiv: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  pendingLinesSpan: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "var(--color-berry)",
+  },
+  pendingRetry: {
+    display: "inline-flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  frameDiv: {
+    paddingLeft: "52px",
+  },
+  frameDiv2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  frameDiv3: {
+    position: "relative",
+    width: "calc(var(--spacing) * 10)",
+    flexShrink: "0",
+  },
+  frameSpan: {
+    position: "absolute",
+    top: "26px",
+    left: "26px",
+  },
+  frameDiv4: {
+    minWidth: "0",
+    flex: "1",
+    paddingBottom: "calc(var(--spacing) * .5)",
+  },
+  frameDiv5: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  frameSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  frameSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  dispatchDiv: {
+    minWidth: "0",
+    flex: "1",
+  },
+  dispatchButton: {
+    display: "block",
+    width: "100%",
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "left",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  dispatchP: {
+    display: "flex",
+    minWidth: "0",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  dispatchSpan: {
+    flexShrink: "0",
+  },
+  dispatchSpan2: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  dispatchButton2: {
+    marginTop: "5px",
+    cursor: "pointer",
+  },
+  messageRowDiv: {
+    marginBottom: "var(--spacing)",
+  },
+  messageRowDiv2: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  messageQuotedBlock: {
+    display: "flex",
+    maxWidth: "var(--container-md)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "2px",
+    borderColor: "var(--color-wheat)",
+    backgroundColor: "var(--color-hover)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  messageRowSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  messageRowDiv3: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  threadPreviewSpan: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  threadPreviewSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-accent)",
+  },
+  threadPreviewSpan3: {
+    flex: "1",
+  },
+  threadPreviewSpan4: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  threadPreviewSpan5: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  threadPreviewSpan6: {
+    flexShrink: "0",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  threadPreviewSpan7: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "var(--color-muted)",
+  },
+});
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },
@@ -133,33 +622,28 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div class="relative flex min-h-0 flex-1 flex-col">
+    <div {...stylex.attrs(viewStyles.messageListRoot)}>
       <Show when={awayFrom() !== undefined}>
-        <button
-          type="button"
-          data-testid="to-latest"
-          onClick={toLatest}
-          class="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 animate-pop-in cursor-pointer items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 text-xs text-ink shadow-float transition-colors duration-120 hover:bg-hover"
-        >
-          <Icon name="expand" size={12} class="rotate-90" />
+        <button type="button" data-testid="to-latest" onClick={toLatest} {...stylex.attrs(recipeStyles2.messageListButton)}>
+          <Icon name="expand" size={12} styles={viewStyles.toLatestIcon} />
           {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
         </button>
       </Show>
       <div
         ref={(el) => (log = el)}
         onScroll={onScroll}
-        class="flex min-h-0 flex-1 scroll-fade-y flex-col-reverse overflow-y-auto"
+        {...stylex.attrs(recipeStyles2.messageListDiv)}
         role="log"
         aria-label={t("web.channel.messages.label")}
         data-testid="messages"
         data-read={props.channel?.read}
       >
-        <div class="flex flex-col px-4 pt-3 pb-4">
-          <div class="flex justify-center pb-2">
+        <div {...stylex.attrs(viewStyles.messageListDiv)}>
+          <div {...stylex.attrs(viewStyles.messageListDiv2)}>
             <Show
               when={hasOlder() && !searching()}
               fallback={
-                <span class="text-xs text-muted">
+                <span {...stylex.attrs(viewStyles.messageListSpan)}>
                   {searching()
                     ? search()?.state !== "done" && searchFailed() === undefined
                       ? t("web.channel.messages.searching")
@@ -174,7 +658,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                   const ch = id();
                   if (ch) void followed.loadOlder(ch);
                 }}
-                class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink"
+                {...stylex.attrs(viewStyles.messageListButton)}
               >
                 {t("web.channel.messages.older")}
               </button>
@@ -182,20 +666,20 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           </div>
           <Show when={parent()}>
             {(m) => (
-              <div class="mb-2 border-b border-line pb-2">
+              <div {...stylex.attrs(viewStyles.messageListDiv3)}>
                 <MessageRow m={m()} continues={false} />
               </div>
             )}
           </Show>
           <Show when={searching() ? searchFailed() : said().error}>
             {(why) => (
-              <p data-testid="messages-failed" class="py-8 text-center text-sm text-berry">
+              <p data-testid="messages-failed" {...stylex.attrs(viewStyles.messagesFailed)}>
                 {searching() ? t("web.channel.messages.searchFailed", { why: why() }) : t("web.channel.messages.readFailed", { why: why() })}
               </p>
             )}
           </Show>
           <Show when={items().length === 0 && (searching() ? hits() !== undefined : !said().error)}>
-            <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
+            <p data-testid="messages-empty" {...stylex.attrs(viewStyles.messagesEmpty)}>
               {searching() ? t("web.channel.messages.notFound") : props.emptyText}
             </p>
           </Show>
@@ -212,13 +696,13 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                 data-kind={item().message.kind}
                 data-lit={lit() === item().message.number && item().message.channel === id() ? "" : undefined}
                 data-number={item().message.channel === id() ? item().message.number : undefined}
-                class={[
-                  "rounded-md transition-[opacity,translate,background-color] duration-280",
-                  {
-                    "starting:translate-y-2 starting:opacity-0": item().message.at > shownAt,
-                    "bg-wheat/25": lit() === item().message.number && item().message.channel === id(),
-                  },
-                ]}
+                {...stylex.attrs(
+                  recipeStyles.messageListDiv,
+                  item().message.at > shownAt ? recipeStyles.messageListDivVariant1Case2 : recipeStyles.messageListDivVariant1Case1,
+                  lit() === item().message.number && item().message.channel === id()
+                    ? recipeStyles.messageListDivVariant2Case2
+                    : recipeStyles.messageListDivVariant2Case1,
+                )}
               >
                 <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
                 <Show when={item().message.id === firstNew()}>
@@ -239,7 +723,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                     />
                   }
                 >
-                  <p class="px-6 py-2 text-center text-xs leading-relaxed text-muted">{item().message.text}</p>
+                  <p {...stylex.attrs(viewStyles.messageListP)}>{item().message.text}</p>
                 </Show>
               </div>
             )}
@@ -254,7 +738,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                 name={orchestrators().find((a) => a.id === typer().agent)?.name || t("web.channel.orchestrator")}
                 meta={roundText(typer().mood, typer().since)}
               >
-                <div class="flex h-5 items-center">
+                <div {...stylex.attrs(viewStyles.messageListDiv4)}>
                   <ThinkingDots />
                 </div>
               </Frame>
@@ -273,31 +757,21 @@ function PendingLines(props: { channel: string | undefined; messages: readonly C
   return (
     <For each={lines()} keyed={(l) => l.key}>
       {(l) => (
-        <div data-testid="pending-line" data-key={l().key} data-state={l().state} class={l().state === "sending" ? "opacity-60" : ""}>
+        <div data-testid="pending-line" data-key={l().key} data-state={l().state} {...stylex.attrs(l().state === "sending" && viewStyles.pendingSending)}>
           <Frame
             face={<OwnerFace size={36} />}
             name={t("web.channel.messages.owner")}
             meta={l().state === "sending" ? t("web.channel.messages.sending") : t("web.channel.messages.notSent")}
           >
-            <p class="text-base break-words whitespace-pre-wrap">{l().text}</p>
+            <p {...stylex.attrs(viewStyles.pendingLinesP)}>{l().text}</p>
             <Show when={l().state === "failed"}>
-              <div class="mt-1 flex items-center gap-2 text-xs">
-                <span class="min-w-0 truncate text-berry">{l().reason ?? t("web.channel.messages.notSent")}</span>
-                <button
-                  type="button"
-                  data-testid="pending-retry"
-                  onClick={() => void says.retry(l().key)}
-                  class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-muted hover:bg-hover hover:text-ink"
-                >
+              <div {...stylex.attrs(viewStyles.pendingLinesDiv)}>
+                <span {...stylex.attrs(viewStyles.pendingLinesSpan)}>{l().reason ?? t("web.channel.messages.notSent")}</span>
+                <button type="button" data-testid="pending-retry" onClick={() => void says.retry(l().key)} {...stylex.attrs(viewStyles.pendingRetry)}>
                   <Icon name="retry" size={12} />
                   {t("web.channel.messages.retrySend")}
                 </button>
-                <button
-                  type="button"
-                  data-testid="pending-drop"
-                  onClick={() => says.drop(l().key)}
-                  class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-muted hover:bg-hover hover:text-ink"
-                >
+                <button type="button" data-testid="pending-drop" onClick={() => says.drop(l().key)} {...stylex.attrs(viewStyles.pendingRetry)}>
                   <Icon name="close" size={12} />
                   {t("web.channel.messages.dropSend")}
                 </button>
@@ -317,10 +791,10 @@ const litMs = 2500;
 
 function DayLine(props: { label: string; tone?: "new" }) {
   return (
-    <div class={["flex items-center gap-3 py-3 text-xs", props.tone === "new" ? "text-berry" : "text-muted"]} role="separator">
-      <span class={["h-px flex-1", props.tone === "new" ? "bg-berry" : "bg-line"]} />
+    <div {...stylex.attrs(viewStyles.dayLineDiv, props.tone === "new" ? viewStyles.dayLineNew : viewStyles.dayLineNormal)} role="separator">
+      <span {...stylex.attrs(viewStyles.dayLineSpan, props.tone === "new" ? viewStyles.dayLineRuleNew : viewStyles.dayLineRuleNormal)} />
       {props.label}
-      <span class={["h-px flex-1", props.tone === "new" ? "bg-berry" : "bg-line"]} />
+      <span {...stylex.attrs(viewStyles.dayLineSpan, props.tone === "new" ? viewStyles.dayLineRuleNew : viewStyles.dayLineRuleNormal)} />
     </div>
   );
 }
@@ -337,29 +811,29 @@ function Frame(props: {
   children: JSX.Element;
 }) {
   return (
-    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues === true ? "pt-0.5" : "mt-3 pt-1"]}>
+    <div {...styleProps([messageRow, messageStyles.row, props.continues === true ? messageStyles.continuation : messageStyles.start])}>
       {props.tools}
       <Show when={props.quote}>
         {(q) => (
-          <div class="pl-[52px]">
+          <div {...stylex.attrs(viewStyles.frameDiv)}>
             <ReplyQuote channel={q().channel} number={q().number} />
           </div>
         )}
       </Show>
-      <div class="flex gap-3">
-        <div class="relative w-10 shrink-0">
+      <div {...stylex.attrs(viewStyles.frameDiv2)}>
+        <div {...stylex.attrs(viewStyles.frameDiv3)}>
           <Show when={props.continues !== true}>
             {props.face}
             <Show when={props.dot}>
-              <span class="absolute top-[26px] left-[26px]">{props.dot}</span>
+              <span {...stylex.attrs(viewStyles.frameSpan)}>{props.dot}</span>
             </Show>
           </Show>
         </div>
-        <div class="min-w-0 flex-1 pb-0.5">
+        <div {...stylex.attrs(viewStyles.frameDiv4)}>
           <Show when={props.continues !== true}>
-            <div class="flex items-baseline gap-2">
-              <span class="text-sm font-semibold">{props.name}</span>
-              <span class="truncate text-xs text-muted">{props.meta}</span>
+            <div {...stylex.attrs(viewStyles.frameDiv5)}>
+              <span {...stylex.attrs(viewStyles.frameSpan2)}>{props.name}</span>
+              <span {...stylex.attrs(viewStyles.frameSpan3)}>{props.meta}</span>
             </div>
           </Show>
           {props.children}
@@ -380,26 +854,26 @@ function Dispatch(props: { m: ChatMessage }) {
     return id ? (core()?.issues ?? []).find((i) => i.id === id) : undefined;
   };
   return (
-    <div class="group/d flex items-start gap-1.5" data-testid="dispatch">
-      <div class="min-w-0 flex-1">
+    <div {...stylex.attrs(viewStyles.dispatchRow, dispatchRow)} data-testid="dispatch">
+      <div {...stylex.attrs(viewStyles.dispatchDiv)}>
         <Show
           when={open()}
           fallback={
             <Show
               when={issue()}
               fallback={
-                <button type="button" onClick={() => setOpen(true)} class="block w-full cursor-pointer truncate text-left text-base">
+                <button type="button" onClick={() => setOpen(true)} {...stylex.attrs(viewStyles.dispatchButton)}>
                   {plainText(props.m.text)}
                 </button>
               }
             >
               {(i) => (
-                <p class="flex min-w-0 items-baseline gap-1.5 text-base">
-                  <span class="shrink-0">{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
-                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" class="min-w-0 truncate font-medium text-water hover:underline">
+                <p {...stylex.attrs(viewStyles.dispatchP)}>
+                  <span {...stylex.attrs(viewStyles.dispatchSpan)}>{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
+                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" {...stylex.attrs(viewStyles.dispatchA)}>
                     #{i().number} {i().title}
                   </A>
-                  <Show when={i().repo}>{(p) => <span class="shrink-0 text-xs text-muted">{p()}</span>}</Show>
+                  <Show when={i().repo}>{(p) => <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{p()}</span>}</Show>
                 </p>
               )}
             </Show>
@@ -413,9 +887,9 @@ function Dispatch(props: { m: ChatMessage }) {
         onClick={() => setOpen(!open())}
         aria-label={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")}
         aria-expanded={aria(open())}
-        class="mt-[5px] cursor-pointer"
+        {...stylex.attrs(viewStyles.dispatchButton2)}
       >
-        <Icon name={open() ? "collapse" : "enlarge"} size={12} class="opacity-50 group-hover/d:opacity-100" />
+        <Icon name={open() ? "collapse" : "enlarge"} size={12} styles={viewStyles.dispatchIcon} />
       </button>
     </div>
   );
@@ -463,11 +937,7 @@ export function MessageRow(props: {
       quote={props.m.replyTo !== undefined ? { channel: props.m.channel, number: props.m.replyTo } : undefined}
       tools={
         props.onJump ? (
-          <button
-            type="button"
-            onClick={() => props.onJump?.()}
-            class="absolute -top-3 right-2 z-10 hidden cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs shadow-float group-focus-within/m:block group-hover/m:block"
-          >
+          <button type="button" onClick={() => props.onJump?.()} {...styleProps(messageStyles.jump)}>
             {t("web.channel.more.jump")}
           </button>
         ) : props.m.deleted === undefined && !props.where ? (
@@ -476,12 +946,12 @@ export function MessageRow(props: {
       }
     >
       <Show when={props.m.kind === "dispatch"}>
-        <div class="mb-1">
+        <div {...stylex.attrs(viewStyles.messageRowDiv)}>
           <Tag icon="send" label={t("web.channel.messages.dispatch")} tone="wait" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
-        <div class="mb-1">
+        <div {...stylex.attrs(viewStyles.messageRowDiv)}>
           <Tag icon={outcome().icon} label={outcome().label} tone={outcome().tone} />
         </div>
       </Show>
@@ -499,16 +969,12 @@ export function MessageRow(props: {
       <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</Show>
       <Show when={props.m.deleted === undefined && (props.m.blocks?.length ?? 0) > 0 ? props.m.blocks : undefined}>
         {(blocks) => (
-          <div class="mt-1 flex flex-col gap-1">
+          <div {...stylex.attrs(viewStyles.messageRowDiv2)}>
             <For each={blocks()} keyed={(b) => `${b.artifactId}:${b.blockId}`}>
               {(b) => (
-                <div
-                  data-testid="message-quoted-block"
-                  data-key={b().blockId}
-                  class="flex max-w-md items-center gap-2 rounded-md border-l-2 border-wheat bg-hover px-2 py-1 text-xs text-muted"
-                >
+                <div data-testid="message-quoted-block" data-key={b().blockId} {...stylex.attrs(viewStyles.messageQuotedBlock)}>
                   <Icon name="artifacts" size={12} />
-                  <span class="min-w-0 flex-1 truncate">
+                  <span {...stylex.attrs(viewStyles.messageRowSpan)}>
                     {t("web.channel.messages.quotedBlock", {
                       title: b().title,
                       text: b().deleted === true ? t("web.channel.messages.quotedGone") : (b().text ?? ""),
@@ -527,7 +993,7 @@ export function MessageRow(props: {
       </Show>
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>
         {(spent) => (
-          <div class="mt-1 flex items-center gap-1 text-xs text-muted">
+          <div {...stylex.attrs(viewStyles.messageRowDiv3)}>
             <Icon name="spend" size={12} />
             {t("web.channel.messages.spent", { spent: spentText(spent()) })}
           </div>
@@ -558,11 +1024,11 @@ function ThreadPreview(props: { thread: Channel }) {
       data-key={props.thread.id}
       data-subject={props.thread.subjectKind}
       onClick={() => router.navigate(chatPath(props.thread))}
-      class="group/t mt-2 flex w-full max-w-xl cursor-pointer flex-col gap-1 rounded-lg border border-line px-3 py-2 text-left hover:bg-hover focus-visible:border-focus"
+      {...stylex.attrs(viewStyles.threadButton, threadPreview)}
     >
-      <span class="flex w-full items-center gap-1.5">
+      <span {...stylex.attrs(viewStyles.threadPreviewSpan)}>
         <Icon name="thread" size={16} />
-        <span class="text-sm font-semibold text-accent">
+        <span {...stylex.attrs(viewStyles.threadPreviewSpan2)}>
           {props.thread.replies > 0
             ? t("web.channel.replies", { n: props.thread.replies })
             : props.thread.subjectKind === "issue"
@@ -572,22 +1038,22 @@ function ThreadPreview(props: { thread: Channel }) {
         <Show when={unread() > 0}>
           <Tag label={t("web.channel.messages.unread", { n: unread() })} tone="ok" />
         </Show>
-        <Show when={session()} fallback={<span class="flex-1" />}>
+        <Show when={session()} fallback={<span {...stylex.attrs(viewStyles.threadPreviewSpan3)} />}>
           {(s) => (
             <>
               <PhaseGlyph phase={s().phase} />
-              <span class="min-w-0 flex-1 truncate text-xs text-muted">{phaseText(s(), now())}</span>
+              <span {...stylex.attrs(viewStyles.threadPreviewSpan4)}>{phaseText(s(), now())}</span>
             </>
           )}
         </Show>
-        <Icon name="expand" size={12} class="opacity-60 group-hover/t:opacity-100" />
+        <Icon name="expand" size={12} styles={viewStyles.threadIcon} />
       </span>
       <Show when={last()}>
         {(m) => (
-          <span class="flex w-full items-center gap-2 text-sm">
-            <span class="shrink-0 font-medium">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
-            <span class="min-w-0 flex-1 truncate text-muted">{plainText(m().text)}</span>
-            <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
+          <span {...stylex.attrs(viewStyles.threadPreviewSpan5)}>
+            <span {...stylex.attrs(viewStyles.threadPreviewSpan6)}>{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
+            <span {...stylex.attrs(viewStyles.threadPreviewSpan7)}>{plainText(m().text)}</span>
+            <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{workbenchClock(m().at)}</span>
           </span>
         )}
       </Show>

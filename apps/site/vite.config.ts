@@ -1,0 +1,27 @@
+import { fileURLToPath } from "node:url";
+
+import solid from "@solidjs/vite-plugin";
+import stylex from "@stylexjs/unplugin";
+import { styleMigrationGraph } from "vibevalley/style-migration";
+import { defineConfig, lazyPlugins } from "vite-plus";
+
+export default defineConfig({
+  plugins:
+    lazyPlugins(() => [
+      stylex.vite({ useCSSLayers: { before: ["theme", "base", "components"], after: ["utilities"], prefix: "stylex" }, sxPropName: false }),
+      solid({ ssr: true, start: { renderMode: "async" } }),
+      styleMigrationGraph("site"),
+    ]) ?? [],
+  resolve: { alias: { "@game": fileURLToPath(new URL("../web/public", import.meta.url)) } },
+  build: { assetsInlineLimit: 0 },
+  test: { include: ["test/**/*.test.ts"], environment: "node" },
+  run: {
+    tasks: {
+      check: { command: "vp run assets && vp run test", cache: false },
+      build: { command: "vp run assets && vpx scripts/build.ts", cache: false },
+      "test:prerender": { command: "playwright test --config test/prerender/playwright.config.ts", cache: false },
+      "test:production": { command: "vp run build && playwright test --config test/production/playwright.config.ts", cache: false },
+      test: "vp test run",
+    },
+  },
+});

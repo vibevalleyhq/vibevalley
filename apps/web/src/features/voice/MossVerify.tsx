@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, Match, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -7,6 +8,14 @@ import { createAct } from "#/ui/act.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 import { Tip } from "#/ui/Tip.tsx";
+
+const viewStyles = stylex.create({
+  mossVerifyViewDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+});
 
 type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 
@@ -30,7 +39,7 @@ export function MossVerify(props: { typed: () => string }) {
 /** The check as it looks: nothing yet, asking, or the answer as a mark with its reason on hover. */
 export function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult | undefined; onCheck: () => void }) {
   return (
-    <div class="flex items-center gap-1.5">
+    <div {...stylex.attrs(viewStyles.mossVerifyViewDiv)}>
       <IconButton icon="plug" label={t("web.voice.voice.moss.verify")} disabled={props.busy} onClick={() => props.onCheck()} />
       <Switch>
         <Match when={props.busy}>
