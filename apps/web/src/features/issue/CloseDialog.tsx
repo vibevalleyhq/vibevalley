@@ -25,6 +25,7 @@ import { issueMove, sendMove } from "./moves";
 import { Note } from "./Sheet";
 
 const viewStyles = stylex.create({
+  doneAction: { marginTop: "calc(var(--spacing) * 4)" },
   closeIssueDialogP: {
     fontSize: "var(--text-base)",
     lineHeight: "var(--text-base--line-height)",
@@ -273,7 +274,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
                 {reasonOf(error())}
               </span>
             </Note>
-            <Button class="mt-4" onClick={() => props.onDone()}>
+            <Button styles={viewStyles.doneAction} onClick={() => props.onDone()}>
               {t("web.issue.later")}
             </Button>
           </div>

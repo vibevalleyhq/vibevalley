@@ -239,6 +239,14 @@ The website comparison now also exercises primary and secondary links while hove
 
 The fail-closed inventory found the new viewer fixture's missing doctype. Its document now declares standards mode, and every visual capture explicitly requires `CSS1Compat`; fixture mode must not silently differ from production. All fourteen viewer comparisons pass again in standards mode. The expanded 162-scenario run reached its last two scenes before the execution window interrupted it, so it has no accepted complete receipt. Full aggregate acceptance remains open.
 
+### Button composition boundary
+
+The workbench Button no longer accepts a private class-string styling prop. Its four remaining callers now pass local StyleX definitions. Composed styles forward their variables as objects, and native object styles merge without discarding those variables. The type separates native-only attributes (including their string and removal forms) from StyleX composition, which accepts only object styles; a caller cannot combine a string style with dynamic StyleX variables.
+
+A dual-theme browser regression checks camel-cased dynamic variables, native style forwarding, keyboard activation, changing dimensions and retained focus. All seventeen component tests and seventeen focused artifact, issue, pairing and runtime-avatar integration tests pass. Twenty button and populated issue fixture comparisons pass A/A and candidate checks with zero changed pixels and equal text; `web:check` passes all twenty-six tasks.
+
+The isolated live receipt `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-I2Bt1L/result.json` records successful shutdown and no cleanup errors. Four manually inspected screenshots show a newly created issue and a populated Markdown artifact with its reply control, at 1440×900 and 390×844. This is scoped live evidence, not the final immutable populated-data matrix.
+
 ## Alternatives considered
 
 - **Keep Astro with a local Solid renderer:** rejected by the owner after the delayed multi-root hydration failure. Do not keep this adapter as a second production route.

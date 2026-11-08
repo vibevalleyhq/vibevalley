@@ -172,6 +172,24 @@ test("regression: StyleX variables survive Base UI positioning and reactive vari
   }
 });
 
+test("regression: button style variables compose with forwarded native attributes", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Button:Dynamic styles", theme, w: "400" })}`);
+    const button = page.getByTestId("button-style-vars");
+    await expect(button).toHaveCSS("width", "200px");
+    await expect(button).toHaveCSS("max-width", "200px");
+    await expect(button).toHaveCSS("margin-left", "12px");
+    await expect(page.getByTestId("button-native-style")).toHaveCSS("margin-left", "12px");
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveCSS("width", "280px");
+    await expect(button).toHaveCSS("max-width", "280px");
+    await expect(button).toBeFocused();
+    check();
+  }
+});
+
 test("regression: viewer rows retain indentation and selected hover precedence", async ({ page }) => {
   const check = diagnosticsOf(page);
   const key = "组件/工作台/Positioner:Dynamic";

@@ -10,6 +10,7 @@ import { Field, TextInput } from "#/ui/Field.tsx";
 import { deviceGuess, pair } from "./device";
 
 const viewStyles = stylex.create({
+  askAction: { alignSelf: "flex-start" },
   pairPageMain: {
     display: "flex",
     minHeight: "100dvh",
@@ -94,7 +95,7 @@ export function PairPage() {
         <Show
           when={asking()}
           fallback={
-            <Button tone="primary" type="submit" data-testid="pair-ask" disabled={!code().trim()} class="self-start">
+            <Button tone="primary" type="submit" data-testid="pair-ask" disabled={!code().trim()} styles={viewStyles.askAction}>
               {t("web.lan.pair.ask")}
             </Button>
           }

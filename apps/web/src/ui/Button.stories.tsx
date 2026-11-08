@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { For } from "solid-js";
+import { createSignal, For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
@@ -7,6 +7,7 @@ import { Button, type Tone } from "./Button";
 import { icons, type IconName } from "./icons";
 
 const viewStyles = stylex.create({
+  dynamic: (width: number) => ({ width, maxWidth: width }),
   buttonStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
@@ -20,6 +21,26 @@ const tones: Tone[] = ["plain", "primary", "quiet", "danger"];
 export default stories({
   title: "组件/工作台/Button",
   stories: {
+    "Dynamic styles": story({
+      render: () => {
+        const [wide, setWide] = createSignal(false);
+        return (
+          <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
+            <Button
+              data-testid="button-style-vars"
+              styles={viewStyles.dynamic(wide() ? 280 : 200)}
+              style={{ "margin-left": "12px" }}
+              onClick={() => setWide(!wide())}
+            >
+              Resize
+            </Button>
+            <Button data-testid="button-native-style" style={{ "margin-left": "12px" }}>
+              Native attributes
+            </Button>
+          </div>
+        );
+      },
+    }),
     Playground: story({
       args: { label: "派活", tone: "primary", icon: "add", disabled: false },
       controls: { tone: { kind: "choice", options: tones }, icon: { kind: "choice", options: ["", ...Object.keys(icons)] } },

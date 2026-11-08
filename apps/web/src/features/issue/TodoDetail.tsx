@@ -26,6 +26,7 @@ import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
 const viewStyles = stylex.create({
+  unqueueAction: { marginTop: "calc(var(--spacing) * 1.5)" },
   parentIssue: {
     marginBottom: "calc(var(--spacing) * 2)",
     cursor: "pointer",
@@ -515,7 +516,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         {(at) => (
           <Note tone="water" class="mt-2 !p-2.5">
             <div>{t("web.issue.todo.inQueue", { ago: ago(at(), Date.now()) })}</div>
-            <Button class="mt-1.5" disabled={busy()} onClick={() => void unqueue()}>
+            <Button styles={viewStyles.unqueueAction} disabled={busy()} onClick={() => void unqueue()}>
               {t("web.issue.todo.unqueue")}
             </Button>
           </Note>

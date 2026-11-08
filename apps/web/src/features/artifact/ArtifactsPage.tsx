@@ -32,6 +32,7 @@ import { PageWords } from "./PageWords";
 import { shellPath } from "./shell";
 
 const viewStyles = stylex.create({
+  replyAction: { alignSelf: "flex-end" },
   artifactsPageDiv: {
     display: "flex",
     height: "100%",
@@ -754,7 +755,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
           }
         }}
       />
-      <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" class="self-end">
+      <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" styles={viewStyles.replyAction}>
         {t("web.artifact.talk.send")}
       </Button>
     </form>

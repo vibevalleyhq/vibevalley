@@ -49,10 +49,22 @@ const styles = stylex.create({
 
 const tones: Record<Tone, stylex.StyleXStyles> = { plain: styles.plain, primary: styles.primary, quiet: styles.quiet, danger: styles.danger };
 
-export function Button(props: { tone?: Tone; icon?: IconName | undefined; children?: JSX.Element } & JSX.ButtonHTMLAttributes<HTMLButtonElement>) {
-  const rest = omit(props, "tone", "icon", "children", "class");
+export function Button(
+  props: {
+    tone?: Tone;
+    icon?: IconName | undefined;
+    children?: JSX.Element;
+  } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "class" | "style"> &
+    (
+      | { styles?: undefined; style?: JSX.ButtonHTMLAttributes<HTMLButtonElement>["style"] }
+      | { styles: stylex.StyleXStyles; style?: JSX.CSSProperties | undefined }
+    ),
+) {
+  const rest = omit(props, "tone", "icon", "children", "styles", "style");
+  const appearance = () => stylex.props(styles.button, tones[props.tone ?? "plain"], props.styles);
+  const inline = () => (typeof props.style === "object" || props.style === undefined ? { ...appearance().style, ...props.style } : props.style);
   return (
-    <button type="button" {...rest} class={[stylex.attrs(styles.button, tones[props.tone ?? "plain"]).class, props.class]}>
+    <button type="button" {...rest} class={appearance().className} style={inline()}>
       {props.icon && <Icon name={props.icon} size={14} />}
       {props.children}
     </button>
