@@ -1,8 +1,47 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Match, Switch } from "solid-js";
 
 import type { BadgeTone } from "@vibevalley/protocol";
 
 import type { SpriteAtlas, SpriteInfo } from "./atlas";
+
+const viewStyles = stylex.create({
+  animalFaceImg: {
+    position: "absolute",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  pieceViewImg: {
+    flexShrink: "0",
+    imageRendering: "pixelated",
+  },
+  pieceViewSvg: {
+    flexShrink: "0",
+  },
+  pieceViewSpan: {
+    position: "relative",
+    flexShrink: "0",
+  },
+  pieceViewSpan2: {
+    position: "absolute",
+    top: "0",
+  },
+  pieceViewSpan3: {
+    position: "absolute",
+    insetBlock: "0",
+    left: "0",
+  },
+  pixelCardDiv: {
+    display: "inline-block",
+    paddingRight: "calc(var(--spacing) * .5)",
+    paddingBottom: "calc(var(--spacing) * .5)",
+  },
+  pixelCardDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+  },
+});
 
 export const CardColors = {
   ink: "#3a2a18",
@@ -59,7 +98,7 @@ export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: numb
         src={cut().url}
         alt=""
         draggable="false"
-        class="absolute max-w-none [image-rendering:pixelated]"
+        {...stylex.attrs(viewStyles.animalFaceImg)}
         style={{ left: `${cut().left}px`, top: `${cut().top}px`, width: `${cut().width}px`, height: `${cut().height}px` }}
       />
     </span>
@@ -91,7 +130,7 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
             src={p().sprite.url}
             alt=""
             draggable="false"
-            class="shrink-0 [image-rendering:pixelated]"
+            {...stylex.attrs(viewStyles.pieceViewImg)}
             style={{ height: `${p().px}px`, width: `${(p().px * p().sprite.w) / p().sprite.h}px` }}
           />
         )}
@@ -105,7 +144,7 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
               height={p().px}
               viewBox={`0 0 ${grid().w} ${grid().h}`}
               shape-rendering="crispEdges"
-              class="shrink-0"
+              {...stylex.attrs(viewStyles.pieceViewSvg)}
               aria-hidden="true"
             >
               <For each={p().cells}>{([x, y, w, h, c]) => <rect x={x} y={y} width={w} height={h} fill={c} />}</For>
@@ -118,11 +157,11 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
           const px = () => p().px ?? 22;
           const n = () => p().looks.length;
           return (
-            <span class="relative shrink-0" style={{ width: `${n() === 0 ? 0 : px() + (n() - 1) * (px() - 10)}px`, height: `${px()}px` }}>
+            <span {...stylex.attrs(viewStyles.pieceViewSpan)} style={{ width: `${n() === 0 ? 0 : px() + (n() - 1) * (px() - 10)}px`, height: `${px()}px` }}>
               {/* The first is drawn last, on top. */}
               <For each={p().looks} keyed={false}>
                 {(look, i) => (
-                  <span class="absolute top-0" style={{ left: `${i * (px() - 10)}px`, "z-index": n() - i }}>
+                  <span {...stylex.attrs(viewStyles.pieceViewSpan2)} style={{ left: `${i * (px() - 10)}px`, "z-index": n() - i }}>
                     <AnimalFace atlas={p().atlas} look={look()} size={px()} />
                   </span>
                 )}
@@ -136,8 +175,14 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
           // Whole twentieths, so the fill moves in steps.
           const steps = () => Math.round(Math.min(1, Math.max(0, p().fill)) * 20) / 20;
           return (
-            <span class="relative shrink-0" style={{ width: `${p().w}px`, height: `${p().h}px`, background: p().track ?? CardColors.barTrack }}>
-              <span class="absolute inset-y-0 left-0" style={{ width: `${Math.round(p().w * steps())}px`, background: p().color ?? CardColors.barFill }} />
+            <span
+              {...stylex.attrs(viewStyles.pieceViewSpan)}
+              style={{ width: `${p().w}px`, height: `${p().h}px`, background: p().track ?? CardColors.barTrack }}
+            >
+              <span
+                {...stylex.attrs(viewStyles.pieceViewSpan3)}
+                style={{ width: `${Math.round(p().w * steps())}px`, background: p().color ?? CardColors.barFill }}
+              />
             </span>
           );
         }}
@@ -161,7 +206,7 @@ export function PixelCard(props: {
 }) {
   const centred = () => !(props.center !== true) || props.width !== undefined || props.height !== undefined;
   return (
-    <div class="inline-block pr-0.5 pb-0.5">
+    <div {...stylex.attrs(viewStyles.pixelCardDiv)}>
       <div
         class={["box-border flex border-2 shadow-px-shade", { "items-center justify-center": centred() }]}
         style={{
@@ -175,7 +220,7 @@ export function PixelCard(props: {
         <div class={["flex flex-col", props.center === true ? "items-center" : "items-start"]}>
           <For each={props.rows} keyed={false}>
             {(row) => (
-              <div class="flex items-center gap-[3px]">
+              <div {...stylex.attrs(viewStyles.pixelCardDiv2)}>
                 <For each={row()} keyed={false}>
                   {(p) => (
                     <PieceView

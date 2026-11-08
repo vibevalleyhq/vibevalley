@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,6 +14,25 @@ import { allOf, counts, kept, newest, type TreeFilter } from "./memories";
 import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
+
+const viewStyles = stylex.create({
+  treePageDiv: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 3)",
+    right: "calc(var(--spacing) * 3)",
+  },
+  treePageLabel: {
+    display: "flex",
+    minWidth: "220px",
+    flex: "1",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  treePageInput: {
+    flex: "1",
+    accentColor: "var(--color-leaf-500)",
+  },
+});
 
 export function TreePage() {
   const router = useRouter();
@@ -97,7 +117,7 @@ export function TreePage() {
           <div class={pxText.sm}>{t("web.tree.sky")}</div>
           <div class={[pxText.xs, "text-bark-500"]}>{t("web.tree.skyHint")}</div>
         </PxWindow>
-        <div class="absolute top-3 right-3">
+        <div {...stylex.attrs(viewStyles.treePageDiv)}>
           <PxButton icon="icon-tree" data-testid="tree-back" onClick={() => lookUp(false)}>
             {t("web.tree.back")}
           </PxButton>
@@ -118,7 +138,7 @@ export function TreePage() {
         <Show when={sky()}>
           <Filters tree={tree} filter={filter()} setFilter={setFilter} class="min-w-[220px] flex-1" />
         </Show>
-        <label class="flex min-w-[220px] flex-1 items-center gap-2">
+        <label {...stylex.attrs(viewStyles.treePageLabel)}>
           <span class={pxText.xs}>{t("web.tree.earliest")}</span>
           <input
             type="range"
@@ -128,7 +148,7 @@ export function TreePage() {
             value={until()}
             aria-label={t("web.tree.past")}
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
-            class="flex-1 accent-[var(--color-leaf-500)]"
+            {...stylex.attrs(viewStyles.treePageInput)}
           />
           <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} class={[pxText.xs, "w-[64px] text-right"]}>
             {until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}

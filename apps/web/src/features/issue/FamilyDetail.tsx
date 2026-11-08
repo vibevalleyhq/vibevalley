@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,6 +13,68 @@ import { toast } from "#/ui/toasts.ts";
 import { ActLines } from "./ActLines";
 import { createIssueActs } from "./acts";
 
+const viewStyles = stylex.create({
+  familyDetailDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+    paddingRight: "calc(var(--spacing) * 10)",
+  },
+  familyDetailH1: {
+    flex: "1",
+    fontSize: "var(--text-xl)",
+    lineHeight: "var(--text-xl--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  familyDetailSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  familyDetailDiv2: {
+    marginTop: "calc(var(--spacing) * 3)",
+  },
+  familyDetailDiv3: {
+    marginTop: "calc(var(--spacing) * 3)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  familyDetailDiv4: {
+    marginTop: "calc(var(--spacing) * 4)",
+  },
+  familyDetailH2: {
+    marginTop: "calc(var(--spacing) * 5)",
+    marginBottom: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  childIssue: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    textAlign: "left",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  familyDetailSpan2: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
+
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
   const acts = createIssueActs(() => props.issue, {
     act: createAct(),
@@ -21,14 +84,14 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
   });
   return (
     <div data-testid="issue-family">
-      <div class="flex items-start gap-3 pr-10">
-        <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
-        <span class="text-xs text-muted">{t(`shared.stage.${props.issue.stage.state}`)}</span>
+      <div {...stylex.attrs(viewStyles.familyDetailDiv)}>
+        <h1 {...stylex.attrs(viewStyles.familyDetailH1)}>{props.issue.title}</h1>
+        <span {...stylex.attrs(viewStyles.familyDetailSpan)}>{t(`shared.stage.${props.issue.stage.state}`)}</span>
       </div>
-      <div class="mt-3">
+      <div {...stylex.attrs(viewStyles.familyDetailDiv2)}>
         <ActLines issue={props.issue.id} />
       </div>
-      <div class="mt-3 flex flex-wrap gap-2">
+      <div {...stylex.attrs(viewStyles.familyDetailDiv3)}>
         <For each={props.issue.stage.acts}>
           {(action) => (
             <Button
@@ -43,16 +106,16 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
         </For>
       </div>
       <Show when={acts.box() || props.issue.stage.acts.some((action) => action.act === "reopen" && action.does === "move" && action.words === "required")}>
-        <div class="mt-3">
+        <div {...stylex.attrs(viewStyles.familyDetailDiv2)}>
           <TextArea aria-label={t("shared.act.tell")} value={acts.text()} onInput={(event) => acts.setText(event.currentTarget.value)} />
         </div>
       </Show>
       <Show when={props.issue.description}>
-        <div class="mt-4">
+        <div {...stylex.attrs(viewStyles.familyDetailDiv4)}>
           <Markdown text={props.issue.description} />
         </div>
       </Show>
-      <h2 class="mt-5 mb-2 text-sm font-semibold">{t("web.issue.family.children")}</h2>
+      <h2 {...stylex.attrs(viewStyles.familyDetailH2)}>{t("web.issue.family.children")}</h2>
       <div class="divide-y divide-line rounded-lg border border-line">
         <For each={props.children}>
           {(child) => (
@@ -60,12 +123,12 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
               type="button"
               data-testid="child-issue"
               data-issue={child.id}
-              class="flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left hover:bg-hover"
+              {...stylex.attrs(viewStyles.childIssue)}
               onClick={() => props.onOpen(child.id)}
             >
-              <span class="text-xs text-muted">#{child.number}</span>
-              <span class="min-w-0 flex-1 text-sm">{child.title}</span>
-              <span class="text-xs text-muted">{t(`shared.status.${child.status}`)}</span>
+              <span {...stylex.attrs(viewStyles.familyDetailSpan)}>#{child.number}</span>
+              <span {...stylex.attrs(viewStyles.familyDetailSpan2)}>{child.title}</span>
+              <span {...stylex.attrs(viewStyles.familyDetailSpan)}>{t(`shared.status.${child.status}`)}</span>
             </button>
           )}
         </For>

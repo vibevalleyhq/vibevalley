@@ -1,7 +1,21 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect } from "solid-js";
 
 import { Dialog as Base } from "@vibevalley/base-ui";
+
+const viewStyles = stylex.create({
+  dialogDiv: {
+    display: "flex",
+    maxHeight: "86vh",
+    flexDirection: "column",
+  },
+  dialogDiv2: {
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 5)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+});
 
 /** The native modal <dialog> (the top layer, a focus trap, the page behind inert), shown while `open`. Escape and a click on the backdrop ask onClose. */
 export function createModal(open: () => boolean, onClose: () => void) {
@@ -33,9 +47,9 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
           props.wide === true ? "w-[min(1080px,94vw)]" : "w-[min(480px,92vw)]",
         ]}
       >
-        <div class="flex max-h-[86vh] flex-col">
+        <div {...stylex.attrs(viewStyles.dialogDiv)}>
           <Base.Title class="border-b border-line px-5 py-3 text-base font-semibold">{props.title}</Base.Title>
-          <div class="overflow-y-auto px-5 py-4">{props.children}</div>
+          <div {...stylex.attrs(viewStyles.dialogDiv2)}>{props.children}</div>
         </div>
       </Base.Popup>
     </Base.Root>

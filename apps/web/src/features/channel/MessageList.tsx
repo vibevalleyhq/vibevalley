@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -28,6 +29,281 @@ import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
+
+const viewStyles = stylex.create({
+  messageListDiv: {
+    display: "flex",
+    flexDirection: "column",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+  },
+  messageListDiv2: {
+    display: "flex",
+    justifyContent: "center",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  messageListSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  messageListButton: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-faint)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+  messageListDiv3: {
+    marginBottom: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  messagesFailed: {
+    paddingBlock: "calc(var(--spacing) * 8)",
+    textAlign: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-berry)",
+  },
+  messagesEmpty: {
+    paddingBlock: "calc(var(--spacing) * 8)",
+    textAlign: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  messageListP: {
+    paddingInline: "calc(var(--spacing) * 6)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    textAlign: "center",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--leading-relaxed)",
+    color: "var(--wb-muted)",
+  },
+  messageListDiv4: {
+    display: "flex",
+    height: "calc(var(--spacing) * 5)",
+    alignItems: "center",
+  },
+  pendingLinesP: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    overflowWrap: "break-word",
+    whiteSpace: "pre-wrap",
+  },
+  pendingLinesDiv: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  pendingLinesSpan: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "var(--wb-berry)",
+  },
+  pendingRetry: {
+    display: "inline-flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  frameDiv: {
+    paddingLeft: "52px",
+  },
+  frameDiv2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  frameDiv3: {
+    position: "relative",
+    width: "calc(var(--spacing) * 10)",
+    flexShrink: "0",
+  },
+  frameSpan: {
+    position: "absolute",
+    top: "26px",
+    left: "26px",
+  },
+  frameDiv4: {
+    minWidth: "0",
+    flex: "1",
+    paddingBottom: "calc(var(--spacing) * .5)",
+  },
+  frameDiv5: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  frameSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  frameSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  dispatchDiv: {
+    minWidth: "0",
+    flex: "1",
+  },
+  dispatchButton: {
+    display: "block",
+    width: "100%",
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "left",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  dispatchP: {
+    display: "flex",
+    minWidth: "0",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  dispatchSpan: {
+    flexShrink: "0",
+  },
+  dispatchSpan2: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  dispatchButton2: {
+    marginTop: "5px",
+    cursor: "pointer",
+  },
+  messageRowDiv: {
+    marginBottom: "var(--spacing)",
+  },
+  messageRowDiv2: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  messageQuotedBlock: {
+    display: "flex",
+    maxWidth: "var(--container-md)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "2px",
+    borderColor: "var(--wb-wheat)",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  messageRowSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  messageRowDiv3: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  threadPreviewSpan: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  threadPreviewSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-accent)",
+  },
+  threadPreviewSpan3: {
+    flex: "1",
+  },
+  threadPreviewSpan4: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  threadPreviewSpan5: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  threadPreviewSpan6: {
+    flexShrink: "0",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  threadPreviewSpan7: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "var(--wb-muted)",
+  },
+});
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },
@@ -154,12 +430,12 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         data-testid="messages"
         data-read={props.channel?.read}
       >
-        <div class="flex flex-col px-4 pt-3 pb-4">
-          <div class="flex justify-center pb-2">
+        <div {...stylex.attrs(viewStyles.messageListDiv)}>
+          <div {...stylex.attrs(viewStyles.messageListDiv2)}>
             <Show
               when={hasOlder() && !searching()}
               fallback={
-                <span class="text-xs text-muted">
+                <span {...stylex.attrs(viewStyles.messageListSpan)}>
                   {searching()
                     ? search()?.state !== "done" && searchFailed() === undefined
                       ? t("web.channel.messages.searching")
@@ -174,7 +450,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                   const ch = id();
                   if (ch) void followed.loadOlder(ch);
                 }}
-                class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink"
+                {...stylex.attrs(viewStyles.messageListButton)}
               >
                 {t("web.channel.messages.older")}
               </button>
@@ -182,20 +458,20 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           </div>
           <Show when={parent()}>
             {(m) => (
-              <div class="mb-2 border-b border-line pb-2">
+              <div {...stylex.attrs(viewStyles.messageListDiv3)}>
                 <MessageRow m={m()} continues={false} />
               </div>
             )}
           </Show>
           <Show when={searching() ? searchFailed() : said().error}>
             {(why) => (
-              <p data-testid="messages-failed" class="py-8 text-center text-sm text-berry">
+              <p data-testid="messages-failed" {...stylex.attrs(viewStyles.messagesFailed)}>
                 {searching() ? t("web.channel.messages.searchFailed", { why: why() }) : t("web.channel.messages.readFailed", { why: why() })}
               </p>
             )}
           </Show>
           <Show when={items().length === 0 && (searching() ? hits() !== undefined : !said().error)}>
-            <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
+            <p data-testid="messages-empty" {...stylex.attrs(viewStyles.messagesEmpty)}>
               {searching() ? t("web.channel.messages.notFound") : props.emptyText}
             </p>
           </Show>
@@ -239,7 +515,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                     />
                   }
                 >
-                  <p class="px-6 py-2 text-center text-xs leading-relaxed text-muted">{item().message.text}</p>
+                  <p {...stylex.attrs(viewStyles.messageListP)}>{item().message.text}</p>
                 </Show>
               </div>
             )}
@@ -254,7 +530,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                 name={orchestrators().find((a) => a.id === typer().agent)?.name || t("web.channel.orchestrator")}
                 meta={roundText(typer().mood, typer().since)}
               >
-                <div class="flex h-5 items-center">
+                <div {...stylex.attrs(viewStyles.messageListDiv4)}>
                   <ThinkingDots />
                 </div>
               </Frame>
@@ -279,25 +555,15 @@ function PendingLines(props: { channel: string | undefined; messages: readonly C
             name={t("web.channel.messages.owner")}
             meta={l().state === "sending" ? t("web.channel.messages.sending") : t("web.channel.messages.notSent")}
           >
-            <p class="text-base break-words whitespace-pre-wrap">{l().text}</p>
+            <p {...stylex.attrs(viewStyles.pendingLinesP)}>{l().text}</p>
             <Show when={l().state === "failed"}>
-              <div class="mt-1 flex items-center gap-2 text-xs">
-                <span class="min-w-0 truncate text-berry">{l().reason ?? t("web.channel.messages.notSent")}</span>
-                <button
-                  type="button"
-                  data-testid="pending-retry"
-                  onClick={() => void says.retry(l().key)}
-                  class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-muted hover:bg-hover hover:text-ink"
-                >
+              <div {...stylex.attrs(viewStyles.pendingLinesDiv)}>
+                <span {...stylex.attrs(viewStyles.pendingLinesSpan)}>{l().reason ?? t("web.channel.messages.notSent")}</span>
+                <button type="button" data-testid="pending-retry" onClick={() => void says.retry(l().key)} {...stylex.attrs(viewStyles.pendingRetry)}>
                   <Icon name="retry" size={12} />
                   {t("web.channel.messages.retrySend")}
                 </button>
-                <button
-                  type="button"
-                  data-testid="pending-drop"
-                  onClick={() => says.drop(l().key)}
-                  class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-muted hover:bg-hover hover:text-ink"
-                >
+                <button type="button" data-testid="pending-drop" onClick={() => says.drop(l().key)} {...stylex.attrs(viewStyles.pendingRetry)}>
                   <Icon name="close" size={12} />
                   {t("web.channel.messages.dropSend")}
                 </button>
@@ -341,25 +607,25 @@ function Frame(props: {
       {props.tools}
       <Show when={props.quote}>
         {(q) => (
-          <div class="pl-[52px]">
+          <div {...stylex.attrs(viewStyles.frameDiv)}>
             <ReplyQuote channel={q().channel} number={q().number} />
           </div>
         )}
       </Show>
-      <div class="flex gap-3">
-        <div class="relative w-10 shrink-0">
+      <div {...stylex.attrs(viewStyles.frameDiv2)}>
+        <div {...stylex.attrs(viewStyles.frameDiv3)}>
           <Show when={props.continues !== true}>
             {props.face}
             <Show when={props.dot}>
-              <span class="absolute top-[26px] left-[26px]">{props.dot}</span>
+              <span {...stylex.attrs(viewStyles.frameSpan)}>{props.dot}</span>
             </Show>
           </Show>
         </div>
-        <div class="min-w-0 flex-1 pb-0.5">
+        <div {...stylex.attrs(viewStyles.frameDiv4)}>
           <Show when={props.continues !== true}>
-            <div class="flex items-baseline gap-2">
-              <span class="text-sm font-semibold">{props.name}</span>
-              <span class="truncate text-xs text-muted">{props.meta}</span>
+            <div {...stylex.attrs(viewStyles.frameDiv5)}>
+              <span {...stylex.attrs(viewStyles.frameSpan2)}>{props.name}</span>
+              <span {...stylex.attrs(viewStyles.frameSpan3)}>{props.meta}</span>
             </div>
           </Show>
           {props.children}
@@ -381,25 +647,25 @@ function Dispatch(props: { m: ChatMessage }) {
   };
   return (
     <div class="group/d flex items-start gap-1.5" data-testid="dispatch">
-      <div class="min-w-0 flex-1">
+      <div {...stylex.attrs(viewStyles.dispatchDiv)}>
         <Show
           when={open()}
           fallback={
             <Show
               when={issue()}
               fallback={
-                <button type="button" onClick={() => setOpen(true)} class="block w-full cursor-pointer truncate text-left text-base">
+                <button type="button" onClick={() => setOpen(true)} {...stylex.attrs(viewStyles.dispatchButton)}>
                   {plainText(props.m.text)}
                 </button>
               }
             >
               {(i) => (
-                <p class="flex min-w-0 items-baseline gap-1.5 text-base">
-                  <span class="shrink-0">{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
+                <p {...stylex.attrs(viewStyles.dispatchP)}>
+                  <span {...stylex.attrs(viewStyles.dispatchSpan)}>{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
                   <A href={`/issues/${i().id}`} data-testid="dispatch-issue" class="min-w-0 truncate font-medium text-water hover:underline">
                     #{i().number} {i().title}
                   </A>
-                  <Show when={i().repo}>{(p) => <span class="shrink-0 text-xs text-muted">{p()}</span>}</Show>
+                  <Show when={i().repo}>{(p) => <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{p()}</span>}</Show>
                 </p>
               )}
             </Show>
@@ -413,7 +679,7 @@ function Dispatch(props: { m: ChatMessage }) {
         onClick={() => setOpen(!open())}
         aria-label={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")}
         aria-expanded={aria(open())}
-        class="mt-[5px] cursor-pointer"
+        {...stylex.attrs(viewStyles.dispatchButton2)}
       >
         <Icon name={open() ? "collapse" : "enlarge"} size={12} class="opacity-50 group-hover/d:opacity-100" />
       </button>
@@ -476,12 +742,12 @@ export function MessageRow(props: {
       }
     >
       <Show when={props.m.kind === "dispatch"}>
-        <div class="mb-1">
+        <div {...stylex.attrs(viewStyles.messageRowDiv)}>
           <Tag icon="send" label={t("web.channel.messages.dispatch")} tone="wait" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
-        <div class="mb-1">
+        <div {...stylex.attrs(viewStyles.messageRowDiv)}>
           <Tag icon={outcome().icon} label={outcome().label} tone={outcome().tone} />
         </div>
       </Show>
@@ -499,16 +765,12 @@ export function MessageRow(props: {
       <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</Show>
       <Show when={props.m.deleted === undefined && (props.m.blocks?.length ?? 0) > 0 ? props.m.blocks : undefined}>
         {(blocks) => (
-          <div class="mt-1 flex flex-col gap-1">
+          <div {...stylex.attrs(viewStyles.messageRowDiv2)}>
             <For each={blocks()} keyed={(b) => `${b.artifactId}:${b.blockId}`}>
               {(b) => (
-                <div
-                  data-testid="message-quoted-block"
-                  data-key={b().blockId}
-                  class="flex max-w-md items-center gap-2 rounded-md border-l-2 border-wheat bg-hover px-2 py-1 text-xs text-muted"
-                >
+                <div data-testid="message-quoted-block" data-key={b().blockId} {...stylex.attrs(viewStyles.messageQuotedBlock)}>
                   <Icon name="artifacts" size={12} />
-                  <span class="min-w-0 flex-1 truncate">
+                  <span {...stylex.attrs(viewStyles.messageRowSpan)}>
                     {t("web.channel.messages.quotedBlock", {
                       title: b().title,
                       text: b().deleted === true ? t("web.channel.messages.quotedGone") : (b().text ?? ""),
@@ -527,7 +789,7 @@ export function MessageRow(props: {
       </Show>
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>
         {(spent) => (
-          <div class="mt-1 flex items-center gap-1 text-xs text-muted">
+          <div {...stylex.attrs(viewStyles.messageRowDiv3)}>
             <Icon name="spend" size={12} />
             {t("web.channel.messages.spent", { spent: spentText(spent()) })}
           </div>
@@ -560,9 +822,9 @@ function ThreadPreview(props: { thread: Channel }) {
       onClick={() => router.navigate(chatPath(props.thread))}
       class="group/t mt-2 flex w-full max-w-xl cursor-pointer flex-col gap-1 rounded-lg border border-line px-3 py-2 text-left hover:bg-hover focus-visible:border-focus"
     >
-      <span class="flex w-full items-center gap-1.5">
+      <span {...stylex.attrs(viewStyles.threadPreviewSpan)}>
         <Icon name="thread" size={16} />
-        <span class="text-sm font-semibold text-accent">
+        <span {...stylex.attrs(viewStyles.threadPreviewSpan2)}>
           {props.thread.replies > 0
             ? t("web.channel.replies", { n: props.thread.replies })
             : props.thread.subjectKind === "issue"
@@ -572,11 +834,11 @@ function ThreadPreview(props: { thread: Channel }) {
         <Show when={unread() > 0}>
           <Tag label={t("web.channel.messages.unread", { n: unread() })} tone="ok" />
         </Show>
-        <Show when={session()} fallback={<span class="flex-1" />}>
+        <Show when={session()} fallback={<span {...stylex.attrs(viewStyles.threadPreviewSpan3)} />}>
           {(s) => (
             <>
               <PhaseGlyph phase={s().phase} />
-              <span class="min-w-0 flex-1 truncate text-xs text-muted">{phaseText(s(), now())}</span>
+              <span {...stylex.attrs(viewStyles.threadPreviewSpan4)}>{phaseText(s(), now())}</span>
             </>
           )}
         </Show>
@@ -584,10 +846,10 @@ function ThreadPreview(props: { thread: Channel }) {
       </span>
       <Show when={last()}>
         {(m) => (
-          <span class="flex w-full items-center gap-2 text-sm">
-            <span class="shrink-0 font-medium">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
-            <span class="min-w-0 flex-1 truncate text-muted">{plainText(m().text)}</span>
-            <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
+          <span {...stylex.attrs(viewStyles.threadPreviewSpan5)}>
+            <span {...stylex.attrs(viewStyles.threadPreviewSpan6)}>{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
+            <span {...stylex.attrs(viewStyles.threadPreviewSpan7)}>{plainText(m().text)}</span>
+            <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{workbenchClock(m().at)}</span>
           </span>
         )}
       </Show>

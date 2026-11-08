@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, omit, Show } from "solid-js";
 
 import { Switch } from "@vibevalley/base-ui";
@@ -12,6 +13,123 @@ import { TextInput } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Hint } from "./Tip";
+
+const viewStyles = stylex.create({
+  listRowSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  listRowSpan2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  cardHeader: {
+    display: "flex",
+    minHeight: "calc(var(--spacing) * 12)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  cardH2: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  cardDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  quietP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  emptyDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "calc(var(--spacing) * 48)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "calc(var(--spacing) * 6)",
+  },
+  emptyDiv2: {
+    display: "flex",
+    maxWidth: "calc(var(--spacing) * 96)",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    textAlign: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  toggleSpan: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  toggleSpan2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  toggleSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  secretInputSpan: {
+    position: "relative",
+    display: "flex",
+  },
+  reveal: {
+    position: "absolute",
+    insetBlock: "0",
+    right: "var(--spacing)",
+    marginBlock: "auto",
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: ".25rem",
+    color: {
+      default: "var(--wb-faint)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
 
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
 export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
@@ -59,9 +177,9 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
       >
         {props.leading}
         <span class="flex min-w-0 flex-1 flex-col">
-          <span class="truncate text-sm font-medium">{props.title}</span>
+          <span {...stylex.attrs(viewStyles.listRowSpan)}>{props.title}</span>
           <Show when={props.line}>
-            <span class="truncate text-xs text-muted">{props.line}</span>
+            <span {...stylex.attrs(viewStyles.listRowSpan2)}>{props.line}</span>
           </Show>
         </span>
         {props.trailing}
@@ -75,26 +193,26 @@ export function Card(props: { title?: JSX.Element; action?: JSX.Element; childre
   return (
     <section data-testid={props.testid} data-key={props.item} class={["flex flex-col rounded-lg border border-line bg-page", props.class]}>
       <Show when={props.title !== undefined}>
-        <header class="flex min-h-12 items-center gap-2 border-b border-line px-4 py-2">
-          <h2 class="min-w-0 flex-1 truncate text-base font-semibold">{props.title}</h2>
+        <header {...stylex.attrs(viewStyles.cardHeader)}>
+          <h2 {...stylex.attrs(viewStyles.cardH2)}>{props.title}</h2>
           {props.action}
         </header>
       </Show>
-      <div class="flex flex-col gap-4 p-4">{props.children}</div>
+      <div {...stylex.attrs(viewStyles.cardDiv)}>{props.children}</div>
     </section>
   );
 }
 
 /** Nothing to show yet, in words. */
 export function Quiet(props: { children: JSX.Element }) {
-  return <p class="text-sm text-muted">{props.children}</p>;
+  return <p {...stylex.attrs(viewStyles.quietP)}>{props.children}</p>;
 }
 
 /** A place with nothing in it yet (docs/style/design.md): its icon, why it is empty, and the next step if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
   return (
-    <div data-testid={props.testid ?? "empty"} class="flex h-full min-h-48 items-center justify-center p-6">
-      <div class="flex max-w-96 flex-col items-center gap-3 text-center text-sm text-muted">
+    <div data-testid={props.testid ?? "empty"} {...stylex.attrs(viewStyles.emptyDiv)}>
+      <div {...stylex.attrs(viewStyles.emptyDiv2)}>
         <Icon name={props.icon} size={48} class="text-faint" />
         <p>{props.children}</p>
         {props.action}
@@ -127,13 +245,13 @@ export function Toggle(props: {
       >
         <Switch.Thumb class="block size-3 rounded-full bg-page shadow transition-transform data-checked:translate-x-3" />
       </Switch.Root>
-      <span class="flex flex-col">
-        <span class="flex items-center gap-1 text-sm">
+      <span {...stylex.attrs(viewStyles.toggleSpan)}>
+        <span {...stylex.attrs(viewStyles.toggleSpan2)}>
           {props.label}
           <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         </span>
         <Show when={props.hint}>
-          <span class="text-xs text-muted">{props.hint}</span>
+          <span {...stylex.attrs(viewStyles.toggleSpan3)}>{props.hint}</span>
         </Show>
       </span>
     </label>
@@ -145,13 +263,13 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
   const [shown, setShown] = createSignal(false);
   const rest = omit(props, "class");
   return (
-    <span class="relative flex">
+    <span {...stylex.attrs(viewStyles.secretInputSpan)}>
       <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-9 font-mono", props.class]} />
       <button
         type="button"
         data-testid="reveal"
         aria-pressed={aria(shown())}
-        class="absolute inset-y-0 right-1 my-auto inline-flex size-7 cursor-pointer items-center justify-center rounded text-faint hover:bg-hover hover:text-ink"
+        {...stylex.attrs(viewStyles.reveal)}
         aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         onClick={() => setShown(!shown())}

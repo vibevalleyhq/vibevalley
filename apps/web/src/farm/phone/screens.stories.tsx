@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 
 import type { InboxItem, InboxKind } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
@@ -8,10 +9,22 @@ import type { CallPhase } from "#/features/voice/index.ts";
 import { lcd } from "./lcd";
 import { OrchestratorLine, RingingScreen } from "./screens";
 
+const viewStyles = stylex.create({
+  screenDiv: {
+    display: "flex",
+    height: "25rem",
+    width: "calc(var(--spacing) * 60)",
+    flexDirection: "column",
+    padding: "2px",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+  },
+});
+
 /** The handset's screen, without the handset: the farm's store and the room are not here. */
 function Screen(props: { children: JSX.Element }) {
   return (
-    <div class="flex h-[25rem] w-60 flex-col p-[2px] font-pixel text-[12px]" style={{ background: lcd.paper, color: lcd.ink }}>
+    <div {...stylex.attrs(viewStyles.screenDiv)} style={{ background: lcd.paper, color: lcd.ink }}>
       {props.children}
     </div>
   );

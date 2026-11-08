@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,6 +13,58 @@ import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
 import { DashedLine, PxMarkdown } from "#/ui/pixel/index.ts";
 
 import { clockOf, FarmEmpty, FarmTag } from "./rows";
+
+const viewStyles = stylex.create({
+  farmLogDiv: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  farmLogDiv2: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  farmLogSpan: {
+    width: "calc(var(--spacing) * 11)",
+    flexShrink: "0",
+    paddingTop: "calc(var(--spacing) * 1.5)",
+    textAlign: "right",
+    fontSize: "12px",
+    color: "var(--color-bark-400)",
+  },
+  saidSpan: {
+    display: "flex",
+    height: "calc(var(--spacing) * 8)",
+    width: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "var(--color-leaf-500)",
+    fontSize: "12px",
+    color: "var(--color-bark-900)",
+  },
+  saidDiv: {
+    minWidth: "0",
+    flex: "1",
+  },
+  saidDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  saidSpan2: {
+    fontSize: "13px",
+  },
+  reportP: {
+    marginTop: "calc(var(--spacing) * .5)",
+    fontSize: "13px",
+  },
+  reportP2: {
+    fontSize: "12px",
+    color: "var(--color-bark-400)",
+  },
+});
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [t("shared.outcome.completed"), "#efcf92", "#2f1f13"],
@@ -37,15 +90,15 @@ export function FarmLog() {
     ].toSorted((a, b) => b.message.at - a.message.at);
   return (
     <Show when={rows().length > 0} fallback={<FarmEmpty text={t("web.farm.log.empty")} />}>
-      <div class="flex flex-col">
+      <div {...stylex.attrs(viewStyles.farmLogDiv)}>
         <For each={rows().slice(0, 80)} keyed={(row) => row.message.id}>
           {(row, i) => (
             <div>
               <Show when={i() > 0}>
                 <DashedLine />
               </Show>
-              <div class="flex items-start gap-2.5 py-2">
-                <span class="w-11 shrink-0 pt-1.5 text-right text-[12px] text-bark-400">{clockOf(row().message.at)}</span>
+              <div {...stylex.attrs(viewStyles.farmLogDiv2)}>
+                <span {...stylex.attrs(viewStyles.farmLogSpan)}>{clockOf(row().message.at)}</span>
                 <Show
                   when={row().kind === "said"}
                   fallback={<Report r={row().message} issue={issueOfSession(core(), row().message.session ?? row().message.from)} />}
@@ -66,11 +119,11 @@ function Said(props: { m: ChatMessage }) {
   return (
     <>
       <Show when={you()} fallback={<OrchestratorFace size={32} agent={props.m.from} />}>
-        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-bark-900">{t("web.farm.log.you")}</span>
+        <span {...stylex.attrs(viewStyles.saidSpan)}>{t("web.farm.log.you")}</span>
       </Show>
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
-          <span class="text-[13px]">{you() ? t("web.farm.log.you") : t("web.farm.orchestrator")}</span>
+      <div {...stylex.attrs(viewStyles.saidDiv)}>
+        <div {...stylex.attrs(viewStyles.saidDiv2)}>
+          <span {...stylex.attrs(viewStyles.saidSpan2)}>{you() ? t("web.farm.log.you") : t("web.farm.orchestrator")}</span>
           <FarmTag text={you() ? t("web.farm.log.said") : t("web.farm.log.answered")} ink="#67482d" />
         </div>
         <div class={["mt-0.5 text-[13px]", you() ? "text-bark-900" : "text-bark-800"]}>
@@ -90,16 +143,16 @@ function Report(props: { r: ChatMessage; issue?: Issue | undefined }) {
   return (
     <>
       <AgentFace agentId={agentId() ?? ""} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={32} />
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
-          <span class="text-[13px]">{props.r.name}</span>
+      <div {...stylex.attrs(viewStyles.saidDiv)}>
+        <div {...stylex.attrs(viewStyles.saidDiv2)}>
+          <span {...stylex.attrs(viewStyles.saidSpan2)}>{props.r.name}</span>
           <FarmTag text={outcomeTag[outcome()][0]} fill={outcomeTag[outcome()][1]} ink={outcomeTag[outcome()][2]} />
         </div>
         <Show when={props.issue}>
-          <p class="mt-0.5 text-[13px]">{props.issue!.title}</p>
+          <p {...stylex.attrs(viewStyles.reportP)}>{props.issue!.title}</p>
         </Show>
         <p class={["line-clamp-4 text-[12px]", outcome() === "failed" ? "text-berry" : "text-bark-600"]}>{props.r.text}</p>
-        <Show when={props.r.spent}>{(spent) => <p class="text-[12px] text-bark-400">{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
+        <Show when={props.r.spent}>{(spent) => <p {...stylex.attrs(viewStyles.reportP2)}>{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
       </div>
     </>
   );

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -11,6 +12,31 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { missedOf, phoneState } from "./calls";
 import { phoneCells } from "./lcd";
+
+const viewStyles = stylex.create({
+  phoneButtonSpan: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -1.5)",
+    right: "calc(var(--spacing) * -1.5)",
+    backgroundColor: "var(--color-berry-500)",
+    paddingInline: "var(--spacing)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "10px",
+    lineHeight: "14px",
+    color: "var(--color-cream-50)",
+  },
+  phoneButtonSpan2: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -1.5)",
+    right: "calc(var(--spacing) * -1.5)",
+    backgroundColor: "var(--wb-berry)",
+    paddingInline: "var(--spacing)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "10px",
+    lineHeight: "14px",
+    color: "var(--color-cream-50)",
+  },
+});
 
 export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);
@@ -52,10 +78,10 @@ export function PhoneButton(props: { height: number }) {
         ]}
       />
       <Show when={count() > 0}>
-        <span class="absolute -top-1.5 -right-1.5 bg-berry-500 px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{count()}</span>
+        <span {...stylex.attrs(viewStyles.phoneButtonSpan)}>{count()}</span>
       </Show>
       <Show when={count() === 0 && unread() > 0}>
-        <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{t("web.farm.phone.new")}</span>
+        <span {...stylex.attrs(viewStyles.phoneButtonSpan2)}>{t("web.farm.phone.new")}</span>
       </Show>
     </button>
   );

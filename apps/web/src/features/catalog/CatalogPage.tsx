@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -17,6 +18,173 @@ import { Tabs } from "#/ui/Tabs.tsx";
 
 import { CursorTile, Detail, fitScale, type Ground, grounds, groundStyle, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
+
+const viewStyles = stylex.create({
+  catalogPageDiv: {
+    height: "100%",
+  },
+  columnDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  layoutDiv: {
+    flexShrink: "0",
+    borderBottomStyle: {
+      default: "solid",
+      "@media (width>=64rem)": "solid",
+    },
+    borderBottomWidth: {
+      default: "1px",
+      "@media (width>=64rem)": "0",
+    },
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-side)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 60)",
+    },
+    overflowY: {
+      default: null,
+      "@media (width>=64rem)": "auto",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=64rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=64rem)": "1px",
+    },
+  },
+  searchDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  shelfButtonSpan: {
+    flex: "1",
+    textAlign: "left",
+  },
+  shelfButtonSpan2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-normal)",
+    color: "var(--wb-muted)",
+  },
+  catalogShelves: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  spritesP: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingTop: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  spritesSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  spritesDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  spritesSpan2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-muted)",
+  },
+  spritesDiv2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill,minmax(88px,1fr))",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  spritesSpan3: {
+    position: "relative",
+    display: "flex",
+    width: "calc(var(--spacing) * 20)",
+    height: "calc(var(--spacing) * 20)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+  },
+  spritesSpan4: {
+    width: "100%",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "center",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  cursorsP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  cursorsDiv: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill,minmax(104px,1fr))",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  soundsCode: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  soundsDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  sound: {
+    display: "flex",
+    height: "calc(var(--spacing) * 8)",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+      ":active": "var(--wb-selected)",
+    },
+    paddingRight: "calc(var(--spacing) * 3)",
+    paddingLeft: "calc(var(--spacing) * 1.5)",
+  },
+  soundsSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  soundsSpan2: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 const usePictures = () => {
   const query = useSprites();
@@ -40,7 +208,7 @@ export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" || props.rest === "sounds" ? props.rest : "sprites");
   const tabs = () => <Tabs label={t("web.catalog.shelves")} value={shelf()} items={shelfTabs.map((s) => ({ value: s.id, label: s.label, href: s.to }))} />;
   return (
-    <div class="h-full">
+    <div {...stylex.attrs(viewStyles.catalogPageDiv)}>
       <Switch fallback={<Sprites id={props.rest ? decodeURIComponent(props.rest) : undefined} tabs={tabs()} />}>
         <Match when={shelf() === "cursors"}>
           <Cursors tabs={tabs()} />
@@ -56,7 +224,7 @@ export function CatalogPage(props: { rest: string }) {
 /** The column every shelf has, so switching shelves never moves the picker: the page's side column (Layout). */
 function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
   return (
-    <div class="flex flex-col gap-2">
+    <div {...stylex.attrs(viewStyles.columnDiv)}>
       {props.tabs}
       {props.children}
     </div>
@@ -67,7 +235,7 @@ function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.E
   return (
     // The shelves are the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
     <div class="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <div class="shrink-0 border-b border-line bg-side px-2 py-3 lg:w-60 lg:overflow-y-auto lg:border-r lg:border-b-0">{props.left}</div>
+      <div {...stylex.attrs(viewStyles.layoutDiv)}>{props.left}</div>
       <Show when={props.right}>
         <div class="shrink-0 p-3 xl:order-last xl:w-88 xl:overflow-y-auto xl:pl-0">{props.right}</div>
       </Show>
@@ -78,7 +246,7 @@ function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.E
 
 function Search(props: { query: string; onChange: (q: string) => void; placeholder: string; ground?: Ground; onGround?: (g: Ground) => void }) {
   return (
-    <div class="flex flex-wrap items-center gap-2">
+    <div {...stylex.attrs(viewStyles.searchDiv)}>
       <TextInput
         data-testid="catalog-search"
         aria-label={t("web.catalog.find")}
@@ -131,8 +299,8 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
       onClick={() => setShelf(b.id)}
       class={["flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-sm", shelf() === b.id ? "bg-selected font-semibold" : "hover:bg-hover"]}
     >
-      <span class="flex-1 text-left">{b.label}</span>
-      <span class="text-xs font-normal text-muted">{b.count}</span>
+      <span {...stylex.attrs(viewStyles.shelfButtonSpan)}>{b.label}</span>
+      <span {...stylex.attrs(viewStyles.shelfButtonSpan2)}>{b.count}</span>
     </button>
   );
   return (
@@ -141,11 +309,11 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
         <Layout
           left={
             <Column tabs={props.tabs}>
-              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" class="flex flex-col gap-0.5">
+              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" {...stylex.attrs(viewStyles.catalogShelves)}>
                 <ShelfButton id="all" label={t("web.catalog.all")} count={pics().length} />
                 <For each={present()}>{(s) => <ShelfButton id={s.id} label={s.label} count={counts().get(s.id) ?? 0} />}</For>
               </nav>
-              <p class="px-2 pt-1 text-xs text-muted">{t("web.catalog.count", { n: pics().length })}</p>
+              <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.count", { n: pics().length })}</p>
             </Column>
           }
           right={
@@ -165,15 +333,15 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                 <Show when={groups().length > 0}>
                   <Card
                     title={`${s.label} · ${groups().reduce((n, g) => n + g.pictures.length, 0)}`}
-                    action={<span class="truncate text-xs text-muted">{s.hint}</span>}
+                    action={<span {...stylex.attrs(viewStyles.spritesSpan)}>{s.hint}</span>}
                   >
                     <For each={groups()}>
                       {(g) => (
-                        <div class="flex flex-col gap-1.5">
+                        <div {...stylex.attrs(viewStyles.spritesDiv)}>
                           <Show when={g.label}>
-                            <span class="text-xs font-semibold text-muted">{g.label}</span>
+                            <span {...stylex.attrs(viewStyles.spritesSpan2)}>{g.label}</span>
                           </Show>
-                          <div class="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-1.5">
+                          <div {...stylex.attrs(viewStyles.spritesDiv2)}>
                             <For each={g.pictures}>
                               {(p) => (
                                 <button
@@ -189,7 +357,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                     selected()?.name === p.name ? "bg-selected" : "hover:bg-hover",
                                   ]}
                                 >
-                                  <span class="relative flex size-20 items-center justify-center overflow-hidden rounded-md" style={groundStyle(ground())}>
+                                  <span {...stylex.attrs(viewStyles.spritesSpan3)} style={groundStyle(ground())}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
                                       <span class="absolute top-0.5 right-0.5 rounded-xs bg-bark-900/70 px-1 text-2xs leading-[14px] text-paper">
@@ -197,7 +365,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                       </span>
                                     </Show>
                                   </span>
-                                  <span class="w-full truncate text-center font-mono text-2xs text-muted">{p.name}</span>
+                                  <span {...stylex.attrs(viewStyles.spritesSpan4)}>{p.name}</span>
                                 </button>
                               )}
                             </For>
@@ -230,15 +398,15 @@ function Cursors(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p class="px-2 pt-1 text-xs text-muted">{t("web.catalog.cursorsIntro")}</p>
+          <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.cursorsIntro")}</p>
         </Column>
       }
     >
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.cursorsFind")} ground={ground()} onGround={setGround} />
       <Card title={t("web.catalog.cursors", { n: all()?.length ?? 0 })}>
-        <p class="text-sm text-muted">{t("web.catalog.cursorsNote")}</p>
+        <p {...stylex.attrs(viewStyles.cursorsP)}>{t("web.catalog.cursorsNote")}</p>
         <Show when={data() !== null} fallback={<Quiet>{t("web.catalog.noCursors")}</Quiet>}>
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-1.5">
+          <div {...stylex.attrs(viewStyles.cursorsDiv)}>
             <For each={all() ?? []}>{([name, hot]) => <CursorTile name={name} hx={hot.hx} hy={hot.hy} ground={ground()} />}</For>
           </div>
         </Show>
@@ -257,15 +425,15 @@ function Sounds(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p class="px-2 pt-1 text-xs text-muted">{t("web.catalog.soundsIntro")}</p>
+          <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.soundsIntro")}</p>
         </Column>
       }
     >
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.soundsFind")} />
       <Card>
-        <p class="text-sm text-muted">
-          {t("web.catalog.soundsRecipes")} <code class="font-mono text-xs">apps/web/src/ui/pixel/sound.ts</code>
-          {t("web.catalog.soundsMusic")} <code class="font-mono text-xs">design/music/suno-prompts.md</code>
+        <p {...stylex.attrs(viewStyles.cursorsP)}>
+          {t("web.catalog.soundsRecipes")} <code {...stylex.attrs(viewStyles.soundsCode)}>apps/web/src/ui/pixel/sound.ts</code>
+          {t("web.catalog.soundsMusic")} <code {...stylex.attrs(viewStyles.soundsCode)}>design/music/suno-prompts.md</code>
           {t("web.catalog.period")}
         </p>
       </Card>
@@ -275,7 +443,7 @@ function Sounds(props: { tabs: JSX.Element }) {
           return (
             <Show when={names().length > 0}>
               <Card title={g.title}>
-                <div class="flex flex-wrap gap-2">
+                <div {...stylex.attrs(viewStyles.soundsDiv)}>
                   <For each={names()}>
                     {(name) => (
                       <button
@@ -284,11 +452,11 @@ function Sounds(props: { tabs: JSX.Element }) {
                         data-key={name}
                         aria-label={t("web.catalog.playSound", { name: SOUND_LABEL[name] })}
                         onClick={() => playSound(name)}
-                        class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page pr-3 pl-1.5 hover:bg-hover active:bg-selected"
+                        {...stylex.attrs(viewStyles.sound)}
                       >
                         <Icon name="play" size={16} />
-                        <span class="text-sm font-medium">{SOUND_LABEL[name]}</span>
-                        <span class="font-mono text-xs text-muted">{name}</span>
+                        <span {...stylex.attrs(viewStyles.soundsSpan)}>{SOUND_LABEL[name]}</span>
+                        <span {...stylex.attrs(viewStyles.soundsSpan2)}>{name}</span>
                       </button>
                     )}
                   </For>

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -5,6 +6,47 @@ import { t } from "@vibevalley/i18n";
 import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
+
+const viewStyles = stylex.create({
+  lightboxDiv: {
+    pointerEvents: "none",
+    display: "flex",
+    width: "100%",
+    height: "100%",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 3)",
+    padding: "calc(var(--spacing) * 6)",
+  },
+  lightboxDiv2: {
+    pointerEvents: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-ink)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 8px 24px var(--wb-float)",
+  },
+  lightboxSpan: {
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  lightboxSpan2: {
+    maxWidth: "calc(var(--spacing) * 72)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    paddingInline: "var(--spacing)",
+  },
+});
 
 export interface Picture {
   readonly src: string;
@@ -40,25 +82,22 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
     >
       <Show when={shown()}>
         {(p) => (
-          <div class="pointer-events-none flex size-full flex-col items-center justify-center gap-3 p-6" onClick={() => props.onAt(undefined)}>
+          <div {...stylex.attrs(viewStyles.lightboxDiv)} onClick={() => props.onAt(undefined)}>
             <img
               src={p().src}
               alt={p().name}
               class="pointer-events-auto max-h-[calc(100%-4rem)] max-w-full animate-pop-in rounded-lg object-contain shadow-float"
               onClick={(e) => e.stopPropagation()}
             />
-            <div
-              class="pointer-events-auto flex items-center gap-1 rounded-lg bg-page px-2 py-1 text-sm text-ink shadow-float"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div {...stylex.attrs(viewStyles.lightboxDiv2)} onClick={(e) => e.stopPropagation()}>
               <Show when={count() > 1}>
                 <IconButton icon="previous" label={t("web.base.lightbox.prev")} onClick={() => go(-1)} />
-                <span class="px-1 text-xs text-muted">
+                <span {...stylex.attrs(viewStyles.lightboxSpan)}>
                   {(props.at ?? 0) + 1} / {count()}
                 </span>
                 <IconButton icon="next" label={t("web.base.lightbox.next")} onClick={() => go(1)} />
               </Show>
-              <span class="max-w-72 truncate px-1">{p().name}</span>
+              <span {...stylex.attrs(viewStyles.lightboxSpan2)}>{p().name}</span>
               {/* The file itself, not a page of the workbench: a plain link to a new tab. */}
               <a
                 href={p().src}

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 
 import { aria } from "#/base/dom.tsx";
@@ -7,6 +8,22 @@ import { type PickOption, pickItems } from "./cells";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
 import { pxDrop, pxFocus, pxRing, pxText } from "./style";
+
+const viewStyles = stylex.create({
+  pxPickDiv: {
+    position: "relative",
+    width: "100%",
+  },
+  pxPickUl: {
+    maxHeight: "50vh",
+    overflowY: "auto",
+  },
+  pxSwitchFieldSpan: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+  },
+});
 
 interface SegmentOption<T> {
   value: T;
@@ -90,7 +107,7 @@ export function PxPick(props: {
   };
 
   return (
-    <div ref={(el) => (wrap = el)} class="relative w-full">
+    <div ref={(el) => (wrap = el)} {...stylex.attrs(viewStyles.pxPickDiv)}>
       <button
         id={props.id}
         data-testid={props.testid}
@@ -134,7 +151,7 @@ export function PxPick(props: {
       </button>
       <Show when={open()}>
         <PxWindow class="absolute top-full left-0 z-30 mt-1.5 min-w-full origin-top p-1 transition-[opacity,scale] duration-100 motion-reduce:transition-none starting:scale-95 starting:opacity-0">
-          <ul id={listId} role="listbox" aria-label={props.label} class="max-h-[50vh] overflow-y-auto">
+          <ul id={listId} role="listbox" aria-label={props.label} {...stylex.attrs(viewStyles.pxPickUl)}>
             <For each={items()}>
               {(o, i) => (
                 <li
@@ -192,7 +209,7 @@ export function PxSwitchField(props: {
       >
         <span class={["size-5 bg-cream-50 transition-transform duration-150 motion-reduce:transition-none", pxDrop, { "translate-x-4": props.checked }]} />
       </span>
-      <span class="flex min-w-0 flex-col">
+      <span {...stylex.attrs(viewStyles.pxSwitchFieldSpan)}>
         <PxTip tip={props.tip} class={pxText.sm}>
           {props.label}
         </PxTip>

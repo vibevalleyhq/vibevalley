@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { Toolbar } from "@vibevalley/base-ui";
@@ -24,6 +25,278 @@ import { useMessage } from "./follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
 import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messagePath } from "./places";
 
+const viewStyles = stylex.create({
+  quote: {
+    marginBottom: "calc(var(--spacing) * .5)",
+    display: "flex",
+    width: "100%",
+    minWidth: "0",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+  replyQuoteSpan: {
+    fontStyle: "italic",
+  },
+  replyQuoteSpan2: {
+    flexShrink: "0",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-ink)",
+  },
+  replyQuoteSpan3: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  messageBodyP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+    fontStyle: "italic",
+  },
+  messageMore: {
+    marginTop: "calc(var(--spacing) * .5)",
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  messageBodySpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  attachmentsDiv: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  attachment: {
+    display: "block",
+    cursor: "zoom-in",
+    borderRadius: "var(--radius-md)",
+    transitionProperty: "opacity",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    opacity: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": ".9",
+      },
+    },
+  },
+  attachmentsImg: {
+    maxHeight: "calc(var(--spacing) * 64)",
+    maxWidth: "calc(var(--spacing) * 80)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    objectFit: "contain",
+  },
+  attachment2: {
+    maxHeight: "calc(var(--spacing) * 72)",
+    maxWidth: "calc(var(--spacing) * 96)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-ink)",
+  },
+  attachment3: {
+    maxWidth: "calc(var(--spacing) * 96)",
+  },
+  attachment4: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  attachmentsSpan: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+  },
+  attachmentsSpan2: {
+    maxWidth: "calc(var(--spacing) * 64)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  attachmentsSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  embedsDiv: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  embedsA: {
+    display: "flex",
+    maxWidth: "var(--container-lg)",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-md)",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "4px",
+    borderColor: "var(--wb-accent)",
+    backgroundColor: {
+      default: "var(--wb-side)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  embedsSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  embedsImg: {
+    width: "calc(var(--spacing) * 16)",
+    height: "calc(var(--spacing) * 16)",
+    flexShrink: "0",
+    borderRadius: ".25rem",
+    objectFit: "cover",
+  },
+  reactionsDiv: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+  },
+  messageToolsDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRightStyle: "solid",
+    borderRightWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingRight: "calc(var(--spacing) * .5)",
+  },
+  editBoxDiv: {
+    marginTop: "calc(var(--spacing) * .5)",
+  },
+  messageEdit: {
+    display: "block",
+    fieldSizing: "content",
+    width: "100%",
+    resize: "none",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-focus)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    outlineStyle: "none",
+  },
+  editBoxDiv2: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  editBoxSpan: {
+    maxWidth: "calc(var(--spacing) * 48)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  editBoxP: {
+    marginTop: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  linkedMessage: {
+    display: "flex",
+    maxWidth: "var(--container-lg)",
+    cursor: "pointer",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "4px",
+    borderColor: "var(--wb-wheat)",
+    backgroundColor: {
+      default: "var(--wb-side)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    textAlign: "left",
+  },
+  linkedCardSpan: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  linkedCardSpan2: {
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-ink)",
+  },
+});
+
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
 const bad = (reason: string) => toast(reason, "bad");
@@ -44,14 +317,14 @@ export function ReplyQuote(props: { channel: string; number: number }) {
       data-testid="quote"
       data-key={props.number}
       onClick={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
-      class="mb-0.5 flex w-full min-w-0 cursor-pointer items-center gap-1.5 text-left text-xs text-muted hover:text-ink"
+      {...stylex.attrs(viewStyles.quote)}
     >
       <Icon name="reply" size={10} class="opacity-60" />
       <Show when={answered()} fallback={<span>#{props.number}</span>}>
         {(m) => (
-          <Show when={m().deleted === undefined} fallback={<span class="italic">{t("web.channel.messages.replyGone")}</span>}>
-            <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
-            <span class="min-w-0 truncate">{m().text || list(m().attachments.map((a) => a.name))}</span>
+          <Show when={m().deleted === undefined} fallback={<span {...stylex.attrs(viewStyles.replyQuoteSpan)}>{t("web.channel.messages.replyGone")}</span>}>
+            <span {...stylex.attrs(viewStyles.replyQuoteSpan2)}>{nameOf(m())}</span>
+            <span {...stylex.attrs(viewStyles.replyQuoteSpan3)}>{m().text || list(m().attachments.map((a) => a.name))}</span>
           </Show>
         )}
       </Show>
@@ -74,7 +347,7 @@ export function MessageBody(props: { m: ChatMessage }) {
     return () => watch.disconnect();
   });
   return (
-    <Show when={props.m.deleted === undefined} fallback={<p class="text-sm text-muted italic">{t("web.channel.messages.deleted")}</p>}>
+    <Show when={props.m.deleted === undefined} fallback={<p {...stylex.attrs(viewStyles.messageBodyP)}>{t("web.channel.messages.deleted")}</p>}>
       <Show when={props.m.text}>
         <div
           ref={(el) => (box = el)}
@@ -91,14 +364,14 @@ export function MessageBody(props: { m: ChatMessage }) {
             data-testid="message-more"
             aria-expanded={open() ? "true" : "false"}
             onClick={() => setOpen(!open())}
-            class="mt-0.5 cursor-pointer rounded-sm px-1 text-xs text-muted hover:bg-hover hover:text-ink"
+            {...stylex.attrs(viewStyles.messageMore)}
           >
             {open() ? t("web.base.rich.longLess") : t("web.base.rich.longMore")}
           </button>
         </Show>
       </Show>
       <Show when={props.m.edited !== undefined}>
-        <span class="text-xs text-faint">{t("web.channel.messages.edited")}</span>
+        <span {...stylex.attrs(viewStyles.messageBodySpan)}>{t("web.channel.messages.edited")}</span>
       </Show>
     </Show>
   );
@@ -111,7 +384,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
   const pictures = () => props.files.filter((f) => shownAs(f.type) === "image").map((f) => ({ id: f.id, src: attachmentPath(f.id), name: f.name }));
   const [open, setOpen] = createSignal<number>();
   return (
-    <div class="mt-1 flex flex-wrap items-start gap-2">
+    <div {...stylex.attrs(viewStyles.attachmentsDiv)}>
       <Lightbox pictures={pictures()} at={open()} onAt={setOpen} />
       <For each={props.files} keyed={(f) => f.id}>
         {(f) => {
@@ -127,10 +400,10 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   data-key={file.id}
                   data-kind="image"
                   aria-label={file.name}
-                  class="block cursor-zoom-in rounded-md transition-opacity duration-120 hover:opacity-90"
+                  {...stylex.attrs(viewStyles.attachment)}
                   onClick={() => setOpen(pictures().findIndex((p) => p.id === file.id))}
                 >
-                  <img src={at()} alt={file.name} class="max-h-64 max-w-80 rounded-md border border-line object-contain" loading="lazy" />
+                  <img src={at()} alt={file.name} {...stylex.attrs(viewStyles.attachmentsImg)} loading="lazy" />
                 </button>
               );
             case "video":
@@ -143,7 +416,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   controls
                   preload="metadata"
                   aria-label={file.name}
-                  class="max-h-72 max-w-96 rounded-md border border-line bg-ink"
+                  {...stylex.attrs(viewStyles.attachment2)}
                 />
               );
             case "audio":
@@ -156,7 +429,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   controls
                   preload="metadata"
                   aria-label={file.name}
-                  class="max-w-96"
+                  {...stylex.attrs(viewStyles.attachment3)}
                 />
               );
             case "pdf":
@@ -169,12 +442,12 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   data-kind={shownAs(file.type)}
                   target="_blank"
                   rel="noreferrer"
-                  class="flex items-center gap-2 rounded-md border border-line bg-page px-3 py-2 text-sm hover:bg-hover"
+                  {...stylex.attrs(viewStyles.attachment4)}
                 >
                   <Icon name={shownAs(file.type) === "pdf" ? "file" : "attach"} size={16} />
-                  <span class="flex min-w-0 flex-col">
-                    <span class="max-w-64 truncate">{file.name}</span>
-                    <span class="text-xs text-muted">
+                  <span {...stylex.attrs(viewStyles.attachmentsSpan)}>
+                    <span {...stylex.attrs(viewStyles.attachmentsSpan2)}>{file.name}</span>
+                    <span {...stylex.attrs(viewStyles.attachmentsSpan3)}>
                       {shownAs(file.type) === "pdf" ? t("web.channel.media.pdf") : t("web.channel.messages.file", { size: sizeText(file.size) })}
                     </span>
                   </span>
@@ -190,18 +463,13 @@ export function Attachments(props: { files: readonly Attachment[] }) {
 /** The links' previews the server read: what the page says of itself, and its picture from its own site. */
 export function Embeds(props: { embeds: readonly Embed[] }) {
   return (
-    <div class="mt-1 flex flex-col gap-1.5" aria-label={t("web.channel.media.preview")}>
+    <div {...stylex.attrs(viewStyles.embedsDiv)} aria-label={t("web.channel.media.preview")}>
       <For each={props.embeds} keyed={(e) => e.url}>
         {(e) => (
-          <a
-            href={e().url}
-            target="_blank"
-            rel="noreferrer noopener"
-            class="flex max-w-lg gap-3 rounded-md border-l-4 border-accent bg-side px-3 py-2 hover:bg-hover"
-          >
+          <a href={e().url} target="_blank" rel="noreferrer noopener" {...stylex.attrs(viewStyles.embedsA)}>
             <span class="flex min-w-0 flex-1 flex-col gap-0.5">
               <Show when={e().site}>
-                <span class="truncate text-xs text-muted">{e().site}</span>
+                <span {...stylex.attrs(viewStyles.embedsSpan)}>{e().site}</span>
               </Show>
               <Show when={e().title}>
                 <span class="line-clamp-2 text-sm font-semibold text-ok-ink">{e().title}</span>
@@ -211,7 +479,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
               </Show>
             </span>
             <Show when={e().image}>
-              {(src) => <img src={src()} alt="" referrerpolicy="no-referrer" loading="lazy" class="size-16 shrink-0 rounded object-cover" />}
+              {(src) => <img src={src()} alt="" referrerpolicy="no-referrer" loading="lazy" {...stylex.attrs(viewStyles.embedsImg)} />}
             </Show>
           </a>
         )}
@@ -223,7 +491,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
 export function Reactions(props: { m: ChatMessage; names: (id: string) => string }) {
   const react = useReact();
   return (
-    <div class="mt-1 flex flex-wrap gap-1">
+    <div {...stylex.attrs(viewStyles.reactionsDiv)}>
       <For each={props.m.reactions} keyed={(r) => r.emoji}>
         {(r) => {
           const mine = () => r().by.includes(ownerId);
@@ -327,7 +595,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       ]}
     >
       <Show when={picking()}>
-        <div role="group" aria-label={t("web.channel.tools.pick")} class="flex items-center gap-0.5 border-r border-line pr-0.5">
+        <div role="group" aria-label={t("web.channel.tools.pick")} {...stylex.attrs(viewStyles.messageToolsDiv)}>
           <For each={quickReactions}>
             {(emoji) => (
               <Toolbar.Button
@@ -486,7 +754,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
     });
   };
   return (
-    <div class="mt-0.5">
+    <div {...stylex.attrs(viewStyles.editBoxDiv)}>
       <textarea
         ref={autofocus()}
         data-testid="message-edit"
@@ -504,10 +772,10 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
             done();
           }
         }}
-        class="block [field-sizing:content] w-full resize-none rounded-md border border-focus bg-page px-2 py-1.5 text-base outline-none"
+        {...stylex.attrs(viewStyles.messageEdit)}
       />
       <Show when={files.length > 0}>
-        <div class="mt-1 flex flex-wrap gap-1.5">
+        <div {...stylex.attrs(viewStyles.editBoxDiv2)}>
           <For each={files}>
             {(f) => {
               const keeps = () => kept().includes(f.id);
@@ -525,7 +793,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
                   ]}
                 >
                   <Icon name="attach" size={12} />
-                  <span class="max-w-48 truncate">{f.name}</span>
+                  <span {...stylex.attrs(viewStyles.editBoxSpan)}>{f.name}</span>
                   <Icon name={keeps() ? "close" : "add"} size={10} />
                 </button>
               );
@@ -533,7 +801,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
           </For>
         </div>
       </Show>
-      <p class="mt-1 text-xs text-muted">{t("web.channel.tools.editHint")}</p>
+      <p {...stylex.attrs(viewStyles.editBoxP)}>{t("web.channel.tools.editHint")}</p>
     </div>
   );
 }
@@ -544,7 +812,7 @@ export function LinkedMessages(props: { text: string }) {
   const links = () => linkedMessages(props.text, core()?.chat, location.host);
   return (
     <Show when={links().length > 0}>
-      <div class="mt-1 flex flex-col gap-1.5">
+      <div {...stylex.attrs(viewStyles.embedsDiv)}>
         <For each={links()} keyed={(l) => `${l.channel}:${l.number}`}>
           {(l) => <LinkedCard at={l()} />}
         </For>
@@ -565,10 +833,10 @@ function LinkedCard(props: { at: LinkedMessage }) {
       data-key={`${props.at.channel}:${props.at.number}`}
       aria-label={t("web.channel.messages.linked", { where: channelLabel(where()), number: props.at.number })}
       onClick={() => router.navigate(messagePath(where(), props.at.number))}
-      class="flex max-w-lg cursor-pointer flex-col gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 text-left hover:bg-hover"
+      {...stylex.attrs(viewStyles.linkedMessage)}
     >
-      <span class="flex items-baseline gap-2 text-xs text-muted">
-        <span class="font-semibold text-ink">
+      <span {...stylex.attrs(viewStyles.linkedCardSpan)}>
+        <span {...stylex.attrs(viewStyles.linkedCardSpan2)}>
           <Show when={m()} fallback={`#${props.at.number}`}>
             {(said) => nameOf(said())}
           </Show>
@@ -578,7 +846,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
       </span>
       <Show when={m()}>
         {(said) => (
-          <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</span>}>
+          <Show when={said().deleted === undefined} fallback={<span {...stylex.attrs(viewStyles.messageBodyP)}>{t("web.channel.messages.replyGone")}</span>}>
             <span class="line-clamp-3 text-sm">{said().text || list(said().attachments.map((a) => a.name))}</span>
           </Show>
         )}

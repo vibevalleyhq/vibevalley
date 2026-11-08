@@ -1,8 +1,18 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { PxButton, type PxSize, type PxTone } from "./button";
+
+const viewStyles = stylex.create({
+  buttonStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 const tones: PxTone[] = ["plain", "primary", "accent", "danger"];
 
@@ -35,7 +45,7 @@ export default stories({
     }),
     Tones: story({
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
           <For each={tones}>
             {(tone) => (
               <PxButton tone={tone} onClick={() => undefined}>

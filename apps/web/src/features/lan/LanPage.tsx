@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,6 +15,130 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { Qr } from "#/ui/Qr.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+const viewStyles = stylex.create({
+  lanPageDiv: {
+    display: "flex",
+    maxWidth: "var(--container-3xl)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  lanPageSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  lanPageP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  lanPageDiv2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  lanPageSpan2: {
+    width: "calc(var(--spacing) * 18)",
+    flexShrink: "0",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  lanPageDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  lanPageP2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-berry)",
+  },
+  lanPageUl: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingTop: "calc(var(--spacing) * 3)",
+  },
+  lanPageLi: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  lanPageSpan3: {
+    marginTop: "calc(var(--spacing) * 2)",
+    width: "var(--spacing)",
+    height: "var(--spacing)",
+    flexShrink: "0",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-faint)",
+  },
+  lanPageDiv4: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  lanPageSpan4: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  lanPageSpan5: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  pairing: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 5)",
+  },
+  pairingQr: {
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--color-white)",
+    padding: "calc(var(--spacing) * 2)",
+  },
+  pairingDiv: {
+    display: "flex",
+    maxWidth: "var(--container-md)",
+    minWidth: "calc(var(--spacing) * 50)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  pairingP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  pairingDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+    paddingTop: "var(--spacing)",
+  },
+  pairingDiv3: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  pairingDiv4: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 const notes = [0, 1, 2, 3] as const;
 
 const lanQuery = defineQuery({ schema: S.LanStatus, key: () => ["lan"], fetch: (_: void, context) => api.lan.get(context), ...retryRead });
@@ -27,10 +152,12 @@ export function LanPage() {
   const keep = (status: LanStatus) => client.setData(lanQuery(), () => ({ value: status }));
   const s = () => ready(status, undefined);
   return (
-    <div class="flex max-w-3xl flex-col gap-3">
+    <div {...stylex.attrs(viewStyles.lanPageDiv)}>
       <Card
         title={t("web.lan.lan.section.label")}
-        action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>}
+        action={
+          <Show when={s()}>{(s) => <span {...stylex.attrs(viewStyles.lanPageSpan)}>{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>
+        }
       >
         <Show when={s()} fallback={<Quiet>{status.error() ? reasonOf(status.error()) : t("web.base.form.asking")}</Quiet>}>
           {(s) => (
@@ -39,7 +166,7 @@ export function LanPage() {
                 when={s().open}
                 fallback={
                   <>
-                    <p class="text-sm">{t("web.lan.lan.intro")}</p>
+                    <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.intro")}</p>
                     <div>
                       <Button
                         tone="primary"
@@ -53,8 +180,8 @@ export function LanPage() {
                   </>
                 }
               >
-                <div class="flex gap-3">
-                  <span class="w-18 shrink-0 text-sm text-muted">{t("web.lan.lan.address")}</span>
+                <div {...stylex.attrs(viewStyles.lanPageDiv2)}>
+                  <span {...stylex.attrs(viewStyles.lanPageSpan2)}>{t("web.lan.lan.address")}</span>
                   <span data-testid="lan-url" class="font-mono text-sm select-all">
                     {s().url ?? "—"}
                   </span>
@@ -62,7 +189,7 @@ export function LanPage() {
                 <Show
                   when={s().pairing}
                   fallback={
-                    <div class="flex flex-wrap gap-2">
+                    <div {...stylex.attrs(viewStyles.lanPageDiv3)}>
                       <Button
                         tone="primary"
                         data-testid="lan-add"
@@ -85,13 +212,13 @@ export function LanPage() {
                 </Show>
               </Show>
               <Show when={s().problem}>
-                <p class="text-sm text-berry">{s().problem}</p>
+                <p {...stylex.attrs(viewStyles.lanPageP2)}>{s().problem}</p>
               </Show>
-              <ul class="flex flex-col gap-1.5 border-t border-line pt-3">
+              <ul {...stylex.attrs(viewStyles.lanPageUl)}>
                 <For each={notes}>
                   {(n) => (
-                    <li class="flex gap-2.5 text-sm text-muted">
-                      <span class="mt-2 size-1 shrink-0 rounded-full bg-faint" aria-hidden="true" />
+                    <li {...stylex.attrs(viewStyles.lanPageLi)}>
+                      <span {...stylex.attrs(viewStyles.lanPageSpan3)} aria-hidden="true" />
                       {t(`web.lan.lan.notes.${n}`)}
                     </li>
                   )}
@@ -103,13 +230,16 @@ export function LanPage() {
       </Card>
       <Show when={s() && (s()?.devices.length ?? 0) > 0 ? s() : undefined}>
         {(s) => (
-          <Card title={t("web.lan.lan.devices")} action={<span class="text-sm text-muted">{t("web.lan.lan.deviceCount", { n: s().devices.length })}</span>}>
+          <Card
+            title={t("web.lan.lan.devices")}
+            action={<span {...stylex.attrs(viewStyles.lanPageSpan)}>{t("web.lan.lan.deviceCount", { n: s().devices.length })}</span>}
+          >
             <For each={s().devices}>
               {(d) => (
-                <div class="flex items-center gap-2">
+                <div {...stylex.attrs(viewStyles.lanPageDiv4)}>
                   <span class="flex min-w-0 flex-1 flex-col">
-                    <span class="truncate text-sm font-medium">{d.name}</span>
-                    <span class="truncate text-xs text-muted">
+                    <span {...stylex.attrs(viewStyles.lanPageSpan4)}>{d.name}</span>
+                    <span {...stylex.attrs(viewStyles.lanPageSpan5)}>
                       {d.lastSeen != null && d.lastSeen !== 0
                         ? t("web.lan.lan.paired", { at: momentText(d.pairedAt), seen: momentText(d.lastSeen) })
                         : t("web.lan.lan.pairedNever", { at: momentText(d.pairedAt) })}
@@ -150,17 +280,17 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
     <Show
       when={props.pairing.asking}
       fallback={
-        <div data-testid="pairing" data-left={left()} class="flex flex-wrap gap-5">
-          <div data-testid="pairing-qr" class="rounded-md border border-line bg-white p-2">
+        <div data-testid="pairing" data-left={left()} {...stylex.attrs(viewStyles.pairing)}>
+          <div data-testid="pairing-qr" {...stylex.attrs(viewStyles.pairingQr)}>
             <Qr text={props.pairing.link} label={t("web.lan.lan.qr")} />
           </div>
-          <div class="flex max-w-md min-w-50 flex-col gap-2">
-            <p class="text-sm">{t("web.lan.lan.scan")}</p>
+          <div {...stylex.attrs(viewStyles.pairingDiv)}>
+            <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.scan")}</p>
             <p data-testid="pairing-link" class="font-mono text-2xs break-all select-all">
               {props.pairing.link}
             </p>
-            <p class="text-xs text-muted">{t("web.lan.lan.left", { s: left() })}</p>
-            <div class="flex flex-wrap gap-2 pt-1">
+            <p {...stylex.attrs(viewStyles.pairingP)}>{t("web.lan.lan.left", { s: left() })}</p>
+            <div {...stylex.attrs(viewStyles.pairingDiv2)}>
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
                 {t("web.lan.lan.copy")}
               </Button>
@@ -176,9 +306,9 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
       }
     >
       {(asking) => (
-        <div class="flex flex-col gap-3">
-          <p class="text-sm">{t("web.lan.lan.asking", { name: asking() })}</p>
-          <div class="flex gap-2">
+        <div {...stylex.attrs(viewStyles.pairingDiv3)}>
+          <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.asking", { name: asking() })}</p>
+          <div {...stylex.attrs(viewStyles.pairingDiv4)}>
             <Button
               tone="primary"
               disabled={props.act.busy()}

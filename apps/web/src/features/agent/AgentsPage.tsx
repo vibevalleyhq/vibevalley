@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -19,6 +20,178 @@ import { Icon } from "#/ui/Icon.tsx";
 import { AgentPage } from "./AgentPage";
 import { TemplatesPage } from "./TemplatesPage";
 
+const viewStyles = stylex.create({
+  agentsPageDiv: {
+    height: "100%",
+    overflowY: "auto",
+  },
+  agentsPageDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 6)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingTop: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 8)",
+  },
+  agentsPageDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  agentsPageSpan: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  agentsPageH2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-muted)",
+  },
+  agentsPageDiv4: {
+    display: "grid",
+    gap: "calc(var(--spacing) * 3)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
+      "@media (width>=64rem)": "repeat(3,minmax(0,1fr))",
+      "@media (width>=96rem)": "repeat(4,minmax(0,1fr))",
+    },
+  },
+  agentsPageP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  cardShellDiv: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 3)",
+    right: "calc(var(--spacing) * 3)",
+  },
+  orchestratorCardDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 3)",
+  },
+  orchestratorCardSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 20)",
+    height: "calc(var(--spacing) * 20)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--wb-hover)",
+  },
+  orchestratorCardSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  orchestratorCardSpan3: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  agentCardDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  agentCardSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 20)",
+    height: "calc(var(--spacing) * 20)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--wb-hover)",
+  },
+  agentCardSpan2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  agentCardSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  agentCardSpan4: {
+    flexShrink: "0",
+    borderRadius: ".25rem",
+    backgroundColor: "var(--color-hat)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-bark-900)",
+  },
+  agentCardSpan5: {
+    display: "flex",
+    minWidth: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    paddingTop: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  agentCardSpan6: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  agentCardDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 3)",
+  },
+  agentCardSpan7: {
+    borderRadius: ".25rem",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  agentCardSpan8: {
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-ink)",
+  },
+  agentCardSpan9: {
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-ok-ink)",
+  },
+  agentCardSpan10: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "right",
+  },
+  agentCardSpan11: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textAlign: "right",
+    color: "var(--wb-berry)",
+  },
+});
+
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {
   return (
@@ -37,10 +210,10 @@ function AgentsPage() {
   const skills = createMemo(() => new Map(ready(allSkills, []).map((s) => [s.id, s.name])));
   const problems = useAgentProblems(agents);
   return (
-    <div class="h-full overflow-y-auto">
-      <div class="flex flex-col gap-6 px-4 pt-4 pb-8">
-        <div class="flex flex-wrap items-end justify-end gap-3">
-          <span class="flex flex-wrap items-center gap-2">
+    <div {...stylex.attrs(viewStyles.agentsPageDiv)}>
+      <div {...stylex.attrs(viewStyles.agentsPageDiv2)}>
+        <div {...stylex.attrs(viewStyles.agentsPageDiv3)}>
+          <span {...stylex.attrs(viewStyles.agentsPageSpan)}>
             <A
               href="/agents/templates"
               data-testid="open-templates"
@@ -60,8 +233,8 @@ function AgentsPage() {
             </A>
           </span>
         </div>
-        <h2 class="text-sm font-semibold text-muted">{t("web.agent.list.orchestrators")}</h2>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <h2 {...stylex.attrs(viewStyles.agentsPageH2)}>{t("web.agent.list.orchestrators")}</h2>
+        <div {...stylex.attrs(viewStyles.agentsPageDiv4)}>
           <For each={orchestrators()}>{(a) => <OrchestratorCard agent={a} />}</For>
           <A
             href="/agents/new?role=orchestrator"
@@ -73,16 +246,16 @@ function AgentsPage() {
             {t("web.agent.list.makeOrchestrator")}
           </A>
         </div>
-        <h2 class="text-sm font-semibold text-muted">{t("web.agent.list.helpers")}</h2>
+        <h2 {...stylex.attrs(viewStyles.agentsPageH2)}>{t("web.agent.list.helpers")}</h2>
         {/* The default orchestrator is always there: once it shows, the profiles are read. */}
         <Show when={orchestrators().length > 0 && agents().length === 0}>
-          <p class="text-sm text-muted">
+          <p {...stylex.attrs(viewStyles.agentsPageP)}>
             <A href="/agents/templates" class="hover:text-ink hover:underline">
               {t("web.agent.templates.none")}
             </A>
           </p>
         </Show>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div {...stylex.attrs(viewStyles.agentsPageDiv4)}>
           <For each={agents()}>
             {(a) => (
               <AgentCard
@@ -130,7 +303,7 @@ function CardShell(props: { agent: Agent; to: string; label: string; muted?: boo
         {props.children}
       </A>
       <Show when={props.corner}>
-        <div class="absolute top-3 right-3">{props.corner}</div>
+        <div {...stylex.attrs(viewStyles.cardShellDiv)}>{props.corner}</div>
       </Show>
     </div>
   );
@@ -142,12 +315,12 @@ function OrchestratorCard(props: { agent: Agent }) {
   const main = () => props.agent.id === defaultOrchestrator;
   return (
     <CardShell agent={props.agent} to={orchestratorHref(props.agent.id)} label={props.agent.name}>
-      <div class="flex items-start gap-3 pb-3">
-        <span class="flex size-20 shrink-0 items-center justify-center rounded-lg bg-hover">
+      <div {...stylex.attrs(viewStyles.orchestratorCardDiv)}>
+        <span {...stylex.attrs(viewStyles.orchestratorCardSpan)}>
           <OrchestratorFace size={68} agent={props.agent.id} />
         </span>
-        <span class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-base font-semibold">{props.agent.name}</span>
+        <span {...stylex.attrs(viewStyles.orchestratorCardSpan2)}>
+          <span {...stylex.attrs(viewStyles.orchestratorCardSpan3)}>{props.agent.name}</span>
           <span class="line-clamp-2 text-sm text-muted">{props.agent.duty || t("web.agent.list.orchestratorLine")}</span>
         </span>
       </div>
@@ -206,43 +379,43 @@ export function AgentCard(props: {
         </button>
       }
     >
-      <div class="flex items-start gap-3">
+      <div {...stylex.attrs(viewStyles.agentCardDiv)}>
         <span
-          class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-hover"
+          {...stylex.attrs(viewStyles.agentCardSpan)}
           style={{ background: `radial-gradient(70% 70% at 50% 70%, ${hexColor(props.agent.look.hat)}33, transparent), var(--color-hover)` }}
         >
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={68} muted={!props.agent.enabled} />
         </span>
-        <span class="flex min-w-0 flex-col gap-0.5">
-          <span class="flex items-center gap-2">
-            <span class="truncate text-base font-semibold">{props.agent.name}</span>
+        <span {...stylex.attrs(viewStyles.orchestratorCardSpan2)}>
+          <span {...stylex.attrs(viewStyles.agentCardSpan2)}>
+            <span {...stylex.attrs(viewStyles.agentCardSpan3)}>{props.agent.name}</span>
             <Show when={props.here > 0}>
-              <span class="shrink-0 rounded bg-hat px-1.5 text-xs text-bark-900">{t("web.agent.list.here", { n: props.here })}</span>
+              <span {...stylex.attrs(viewStyles.agentCardSpan4)}>{t("web.agent.list.here", { n: props.here })}</span>
             </Show>
           </span>
           <span class="line-clamp-2 text-sm text-muted">{props.agent.duty}</span>
-          <span class="flex min-w-0 items-center gap-1.5 pt-1 text-xs text-muted">
+          <span {...stylex.attrs(viewStyles.agentCardSpan5)}>
             <span class={["size-[7px] shrink-0 rounded-full", available() ? "bg-leaf" : "bg-berry"]} aria-hidden="true" />
-            <span class="truncate">
+            <span {...stylex.attrs(viewStyles.agentCardSpan6)}>
               {[props.runtime?.preset.label ?? props.agent.runtime, props.agent.model, props.agent.effort].filter(Boolean).join(" · ")}
             </span>
           </span>
         </span>
       </div>
       <Show when={props.agent.skills.length > 0}>
-        <div class="flex flex-wrap gap-1 pt-3">
-          <For each={props.agent.skills}>{(id) => <span class="rounded bg-hover px-1.5 text-xs">{props.skillName.get(id) ?? id}</span>}</For>
+        <div {...stylex.attrs(viewStyles.agentCardDiv2)}>
+          <For each={props.agent.skills}>{(id) => <span {...stylex.attrs(viewStyles.agentCardSpan7)}>{props.skillName.get(id) ?? id}</span>}</For>
         </div>
       </Show>
       <div class={[footer, "mt-3"]}>
         <span title={t("web.agent.list.tallyHint")}>
-          {t("web.agent.list.hired")} <span class="font-medium text-ink">{Math.round(props.tally?.hired ?? 0)}</span>
+          {t("web.agent.list.hired")} <span {...stylex.attrs(viewStyles.agentCardSpan8)}>{Math.round(props.tally?.hired ?? 0)}</span>
         </span>
         <span>
-          {t("web.agent.list.merged")} <span class="font-medium text-ok-ink">{Math.round(props.tally?.harvested ?? 0)}</span>
+          {t("web.agent.list.merged")} <span {...stylex.attrs(viewStyles.agentCardSpan9)}>{Math.round(props.tally?.harvested ?? 0)}</span>
         </span>
-        <Show when={props.errors.length > 0} fallback={<span class="min-w-0 flex-1 truncate text-right">{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
-          <span class="min-w-0 flex-1 truncate text-right text-berry" title={props.errors.join("\n")}>
+        <Show when={props.errors.length > 0} fallback={<span {...stylex.attrs(viewStyles.agentCardSpan10)}>{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
+          <span {...stylex.attrs(viewStyles.agentCardSpan11)} title={props.errors.join("\n")}>
             {t("web.agent.cannot")}
             {props.errors[0]}
           </span>

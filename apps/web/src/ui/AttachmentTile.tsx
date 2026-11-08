@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -5,6 +6,58 @@ import { type Attachment, attachmentPath } from "@vibevalley/protocol";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+
+const viewStyles = stylex.create({
+  attachmentTileSpan: {
+    display: "flex",
+    maxWidth: "calc(var(--spacing) * 64)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingBlock: "var(--spacing)",
+    paddingRight: "var(--spacing)",
+    paddingLeft: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  attachmentTileSpan2: {
+    display: "flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--wb-hover)",
+    color: "var(--wb-muted)",
+  },
+  attachmentTileImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  attachmentTileSpan3: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+  },
+  attachmentTileSpan4: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "var(--wb-ink)",
+  },
+  attachmentTileSpan5: {
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 /** How a file shows: a picture, a player, a PDF to open in a tab, or a file to save. */
 type FileKind = "image" | "video" | "audio" | "pdf" | "file";
@@ -21,19 +74,15 @@ export const sizeText = (bytes: number) =>
 export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void) | undefined; testid?: string }) {
   const kind = () => fileKind(props.file.type);
   return (
-    <span
-      data-testid={props.testid}
-      data-key={props.file.name}
-      class="flex max-w-64 items-center gap-2 rounded-md border border-line bg-page py-1 pr-1 pl-1 text-xs"
-    >
-      <span class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-hover text-muted">
+    <span data-testid={props.testid} data-key={props.file.name} {...stylex.attrs(viewStyles.attachmentTileSpan)}>
+      <span {...stylex.attrs(viewStyles.attachmentTileSpan2)}>
         <Show when={kind() === "image"} fallback={<Icon name={kindIcon[kind()]} size={16} />}>
-          <img src={attachmentPath(props.file.id)} alt="" class="size-full object-cover" loading="lazy" />
+          <img src={attachmentPath(props.file.id)} alt="" {...stylex.attrs(viewStyles.attachmentTileImg)} loading="lazy" />
         </Show>
       </span>
-      <span class="flex min-w-0 flex-col">
-        <span class="truncate text-ink">{props.file.name}</span>
-        <span class="text-2xs text-muted">{kind() === "pdf" ? t("web.base.file.pdf") : sizeText(props.file.size)}</span>
+      <span {...stylex.attrs(viewStyles.attachmentTileSpan3)}>
+        <span {...stylex.attrs(viewStyles.attachmentTileSpan4)}>{props.file.name}</span>
+        <span {...stylex.attrs(viewStyles.attachmentTileSpan5)}>{kind() === "pdf" ? t("web.base.file.pdf") : sizeText(props.file.size)}</span>
       </span>
       <Show when={props.onRemove}>
         {(remove) => (

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,6 +14,31 @@ import { toast } from "#/ui/toasts.ts";
 
 import { artifactHref } from "./ArtifactCard";
 import { selectionOf } from "./shell";
+
+const viewStyles = stylex.create({
+  artifactWords: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  pageWordsH2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-muted)",
+  },
+  pageWordsP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  pageWordsDiv: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 /** One version's frame: made again when another version is shown, so the words picked are always this version's. */
 export function PageWords(props: { artifact: Artifact; version: number; frame: HTMLIFrameElement }) {
@@ -48,9 +74,9 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: H
   };
   return (
     <Show when={picked()}>
-      <div data-testid="artifact-words" class="flex flex-col gap-1.5">
-        <h2 class="text-xs font-semibold text-muted">{t("web.artifact.edit.title")}</h2>
-        <Show when={latest() ? picked() : undefined} fallback={<p class="text-xs text-faint">{t("web.artifact.edit.older")}</p>}>
+      <div data-testid="artifact-words" {...stylex.attrs(viewStyles.artifactWords)}>
+        <h2 {...stylex.attrs(viewStyles.pageWordsH2)}>{t("web.artifact.edit.title")}</h2>
+        <Show when={latest() ? picked() : undefined} fallback={<p {...stylex.attrs(viewStyles.pageWordsP)}>{t("web.artifact.edit.older")}</p>}>
           {(p) => (
             <>
               <blockquote data-testid="artifact-words-quote" class="line-clamp-3 border-l-2 border-wheat pl-2 text-xs text-muted">
@@ -67,7 +93,7 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: H
                   if (e.key === "Escape") setPicked(undefined);
                 }}
               />
-              <div class="flex items-center justify-end gap-2">
+              <div {...stylex.attrs(viewStyles.pageWordsDiv)}>
                 <Button onClick={() => setPicked(undefined)}>{t("web.base.form.never")}</Button>
                 <Button tone="primary" data-testid="artifact-words-save" disabled={act.busy()} onClick={() => void save()}>
                   {t("web.artifact.edit.save")}

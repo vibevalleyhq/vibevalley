@@ -1,8 +1,23 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
 import { Dialog } from "./Dialog";
 import { Field, TextInput } from "./Field";
+
+const viewStyles = stylex.create({
+  dialogStoriesDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  dialogStoriesDiv2: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 export default stories({
   title: "组件/工作台/Dialog",
@@ -14,11 +29,11 @@ export default stories({
         <>
           <Button onClick={() => set({ open: true })}>打开</Button>
           <Dialog open={a.open} wide={a.wide} title={a.title} onClose={() => set({ open: false })}>
-            <div class="flex flex-col gap-3">
+            <div {...stylex.attrs(viewStyles.dialogStoriesDiv)}>
               <Field label="名字">
                 <TextInput placeholder="vibevalley" />
               </Field>
-              <div class="flex justify-end gap-2">
+              <div {...stylex.attrs(viewStyles.dialogStoriesDiv2)}>
                 <Button onClick={() => set({ open: false })}>取消</Button>
                 <Button tone="primary" onClick={() => set({ open: false })}>
                   建好

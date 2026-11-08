@@ -244,6 +244,7 @@ test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with
   const id = await api.channel.create({ name: "front-desk" });
   const badger = await api.agent.create({ ...helper, name: "badger" });
   await page.goto("/issues");
+  await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
   await page.keyboard.press("Control+k");
   const dialog = page.getByTestId("switcher");
   const box = dialog.getByTestId("switcher-input");

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { Combobox } from "@vibevalley/base-ui";
@@ -17,6 +18,23 @@ import { Dialog } from "#/ui/Dialog.tsx";
 
 import { chatPath, type SwitchTarget, switchTargets } from "./places";
 import { Count } from "./presence";
+
+const viewStyles = stylex.create({
+  switcherBodyDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  switcherBodySpan: {
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 const shown = defineAtom(false);
 
@@ -67,7 +85,7 @@ function SwitcherBody(props: { onClose: () => void }) {
   };
   return (
     <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>
-      <div class="flex flex-col gap-2">
+      <div {...stylex.attrs(viewStyles.switcherBodyDiv)}>
         <Combobox.Input
           ref={autofocus()}
           data-testid="switcher-input"
@@ -91,7 +109,7 @@ function SwitcherBody(props: { onClose: () => void }) {
                 class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 data-highlighted:bg-selected"
               >
                 <span class={["min-w-0 flex-1 truncate text-sm", { "font-semibold": t().unread > 0 }]}>{t().label}</span>
-                <span class="shrink-0 truncate text-xs text-muted">{t().hint}</span>
+                <span {...stylex.attrs(viewStyles.switcherBodySpan)}>{t().hint}</span>
                 <Show when={t().unread > 0}>
                   <Count n={t().unread} />
                 </Show>

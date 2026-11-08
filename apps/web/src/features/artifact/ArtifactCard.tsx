@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { Show } from "solid-js";
 
@@ -11,6 +12,41 @@ import { defineQuery, retryRead, useQuery } from "#/infra/query.ts";
 import { useRouter, Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
+
+const viewStyles = stylex.create({
+  artifactCardSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 9)",
+    height: "calc(var(--spacing) * 9)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-hover)",
+    color: "var(--wb-muted)",
+  },
+  artifactCardSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+  },
+  artifactCardSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  artifactCardSpan4: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 // Artifacts (docs/subsystems/artifact.md) are not in the frame.
 const fresh = 5_000;
@@ -55,12 +91,12 @@ export function ArtifactCard(props: { card: Card }) {
       aria-label={t("web.artifact.card.open", { title: props.card.title })}
       class="mt-1 flex w-full max-w-md items-center gap-3 rounded-lg border border-line bg-page px-3 py-2 transition-colors duration-120 hover:bg-hover"
     >
-      <span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-hover text-muted">
+      <span {...stylex.attrs(viewStyles.artifactCardSpan)}>
         <Icon name={bodyIcon[props.card.body]} size={20} />
       </span>
-      <span class="flex min-w-0 flex-col">
-        <span class="truncate text-sm font-semibold">{props.card.title}</span>
-        <span class="truncate text-xs text-muted">
+      <span {...stylex.attrs(viewStyles.artifactCardSpan2)}>
+        <span {...stylex.attrs(viewStyles.artifactCardSpan3)}>{props.card.title}</span>
+        <span {...stylex.attrs(viewStyles.artifactCardSpan4)}>
           {bodyLabel[props.card.body]}
           <Show when={props.card.body === "html"}> · {t("web.artifact.card.version", { version: props.card.version })}</Show>
           <Show when={props.card.note}>{(note) => <> · {note()}</>}</Show>

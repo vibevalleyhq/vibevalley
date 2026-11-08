@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createMemo, createSignal, For, Show } from "solid-js";
 
@@ -15,18 +16,83 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { dayKey, dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";
 
+const viewStyles = stylex.create({
+  pkmCalendar: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  pkmCalendarFold: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+  monthDiv: {
+    display: "flex",
+    alignItems: "center",
+  },
+  monthSpan: {
+    flex: "1",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  monthDiv2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7,minmax(0,1fr))",
+    textAlign: "center",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  monthDiv3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7,minmax(0,1fr))",
+  },
+  monthSpan2: {
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: "0",
+    width: "1px",
+    height: "1px",
+    margin: "-1px",
+    padding: "0",
+    position: "absolute",
+    overflow: "hidden",
+  },
+  monthSpan3: {
+    position: "absolute",
+    bottom: "calc(var(--spacing) * .5)",
+    width: "var(--spacing)",
+    height: "var(--spacing)",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-accent)",
+  },
+});
+
 const unfolded = defineStored("pkm.calendar", Schema.Boolean, true);
 
 /** open: the day of the journal open, if one is. */
 export function Calendar(props: { pages: readonly PkmPageSummary[]; open: string | undefined }) {
   return (
-    <section data-testid="pkm-calendar" aria-label={t("web.pkm.calendar.label")} class="flex flex-col gap-1">
+    <section data-testid="pkm-calendar" aria-label={t("web.pkm.calendar.label")} {...stylex.attrs(viewStyles.pkmCalendar)}>
       <button
         type="button"
         data-testid="pkm-calendar-fold"
         aria-expanded={unfolded.get() ? "true" : "false"}
         onClick={() => unfolded.update((open) => !open)}
-        class="flex cursor-pointer items-center gap-1 text-xs font-semibold text-muted hover:text-ink"
+        {...stylex.attrs(viewStyles.pkmCalendarFold)}
       >
         <Icon name={unfolded.get() ? "choose" : "expand"} size={12} />
         {t("web.pkm.calendar.label")}
@@ -61,18 +127,18 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
     });
   };
   return (
-    <div class="flex flex-col gap-1">
-      <div class="flex items-center">
-        <span class="flex-1 text-xs text-muted">{monthTitle(month().year, month().month)}</span>
+    <div {...stylex.attrs(viewStyles.pkmCalendar)}>
+      <div {...stylex.attrs(viewStyles.monthDiv)}>
+        <span {...stylex.attrs(viewStyles.monthSpan)}>{monthTitle(month().year, month().month)}</span>
         <IconButton icon="previous" size={12} label={t("web.pkm.calendar.previous")} testid="pkm-calendar-previous" onClick={() => shift(-1)} />
         <IconButton icon="next" size={12} label={t("web.pkm.calendar.next")} testid="pkm-calendar-next" onClick={() => shift(1)} />
       </div>
-      <div class="grid grid-cols-7 text-center text-2xs text-faint">
+      <div {...stylex.attrs(viewStyles.monthDiv2)}>
         <For each={weekdayNames()}>{(name) => <span>{name}</span>}</For>
       </div>
       <For each={monthWeeks(month().year, month().month)}>
         {(week) => (
-          <div class="grid grid-cols-7">
+          <div {...stylex.attrs(viewStyles.monthDiv3)}>
             <For each={week}>
               {(d) => (
                 <button
@@ -91,9 +157,9 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
                   ]}
                 >
                   {Number(d.day.slice(8))}
-                  <span class="sr-only">{dayTitle(d.day, today)}</span>
+                  <span {...stylex.attrs(viewStyles.monthSpan2)}>{dayTitle(d.day, today)}</span>
                   <Show when={journals().has(d.day)}>
-                    <span aria-hidden="true" class="absolute bottom-0.5 size-1 rounded-full bg-accent" />
+                    <span aria-hidden="true" {...stylex.attrs(viewStyles.monthSpan3)} />
                   </Show>
                 </button>
               )}

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, Show, snapshot, untrack } from "solid-js";
 // The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the DOM over it (store screen), and wears the tool's cursor.
 
@@ -21,6 +22,56 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { startScene, type Scene } from "./scene";
 import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./screen";
+
+const viewStyles = stylex.create({
+  villageCanvasDiv: {
+    position: "absolute",
+    inset: "0",
+    overflow: "hidden",
+  },
+  villageCanvasDiv2: {
+    position: "absolute",
+    inset: "0",
+    backgroundSize: "cover",
+    backgroundPosition: "50%",
+    opacity: ".3",
+    imageRendering: "pixelated",
+  },
+  village: {
+    position: "absolute",
+    inset: "0",
+  },
+  villageError: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    fontFamily: "var(--font-pixel)",
+    color: "var(--color-cream-200)",
+  },
+  enteringDiv: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+  },
+  enteringDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    color: "var(--color-cream-100)",
+  },
+  enteringDiv3: {
+    height: "100%",
+    backgroundColor: "var(--color-leaf-500)",
+    transitionProperty: "width",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".2s",
+  },
+});
 
 export function VillageCanvas() {
   let host!: HTMLDivElement;
@@ -129,18 +180,14 @@ export function VillageCanvas() {
   );
 
   return (
-    <div class="absolute inset-0 overflow-hidden" style={{ background }} aria-label={t("web.farm.canvas.label")} role="region">
+    <div {...stylex.attrs(viewStyles.villageCanvasDiv)} style={{ background }} aria-label={t("web.farm.canvas.label")} role="region">
       <Show when={loaded().village}>
-        <div
-          aria-hidden="true"
-          class="absolute inset-0 bg-cover bg-center opacity-30 [image-rendering:pixelated]"
-          style={{ "background-image": `url(${spriteUrl("map")})` }}
-        />
+        <div aria-hidden="true" {...stylex.attrs(viewStyles.villageCanvasDiv2)} style={{ "background-image": `url(${spriteUrl("map")})` }} />
       </Show>
-      <div ref={(el) => (host = el)} class="absolute inset-0" data-testid="village" />
+      <div ref={(el) => (host = el)} {...stylex.attrs(viewStyles.village)} data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
         {(why) => (
-          <p data-testid="village-error" data-opening="failed" class="absolute inset-0 grid place-items-center font-pixel text-cream-200">
+          <p data-testid="village-error" data-opening="failed" {...stylex.attrs(viewStyles.villageError)}>
             {t("web.farm.canvas.noMap", { why: why() })}
           </p>
         )}
@@ -163,8 +210,8 @@ function Entering(props: { mapped: boolean }) {
     return done < total ? t("web.farm.canvas.moving", { done, total }) : t("web.farm.canvas.lights");
   };
   return (
-    <div class="absolute inset-0 grid place-items-center" data-opening="pending" data-opening-progress={fill()}>
-      <div class="flex flex-col items-center gap-2 font-pixel text-[12px] text-cream-100">
+    <div {...stylex.attrs(viewStyles.enteringDiv)} data-opening="pending" data-opening-progress={fill()}>
+      <div {...stylex.attrs(viewStyles.enteringDiv2)}>
         <div
           role="progressbar"
           data-testid="village-loading"
@@ -174,7 +221,7 @@ function Entering(props: { mapped: boolean }) {
           aria-valuenow={Math.round(fill() * 100)}
           class="h-4 w-64 border-2 border-bark-900 bg-bark-900/60 p-0.5 shadow-px-shade"
         >
-          <div class="h-full bg-leaf-500 transition-[width] duration-200" style={{ width: `${fill() * 100}%` }} />
+          <div {...stylex.attrs(viewStyles.enteringDiv3)} style={{ width: `${fill() * 100}%` }} />
         </div>
         <span>{words()}</span>
       </div>

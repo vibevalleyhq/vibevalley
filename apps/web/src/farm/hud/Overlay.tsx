@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -15,6 +16,23 @@ import { useFrames } from "#/infra/frame.ts";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "#/ui/pixel/index.ts";
 
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
+
+const viewStyles = stylex.create({
+  pinViewDiv: {
+    position: "absolute",
+  },
+  overlayDiv: {
+    pointerEvents: "none",
+    position: "absolute",
+    inset: "0",
+    overflow: "hidden",
+  },
+  headDiv: {
+    position: "absolute",
+    top: "0",
+    left: "0",
+  },
+});
 
 /** Rows of art pixels above the plot's bottom where its rail is. */
 const rail = 5;
@@ -74,7 +92,10 @@ function PinView(props: { pin: Pin }) {
     />
   );
   return (
-    <div class="absolute" style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}>
+    <div
+      {...stylex.attrs(viewStyles.pinViewDiv)}
+      style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}
+    >
       <Show when={props.pin.hop !== undefined} fallback={card()}>
         <span class="block motion-safe:animate-[hop_3.2s_steps(1)_infinite]" style={{ "animation-delay": `${props.pin.hop}s` }}>
           {card()}
@@ -197,7 +218,7 @@ export function Overlay() {
   return (
     <Show when={pins()}>
       {(p) => (
-        <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div {...stylex.attrs(viewStyles.overlayDiv)} aria-hidden="true">
           <For each={p().back} keyed={(pin) => pin.key}>
             {(pin) => <PinView pin={pin()} />}
           </For>
@@ -264,7 +285,7 @@ function Head(props: { session: SessionView; village: Village; placed: Map<strin
   return (
     <Show when={rows()}>
       {(r) => (
-        <div ref={(div) => (el = div)} class="absolute top-0 left-0" style={{ visibility: "hidden" }} data-testid={`head-${props.session.id}`}>
+        <div ref={(div) => (el = div)} {...stylex.attrs(viewStyles.headDiv)} style={{ visibility: "hidden" }} data-testid={`head-${props.session.id}`}>
           <PixelCard padX={3} padY={2} rows={[r()]} />
         </div>
       )}

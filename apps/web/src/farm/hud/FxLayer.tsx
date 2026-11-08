@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,6 +10,47 @@ import { subscribeLive } from "#/infra/frame.ts";
 import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "#/ui/pixel/index.ts";
 
 import { clearingLevels } from "./readout";
+
+const viewStyles = stylex.create({
+  levelUp: {
+    pointerEvents: "none",
+    position: "absolute",
+    insetInline: "0",
+    top: "calc(var(--spacing) * 24)",
+    display: "flex",
+    justifyContent: "center",
+  },
+  fxLayerSpan: {
+    display: "flex",
+    height: "calc(var(--spacing) * 5)",
+    width: "calc(var(--spacing) * 14)",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    overflow: "visible",
+  },
+  fxLayerImg: {
+    marginBottom: "0",
+    height: "calc(var(--spacing) * 14)",
+    width: "calc(var(--spacing) * 14)",
+    flexShrink: "0",
+    imageRendering: "pixelated",
+  },
+  fxLayerSpan2: {
+    marginTop: "calc(var(--spacing) * .5)",
+    fontSize: "12px",
+    letterSpacing: ".3px",
+    color: "var(--color-leaf-700)",
+  },
+  fxLayerSpan3: {
+    fontSize: "24px",
+    color: "var(--color-bark-900)",
+  },
+  fxLayerSpan4: {
+    marginTop: "calc(var(--spacing) * .5)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+});
 
 const bannerMs = 3400;
 
@@ -66,22 +108,22 @@ export function FxLayer() {
       <Show when={banner()} keyed>
         {(b) => (
           <div
-            class="pointer-events-none absolute inset-x-0 top-24 flex justify-center"
+            {...stylex.attrs(viewStyles.levelUp)}
             role="status"
             data-testid="level-up"
             data-level={b.level}
             aria-label={t("web.farm.fx.levelUp", { level: b.level })}
           >
             <div class="flex flex-col items-center bg-cream-50 px-7 pt-0 pb-4 shadow-px motion-safe:animate-[level-up_3.4s_cubic-bezier(0.2,0.9,0.2,1)_forwards]">
-              <span class="flex h-5 w-14 items-end justify-center overflow-visible">
+              <span {...stylex.attrs(viewStyles.fxLayerSpan)}>
                 <Show when={loaded().village?.atlas.has("icon-star")}>
-                  <img src="/pixel/icon-star.png" alt="" class="mb-[-0px] h-14 w-14 shrink-0 [image-rendering:pixelated]" style={{ "margin-top": "-36px" }} />
+                  <img src="/pixel/icon-star.png" alt="" {...stylex.attrs(viewStyles.fxLayerImg)} style={{ "margin-top": "-36px" }} />
                 </Show>
               </span>
-              <span class="mt-0.5 text-[12px] tracking-[0.3px] text-leaf-700">LEVEL UP</span>
-              <span class="text-[24px] text-bark-900">{t("web.farm.fx.level", { level: b.level })}</span>
+              <span {...stylex.attrs(viewStyles.fxLayerSpan2)}>LEVEL UP</span>
+              <span {...stylex.attrs(viewStyles.fxLayerSpan3)}>{t("web.farm.fx.level", { level: b.level })}</span>
               <Show when={clearingLevels.has(b.level)}>
-                <span class="mt-0.5 text-[12px] text-bark-600">{t("web.farm.fx.cleared")}</span>
+                <span {...stylex.attrs(viewStyles.fxLayerSpan4)}>{t("web.farm.fx.cleared")}</span>
               </Show>
             </div>
           </div>

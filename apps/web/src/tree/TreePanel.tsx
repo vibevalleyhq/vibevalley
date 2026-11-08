@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -10,6 +11,97 @@ import { stageName, type TreeFilter } from "./memories";
 import { type MemoryItem, type MemoryKind, type MemoryTree, TreeStageValues } from "./mock";
 import type { SceneHover } from "./Scene";
 import { type Ties, tiesOf } from "./sky";
+
+const viewStyles = stylex.create({
+  panelHeader: {
+    textAlign: "center",
+  },
+  panelDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+  },
+  memoryCounts: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3,minmax(0,1fr))",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  panelDl: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "var(--spacing)",
+  },
+  panelUl: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  panelLi: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  panelUl2: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  tieListDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  tieListButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  countDiv: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+  },
+  sectionSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderTopStyle: "dashed",
+    borderTopWidth: "2px",
+    borderStyle: "dashed",
+    borderColor: "var(--color-cream-300)",
+    paddingTop: "calc(var(--spacing) * 2)",
+  },
+  sectionDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  sectionSpan: {
+    marginLeft: "auto",
+  },
+});
 
 export const panelWidth = 340;
 export const narrowBelow = 760;
@@ -83,16 +175,16 @@ export function Panel(props: {
       class={["absolute flex flex-col gap-3 overflow-y-auto p-4", props.narrow ? "inset-x-2 bottom-2 h-[48%]" : "top-3 right-3 bottom-3"]}
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
-      <header class="text-center">
+      <header {...stylex.attrs(viewStyles.panelHeader)}>
         <h1 class={pxText.lg}>{t("web.tree.title")}</h1>
         <p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.stats", { days: days(), rounds: props.tree.rounds, recalls: props.tree.recalls })}</p>
       </header>
-      <div class="flex items-center gap-2 border-2 border-cream-300 bg-cream-100 px-2 py-1.5">
+      <div {...stylex.attrs(viewStyles.panelDiv)}>
         <SpriteIcon name="icon-rings" size={20} />
         <span class={pxText.sm}>{stageName(props.tree.stage)}</span>
         <span class={[pxText.xs, "ml-auto text-bark-500"]}>{growth()}</span>
       </div>
-      <div class="grid grid-cols-3 gap-2" data-testid="memory-counts">
+      <div {...stylex.attrs(viewStyles.memoryCounts)} data-testid="memory-counts">
         <Count icon="icon-leaf" label={t("web.tree.kind.leaf")} n={props.tally.leaf} />
         <Count icon="icon-fruit" label={t("web.tree.kind.fruit")} n={props.tally.fruit} />
         <Count icon="icon-seed" label={t("web.tree.kind.seed")} n={props.tally.seed} />
@@ -110,7 +202,7 @@ export function Panel(props: {
             </p>
             <Show when={m().case} fallback={<p class={pxText.sm}>{m().body}</p>}>
               {(c) => (
-                <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dl {...stylex.attrs(viewStyles.panelDl)}>
                   <dt class={[pxText.xs, "text-bark-500"]}>{t("web.tree.intent")}</dt>
                   <dd class={pxText.sm}>{c().intent}</dd>
                   <dt class={[pxText.xs, "text-bark-500"]}>{t("web.tree.approach")}</dt>
@@ -126,10 +218,10 @@ export function Panel(props: {
         )}
       </Show>
       <Section title={t("web.tree.recent")}>
-        <ul class="flex flex-col gap-1">
+        <ul {...stylex.attrs(viewStyles.panelUl)}>
           <For each={props.recent}>
             {(m) => (
-              <li class="flex items-center gap-2">
+              <li {...stylex.attrs(viewStyles.panelLi)}>
                 <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName(m.kind)} />
                 <span class={[pxText.sm, "min-w-0 flex-1 truncate"]} title={m.body}>
                   {m.body}
@@ -152,7 +244,7 @@ export function Panel(props: {
         }
       >
         <Show when={showFading()} fallback={<p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.fadingNote")}</p>}>
-          <ul class="flex flex-col gap-1">
+          <ul {...stylex.attrs(viewStyles.panelUl)}>
             <For each={props.fading}>
               {(m) => (
                 <li class={[pxText.sm, "truncate"]} title={m.body}>
@@ -165,10 +257,10 @@ export function Panel(props: {
       </Section>
       <Section title={t("web.tree.waiting")} icon="icon-seed-gold">
         <Show when={props.waiting.length > 0} fallback={<p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.noSeeds")}</p>}>
-          <ul class="flex flex-col gap-2">
+          <ul {...stylex.attrs(viewStyles.panelUl2)}>
             <For each={props.waiting}>
               {(seed) => (
-                <li class="flex items-center gap-2">
+                <li {...stylex.attrs(viewStyles.panelLi)}>
                   <SpriteIcon name="icon-seed" size={20} />
                   <span class={[pxText.sm, "min-w-0 flex-1"]}>{seed.body}</span>
                   <PxButton size="sm" tone="primary" data-testid="tree-sow" onClick={() => props.onSow(seed)}>
@@ -205,13 +297,13 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
   return (
     <For each={groups()}>
       {(g) => (
-        <div class="flex flex-col gap-0.5">
+        <div {...stylex.attrs(viewStyles.tieListDiv)}>
           <span class={[pxText.xs, "text-bark-500"]}>{g.title}</span>
           <For each={g.ids}>
             {(id) => (
               <Show when={find(id)}>
                 {(m) => (
-                  <button type="button" onClick={() => props.pick(m())} class="flex cursor-pointer items-center gap-1.5 text-left hover:bg-cream-200">
+                  <button type="button" onClick={() => props.pick(m())} {...stylex.attrs(viewStyles.tieListButton)}>
                     <SpriteIcon name={kindIcon[m().kind]} size={14} />
                     <span class={[pxText.sm, "min-w-0 flex-1 truncate"]}>{m().body}</span>
                   </button>
@@ -227,7 +319,7 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
 
 function Count(props: { icon: string; label: string; n: number }) {
   return (
-    <div class="flex items-center justify-center gap-1.5 border-2 border-cream-300 bg-cream-100 py-1.5" title={props.label}>
+    <div {...stylex.attrs(viewStyles.countDiv)} title={props.label}>
       <SpriteIcon name={props.icon} size={20} label={props.label} />
       <span class={pxText.sm}>{props.n}</span>
     </div>
@@ -236,11 +328,11 @@ function Count(props: { icon: string; label: string; n: number }) {
 
 function Section(props: { title: string; icon?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section class="flex flex-col gap-1.5 border-t-2 border-dashed border-cream-300 pt-2">
-      <div class="flex items-center gap-1.5">
+    <section {...stylex.attrs(viewStyles.sectionSection)}>
+      <div {...stylex.attrs(viewStyles.sectionDiv)}>
         <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={16} />}</Show>
         <h2 class={pxText.sm}>{props.title}</h2>
-        <span class="ml-auto">{props.aside}</span>
+        <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.aside}</span>
       </div>
       {props.children}
     </section>
@@ -254,7 +346,7 @@ export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id
   const top = () => Math.min(props.hover.y + 14, window.innerHeight - 110);
   return (
     <PxWindow class="pointer-events-none fixed z-40 w-[256px] px-2.5 py-2" style={{ left: `${left()}px`, top: `${top()}px` }}>
-      <div class="flex items-center gap-1.5">
+      <div {...stylex.attrs(viewStyles.sectionDiv)}>
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
         <span class={pxText.xs}>
           {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")}

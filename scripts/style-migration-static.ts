@@ -44,8 +44,30 @@ for (const [name, story] of [
   ["segmented-states", "组件/工作台/Segmented:States"],
   ["segmented-disabled", "组件/工作台/Segmented:Playground"],
   ["tabs-states", "组件/工作台/Tabs:States"],
+  ["attachment-kinds", "组件/工作台/AttachmentTile:Kinds"],
+  ["checkbox-states", "组件/工作台/Checkbox:States"],
+  ["chips-values", "组件/工作台/Chips:Key and value"],
+  ["agent-faces", "组件/工作台/Face:Agents"],
+  ["form-receipts", "组件/工作台/Form:Receipts"],
+  ["icon-catalog", "设计体系/图标:All"],
+  ["key-marks", "组件/工作台/KeyField:Marks"],
+  ["layout-card", "组件/工作台/layout:Card"],
+  ["layout-rows", "组件/工作台/layout:Row states"],
+  ["layout-empty", "组件/工作台/layout:Empty with a next step"],
+  ["markdown-message", "组件/工作台/Markdown:Message"],
+  ["data-table", "组件/工作台/DataTable:Local"],
+  ["agent-cards", "组件/帮工/档案卡:States"],
+  ["memory-states", "组件/记性/一条记性:States"],
+  ["messages-rich", "界面/频道/消息:Rich"],
+  ["messages-reports", "界面/频道/消息:Reports"],
+  ["issue-board", "界面/工单/看板:Board"],
+  ["issue-answer", "界面/工单/工单页:答案"],
+  ["runtime-details", "界面/农机/详情:能用"],
+  ["runtime-usage", "界面/农机/详情:快用完"],
+  ["pixel-marks", "组件/像素/icons:Marked"],
+  ["pixel-sprites", "组件/像素/icons:Sprites"],
 ])
-  for (const theme of ["light", "dark"])
+  for (const theme of story?.startsWith("组件/像素/") === true ? ["light"] : ["light", "dark"])
     for (const width of [400, 800]) {
       if (name === undefined || story === undefined) throw new Error("Incomplete story scene");
       scenes.push({
@@ -57,6 +79,9 @@ for (const [name, story] of [
       });
     }
 const captureOptions = { locale: "en-US", timezoneId: "UTC", deviceScaleFactor: 1, clock: "2026-11-08T12:00:00.000Z", reducedMotion: "reduce" };
+const browserArgs = ["--disable-skia-runtime-opts", "--disable-partial-raster", "--num-raster-threads=1", "--force-color-profile=srgb"];
+const mediaPath = "scripts/testdata/style-migration/attachment.mp4";
+const mediaFixture = readFileSync(resolve(migrationRoot, mediaPath));
 const mime: Record<string, string> = {
   ".html": "text/html",
   ".css": "text/css",
@@ -85,6 +110,13 @@ async function serve(root: string) {
   const server = createServer((request, response) => {
     try {
       const path = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
+      if (path === "/api/v1/attachment/a2") {
+        response.setHeader("Content-Type", "video/mp4");
+        response.setHeader("Content-Length", mediaFixture.length);
+        response.setHeader("Cache-Control", "no-store");
+        response.end(mediaFixture);
+        return;
+      }
       const file = resolve(root, `.${path.endsWith("/") ? `${path}index.html` : path}`);
       if (!file.startsWith(`${root}${sep}`) || !statSync(file).isFile()) throw new Error("Not a served file");
       response.setHeader("Content-Type", mime[extname(file)] ?? "application/octet-stream");
@@ -152,6 +184,13 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
           return image.decode();
         }),
       );
+      for (const video of document.querySelectorAll<HTMLVideoElement>("video[src]")) {
+        if (video.error !== null) throw new Error(`Media fixture failed: ${video.currentSrc}`);
+        if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          video.preload = "auto";
+          video.load();
+        }
+      }
       if (entry === "site") {
         for (let y = 0; y < document.documentElement.scrollHeight; y += 900) {
           scrollTo(0, y);
@@ -160,6 +199,9 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
         scrollTo(0, 0);
       }
     }, scene.entry);
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll<HTMLVideoElement>("video[src]")].every((video) => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
+    );
     await page.waitForTimeout(1200);
     const target = scene.entry === "site" ? page.locator("body") : scene.popup !== undefined ? page.getByRole(popupRole) : page.getByTestId("story-frame");
     const textHash = hash(await target.innerText());
@@ -213,7 +255,7 @@ const results: {
   textEqual?: boolean;
 }[] = [];
 const servers: Awaited<ReturnType<typeof serve>>[] = [];
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: browserArgs });
 try {
   const urls = { before: { site: "", stories: "" }, after: { site: "", stories: "" } };
   await Promise.all(
@@ -263,7 +305,9 @@ await writeFile(
       inputs,
       baseline: beforeInputs,
       outputs,
+      fixtures: [{ path: mediaPath, route: "/api/v1/attachment/a2", hash: hash(mediaFixture) }],
       environment: {
+        browserArgs,
         platform: process.platform,
         arch: arch(),
         release: release(),

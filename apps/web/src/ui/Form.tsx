@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { onCleanup, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -6,6 +7,34 @@ import { t } from "@vibevalley/i18n";
 import type { FormField as Binding } from "#/infra/form.ts";
 
 import { Hint } from "./Tip";
+
+const viewStyles = stylex.create({
+  formP: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-berry)",
+  },
+  formFieldDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  formFieldLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-muted)",
+  },
+  formFieldP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+});
 
 export const formMessages = {
   issue: () => t("web.base.form.invalid"),
@@ -52,7 +81,7 @@ export function Form(props: { form: Controls; children: JSX.Element; class?: str
     >
       {props.children}
       <Show when={props.form.messages().length > 0 || props.form.submitError() !== undefined}>
-        <p tabindex={-1} data-form-summary role="alert" class="mt-2 text-sm text-berry">
+        <p tabindex={-1} data-form-summary role="alert" {...stylex.attrs(viewStyles.formP)}>
           {props.form.submitError() ?? props.form.messages().join(" · ")}
         </p>
       </Show>
@@ -69,14 +98,14 @@ export function formControl<V>(field: Binding<V>) {
 }
 export function FormField(props: { field: Pick<Binding<unknown>, "id" | "messages">; label: string; hint?: string; children: JSX.Element }) {
   return (
-    <div class="flex flex-col gap-1">
-      <label for={props.field.id} class="flex items-center gap-1.5 text-xs font-medium text-muted">
+    <div {...stylex.attrs(viewStyles.formFieldDiv)}>
+      <label for={props.field.id} {...stylex.attrs(viewStyles.formFieldLabel)}>
         {props.label}
         <Show when={props.hint}>{(hint) => <Hint text={hint()} />}</Show>
       </label>
       {props.children}
       <Show when={props.field.messages().length > 0}>
-        <p id={`${props.field.id}-errors`} class="text-xs text-berry">
+        <p id={`${props.field.id}-errors`} {...stylex.attrs(viewStyles.formFieldP)}>
           {props.field.messages().join(" · ")}
         </p>
       </Show>

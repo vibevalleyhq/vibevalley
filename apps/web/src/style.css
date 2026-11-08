@@ -138,6 +138,18 @@
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --leading-snug: 1.375;
+  --leading-relaxed: 1.625;
+  --tracking-wide: 0.025em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: calc(2 / 1.5);
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  --container-2xl: 42rem;
+  --container-3xl: 48rem;
+  --container-4xl: 56rem;
+  --color-white: #fff;
   --color-page: var(--wb-page);
   --color-side: var(--wb-side);
   --color-ink: var(--wb-ink);

@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,6 +13,90 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { PoseSprite } from "#/ui/PoseSprite.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
+const viewStyles = stylex.create({
+  labeledDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  labeledDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  labeledSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-muted)",
+  },
+  labeledSpan2: {
+    flex: "1",
+  },
+  labeledSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+  lookPanelDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 5)",
+  },
+  lookPanelDiv2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  lookPanelSpan: {
+    display: "flex",
+    height: "calc(var(--spacing) * 16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lookPanelImg: {
+    height: "calc(var(--spacing) * 16)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  stageDiv: {
+    position: "relative",
+    display: "flex",
+    flex: "1",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  stageDiv2: {
+    position: "relative",
+    height: "calc(var(--spacing) * 72)",
+    width: "calc(var(--spacing) * 96)",
+    maxWidth: "100%",
+  },
+  stageImg: {
+    position: "absolute",
+    bottom: "calc(var(--spacing) * 6)",
+    width: "calc(var(--spacing) * 72)",
+    imageRendering: "pixelated",
+  },
+  stageDiv3: {
+    position: "absolute",
+    right: "calc(var(--spacing) * 24)",
+    bottom: "calc(var(--spacing) * 2)",
+    translate: "calc(1 / 2 * 100%) 0",
+  },
+  stageDiv4: {
+    pointerEvents: "none",
+    position: "absolute",
+    insetInline: "0",
+    bottom: "calc(var(--spacing) * 4)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+});
+
 /** A label with what it means behind an info icon, what sits at its right, the control, and what is wrong under it. */
 export function Labeled(props: {
   label: string;
@@ -22,16 +107,16 @@ export function Labeled(props: {
   children: JSX.Element;
 }) {
   return (
-    <div class="flex flex-col gap-1">
-      <div class="flex items-center gap-1.5">
-        <span class="text-xs font-medium text-muted">{props.label}</span>
+    <div {...stylex.attrs(viewStyles.labeledDiv)}>
+      <div {...stylex.attrs(viewStyles.labeledDiv2)}>
+        <span {...stylex.attrs(viewStyles.labeledSpan)}>{props.label}</span>
         <Show when={props.hint ?? props.tip}>{(h) => <Hint text={h()} />}</Show>
-        <span class="flex-1" />
+        <span {...stylex.attrs(viewStyles.labeledSpan2)} />
         {props.aside}
       </div>
       {props.children}
       <Show when={props.error}>
-        <span class="text-xs text-berry">{props.error}</span>
+        <span {...stylex.attrs(viewStyles.labeledSpan3)}>{props.error}</span>
       </Show>
     </div>
   );
@@ -41,14 +126,14 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
   const cast = () => castOf(props.draft.look, props.draft.id);
   const sprites = useSprites();
   return (
-    <div class="flex flex-col gap-5">
+    <div {...stylex.attrs(viewStyles.lookPanelDiv)}>
       <div>
         <Button icon="shuffle" onClick={() => props.onChange(randomLook())}>
           {t("web.agent.random")}
         </Button>
       </div>
       <Labeled label={t("web.agent.looksAs")} hint={t("web.agent.looksHint")}>
-        <div class="grid grid-cols-4 gap-1.5">
+        <div {...stylex.attrs(viewStyles.lookPanelDiv2)}>
           <For each={SpeciesValues}>
             {(species) => (
               <Tile active={cast().species === species} label={speciesLabel[species]} onClick={() => props.onChange({ ...props.draft.look, species })}>
@@ -59,7 +144,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
         </div>
       </Labeled>
       <Labeled label={t("web.agent.wears")}>
-        <div class="grid grid-cols-4 gap-1.5">
+        <div {...stylex.attrs(viewStyles.lookPanelDiv2)}>
           <For each={OutfitValues}>
             {(outfit) => {
               const name = () => {
@@ -68,8 +153,8 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
               };
               return (
                 <Tile active={cast().outfit === outfit} label={outfitLabel[outfit]} onClick={() => props.onChange({ ...props.draft.look, outfit })}>
-                  <span class="flex h-16 items-center justify-center">
-                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" class="h-16 object-contain [image-rendering:pixelated]" />}</Show>
+                  <span {...stylex.attrs(viewStyles.lookPanelSpan)}>
+                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" {...stylex.attrs(viewStyles.lookPanelImg)} />}</Show>
                   </span>
                 </Tile>
               );
@@ -105,23 +190,20 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const crop = () => stagePoses.find((p) => p.pose === props.pose)?.crop ?? "empty";
   return (
-    <div
-      class="relative flex flex-1 items-center justify-center overflow-hidden"
-      style={{ background: "radial-gradient(60% 60% at 50% 45%, #c7dd9a, #9cc069 60%, #7ea64f)" }}
-    >
-      <div class="relative h-72 w-96 max-w-full">
+    <div {...stylex.attrs(viewStyles.stageDiv)} style={{ background: "radial-gradient(60% 60% at 50% 45%, #c7dd9a, #9cc069 60%, #7ea64f)" }}>
+      <div {...stylex.attrs(viewStyles.stageDiv2)}>
         <img
           src={`/pixel/${cropSprite(crop())}.png`}
           alt=""
-          class="absolute bottom-6 w-72 [image-rendering:pixelated]"
+          {...stylex.attrs(viewStyles.stageImg)}
           style={{ left: `${192 - 288 * 0.62}px` }}
           onError={(e) => (e.currentTarget.style.display = "none")}
         />
-        <div class="absolute right-24 bottom-2 translate-x-1/2">
+        <div {...stylex.attrs(viewStyles.stageDiv3)}>
           <PoseSprite cast={cast()} pose={props.pose} height={224} />
         </div>
       </div>
-      <div class="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1">
+      <div {...stylex.attrs(viewStyles.stageDiv4)}>
         <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || t("web.agent.unnamedAgent")}</span>
         <Show when={props.draft.duty}>
           <span class="max-w-96 rounded bg-paper/75 px-2 py-px text-center text-xs">{props.draft.duty}</span>

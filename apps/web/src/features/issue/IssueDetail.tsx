@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -30,6 +31,179 @@ import { issueMove, movedIssue } from "./moves";
 import { issueState, noStepsText, stageTone } from "./overview";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { issueDeliver, shownDeliver } from "./write";
+
+const viewStyles = stylex.create({
+  issueDetailDiv: {
+    paddingRight: "calc(var(--spacing) * 10)",
+  },
+  parentIssue: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    cursor: "pointer",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  issueDetailDiv2: {
+    containerType: "inline-size",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: "calc(var(--spacing) * 2)",
+  },
+  issueDetailSpan: {
+    flexShrink: "0",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  issueNow: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  issueAsk: {
+    marginBottom: "calc(var(--spacing) * 5)",
+  },
+  issueDetailDiv3: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  issueDetailDiv4: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  issueDetailDiv5: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  issueDetailSpan2: {
+    marginLeft: "calc(var(--spacing) * 2)",
+    fontWeight: "var(--font-weight-normal)",
+  },
+  issueDetailDiv6: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-water)",
+  },
+  issueDetailDiv7: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  issueDetailP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  issueDetailDiv8: {
+    marginTop: "calc(var(--spacing) * 2)",
+  },
+  issueDetailDiv9: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  issueDetailDiv10: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-berry)",
+  },
+  issueDetailDiv11: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  issueDetailDiv12: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  issueDetailA: {
+    marginTop: "var(--spacing)",
+    display: "block",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  issueDetailP2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  issueDetailDiv13: {
+    marginTop: "calc(var(--spacing) * 3)",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  issueDetailSummary: {
+    cursor: "pointer",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  issueDetailSpan3: {
+    marginLeft: "calc(var(--spacing) * 2)",
+    fontWeight: "var(--font-weight-normal)",
+    color: "var(--wb-muted)",
+  },
+  issueDetailDiv14: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  issueDetailSpan4: {
+    color: "var(--wb-accent)",
+  },
+  issueDetailSpan5: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  issueDetailSpan6: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "var(--spacing)",
+  },
+  issueDetailButton: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    padding: "calc(var(--spacing) * .5)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  issueDetailDiv15: {
+    color: "var(--wb-faint)",
+    textDecorationLine: "line-through",
+  },
+});
 
 export { AnswerView, OrchestratorIssueDetail };
 
@@ -83,16 +257,16 @@ export function IssueDetail(props: {
   const parent = () => issues().find((item) => item.id === props.issue.parent);
   const tone = () => stageTone[s().stage.state];
   const heading = (
-    <div class="pr-10">
+    <div {...stylex.attrs(viewStyles.issueDetailDiv)}>
       <Show when={s().inFamily ? props.onParent : undefined}>
         {(onParent) => (
-          <button type="button" data-testid="parent-issue" onClick={() => onParent()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
+          <button type="button" data-testid="parent-issue" onClick={() => onParent()()} {...stylex.attrs(viewStyles.parentIssue)}>
             ‹ {parent()?.title ?? t("web.issue.family.parent")}
           </button>
         )}
       </Show>
-      <div class="@container flex flex-wrap items-baseline gap-x-2">
-        <span class="shrink-0 text-sm text-muted">#{props.issue.number}</span>
+      <div {...stylex.attrs(viewStyles.issueDetailDiv2)}>
+        <span {...stylex.attrs(viewStyles.issueDetailSpan)}>#{props.issue.number}</span>
         <h1 class="line-clamp-2 min-w-0 flex-1 text-lg font-semibold" title={s().title}>
           {s().title}
         </h1>
@@ -100,7 +274,7 @@ export function IssueDetail(props: {
           {[s().repo, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
         </span>
       </div>
-      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
+      <div {...stylex.attrs(viewStyles.issueNow)} aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
         <Dot tone={tone()} size={8} ring={false} />
         <span>{t(`shared.status.${props.issue.status}`)} ·</span>
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
@@ -119,10 +293,10 @@ export function IssueDetail(props: {
       <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
       <Show when={s().ask}>
         {(ask) => (
-          <section aria-label={t("web.issue.detail.yours")} data-testid="issue-ask" class="mb-5">
+          <section aria-label={t("web.issue.detail.yours")} data-testid="issue-ask" {...stylex.attrs(viewStyles.issueAsk)}>
             <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
-              <div class="font-semibold">{ask().head}</div>
+              <div {...stylex.attrs(viewStyles.issueDetailDiv3)}>{ask().head}</div>
               <Show when={ask().line}>{(line) => <div class="mt-1 line-clamp-4">{plainText(line())}</div>}</Show>
               <Show when={s().stage.state === "asking"}>
                 <For each={props.issue.questions}>
@@ -165,7 +339,7 @@ export function IssueDetail(props: {
                 }
               />
             </Show>
-            <div class="mt-2.5 flex flex-wrap gap-2">
+            <div {...stylex.attrs(viewStyles.issueDetailDiv4)}>
               <Show when={s().lead} keyed>
                 {(lead) => button(lead, () => true)}
               </Show>
@@ -175,7 +349,7 @@ export function IssueDetail(props: {
         )}
       </Show>
       <Show when={!s().ask && box() === "tell"}>
-        <section aria-label={t("web.issue.detail.tellSection")} class="mb-5">
+        <section aria-label={t("web.issue.detail.tellSection")} {...stylex.attrs(viewStyles.issueAsk)}>
           <TextArea
             rows={2}
             value={text()}
@@ -191,7 +365,7 @@ export function IssueDetail(props: {
             aria-label={t("web.issue.detail.tell", { who: head().name })}
             autofocus
           />
-          <div class="mt-2 flex gap-2">
+          <div {...stylex.attrs(viewStyles.issueDetailDiv5)}>
             {button("tell", () => true)}
             <Button disabled={busy()} onClick={() => setBox(undefined)}>
               {t("web.issue.never")}
@@ -204,25 +378,25 @@ export function IssueDetail(props: {
         <SheetLabel>
           {t("web.issue.detail.progress")}
           <Show when={s().criteria.length > 0}>
-            <span class="ml-2 font-normal">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</span>
+            <span {...stylex.attrs(viewStyles.issueDetailSpan2)}>{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</span>
           </Show>
         </SheetLabel>
         <Show when={s().doing}>
-          <div class="mb-1.5 text-sm text-water">{s().doing}</div>
+          <div {...stylex.attrs(viewStyles.issueDetailDiv6)}>{s().doing}</div>
         </Show>
         <Show when={s().inFamily}>
-          <div class="mb-1.5 text-xs text-muted">{s().parentText}</div>
+          <div {...stylex.attrs(viewStyles.issueDetailDiv7)}>{s().parentText}</div>
         </Show>
         <Show
           when={s().criteria.length > 0}
-          fallback={<p class="text-sm text-muted">{t("web.issue.detail.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
+          fallback={<p {...stylex.attrs(viewStyles.issueDetailP)}>{t("web.issue.detail.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
         >
           <Criteria rows={s().criteria} checking={s().stage.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().openFindings.length > 0}>
-          <div class="mt-2">
-            <div class="text-xs text-muted">{t("web.issue.detail.rejected")}</div>
-            <For each={s().openFindings}>{(f) => <div class="text-sm text-berry">· {f.text}</div>}</For>
+          <div {...stylex.attrs(viewStyles.issueDetailDiv8)}>
+            <div {...stylex.attrs(viewStyles.issueDetailDiv9)}>{t("web.issue.detail.rejected")}</div>
+            <For each={s().openFindings}>{(f) => <div {...stylex.attrs(viewStyles.issueDetailDiv10)}>· {f.text}</div>}</For>
           </div>
         </Show>
       </section>
@@ -231,13 +405,13 @@ export function IssueDetail(props: {
         <SheetLabel>{t("web.issue.detail.made")}</SheetLabel>
         <Switch
           fallback={
-            <p class="text-sm text-muted">
+            <p {...stylex.attrs(viewStyles.issueDetailP)}>
               {s().stage.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
             </p>
           }
         >
           <Match when={props.issue.deliver === "answer"}>
-            <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">{t("web.issue.detail.noAnswer")}</p>}>
+            <Show when={props.issue.answer} fallback={<p {...stylex.attrs(viewStyles.issueDetailP)}>{t("web.issue.detail.noAnswer")}</p>}>
               {(a) => <AnswerView answer={a()} />}
             </Show>
           </Match>
@@ -245,12 +419,12 @@ export function IssueDetail(props: {
             {(c) => (
               <Show
                 when={c().commits.length > 0 || c().uncommitted.length > 0 || c().files.length > 0}
-                fallback={<p class="text-sm text-muted">{t("web.issue.detail.noChanges")}</p>}
+                fallback={<p {...stylex.attrs(viewStyles.issueDetailP)}>{t("web.issue.detail.noChanges")}</p>}
               >
-                <div class="flex flex-col gap-2">
-                  <div class="text-sm">{changesLine(c())}</div>
+                <div {...stylex.attrs(viewStyles.issueDetailDiv11)}>
+                  <div {...stylex.attrs(viewStyles.issueDetailDiv12)}>{changesLine(c())}</div>
                   <Show when={c().conflicts.length > 0}>
-                    <div class="text-sm text-berry">{t("web.issue.detail.conflict", { base: c().base, files: list(c().conflicts) })}</div>
+                    <div {...stylex.attrs(viewStyles.issueDetailDiv10)}>{t("web.issue.detail.conflict", { base: c().base, files: list(c().conflicts) })}</div>
                   </Show>
                   <Fold label={t("web.issue.detail.changedFiles")} summary={t("web.issue.detail.fileCount", { n: c().files.length })}>
                     <ChangesHead changes={c()} />
@@ -261,12 +435,14 @@ export function IssueDetail(props: {
             )}
           </Match>
           <Match when={s().showsChanges}>
-            <p class="text-sm text-muted">{changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}</p>
+            <p {...stylex.attrs(viewStyles.issueDetailP)}>
+              {changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}
+            </p>
           </Match>
         </Switch>
         <Show when={props.issue.pullRequest}>
           {(pr) => (
-            <a href={pr().url} target="_blank" rel="noreferrer" class="mt-1 block text-sm text-water hover:underline">
+            <a href={pr().url} target="_blank" rel="noreferrer" {...stylex.attrs(viewStyles.issueDetailA)}>
               {t("shared.join.aside", { text: `PR #${pr().number}`, aside: pr().state })}
             </a>
           )}
@@ -280,20 +456,22 @@ export function IssueDetail(props: {
         <SheetLabel>{t("web.issue.detail.story")}</SheetLabel>
         <Show
           when={timeline()}
-          fallback={<p class="text-xs text-faint">{timelineQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.unread")}</p>}
+          fallback={
+            <p {...stylex.attrs(viewStyles.issueDetailP2)}>{timelineQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.unread")}</p>
+          }
         >
           {(line) => <Story milestones={line().milestones} />}
         </Show>
-        <div class="mt-3 border-t border-line">
+        <div {...stylex.attrs(viewStyles.issueDetailDiv13)}>
           <details onToggle={(event) => setShowSteps(event.currentTarget.open)}>
-            <summary class="cursor-pointer py-2.5 text-sm font-semibold">
+            <summary {...stylex.attrs(viewStyles.issueDetailSummary)}>
               {t("web.issue.detail.steps")}
               <Show when={steps().length > 0}>
-                <span class="ml-2 font-normal text-muted">{stepsLine(steps())}</span>
+                <span {...stylex.attrs(viewStyles.issueDetailSpan3)}>{stepsLine(steps())}</span>
               </Show>
             </summary>
             <Show when={showSteps()}>
-              <Show when={steps().length > 0 ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
+              <Show when={steps().length > 0 ? steps() : undefined} fallback={<p {...stylex.attrs(viewStyles.issueDetailP2)}>{noStepsText(head())}</p>}>
                 {(st) => <WorkLog steps={st()} />}
               </Show>
             </Show>
@@ -314,7 +492,7 @@ export function IssueDetail(props: {
   const side = (
     <>
       <Show when={sideActs().length > 0}>
-        <div class="mb-3 flex flex-wrap gap-2">
+        <div {...stylex.attrs(viewStyles.issueDetailDiv14)}>
           <For each={sideActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
         </div>
       </Show>
@@ -327,7 +505,7 @@ export function IssueDetail(props: {
       <Show when={props.issue.reviewedAt}>
         {(at) => (
           <Property label={t("web.issue.detail.reviewed")}>
-            <span class="text-accent">{wallClockText(at())}</span>
+            <span {...stylex.attrs(viewStyles.issueDetailSpan4)}>{wallClockText(at())}</span>
           </Property>
         )}
       </Show>
@@ -358,20 +536,20 @@ export function IssueDetail(props: {
         <Property label={t("web.issue.detail.profile")}>{agent()?.name ?? head().name}</Property>
         <Show when={head().branch}>
           <Property label={t("web.issue.detail.branch")}>
-            <span class="font-mono text-xs">{head().branch}</span>
+            <span {...stylex.attrs(viewStyles.issueDetailSpan5)}>{head().branch}</span>
           </Property>
         </Show>
         <Show when={head().worktree}>
           {(worktree) => (
             <Property label="worktree">
-              <span class="flex items-start gap-1">
+              <span {...stylex.attrs(viewStyles.issueDetailSpan6)}>
                 <span class="min-w-0 flex-1 font-mono text-xs break-all select-text">{worktree()}</span>
                 <button
                   type="button"
                   aria-label={t("web.issue.detail.copyPath")}
                   title={t("web.issue.detail.copyPath")}
                   onClick={() => void navigator.clipboard.writeText(worktree())}
-                  class="cursor-pointer rounded p-0.5 hover:bg-hover"
+                  {...stylex.attrs(viewStyles.issueDetailButton)}
                 >
                   <Icon name="copy" size={14} />
                 </button>
@@ -382,7 +560,7 @@ export function IssueDetail(props: {
         <Property label={t("web.issue.detail.took")}>{s().usedLine(steps(), now())}</Property>
         <Show when={s().resolvedFindings.length > 0}>
           <Property label={t("web.issue.detail.resolved")}>
-            <For each={s().resolvedFindings}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
+            <For each={s().resolvedFindings}>{(f) => <div {...stylex.attrs(viewStyles.issueDetailDiv15)}>{f.text}</div>}</For>
           </Property>
         </Show>
       </More>

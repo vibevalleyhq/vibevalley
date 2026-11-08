@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,77 @@ import { Opened } from "./PageView";
 import { Sidebar } from "./Sidebar";
 import { refreshVault, usePkmVault } from "./vault";
 
+const viewStyles = stylex.create({
+  pkmPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+  },
+  daysDiv: {
+    marginInline: "auto",
+    display: "flex",
+    width: "100%",
+    maxWidth: "var(--container-3xl)",
+    minWidth: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 6)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+  daysDiv2: {
+    display: {
+      default: null,
+      "@media (width>=64rem)": "none",
+    },
+  },
+  daysAside: {
+    marginInline: {
+      default: "auto",
+      "@media (width>=80rem)": "0",
+    },
+    width: {
+      default: "100%",
+      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+    },
+    maxWidth: "var(--container-3xl)",
+    borderTopStyle: {
+      default: "solid",
+      "@media (width>=80rem)": "solid",
+    },
+    borderTopWidth: {
+      default: "1px",
+      "@media (width>=80rem)": "0",
+    },
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+    position: {
+      default: null,
+      "@media (width>=80rem)": "sticky",
+    },
+    top: {
+      default: null,
+      "@media (width>=80rem)": "0",
+    },
+    flexShrink: {
+      default: null,
+      "@media (width>=80rem)": "0",
+    },
+    borderLeftStyle: {
+      default: null,
+      "@media (width>=80rem)": "solid",
+    },
+    borderLeftWidth: {
+      default: null,
+      "@media (width>=80rem)": "1px",
+    },
+  },
+});
+
 /** `rest` is the path after /pkm/: a page's slug. */
 export function PkmPage(props: { rest: string }) {
   const vault = usePkmVault();
@@ -24,7 +96,7 @@ export function PkmPage(props: { rest: string }) {
   const pages = () => ready(vault, undefined)?.pages ?? [];
   const nav = () => search().has("nav");
   return (
-    <div class="flex h-full min-h-0 flex-col lg:flex-row">
+    <div {...stylex.attrs(viewStyles.pkmPageDiv)}>
       <nav
         aria-label={t("web.pkm.list.label")}
         data-testid="pkm-nav"
@@ -63,8 +135,8 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
       .slice(0, daysShown);
   return (
     <div data-testid="pkm-days" class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:items-start">
-      <div class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-6 px-4 py-4">
-        <div class="lg:hidden">
+      <div {...stylex.attrs(viewStyles.daysDiv)}>
+        <div {...stylex.attrs(viewStyles.daysDiv2)}>
           <A href="/pkm?nav" class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink">
             <Icon name="calendar" size={14} />
             {t("web.pkm.list.label")}
@@ -75,10 +147,7 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
           {(p) => <Opened slug={p().slug} pages={props.pages} compact />}
         </For>
       </div>
-      <aside
-        aria-label={t("web.pkm.rail.label")}
-        class="mx-auto w-full max-w-3xl border-t border-line px-4 py-4 xl:sticky xl:top-0 xl:mx-0 xl:w-72 xl:shrink-0 xl:border-t-0 xl:border-l"
-      >
+      <aside aria-label={t("web.pkm.rail.label")} {...stylex.attrs(viewStyles.daysAside)}>
         <Calendar pages={props.pages} open={today} />
       </aside>
     </div>

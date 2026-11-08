@@ -1,9 +1,91 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
+
+const viewStyles = stylex.create({
+  nameSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  gridDiv: {
+    display: "flex",
+    width: "100%",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  curveDiv: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+  curveSvg: {
+    width: "calc(var(--spacing) * 12)",
+    height: "calc(var(--spacing) * 12)",
+    color: "var(--wb-line)",
+  },
+  ease: {
+    stroke: "var(--wb-accent)",
+  },
+  tokensStoriesDiv: {
+    display: "grid",
+    width: "100%",
+    gridTemplateColumns: "repeat(auto-fill,minmax(5.5rem,1fr))",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  tokensStoriesDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  tokensStoriesDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 4)",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  tokensStoriesDiv4: {
+    display: "flex",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-500)",
+  },
+  tokensStoriesSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--color-bark-600)",
+  },
+  tokensStoriesDiv5: {
+    display: "flex",
+    width: "100%",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  tokensStoriesDiv6: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  tokensStoriesSpan2: {
+    width: "calc(var(--spacing) * 16)",
+    flexShrink: "0",
+  },
+  tokensStoriesDiv7: {
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "calc(var(--spacing) * 3)",
+  },
+});
 
 const colours: [string, string][] = [
   ["page", "bg-page"],
@@ -70,11 +152,11 @@ const eases: [string, string][] = [
 ];
 
 function Name(props: { children: string }) {
-  return <span class="font-mono text-2xs text-muted">{props.children}</span>;
+  return <span {...stylex.attrs(viewStyles.nameSpan)}>{props.children}</span>;
 }
 
 function Grid(props: { children: JSX.Element }) {
-  return <div class="flex w-full flex-wrap items-end gap-3">{props.children}</div>;
+  return <div {...stylex.attrs(viewStyles.gridDiv)}>{props.children}</div>;
 }
 
 /** cubic-bezier(a, b, c, d) as its four numbers. */
@@ -93,16 +175,16 @@ function Curve(props: { name: string; class: string }) {
   });
   const y = (v: number) => 44 - v * 32;
   return (
-    <div class="flex flex-col items-center gap-1">
+    <div {...stylex.attrs(viewStyles.curveDiv)}>
       <span ref={(el) => (probe = el)} class={["hidden", props.class]} />
-      <svg viewBox="0 0 48 56" class="size-12 text-line" aria-hidden="true">
+      <svg viewBox="0 0 48 56" {...stylex.attrs(viewStyles.curveSvg)} aria-hidden="true">
         <rect x="8" y="12" width="32" height="32" fill="none" stroke="currentColor" />
         <Show when={p()}>
           {(c) => (
             <path
               d={`M8 ${y(0)} C${8 + c()[0] * 32} ${y(c()[1])} ${8 + c()[2] * 32} ${y(c()[3])} 40 ${y(1)}`}
               fill="none"
-              class="stroke-accent"
+              {...stylex.attrs(viewStyles.ease)}
               stroke-width="2"
               data-testid="ease"
             />
@@ -119,10 +201,10 @@ export default stories({
   stories: {
     Colour: story({
       render: () => (
-        <div class="grid w-full grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2">
+        <div {...stylex.attrs(viewStyles.tokensStoriesDiv)}>
           <For each={colours}>
             {([name, cls]) => (
-              <div class="flex flex-col gap-1">
+              <div {...stylex.attrs(viewStyles.tokensStoriesDiv2)}>
                 <span class={["h-8 rounded-md border border-line", cls]} />
                 <Name>{name}</Name>
               </div>
@@ -134,14 +216,14 @@ export default stories({
     "Pixel palette": story({
       note: "像素皮的颜色不跟主题走。",
       render: () => (
-        <div data-theme="light" class="flex flex-wrap gap-4 rounded-lg bg-cream-50 p-4">
+        <div data-theme="light" {...stylex.attrs(viewStyles.tokensStoriesDiv3)}>
           <For each={palette}>
             {([name, list]) => (
-              <div class="flex flex-col gap-1">
-                <div class="flex border-2 border-bark-500">
+              <div {...stylex.attrs(viewStyles.tokensStoriesDiv2)}>
+                <div {...stylex.attrs(viewStyles.tokensStoriesDiv4)}>
                   <For each={list}>{(cls) => <span class={["size-7", cls]} />}</For>
                 </div>
-                <span class="font-mono text-2xs text-bark-600">{name}</span>
+                <span {...stylex.attrs(viewStyles.tokensStoriesSpan)}>{name}</span>
               </div>
             )}
           </For>
@@ -151,11 +233,11 @@ export default stories({
     Type: story({
       args: { sample: "工单派给帮工，主人看改动 Ship it" },
       render: (a) => (
-        <div class="flex w-full flex-col gap-1">
+        <div {...stylex.attrs(viewStyles.tokensStoriesDiv5)}>
           <For each={sizes}>
             {([name, cls]) => (
-              <div class="flex items-baseline gap-3">
-                <span class="w-16 shrink-0">
+              <div {...stylex.attrs(viewStyles.tokensStoriesDiv6)}>
+                <span {...stylex.attrs(viewStyles.tokensStoriesSpan2)}>
                   <Name>{name}</Name>
                 </span>
                 <span class={["truncate", cls]}>{a.sample}</span>
@@ -170,7 +252,7 @@ export default stories({
         <Grid>
           <For each={radii}>
             {([name, cls]) => (
-              <div class="flex flex-col items-center gap-1">
+              <div {...stylex.attrs(viewStyles.curveDiv)}>
                 <span class={["size-10 border border-line bg-side", cls]} />
                 <Name>{name}</Name>
               </div>
@@ -178,7 +260,7 @@ export default stories({
           </For>
           <For each={shadows}>
             {([name, cls]) => (
-              <div class="flex flex-col items-center gap-1">
+              <div {...stylex.attrs(viewStyles.curveDiv)}>
                 <span class={["size-10 rounded-md border border-line bg-page", cls]} />
                 <Name>{name}</Name>
               </div>
@@ -196,12 +278,12 @@ export default stories({
             {/* Keyed by the count, so each press mounts them again and they play again. */}
             <For each={[replay()]}>
               {() => (
-                <div class="flex items-end gap-3">
-                  <div class="flex flex-col items-center gap-1">
+                <div {...stylex.attrs(viewStyles.tokensStoriesDiv7)}>
+                  <div {...stylex.attrs(viewStyles.curveDiv)}>
                     <span class="size-10 animate-pop-in rounded-md bg-accent" />
                     <Name>pop-in</Name>
                   </div>
-                  <div class="flex flex-col items-center gap-1">
+                  <div {...stylex.attrs(viewStyles.curveDiv)}>
                     <span class="size-10 animate-fade-in rounded-md bg-accent" />
                     <Name>fade-in</Name>
                   </div>

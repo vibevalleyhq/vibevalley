@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { For, Show } from "solid-js";
 
@@ -13,6 +14,41 @@ import { Button } from "#/ui/Button.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
 
 import { SheetLabel } from "./Sheet";
+
+const viewStyles = stylex.create({
+  issueThreadP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-berry)",
+  },
+  issueThreadP2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  issueThreadDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  issueMessage: {
+    minWidth: "0",
+  },
+  issueThreadDiv2: {
+    marginBottom: "var(--spacing)",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  issueThreadSpan: {
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-ink)",
+  },
+});
 
 const conversationQuery = defineQuery({
   schema: Schema.NullOr(Schema.String),
@@ -30,7 +66,7 @@ export function IssueThread(props: { issue: string }) {
   return (
     <section data-testid="issue-conversation" aria-label={t("web.issue.conversation.title")}>
       <SheetLabel>{t("web.issue.conversation.title")}</SheetLabel>
-      <Show when={feed().error}>{(error) => <p class="text-sm text-berry">{error()}</p>}</Show>
+      <Show when={feed().error}>{(error) => <p {...stylex.attrs(viewStyles.issueThreadP)}>{error()}</p>}</Show>
       <Show when={thread() && feed().ready && !feed().complete}>
         <Button
           disabled={act.busy()}
@@ -42,13 +78,13 @@ export function IssueThread(props: { issue: string }) {
           {t("web.issue.conversation.older")}
         </Button>
       </Show>
-      <Show when={feed().messages.length > 0} fallback={<p class="text-sm text-muted">{t("web.issue.conversation.empty")}</p>}>
-        <div class="flex flex-col gap-4">
+      <Show when={feed().messages.length > 0} fallback={<p {...stylex.attrs(viewStyles.issueThreadP2)}>{t("web.issue.conversation.empty")}</p>}>
+        <div {...stylex.attrs(viewStyles.issueThreadDiv)}>
           <For each={feed().messages.filter((message) => message.deleted === undefined)}>
             {(message) => (
-              <article data-testid="issue-message" class="min-w-0">
-                <div class="mb-1 flex flex-wrap items-baseline gap-2 text-xs text-muted">
-                  <span class="font-medium text-ink">{message.name}</span>
+              <article data-testid="issue-message" {...stylex.attrs(viewStyles.issueMessage)}>
+                <div {...stylex.attrs(viewStyles.issueThreadDiv2)}>
+                  <span {...stylex.attrs(viewStyles.issueThreadSpan)}>{message.name}</span>
                   <time>{wallClockText(message.at)}</time>
                 </div>
                 <Markdown class="text-sm break-words" text={message.text} />

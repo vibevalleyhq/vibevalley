@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show, snapshot, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -50,6 +51,56 @@ import {
   type VoicePart,
   withPart,
 } from "./VoiceVendorFields";
+
+const viewStyles = stylex.create({
+  barP: {
+    color: "var(--wb-berry)",
+  },
+  formDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  formDiv2: {
+    display: "flex",
+    maxWidth: "var(--container-4xl)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "var(--spacing)",
+  },
+  formSpan: {
+    flex: "1",
+  },
+  formSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  formDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "calc(var(--spacing) * 2)",
+  },
+  formP: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  dictationMossKey: {
+    display: "contents",
+  },
+  formDiv4: {
+    maxWidth: "var(--container-4xl)",
+  },
+});
 
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
@@ -170,7 +221,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       busy={busy() || !!problem()}
       onSave={() => void submit()}
       onUndo={undo}
-      left={<Show when={error() ?? problem()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
+      left={<Show when={error() ?? problem()}>{(e) => <p {...stylex.attrs(viewStyles.barP)}>{e()}</p>}</Show>}
       // Reset to defaults puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
         <Show when={props.part === "agent" || props.view === "call"}>
@@ -205,7 +256,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     <Show
       when={props.part === "agent"}
       fallback={
-        <div class="flex h-full min-h-0 flex-col gap-3">
+        <div {...stylex.attrs(viewStyles.formDiv)}>
           <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
             <Show when={props.view === "moss"}>
               <SettingsGroup>
@@ -223,14 +274,14 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </SettingsGroup>
             </Show>
             <Show when={props.view === "call"}>
-              <div class="flex max-w-4xl items-center gap-2 px-1">
+              <div {...stylex.attrs(viewStyles.formDiv2)}>
                 <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-ok-soft text-ok-ink" : "bg-bad-soft text-berry"]}>
                   {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
                 </span>
                 <Hint
                   text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
                 />
-                <span class="flex-1" />
+                <span {...stylex.attrs(viewStyles.formSpan)} />
                 <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
                 <Hint text={t("web.base.form.storedIn", { file: base().file })} />
               </div>
@@ -264,7 +315,11 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   </Labeled>
                 </Cols>
               </Card>
-              <Card title={t("web.voice.voice.listen")} action={<span class="text-sm text-muted">{t("web.voice.voice.listenParts")}</span>} class="max-w-4xl">
+              <Card
+                title={t("web.voice.voice.listen")}
+                action={<span {...stylex.attrs(viewStyles.formSpan2)}>{t("web.voice.voice.listenParts")}</span>}
+                class="max-w-4xl"
+              >
                 <Cols>
                   <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
                     <Segmented
@@ -316,7 +371,11 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   {number("idleSeconds")}
                 </Cols>
               </Card>
-              <Card title={t("web.voice.voice.think")} action={<span class="text-sm text-muted">{answerLabel[answer().vendor]}</span>} class="max-w-4xl">
+              <Card
+                title={t("web.voice.voice.think")}
+                action={<span {...stylex.attrs(viewStyles.formSpan2)}>{answerLabel[answer().vendor]}</span>}
+                class="max-w-4xl"
+              >
                 <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
                   <Segmented
                     label={t("web.voice.voice.who")}
@@ -387,7 +446,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             <Show when={props.view === "dictation"}>
               {/* The page's title already says Dictation: the card has none of its own. */}
               <Card class="max-w-4xl">
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div {...stylex.attrs(viewStyles.formDiv3)}>
                   <Segmented
                     label={t("web.voice.voice.dictationVia")}
                     testid="dictation-via"
@@ -398,7 +457,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     ]}
                     onChange={(via) => setDictation({ ...dictation(), via })}
                   />
-                  <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+                  <p {...stylex.attrs(viewStyles.formP)}>
                     {dictation().via === "moss" ? t("web.voice.voice.dictationMossIntro") : t("web.voice.voice.dictationIntro")}
                     <Show when={dictation().via === "own"}>
                       <OutLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />
@@ -409,7 +468,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   when={dictation().via === "own"}
                   fallback={
                     <Cols>
-                      <div data-testid="dictation-moss-key" class="contents">
+                      <div data-testid="dictation-moss-key" {...stylex.attrs(viewStyles.dictationMossKey)}>
                         {secret("mossKey", t("web.voice.voice.dictationMossKey"), () => base().mossKey, {
                           href: "https://platform.mosi.cn/",
                           label: t("web.voice.voice.moss.console"),
@@ -449,7 +508,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </Card>
             </Show>
           </div>
-          <div class="max-w-4xl">{bar()}</div>
+          <div {...stylex.attrs(viewStyles.formDiv4)}>{bar()}</div>
         </div>
       }
     >

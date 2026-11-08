@@ -1,6 +1,23 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { PxField, PxTextArea, PxTextInput, PxTip } from "./field";
+
+const viewStyles = stylex.create({
+  fieldStoriesDiv: {
+    width: "calc(var(--spacing) * 72)",
+  },
+  fieldStoriesDiv2: {
+    width: "calc(var(--spacing) * 96)",
+  },
+  fieldStoriesSpan: {
+    borderBottomStyle: "dotted",
+    borderBottomWidth: "2px",
+    borderStyle: "dotted",
+    borderColor: "var(--color-bark-500)",
+  },
+});
 
 export default stories({
   title: "组件/像素/field",
@@ -10,7 +27,7 @@ export default stories({
     Text: story({
       args: { value: "", error: "", required: true, mono: false, disabled: false },
       render: (a, set) => (
-        <div class="w-72">
+        <div {...stylex.attrs(viewStyles.fieldStoriesDiv)}>
           <PxField label="地的名字" tip="写在地头的木牌上" error={a.error || undefined} required={a.required}>
             {(id) => (
               <PxTextInput
@@ -30,7 +47,7 @@ export default stories({
     "Long text": story({
       args: { value: "修好登录：过期的会话回到登录页。", reading: true },
       render: (a, set) => (
-        <div class="w-96">
+        <div {...stylex.attrs(viewStyles.fieldStoriesDiv2)}>
           <PxField label="说明">{(id) => <PxTextArea id={id} rows={5} value={a.value} reading={a.reading} onChange={(value) => set({ value })} />}</PxField>
         </div>
       ),
@@ -38,7 +55,7 @@ export default stories({
     Tip: story({
       render: () => (
         <PxTip tip="悬停才出来">
-          <span class="border-b-2 border-dotted border-bark-500">这是什么</span>
+          <span {...stylex.attrs(viewStyles.fieldStoriesSpan)}>这是什么</span>
         </PxTip>
       ),
     }),

@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,6 +10,25 @@ import { spelled } from "#/base/search.ts";
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
 import { cx, pxRing, pxText } from "./style";
+
+const viewStyles = stylex.create({
+  pxFieldDiv: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  pxFieldDiv2: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  pxFieldSpan: {
+    color: "var(--color-leaf-300)",
+  },
+  pxFieldSpan2: {
+    color: "var(--color-bark-500)",
+  },
+});
 
 /** `label` with a dotted underline that shows `tip` on hover; the bare label without one. */
 export function PxTip(props: { tip?: string | undefined; children: JSX.Element; class?: string }) {
@@ -42,15 +62,15 @@ export function PxField(props: {
   const bound = () => typeof props.children === "function" || props.id !== undefined;
   const note = () => (props.error ? props.error : props.hint);
   return (
-    <div class="flex flex-col">
-      <div class="mb-1.5 flex items-baseline gap-2">
+    <div {...stylex.attrs(viewStyles.pxFieldDiv)}>
+      <div {...stylex.attrs(viewStyles.pxFieldDiv2)}>
         <label for={bound() ? target() : undefined} class={[pxText.xs, "min-w-0 flex-1 text-bark-600"]}>
           <PxTip tip={props.tip}>{props.label}</PxTip>
           <Show when={props.required}>
-            <span class="text-leaf-300"> *</span>
+            <span {...stylex.attrs(viewStyles.pxFieldSpan)}> *</span>
           </Show>
           <Show when={props.optional}>
-            <span class="text-bark-500">{t("web.ui.pixel.optional")}</span>
+            <span {...stylex.attrs(viewStyles.pxFieldSpan2)}>{t("web.ui.pixel.optional")}</span>
           </Show>
         </label>
         <Show when={props.aside != null}>

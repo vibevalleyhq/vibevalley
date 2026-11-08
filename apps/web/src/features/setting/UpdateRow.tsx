@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,6 +15,25 @@ import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { SettingRow } from "#/ui/settings.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+const viewStyles = stylex.create({
+  updateState: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  updateRowA: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    textDecorationLine: "underline",
+  },
+  cliState: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
+
 export function UpdateRow() {
   const update = currentHost().update;
   const state = useUpdates();
@@ -25,7 +45,7 @@ export function UpdateRow() {
     <Show when={state()}>
       {(s) => (
         <SettingRow label={t("web.setting.about.update")} hint={t("web.setting.about.updateHint")}>
-          <span data-testid="update-state" data-state={s()._tag} class="text-sm text-muted">
+          <span data-testid="update-state" data-state={s()._tag} {...stylex.attrs(viewStyles.updateState)}>
             <Switch>
               <Match when={s()._tag === "idle"}>{t("web.setting.about.upToDate")}</Match>
               <Match when={s()._tag === "checking"}>{t("web.setting.about.checking")}</Match>
@@ -63,7 +83,7 @@ export function UpdateRow() {
             </Match>
             <Match when={variant(s(), "_tag", "manual")}>
               {(m) => (
-                <a href={m().page} target="_blank" rel="noreferrer" class="text-sm underline">
+                <a href={m().page} target="_blank" rel="noreferrer" {...stylex.attrs(viewStyles.updateRowA)}>
                   {t("web.setting.about.download")}
                 </a>
               )}
@@ -95,7 +115,7 @@ export function CommandLineRow() {
     <Show when={state()}>
       {(s) => (
         <SettingRow label={t("web.setting.about.cli")} hint={hint(s())}>
-          <span data-testid="cli-state" data-installed={String(s().installed)} class="font-mono text-xs text-muted">
+          <span data-testid="cli-state" data-installed={String(s().installed)} {...stylex.attrs(viewStyles.cliState)}>
             {s().command}
           </span>
           <Show

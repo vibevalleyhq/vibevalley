@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,137 @@ import { missedOf, phoneState } from "./calls";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { lcd, phoneCells } from "./lcd";
+
+const viewStyles = stylex.create({
+  cellsSvg: {
+    flexShrink: "0",
+  },
+  smallFaceSpan: {
+    display: "grid",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    placeItems: "center",
+    overflow: "hidden",
+  },
+  ringingScreenSpan: {
+    marginTop: "calc(var(--spacing) * 3)",
+  },
+  ringingScreenP: {
+    marginTop: "calc(var(--spacing) * 3)",
+    fontSize: "24px",
+    lineHeight: "1",
+  },
+  ringingScreenP2: {
+    marginTop: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  ringingScreenDiv: {
+    marginTop: "auto",
+    marginBottom: "calc(var(--spacing) * 5)",
+    display: "flex",
+    gap: "calc(var(--spacing) * 8)",
+  },
+  roundKeyButton: {
+    display: "flex",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+  roundKeySpan: {
+    display: "grid",
+    width: "calc(var(--spacing) * 11)",
+    height: "calc(var(--spacing) * 11)",
+    placeItems: "center",
+  },
+  roundKeySpan2: {
+    display: "flex",
+  },
+  callOrchestrator: {
+    margin: "calc(var(--spacing) * 2)",
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    filter: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "brightness(110%)",
+      },
+    },
+  },
+  callsEmpty: {
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 6)",
+    textAlign: "center",
+  },
+  listScreenUl: {
+    minHeight: "0",
+    flex: "1",
+    overflowY: "auto",
+  },
+  listScreenSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  listScreenSpan2: {
+    minWidth: "0",
+    flex: "1",
+  },
+  listScreenSpan3: {
+    marginLeft: "auto",
+  },
+  listScreenSpan4: {
+    display: "block",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  orchestratorLineP: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "24px",
+    lineHeight: "1",
+  },
+  orchestratorLineDiv: {
+    marginTop: "auto",
+    marginBottom: "calc(var(--spacing) * 5)",
+  },
+  sokobanIconSpan: {
+    display: "grid",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    placeItems: "center",
+    fontSize: "18px",
+    lineHeight: "1",
+  },
+  gamesIconSpan: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+    gap: "1px",
+  },
+  appGridDiv: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3,minmax(0,1fr))",
+    alignContent: "flex-start",
+    rowGap: "calc(var(--spacing) * 3)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingTop: "calc(var(--spacing) * 4)",
+  },
+  appGridSpan: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -1.5)",
+    right: "calc(var(--spacing) * -1.5)",
+    paddingInline: "var(--spacing)",
+    lineHeight: "14px",
+  },
+});
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
@@ -36,7 +168,7 @@ function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; siz
       viewBox={`${origin()[0]} ${origin()[1]} ${props.grid[0]} ${props.grid[1]}`}
       shape-rendering="crispEdges"
       aria-hidden="true"
-      class="shrink-0"
+      {...stylex.attrs(viewStyles.cellsSvg)}
     >
       <For each={props.cells}>{([x, y, w, h, fill]) => <rect x={x} y={y} width={w} height={h} fill={fill} />}</For>
     </svg>
@@ -71,7 +203,7 @@ const BigFace = (props: { children: JSX.Element; shake?: boolean }) => (
 );
 
 const SmallFace = (props: { children: JSX.Element }) => (
-  <span class="grid size-8 shrink-0 place-items-center overflow-hidden" style={{ background: lcd.pale }}>
+  <span {...stylex.attrs(viewStyles.smallFaceSpan)} style={{ background: lcd.pale }}>
     {props.children}
   </span>
 );
@@ -80,17 +212,17 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
   return (
     <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
       <span class="phone-blink">{t("web.farm.phone.ringing")}</span>
-      <span class="mt-3">
+      <span {...stylex.attrs(viewStyles.ringingScreenSpan)}>
         <BigFace shake>
           <CallerFace call={props.call} size={60} />
         </BigFace>
       </span>
-      <p class="mt-3 text-[24px] leading-none">{props.call.who}</p>
-      <p class="mt-2 px-2" style={{ background: lcd.dark, color: lcd.pale }}>
+      <p {...stylex.attrs(viewStyles.ringingScreenP)}>{props.call.who}</p>
+      <p {...stylex.attrs(viewStyles.ringingScreenP2)} style={{ background: lcd.dark, color: lcd.pale }}>
         {props.call.words.label}
       </p>
       <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
-      <div class="mt-auto mb-5 flex gap-8">
+      <div {...stylex.attrs(viewStyles.ringingScreenDiv)}>
         <RoundKey answer={false} testid="decline" label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
         <RoundKey answer testid="answer" label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
       </div>
@@ -100,12 +232,12 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
 
 function RoundKey(props: { answer: boolean; testid: string; label: string; onClick: () => void }) {
   return (
-    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} class="flex cursor-pointer flex-col items-center gap-1">
+    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} {...stylex.attrs(viewStyles.roundKeyButton)}>
       <span
-        class="grid size-11 place-items-center"
+        {...stylex.attrs(viewStyles.roundKeySpan)}
         style={{ background: props.answer ? answerGreen : declineRed, "box-shadow": `inset 0 0 0 2px ${bark}, inset -3px -3px 0 0 #00000040` }}
       >
-        <span style={props.answer ? undefined : { transform: "rotate(135deg)" }} class="flex">
+        <span style={props.answer ? undefined : { transform: "rotate(135deg)" }} {...stylex.attrs(viewStyles.roundKeySpan2)}>
           <Cells
             cells={[
               [0, 2, 3, 4, cream],
@@ -128,7 +260,7 @@ function CallOrchestrator(props: { onCall: () => void }) {
       type="button"
       data-testid="call-orchestrator"
       onClick={() => props.onCall()}
-      class="m-2 flex cursor-pointer items-center justify-center gap-2 py-1.5 hover:brightness-110"
+      {...stylex.attrs(viewStyles.callOrchestrator)}
       style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
     >
       <PhoneGlyph size={14} lit />
@@ -141,7 +273,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
   const phone = phoneState();
   const missed = () => missedOf(phone());
   const empty = (text: string) => (
-    <li data-testid="calls-empty" class="px-3 py-6 text-center" style={{ color: lcd.dark }}>
+    <li data-testid="calls-empty" {...stylex.attrs(viewStyles.callsEmpty)} style={{ color: lcd.dark }}>
       {text}
     </li>
   );
@@ -149,7 +281,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
   const rule = { "border-bottom": `1px solid ${lcd.rule}` };
   return (
     <>
-      <div class="flex" style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
+      <div {...stylex.attrs(viewStyles.roundKeySpan2)} style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
         <For each={["missed", "log"] as const}>
           {(s) => (
             <button
@@ -165,7 +297,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           )}
         </For>
       </div>
-      <ul class="min-h-0 flex-1 overflow-y-auto">
+      <ul {...stylex.attrs(viewStyles.listScreenUl)}>
         <Show
           when={props.screen === "missed"}
           fallback={
@@ -176,7 +308,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     <SmallFace>
                       <CallerFace call={e().call} size={28} />
                     </SmallFace>
-                    <span class="min-w-0 flex-1 truncate">
+                    <span {...stylex.attrs(viewStyles.listScreenSpan)}>
                       {e().call.who} · {e().call.words.label}
                     </span>
                     <span style={{ color: e().answered ? lcd.dark : declineRed }}>
@@ -203,14 +335,14 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     <SmallFace>
                       <CallerFace call={c()} size={28} />
                     </SmallFace>
-                    <span class="min-w-0 flex-1">
-                      <span class="flex">
+                    <span {...stylex.attrs(viewStyles.listScreenSpan2)}>
+                      <span {...stylex.attrs(viewStyles.roundKeySpan2)}>
                         {c().who}
-                        <span class="ml-auto" style={{ color: declineRed }}>
+                        <span {...stylex.attrs(viewStyles.listScreenSpan3)} style={{ color: declineRed }}>
                           {c().words.label}
                         </span>
                       </span>
-                      <span class="block truncate" style={{ color: lcd.dark }}>
+                      <span {...stylex.attrs(viewStyles.listScreenSpan4)} style={{ color: lcd.dark }}>
                         {c().text}
                       </span>
                     </span>
@@ -264,11 +396,11 @@ export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; 
       <BigFace shake={props.phase === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
-      <p class="mt-2 text-[24px] leading-none">{t("web.farm.phone.manager")}</p>
+      <p {...stylex.attrs(viewStyles.orchestratorLineP)}>{t("web.farm.phone.manager")}</p>
       <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: props.phase === "idle" && props.problem ? failedInk : undefined }}>
         {line()}
       </p>
-      <div class="mt-auto mb-5">
+      <div {...stylex.attrs(viewStyles.orchestratorLineDiv)}>
         <RoundKey
           answer={!on()}
           testid="line-key"
@@ -289,7 +421,7 @@ interface App {
 }
 
 const SokobanIcon = () => (
-  <span class="grid size-7 place-items-center text-[18px] leading-none" style={{ "box-shadow": `inset 0 0 0 2px ${lcd.ink}` }}>
+  <span {...stylex.attrs(viewStyles.sokobanIconSpan)} style={{ "box-shadow": `inset 0 0 0 2px ${lcd.ink}` }}>
     ×
   </span>
 );
@@ -305,7 +437,7 @@ const games = (open: (app: PhoneApp) => void): App[] => [
 
 /** The games folder's icon: four of them small, as a folder shows what is in it. */
 const GamesIcon = () => (
-  <span class="grid grid-cols-2 gap-px" aria-hidden="true">
+  <span {...stylex.attrs(viewStyles.gamesIconSpan)} aria-hidden="true">
     <BlocksIcon size={12} />
     <DinoIcon size={12} />
     <BugSnakeIcon size={12} />
@@ -344,7 +476,7 @@ export function GamesScreen(props: { onOpen: (app: PhoneApp) => void }) {
 
 function AppGrid(props: { apps: readonly App[] }) {
   return (
-    <div class="grid grid-cols-3 content-start gap-y-3 px-2 pt-4">
+    <div {...stylex.attrs(viewStyles.appGridDiv)}>
       <For each={props.apps}>
         {(a) => (
           <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
@@ -354,7 +486,7 @@ function AppGrid(props: { apps: readonly App[] }) {
             >
               {a.icon()}
               <Show when={a.badge?.()}>
-                <span class="absolute -top-1.5 -right-1.5 px-1 leading-[14px]" style={{ background: declineRed, color: cream }}>
+                <span {...stylex.attrs(viewStyles.appGridSpan)} style={{ background: declineRed, color: cream }}>
                   {a.badge?.()}
                 </span>
               </Show>

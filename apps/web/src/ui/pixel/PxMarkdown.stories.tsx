@@ -1,6 +1,17 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { PxMarkdown, PxReadText } from "./PxMarkdown";
+
+const viewStyles = stylex.create({
+  pxMarkdownStoriesDiv: {
+    width: "calc(var(--spacing) * 96)",
+  },
+  pxMarkdownStoriesDiv2: {
+    width: "calc(var(--spacing) * 64)",
+  },
+});
 
 const sample = [
   "## 交活了",
@@ -24,7 +35,7 @@ export default stories({
       args: { text: sample, reading: false },
       controls: { text: { kind: "text", long: true } },
       render: (a) => (
-        <div class="w-96">
+        <div {...stylex.attrs(viewStyles.pxMarkdownStoriesDiv)}>
           <PxMarkdown text={a.text} reading={a.reading} />
         </div>
       ),
@@ -32,7 +43,7 @@ export default stories({
     "Read text": story({
       args: { maxLines: 2 },
       render: (a) => (
-        <div class="w-64">
+        <div {...stylex.attrs(viewStyles.pxMarkdownStoriesDiv2)}>
           <PxReadText text="一段很长的说明，只给看前几行，后面的折起来；点开工单才看得到全部。再多写一点让它够长。" maxLines={a.maxLines} />
         </div>
       ),

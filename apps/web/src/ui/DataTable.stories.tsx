@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createSignal } from "solid-js";
 
@@ -8,6 +9,15 @@ import { defineColumns, useTable, type Page, type Sort } from "#/infra/table.ts"
 
 import { Button } from "./Button";
 import { DataTable, tableCell } from "./DataTable";
+
+const viewStyles = stylex.create({
+  localDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+});
 
 const Row = Schema.Struct({ id: Schema.String, name: Schema.String, count: Schema.Finite });
 const column = defineColumns(Row);
@@ -31,7 +41,7 @@ function Local() {
   const [filtered, setFiltered] = createSignal(false);
   const table = useTable({ mode: "local", rows: () => (filtered() ? records.slice(0, 3) : records), rowId: (row) => row.id, columns });
   return (
-    <div class="flex flex-col gap-3 p-4">
+    <div {...stylex.attrs(viewStyles.localDiv)}>
       <Button data-testid="table-filter" onClick={() => setFiltered(!filtered())}>
         Toggle filter
       </Button>
@@ -73,7 +83,7 @@ function Remote() {
     sort: { value: sort, onChange: setSort },
   });
   return (
-    <div class="flex flex-col gap-3 p-4">
+    <div {...stylex.attrs(viewStyles.localDiv)}>
       <Button data-testid="table-deliver" onClick={() => finish?.()}>
         Deliver requested page
       </Button>

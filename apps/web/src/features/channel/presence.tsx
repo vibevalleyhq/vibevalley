@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { type ChatMessage, type Phase, type SessionView } from "@vibevalley/protocol";
@@ -8,6 +9,29 @@ import { useCore } from "#/infra/frame.ts";
 import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { Icon, type IconSize } from "#/ui/Icon.tsx";
 import { actionIcon, type IconName } from "#/ui/icons.ts";
+
+const viewStyles = stylex.create({
+  phaseGlyphSpan: {
+    display: "inline-block",
+    flexShrink: "0",
+  },
+  thinkingDotsSpan: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+  countSpan: {
+    flexShrink: "0",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-accent)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-page)",
+    fontVariantNumeric: "tabular-nums",
+  },
+});
 const span = spanText;
 
 export { Dot } from "#/ui/Tag.tsx";
@@ -61,7 +85,7 @@ export function PhaseGlyph(props: { phase: Phase; size?: IconSize }) {
   return (
     <Show
       when={phaseIcon(props.phase)}
-      fallback={<span class="inline-block shrink-0" style={{ width: `${props.size ?? 14}px`, height: `${props.size ?? 14}px` }} />}
+      fallback={<span {...stylex.attrs(viewStyles.phaseGlyphSpan)} style={{ width: `${props.size ?? 14}px`, height: `${props.size ?? 14}px` }} />}
     >
       {(icon) => <Icon name={icon()} size={props.size ?? 14} />}
     </Show>
@@ -95,7 +119,7 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
 
 export function ThinkingDots() {
   return (
-    <span class="inline-flex items-center gap-1" aria-hidden="true">
+    <span {...stylex.attrs(viewStyles.thinkingDotsSpan)} aria-hidden="true">
       <For each={[0, 150, 300]}>
         {(d) => <span class="size-1.5 bg-faint motion-safe:animate-bounce" style={{ "animation-delay": `${d}ms`, "animation-duration": "900ms" }} />}
       </For>
@@ -104,5 +128,5 @@ export function ThinkingDots() {
 }
 
 export function Count(props: { n: number }) {
-  return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
+  return <span {...stylex.attrs(viewStyles.countSpan)}>{props.n}</span>;
 }

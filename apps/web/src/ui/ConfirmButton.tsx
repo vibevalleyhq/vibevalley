@@ -1,9 +1,18 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "./Button";
 import type { IconName } from "./icons";
+
+const viewStyles = stylex.create({
+  confirmButtonSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 /** A button for what cannot be taken back (docs/style/design.md): the first press asks in place, the question, the action's own button and a way back. */
 export function ConfirmButton(props: {
@@ -36,7 +45,7 @@ export function ConfirmButton(props: {
         onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null) && setArmed(false)}
       >
         <Show when={props.question}>
-          <span class="text-sm text-muted">{props.question}</span>
+          <span {...stylex.attrs(viewStyles.confirmButtonSpan)}>{props.question}</span>
         </Show>
         <Button
           tone={props.tone ?? "danger"}

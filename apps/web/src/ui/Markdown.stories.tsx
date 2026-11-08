@@ -1,6 +1,15 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { Markdown } from "./Markdown";
+
+const viewStyles = stylex.create({
+  markdownStoriesDiv: {
+    width: "100%",
+    maxWidth: "var(--container-2xl)",
+  },
+});
 
 const sample = [
   "## 修好登录",
@@ -33,7 +42,7 @@ export default stories({
       args: { text: sample, mentions: true },
       controls: { text: { kind: "text", long: true } },
       render: (a) => (
-        <div class="w-full max-w-2xl">
+        <div {...stylex.attrs(viewStyles.markdownStoriesDiv)}>
           <Markdown text={a.text} mentions={a.mentions} />
         </div>
       ),
@@ -43,14 +52,14 @@ export default stories({
       args: { text: diagram },
       controls: { text: { kind: "text", long: true } },
       render: (a) => (
-        <div class="w-full max-w-2xl">
+        <div {...stylex.attrs(viewStyles.markdownStoriesDiv)}>
           <Markdown text={a.text} />
         </div>
       ),
     }),
     "Folded code": story({
       render: () => (
-        <div class="w-full max-w-2xl">
+        <div {...stylex.attrs(viewStyles.markdownStoriesDiv)}>
           <Markdown text={long} />
         </div>
       ),

@@ -1,6 +1,17 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { PxPick, PxSegmented, PxSwitchField } from "./choice";
+
+const viewStyles = stylex.create({
+  choiceStoriesDiv: {
+    width: "calc(var(--spacing) * 64)",
+  },
+  choiceStoriesDiv2: {
+    width: "calc(var(--spacing) * 72)",
+  },
+});
 
 const runtimes = [
   { value: "claude", label: "Claude Code", detail: "Anthropic" },
@@ -33,7 +44,7 @@ export default stories({
     Pick: story({
       args: { value: "", clearable: true, disabled: false },
       render: (a, set) => (
-        <div class="w-64">
+        <div {...stylex.attrs(viewStyles.choiceStoriesDiv)}>
           <PxPick
             label="农机"
             placeholder="选一台农机"
@@ -49,7 +60,7 @@ export default stories({
     Switch: story({
       args: { checked: true, disabled: false },
       render: (a, set) => (
-        <div class="w-72">
+        <div {...stylex.attrs(viewStyles.choiceStoriesDiv2)}>
           <PxSwitchField label="自动派活" hint="管家看到空闲的帮工就派" checked={a.checked} disabled={a.disabled} onChange={(checked) => set({ checked })} />
         </div>
       ),

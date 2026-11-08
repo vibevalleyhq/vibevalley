@@ -1,6 +1,36 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { Splitter, usePaneWidth } from "./Splitter";
+
+const viewStyles = stylex.create({
+  splitterStoriesDiv: {
+    display: "flex",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  splitterStoriesDiv2: {
+    position: "relative",
+    flexShrink: "0",
+    borderRightStyle: "solid",
+    borderRightWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-side)",
+    padding: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  splitterStoriesDiv3: {
+    flex: "1",
+    padding: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 export default stories({
   title: "组件/工作台/Splitter",
@@ -11,12 +41,12 @@ export default stories({
       render: () => {
         const width = usePaneWidth("story", 240, 160, 400);
         return (
-          <div class="flex rounded-md border border-line">
-            <div class="relative shrink-0 border-r border-line bg-side p-3 text-sm" style={{ width: `${width()}px` }}>
+          <div {...stylex.attrs(viewStyles.splitterStoriesDiv)}>
+            <div {...stylex.attrs(viewStyles.splitterStoriesDiv2)} style={{ width: `${width()}px` }}>
               列表
               <Splitter pane="story" side="right" width={width()} min={160} max={400} label="列表的宽度" />
             </div>
-            <div class="flex-1 p-3 text-sm text-muted">详情</div>
+            <div {...stylex.attrs(viewStyles.splitterStoriesDiv3)}>详情</div>
           </div>
         );
       },

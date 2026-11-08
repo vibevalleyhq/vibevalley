@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,16 @@ import { Panels } from "./panels/Panels";
 import { feedPhoneCalls } from "./phone/calls";
 import { farm, useFarm } from "./store";
 import { farmKeys } from "./tools";
+
+const viewStyles = stylex.create({
+  farmPageP: {
+    position: "absolute",
+    insetInline: "0",
+    top: "33.3333%",
+    textAlign: "center",
+    color: "var(--color-cream-200)",
+  },
+});
 
 /** `repo`: whose farm ("" for the sessions without a repo). */
 export function FarmPage(props: { repo: string }) {
@@ -54,7 +65,7 @@ export function FarmPage(props: { repo: string }) {
         <Panels />
       </FramesContext>
       <Show when={!frames.frame}>
-        <p role="status" class="absolute inset-x-0 top-1/3 text-center text-cream-200">
+        <p role="status" {...stylex.attrs(viewStyles.farmPageP)}>
           {frames.link === "lost" ? t("web.farm.page.lost") : t("web.farm.page.waiting")}
         </p>
       </Show>

@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -31,6 +32,159 @@ import {
   saved,
 } from "./editing";
 import type { DropAt } from "./selection";
+
+const viewStyles = stylex.create({
+  rowSpan: {
+    position: "absolute",
+    insetBlock: "0",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  pkmBullet: {
+    position: "relative",
+    marginTop: "var(--spacing)",
+    display: "flex",
+    width: "calc(var(--spacing) * 4)",
+    height: "calc(var(--spacing) * 4)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-xs)",
+    color: "var(--wb-muted)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  rowSpan2: {
+    color: "var(--wb-faint)",
+  },
+  pkmBubble: {
+    marginTop: "calc(var(--spacing) * .5)",
+    display: "inline-flex",
+    height: "calc(var(--spacing) * 5)",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "2147483647px",
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-wheat)",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--wb-wheat) 30%, transparent)",
+        },
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-warn-ink)",
+  },
+  editorDiv: {
+    position: "relative",
+  },
+  pkmEditor: {
+    display: "block",
+    minHeight: "calc(var(--spacing) * 6)",
+    width: "100%",
+    resize: "none",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "calc(var(--spacing) * 6)",
+    color: "var(--wb-ink)",
+    outlineStyle: "none",
+  },
+  pkmComplete: {
+    position: "absolute",
+    top: "100%",
+    left: "0",
+    zIndex: "20",
+    marginTop: "var(--spacing)",
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 64)",
+    width: "calc(var(--spacing) * 80)",
+    maxWidth: "100%",
+    flexDirection: "column",
+    overflowY: "auto",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "var(--spacing)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 8px 24px var(--wb-float)",
+  },
+  editorSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  editorSpan2: {
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  pkmToolbar: {
+    position: "sticky",
+    bottom: "0",
+    zIndex: "10",
+    marginTop: "calc(var(--spacing) * 2)",
+    display: {
+      default: "flex",
+      "@media (width>=48rem)": "none",
+    },
+    justifyContent: "space-around",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingBlock: "var(--spacing)",
+  },
+  toolbarButton: {
+    display: "flex",
+    width: "calc(var(--spacing) * 9)",
+    height: "calc(var(--spacing) * 9)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
 
 export interface Writing {
   readonly block: string;
@@ -102,7 +256,7 @@ export function Row(props: {
         )}
       </Show>
       <For each={Array.from({ length: props.block.depth }, (_, i) => i)}>
-        {(i) => <span aria-hidden="true" class="absolute inset-y-0 border-l border-line" style={{ left: `${i * indentPx + 9}px` }} />}
+        {(i) => <span aria-hidden="true" {...stylex.attrs(viewStyles.rowSpan)} style={{ left: `${i * indentPx + 9}px` }} />}
       </For>
       <button
         type="button"
@@ -114,7 +268,7 @@ export function Row(props: {
         onDragStart={(e) => props.onDrag(e)}
         onDragEnd={() => props.onDragEnd()}
         onClick={() => props.onToggle()}
-        class="relative mt-1 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs text-muted hover:bg-hover disabled:cursor-default"
+        {...stylex.attrs(viewStyles.pkmBullet)}
       >
         <span class={["size-1.5 rounded-full bg-muted", props.parent ? (props.folded ? "ring-3 ring-line" : "group-hover:hidden") : ""]} />
         <Show when={props.parent && !props.folded}>
@@ -153,7 +307,7 @@ export function Row(props: {
               onKeyDown={(e) => e.key === "Enter" && props.onOpen("end", false)}
               class={["min-h-6 cursor-text rounded-sm px-1 text-sm leading-6", done() ? "line-through decoration-faint" : ""]}
             >
-              <Show when={props.block.body} fallback={<span class="text-faint">{"\u00a0"}</span>}>
+              <Show when={props.block.body} fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{"\u00a0"}</span>}>
                 <Body text={props.block.body} refs={props.refs} />
               </Show>
             </div>
@@ -167,7 +321,7 @@ export function Row(props: {
           href={`#comment-${props.block.id}`}
           data-testid="pkm-bubble"
           aria-label={t("web.pkm.comments.count", { n: props.comments })}
-          class="mt-0.5 inline-flex h-5 shrink-0 items-center gap-0.5 rounded-full bg-wheat/20 px-1.5 text-2xs text-warn-ink hover:bg-wheat/30"
+          {...stylex.attrs(viewStyles.pkmBubble)}
         >
           <Icon name="thread" size={10} />
           {props.comments}
@@ -362,7 +516,7 @@ export function Editor(props: {
     return () => props.onWriting(undefined);
   });
   return (
-    <div class="relative">
+    <div {...stylex.attrs(viewStyles.editorDiv)}>
       <textarea
         ref={(t) => (el = t)}
         data-testid="pkm-editor"
@@ -407,14 +561,10 @@ export function Editor(props: {
           e.preventDefault();
           hand(a);
         }}
-        class="block min-h-6 w-full resize-none overflow-hidden rounded-sm bg-hover px-1 text-sm leading-6 text-ink outline-none"
+        {...stylex.attrs(viewStyles.pkmEditor)}
       />
       <Show when={choices().length > 0}>
-        <ul
-          role="listbox"
-          data-testid="pkm-complete"
-          class="absolute top-full left-0 z-20 mt-1 flex max-h-64 w-80 max-w-full flex-col overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
-        >
+        <ul role="listbox" data-testid="pkm-complete" {...stylex.attrs(viewStyles.pkmComplete)}>
           <For each={choices()} keyed={(c) => c.key}>
             {(c, i) => (
               <li
@@ -428,8 +578,8 @@ export function Editor(props: {
                 }}
                 class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm aria-selected:bg-selected"
               >
-                <span class="min-w-0 flex-1 truncate">{c().label}</span>
-                <Show when={c().hint}>{(h) => <span class="shrink-0 truncate text-xs text-muted">{h()}</span>}</Show>
+                <span {...stylex.attrs(viewStyles.editorSpan)}>{c().label}</span>
+                <Show when={c().hint}>{(h) => <span {...stylex.attrs(viewStyles.editorSpan2)}>{h()}</span>}</Show>
               </li>
             )}
           </For>
@@ -451,12 +601,7 @@ export function Toolbar(props: { writing: Writing }) {
     { id: "link", icon: "link", label: t("web.pkm.toolbar.link"), run: () => props.writing.insert("[[]]", 2) },
   ];
   return (
-    <div
-      role="toolbar"
-      aria-label={t("web.pkm.toolbar.label")}
-      data-testid="pkm-toolbar"
-      class="sticky bottom-0 z-10 mt-2 flex justify-around border-t border-line bg-page py-1 md:hidden"
-    >
+    <div role="toolbar" aria-label={t("web.pkm.toolbar.label")} data-testid="pkm-toolbar" {...stylex.attrs(viewStyles.pkmToolbar)}>
       <For each={tools}>
         {(tool) => (
           <button
@@ -466,7 +611,7 @@ export function Toolbar(props: { writing: Writing }) {
             // The box keeps the focus, so the keyboard stays up.
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => tool.run()}
-            class="flex size-9 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+            {...stylex.attrs(viewStyles.toolbarButton)}
           >
             <Icon name={tool.icon} size={16} />
           </button>

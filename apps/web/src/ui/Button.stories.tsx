@@ -1,9 +1,19 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { Button, type Tone } from "./Button";
 import { icons, type IconName } from "./icons";
+
+const viewStyles = stylex.create({
+  buttonStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 const tones: Tone[] = ["plain", "primary", "quiet", "danger"];
 
@@ -32,7 +42,7 @@ export default stories({
     Tones: story({
       note: "主色一页只有一个；危险的动作用 danger，不用红色的主色。",
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
           <For each={tones}>{(tone) => <Button tone={tone}>{tone}</Button>}</For>
           <Button disabled>disabled</Button>
         </div>
@@ -40,7 +50,7 @@ export default stories({
     }),
     "With icon": story({
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
           <Button tone="primary" icon="add">
             新工单
           </Button>

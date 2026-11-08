@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -45,6 +46,239 @@ import {
   spotText,
 } from "./islands";
 
+const viewStyles = stylex.create({
+  repoMapDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  repoMapDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 5)",
+    rowGap: "calc(var(--spacing) * 1.5)",
+  },
+  repoMapSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  repoMapSpan2: {
+    display: "flex",
+    flexWrap: "wrap",
+    columnGap: "calc(var(--spacing) * 4)",
+    rowGap: "var(--spacing)",
+  },
+  repoMapSpan3: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  repoMapDiv3: {
+    position: "relative",
+    minHeight: "0",
+    flex: "1",
+    overflow: "hidden",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  repoMapDiv4: {
+    position: "absolute",
+    inset: "0",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  repoMapDiv5: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  gridDiv: {
+    pointerEvents: "none",
+    position: "absolute",
+    inset: "0",
+  },
+  gridDiv2: {
+    position: "absolute",
+    inset: "0",
+  },
+  placedSpan: {
+    position: "absolute",
+  },
+  placedButton: {
+    position: "absolute",
+    cursor: "pointer",
+  },
+  islandViewDiv: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  islandViewDiv2: {
+    position: "relative",
+  },
+  island: {
+    position: "absolute",
+    insetInline: "0",
+    bottom: "0",
+    cursor: "pointer",
+  },
+  islandViewSpan: {
+    pointerEvents: "none",
+    position: "absolute",
+    translate: "calc(calc(1 / 2 * 100%) * -1) 0",
+  },
+  islandViewSpan2: {
+    pointerEvents: "none",
+    position: "absolute",
+  },
+  homelessDiv: {
+    marginInline: "auto",
+    marginTop: "calc(var(--spacing) * 4)",
+    display: "flex",
+    width: "fit-content",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  homelessSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  homelessButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    textDecorationLine: "underline",
+  },
+  noReposDiv: {
+    marginInline: "auto",
+    display: "flex",
+    width: "fit-content",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  noReposP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  sowHereDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  sowHereDiv2: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  islandDetailDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+  },
+  islandDetailDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  islandDetailSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-muted)",
+  },
+  islandDetailButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    padding: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  islandDetailSpan2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  islandDetailSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  islandDetailDiv3: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  islandDetailDiv4: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  islandDetailSpan4: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  islandDetailButton2: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    padding: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
 const gap = 24;
 const parchment = "#ebd9ae";
 
@@ -85,9 +319,9 @@ function RepoMap() {
   const tally = () => mapTally(islands());
   const stray = () => homeless(core()?.sessions ?? []);
   return (
-    <div class="flex h-full min-h-0 flex-col gap-2">
-      <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-        <span class="text-sm font-medium">
+    <div {...stylex.attrs(viewStyles.repoMapDiv)}>
+      <div {...stylex.attrs(viewStyles.repoMapDiv2)}>
+        <span {...stylex.attrs(viewStyles.repoMapSpan)}>
           {[
             t("web.farm.map.islands", { n: islands().length }),
             t("web.farm.map.peopled", { n: tally().peopled }),
@@ -95,7 +329,7 @@ function RepoMap() {
             ...(tally().queued > 0 ? [t("web.farm.map.queued", { n: tally().queued })] : []),
           ].join(" · ")}
         </span>
-        <span class="flex flex-wrap gap-x-4 gap-y-1">
+        <span {...stylex.attrs(viewStyles.repoMapSpan2)}>
           <For
             each={
               [
@@ -106,7 +340,7 @@ function RepoMap() {
             }
           >
             {([icon, words]) => (
-              <span class="flex items-center gap-1 text-xs text-muted">
+              <span {...stylex.attrs(viewStyles.repoMapSpan3)}>
                 <SpriteIcon name={icon} size={18} />
                 {words}
               </span>
@@ -114,19 +348,19 @@ function RepoMap() {
           </For>
         </span>
       </div>
-      <div ref={(el) => (box = el)} class="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-line" style={{ background: parchment }}>
+      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.repoMapDiv3)} style={{ background: parchment }}>
         <Grid />
         <Show when={atlas()}>{(a) => <Clouds atlas={a()} />}</Show>
         <Show when={atlas()?.has("map-compass") === true && width() >= 700 ? atlas() : undefined}>
           {(a) => <Art sp={a().get("map-compass")} scale={1.5} class="pointer-events-none absolute right-4 bottom-4 opacity-80" />}
         </Show>
-        <div class="absolute inset-0 overflow-y-auto p-4">
+        <div {...stylex.attrs(viewStyles.repoMapDiv4)}>
           <Switch
             fallback={
               // Keyed by the atlas, loaded once: a plain value, so the islands' queries never read a closed branch.
               <Show when={atlas()} keyed>
                 {(a) => (
-                  <div class="flex flex-wrap justify-center" style={{ gap: `${gap}px` }}>
+                  <div {...stylex.attrs(viewStyles.repoMapDiv5)} style={{ gap: `${gap}px` }}>
                     <For each={islands()} keyed={(i) => i.repo}>
                       {(i) => (
                         <div style={{ width: `${cell().w * scale()}px` }}>
@@ -162,16 +396,16 @@ function RepoMap() {
 function Grid() {
   const ink = "#c8a46e73";
   return (
-    <div class="pointer-events-none absolute inset-0">
+    <div {...stylex.attrs(viewStyles.gridDiv)}>
       <div
-        class="absolute inset-0"
+        {...stylex.attrs(viewStyles.gridDiv2)}
         style={{
           background: `repeating-linear-gradient(to right, transparent 0 62px, ${ink} 62px 64px)`,
           "mask-image": "repeating-linear-gradient(to bottom, #000 0 4px, transparent 4px 8px)",
         }}
       />
       <div
-        class="absolute inset-0"
+        {...stylex.attrs(viewStyles.gridDiv2)}
         style={{
           background: `repeating-linear-gradient(to bottom, transparent 0 62px, ${ink} 62px 64px)`,
           "mask-image": "repeating-linear-gradient(to right, #000 0 4px, transparent 4px 8px)",
@@ -199,7 +433,7 @@ function Clouds(props: { atlas: SpriteAtlas }) {
       {(cloud) => {
         const span = () => (box?.clientWidth ?? 800) + cloud().w * 4;
         return (
-          <div ref={(el) => (box = el)} class="pointer-events-none absolute inset-0">
+          <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.gridDiv)}>
             <For each={clouds}>
               {([y, from, speed]) => (
                 <Art
@@ -247,7 +481,7 @@ function Placed(props: {
     <Show
       when={props.onClick}
       fallback={
-        <span title={props.tip} aria-label={props.label} class="absolute" style={style()}>
+        <span title={props.tip} aria-label={props.label} {...stylex.attrs(viewStyles.placedSpan)} style={style()}>
           {props.children}
         </span>
       }
@@ -258,7 +492,7 @@ function Placed(props: {
           title={props.tip}
           aria-label={props.label ?? props.tip}
           onClick={() => onClick()()}
-          class="absolute cursor-pointer"
+          {...stylex.attrs(viewStyles.placedButton)}
           style={style()}
         >
           {props.children}
@@ -288,15 +522,15 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   const gate = () => ({ x: yard().left + yard().width / 2, y: yard().top + yard().height + down() });
   const sacks = () => props.island.queued.slice(0, 3);
   return (
-    <div class="flex flex-col items-center gap-1.5">
-      <div class="relative" style={{ width: `${pic().w * s()}px`, height: `${props.cellHeight * s()}px` }}>
+    <div {...stylex.attrs(viewStyles.islandViewDiv)}>
+      <div {...stylex.attrs(viewStyles.islandViewDiv2)} style={{ width: `${pic().w * s()}px`, height: `${props.cellHeight * s()}px` }}>
         <button
           type="button"
           data-testid="island"
           data-key={props.island.repo}
           aria-label={t("shared.join.labeled", { label: props.island.repo, text: islandText(props.island) })}
           onClick={open}
-          class="absolute inset-x-0 bottom-0 cursor-pointer"
+          {...stylex.attrs(viewStyles.island)}
         >
           <Art sp={pic()} scale={s()} class="mx-auto block" />
         </button>
@@ -334,10 +568,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                         </Placed>
                         <Show when={taken().plot.badge}>
                           {(badge) => (
-                            <span
-                              class="pointer-events-none absolute -translate-x-1/2"
-                              style={{ left: `${foot().x * s()}px`, top: `${(foot().y - 3) * s()}px` }}
-                            >
+                            <span {...stylex.attrs(viewStyles.islandViewSpan)} style={{ left: `${foot().x * s()}px`, top: `${(foot().y - 3) * s()}px` }}>
                               <PixelCard
                                 paper={badgeColors[badge().tone][0]}
                                 ink={badgeColors[badge().tone][1]}
@@ -393,7 +624,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   <Art sp={sack()} scale={s()} />
                 </Placed>
                 <Show when={i() === sacks().length - 1 && props.island.queued.length > sacks().length}>
-                  <span class="pointer-events-none absolute" style={{ left: `${(foot().x + 6) * s()}px`, top: `${(foot().y - 20) * s()}px` }}>
+                  <span {...stylex.attrs(viewStyles.islandViewSpan2)} style={{ left: `${(foot().x + 6) * s()}px`, top: `${(foot().y - 20) * s()}px` }}>
                     <PixelCard padX={3} padY={0} rows={[[{ kind: "words", text: `+${props.island.queued.length - sacks().length}`, size: 10 }]]} />
                   </span>
                 </Show>
@@ -431,11 +662,11 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
 function Homeless(props: { sessions: Session[] }) {
   const router = useRouter();
   return (
-    <div class="mx-auto mt-4 flex w-fit flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 py-2">
-      <span class="text-xs text-muted">{t("web.farm.map.homeless")}</span>
+    <div {...stylex.attrs(viewStyles.homelessDiv)}>
+      <span {...stylex.attrs(viewStyles.homelessSpan)}>{t("web.farm.map.homeless")}</span>
       <For each={props.sessions}>
         {(h) => (
-          <button type="button" onClick={() => go(router.navigate, h.id)} class="flex cursor-pointer items-center gap-1 text-sm underline">
+          <button type="button" onClick={() => go(router.navigate, h.id)} {...stylex.attrs(viewStyles.homelessButton)}>
             <AgentFace agentId={h.agent} runtime={h.runtime} size={20} />
             {h.name}
           </button>
@@ -447,8 +678,8 @@ function Homeless(props: { sessions: Session[] }) {
 
 function NoRepos() {
   return (
-    <div class="mx-auto flex w-fit flex-col items-center gap-3 rounded-lg border border-line bg-page p-4">
-      <p class="text-sm text-muted">{t("web.farm.map.sea")}</p>
+    <div {...stylex.attrs(viewStyles.noReposDiv)}>
+      <p {...stylex.attrs(viewStyles.noReposP)}>{t("web.farm.map.sea")}</p>
     </div>
   );
 }
@@ -487,8 +718,8 @@ function SowHere(props: { repo: string; onDone: () => void }) {
     });
   };
   return (
-    <div class="flex flex-col gap-3">
-      <p class="text-sm text-muted">{t("web.farm.map.sowIntro", { repo: props.repo })}</p>
+    <div {...stylex.attrs(viewStyles.sowHereDiv)}>
+      <p {...stylex.attrs(viewStyles.noReposP)}>{t("web.farm.map.sowIntro", { repo: props.repo })}</p>
       <TextArea
         ref={autofocus()}
         aria-label={t("web.farm.map.job")}
@@ -497,7 +728,7 @@ function SowHere(props: { repo: string; onDone: () => void }) {
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
-      <div class="flex justify-end gap-2">
+      <div {...stylex.attrs(viewStyles.sowHereDiv2)}>
         <Button disabled={busy() || !text().trim()} onClick={() => void write()}>
           {t("web.farm.map.todo")}
         </Button>
@@ -526,13 +757,13 @@ function IslandDetail(props: { island: Island }) {
   const taken = () => props.island.spots.flatMap((s) => (s.kind === "taken" ? [s] : []));
   const open = () => openOf(props.island);
   return (
-    <Card title={props.island.repo} action={<span class="text-sm text-muted">{islandText(props.island)}</span>}>
-      <div class="flex items-center gap-2.5">
+    <Card title={props.island.repo} action={<span {...stylex.attrs(viewStyles.noReposP)}>{islandText(props.island)}</span>}>
+      <div {...stylex.attrs(viewStyles.islandDetailDiv)}>
         <SpriteIcon name={`plot-${growth().crop}`} size={36} />
-        <p class="text-sm text-muted">{growthText()}</p>
+        <p {...stylex.attrs(viewStyles.noReposP)}>{growthText()}</p>
       </div>
-      <div class="flex flex-col gap-1.5">
-        <span class="text-xs font-semibold text-muted">{t("web.farm.map.worktrees", { n: taken().length })}</span>
+      <div {...stylex.attrs(viewStyles.islandDetailDiv2)}>
+        <span {...stylex.attrs(viewStyles.islandDetailSpan)}>{t("web.farm.map.worktrees", { n: taken().length })}</span>
         <Show when={taken().length > 0} fallback={<Quiet>{t("web.farm.map.noHelpers")}</Quiet>}>
           <For each={taken()}>
             {(slot) => (
@@ -540,16 +771,16 @@ function IslandDetail(props: { island: Island }) {
                 type="button"
                 onClick={() => go(router.navigate, slot.session.id)}
                 aria-label={t("shared.join.labeled", { label: slot.session.name, text: phaseText(slot.session, now()) })}
-                class="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-left hover:bg-hover"
+                {...stylex.attrs(viewStyles.islandDetailButton)}
               >
                 <AgentFace agentId={slot.session.agent} runtime={slot.session.runtime} size={32} />
                 <span class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-sm font-medium">{slot.session.name}</span>
+                  <span {...stylex.attrs(viewStyles.repoMapSpan)}>{slot.session.name}</span>
                   <span class="line-clamp-2 text-xs text-muted">{phaseText(slot.session, now())}</span>
                   <Show when={slot.session.branch}>
-                    <span class="flex items-center gap-1 font-mono text-xs text-muted">
+                    <span {...stylex.attrs(viewStyles.islandDetailSpan2)}>
                       <SpriteIcon name="icon-branch" size={14} />
-                      <span class="truncate">{slot.session.branch}</span>
+                      <span {...stylex.attrs(viewStyles.islandDetailSpan3)}>{slot.session.branch}</span>
                     </span>
                   </Show>
                 </span>
@@ -559,9 +790,9 @@ function IslandDetail(props: { island: Island }) {
           </For>
         </Show>
       </div>
-      <div class="flex items-center gap-2">
+      <div {...stylex.attrs(viewStyles.islandDetailDiv3)}>
         <SpriteIcon name={open() > 0 ? "map-stake" : "plot-locked"} size={24} />
-        <p class="text-sm text-muted">
+        <p {...stylex.attrs(viewStyles.noReposP)}>
           {!props.island.summary
             ? t("web.farm.map.noMore")
             : open() > 0
@@ -572,19 +803,19 @@ function IslandDetail(props: { island: Island }) {
         </p>
       </div>
       <Show when={props.island.queued.length > 0}>
-        <div class="flex flex-col gap-1">
-          <span class="text-xs font-semibold text-muted">{t("web.farm.map.queue", { n: props.island.queued.length })}</span>
+        <div {...stylex.attrs(viewStyles.islandDetailDiv4)}>
+          <span {...stylex.attrs(viewStyles.islandDetailSpan)}>{t("web.farm.map.queue", { n: props.island.queued.length })}</span>
           <For each={props.island.queued}>
             {(item) => (
-              <div class="flex items-center gap-2">
+              <div {...stylex.attrs(viewStyles.islandDetailDiv3)}>
                 <SpriteIcon name="map-sack" size={20} />
-                <span class="min-w-0 flex-1 truncate text-sm">{item.title}</span>
+                <span {...stylex.attrs(viewStyles.islandDetailSpan4)}>{item.title}</span>
                 <button
                   type="button"
                   title={t("web.farm.map.see")}
                   aria-label={t("web.farm.map.see")}
                   onClick={() => go(router.navigate, item.id)}
-                  class="cursor-pointer rounded p-1 hover:bg-hover"
+                  {...stylex.attrs(viewStyles.islandDetailButton2)}
                 >
                   <SpriteIcon name="button-open" size={14} />
                 </button>

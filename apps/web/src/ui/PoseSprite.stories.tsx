@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { SpeciesValues, type Species } from "@vibevalley/protocol";
@@ -5,6 +6,27 @@ import { stories, story } from "@vibevalley/stories";
 
 import type { Pose } from "./cast";
 import { PoseSprite } from "./PoseSprite";
+
+const viewStyles = stylex.create({
+  poseSpriteStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: "calc(var(--spacing) * 6)",
+  },
+  poseSpriteStoriesDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+  poseSpriteStoriesSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 const poses: Pose[] = ["idle", "walk", "think", "work", "cheer", "worry"];
 
@@ -15,12 +37,12 @@ export default stories({
       args: { species: "bear", height: 64 },
       controls: { species: { kind: "choice", options: SpeciesValues }, height: { kind: "number", min: 32, max: 128, step: 16 } },
       render: (a) => (
-        <div class="flex flex-wrap items-end gap-6">
+        <div {...stylex.attrs(viewStyles.poseSpriteStoriesDiv)}>
           <For each={poses}>
             {(pose) => (
-              <div class="flex flex-col items-center gap-1">
+              <div {...stylex.attrs(viewStyles.poseSpriteStoriesDiv2)}>
                 <PoseSprite cast={{ species: a.species as Species, outfit: "farmer" }} pose={pose} height={a.height} />
-                <span class="font-mono text-2xs text-muted">{pose}</span>
+                <span {...stylex.attrs(viewStyles.poseSpriteStoriesSpan)}>{pose}</span>
               </div>
             )}
           </For>

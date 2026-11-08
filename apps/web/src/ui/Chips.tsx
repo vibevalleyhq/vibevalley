@@ -1,6 +1,105 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+
+const viewStyles = stylex.create({
+  chipsInputSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: ".25rem",
+    backgroundColor: "var(--wb-hover)",
+    paddingBlock: "1px",
+    paddingRight: "calc(var(--spacing) * .5)",
+    paddingLeft: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  chipsInputButton: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    paddingInline: "var(--spacing)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-berry)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-selected)",
+      },
+    },
+  },
+  chipsInputInput: {
+    height: "calc(var(--spacing) * 6)",
+    minWidth: "calc(var(--spacing) * 24)",
+    flex: "1",
+    backgroundColor: "transparent",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--wb-faint)",
+    },
+  },
+  keyValueEditorDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  keyValueEditorSpan: {
+    width: "calc(var(--spacing) * 40)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  keyValueEditorButton: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-berry)",
+      },
+    },
+  },
+  newPairAdd: {
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+});
 
 const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";
 
@@ -16,14 +115,14 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
     <div class={[box, { "opacity-50": !(props.disabled !== true) }]}>
       <For each={props.value}>
         {(v) => (
-          <span class="flex items-center gap-0.5 rounded bg-hover py-px pr-0.5 pl-1.5 text-xs">
+          <span {...stylex.attrs(viewStyles.chipsInputSpan)}>
             {v}
             <button
               type="button"
               disabled={props.disabled}
               aria-label={t("web.base.chips.drop", { v })}
               onClick={() => props.onChange(props.value.filter((x) => x !== v))}
-              class="cursor-pointer rounded px-1 text-muted hover:bg-selected hover:text-berry"
+              {...stylex.attrs(viewStyles.chipsInputButton)}
             >
               ×
             </button>
@@ -44,7 +143,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
             add();
           } else if (e.key === "Backspace" && text() === "" && props.value.length > 0) props.onChange(props.value.slice(0, -1));
         }}
-        class="h-6 min-w-24 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-faint"
+        {...stylex.attrs(viewStyles.chipsInputInput)}
       />
     </div>
   );
@@ -63,8 +162,8 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         {(row) => {
           const k = () => row()[0];
           return (
-            <div class="flex items-center gap-1.5">
-              <span class="w-40 truncate font-mono text-sm">{k()}</span>
+            <div {...stylex.attrs(viewStyles.keyValueEditorDiv)}>
+              <span {...stylex.attrs(viewStyles.keyValueEditorSpan)}>{k()}</span>
               <input
                 data-testid="pair-value"
                 data-key={k()}
@@ -79,7 +178,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
                 disabled={props.disabled}
                 aria-label={t("web.base.chips.removeKey", { k: k() })}
                 onClick={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
-                class="cursor-pointer rounded px-1.5 text-xs text-muted hover:text-berry"
+                {...stylex.attrs(viewStyles.keyValueEditorButton)}
               >
                 {t("web.base.chips.remove")}
               </button>
@@ -88,7 +187,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         }}
       </For>
       <form
-        class="flex items-center gap-1.5"
+        {...stylex.attrs(viewStyles.keyValueEditorDiv)}
         onSubmit={(e) => {
           e.preventDefault();
           if (!key().trim()) return;
@@ -115,12 +214,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           value={val()}
           onInput={(e) => setVal(e.currentTarget.value)}
         />
-        <button
-          type="submit"
-          data-testid="new-pair-add"
-          disabled={props.disabled === true || key().trim() === ""}
-          class="h-7 cursor-pointer rounded-md border border-line px-2.5 text-sm hover:bg-hover disabled:opacity-50"
-        >
+        <button type="submit" data-testid="new-pair-add" disabled={props.disabled === true || key().trim() === ""} {...stylex.attrs(viewStyles.newPairAdd)}>
           {t("web.base.chips.add")}
         </button>
       </form>

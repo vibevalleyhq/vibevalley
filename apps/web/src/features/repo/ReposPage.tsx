@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { type Component, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -18,6 +19,165 @@ import { toast } from "#/ui/toasts.ts";
 import { dateText, type Recency, recencyOf, recencyText, since } from "./calendar";
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
+
+const viewStyles = stylex.create({
+  reposPageDiv: {
+    maxHeight: {
+      default: "calc(var(--spacing) * 60)",
+      "@media (width>=48rem)": "none",
+    },
+    flexShrink: "0",
+    overflowY: "auto",
+    borderBottomStyle: {
+      default: "solid",
+      "@media (width>=48rem)": "solid",
+    },
+    borderBottomWidth: {
+      default: "1px",
+      "@media (width>=48rem)": "0",
+    },
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-side)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=48rem)": "calc(var(--spacing) * 72)",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=48rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=48rem)": "1px",
+    },
+  },
+  reposPageLi: {
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingTop: "var(--spacing)",
+    paddingBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  reposPageLi2: {
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  repo: {
+    display: "flex",
+    maxWidth: "var(--container-4xl)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: {
+      default: null,
+      "@media (width>=48rem)": "auto",
+    },
+  },
+  overviewSection: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 4)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  overviewSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 24)",
+    height: "calc(var(--spacing) * 24)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--wb-hover)",
+  },
+  overviewDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  overviewH2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xl)",
+    lineHeight: "var(--text-xl--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  overviewDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    columnGap: "calc(var(--spacing) * 6)",
+    rowGap: "calc(var(--spacing) * 2)",
+  },
+  overviewDiv3: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  overviewSpan2: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  overviewButton: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    padding: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  overviewDiv4: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: "var(--spacing)",
+  },
+  overviewButton2: {
+    cursor: "pointer",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    padding: "calc(var(--spacing) * 1.5)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  overviewSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 const languagesQuery = defineQuery({
   schema: S.RepoLanguages,
@@ -65,7 +225,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
     <div class="flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-      <div class="max-h-60 shrink-0 overflow-y-auto border-b border-line bg-side px-2 py-3 md:max-h-none md:w-72 md:border-r md:border-b-0">
+      <div {...stylex.attrs(viewStyles.reposPageDiv)}>
         <ListCard
           bare
           title={t("web.repo.title")}
@@ -77,7 +237,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
             </Button>
           }
         >
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.repo.repos")}</li>
+          <li {...stylex.attrs(viewStyles.reposPageLi)}>{t("web.repo.repos")}</li>
           <Switch
             fallback={
               <>
@@ -102,10 +262,10 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
             }
           >
             <Match when={!ready(list, undefined)}>
-              <li class="px-2.5 pb-2 text-sm text-muted">{t("web.repo.finding")}</li>
+              <li {...stylex.attrs(viewStyles.reposPageLi2)}>{t("web.repo.finding")}</li>
             </Match>
             <Match when={sorted().length === 0}>
-              <li class="px-2.5 pb-2 text-sm text-muted">{t("web.repo.none")}</li>
+              <li {...stylex.attrs(viewStyles.reposPageLi2)}>{t("web.repo.none")}</li>
             </Match>
           </Switch>
         </ListCard>
@@ -131,7 +291,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
 function RepoPanel(props: { name: string; repos: () => RepoSummary[]; now: number; Head: ReposSkin["Head"] }) {
   const repo = createMemo<RepoSummary | undefined>((last) => props.repos().find((p) => p.name === props.name) ?? last);
   return (
-    <div data-testid="repo" data-key={props.name} class="flex max-w-4xl flex-col gap-3 md:overflow-y-auto">
+    <div data-testid="repo" data-key={props.name} {...stylex.attrs(viewStyles.repo)}>
       <props.Head name={props.name} />
       <Show when={repo()}>{(p) => <Details repo={p()} now={props.now} />}</Show>
     </div>
@@ -189,38 +349,38 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
   const busy = () => props.languages.fetching() || props.activity.fetching();
   const notCounted = () => !!props.languages.error();
   return (
-    <section class="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
-      <span class="flex size-24 shrink-0 items-center justify-center rounded-lg bg-hover">
+    <section {...stylex.attrs(viewStyles.overviewSection)}>
+      <span {...stylex.attrs(viewStyles.overviewSpan)}>
         <SpriteIcon name={recencyPicture[recency()]} size={80} label={t("web.repo.recency.label", { label: recencyText(recency()) })} />
       </span>
       <div class="flex min-w-0 flex-1 flex-col gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <h2 class="truncate text-xl font-semibold">{props.repo.name}</h2>
+        <div {...stylex.attrs(viewStyles.overviewDiv)}>
+          <h2 {...stylex.attrs(viewStyles.overviewH2)}>{props.repo.name}</h2>
           <span class="rounded bg-leaf-300/50 px-1.5 text-xs">{recencyText(recency())}</span>
         </div>
-        <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <div {...stylex.attrs(viewStyles.overviewDiv2)}>
           <Stat label={t("web.repo.firstCommit")} value={firstCommit()} />
           <Stat label={t("web.repo.commitCount")} value={commitTotal()} />
           <Stat label={t("web.repo.code")} value={codeLines()} />
           <Stat label={t("web.repo.languages")} value={languageTotal()} />
         </div>
-        <div class="flex items-center gap-1.5">
+        <div {...stylex.attrs(viewStyles.overviewDiv3)}>
           <Icon name="folder" size={14} />
-          <span class="min-w-0 truncate font-mono text-xs text-muted" title={props.repo.path}>
+          <span {...stylex.attrs(viewStyles.overviewSpan2)} title={props.repo.path}>
             {props.repo.path}
           </span>
           <button
             type="button"
             title={t("web.repo.copyPath")}
             aria-label={t("web.repo.copyPath")}
-            class="cursor-pointer rounded p-1 hover:bg-hover"
+            {...stylex.attrs(viewStyles.overviewButton)}
             onClick={() => void copyPath(props.repo.path)}
           >
             <Icon name="copy" size={14} />
           </button>
         </div>
       </div>
-      <div class="flex flex-col items-end gap-1">
+      <div {...stylex.attrs(viewStyles.overviewDiv4)}>
         <button
           type="button"
           title={busy() ? t("web.repo.counting") : t("web.repo.recount")}
@@ -229,11 +389,13 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           onClick={() => {
             void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
           }}
-          class="cursor-pointer rounded-md border border-line p-1.5 hover:bg-hover disabled:opacity-50"
+          {...stylex.attrs(viewStyles.overviewButton2)}
         >
           <Icon name="refresh" size={16} />
         </button>
-        <Show when={counted()}>{(c) => <span class="text-xs text-muted">{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</span>}</Show>
+        <Show when={counted()}>
+          {(c) => <span {...stylex.attrs(viewStyles.overviewSpan3)}>{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</span>}
+        </Show>
       </div>
     </section>
   );

@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,6 +10,39 @@ import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
 import { pxFocus, pxText, pxWindow } from "./style";
+
+const viewStyles = stylex.create({
+  farmDialogDiv: {
+    display: "flex",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+  },
+  farmDialogDiv2: {
+    flexShrink: "0",
+    backgroundColor: "var(--color-cream-100)",
+  },
+  farmDialogDiv3: {
+    minHeight: "0",
+    flex: "1",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  farmSectionSection: {
+    display: "flex",
+    flexDirection: "column",
+    paddingTop: "calc(var(--spacing) * 4)",
+  },
+  pxDialogDiv: {
+    marginBottom: "calc(var(--spacing) * 5)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+});
 
 function Modal(props: {
   open: boolean;
@@ -75,7 +109,7 @@ export function FarmDialog(props: {
       class={farmSizes[props.size]}
     >
       <div class={[pxText.sm, "flex h-full flex-col overflow-hidden"]}>
-        <div class="flex shrink-0 items-center gap-2 bg-cream-100 px-4 py-2.5">
+        <div {...stylex.attrs(viewStyles.farmDialogDiv)}>
           <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={32} />}</Show>
           <h2 class={[pxText.lg, "min-w-0 flex-1 truncate"]}>{props.title}</h2>
           <button
@@ -87,10 +121,10 @@ export function FarmDialog(props: {
             <SpriteIcon name="button-close" size={18} class="group-active:translate-x-px group-active:translate-y-px" />
           </button>
         </div>
-        <div class="shrink-0 bg-cream-100">
+        <div {...stylex.attrs(viewStyles.farmDialogDiv2)}>
           <DashedLine />
         </div>
-        <div class="min-h-0 flex-1 overflow-y-auto p-4">{props.children}</div>
+        <div {...stylex.attrs(viewStyles.farmDialogDiv3)}>{props.children}</div>
       </div>
     </Modal>
   );
@@ -98,7 +132,7 @@ export function FarmDialog(props: {
 
 export function FarmSection(props: { title: string; children?: JSX.Element }) {
   return (
-    <section class="flex flex-col pt-4">
+    <section {...stylex.attrs(viewStyles.farmSectionSection)}>
       <h3 class={[pxText.xs, "mb-1.5 text-bark-600"]}>{props.title}</h3>
       {props.children}
     </section>
@@ -117,7 +151,7 @@ export function PxDialog(props: { title: string; open?: boolean; testid?: string
       class="w-[min(512px,calc(100vw-32px))] border-2 border-bark-500"
     >
       <div class={[pxText.sm, "max-h-[85dvh] overflow-y-auto p-6"]}>
-        <div class="mb-5 flex items-center gap-3">
+        <div {...stylex.attrs(viewStyles.pxDialogDiv)}>
           <h2 class={[pxText.xl, "min-w-0 flex-1"]}>{props.title}</h2>
           <PxButton size="icon" label={t("web.ui.pixel.close")} onClick={() => props.onClose()}>
             <SpriteIcon name="button-close" size={16} />

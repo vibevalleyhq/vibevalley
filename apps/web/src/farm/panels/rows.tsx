@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,15 +9,75 @@ import { aria } from "#/base/dom.tsx";
 import { changeKind, patchLines, patchMarkOf } from "#/features/issue/index.ts";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 
+const viewStyles = stylex.create({
+  farmTagSpan: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "12px",
+    whiteSpace: "nowrap",
+  },
+  farmEmptyDiv: {
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 8)",
+    textAlign: "center",
+    fontSize: "13px",
+    color: "var(--color-bark-600)",
+  },
+  plusMinusSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "12.5px",
+    whiteSpace: "nowrap",
+  },
+  plusMinusSpan2: {
+    color: "var(--color-leaf-700)",
+  },
+  plusMinusSpan3: {
+    color: "var(--wb-berry)",
+  },
+  patchDiv: {
+    marginInline: "calc(var(--spacing) * 2)",
+    marginBottom: "calc(var(--spacing) * 2)",
+    maxHeight: "calc(var(--spacing) * 80)",
+    overflow: "auto",
+    backgroundColor: "var(--color-cream-50)",
+    paddingBlock: "var(--spacing)",
+  },
+  patchDiv2: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "12.5px",
+    lineHeight: "1.4",
+    whiteSpace: "pre",
+  },
+  fileRowDiv: {
+    backgroundColor: "var(--color-cream-100)",
+  },
+  fileRowSpan: {
+    display: "flex",
+    height: "calc(var(--spacing) * 5)",
+    width: "calc(var(--spacing) * 5)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "12px",
+  },
+  fileRowSpan2: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "12.5px",
+    color: "var(--color-bark-500)",
+  },
+});
+
 /** A colour at `alpha` of its strength over cream. */
 export const tint = (hex: string, alpha: number) => `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, #f7e8c4)`;
 
 export function FarmTag(props: { text: string; fill?: string; ink?: string; icon?: string; goes?: boolean }) {
   return (
-    <span
-      class="inline-flex items-center gap-1 px-2 py-0.5 text-[12px] whitespace-nowrap"
-      style={{ background: props.fill ?? "#e2c995", color: props.ink ?? "#46301d" }}
-    >
+    <span {...stylex.attrs(viewStyles.farmTagSpan)} style={{ background: props.fill ?? "#e2c995", color: props.ink ?? "#46301d" }}>
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={12} />}</Show>
       {props.text}
       <Show when={props.goes}>
@@ -35,7 +96,7 @@ export function Tinted(props: { children: JSX.Element; color?: string; class?: s
 }
 
 export function FarmEmpty(props: { text: string }) {
-  return <div class="bg-cream-100 px-4 py-8 text-center text-[13px] text-bark-600">{props.text}</div>;
+  return <div {...stylex.attrs(viewStyles.farmEmptyDiv)}>{props.text}</div>;
 }
 
 /** What the server answered, under the button that asked. */
@@ -45,9 +106,9 @@ export { farmClock as clockOf } from "#/farm/store.ts";
 
 export function PlusMinus(props: { added: number; removed: number }) {
   return (
-    <span class="font-mono text-[12.5px] whitespace-nowrap">
-      <span class="text-leaf-700">+{props.added}</span>
-      <span class="text-berry"> −{props.removed}</span>
+    <span {...stylex.attrs(viewStyles.plusMinusSpan)}>
+      <span {...stylex.attrs(viewStyles.plusMinusSpan2)}>+{props.added}</span>
+      <span {...stylex.attrs(viewStyles.plusMinusSpan3)}> −{props.removed}</span>
     </span>
   );
 }
@@ -63,13 +124,10 @@ const patchFill = { added: "#b4cb7c59", removed: "#c84a3a1a", hunk: undefined, p
 
 function Patch(props: { text: string }) {
   return (
-    <div class="mx-2 mb-2 max-h-80 overflow-auto bg-cream-50 py-1">
+    <div {...stylex.attrs(viewStyles.patchDiv)}>
       <For each={patchLines(props.text)} keyed={false}>
         {(line) => (
-          <div
-            class="px-2 font-mono text-[12.5px] leading-[1.4] whitespace-pre"
-            style={{ background: patchFill[patchMarkOf(line())], color: patchInk[patchMarkOf(line())] }}
-          >
+          <div {...stylex.attrs(viewStyles.patchDiv2)} style={{ background: patchFill[patchMarkOf(line())], color: patchInk[patchMarkOf(line())] }}>
             {line() || " "}
           </div>
         )}
@@ -83,7 +141,7 @@ export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
   const kind = () => changeKind(props.file.status);
   const look = () => fileLook[props.file.status] ?? { fill: "#e2c995", ink: "#46301d" };
   return (
-    <div class="bg-cream-100">
+    <div {...stylex.attrs(viewStyles.fileRowDiv)}>
       <button
         type="button"
         aria-label={props.file.path}
@@ -92,7 +150,7 @@ export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         onClick={() => setOpen(!open())}
         class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left enabled:cursor-pointer enabled:hover:bg-cream-200"
       >
-        <span title={kind().label} class="flex h-5 w-5 shrink-0 items-center justify-center text-[12px]" style={{ background: look().fill, color: look().ink }}>
+        <span title={kind().label} {...stylex.attrs(viewStyles.fileRowSpan)} style={{ background: look().fill, color: look().ink }}>
           {kind().mark}
         </span>
         <span title={props.file.path} class={["min-w-0 flex-1 truncate font-mono text-[12.5px]", props.conflict ? "text-berry" : "text-bark-800"]}>
@@ -101,7 +159,7 @@ export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         <Show when={props.conflict}>
           <FarmTag text={t("web.farm.conflictTag")} fill={tint("#c84a3a", 0.15)} ink="#c84a3a" />
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-[12.5px] text-bark-500">{t("web.farm.binary")}</span>}>
+        <Show when={props.file.added >= 0} fallback={<span {...stylex.attrs(viewStyles.fileRowSpan2)}>{t("web.farm.binary")}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>

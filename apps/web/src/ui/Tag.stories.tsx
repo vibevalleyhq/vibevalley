@@ -1,9 +1,32 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { icons, type IconName } from "./icons";
 import { Dot, type DotTone, Tag, type TagTone } from "./Tag";
+
+const viewStyles = stylex.create({
+  tagStoriesDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  tagStoriesDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  tagStoriesSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 const dotTones: DotTone[] = ["leaf", "wheat", "berry", "water", "idle", "faint", "muted"];
 
@@ -22,7 +45,7 @@ export default stories({
     }),
     Tones: story({
       render: () => (
-        <div class="flex gap-2">
+        <div {...stylex.attrs(viewStyles.tagStoriesDiv)}>
           <Tag tone="ok" icon="check" label="完成" />
           <Tag tone="bad" icon="close" label="失败" />
           <Tag tone="wait" icon="send" label="已发" />
@@ -33,10 +56,10 @@ export default stories({
       args: { ring: false, size: 8 },
       controls: { size: { kind: "number", min: 4, max: 16 } },
       render: (a) => (
-        <div class="flex flex-wrap items-center gap-4">
+        <div {...stylex.attrs(viewStyles.tagStoriesDiv2)}>
           <For each={dotTones}>
             {(tone) => (
-              <span class="flex items-center gap-1.5 font-mono text-2xs text-muted">
+              <span {...stylex.attrs(viewStyles.tagStoriesSpan)}>
                 <Dot tone={tone} ring={a.ring} size={a.size} />
                 {tone}
               </span>

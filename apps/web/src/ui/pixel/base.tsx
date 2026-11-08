@@ -1,7 +1,20 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { pxFrame, pxText, pxWindow } from "./style";
+
+const viewStyles = stylex.create({
+  pxCardDiv: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: "calc(var(--spacing) * 2)",
+    rowGap: "var(--spacing)",
+  },
+});
 
 /** `border` draws a second edge inside the frame. `paper` is a bg-* class. */
 export function PxWindow(props: {
@@ -33,7 +46,7 @@ export function PxCard(props: { title?: JSX.Element; aside?: JSX.Element; childr
     <PxWindow class={["flex flex-col p-4", props.class]}>
       <Show when={props.title != null}>
         {/* The aside wraps under the title when both do not fit, instead of squeezing the title to a letter a line. */}
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div {...stylex.attrs(viewStyles.pxCardDiv)}>
           <div class={pxText.sm}>{props.title}</div>
           <Show when={props.aside != null}>
             <div class={[pxText.xs, "text-bark-500"]}>{props.aside}</div>

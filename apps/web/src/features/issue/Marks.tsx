@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,6 +9,34 @@ import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
 
 import type { BoardCard, Tone } from "./cards";
 import { cardAgent } from "./cards";
+
+const viewStyles = stylex.create({
+  statusMarkSvg: {
+    flexShrink: "0",
+  },
+  progressMarkSpan: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "14px",
+    color: "var(--wb-muted)",
+  },
+  progressMarkSvg: {
+    rotate: "-90deg",
+  },
+  flagChipSpan: {
+    borderRadius: ".25rem",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "calc(var(--spacing) * 4)",
+    fontWeight: "var(--font-weight-medium)",
+    whiteSpace: "nowrap",
+  },
+  agentFaceOfSpan: {
+    display: "inline-flex",
+  },
+});
 
 export const toneVar = (tone: Tone) => `var(--color-${tone})`;
 
@@ -33,7 +62,7 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
       viewBox={`0 0 ${size()} ${size()}`}
       role="img"
       aria-label={props.label ?? t(`shared.status.${props.status}`)}
-      class="shrink-0"
+      {...stylex.attrs(viewStyles.statusMarkSvg)}
     >
       <Switch
         fallback={
@@ -92,7 +121,7 @@ export function PriorityMark(props: { priority: Priority; size?: number }) {
   const lit = () => (props.priority === "high" ? 3 : props.priority === "medium" ? 2 : 1);
   const w = () => s() / 5;
   return (
-    <svg width={s()} height={s()} viewBox={`0 0 ${s()} ${s()}`} role="img" aria-label={label()} class="shrink-0">
+    <svg width={s()} height={s()} viewBox={`0 0 ${s()} ${s()}`} role="img" aria-label={label()} {...stylex.attrs(viewStyles.statusMarkSvg)}>
       <title>{label()}</title>
       <Show
         when={props.priority === "urgent"}
@@ -128,8 +157,8 @@ export function ProgressMark(props: { done: number; total: number }) {
   const r = 5.5;
   const len = 2 * Math.PI * r;
   return (
-    <span class="inline-flex items-center gap-1 text-2xs leading-[14px] text-muted">
-      <svg width={13} height={13} viewBox="0 0 13 13" aria-hidden="true" class="-rotate-90">
+    <span {...stylex.attrs(viewStyles.progressMarkSpan)}>
+      <svg width={13} height={13} viewBox="0 0 13 13" aria-hidden="true" {...stylex.attrs(viewStyles.progressMarkSvg)}>
         <circle cx={6.5} cy={6.5} r={r} fill="none" stroke="var(--color-line)" stroke-width={2} />
         <Show when={part() > 0}>
           <circle cx={6.5} cy={6.5} r={r} fill="none" stroke="var(--color-leaf)" stroke-width={2} stroke-dasharray={`${len * part()} ${len}`} />
@@ -146,7 +175,7 @@ export function NoFaceMark(props: { size?: number }) {
   const c = () => s() / 2;
   const r = () => s() / 2 - 1;
   return (
-    <svg width={s()} height={s()} viewBox={`0 0 ${s()} ${s()}`} role="img" aria-label={t("web.issue.noHelper")} class="shrink-0">
+    <svg width={s()} height={s()} viewBox={`0 0 ${s()} ${s()}`} role="img" aria-label={t("web.issue.noHelper")} {...stylex.attrs(viewStyles.statusMarkSvg)}>
       <title>{t("web.issue.noHelper")}</title>
       <circle
         cx={c()}
@@ -169,10 +198,7 @@ export function NoFaceMark(props: { size?: number }) {
 /** A small flag on a card or row: only the things the owner should notice. */
 export function FlagChip(props: { text: string; tone: Tone }) {
   return (
-    <span
-      class="rounded px-1.5 text-2xs leading-4 font-medium whitespace-nowrap"
-      style={{ background: `color-mix(in srgb, ${toneVar(props.tone)} 18%, transparent)` }}
-    >
+    <span {...stylex.attrs(viewStyles.flagChipSpan)} style={{ background: `color-mix(in srgb, ${toneVar(props.tone)} 18%, transparent)` }}>
       {props.text}
     </span>
   );
@@ -183,7 +209,7 @@ export function AgentFaceOf(props: { agent: string; runtime?: string | undefined
   const found = useAgent(() => props.agent);
   return (
     <Show when={found()?.role !== "orchestrator"} fallback={<OrchestratorFace size={props.size ?? 18} agent={props.agent} />}>
-      <span title={found()?.name ?? props.agent} class="inline-flex">
+      <span title={found()?.name ?? props.agent} {...stylex.attrs(viewStyles.agentFaceOfSpan)}>
         <AgentFace agentId={props.agent} runtime={props.runtime ?? found()?.runtime} look={found()?.look} size={props.size ?? 18} />
       </span>
     </Show>

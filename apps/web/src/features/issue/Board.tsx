@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,10 +14,126 @@ import { laneOrder, type Ordering } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
+const viewStyles = stylex.create({
+  olderLinkButton: {
+    marginInline: "auto",
+    display: "block",
+    cursor: "pointer",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  issueBoardDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    gap: "calc(var(--spacing) * 2.5)",
+    overflowX: "auto",
+  },
+  laneViewHeader: {
+    display: "flex",
+    height: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "var(--spacing)",
+  },
+  laneViewH2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  laneViewSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  laneViewP: {
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  cardViewDiv: {
+    marginBottom: "var(--spacing)",
+    height: "calc(var(--spacing) * .5)",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-leaf)",
+  },
+  cardViewDiv2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "14px",
+    color: "var(--wb-muted)",
+  },
+  cardMarks: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  moveFailed: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+  cardViewSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  moveRetry: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 6)",
+    height: "calc(var(--spacing) * 6)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  emptyNoteP: {
+    paddingInline: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+});
+
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
 export function OlderLink(props: { hidden: number; onClick: () => void }) {
   return (
-    <button type="button" onClick={() => props.onClick()} class="mx-auto block cursor-pointer py-1 text-sm text-water hover:underline">
+    <button type="button" onClick={() => props.onClick()} {...stylex.attrs(viewStyles.olderLinkButton)}>
       {props.hidden > 0 ? t("web.issue.board.earlier", { n: props.hidden }) : t("web.issue.board.recent")}
     </button>
   );
@@ -64,7 +181,7 @@ export function IssueBoard(props: BoardProps) {
           options={lanes.map((l) => ({ value: l, label: `${laneLabel[l]} ${props.cards.filter((c) => c.lane === l).length}` }))}
         />
       </div>
-      <div class="flex min-h-0 flex-1 gap-2.5 overflow-x-auto">
+      <div {...stylex.attrs(viewStyles.issueBoardDiv)}>
         <For each={lanes}>
           {(l) => <LaneView board={props} lane={l} shownNarrow={l === lane()} cards={props.cards.filter((c) => c.lane === l)} drag={drag} />}
         </For>
@@ -112,10 +229,10 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
         over() ? "border-leaf bg-leaf/15" : "border-transparent bg-hover",
       ]}
     >
-      <header class="flex h-7 items-center gap-2 px-1">
+      <header {...stylex.attrs(viewStyles.laneViewHeader)}>
         <StatusMark status={laneStatus[props.lane]} />
-        <h2 class="text-sm font-semibold">{laneLabel[props.lane]}</h2>
-        <span class="text-xs text-muted">{head()}</span>
+        <h2 {...stylex.attrs(viewStyles.laneViewH2)}>{laneLabel[props.lane]}</h2>
+        <span {...stylex.attrs(viewStyles.laneViewSpan)}>{head()}</span>
         <Hint text={emptyText[props.lane]} />
       </header>
       <Show when={props.lane === "todo"}>
@@ -155,7 +272,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
           }
         >
           <Match when={p().loading}>
-            <p class="px-1 text-xs text-faint">{t("web.issue.reading")}</p>
+            <p {...stylex.attrs(viewStyles.laneViewP)}>{t("web.issue.reading")}</p>
           </Match>
           {/* The todo lane has its placeholder card: no second empty box under it. */}
           <Match when={props.cards.length === 0 && props.lane !== "todo"}>
@@ -212,7 +329,7 @@ function CardView(props: {
       }}
     >
       <Show when={before()}>
-        <div class="mb-1 h-0.5 rounded-full bg-leaf" />
+        <div {...stylex.attrs(viewStyles.cardViewDiv)} />
       </Show>
       <div
         role="button"
@@ -248,12 +365,12 @@ function CardView(props: {
         ]}
       >
         <Show when={where()}>
-          <div class="truncate text-2xs leading-[14px] text-muted">{where()}</div>
+          <div {...stylex.attrs(viewStyles.cardViewDiv2)}>{where()}</div>
         </Show>
         <div class="mt-0.5 line-clamp-2 text-sm font-medium break-words">{look().title}</div>
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <Show when={marks()}>
-          <div data-testid="card-marks" class="mt-2 flex flex-wrap items-center gap-1.5">
+          <div data-testid="card-marks" {...stylex.attrs(viewStyles.cardMarks)}>
             <Show when={showsStatus()}>
               <StatusMark status={look().status} tone={look().statusTone} size={13} />
             </Show>
@@ -268,8 +385,8 @@ function CardView(props: {
       </div>
       <Show when={props.card.move?.state === "failed" ? props.card.move : undefined}>
         {(m) => (
-          <div data-testid="move-failed" class="mt-1 flex items-center gap-1.5 px-1 text-xs text-berry">
-            <span class="min-w-0 flex-1 truncate" title={m().reason}>
+          <div data-testid="move-failed" {...stylex.attrs(viewStyles.moveFailed)}>
+            <span {...stylex.attrs(viewStyles.cardViewSpan)} title={m().reason}>
               {m().reason ?? t("web.issue.board.moveFailed")}
             </span>
             <button
@@ -278,7 +395,7 @@ function CardView(props: {
               aria-label={t("web.issue.board.retryMove")}
               title={t("web.issue.board.retryMove")}
               onClick={() => props.onRetry(props.card)}
-              class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+              {...stylex.attrs(viewStyles.moveRetry)}
             >
               <Icon name="retry" size={14} />
             </button>
@@ -288,7 +405,7 @@ function CardView(props: {
               aria-label={t("web.issue.board.putBack")}
               title={t("web.issue.board.putBack")}
               onClick={() => props.onPutBack(props.card)}
-              class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+              {...stylex.attrs(viewStyles.moveRetry)}
             >
               <Icon name="undo" size={14} />
             </button>
@@ -300,5 +417,5 @@ function CardView(props: {
 }
 
 export function EmptyNote(props: { children: JSX.Element }) {
-  return <p class="px-3 text-xs text-faint">{props.children}</p>;
+  return <p {...stylex.attrs(viewStyles.emptyNoteP)}>{props.children}</p>;
 }

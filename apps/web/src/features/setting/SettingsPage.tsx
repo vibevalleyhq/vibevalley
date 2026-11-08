@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -18,6 +19,74 @@ import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
+
+const viewStyles = stylex.create({
+  settingsPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=48rem)": "row",
+    },
+  },
+  settingsNav: {
+    position: "relative",
+    display: "flex",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+    borderColor: "var(--wb-line)",
+    padding: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=48rem)": "var(--pane-w)",
+    },
+    overflowY: {
+      default: null,
+      "@media (width>=48rem)": "auto",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=48rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=48rem)": "1px",
+    },
+  },
+  settingsPageDiv2: {
+    display: {
+      default: "none",
+      "@media (width>=48rem)": "block",
+    },
+  },
+  settingsPageDiv3: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  settingsPageSpan: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBottom: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-faint)",
+  },
+  settingsPageDiv4: {
+    display: "flex",
+    flexDirection: "column",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    marginTop: {
+      default: null,
+      "@media (width>=48rem)": "auto",
+    },
+  },
+});
 
 /** The groups listed under their names. */
 type Listed = "options" | "helpers" | "voice" | "connect";
@@ -63,14 +132,14 @@ export function SettingsPage(props: { rest: string }) {
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
         <SettingsSearch value={q}>
-          <div class="flex h-full min-h-0 flex-col md:flex-row">
+          <div {...stylex.attrs(viewStyles.settingsPageDiv)}>
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              class="relative flex shrink-0 flex-col gap-4 border-line p-3 md:w-(--pane-w) md:overflow-y-auto md:border-r"
+              {...stylex.attrs(viewStyles.settingsNav)}
               style={{ "--pane-w": `${navWidth()}px` }}
             >
-              <div class="hidden md:block">
+              <div {...stylex.attrs(viewStyles.settingsPageDiv2)}>
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
               </div>
               <TextInput
@@ -84,8 +153,8 @@ export function SettingsPage(props: { rest: string }) {
               <For each={groups}>
                 {(g) => (
                   <Show when={shown(g).length > 0}>
-                    <div class="flex flex-col gap-0.5">
-                      <span class="px-2 pb-1 text-xs font-medium text-faint">{t(`web.setting.groups.${g}`)}</span>
+                    <div {...stylex.attrs(viewStyles.settingsPageDiv3)}>
+                      <span {...stylex.attrs(viewStyles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
                       <For each={shown(g)}>{(s) => <SectionLink section={s} current={s === section()} />}</For>
                     </div>
                   </Show>
@@ -93,7 +162,7 @@ export function SettingsPage(props: { rest: string }) {
               </For>
               <For each={shown("about")}>
                 {(s) => (
-                  <div class="flex flex-col border-t border-line pt-3 md:mt-auto">
+                  <div {...stylex.attrs(viewStyles.settingsPageDiv4)}>
                     <SectionLink section={s} current={s === section()} />
                   </div>
                 )}

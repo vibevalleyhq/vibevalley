@@ -1,7 +1,19 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { t } from "@vibevalley/i18n";
 import type { RuntimeInfo } from "@vibevalley/protocol";
 
 import { ready, useRuntimes, useSprites } from "#/infra/query.ts";
+
+const viewStyles = stylex.create({
+  runtimeBadgeImg: {
+    height: "100%",
+    width: "100%",
+    objectFit: "contain",
+    padding: "1px",
+    imageRendering: "pixelated",
+  },
+});
 
 /** The catalog's label for it; the runtime's id when the catalog does not list it. */
 export const runtimeName = (catalog: readonly RuntimeInfo[], runtime: string) => catalog.find((r) => r.id === runtime)?.preset.label ?? runtime;
@@ -24,7 +36,7 @@ export function RuntimeBadge(props: { runtime: string; size: number }) {
       title={label()}
       data-runtime={props.runtime}
     >
-      <img src={`/pixel/${icon()}.png`} alt="" draggable="false" class="h-full w-full object-contain p-px [image-rendering:pixelated]" />
+      <img src={`/pixel/${icon()}.png`} alt="" draggable="false" {...stylex.attrs(viewStyles.runtimeBadgeImg)} />
     </span>
   );
 }

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
@@ -5,6 +6,29 @@ import { stories, story } from "@vibevalley/stories";
 
 import type { Tone } from "./cards";
 import { FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
+
+const viewStyles = stylex.create({
+  marksStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  marksStoriesSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  marksStoriesDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 const tones: Tone[] = ["berry", "wheat", "water", "leaf", "faint", "muted"];
 
@@ -14,10 +38,10 @@ export default stories({
     Status: story({
       note: "工单的状态圈：画法跟着状态，颜色跟着令牌。",
       render: () => (
-        <div class="flex flex-wrap gap-4">
+        <div {...stylex.attrs(viewStyles.marksStoriesDiv)}>
           <For each={IssueStatusValues}>
             {(status) => (
-              <span class="flex items-center gap-1.5 font-mono text-2xs text-muted">
+              <span {...stylex.attrs(viewStyles.marksStoriesSpan)}>
                 <StatusMark status={status} />
                 {status}
               </span>
@@ -28,10 +52,10 @@ export default stories({
     }),
     Priority: story({
       render: () => (
-        <div class="flex flex-wrap gap-4">
+        <div {...stylex.attrs(viewStyles.marksStoriesDiv)}>
           <For each={PriorityValues}>
             {(priority) => (
-              <span class="flex items-center gap-1.5 font-mono text-2xs text-muted">
+              <span {...stylex.attrs(viewStyles.marksStoriesSpan)}>
                 <PriorityMark priority={priority} />
                 {priority}
               </span>
@@ -47,7 +71,7 @@ export default stories({
     }),
     Flags: story({
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.marksStoriesDiv2)}>
           <For each={tones}>{(tone) => <FlagChip text={tone} tone={tone} />}</For>
           <NoFaceMark />
         </div>

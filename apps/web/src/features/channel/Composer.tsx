@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, flush, For, Show, untrack } from "solid-js";
 
 import { Progress } from "@vibevalley/base-ui";
@@ -23,6 +24,221 @@ import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEd
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";
+
+const viewStyles = stylex.create({
+  composer: {
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 4)",
+  },
+  composerSpan: {
+    width: "calc(var(--spacing) * 5)",
+    height: "calc(var(--spacing) * 5)",
+  },
+  composerSpan2: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  composerSpan3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  composerSpan4: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  chatProblem: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+  composerDiv: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  quotedBlock: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  composerSpan5: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  quotedBlockRemove: {
+    cursor: "pointer",
+    borderRadius: ".25rem",
+    padding: "calc(var(--spacing) * .5)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-page)",
+      },
+    },
+  },
+  replying: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  composerDiv2: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  composerSpan6: {
+    position: "relative",
+    maxWidth: "calc(var(--spacing) * 48)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  composerDiv3: {
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--wb-line)",
+      ":focus-within": "var(--wb-focus)",
+    },
+    backgroundColor: "var(--wb-page)",
+  },
+  composerInput: {
+    display: "block",
+    fieldSizing: "content",
+    maxHeight: "200px",
+    minHeight: "52px",
+    width: "100%",
+    resize: "none",
+    backgroundColor: "transparent",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingTop: "calc(var(--spacing) * 2.5)",
+    paddingBottom: "var(--spacing)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--wb-faint)",
+    },
+  },
+  composerDiv4: {
+    display: "flex",
+    height: "calc(var(--spacing) * 9)",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  composerSpan7: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  composerSpan8: {
+    flex: "1",
+  },
+  composerInput2: {
+    display: "none",
+  },
+  attach: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  stop: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    color: "var(--wb-berry)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  dropHint: {
+    pointerEvents: "none",
+    position: "absolute",
+    inset: "calc(var(--spacing) * 2)",
+    zIndex: "20",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "dashed",
+    borderWidth: "2px",
+    borderColor: "var(--wb-accent)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-page) 85%, transparent)",
+    },
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-accent)",
+  },
+});
 
 /** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
 export interface QuotedBlockDraft {
@@ -125,7 +341,7 @@ export function Composer(props: {
   };
 
   return (
-    <div data-testid="composer" data-key={props.channel?.id} class="border-t border-line px-4 pt-3 pb-4">
+    <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(viewStyles.composer)}>
       <Show when={box.offered().length > 0}>
         <div
           role="listbox"
@@ -147,14 +363,17 @@ export function Composer(props: {
                 }}
                 class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", { "bg-selected": i() === box.active() }]}
               >
-                <Show when={n().session} fallback={n().orchestrator ? <OrchestratorFace size={20} agent={n().orchestrator} /> : <span class="size-5" />}>
+                <Show
+                  when={n().session}
+                  fallback={n().orchestrator ? <OrchestratorFace size={20} agent={n().orchestrator} /> : <span {...stylex.attrs(viewStyles.composerSpan)} />}
+                >
                   {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
-                <span class="font-mono text-xs">{n().token}</span>
+                <span {...stylex.attrs(viewStyles.composerSpan2)}>{n().token}</span>
                 <Show when={n().session}>
-                  <span class="text-sm">{n().name}</span>
+                  <span {...stylex.attrs(viewStyles.composerSpan3)}>{n().name}</span>
                 </Show>
-                <span class="min-w-0 flex-1 truncate text-xs text-muted">{n().note}</span>
+                <span {...stylex.attrs(viewStyles.composerSpan4)}>{n().note}</span>
               </div>
             )}
           </For>
@@ -162,21 +381,21 @@ export function Composer(props: {
       </Show>
       <Show when={problem()}>
         {(p) => (
-          <p role="alert" data-testid="chat-problem" class="mb-1.5 text-xs text-berry">
+          <p role="alert" data-testid="chat-problem" {...stylex.attrs(viewStyles.chatProblem)}>
             {p()}
           </p>
         )}
       </Show>
       <Show when={(props.quoted?.length ?? 0) > 0}>
-        <div class="mb-1.5 flex flex-col gap-1">
+        <div {...stylex.attrs(viewStyles.composerDiv)}>
           <For each={props.quoted} keyed={(q) => q.ref.blockId}>
             {(q) => (
-              <div data-testid="quoted-block" data-key={q().ref.blockId} class="flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
+              <div data-testid="quoted-block" data-key={q().ref.blockId} {...stylex.attrs(viewStyles.quotedBlock)}>
                 <Icon name="artifacts" size={12} />
-                <span class="min-w-0 flex-1 truncate">{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
+                <span {...stylex.attrs(viewStyles.composerSpan5)}>{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
                 <button
                   type="button"
-                  class="cursor-pointer rounded p-0.5 hover:bg-page"
+                  {...stylex.attrs(viewStyles.quotedBlockRemove)}
                   data-testid="quoted-block-remove"
                   aria-label={t("web.channel.composer.cancelQuote")}
                   title={t("web.channel.composer.cancelQuote")}
@@ -191,9 +410,9 @@ export function Composer(props: {
       </Show>
       <Show when={replying()}>
         {(m) => (
-          <div data-testid="replying" data-key={m().number} class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
+          <div data-testid="replying" data-key={m().number} {...stylex.attrs(viewStyles.replying)}>
             <Icon name="reply" size={12} />
-            <span class="min-w-0 flex-1 truncate">
+            <span {...stylex.attrs(viewStyles.composerSpan5)}>
               {t("shared.join.labeled", {
                 label: t("web.channel.composer.replying", { name: m().from === ownerId ? t("web.channel.messages.owner") : m().name }),
                 text: m().text,
@@ -201,7 +420,7 @@ export function Composer(props: {
             </span>
             <button
               type="button"
-              class="cursor-pointer rounded p-0.5 hover:bg-page"
+              {...stylex.attrs(viewStyles.quotedBlockRemove)}
               data-testid="cancel-reply"
               aria-label={t("web.channel.composer.cancelReply")}
               title={t("web.channel.composer.cancelReply")}
@@ -213,7 +432,7 @@ export function Composer(props: {
         )}
       </Show>
       <Show when={draft().files.length > 0 || uploading().length > 0}>
-        <div class="mb-1.5 flex flex-wrap gap-1.5">
+        <div {...stylex.attrs(viewStyles.composerDiv2)}>
           <For each={draft().files} keyed={(f) => f.id}>
             {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => props.channel && drafts.drop(props.channel.id, f().id)} />}
           </For>
@@ -225,13 +444,13 @@ export function Composer(props: {
                 class="relative flex h-10 items-center overflow-hidden rounded-md border border-line bg-page px-2 text-xs text-muted"
               >
                 <Progress.Indicator class="absolute inset-y-0 left-0 bg-leaf/20" />
-                <span class="relative max-w-48 truncate">{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
+                <span {...stylex.attrs(viewStyles.composerSpan6)}>{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
               </Progress.Root>
             )}
           </For>
         </div>
       </Show>
-      <div class="rounded-lg border border-line bg-page focus-within:border-focus">
+      <div {...stylex.attrs(viewStyles.composerDiv3)}>
         <textarea
           ref={(el) => (input = el)}
           value={box.text()}
@@ -254,23 +473,23 @@ export function Composer(props: {
             e.preventDefault();
             attach(files);
           }}
-          class="block [field-sizing:content] max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none placeholder:text-faint"
+          {...stylex.attrs(viewStyles.composerInput)}
         />
         <DictationProblem dictating={dictating} />
-        <div class="flex h-9 items-center gap-1 px-2 pb-2">
+        <div {...stylex.attrs(viewStyles.composerDiv4)}>
           <Show
             when={listening()}
             fallback={
               <>
                 <Show when={props.channel?.type !== "direct"}>
-                  <span class="text-xs text-faint">{t("web.channel.composer.mention")}</span>
+                  <span {...stylex.attrs(viewStyles.composerSpan7)}>{t("web.channel.composer.mention")}</span>
                 </Show>
-                <span class="flex-1" />
+                <span {...stylex.attrs(viewStyles.composerSpan8)} />
                 <input
                   ref={(el) => (picker = el)}
                   type="file"
                   multiple
-                  class="hidden"
+                  {...stylex.attrs(viewStyles.composerInput2)}
                   aria-hidden="true"
                   tabindex={-1}
                   onChange={(e) => {
@@ -286,7 +505,7 @@ export function Composer(props: {
                   disabled={!props.channel}
                   aria-label={t("web.channel.composer.attach")}
                   title={t("web.channel.composer.attach")}
-                  class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
+                  {...stylex.attrs(viewStyles.attach)}
                 >
                   <Icon name="attach" size={16} />
                 </button>
@@ -300,7 +519,7 @@ export function Composer(props: {
                     aria-label={t("web.channel.emoji.open")}
                     aria-expanded={aria(emoji())}
                     title={t("web.channel.emoji.open")}
-                    class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
+                    {...stylex.attrs(viewStyles.attach)}
                   >
                     <Icon name="react" size={16} />
                   </button>
@@ -329,7 +548,7 @@ export function Composer(props: {
                 onClick={() => void stop()}
                 aria-label={t("web.channel.composer.stop")}
                 title={t("web.channel.composer.stopHint")}
-                class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
+                {...stylex.attrs(viewStyles.stop)}
               >
                 <Icon name="stop" size={16} />
               </button>
@@ -380,10 +599,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
     >
       {props.children}
       <Show when={over()}>
-        <div
-          data-testid="drop-hint"
-          class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent"
-        >
+        <div data-testid="drop-hint" {...stylex.attrs(viewStyles.dropHint)}>
           {t("web.channel.media.drop")}
         </div>
       </Show>

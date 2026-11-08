@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -21,6 +22,92 @@ import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
 import { tint } from "./rows";
 import { SowForm, WaterForm } from "./SeedForms";
+
+const viewStyles = stylex.create({
+  orchestratorLooksDiv: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  orchestratorLooksP: {
+    fontSize: "13px",
+    color: "var(--color-bark-900)",
+  },
+  orchestratorLooksDiv2: {
+    marginTop: "calc(var(--spacing) * 3)",
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(2,minmax(0,1fr))",
+      "@media (width>=40rem)": "repeat(3,minmax(0,1fr))",
+    },
+    gap: "calc(var(--spacing) * 2.5)",
+  },
+  orchestratorLooksSpan: {
+    height: "calc(var(--spacing) * 28)",
+  },
+  orchestratorLooksSpan2: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontSize: "13px",
+  },
+  orchestratorLooksSpan3: {
+    textAlign: "center",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  orchestratorLooksP2: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "13px",
+  },
+  orchestratorLooksDiv3: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    gap: "calc(var(--spacing) * 2.5)",
+  },
+  orchestratorLooksDiv4: {
+    flex: "1",
+    backgroundColor: "var(--color-cream-100)",
+  },
+  orchestratorLooksSpan4: {
+    height: "calc(var(--spacing) * 16)",
+  },
+  orchestratorLooksSpan5: {
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  shopP: {
+    fontSize: "13px",
+    color: "var(--color-bark-800)",
+  },
+  shopDiv: {
+    marginTop: "calc(var(--spacing) * 3)",
+    display: "grid",
+    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  shopDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    backgroundColor: "var(--color-cream-100)",
+    padding: "calc(var(--spacing) * 2.5)",
+    opacity: ".8",
+  },
+  shopSpan: {
+    minWidth: "0",
+    flex: "1",
+  },
+  shopSpan2: {
+    display: "block",
+    fontSize: "13px",
+  },
+  shopSpan3: {
+    display: "block",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+});
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],
@@ -165,37 +252,37 @@ function OrchestratorLooks() {
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
-    <div class="flex flex-col">
-      <p class="text-[13px] text-bark-900">{t("web.farm.panel.pickLook")}</p>
-      <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+    <div {...stylex.attrs(viewStyles.orchestratorLooksDiv)}>
+      <p {...stylex.attrs(viewStyles.orchestratorLooksP)}>{t("web.farm.panel.pickLook")}</p>
+      <div {...stylex.attrs(viewStyles.orchestratorLooksDiv2)}>
         <For each={orchestratorLooks}>
           {(look) => (
             <Tile item={look.id} chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
-              <span class="h-28">
+              <span {...stylex.attrs(viewStyles.orchestratorLooksSpan)}>
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
                 </Show>
               </span>
-              <span class="mt-1.5 text-[13px]">{look.name}</span>
-              <span class="text-center text-[12px] text-bark-600">{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
+              <span {...stylex.attrs(viewStyles.orchestratorLooksSpan2)}>{look.name}</span>
+              <span {...stylex.attrs(viewStyles.orchestratorLooksSpan3)}>{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
             </Tile>
           )}
         </For>
       </div>
-      <p class="mt-2 text-[13px]">{t("web.farm.panel.pets")}</p>
-      <div class="mt-2 flex gap-2.5">
+      <p {...stylex.attrs(viewStyles.orchestratorLooksP2)}>{t("web.farm.panel.pets")}</p>
+      <div {...stylex.attrs(viewStyles.orchestratorLooksDiv3)}>
         <For each={pets}>
           {(p) => (
-            <div class="flex-1 bg-cream-100">
+            <div {...stylex.attrs(viewStyles.orchestratorLooksDiv4)}>
               <Tile item={p} chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
-                <span class="h-16">
+                <span {...stylex.attrs(viewStyles.orchestratorLooksSpan4)}>
                   <Show when={has(`${p}-awake`)}>
                     <SpriteIcon name={`${p}-awake`} size={64} />
                   </Show>
                 </span>
-                <span class="mt-1.5 text-[13px]">{petName[p]}</span>
+                <span {...stylex.attrs(viewStyles.orchestratorLooksSpan2)}>{petName[p]}</span>
                 <Show when={!has(`${p}-awake`)}>
-                  <span class="text-[12px] text-bark-600">{t("web.farm.panel.drawing")}</span>
+                  <span {...stylex.attrs(viewStyles.orchestratorLooksSpan5)}>{t("web.farm.panel.drawing")}</span>
                 </Show>
               </Tile>
             </div>
@@ -216,19 +303,19 @@ const shop = [
 function Shop() {
   const core = useCore();
   return (
-    <div class="flex flex-col">
-      <p class="text-[13px] text-bark-800">{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
-      <div class="mt-3 grid grid-cols-2 gap-2">
+    <div {...stylex.attrs(viewStyles.orchestratorLooksDiv)}>
+      <p {...stylex.attrs(viewStyles.shopP)}>{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
+      <div {...stylex.attrs(viewStyles.shopDiv)}>
         <For each={shop}>
           {(item) => (
-            <div class="flex items-center gap-2 bg-cream-100 p-2.5 opacity-80">
+            <div {...stylex.attrs(viewStyles.shopDiv2)}>
               <SpriteIcon name={item.icon} size={36} />
-              <span class="min-w-0 flex-1">
-                <span class="block text-[13px]">{item.name}</span>
-                <span class="block truncate text-[12px] text-bark-600">{item.note}</span>
+              <span {...stylex.attrs(viewStyles.shopSpan)}>
+                <span {...stylex.attrs(viewStyles.shopSpan2)}>{item.name}</span>
+                <span {...stylex.attrs(viewStyles.shopSpan3)}>{item.note}</span>
               </span>
               <SpriteIcon name="icon-coin" size={16} />
-              <span class="text-[13px] text-bark-800">{item.price}</span>
+              <span {...stylex.attrs(viewStyles.shopP)}>{item.price}</span>
             </div>
           )}
         </For>

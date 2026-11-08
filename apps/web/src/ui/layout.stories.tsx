@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -6,6 +7,30 @@ import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } from "./layout";
 import { Dot } from "./Tag";
+
+const viewStyles = stylex.create({
+  layoutStoriesDiv: {
+    width: "calc(var(--spacing) * 72)",
+  },
+  layoutStoriesDiv2: {
+    width: "calc(var(--spacing) * 96)",
+  },
+  layoutStoriesUl: {
+    width: "calc(var(--spacing) * 56)",
+  },
+  layoutStoriesDiv3: {
+    display: "flex",
+    width: "calc(var(--spacing) * 96)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  layoutStoriesDiv4: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
 
 const repos = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf" as const },
@@ -21,7 +46,7 @@ export default stories({
       args: { active: "vibevalley" },
       controls: { active: { kind: "choice", options: repos.map((p) => p.id) } },
       render: (a) => (
-        <div class="w-72">
+        <div {...stylex.attrs(viewStyles.layoutStoriesDiv)}>
           <ListCard title="仓库" action={<IconButton icon="add" label="新建仓库" onClick={() => undefined} />}>
             <For each={repos}>
               {(p) => <ListRow to={`/repos/${p.id}`} item={p.id} active={a.active === p.id} title={p.id} line={p.line} leading={<Dot tone={p.tone} />} />}
@@ -32,7 +57,7 @@ export default stories({
     }),
     Card: story({
       render: () => (
-        <div class="w-96">
+        <div {...stylex.attrs(viewStyles.layoutStoriesDiv2)}>
           <Card title="vibevalley" action={<Button>打开目录</Button>}>
             <Quiet>还没有说明。</Quiet>
           </Card>
@@ -49,7 +74,7 @@ export default stories({
       args: { active: false },
       grid: { rows: ["active", [false, true]], cols: "pseudo" },
       render: (a) => (
-        <ul class="w-56">
+        <ul {...stylex.attrs(viewStyles.layoutStoriesUl)}>
           <ListRow to="/repos/vibevalley" title="vibevalley" line="3 个在做" active={a.active} leading={<Dot tone="leaf" />} />
         </ul>
       ),
@@ -57,16 +82,16 @@ export default stories({
     Toggle: story({
       args: { checked: true, disabled: false, label: "开机时启动", hint: "登录后自己起来，农场一直在" },
       render: (a, set) => (
-        <div class="w-96">
+        <div {...stylex.attrs(viewStyles.layoutStoriesDiv2)}>
           <Toggle label={a.label} hint={a.hint || undefined} checked={a.checked} disabled={a.disabled} onChange={(checked) => set({ checked })} />
         </div>
       ),
     }),
     Controls: story({
       render: () => (
-        <div class="flex w-96 flex-col gap-3">
+        <div {...stylex.attrs(viewStyles.layoutStoriesDiv3)}>
           <SecretInput placeholder="sk-…" aria-label="钥匙" />
-          <div class="flex gap-3 text-sm">
+          <div {...stylex.attrs(viewStyles.layoutStoriesDiv4)}>
             <TextLink onClick={() => undefined}>换一个</TextLink>
             <TextLink danger onClick={() => undefined}>
               删掉

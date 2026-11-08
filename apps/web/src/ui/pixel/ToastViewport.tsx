@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,6 +9,17 @@ import { defineAtom } from "#/state/atom.ts";
 
 import { SpriteIcon } from "./icons";
 import { pxDrop, pxText } from "./style";
+
+const viewStyles = stylex.create({
+  toastViewportDiv: {
+    pointerEvents: "none",
+    position: "fixed",
+    insetInline: "0",
+    zIndex: "50",
+    display: "flex",
+    justifyContent: "center",
+  },
+});
 
 export const ToastType = { info: "info", warn: "warn", error: "error", achievement: "achievement" } as const;
 export type ToastType = (typeof ToastType)[keyof typeof ToastType];
@@ -115,7 +127,7 @@ export function ToastViewport(props: {
   const store = untrack(() => props.store) ?? toasts;
   return (
     // Only the cards take the pointer: around them (and with none shown) clicks go through to the page below.
-    <div class="pointer-events-none fixed inset-x-0 z-50 flex justify-center" style={{ top: `${props.top ?? 12}px` }}>
+    <div {...stylex.attrs(viewStyles.toastViewportDiv)} style={{ top: `${props.top ?? 12}px` }}>
       <div
         role="status"
         aria-live="polite"

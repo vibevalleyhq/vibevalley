@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { Meter } from "@vibevalley/base-ui";
@@ -32,6 +33,133 @@ import { Segmented } from "#/ui/Segmented.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
+
+const viewStyles = stylex.create({
+  usageP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-warn-ink)",
+  },
+  usageDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  usageSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 14)",
+    flexShrink: "0",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  usageSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  usageP2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  windowDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  windowSpan: {
+    display: "flex",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  windowSpan2: {
+    flex: "1",
+    color: "var(--wb-muted)",
+  },
+  windowSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  supportCardDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  supportCardSpan: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  supportCardSpan2: {
+    paddingTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-muted)",
+  },
+  supportCardSpan3: {
+    fontFamily: "var(--font-mono)",
+  },
+  supportCardDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+  },
+  fieldSpan: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-muted)",
+  },
+  settingsCardSpan: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  settingsCardDiv: {
+    display: "grid",
+    gap: "calc(var(--spacing) * 4)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
+    },
+  },
+  settingsCardSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-faint)",
+  },
+  modelsCardSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  modelsCardSpan2: {
+    marginLeft: "calc(var(--spacing) * 2)",
+    borderRadius: ".25rem",
+    backgroundColor: "var(--wb-ok-soft)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-ok-ink)",
+  },
+  inventoryCardLi: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  inventoryCardSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: t("web.runtime.capability.listModels"),
@@ -74,14 +202,14 @@ export function Usage(props: { info: RuntimeInfo }) {
       {(usage) => (
         <Switch>
           <Match when={usage().status === "login_required"}>
-            <p class="text-xs text-warn-ink">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
+            <p {...stylex.attrs(viewStyles.usageP)}>{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
           </Match>
           <Match when={variant(usage(), "status", "unavailable")}>{(u) => <Quiet>{t("web.runtime.unreadable", { why: u().reason })}</Quiet>}</Match>
           <Match when={usage()}>
-            <div class="flex items-start gap-3">
-              <span class="flex w-14 shrink-0 flex-col items-center">
+            <div {...stylex.attrs(viewStyles.usageDiv)}>
+              <span {...stylex.attrs(viewStyles.usageSpan)}>
                 <SpriteIcon name={bottleSprite(quota())} size={52} />
-                <span class="text-sm">{quota().short || "—"}</span>
+                <span {...stylex.attrs(viewStyles.usageSpan2)}>{quota().short || "—"}</span>
               </span>
               <div class="flex min-w-0 flex-1 flex-col gap-2.5">
                 <Switch>
@@ -91,7 +219,7 @@ export function Usage(props: { info: RuntimeInfo }) {
                         <p class={["text-sm", { "text-berry": !u().available }]}>
                           {t("web.runtime.balance", { provider: u().provider, enough: u().available })}
                         </p>
-                        <p class="text-sm text-muted">
+                        <p {...stylex.attrs(viewStyles.usageP2)}>
                           {(props.info.settings.dailyBudget ?? 0) > 0
                             ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget ?? 0) })
                             : t("web.runtime.spentToday", { spent: yuan(props.info.spentToday ?? 0) })}
@@ -103,7 +231,7 @@ export function Usage(props: { info: RuntimeInfo }) {
                     {(u) => (
                       <>
                         <Show when={u().subscription}>
-                          <p class="text-sm text-muted">{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</p>
+                          <p {...stylex.attrs(viewStyles.usageP2)}>{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</p>
                         </Show>
                         <For each={u().windows}>{(w) => <Window window={w} />}</For>
                       </>
@@ -125,9 +253,9 @@ function Window(props: { window: UsageWindow }) {
   const left = () => 100 - props.window.usedPercent;
   const label = () => windowLabel(props.window.label);
   return (
-    <div class="flex flex-col gap-1">
-      <span class="flex text-xs">
-        <span class="flex-1 text-muted">{label()}</span>
+    <div {...stylex.attrs(viewStyles.windowDiv)}>
+      <span {...stylex.attrs(viewStyles.windowSpan)}>
+        <span {...stylex.attrs(viewStyles.windowSpan2)}>{label()}</span>
         {t("web.runtime.left", { pct: pct(left()) })}
       </span>
       <Stamina
@@ -140,7 +268,9 @@ function Window(props: { window: UsageWindow }) {
         width={220}
         height={10}
       />
-      <Show when={props.window.resetsAt}>{(at) => <span class="text-xs text-muted">{t("web.runtime.resets", { moment: momentText(at()) })}</span>}</Show>
+      <Show when={props.window.resetsAt}>
+        {(at) => <span {...stylex.attrs(viewStyles.windowSpan3)}>{t("web.runtime.resets", { moment: momentText(at()) })}</span>}
+      </Show>
     </div>
   );
 }
@@ -150,24 +280,24 @@ export function SupportCard(props: { info: RuntimeInfo }) {
   const refused = () => Object.entries(support().refused);
   return (
     <Card title={t("web.runtime.can")}>
-      <div class="flex flex-col gap-1.5">
-        <span class="flex items-start gap-1.5 text-sm">
+      <div {...stylex.attrs(viewStyles.supportCardDiv)}>
+        <span {...stylex.attrs(viewStyles.supportCardSpan)}>
           <Icon name={support().steer ? "check" : "cross"} size={12} class="mt-1" />
           {support().steer ? t("web.runtime.steer") : t("web.runtime.noSteer")}
         </span>
-        <span class="text-sm">{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
-        <span class="pt-2 text-xs font-medium text-muted">{t("web.runtime.refused")}</span>
-        <Show when={refused().length > 0} fallback={<span class="text-sm">{t("web.runtime.acceptsAll")}</span>}>
+        <span {...stylex.attrs(viewStyles.usageSpan2)}>{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
+        <span {...stylex.attrs(viewStyles.supportCardSpan2)}>{t("web.runtime.refused")}</span>
+        <Show when={refused().length > 0} fallback={<span {...stylex.attrs(viewStyles.usageSpan2)}>{t("web.runtime.acceptsAll")}</span>}>
           <For each={refused()}>
             {([k, v]) => (
-              <span class="text-sm">
-                <span class="font-mono">{k}</span> <span class="text-xs text-muted">{v}</span>
+              <span {...stylex.attrs(viewStyles.usageSpan2)}>
+                <span {...stylex.attrs(viewStyles.supportCardSpan3)}>{k}</span> <span {...stylex.attrs(viewStyles.windowSpan3)}>{v}</span>
               </span>
             )}
           </For>
         </Show>
-        <span class="pt-2 text-xs font-medium text-muted">{t("web.runtime.queries")}</span>
-        <div class="flex flex-wrap gap-1">
+        <span {...stylex.attrs(viewStyles.supportCardSpan2)}>{t("web.runtime.queries")}</span>
+        <div {...stylex.attrs(viewStyles.supportCardDiv2)}>
           <For each={RuntimeCapabilityValues}>
             {(c) => (
               <span class={["rounded px-1.5 py-px text-xs", support().capabilities.includes(c) ? "bg-selected" : "border border-line text-muted line-through"]}>
@@ -204,8 +334,8 @@ function NumberInput(props: { value?: number | undefined; onChange: (n: number |
 
 function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
-    <div class="flex flex-col gap-1">
-      <span class="flex items-center gap-1.5 text-xs font-medium text-muted">
+    <div {...stylex.attrs(viewStyles.windowDiv)}>
+      <span {...stylex.attrs(viewStyles.fieldSpan)}>
         {props.label}
         <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
       </span>
@@ -240,7 +370,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
       title={t("web.runtime.settings")}
       action={
         <Show when={dirty()}>
-          <span class="flex gap-2">
+          <span {...stylex.attrs(viewStyles.settingsCardSpan)}>
             <Button data-testid="discard" onClick={() => setDraft(props.info.settings)}>
               {t("web.runtime.discard")}
             </Button>
@@ -251,7 +381,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
         </Show>
       }
     >
-      <div class="grid gap-4 md:grid-cols-2">
+      <div {...stylex.attrs(viewStyles.settingsCardDiv)}>
         <Toggle
           label={t("web.runtime.enabled")}
           tip={t("web.runtime.enabledHint")}
@@ -277,7 +407,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
           />
         </Field>
         <Field label={t("web.runtime.defaultEffort")} hint={effortHint()}>
-          <Show when={(model()?.effortLevels.length ?? 0) > 0} fallback={<span class="text-sm text-faint">—</span>}>
+          <Show when={(model()?.effortLevels.length ?? 0) > 0} fallback={<span {...stylex.attrs(viewStyles.settingsCardSpan2)}>—</span>}>
             <Segmented
               label={t("web.runtime.defaultEffort")}
               value={draft().defaultEffort}
@@ -333,9 +463,9 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
       () => t("web.runtime.models"),
       (value, model) => (
         <>
-          <span class="font-mono text-sm">{value()}</span>
+          <span {...stylex.attrs(viewStyles.modelsCardSpan)}>{value()}</span>
           <Show when={model().isDefault}>
-            <span class="ml-2 rounded bg-ok-soft px-1.5 text-xs text-ok-ink">{t("web.runtime.default")}</span>
+            <span {...stylex.attrs(viewStyles.modelsCardSpan2)}>{t("web.runtime.default")}</span>
           </Show>
         </>
       ),
@@ -343,13 +473,15 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
     effort: tableCell(
       effort,
       () => t("web.runtime.effort"),
-      (value) => <span class="text-sm text-muted">{value() || "—"}</span>,
+      (value) => <span {...stylex.attrs(viewStyles.usageP2)}>{value() || "—"}</span>,
     ),
   };
   return (
     <Card
       title={t("web.runtime.models")}
-      action={<Show when={props.info.models}>{(m) => <span class="text-sm text-muted">{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>}
+      action={
+        <Show when={props.info.models}>{(m) => <span {...stylex.attrs(viewStyles.usageP2)}>{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>
+      }
     >
       <Show
         when={props.info.models}
@@ -363,16 +495,16 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
 
 export function InventoryCard(props: { title: string; entries: InventoryEntry[] | null }) {
   return (
-    <Card title={props.title} action={<Show when={props.entries}>{(e) => <span class="text-sm text-muted">{e().length}</span>}</Show>}>
+    <Card title={props.title} action={<Show when={props.entries}>{(e) => <span {...stylex.attrs(viewStyles.usageP2)}>{e().length}</span>}</Show>}>
       <Switch
         fallback={
-          <ul class="flex flex-col gap-1">
+          <ul {...stylex.attrs(viewStyles.windowDiv)}>
             <For each={props.entries}>
               {(e) => (
-                <li class="flex flex-col">
+                <li {...stylex.attrs(viewStyles.inventoryCardLi)}>
                   <span class={["font-mono text-sm", { "text-muted line-through": e.enabled === false }]}>{e.name}</span>
                   <Show when={e.description}>
-                    <span class="truncate text-xs text-muted">{e.description}</span>
+                    <span {...stylex.attrs(viewStyles.inventoryCardSpan)}>{e.description}</span>
                   </Show>
                 </li>
               )}

@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,6 +14,62 @@ import { tierOrder } from "./outline";
 import { tierLabel } from "./PageView";
 import { notesSearch } from "./Search";
 import { pkmHref, usePkmRadar } from "./vault";
+
+const viewStyles = stylex.create({
+  sidebarSpan: {
+    flex: "1",
+    textAlign: "left",
+  },
+  sidebarDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1px",
+  },
+  sidebarSpan2: {
+    flex: "1",
+  },
+  sidebarP: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+  sidebarSpan3: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  sidebarSpan4: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  pkmRadar: {
+    display: "contents",
+  },
+  radarSpan: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  radarSpan2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  radarSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-berry)",
+  },
+});
 
 /** slug: the page open, if any. */
 export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPageSummary[]; error?: unknown }) {
@@ -34,20 +91,20 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
         class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2 text-sm text-faint transition-colors duration-120 hover:border-faint/40 hover:text-muted"
       >
         <Icon name="search" size={14} />
-        <span class="flex-1 text-left">{t("web.pkm.list.find")}</span>
+        <span {...stylex.attrs(viewStyles.sidebarSpan)}>{t("web.pkm.list.find")}</span>
       </button>
-      <div class="flex flex-col gap-px">
+      <div {...stylex.attrs(viewStyles.sidebarDiv)}>
         <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} class={row(props.slug === undefined)}>
           <Icon name="calendar" size={14} class={props.slug === undefined ? "text-ink" : "text-faint"} />
-          <span class="flex-1">{t("web.pkm.list.today")}</span>
+          <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{t("web.pkm.list.today")}</span>
         </A>
         <Radar />
       </div>
-      <Show when={props.error}>{(e) => <p class="px-2 text-xs text-berry">{reasonOf(e())}</p>}</Show>
+      <Show when={props.error}>{(e) => <p {...stylex.attrs(viewStyles.sidebarP)}>{reasonOf(e())}</p>}</Show>
       <div class="-mx-2 flex min-h-0 scroll-fade-y flex-col gap-4 overflow-y-auto px-2 pb-2" data-testid="pkm-list">
         <For each={tierOrder.filter((tier) => tier !== "journal" && listed(tier).length > 0)}>
           {(tier) => (
-            <section data-testid="pkm-tier" data-key={tier} class="flex flex-col gap-px">
+            <section data-testid="pkm-tier" data-key={tier} {...stylex.attrs(viewStyles.sidebarDiv)}>
               <button
                 type="button"
                 aria-expanded={shut().has(tier) ? "false" : "true"}
@@ -63,7 +120,7 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
                 />
               </button>
               <Show when={!shut().has(tier)}>
-                <ul class="flex flex-col gap-px">
+                <ul {...stylex.attrs(viewStyles.sidebarDiv)}>
                   <For each={listed(tier)} keyed={(p) => p.slug}>
                     {(p) => (
                       <li>
@@ -74,9 +131,9 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
                           aria-current={p().slug === props.slug ? "page" : undefined}
                           class={[row(p().slug === props.slug), "pl-7.5"]}
                         >
-                          <span class="min-w-0 flex-1 truncate">{p().title}</span>
+                          <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{p().title}</span>
                           <Show when={p().open > 0}>
-                            <span class="shrink-0 text-xs text-faint tabular-nums" title={t("web.pkm.list.open", { n: p().open })}>
+                            <span {...stylex.attrs(viewStyles.sidebarSpan4)} title={t("web.pkm.list.open", { n: p().open })}>
                               {p().open}
                             </span>
                           </Show>
@@ -112,14 +169,14 @@ function Radar() {
       class={[row(props.open === true), "cursor-pointer text-left"]}
     >
       <Icon name={props.icon} size={14} class="text-faint" />
-      <span class="flex-1">{props.label}</span>
+      <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{props.label}</span>
       <span class={["text-xs tabular-nums", props.tone ?? "text-faint"]}>{props.n}</span>
     </button>
   );
   return (
     <Show when={ready(radar, undefined)}>
       {(r) => (
-        <div data-testid="pkm-radar" class="contents">
+        <div data-testid="pkm-radar" {...stylex.attrs(viewStyles.pkmRadar)}>
           <Show when={r().inbox > 0}>
             {look({
               icon: "inbox",
@@ -140,13 +197,13 @@ function Radar() {
             })}
           </Show>
           <Show when={which() === "stale"}>
-            <ul class="flex flex-col gap-px">
+            <ul {...stylex.attrs(viewStyles.sidebarDiv)}>
               <For each={r().stale} keyed={(s) => s.slug}>
                 {(s) => (
                   <li>
                     <A href={pkmHref(s().slug)} class={[row(false), "pl-7.5"]}>
-                      <span class="min-w-0 flex-1 truncate">{s().title}</span>
-                      <span class="shrink-0 text-xs text-faint">{t("web.pkm.radar.days", { n: s().days })}</span>
+                      <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{s().title}</span>
+                      <span {...stylex.attrs(viewStyles.radarSpan)}>{t("web.pkm.radar.days", { n: s().days })}</span>
                     </A>
                   </li>
                 )}
@@ -166,13 +223,13 @@ function Radar() {
             })}
           </Show>
           <Show when={which() === "overdue"}>
-            <ul class="flex flex-col gap-px">
+            <ul {...stylex.attrs(viewStyles.sidebarDiv)}>
               <For each={r().overdue} keyed={(o) => o.block}>
                 {(o) => (
                   <li>
                     <A href={pkmHref(o().page, o().block)} class="flex flex-col rounded-md py-1 pr-2 pl-7.5 hover:bg-hover">
-                      <span class="truncate text-sm">{o().plain}</span>
-                      <span class="text-xs text-berry">{o().deadline}</span>
+                      <span {...stylex.attrs(viewStyles.radarSpan2)}>{o().plain}</span>
+                      <span {...stylex.attrs(viewStyles.radarSpan3)}>{o().deadline}</span>
                     </A>
                   </li>
                 )}

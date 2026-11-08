@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -7,6 +8,35 @@ import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
+
+const viewStyles = stylex.create({
+  blocksGameDiv: {
+    position: "relative",
+    flexShrink: "0",
+    alignSelf: "flex-start",
+  },
+  blocksGameCanvas: {
+    display: "block",
+    imageRendering: "pixelated",
+  },
+  blocksGameP: {
+    marginTop: "auto",
+    marginBottom: "var(--spacing)",
+    lineHeight: "1.625",
+  },
+  nextSvg: {
+    marginTop: "var(--spacing)",
+    display: "block",
+    padding: "var(--spacing)",
+  },
+  statDiv: {
+    display: "flex",
+  },
+  statSpan: {
+    marginLeft: "auto",
+    fontVariantNumeric: "tabular-nums",
+  },
+});
 
 const game = kept<Blocks | undefined>(undefined);
 const best = kept(0);
@@ -117,12 +147,12 @@ export function BlocksGame(props: { big?: boolean }) {
       data-state={!g() ? "ready" : g()!.over ? "over" : playing() ? "playing" : "paused"}
       class={["flex min-h-0 flex-1 px-2 pt-2", props.big === true ? "gap-4" : "gap-2"]}
     >
-      <div class="relative shrink-0 self-start" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(viewStyles.blocksGameDiv)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
           ref={(el) => (canvas = el)}
           width={blocksWidth * cell()}
           height={blocksHeight * cell()}
-          class="block [image-rendering:pixelated]"
+          {...stylex.attrs(viewStyles.blocksGameCanvas)}
           aria-label={t("web.farm.phone.blocks.well")}
           role="img"
         />
@@ -144,7 +174,7 @@ export function BlocksGame(props: { big?: boolean }) {
         <Stat label={t("web.farm.phone.blocks.lines")} value={g()?.lines ?? 0} />
         <Stat label={t("web.farm.phone.blocks.level")} value={g()?.level ?? 1} />
         <Stat label={t("web.farm.phone.blocks.best")} value={Math.max(top(), g()?.score ?? 0)} />
-        <p class="mt-auto mb-1 leading-[1.625]" style={{ color: lcd.dark }}>
+        <p {...stylex.attrs(viewStyles.blocksGameP)} style={{ color: lcd.dark }}>
           {t("web.farm.phone.blocks.help")}
           <br />
           {t("web.farm.phone.blocks.help2")}
@@ -161,7 +191,15 @@ function Next(props: { kind: PieceKind | undefined }) {
   return (
     <div>
       <span>{t("web.farm.phone.blocks.next")}</span>
-      <svg width={36} height={20} viewBox="0 0 4 2" shape-rendering="crispEdges" class="mt-1 block p-1" style={{ background: lcd.light }} aria-hidden="true">
+      <svg
+        width={36}
+        height={20}
+        viewBox="0 0 4 2"
+        shape-rendering="crispEdges"
+        {...stylex.attrs(viewStyles.nextSvg)}
+        style={{ background: lcd.light }}
+        aria-hidden="true"
+      >
         <For each={cells()}>{([x, y]) => <rect x={x} y={y === 0 ? 0 : 1} width={0.9} height={0.9} fill={lcd.ink} />}</For>
       </svg>
     </div>
@@ -170,9 +208,9 @@ function Next(props: { kind: PieceKind | undefined }) {
 
 function Stat(props: { label: string; value: number }) {
   return (
-    <div class="flex">
+    <div {...stylex.attrs(viewStyles.statDiv)}>
       <span>{props.label}</span>
-      <span class="ml-auto tabular-nums">{props.value}</span>
+      <span {...stylex.attrs(viewStyles.statSpan)}>{props.value}</span>
     </div>
   );
 }

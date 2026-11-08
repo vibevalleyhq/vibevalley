@@ -1,8 +1,30 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { Link as A } from "#/infra/router.ts";
 
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { Tip } from "./Tip";
+
+const viewStyles = stylex.create({
+  outLinkA: {
+    display: "inline-flex",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-sm)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    whiteSpace: "nowrap",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+});
 
 /** A button that is only its icon: its label is what hovering shows and what a screen reader says. */
 export function IconButton(props: {
@@ -39,12 +61,7 @@ export function IconButton(props: {
 /** A link out to another site, in a new tab, that says where it goes: beside a field, where an icon alone would not. */
 export function OutLink(props: { href: string; label: string }) {
   return (
-    <a
-      href={props.href}
-      target="_blank"
-      rel="noreferrer"
-      class="inline-flex shrink-0 items-center gap-1 rounded-sm text-xs whitespace-nowrap text-muted hover:text-ink"
-    >
+    <a href={props.href} target="_blank" rel="noreferrer" {...stylex.attrs(viewStyles.outLinkA)}>
       {props.label}
       <Icon name="open" size={12} />
     </a>

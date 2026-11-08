@@ -1,6 +1,14 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { PxChipsInput } from "./forms";
+
+const viewStyles = stylex.create({
+  formsStoriesDiv: {
+    width: "calc(var(--spacing) * 80)",
+  },
+});
 
 export default stories({
   title: "组件/像素/forms",
@@ -10,7 +18,7 @@ export default stories({
     Chips: story({
       args: { words: "frontend,urgent", disabled: false },
       render: (a, set) => (
-        <div class="w-80">
+        <div {...stylex.attrs(viewStyles.formsStoriesDiv)}>
           <PxChipsInput
             label="标签"
             placeholder="加一个"

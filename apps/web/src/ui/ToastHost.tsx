@@ -1,18 +1,28 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { toasts } from "./toasts";
 
+const viewStyles = stylex.create({
+  toasts: {
+    pointerEvents: "none",
+    position: "fixed",
+    insetInline: "0",
+    bottom: "calc(var(--spacing) * 4)",
+    zIndex: "40",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 /** Draws the toasts (ui/toasts.ts) at the bottom of the page. */
 export function ToastHost() {
   return (
-    <div
-      class="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex flex-col items-center gap-2"
-      role="log"
-      aria-label={t("web.base.toasts")}
-      data-testid="toasts"
-    >
+    <div {...stylex.attrs(viewStyles.toasts)} role="log" aria-label={t("web.base.toasts")} data-testid="toasts">
       <For each={toasts.get()}>
         {(t) => (
           <div

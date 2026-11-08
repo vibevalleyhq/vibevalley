@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createSignal, onCleanup } from "solid-js";
 
@@ -8,6 +9,16 @@ import { useForm, type Submission } from "#/infra/form.ts";
 import { Button } from "./Button";
 import { TextInput } from "./Field";
 import { Form, FormField, formControl, formMessages } from "./Form";
+
+const viewStyles = stylex.create({
+  editorDiv: {
+    display: "flex",
+    maxWidth: "var(--container-md)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+});
 
 const Input = Schema.Struct({
   name: Schema.Trim.check(Schema.isMinLength(1)),
@@ -37,7 +48,7 @@ function Editor() {
   const name = form.field(["name"]);
   const amount = form.field(["amount"]);
   return (
-    <div class="flex max-w-md flex-col gap-3 p-4">
+    <div {...stylex.attrs(viewStyles.editorDiv)}>
       <Form form={form} testid="form-demo" class="flex flex-col gap-3">
         <FormField field={name} label="Name">
           <TextInput {...formControl(name)} data-testid="form-name" value={name.value()} onInput={(event) => name.setValue(event.currentTarget.value)} />
