@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { styleProps } from "./positioner";
 
 /** What a tag says by its colour: done or new (ok), failed (bad), sent or stopped (wait). Its ink comes with it, so it
  * reads in both themes. */
@@ -30,7 +31,7 @@ const styles = stylex.create({
   },
   dot: { display: "inline-block", flexShrink: 0, borderRadius: "2147483647px" },
   size: (size: number) => ({ width: size, height: size }),
-  ring: { boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 0 2px var(--color-page), 0 0 transparent" },
+  ring: { boxShadow: "0 0 0 2px var(--color-page)" },
   leaf: { backgroundColor: "var(--color-leaf)" },
   wheat: { backgroundColor: "var(--color-wheat)" },
   berry: { backgroundColor: "var(--color-berry)" },
@@ -66,6 +67,10 @@ const dotColor: Record<DotTone, stylex.StyleXStyles> = {
 
 /** A round status dot. ring: drawn on a face or a picture, it is ringed in the page colour to stand off it. */
 export function Dot(props: { tone: DotTone; size?: number; ring?: boolean; styles?: stylex.StyleXStyles }) {
-  const appearance = () => stylex.props(styles.dot, dotColor[props.tone], props.ring !== false && styles.ring, props.styles, styles.size(props.size ?? 9));
-  return <span class={appearance().className} style={appearance().style} aria-hidden="true" />;
+  return (
+    <span
+      {...styleProps([styles.dot, dotColor[props.tone], props.ring !== false && styles.ring, props.styles, styles.size(props.size ?? 9)])}
+      aria-hidden="true"
+    />
+  );
 }

@@ -61,7 +61,7 @@ const viewStyles = stylex.create({
   },
   harvestReviewP: {
     fontSize: "13px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   harvestReviewP2: {
     paddingBlock: "calc(var(--spacing) * 10)",

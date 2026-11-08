@@ -6,31 +6,6 @@ import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { Tip } from "./Tip";
 
-const variantStyles = stylex.create({
-  iconLinkA: {
-    display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: {
-      default: "var(--wb-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-selected)",
-      },
-    },
-  },
-});
-
 const viewStyles = stylex.create({
   button: {
     display: "inline-flex",
@@ -51,6 +26,28 @@ const viewStyles = stylex.create({
   normal: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
   danger: { color: "var(--color-berry)" },
   pressed: { backgroundColor: "var(--color-selected)" },
+  iconLink: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-selected)",
+      },
+    },
+  },
   outLinkA: {
     display: "inline-flex",
     flexShrink: "0",
@@ -61,10 +58,10 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     whiteSpace: "nowrap",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -112,7 +109,7 @@ export function OutLink(props: { href: string; label: string }) {
 export function IconLink(props: { href: `/${string}`; label: string; icon?: IconName }) {
   return (
     <Tip text={props.label}>
-      <A href={props.href} aria-label={props.label} {...stylex.attrs(variantStyles.iconLinkA)}>
+      <A href={props.href} aria-label={props.label} {...stylex.attrs(viewStyles.iconLink)}>
         <Icon name={props.icon ?? "open"} size={16} />
       </A>
     </Tip>

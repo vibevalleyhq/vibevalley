@@ -23,6 +23,55 @@ import { MessageList } from "./MessageList";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "./places";
 import { Crons, Sessions } from "./Tabs";
 
+const recipeStyles2 = stylex.create({
+  chatDiv: {
+    position: "absolute",
+    insetBlock: "0",
+    left: "0",
+    display: "flex",
+    width: "calc(var(--spacing) * 72)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 8px 24px var(--wb-float)",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".28s",
+    translate: {
+      default: null,
+      "@starting-style": "-100% 0",
+    },
+  },
+  chatDiv2: {
+    position: {
+      default: "absolute",
+      "@media (width>=64rem)": "relative",
+    },
+    inset: "0",
+    zIndex: {
+      default: 20,
+      "@media (width>=64rem)": "auto",
+    },
+    display: "flex",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".18s",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "var(--pane-w)",
+    },
+    flexShrink: {
+      default: null,
+      "@media (width>=64rem)": "0",
+    },
+    translate: {
+      default: null,
+      "@starting-style": "100% 0",
+    },
+  },
+});
+
 const recipeStyles = stylex.create({
   channelMainHeader: {
     display: "flex",
@@ -32,7 +81,7 @@ const recipeStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
   },
   channelMainButton: {
@@ -54,7 +103,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -84,16 +133,16 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   channelMainButtonVariant1Case2: {
     backgroundColor: {
-      default: "var(--wb-selected)",
+      default: "var(--color-selected)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -136,7 +185,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -173,7 +222,7 @@ const viewStyles = stylex.create({
   chatDiv4: {
     position: "absolute",
     inset: "0",
-    backgroundColor: "var(--wb-scrim)",
+    backgroundColor: "var(--color-scrim)",
   },
   chatDiv5: {
     display: {
@@ -194,8 +243,8 @@ const viewStyles = stylex.create({
     display: "flex",
     borderLeftStyle: "solid",
     borderLeftWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     width: {
       default: null,
       "@media (width>=64rem)": "520px",
@@ -219,11 +268,11 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     fontSize: "var(--text-lg)",
     lineHeight: "var(--text-lg--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   channelMainH1: {
     textOverflow: "ellipsis",
@@ -239,7 +288,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   channelMainLabel: {
     display: "flex",
@@ -251,8 +300,8 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus-within": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
     },
     paddingInline: "calc(var(--spacing) * 2)",
   },
@@ -265,7 +314,7 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   channelMainDiv: {
@@ -332,7 +381,7 @@ function Chat() {
       <Show when={drawer()}>
         <div {...stylex.attrs(viewStyles.chatDiv3)}>
           <div {...stylex.attrs(viewStyles.chatDiv4)} onClick={() => setDrawer(false)} />
-          <div class="absolute inset-y-0 left-0 flex w-72 shadow-float transition-transform duration-280 starting:-translate-x-full">{sidebar()}</div>
+          <div {...stylex.attrs(recipeStyles2.chatDiv)}>{sidebar()}</div>
         </div>
       </Show>
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
@@ -352,10 +401,7 @@ function Chat() {
       </Show>
       <Show when={thread()}>
         {(shown) => (
-          <div
-            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0 starting:translate-x-full"
-            style={{ "--pane-w": `${threadWidth()}px` }}
-          >
+          <div {...stylex.attrs(recipeStyles2.chatDiv2)} style={{ "--pane-w": `${threadWidth()}px` }}>
             <div {...stylex.attrs(viewStyles.chatDiv5)}>
               <Splitter pane="thread" side="left" width={threadWidth()} min={320} max={720} label={t("web.channel.threadWidth")} />
             </div>

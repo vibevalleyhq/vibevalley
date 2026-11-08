@@ -49,10 +49,10 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
@@ -62,7 +62,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -92,12 +92,12 @@ const viewStyles = stylex.create({
     paddingTop: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   detailP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   detailH1: {
     fontSize: "var(--text-lg)",
@@ -108,7 +108,7 @@ const viewStyles = stylex.create({
     marginTop: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   detailH12: {
     fontSize: "var(--text-xl)",
@@ -157,10 +157,10 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus-within": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
     },
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 2)",
   },
   issueSearch: {
@@ -172,19 +172,19 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   toolbarSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   filterClear: {
     cursor: "pointer",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {

@@ -31,11 +31,11 @@ const recipeStyles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: {
-      default: "var(--color-bark-900)99",
+      default: "var(--color-px-canvas-shade)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 60%, transparent)",
     },
     padding: "calc(var(--spacing) * .5)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
 });
 

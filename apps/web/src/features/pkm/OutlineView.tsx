@@ -30,8 +30,8 @@ const viewStyles = stylex.create({
     height: "calc(var(--spacing) * 1.5)",
     borderRadius: "2147483647px",
     backgroundColor: {
-      default: "var(--wb-faint)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-faint) 40%, transparent)",
+      default: "var(--color-faint)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-faint) 40%, transparent)",
     },
   },
   outlineSpan3: {
@@ -39,7 +39,7 @@ const viewStyles = stylex.create({
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-sm)",
     lineHeight: "calc(var(--spacing) * 6)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
 });
 

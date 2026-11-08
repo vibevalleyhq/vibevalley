@@ -38,7 +38,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -56,17 +56,17 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   messageToolsToolbarButtonVariant1Case2: {
     backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 15%, transparent)",
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -95,7 +95,7 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-ok-ink)",
+    color: "var(--color-ok-ink)",
   },
   embedsSpan3: {
     WebkitLineClamp: "3",
@@ -119,16 +119,16 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   reactionsButtonVariant: {
-    borderColor: "var(--wb-accent)",
-    backgroundColor: "var(--wb-selected)",
+    borderColor: "var(--color-accent)",
+    backgroundColor: "var(--color-selected)",
   },
   reactionsButtonVariant2: {
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -139,7 +139,7 @@ const variantStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     borderRadius: "var(--radius-md)",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-xs)",
@@ -147,11 +147,11 @@ const variantStyles = stylex.create({
   },
   editBoxButtonVariant: {
     borderStyle: "solid",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
   },
   editBoxButtonVariant2: {
     borderStyle: "dashed",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
     textDecorationLine: "line-through",
   },
   linkedCardSpan: {
@@ -177,10 +177,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -190,7 +190,7 @@ const viewStyles = stylex.create({
   replyQuoteSpan2: {
     flexShrink: "0",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   replyQuoteSpan3: {
     minWidth: "0",
@@ -201,7 +201,7 @@ const viewStyles = stylex.create({
   messageBodyP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     fontStyle: "italic",
   },
   messageMore: {
@@ -212,24 +212,24 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   messageBodySpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   attachmentsDiv: {
     marginTop: "var(--spacing)",
@@ -259,7 +259,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     objectFit: "contain",
   },
   attachment2: {
@@ -268,8 +268,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-ink)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-ink)",
   },
   attachment3: {
     maxWidth: "calc(var(--spacing) * 96)",
@@ -281,12 +281,12 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 3)",
@@ -308,7 +308,7 @@ const viewStyles = stylex.create({
   attachmentsSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   embedsDiv: {
     marginTop: "var(--spacing)",
@@ -323,12 +323,12 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderLeftStyle: "solid",
     borderLeftWidth: "4px",
-    borderColor: "var(--wb-accent)",
+    borderColor: "var(--color-accent)",
     backgroundColor: {
-      default: "var(--wb-side)",
+      default: "var(--color-side)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 3)",
@@ -340,7 +340,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   embedsImg: {
     width: "calc(var(--spacing) * 16)",
@@ -361,7 +361,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * .5)",
     borderRightStyle: "solid",
     borderRightWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingRight: "calc(var(--spacing) * .5)",
   },
   editBoxDiv: {
@@ -375,8 +375,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-focus)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-focus)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-base)",
@@ -399,7 +399,7 @@ const viewStyles = stylex.create({
     marginTop: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   linkedMessage: {
     display: "flex",
@@ -410,12 +410,12 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderLeftStyle: "solid",
     borderLeftWidth: "4px",
-    borderColor: "var(--wb-wheat)",
+    borderColor: "var(--color-wheat)",
     backgroundColor: {
-      default: "var(--wb-side)",
+      default: "var(--color-side)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 3)",
@@ -428,11 +428,11 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   linkedCardSpan2: {
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
 });
 

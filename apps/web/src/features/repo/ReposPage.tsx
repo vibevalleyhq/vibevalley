@@ -24,7 +24,7 @@ const recipeStyles = stylex.create({
   overviewSpan: {
     borderRadius: ".25rem",
     backgroundColor: {
-      default: "var(--color-leaf-300)80",
+      default: "var(--color-px-leaf-soft)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 1.5)",
@@ -70,8 +70,8 @@ const viewStyles = stylex.create({
       default: "1px",
       "@media (width>=48rem)": "0",
     },
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * 3)",
     width: {
@@ -93,14 +93,14 @@ const viewStyles = stylex.create({
     paddingBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   reposPageLi2: {
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBottom: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   repo: {
     display: "flex",
@@ -120,8 +120,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 4)",
   },
   overviewSpan: {
@@ -132,7 +132,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   overviewDiv: {
     display: "flex",
@@ -167,7 +167,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   overviewButton: {
     cursor: "pointer",
@@ -177,7 +177,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -192,13 +192,13 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     padding: "calc(var(--spacing) * 1.5)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -209,7 +209,7 @@ const viewStyles = stylex.create({
   overviewSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

@@ -35,10 +35,10 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   blocksViewPVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   blocksViewPVariant2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -59,7 +59,7 @@ const viewStyles = stylex.create({
     textAlign: "left",
     fontSize: "var(--text-base)",
     lineHeight: "var(--text-base--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   artifactSuggestions: {
     marginBottom: "calc(var(--spacing) * 2)",
@@ -67,8 +67,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 2)",
   },
   suggestionsListH2: {
@@ -77,7 +77,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   artifactSuggestion: {
     display: "flex",
@@ -91,7 +91,7 @@ const viewStyles = stylex.create({
       default: "1px",
       ":first-child": "0",
     },
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "var(--spacing)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
   },
@@ -101,7 +101,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   suggestionsListSpan: {
     minWidth: "0",
@@ -116,7 +116,7 @@ const viewStyles = stylex.create({
   suggestionsListP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   suggestionsListDiv2: {
     display: "flex",
@@ -128,12 +128,12 @@ const viewStyles = stylex.create({
       ":disabled": "default",
     },
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-page)",
+    color: "var(--color-page)",
     opacity: {
       default: null,
       ":disabled": ".5",
@@ -145,12 +145,12 @@ const viewStyles = stylex.create({
       ":disabled": "default",
     },
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     opacity: {
       default: null,
       ":disabled": ".5",
@@ -165,22 +165,22 @@ const viewStyles = stylex.create({
   },
   suggestionDiffP: {
     whiteSpace: "pre-wrap",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: "line-through",
   },
   suggestionDiffP2: {
     whiteSpace: "pre-wrap",
-    color: "var(--wb-leaf)",
+    color: "var(--color-leaf)",
   },
   suggestionDiffP3: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   markSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   blockRowSpan: {
     width: "22px",
@@ -196,7 +196,7 @@ const viewStyles = stylex.create({
   },
   blockRowHr: {
     marginBlock: "calc(var(--spacing) * 2)",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   blockRowSpan3: {
     width: "26px",
@@ -205,15 +205,15 @@ const viewStyles = stylex.create({
   },
   placeholderDiv: {
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   blockFieldSpan: {
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
 });
 

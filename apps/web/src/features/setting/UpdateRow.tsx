@@ -19,7 +19,7 @@ const viewStyles = stylex.create({
   updateState: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   updateRowA: {
     fontSize: "var(--text-sm)",
@@ -30,7 +30,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

@@ -29,7 +29,7 @@ const recipeStyles = stylex.create({
     borderColor: "var(--color-cream-300)",
     backgroundColor: "var(--color-cream-50)",
     paddingBlock: "var(--spacing)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
   farmComposerButton: {
     display: "flex",
@@ -47,7 +47,7 @@ const recipeStyles = stylex.create({
   },
   farmComposerButtonVariant1Case2: {
     backgroundColor: {
-      default: "var(--color-leaf-300)66",
+      default: "var(--color-px-leaf-hover)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
     },
   },
@@ -143,7 +143,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     backgroundColor: "var(--color-cream-50)",
     paddingInline: "var(--spacing)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-cream-300)",
+    boxShadow: "inset 0 0 0 2px var(--color-cream-300)",
   },
   composerInput: {
     maxHeight: "calc(var(--spacing) * 24)",

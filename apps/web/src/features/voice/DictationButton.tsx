@@ -38,7 +38,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     fontVariantNumeric: "tabular-nums",
   },
   dictationBarSpan2: {
@@ -46,8 +46,8 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     borderRadius: "2147483647px",
     backgroundColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 55%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 55%, transparent)",
     },
   },
   dictationBarSpan3: {
@@ -58,7 +58,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   dictationCancel: {
     display: "inline-flex",
@@ -70,17 +70,17 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -91,7 +91,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-xs)",
@@ -103,7 +103,7 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dictationProblemButton: {
     flexShrink: "0",
@@ -112,12 +112,12 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-page)",
+        ":hover": "var(--color-page)",
       },
     },
   },
@@ -127,17 +127,17 @@ const viewStyles = stylex.create({
     borderRadius: ".25rem",
     padding: "calc(var(--spacing) * .5)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-page)",
+        ":hover": "var(--color-page)",
       },
     },
   },

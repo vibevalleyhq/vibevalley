@@ -29,14 +29,14 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingTop: "calc(var(--spacing) * 3)",
   },
   newIssueSpan: {
     marginRight: "auto",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
 });
 

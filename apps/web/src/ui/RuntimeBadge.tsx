@@ -6,6 +6,18 @@ import type { RuntimeInfo } from "@vibevalley/protocol";
 import { ready, useRuntimes, useSprites } from "#/infra/query.ts";
 
 const viewStyles = stylex.create({
+  badge: {
+    position: "absolute",
+    right: "calc(var(--spacing) * -0.5)",
+    bottom: "calc(var(--spacing) * -0.5)",
+    zIndex: "10",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-xs)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "0 0 0 1px currentcolor",
+  },
   runtimeBadgeImg: {
     height: "100%",
     width: "100%",
@@ -29,7 +41,7 @@ export function RuntimeBadge(props: { runtime: string; size: number }) {
   };
   return (
     <span
-      class="ring-bark-300/70 absolute -right-0.5 -bottom-0.5 z-10 inline-flex items-center justify-center rounded-xs bg-cream-50 ring-1"
+      {...stylex.attrs(viewStyles.badge)}
       style={{ width: `${props.size}px`, height: `${props.size}px` }}
       role="img"
       aria-label={label()}

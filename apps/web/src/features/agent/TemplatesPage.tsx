@@ -28,7 +28,7 @@ const variantStyles2 = stylex.create({
   templatesPageA: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -54,17 +54,17 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   templateCardSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
   templateCardSpanVariant: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   templateCardSpanVariant2: {
-    color: "var(--wb-warn-ink)",
+    color: "var(--color-warn-ink)",
   },
 });
 
@@ -118,8 +118,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 4)",
   },
   templateCardDiv: {
@@ -135,7 +135,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   templateCardSpan2: {
     textOverflow: "ellipsis",
@@ -148,30 +148,30 @@ const viewStyles = stylex.create({
   templateCardSpan3: {
     flexShrink: "0",
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   templatePersona: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     padding: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
   templateCardP: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   templateCardP2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   templateCardP3: {
     whiteSpace: "pre-wrap",
@@ -184,11 +184,11 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingTop: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   templateCardSpan4: {
     flex: "1",

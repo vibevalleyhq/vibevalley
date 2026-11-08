@@ -18,7 +18,7 @@ const variantStyles = stylex.create({
   orchestratorOfA: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -47,7 +47,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   headDiv2: {
     display: "flex",
@@ -63,7 +63,7 @@ const viewStyles = stylex.create({
   headP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   orchestratorOfDiv: {
     display: "flex",

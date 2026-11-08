@@ -75,19 +75,19 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   formSpanVariant: {
-    backgroundColor: "var(--wb-ok-soft)",
-    color: "var(--wb-ok-ink)",
+    backgroundColor: "var(--color-ok-soft)",
+    color: "var(--color-ok-ink)",
   },
   formSpanVariant2: {
-    backgroundColor: "var(--wb-bad-soft)",
-    color: "var(--wb-berry)",
+    backgroundColor: "var(--color-bad-soft)",
+    color: "var(--color-berry)",
   },
 });
 
 const viewStyles = stylex.create({
   voiceCard: { maxWidth: "var(--container-4xl)" },
   barP: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   formDiv: {
     display: "flex",
@@ -109,7 +109,7 @@ const viewStyles = stylex.create({
   formSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   formDiv3: {
     display: "flex",
@@ -125,7 +125,7 @@ const viewStyles = stylex.create({
     columnGap: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dictationMossKey: {
     display: "contents",

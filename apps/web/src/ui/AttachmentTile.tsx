@@ -15,10 +15,10 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-sm)",
     padding: "var(--spacing)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
@@ -28,7 +28,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -43,8 +43,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingBlock: "var(--spacing)",
     paddingRight: "var(--spacing)",
     paddingLeft: "var(--spacing)",
@@ -60,8 +60,8 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     overflow: "hidden",
     borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--wb-hover)",
-    color: "var(--wb-muted)",
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
   },
   attachmentTileImg: {
     width: "100%",
@@ -77,12 +77,12 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   attachmentTileSpan5: {
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

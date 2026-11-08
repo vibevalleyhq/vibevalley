@@ -51,6 +51,18 @@ import { sendReplacing, useIntents } from "#/state/intent.ts";
 import { castPrefix, outfitLabel, speciesLabel } from "#/ui/cast.ts";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 
+const recipeStyles2 = stylex.create({
+  issueBodySpan: {
+    minWidth: "0",
+    flex: "1",
+    fontFamily: "var(--font-mono)",
+    fontSize: "12.5px",
+    wordBreak: "break-all",
+    WebkitUserSelect: "text",
+    userSelect: "text",
+  },
+});
+
 const recipeStyles = stylex.create({
   plotDetailP: {
     fontSize: "13px",
@@ -90,7 +102,7 @@ const recipeStyles = stylex.create({
   issueBodyP3: {
     fontSize: "13px",
     lineHeight: "1.5",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   issueBodyP4: {
     fontSize: "13px",
@@ -100,7 +112,7 @@ const recipeStyles = stylex.create({
     color: "var(--color-bark-800)",
   },
   issueBodyPVariant1Case2: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   issueBodyP5: {
     fontSize: "13px",
@@ -135,7 +147,7 @@ const variantStyles = stylex.create({
     overflow: "hidden",
   },
   issueBodySpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   issueBodySpanVariant2: {
     color: "var(--color-bark-600)",
@@ -774,7 +786,7 @@ function IssueBody(props: {
                 {(tree) => (
                   <Row label="worktree">
                     <div {...stylex.attrs(viewStyles.issueBodyDiv10)}>
-                      <span class="min-w-0 flex-1 font-mono text-[12.5px] break-all select-text">{tree()}</span>
+                      <span {...stylex.attrs(recipeStyles2.issueBodySpan)}>{tree()}</span>
                       <PxButton size="sm" onClick={() => void navigator.clipboard.writeText(tree())}>
                         {t("web.farm.plot.copyPath")}
                       </PxButton>

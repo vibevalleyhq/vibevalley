@@ -19,7 +19,7 @@ const viewStyles = stylex.create({
     width: "32rem",
   },
   keyFieldStoriesSpan: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 

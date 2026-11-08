@@ -44,7 +44,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -60,7 +60,7 @@ const recipeStyles = stylex.create({
     gap: "calc(var(--spacing) * 2.5)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
   },
 });
@@ -103,21 +103,21 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pinsP2: {
     paddingInline: "var(--spacing)",
     paddingBlock: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pinsFailed: {
     paddingInline: "var(--spacing)",
     paddingBlock: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   pin: {
     cursor: "pointer",
@@ -129,7 +129,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -144,7 +144,7 @@ const viewStyles = stylex.create({
     fontWeight: "var(--font-weight-semibold)",
   },
   pinsSpan3: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   members: {
     display: {
@@ -158,8 +158,8 @@ const viewStyles = stylex.create({
     overflowY: "auto",
     borderLeftStyle: "solid",
     borderLeftWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
     padding: "calc(var(--spacing) * 3)",
   },
   membersP: {
@@ -168,7 +168,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   membersDiv: {
     display: "flex",
@@ -186,11 +186,11 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   membersSpan2: {
     display: "flex",
@@ -209,19 +209,19 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   membersSpan5: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   membersP2: {
     paddingInline: "var(--spacing)",
     paddingTop: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   threadPaneSpan: {
     display: "flex",
@@ -245,7 +245,7 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   threadsArchived: {
     marginTop: "var(--spacing)",
@@ -258,10 +258,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -294,7 +294,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   threadName: {
     marginBlock: "var(--spacing)",
@@ -303,8 +303,8 @@ const viewStyles = stylex.create({
     borderRadius: ".25rem",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-focus)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-focus)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-sm)",
@@ -325,8 +325,8 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus-within": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
     },
     paddingInline: "calc(var(--spacing) * 2)",
   },
@@ -339,23 +339,23 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   farmSearchBodyP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   farmSearchBodyP2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   searchFailed: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   farmSearchBodyDiv2: {
     display: "flex",
@@ -375,13 +375,13 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   farmSearchBodySpan: {
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
 });
 

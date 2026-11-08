@@ -1,9 +1,15 @@
+import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 
 const styles = stylex.create({ floating: { zIndex: 30 } });
 
+/** Composes StyleX rules into Solid's `class` and object `style`, preserving dynamic custom property names. */
+export function styleProps(values: stylex.StyleXStyles, inline?: JSX.CSSProperties) {
+  const { className, style, ...attributes } = stylex.props(values);
+  return { ...attributes, class: className, style: inline === undefined ? style : { ...style, ...inline } };
+}
+
 export function positionerAttrs(...values: readonly stylex.StyleXStyles[]) {
   // Base UI merges object styles with its coordinates; attrs() would serialize and lose these variables.
-  const { className, ...attributes } = stylex.props(styles.floating, values);
-  return { ...attributes, class: className };
+  return styleProps([styles.floating, values]);
 }

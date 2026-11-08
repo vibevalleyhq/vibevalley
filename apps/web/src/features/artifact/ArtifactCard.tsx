@@ -24,12 +24,12 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 3)",
@@ -49,8 +49,8 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
-    color: "var(--wb-muted)",
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
   },
   artifactCardSpan2: {
     display: "flex",
@@ -71,7 +71,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

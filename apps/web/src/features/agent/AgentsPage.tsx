@@ -28,21 +28,21 @@ const recipeStyles2 = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
+      default: "var(--color-line)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-ink) 20%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-ink) 20%, transparent)",
         },
       },
     },
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-page)",
+        ":hover": "var(--color-page)",
       },
     },
     padding: "calc(var(--spacing) * 4)",
@@ -59,7 +59,7 @@ const recipeStyles2 = stylex.create({
     },
     outlineColor: {
       default: null,
-      ":focus-visible": "var(--wb-focus)",
+      ":focus-visible": "var(--color-focus)",
     },
   },
   cardShellAVariant1Case1: {
@@ -79,7 +79,7 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -87,7 +87,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -99,18 +99,18 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-accent)",
+    borderColor: "var(--color-accent)",
     backgroundColor: {
-      default: "var(--wb-accent)",
+      default: "var(--color-accent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-accent-hover)",
+        ":hover": "var(--color-accent-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-page)",
+    color: "var(--color-page)",
   },
   agentsPageA3: {
     display: "flex",
@@ -123,14 +123,14 @@ const recipeStyles = stylex.create({
     borderStyle: "dashed",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 20%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 20%, transparent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-leaf)",
+        ":hover": "var(--color-leaf)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-leaf) 60%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-leaf) 60%, transparent)",
         },
       },
     },
@@ -138,10 +138,10 @@ const recipeStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ok-ink)",
+        ":hover": "var(--color-ok-ink)",
       },
     },
   },
@@ -150,7 +150,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     textDecorationLine: {
@@ -172,14 +172,14 @@ const recipeStyles = stylex.create({
     borderStyle: "dashed",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 20%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 20%, transparent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-leaf)",
+        ":hover": "var(--color-leaf)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-leaf) 60%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-leaf) 60%, transparent)",
         },
       },
     },
@@ -187,10 +187,10 @@ const recipeStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ok-ink)",
+        ":hover": "var(--color-ok-ink)",
       },
     },
   },
@@ -201,11 +201,11 @@ const recipeStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingTop: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -217,7 +217,7 @@ const variantStyles2 = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -229,10 +229,10 @@ const variantStyles = stylex.create({
     borderRadius: "2147483647px",
   },
   agentCardSpanVariant: {
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
   },
   agentCardSpanVariant2: {
-    backgroundColor: "var(--wb-berry)",
+    backgroundColor: "var(--color-berry)",
   },
 });
 
@@ -266,7 +266,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   agentsPageDiv4: {
     display: "grid",
@@ -281,7 +281,7 @@ const viewStyles = stylex.create({
   agentsPageP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   cardShellDiv: {
     position: "absolute",
@@ -302,7 +302,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   orchestratorCardSpan2: {
     display: "flex",
@@ -329,7 +329,7 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     overflow: "hidden",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   agentCardSpan2: {
     display: "flex",
@@ -361,7 +361,7 @@ const viewStyles = stylex.create({
     paddingTop: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   agentCardSpan6: {
     textOverflow: "ellipsis",
@@ -376,18 +376,18 @@ const viewStyles = stylex.create({
   },
   agentCardSpan7: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
   agentCardSpan8: {
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   agentCardSpan9: {
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ok-ink)",
+    color: "var(--color-ok-ink)",
   },
   agentCardSpan10: {
     minWidth: "0",
@@ -404,7 +404,7 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     textAlign: "right",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 

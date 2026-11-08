@@ -26,10 +26,10 @@ const variantStyles2 = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus": "var(--color-focus)",
     },
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-base)",
     lineHeight: "var(--text-base--line-height)",
@@ -45,7 +45,7 @@ const variantStyles2 = stylex.create({
     paddingBlock: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   switcherBodyComboboxItem: {
     display: "flex",
@@ -57,7 +57,7 @@ const variantStyles2 = stylex.create({
     paddingBlock: "calc(var(--spacing) * 1.5)",
     backgroundColor: {
       default: null,
-      ":is([data-highlighted])": "var(--wb-selected)",
+      ":is([data-highlighted])": "var(--color-selected)",
     },
   },
 });
@@ -91,7 +91,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

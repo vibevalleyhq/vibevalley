@@ -29,7 +29,7 @@ const viewStyles = stylex.create({
     position: "absolute",
     top: "calc(var(--spacing) * -1.5)",
     right: "calc(var(--spacing) * -1.5)",
-    backgroundColor: "var(--wb-berry)",
+    backgroundColor: "var(--color-berry)",
     paddingInline: "var(--spacing)",
     fontFamily: "var(--font-pixel)",
     fontSize: "10px",

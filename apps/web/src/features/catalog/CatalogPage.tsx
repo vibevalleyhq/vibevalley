@@ -26,7 +26,7 @@ const recipeStyles = stylex.create({
     right: "calc(var(--spacing) * .5)",
     borderRadius: "var(--radius-xs)",
     backgroundColor: {
-      default: "var(--color-bark-900)b3",
+      default: "var(--color-catalog-shade)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 70%, transparent)",
     },
     paddingInline: "var(--spacing)",
@@ -68,7 +68,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   spritesButtonVariant: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-semibold)",
   },
   spritesButtonVariant2: {
@@ -76,7 +76,7 @@ const variantStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -98,11 +98,11 @@ const variantStyles = stylex.create({
     },
     outlineColor: {
       default: null,
-      ":focus-visible": "var(--wb-focus)",
+      ":focus-visible": "var(--color-focus)",
     },
   },
   spritesButtonVariant3: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
 });
 
@@ -125,8 +125,8 @@ const viewStyles = stylex.create({
       default: "1px",
       "@media (width>=64rem)": "0",
     },
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * 3)",
     width: {
@@ -160,7 +160,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-normal)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   catalogShelves: {
     display: "flex",
@@ -172,7 +172,7 @@ const viewStyles = stylex.create({
     paddingTop: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   spritesSpan: {
     textOverflow: "ellipsis",
@@ -180,7 +180,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   spritesDiv: {
     display: "flex",
@@ -191,7 +191,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   spritesDiv2: {
     display: "grid",
@@ -217,12 +217,12 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   cursorsP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   cursorsDiv: {
     display: "grid",
@@ -248,14 +248,14 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
-      ":active": "var(--wb-selected)",
+      ":active": "var(--color-selected)",
     },
     paddingRight: "calc(var(--spacing) * 3)",
     paddingLeft: "calc(var(--spacing) * 1.5)",
@@ -269,7 +269,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

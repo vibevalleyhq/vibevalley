@@ -32,12 +32,12 @@ const variantStyles2 = stylex.create({
     height: "var(--spacing)",
     width: "100%",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   detailSliderIndicator: {
     height: "100%",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
   },
   detailSliderThumb: {
     top: "50%",
@@ -47,9 +47,9 @@ const variantStyles2 = stylex.create({
     borderRadius: "2147483647px",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-leaf)",
-    backgroundColor: "var(--wb-page)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 1px 2px var(--wb-raise)",
+    borderColor: "var(--color-leaf)",
+    backgroundColor: "var(--color-page)",
+    boxShadow: "var(--shadow-raise)",
     outlineStyle: {
       default: "none",
       ":focus-visible": "none",
@@ -60,7 +60,7 @@ const variantStyles2 = stylex.create({
     },
     outlineColor: {
       default: null,
-      ":focus-visible": "var(--wb-focus)",
+      ":focus-visible": "var(--color-focus)",
     },
   },
 });
@@ -77,7 +77,7 @@ const variantStyles = stylex.create({
     borderRadius: ".25rem",
   },
   detailButtonVariant: {
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 0 calc(2px + 0) var(--wb-focus), 0 0 transparent",
+    boxShadow: "0 0 0 calc(2px + 0) var(--color-focus)",
   },
   detailButtonVariant2: {},
 });
@@ -98,12 +98,12 @@ const viewStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -116,7 +116,7 @@ const viewStyles = stylex.create({
   rowSpan: {
     width: "calc(var(--spacing) * 16)",
     flexShrink: "0",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowSpan2: {
     display: "flex",
@@ -131,7 +131,7 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "1px",
     fontFamily: "var(--font-mono)",
@@ -158,7 +158,7 @@ const viewStyles = stylex.create({
     position: "absolute",
     borderStyle: "solid",
     borderWidth: "2px",
-    borderColor: "var(--wb-water)",
+    borderColor: "var(--color-water)",
   },
   detailDiv2: {
     display: "flex",
@@ -171,7 +171,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 1.5)",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     padding: "calc(var(--spacing) * 2)",
   },
   detailDiv4: {
@@ -182,7 +182,7 @@ const viewStyles = stylex.create({
   detailSpan4: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   detailSpan5: {
     flex: "1",
@@ -191,7 +191,7 @@ const viewStyles = stylex.create({
     width: "calc(var(--spacing) * 14)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   detailDiv5: {
     display: "flex",
@@ -233,13 +233,13 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--wb-berry)",
+    backgroundColor: "var(--color-berry)",
   },
   cursorTileSpan3: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

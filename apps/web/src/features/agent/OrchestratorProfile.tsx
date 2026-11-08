@@ -22,7 +22,7 @@ const variantStyles2 = stylex.create({
   orchestratorProfileA: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -44,8 +44,8 @@ const variantStyles2 = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":is([data-checked])": "var(--wb-leaf)",
+      default: "var(--color-line)",
+      ":is([data-checked])": "var(--color-leaf)",
     },
     padding: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
@@ -54,9 +54,9 @@ const variantStyles2 = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
-      ":is([data-checked])": "var(--wb-selected)",
+      ":is([data-checked])": "var(--color-selected)",
     },
   },
 });
@@ -74,8 +74,8 @@ const variantStyles = stylex.create({
     color: "var(--color-bark-900)",
   },
   orchestratorProfileSpanVariant2: {
-    backgroundColor: "var(--wb-hover)",
-    color: "var(--wb-muted)",
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -100,13 +100,13 @@ const viewStyles = stylex.create({
     rowGap: "calc(var(--spacing) * 2)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingBlock: "calc(var(--spacing) * 3)",
   },
   orchestratorProfileSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   orchestratorProfileSpan2: {
     display: "flex",
@@ -126,11 +126,11 @@ const viewStyles = stylex.create({
   orchestratorProfileSpan4: {
     flexShrink: "0",
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   orchestratorProfileSpan5: {
     display: "flex",
@@ -141,7 +141,7 @@ const viewStyles = stylex.create({
   orchestratorProfileP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   orchestratorProfileDiv3: {
     display: "grid",
@@ -160,7 +160,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

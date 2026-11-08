@@ -35,20 +35,20 @@ const variantStyles2 = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   composerProgressIndicator: {
     position: "absolute",
     insetBlock: "0",
     left: "0",
     backgroundColor: {
-      default: "var(--wb-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 20%, transparent)",
+      default: "var(--color-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 20%, transparent)",
     },
   },
 });
@@ -64,7 +64,7 @@ const variantStyles = stylex.create({
     paddingBlock: "var(--spacing)",
   },
   composerDivVariant: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   composerDivVariant2: {},
   composerButton: {
@@ -82,12 +82,12 @@ const variantStyles = stylex.create({
     borderWidth: "1px",
   },
   composerButtonVariant: {
-    borderColor: "var(--wb-accent)",
+    borderColor: "var(--color-accent)",
     backgroundColor: {
-      default: "var(--wb-accent)",
+      default: "var(--color-accent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-accent-hover)",
+        ":hover": "var(--color-accent-hover)",
       },
     },
   },
@@ -108,7 +108,7 @@ const viewStyles = stylex.create({
   composer: {
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingTop: "calc(var(--spacing) * 3)",
     paddingBottom: "calc(var(--spacing) * 4)",
@@ -134,13 +134,13 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   chatProblem: {
     marginBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   composerDiv: {
     marginBottom: "calc(var(--spacing) * 1.5)",
@@ -153,12 +153,12 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   composerSpan5: {
     minWidth: "0",
@@ -175,7 +175,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-page)",
+        ":hover": "var(--color-page)",
       },
     },
   },
@@ -185,12 +185,12 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   composerDiv2: {
     marginBottom: "calc(var(--spacing) * 1.5)",
@@ -210,10 +210,10 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus-within": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
     },
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
   },
   composerInput: {
     display: "block",
@@ -231,7 +231,7 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   composerDiv4: {
@@ -245,7 +245,7 @@ const viewStyles = stylex.create({
   composerSpan7: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   composerSpan8: {
     flex: "1",
@@ -268,7 +268,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -286,13 +286,13 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    color: "var(--wb-berry)",
+    borderColor: "var(--color-line)",
+    color: "var(--color-berry)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -307,15 +307,15 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "dashed",
     borderWidth: "2px",
-    borderColor: "var(--wb-accent)",
+    borderColor: "var(--color-accent)",
     backgroundColor: {
-      default: "var(--wb-page)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-page) 85%, transparent)",
+      default: "var(--color-page)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-page) 85%, transparent)",
     },
     fontSize: "var(--text-base)",
     lineHeight: "var(--text-base--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
 });
 

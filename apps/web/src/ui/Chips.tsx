@@ -3,18 +3,6 @@ import { createSignal, For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-const variantStyles = stylex.create({
-  keyValueEditorDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
-  },
-  keyValueEditorDivVariant: {
-    opacity: ".5",
-  },
-  keyValueEditorDivVariant2: {},
-});
-
 const viewStyles = stylex.create({
   box: {
     display: "flex",
@@ -54,7 +42,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * .5)",
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingBlock: "1px",
     paddingRight: "calc(var(--spacing) * .5)",
     paddingLeft: "calc(var(--spacing) * 1.5)",
@@ -66,17 +54,17 @@ const viewStyles = stylex.create({
     borderRadius: ".25rem",
     paddingInline: "var(--spacing)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-berry)",
+        ":hover": "var(--color-berry)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-selected)",
+        ":hover": "var(--color-selected)",
       },
     },
   },
@@ -91,8 +79,13 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
+  },
+  keyValueEditorStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
   },
   keyValueEditorDiv: {
     display: "flex",
@@ -115,10 +108,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-berry)",
+        ":hover": "var(--color-berry)",
       },
     },
   },
@@ -128,7 +121,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -136,7 +129,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -198,12 +191,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
   const [val, setVal] = createSignal("");
   const rows = () => Object.entries(props.value);
   return (
-    <div
-      {...stylex.attrs(
-        variantStyles.keyValueEditorDiv,
-        !(props.disabled !== true) ? variantStyles.keyValueEditorDivVariant : variantStyles.keyValueEditorDivVariant2,
-      )}
-    >
+    <div {...stylex.attrs(viewStyles.keyValueEditorStack, props.disabled === true && viewStyles.disabledBox)}>
       {/* By name: a keystroke makes new pairs, and a row made again would lose its input's focus. */}
       <For each={rows()} keyed={([k]) => k}>
         {(row) => {

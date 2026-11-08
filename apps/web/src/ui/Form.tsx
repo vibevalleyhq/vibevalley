@@ -6,6 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import type { FormField as Binding } from "#/infra/form.ts";
 
+import { styleProps } from "./positioner";
 import { Hint } from "./Tip";
 
 const viewStyles = stylex.create({
@@ -13,7 +14,7 @@ const viewStyles = stylex.create({
     marginTop: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   formFieldDiv: {
     display: "flex",
@@ -27,12 +28,12 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   formFieldP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 
@@ -49,7 +50,6 @@ type Controls = {
   submitError: () => string | undefined;
 };
 export function Form(props: { form: Controls; children: JSX.Element; styles?: stylex.StyleXStyles; testid?: string }) {
-  const appearance = () => stylex.props(props.styles);
   let element: HTMLFormElement | undefined;
   let frame: number | undefined;
   let alive = true;
@@ -70,8 +70,7 @@ export function Form(props: { form: Controls; children: JSX.Element; styles?: st
         element = node;
       }}
       novalidate
-      class={appearance().className}
-      style={appearance().style}
+      {...styleProps(props.styles)}
       data-testid={props.testid}
       aria-busy={props.form.submitting() ? "true" : undefined}
       onCompositionStart={() => props.form.composition(true)}

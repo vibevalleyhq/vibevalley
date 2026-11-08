@@ -11,7 +11,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   gridDiv: {
     display: "flex",
@@ -29,10 +29,10 @@ const viewStyles = stylex.create({
   curveSvg: {
     width: "calc(var(--spacing) * 12)",
     height: "calc(var(--spacing) * 12)",
-    color: "var(--wb-line)",
+    color: "var(--color-line)",
   },
   ease: {
-    stroke: "var(--wb-accent)",
+    stroke: "var(--color-accent)",
   },
   tokensStoriesDiv: {
     display: "grid",

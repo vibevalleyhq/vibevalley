@@ -32,16 +32,16 @@ const variantStyles = stylex.create({
     alignItems: "center",
     borderRadius: "var(--radius-md)",
     backgroundColor: {
-      default: "var(--wb-accent)",
+      default: "var(--color-accent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-accent-hover)",
+        ":hover": "var(--color-accent-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-page)",
+    color: "var(--color-page)",
   },
   entryA: {
     display: "flex",
@@ -52,10 +52,10 @@ const variantStyles = stylex.create({
   },
   entryAVariant: {
     backgroundColor: {
-      default: "var(--wb-selected)",
+      default: "var(--color-selected)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -64,7 +64,7 @@ const variantStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -74,10 +74,10 @@ const variantStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     borderRadius: "var(--radius-md)",
     backgroundColor: {
-      default: "var(--wb-hover)",
+      default: "var(--color-hover)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-selected)",
+        ":hover": "var(--color-selected)",
       },
     },
     paddingBlock: "var(--spacing)",
@@ -96,8 +96,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 2)",
     width: {
       default: null,
@@ -119,7 +119,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   skillsPageH3: {
     paddingInline: "calc(var(--spacing) * 2)",
@@ -127,13 +127,13 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   skillsPageP2: {
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   skillsPageUl: {
     display: "flex",
@@ -152,7 +152,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   skillsPageDiv2: {
     minWidth: "0",
@@ -176,12 +176,12 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   installedCardP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   installedCardP2: {
     fontSize: "var(--text-sm)",
@@ -197,14 +197,14 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   installedCardDiv2: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2.5)",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
@@ -223,7 +223,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   skillEditorDiv: {
     display: "flex",
@@ -235,7 +235,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   skillEditorDiv2: {
     display: "flex",

@@ -29,7 +29,7 @@ const viewStyles = stylex.create({
   familyDetailSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   familyDetailDiv2: {
     marginTop: "calc(var(--spacing) * 3)",
@@ -63,7 +63,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },

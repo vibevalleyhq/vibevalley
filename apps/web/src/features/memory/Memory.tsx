@@ -17,6 +17,23 @@ import { Button } from "#/ui/Button.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Quiet } from "#/ui/layout.tsx";
 
+const recipeStyles2 = stylex.create({
+  archivePanelPre: {
+    maxHeight: "calc(var(--spacing) * 96)",
+    overflowY: "auto",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    whiteSpace: "pre-wrap",
+    WebkitUserSelect: "text",
+    userSelect: "text",
+  },
+});
+
 const recipeStyles = stylex.create({
   memoryPanelDiv: {
     display: "flex",
@@ -24,8 +41,8 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
   },
   sourcesDiv: {
     display: "flex",
@@ -36,20 +53,20 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   recallPreviewP: {
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
@@ -63,8 +80,8 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
@@ -73,8 +90,8 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
   },
 });
 
@@ -94,31 +111,31 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   pillButtonVariant: {
-    backgroundColor: "var(--wb-ink)",
-    color: "var(--wb-page)",
+    backgroundColor: "var(--color-ink)",
+    color: "var(--color-page)",
   },
   pillButtonVariant2: {
     backgroundColor: {
-      default: "var(--wb-hover)",
+      default: "var(--color-hover)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-selected)",
+        ":hover": "var(--color-selected)",
       },
     },
   },
   sourcesSpan: {},
   sourcesSpanVariant: {
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
   sourcesSpanVariant2: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   memoryItemSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
   memoryItemSpanVariant: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -141,7 +158,7 @@ const viewStyles = stylex.create({
   sectionSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   sectionSpan2: {
     flex: "1",
@@ -154,12 +171,12 @@ const viewStyles = stylex.create({
   memoryPanelP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   memoryPanelSpan: {
     width: "3px",
     flexShrink: "0",
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
   },
   memoryPanelDiv2: {
     display: "flex",
@@ -174,11 +191,11 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   memoryPanelSpan3: {
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   memoryPanelSpan4: {
     fontSize: "var(--text-sm)",
@@ -193,7 +210,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   recallPreviewDiv: {
     display: "flex",
@@ -211,7 +228,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   archivePanelButton: {
     display: "flex",
@@ -226,7 +243,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -249,7 +266,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   writeNoteDiv2: {
     display: "flex",
@@ -260,12 +277,12 @@ const viewStyles = stylex.create({
   writeNoteSpan2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   writeNoteSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   memoryItemDiv: {
     display: "flex",
@@ -280,10 +297,10 @@ const viewStyles = stylex.create({
     columnGap: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   memoryItemSpan2: {
-    color: "var(--wb-warn-ink)",
+    color: "var(--color-warn-ink)",
   },
 });
 
@@ -646,7 +663,7 @@ export function ArchivePanel(props: { agent: string }) {
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
-                      <pre class="max-h-96 overflow-y-auto border-t border-line px-3 py-2 text-sm whitespace-pre-wrap select-text">{open()?.text}</pre>
+                      <pre {...stylex.attrs(recipeStyles2.archivePanelPre)}>{open()?.text}</pre>
                     </Show>
                   </div>
                 )}

@@ -20,7 +20,7 @@ const variantStyles = stylex.create({
     fontSize: "12.5px",
   },
   fileRowSpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   fileRowSpanVariant2: {
     color: "var(--color-bark-800)",
@@ -54,7 +54,7 @@ const viewStyles = stylex.create({
     color: "var(--color-leaf-700)",
   },
   plusMinusSpan3: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   patchDiv: {
     marginInline: "calc(var(--spacing) * 2)",

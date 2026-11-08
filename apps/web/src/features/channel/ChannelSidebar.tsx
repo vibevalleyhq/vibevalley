@@ -21,6 +21,36 @@ import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 
+const recipeStyles2 = stylex.create({
+  sessionRowButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    cursor: {
+      default: null,
+      ":enabled": "pointer",
+    },
+  },
+  sessionRowButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  sessionRowButtonVariant1Case2: {
+    backgroundColor: "var(--wb-selected)",
+  },
+});
+
 const recipeStyles = stylex.create({
   sidebarDiv: {
     display: "flex",
@@ -30,7 +60,7 @@ const recipeStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 5)",
   },
   sidebarButton: {
@@ -49,7 +79,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {
@@ -74,18 +104,18 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   channelRowButtonVariant1Case2: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   channelRowButtonVariant2Case1: {
     boxShadow: null,
   },
   channelRowButtonVariant2Case2: {
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 2px 0 var(--color-accent)",
+    boxShadow: "inset 0 2px 0 var(--color-accent)",
   },
   channelRowSpan: {
     minWidth: "0",
@@ -104,7 +134,7 @@ const recipeStyles = stylex.create({
     color: null,
   },
   channelRowSpanVariant2Case2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -141,8 +171,8 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     borderRightStyle: "solid",
     borderRightWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
   },
   sidebarSpan: {
     flex: "1",
@@ -161,19 +191,19 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 2.5)",
     textAlign: "left",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   sidebarSpan2: {
     flex: "1",
@@ -181,7 +211,7 @@ const viewStyles = stylex.create({
   sidebarSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   sidebarDiv: {
     position: "relative",
@@ -190,7 +220,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   directPickerP: {
     paddingInline: "calc(var(--spacing) * 2)",
@@ -198,14 +228,14 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   directPickerP2: {
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   directPickerButton: {
     display: "flex",
@@ -222,7 +252,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -251,7 +281,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   sectionDiv2: {
     display: "flex",
@@ -259,7 +289,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * .5)",
   },
   channelRowSpan: {
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   sessionRowSpan: {
     position: "relative",
@@ -276,7 +306,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   channelOrchestratorLine: {
     display: "flex",
@@ -284,7 +314,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
@@ -293,11 +323,9 @@ const viewStyles = stylex.create({
   orchestratorLineSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
-
-export const channelHeadClass = "flex h-[66px] shrink-0 items-center border-b border-line";
 
 export const channelIconButtonClass =
   "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50";
@@ -597,7 +625,10 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
         if (current) props.onShow(current);
       }}
       title={phase()}
-      class={["flex items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm enabled:cursor-pointer", props.active ? "bg-selected" : "hover:bg-hover"]}
+      {...stylex.attrs(
+        recipeStyles2.sessionRowButton,
+        props.active ? recipeStyles2.sessionRowButtonVariant1Case2 : recipeStyles2.sessionRowButtonVariant1Case1,
+      )}
     >
       <span {...stylex.attrs(viewStyles.sessionRowSpan)}>
         <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={24} />

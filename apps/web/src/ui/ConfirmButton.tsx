@@ -7,10 +7,20 @@ import { Button } from "./Button";
 import type { IconName } from "./icons";
 
 const viewStyles = stylex.create({
+  group: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "180ms",
+    animationTimingFunction: "var(--ease-out)",
+    animationFillMode: "both",
+  },
   confirmButtonSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -39,7 +49,7 @@ export function ConfirmButton(props: {
     >
       <span
         role="group"
-        class="flex animate-fade-in flex-wrap items-center gap-2"
+        {...stylex.attrs(viewStyles.group)}
         onKeyDown={(e) => e.key === "Escape" && setArmed(false)}
         // Leaving the group takes the question back; moving between its buttons does not.
         onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null) && setArmed(false)}

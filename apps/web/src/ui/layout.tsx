@@ -12,29 +12,21 @@ import { Link as A } from "#/infra/router.ts";
 import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { styleProps } from "./positioner";
 import { Hint } from "./Tip";
 
-const variantStyles2 = stylex.create({
-  emptyIcon: {
-    color: "var(--wb-faint)",
-  },
-});
-
-const variantStyles = stylex.create({
+const viewStyles = stylex.create({
   toggleLabel: {
     display: "flex",
     alignItems: "flex-start",
     gap: "calc(var(--spacing) * 2)",
   },
-  toggleLabelVariant: {
+  toggleDisabled: {
     opacity: ".5",
   },
-  toggleLabelVariant2: {
+  toggleEnabled: {
     cursor: "pointer",
   },
-});
-
-const viewStyles = stylex.create({
   switchRoot: {
     marginTop: "calc(var(--spacing) * 0.5)",
     display: "flex",
@@ -55,7 +47,7 @@ const viewStyles = stylex.create({
     height: "calc(var(--spacing) * 3)",
     borderRadius: "2147483647px",
     backgroundColor: "var(--color-page)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, var(--shadow-toggle-thumb)",
+    boxShadow: "var(--shadow-toggle-thumb)",
     transitionProperty: "transform, translate, scale, rotate",
     transitionDuration: "var(--default-transition-duration)",
     transitionTimingFunction: "var(--default-transition-timing-function)",
@@ -158,7 +150,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   cardHeader: {
     display: "flex",
@@ -167,7 +159,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
@@ -190,7 +182,7 @@ const viewStyles = stylex.create({
   quietP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   emptyDiv: {
     display: "flex",
@@ -209,7 +201,10 @@ const viewStyles = stylex.create({
     textAlign: "center",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
+  },
+  emptyIcon: {
+    color: "var(--color-faint)",
   },
   toggleSpan: {
     display: "flex",
@@ -225,7 +220,7 @@ const viewStyles = stylex.create({
   toggleSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   secretInputSpan: {
     position: "relative",
@@ -244,17 +239,17 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     borderRadius: ".25rem",
     color: {
-      default: "var(--wb-faint)",
+      default: "var(--color-faint)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -317,9 +312,8 @@ export function Card(props: {
   testid?: string;
   item?: string;
 }) {
-  const appearance = () => stylex.props(viewStyles.card, props.styles);
   return (
-    <section data-testid={props.testid} data-key={props.item} class={appearance().className} style={appearance().style}>
+    <section data-testid={props.testid} data-key={props.item} {...styleProps([viewStyles.card, props.styles])}>
       <Show when={props.title !== undefined}>
         <header {...stylex.attrs(viewStyles.cardHeader)}>
           <h2 {...stylex.attrs(viewStyles.cardH2)}>{props.title}</h2>
@@ -341,7 +335,7 @@ export function Empty(props: { icon: IconName; children: JSX.Element; action?: J
   return (
     <div data-testid={props.testid ?? "empty"} {...stylex.attrs(viewStyles.emptyDiv)}>
       <div {...stylex.attrs(viewStyles.emptyDiv2)}>
-        <Icon name={props.icon} size={48} styles={[variantStyles2.emptyIcon]} />
+        <Icon name={props.icon} size={48} styles={viewStyles.emptyIcon} />
         <p>{props.children}</p>
         {props.action}
       </div>
@@ -362,7 +356,7 @@ export function Toggle(props: {
   testid?: string;
 }) {
   return (
-    <label {...stylex.attrs(variantStyles.toggleLabel, props.disabled === true ? variantStyles.toggleLabelVariant : variantStyles.toggleLabelVariant2)}>
+    <label {...stylex.attrs(viewStyles.toggleLabel, props.disabled === true ? viewStyles.toggleDisabled : viewStyles.toggleEnabled)}>
       <Switch.Root
         data-testid={props.testid}
         checked={props.checked}

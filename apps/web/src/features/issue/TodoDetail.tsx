@@ -38,10 +38,10 @@ const variantStyles = stylex.create({
     borderRadius: "2147483647px",
   },
   todoDetailSpanVariant: {
-    backgroundColor: "var(--wb-wheat)",
+    backgroundColor: "var(--color-wheat)",
   },
   todoDetailSpanVariant2: {
-    backgroundColor: "var(--wb-water)",
+    backgroundColor: "var(--color-water)",
   },
 });
 
@@ -52,7 +52,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -74,9 +74,9 @@ const viewStyles = stylex.create({
       default: "transparent",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-line)",
+        ":hover": "var(--color-line)",
       },
-      ":focus": "var(--wb-focus)",
+      ":focus": "var(--color-focus)",
     },
     backgroundColor: "transparent",
     paddingInline: "calc(var(--spacing) * 2)",
@@ -87,7 +87,7 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   todoDetailDiv2: {
@@ -123,10 +123,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     textDecorationLine: {
@@ -147,9 +147,9 @@ const viewStyles = stylex.create({
       default: "transparent",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-line)",
+        ":hover": "var(--color-line)",
       },
-      ":focus": "var(--wb-focus)",
+      ":focus": "var(--color-focus)",
     },
     backgroundColor: "transparent",
     paddingInline: "calc(var(--spacing) * 2)",
@@ -159,14 +159,14 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   todoDetailDiv7: {
     marginTop: "calc(var(--spacing) * 3)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   todoDetailSpan: {
     display: "flex",
@@ -180,7 +180,7 @@ const viewStyles = stylex.create({
     alignSelf: "flex-start",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {

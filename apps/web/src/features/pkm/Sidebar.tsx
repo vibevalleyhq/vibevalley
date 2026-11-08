@@ -16,7 +16,14 @@ import { notesSearch } from "./Search";
 import { tierHeading } from "./sidebar.stylex";
 import { pkmHref, usePkmRadar } from "./vault";
 
-const recipeStyles = stylex.create({
+const viewStyles = stylex.create({
+  sidebarRoot: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+  },
   sidebarButton: {
     display: "flex",
     height: "calc(var(--spacing) * 8)",
@@ -27,72 +34,37 @@ const recipeStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
+      default: "var(--color-line)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-faint)",
+        ":hover": "var(--color-faint)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-faint) 40%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-faint) 40%, transparent)",
         },
       },
     },
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: {
-      default: "var(--wb-faint)",
+      default: "var(--color-faint)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-muted)",
+        ":hover": "var(--color-muted)",
       },
     },
     transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: ".12s",
   },
-});
-
-const variantStyles3 = stylex.create({
-  sidebarIcon: {},
-  sidebarIconVariant: {
-    color: "var(--wb-ink)",
+  sidebarIconActive: {
+    color: "var(--color-ink)",
   },
-  sidebarIconVariant2: {
-    color: "var(--wb-faint)",
+  sidebarIconFaint: {
+    color: "var(--color-faint)",
   },
-});
-
-const variantStyles2 = stylex.create({
-  radarA: {
-    display: "flex",
-    flexDirection: "column",
-    borderRadius: "var(--radius-md)",
-    paddingBlock: "var(--spacing)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "calc(var(--spacing) * 7.5)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-hover)",
-      },
-    },
-  },
-});
-
-const variantStyles = stylex.create({
-  sidebarDiv: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-  },
-});
-
-const viewStyles = stylex.create({
   tierHeading: {
     display: "flex",
     height: "calc(var(--spacing) * 6)",
@@ -132,7 +104,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   sidebarSpan3: {
     minWidth: "0",
@@ -145,17 +117,32 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
     fontVariantNumeric: "tabular-nums",
   },
   pkmRadar: {
     display: "contents",
   },
+  radarA: {
+    display: "flex",
+    flexDirection: "column",
+    borderRadius: "var(--radius-md)",
+    paddingBlock: "var(--spacing)",
+    paddingRight: "calc(var(--spacing) * 2)",
+    paddingLeft: "calc(var(--spacing) * 7.5)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
   radarSpan: {
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   radarSpan2: {
     textOverflow: "ellipsis",
@@ -167,7 +154,7 @@ const viewStyles = stylex.create({
   radarSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 
@@ -183,18 +170,14 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
       return next;
     });
   return (
-    <div {...stylex.attrs(variantStyles.sidebarDiv)}>
-      <button type="button" data-testid="pkm-find" onClick={() => notesSearch.open()} {...stylex.attrs(recipeStyles.sidebarButton)}>
+    <div {...stylex.attrs(viewStyles.sidebarRoot)}>
+      <button type="button" data-testid="pkm-find" onClick={() => notesSearch.open()} {...stylex.attrs(viewStyles.sidebarButton)}>
         <Icon name="search" size={14} />
         <span {...stylex.attrs(viewStyles.sidebarSpan)}>{t("web.pkm.list.find")}</span>
       </button>
       <div {...stylex.attrs(viewStyles.sidebarDiv)}>
         <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} class={row(props.slug === undefined)}>
-          <Icon
-            name="calendar"
-            size={14}
-            styles={[variantStyles3.sidebarIcon, props.slug === undefined ? variantStyles3.sidebarIconVariant : variantStyles3.sidebarIconVariant2]}
-          />
+          <Icon name="calendar" size={14} styles={props.slug === undefined ? viewStyles.sidebarIconActive : viewStyles.sidebarIconFaint} />
           <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{t("web.pkm.list.today")}</span>
         </A>
         <Radar />
@@ -263,7 +246,7 @@ function Radar() {
       onClick={() => props.click()}
       class={[row(props.open === true), "cursor-pointer text-left"]}
     >
-      <Icon name={props.icon} size={14} styles={[variantStyles3.sidebarIconVariant2]} />
+      <Icon name={props.icon} size={14} styles={viewStyles.sidebarIconFaint} />
       <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{props.label}</span>
       <span class={["text-xs tabular-nums", props.tone ?? "text-faint"]}>{props.n}</span>
     </button>
@@ -322,7 +305,7 @@ function Radar() {
               <For each={r().overdue} keyed={(o) => o.block}>
                 {(o) => (
                   <li>
-                    <A href={pkmHref(o().page, o().block)} {...stylex.attrs(variantStyles2.radarA)}>
+                    <A href={pkmHref(o().page, o().block)} {...stylex.attrs(viewStyles.radarA)}>
                       <span {...stylex.attrs(viewStyles.radarSpan2)}>{o().plain}</span>
                       <span {...stylex.attrs(viewStyles.radarSpan3)}>{o().deadline}</span>
                     </A>

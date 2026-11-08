@@ -5,73 +5,46 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { createModal } from "#/ui/Dialog.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
-import { pxFocus, pxWindow } from "./style";
+import { pxFocus, pxStyle } from "./style";
 
-const recipeStyles = stylex.create({
-  farmDialogDiv: {
+const viewStyles = stylex.create({
+  modal: {
+    margin: "auto",
+    maxHeight: "none",
+    maxWidth: "none",
+    overflow: "visible",
+    backgroundColor: "var(--color-cream-50)",
+    padding: 0,
+    color: "var(--color-bark-900)",
+    transitionProperty: { default: "opacity,scale", "@media (prefers-reduced-motion: reduce)": "none" },
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: "150ms",
+    scale: { default: null, "@starting-style": "95% 95%" },
+    opacity: { default: null, "@starting-style": 0 },
+  },
+  farmBackdrop: {
+    backgroundColor: {
+      default: "var(--color-cream-50)",
+      "::backdrop": {
+        default: "var(--color-px-dialog-backdrop)",
+        "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 30%, transparent)",
+      },
+    },
+  },
+  settingsBackdrop: { backgroundColor: { default: "var(--color-cream-50)", "::backdrop": "var(--color-px-scrim)" } },
+  settingsSize: { width: "min(512px,calc(100vw - 32px))", borderWidth: 2, borderStyle: "solid", borderColor: "var(--color-bark-500)" },
+  farmDialogRoot: {
     display: "flex",
     height: "100%",
     flexDirection: "column",
     overflow: "hidden",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
   },
-  farmDialogH2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "24px",
-    lineHeight: "1.5556",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  farmSectionH3: {
-    marginBottom: "calc(var(--spacing) * 1.5)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-600)",
-    fontSynthesis: "none",
-  },
-  pxDialogDiv: {
-    maxHeight: "85dvh",
-    overflowY: "auto",
-    padding: "calc(var(--spacing) * 6)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  pxDialogH2: {
-    minWidth: "0",
-    flex: "1",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "24px",
-    lineHeight: "1.4",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-});
-
-const viewStyles = stylex.create({
-  farmDialogDiv: {
+  farmDialogHeader: {
     display: "flex",
     flexShrink: "0",
     alignItems: "center",
@@ -80,26 +53,46 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 2.5)",
   },
-  farmDialogDiv2: {
+  farmDialogTitle: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  farmDialogRule: {
     flexShrink: "0",
     backgroundColor: "var(--color-cream-100)",
   },
-  farmDialogDiv3: {
+  farmDialogBody: {
     minHeight: "0",
     flex: "1",
     overflowY: "auto",
     padding: "calc(var(--spacing) * 4)",
   },
-  farmSectionSection: {
+  farmSection: {
     display: "flex",
     flexDirection: "column",
     paddingTop: "calc(var(--spacing) * 4)",
   },
-  pxDialogDiv: {
+  farmSectionTitle: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    color: "var(--color-bark-600)",
+  },
+  pxDialogRoot: {
+    maxHeight: "85dvh",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 6)",
+  },
+  pxDialogHeader: {
     marginBottom: "calc(var(--spacing) * 5)",
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 3)",
+  },
+  pxDialogTitle: {
+    minWidth: "0",
+    flex: "1",
   },
 });
 
@@ -108,8 +101,8 @@ function Modal(props: {
   onClose: () => void;
   label: string;
   testid?: string | undefined;
-  backdrop: string;
-  class: string;
+  backdrop: stylex.StyleXStyles;
+  styles: stylex.StyleXStyles;
   style?: JSX.CSSProperties;
   children: JSX.Element;
 }) {
@@ -125,26 +118,19 @@ function Modal(props: {
       onCancel={m.onCancel}
       onClose={m.onClose}
       onClick={m.onClick}
-      style={props.style}
-      class={[
-        "m-auto max-h-none max-w-none overflow-visible bg-cream-50 p-0 text-bark-900",
-        pxWindow,
-        "transition-[opacity,scale] duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0",
-        props.backdrop,
-        props.class,
-      ]}
+      {...styleProps([viewStyles.modal, pxStyle.window, props.backdrop, props.styles], props.style)}
     >
       <Show when={props.open}>{props.children}</Show>
     </dialog>
   );
 }
 
-const farmSizes = {
-  sm: "w-[min(480px,calc(100vw-24px))] h-[min(384px,88dvh)]",
-  md: "w-[min(480px,calc(100vw-24px))] h-[min(608px,88dvh)]",
-  lg: "w-[min(736px,calc(100vw-24px))] h-[min(576px,88dvh)]",
-  wide: "w-[min(720px,calc(100vw-24px))] h-[min(608px,88dvh)]",
-} as const;
+const farmSizes = stylex.create({
+  sm: { width: "min(480px,calc(100vw - 24px))", height: "min(384px,88dvh)" },
+  md: { width: "min(480px,calc(100vw - 24px))", height: "min(608px,88dvh)" },
+  lg: { width: "min(736px,calc(100vw - 24px))", height: "min(576px,88dvh)" },
+  wide: { width: "min(720px,calc(100vw - 24px))", height: "min(608px,88dvh)" },
+});
 
 export type FarmDialogSize = keyof typeof farmSizes;
 
@@ -164,13 +150,13 @@ export function FarmDialog(props: {
       onClose={() => props.onClose()}
       label={props.title}
       testid={props.testid}
-      backdrop="backdrop:bg-bark-900/30"
-      class={farmSizes[props.size]}
+      backdrop={viewStyles.farmBackdrop}
+      styles={farmSizes[props.size]}
     >
-      <div {...stylex.attrs(recipeStyles.farmDialogDiv)}>
-        <div {...stylex.attrs(viewStyles.farmDialogDiv)}>
+      <div {...stylex.attrs(pxStyle.sm, viewStyles.farmDialogRoot)}>
+        <div {...stylex.attrs(viewStyles.farmDialogHeader)}>
           <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={32} />}</Show>
-          <h2 {...stylex.attrs(recipeStyles.farmDialogH2)}>{props.title}</h2>
+          <h2 {...stylex.attrs(pxStyle.lg, viewStyles.farmDialogTitle)}>{props.title}</h2>
           <button
             type="button"
             aria-label={t("web.ui.pixel.close")}
@@ -180,10 +166,10 @@ export function FarmDialog(props: {
             <SpriteIcon name="button-close" size={18} class="group-active:translate-x-px group-active:translate-y-px" />
           </button>
         </div>
-        <div {...stylex.attrs(viewStyles.farmDialogDiv2)}>
+        <div {...stylex.attrs(viewStyles.farmDialogRule)}>
           <DashedLine />
         </div>
-        <div {...stylex.attrs(viewStyles.farmDialogDiv3)}>{props.children}</div>
+        <div {...stylex.attrs(viewStyles.farmDialogBody)}>{props.children}</div>
       </div>
     </Modal>
   );
@@ -191,8 +177,8 @@ export function FarmDialog(props: {
 
 export function FarmSection(props: { title: string; children?: JSX.Element }) {
   return (
-    <section {...stylex.attrs(viewStyles.farmSectionSection)}>
-      <h3 {...stylex.attrs(recipeStyles.farmSectionH3)}>{props.title}</h3>
+    <section {...stylex.attrs(viewStyles.farmSection)}>
+      <h3 {...stylex.attrs(pxStyle.xs, viewStyles.farmSectionTitle)}>{props.title}</h3>
       {props.children}
     </section>
   );
@@ -206,12 +192,12 @@ export function PxDialog(props: { title: string; open?: boolean; testid?: string
       onClose={() => props.onClose()}
       label={props.title}
       testid={props.testid}
-      backdrop="backdrop:bg-px-scrim"
-      class="w-[min(512px,calc(100vw-32px))] border-2 border-bark-500"
+      backdrop={viewStyles.settingsBackdrop}
+      styles={viewStyles.settingsSize}
     >
-      <div {...stylex.attrs(recipeStyles.pxDialogDiv)}>
-        <div {...stylex.attrs(viewStyles.pxDialogDiv)}>
-          <h2 {...stylex.attrs(recipeStyles.pxDialogH2)}>{props.title}</h2>
+      <div {...stylex.attrs(pxStyle.sm, viewStyles.pxDialogRoot)}>
+        <div {...stylex.attrs(viewStyles.pxDialogHeader)}>
+          <h2 {...stylex.attrs(pxStyle.xl, viewStyles.pxDialogTitle)}>{props.title}</h2>
           <PxButton size="icon" label={t("web.ui.pixel.close")} onClick={() => props.onClose()}>
             <SpriteIcon name="button-close" size={16} />
           </PxButton>

@@ -54,8 +54,8 @@ const variantStyles = stylex.create({
     borderLeftStyle: "solid",
     borderLeftWidth: "2px",
     borderColor: {
-      default: "var(--wb-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 50%, transparent)",
+      default: "var(--color-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 50%, transparent)",
     },
     paddingLeft: "calc(var(--spacing) * 2.5)",
   },
@@ -72,10 +72,10 @@ const variantStyles = stylex.create({
   },
   toolStepButtonVariant: {
     backgroundColor: {
-      default: "var(--wb-hover)",
+      default: "var(--color-hover)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -84,7 +84,7 @@ const variantStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -105,12 +105,12 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -135,7 +135,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -152,13 +152,13 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runFoldDiv2: {
     borderRadius: "var(--radius-md)",
     backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 15%, transparent)",
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 15%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
@@ -169,7 +169,7 @@ const viewStyles = stylex.create({
     paddingLeft: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -189,7 +189,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   foldedDiv: {
     display: "flex",
@@ -201,7 +201,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -219,7 +219,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   boxSpan2: {
     flex: "1",
@@ -243,7 +243,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   toolStepSpan3: {
     flexShrink: "0",
@@ -251,7 +251,7 @@ const viewStyles = stylex.create({
   toolStepSpan4: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   toolStepDiv: {
     display: "flex",
@@ -265,26 +265,26 @@ const viewStyles = stylex.create({
   toolStepSpan5: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   toolStepPre: {
     maxHeight: "calc(var(--spacing) * 40)",
     overflow: "auto",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-code-bg)",
+    backgroundColor: "var(--color-code-bg)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 2)",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     whiteSpace: "pre-wrap",
-    color: "var(--wb-code-ink)",
+    color: "var(--color-code-ink)",
   },
   toolStepPre2: {
     maxHeight: "calc(var(--spacing) * 56)",
     overflow: "auto",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 2)",
     fontFamily: "var(--font-mono)",

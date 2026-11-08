@@ -20,10 +20,10 @@ const variantStyles = stylex.create({
     fontVariantNumeric: "tabular-nums",
   },
   statSpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   statSpanVariant2: {
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   mossLineViewDiv: {
     display: "flex",
@@ -38,10 +38,10 @@ const variantStyles = stylex.create({
     marginRight: "calc(var(--spacing) * 1.5)",
   },
   mossLineViewSpanVariant: {
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
   },
   mossLineViewSpanVariant2: {
-    color: "var(--wb-leaf)",
+    color: "var(--color-leaf)",
   },
 });
 
@@ -52,7 +52,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   levelSpan2: {
     width: "calc(var(--spacing) * 10)",
@@ -65,13 +65,13 @@ const viewStyles = stylex.create({
     width: "calc(var(--spacing) * 24)",
     overflow: "hidden",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   levelSpan4: {
     display: "block",
     height: "100%",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
     transitionProperty: "width",
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: ".12s",
@@ -82,14 +82,14 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
   },
   statSpan2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   mossLine: {
     display: "flex",
@@ -110,7 +110,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   mossLineViewDiv2: {
     display: "flex",
@@ -121,7 +121,7 @@ const viewStyles = stylex.create({
   mossLineViewP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   mossQos: {
     display: "flex",
@@ -138,7 +138,7 @@ const viewStyles = stylex.create({
   mossLineViewP2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   mossEvents: {
     maxHeight: "calc(var(--spacing) * 72)",

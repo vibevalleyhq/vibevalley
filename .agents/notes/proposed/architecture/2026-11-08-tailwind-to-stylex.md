@@ -70,7 +70,13 @@ The production compiler must extract CSS for the app, stories, and website. It m
 
 Keep existing token values and theme scopes. Use typed references to existing CSS custom properties rather than creating a second palette. Define CSS layer order explicitly. Replace Tailwind's reset and implicit defaults before removing its plugin.
 
-Use `stylex.attrs()` at Solid DOM boundaries. Its serialized `style` string is not interchangeable with a style object. Base UI positioners merge object styles: use a narrow, tested styled boundary that preserves their positioning values without adding StyleX to Base UI.
+Use `stylex.attrs()` at ordinary Solid DOM boundaries. Its serialized `style` string is not interchangeable with a style object and kebab-cases dynamic custom property names in StyleX 0.19.1. At component boundaries that accept caller `StyleXStyles`, merge native `style` objects, or position Base UI elements, use the shared `styleProps()` / `positionerAttrs()` boundary in `apps/web/src/ui/positioner.ts`:
+
+- Evaluate `stylex.props()` once per reactive read, map `className` to Solid's `class`, and preserve dynamic StyleX variables as object styles.
+- Place component defaults and semantic tone maps before caller `props.styles` (`styleProps([styles.base, defaultTone, props.styles])`) so explicit caller overrides work predictably.
+- Reference semantic tokens (`--color-*`, `--shadow-*`) in component styles rather than theme-internal `--wb-*` primitives.
+- Keep shared skin recipes (such as `apps/web/src/ui/pixel/style.ts` typography and chrome) in one `stylex.create` module and compose them at call sites rather than inlining duplicate per-file `recipeStyles` or four-layer `0 0 transparent` ring placeholders.
+- Keep owned rich-text CSS (`apps/web/src/ui/Markdown.css`) grouped by selector inside `@layer components`.
 
 ### Machine-readable completion
 
@@ -220,16 +226,16 @@ The 170-scene full capture was interrupted at the owner's request while still ru
 
 ### Contract triage queue
 
-| Owner | Contract findings | Definition files | Next action |
+| Owner | Baseline contract findings | Definition files | Next action |
 |---|---:|---|---|
 | Workbench UI | 5 | `Checkbox.tsx`, `Form.tsx`, `Markdown.tsx`, `Tag.tsx`, `layout.tsx` | These baseline contracts and their callers are migrated; finish remaining literal styles and phase 6 acceptance |
-| Pixel UI | 9 | `PxMarkdown.tsx` (2), `base.tsx` (3), `dialog.tsx` (1), `field.tsx` (3) | Replace class composition while preserving positioning, themed chrome and rich text |
+| Pixel UI | 9 | `PxMarkdown.tsx` (2), `base.tsx` (3), `dialog.tsx` (1), `field.tsx` (3) | Base, modal and field contracts are migrated; the two Markdown contracts and remaining literal styles are open |
 | Token stories | 1 | `ui/tokens.stories.tsx` | Migrate class-bearing story data; do not count this as a public component API |
 | Business features | 5 | `issue/Sheet.tsx` (1), `session/WorkLog.tsx` (1), `voice/DictationButton.tsx` (3) | Trace wrapper and render-prop forwarding before replacing contracts |
 | Farm | 2 | `farm/map/RepoMap.tsx`, `farm/panels/rows.tsx` | Coordinate with phase 3 DOM conversion |
 | Tree | 1 | `tree/TreePanel.tsx` | Coordinate with phase 3 overlay conversion |
 
-The ten helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Their definitions must be removed only after all callers are migrated. The five baseline workbench contracts are now converted, reducing contract findings from 23 to 18. Additional native-attribute interfaces (TextInput, TextArea, SecretInput and Icon) were migrated as well, but were not counted in that baseline category. Split/ListCard/ListRow, Toggle and TextLink are converted. Next are the remaining ordinary UI literals, pixel contracts and their callers. The queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
+The ten baseline helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Field's three calls are removed; seven findings remain. Definitions must be removed only after all callers are migrated. The five baseline workbench contracts and seven pixel contracts are converted, reducing contract findings from 23 to 11. Additional native-attribute interfaces (TextInput, TextArea, SecretInput and Icon) were migrated as well, but were not counted in that baseline category. Split/ListCard/ListRow, Toggle and TextLink are converted. Next are the remaining ordinary UI literals, pixel contracts and their callers. The queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
 
 ### Execution ledger
 
@@ -243,6 +249,7 @@ The ten helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), an
 | Phase 1: text controls, remaining layout controls and Icon | 3,412 / 131 → 3,273 / 125 | 25 text-control and 31 Icon call sites migrated; clean 1,295-file type/lint and production stories compilation; non-styling AST comparison passes for 28 caller files | Implementation checkpoint; 19 contract findings remain; new browser tests and full visual acceptance pending phase 6 |
 | Phase 1: Markdown, IconButton and Chips | 3,273 / 125 → 3,199 / 123 | Markdown's two callers migrated; its 40 descendant utility rules become owned rich-text CSS; IconButton and Chips use StyleX; contract findings 19 → 18 | Implementation checkpoint; browser and visual acceptance pending phase 6 |
 | Cross-phase mechanical sweep: constants, maps and independent conditions | 3,199 / 123 → 2,021 / 108 | 229 expressions across 53 files; non-styling AST comparison passes; clean type/lint and production stories compilation | Implementation checkpoint; 18 contract findings remain; full acceptance pending phase 6 |
+| Pixel contracts, alpha fallbacks and remaining simple native patterns | 1,968 / 102 → 1,686 / 95 | Fresh working-tree starting scan; contract findings 18 → 11; 19 native expressions / 14 files and 9 caller expressions / 5 files; core and native non-styling AST proofs; 38 migration unit tests | Implementation checkpoint; new browser regression and complete visual/live/host acceptance remain pending phase 6 |
 
 Card live inspection covers the new-skill and voice configuration forms at 1440×900 and 390×844. Desktop receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-IR07mx/result.json`. Narrow receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-bjJzVX/result.json`. Both record code 0, stopped true and no cleanup errors. The default narrow navigation leaves the cards below the fold; the inspected narrow card captures use the real settings-search control to filter navigation and then scroll to the card. This is scoped form evidence, not a default-state full-page comparison or final populated-data acceptance.
 
@@ -303,6 +310,18 @@ Update design rules, web and site READMEs, the app/site/foundation subsystem doc
 
 ## Execution evidence
 
+### Pixel contracts and malformed color fallbacks
+
+PxWindow, PxFrame, PxCard, DashedLine, PxTip, PxTextInput, PxTextArea and the internal Modal now compose typed StyleX styles with their callers. Window/frame shadows live in `pxStyle`; obsolete string exports are removed. Tree overlays retain their conditional placement and native coordinate objects. Modal backdrops, bounded sizes and starting styles retain reduced-motion branches. The installed compiler was probed for `@starting-style` before use. Textareas retain the original effective typography: the baseline's mono/pixel line-height rules override the extra `leading-[1.625]` utility, despite their order in the class string.
+
+The converter's fixed-color substitution had matched a six-digit color inside an eight-digit alpha color, producing invalid values such as `var(--color-leaf-300)99`. All 23 occurrences across 16 files are replaced with owned complete alpha-color tokens; fallback bytes and existing color-mix support branches are retained. Substitution now requires a complete color match. The inventory rejects malformed variable suffixes, with a regression test that also preserves legitimate content strings.
+
+The remaining native-pattern pass covers prefixed user-selection/decoration/mask declarations, enabled states and starting styles. Nineteen native expressions in fourteen files pass the narrow AST proof (`/tmp/vv-converge-native-proof.json`); nine component caller expressions in five files were converted separately. The seven core/caller implementation files also pass a non-styling AST comparison (`/tmp/vv-converge-core-proof.json`), excluding only style definitions, style imports/attributes/contracts and the typography-reference rename. These file groups overlap. Dead-code cleanup removes the unused channel-header class export and two pixel barrel re-exports.
+
+Type/lint, the production stories build, all 38 migration unit tests, dead-code checks and all nine documentation tasks pass. The production CSS probe (`/tmp/vv-converge-css-proof.json`) finds all thirteen exact alpha-color tokens, no malformed color-variable suffixes, six starting-style rules, and the original `properties → theme → base → components → utilities` layer sequence with StyleX inserted before utilities.
+
+The new composition story and browser regression cover window variables plus native style, input/textarea variables, suggestion keyboard selection, retained input identity, effective line heights and disabled controls. The regression is deliberately unrun until phase 6; compiler and AST checks do not establish browser or pixel acceptance. The source inventory remains failed at 1,686 tokens / 95 files / 11 contracts. The batch starts from a fresh 1,968 / 102 working-tree scan, not the preceding commit's ledger count.
+
 ### Cross-phase mechanical sweep
 
 The implementation now proceeds by syntax pattern across phases 1–4, rather than finishing individual components in isolation. The temporary converter resolves static constants, readonly exported maps and their barrel re-exports, static template fragments, and independent conditional class combinations. It enumerates bounded combinations against the original production stylesheet and only separates properties whose values depend on at most one condition. Coupled properties, unresolved calls, mutable/escaped maps and complex selectors remain exceptions. Generated production code contains StyleX definitions and typed lookups, not a runtime utility resolver.
@@ -313,7 +332,7 @@ The sweep converts 229 expressions in 53 files: 135 in its first web pass, 80 in
 
 ### Markdown, icon buttons and chips
 
-Markdown's root and both styled callers use typed StyleX composition. Its 40 descendant utility rules are now scoped to `.markdown` in `apps/web/src/ui/Markdown.css`, the explicitly allowed rich-text CSS boundary, without Tailwind variables or directives. Parsing, safe links, issue references, mentions, code highlighting and diagram lifetimes are unchanged. The stylesheet is imported through the host stylesheet: importing it from the component hoisted the `components` layer before `base` in the production asset. The compiled first-encounter layer order is now verified as theme → base → components → stylex → utilities (`/tmp/vv-richtext-layer-order.json`); minification may remove a redundant textual prelude, so the check reads semantic layer order rather than a literal prefix.
+Markdown's root and both styled callers use typed StyleX composition through `styleProps`. Its descendant utility rules are scoped to `.markdown` in `apps/web/src/ui/Markdown.css`, grouped by selector inside `@layer components` without Tailwind variables or directives. Parsing, safe links, issue references, mentions, code highlighting and diagram lifetimes are unchanged. The stylesheet is imported through the host stylesheet: importing it from the component hoisted the `components` layer before `base` in the production asset. The compiled first-encounter layer order is now verified as theme → base → components → stylex → utilities (`/tmp/vv-richtext-layer-order.json`); minification may remove a redundant textual prelude, so the check reads semantic layer order rather than a literal prefix.
 
 IconButton retains pressed, danger, hover, active and disabled states through composed styles. ChipsInput and KeyValueEditor retain their handlers and keyed rows while replacing their class-string recipes. Their stories expose keyboard selection and disabled controls. The added browser regressions (text controls, icons, Markdown and icon buttons) remain unrun until phase 6.
 
@@ -321,11 +340,13 @@ The expanded caller AST proof now covers 29 files, with no non-styling differenc
 
 ### Text controls, layout controls and icons
 
-TextInput, TextArea and SecretInput share typed StyleX composition with object-only inline styles. All 25 explicit text-control class callers moved together; a separate spread audit found only the form-control bindings, the typed SecretInput forwarding and the settings control's narrow attribute Pick. A new story and regression cover camel-cased runtime variables, native inline height, editing, keyboard focus and input identity. The input's horizontal padding has separate physical slots so SecretInput's right padding does not discard its left padding during composition.
+TextInput, TextArea, Select, Button, Checkbox, Form, Card, Dot, Icon and Markdown share the `styleProps` composition helper in `apps/web/src/ui/positioner.ts`, which evaluates `stylex.props()` once per reactive read, maps `className` to Solid's `class`, and preserves object-only inline styles. All 25 explicit text-control class callers moved together; a separate spread audit found only the form-control bindings, the typed SecretInput forwarding and the settings control's narrow attribute Pick. A new story and regression cover camel-cased runtime variables, native inline height, editing, keyboard focus and input identity. The input's horizontal padding has separate physical slots so SecretInput's right padding does not discard its left padding during composition.
 
-Toggle and TextLink now own their styles directly. The toggle thumb's original two-shadow paint is retained in the control-specific `--shadow-toggle-thumb` token, including the original transparent shadow layers. The desktop strip retains its existing semantic `window-drag` CSS for the external Electron drag region; its ordinary layout styles use StyleX.
+Toggle and TextLink now own their styles directly. The toggle thumb's original two-shadow paint is retained in the control-specific `--shadow-toggle-thumb` token. The desktop strip retains its existing semantic `window-drag` CSS for the external Electron drag region; its ordinary layout styles use StyleX.
 
-Icon and its 31 explicit class callers now compose typed styles. Semantic marks retain their fixed tones; a new composition story and regression cover tone precedence and dynamic variables. Dispatch/thread and knowledge-sidebar hover/focus relationships use exported StyleX markers. The outline chevron deliberately retains its visible `inline-flex` rest state: in the original production stylesheet `.inline-flex` follows and overrides `.hidden`. Changing it to hidden would be a behavior change, not a migration. Its existing group remains for the not-yet-converted bullet; the chevron uses the new marker.
+Icon and its 31 explicit class callers now compose typed styles. Semantic marks retain their fixed tones; a new composition story and regression cover tone precedence and dynamic variables. Dispatch/thread and knowledge-sidebar hover/focus relationships use exported StyleX markers. The outline chevron retains its visible `position: absolute` rest state without a no-op hover display marker: in the original production stylesheet `.inline-flex` followed and overrode `.hidden`, and `position: absolute` already blockifies the element's display box.
+
+Shared pixel typography and chrome (`pxStyle` in `apps/web/src/ui/pixel/style.ts`) are authored once with `stylex.create` and composed in `base.tsx`, `dialog.tsx`, `choice.tsx`, `ToastViewport.tsx`, `field.tsx`, `forms.tsx` and `PixelCard.tsx` rather than duplicated across per-file `recipeStyles`. Component StyleX declarations reference semantic `--color-*` and `--shadow-*` tokens rather than palette-internal `--wb-*` variables, and omit redundant four-layer `0 0 transparent` ring placeholders.
 
 The mechanical tools converted 49 expressions (25 text-control and 24 Icon expressions); the other seven Icon calls were migrated explicitly. The initial caller proof covered 28 files with no non-styling differences. `/tmp/vv-control-callers-proof.json` has since been expanded to include Markdown callers (29 files); its restored styling attributes include unchanged attributes and are **not** a conversion count. Type/lint and production compilation pass; the added browser regressions have not yet been run. This slice expanded the canonical manifest to 190 scenes with the existing layout controls and toggle-state grid; the later Markdown/IconButton/Chips slice brings it to 202. No complete new visual receipt is claimed.
 

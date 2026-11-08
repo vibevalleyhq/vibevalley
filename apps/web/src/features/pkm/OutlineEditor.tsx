@@ -31,60 +31,53 @@ import {
   pasteAction,
   saved,
 } from "./editing";
-import { outlineBlock } from "./outline.stylex";
 import type { DropAt } from "./selection";
 
-const variantStyles = stylex.create({
-  rowSpan: {
-    pointerEvents: "none",
-    position: "absolute",
-    right: "0",
-    height: "calc(var(--spacing) * .5)",
-    borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-water)",
-  },
-  rowSpanVariant: {
-    top: "-1px",
-  },
-  rowSpanVariant2: {
-    bottom: "-1px",
-  },
+const recipeStyles = stylex.create({
   rowDiv: {
-    minWidth: "0",
-    flex: "1",
-  },
-  rowDivVariant: {
-    color: "var(--wb-muted)",
-  },
-  rowDivVariant2: {},
-  editorLi: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    minHeight: "calc(var(--spacing) * 6)",
+    cursor: "text",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "var(--spacing)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
-    backgroundColor: {
-      default: null,
-      ":is([aria-selected=true])": "var(--wb-selected)",
-    },
+    lineHeight: "calc(var(--spacing) * 6)",
+  },
+  rowDivVariant1Case1: {
+    textDecorationLine: null,
+    WebkitTextDecorationColor: null,
+    textDecorationColor: null,
+  },
+  rowDivVariant1Case2: {
+    textDecorationLine: "line-through",
+    WebkitTextDecorationColor: "var(--wb-faint)",
+    textDecorationColor: "var(--wb-faint)",
   },
 });
 
 const viewStyles = stylex.create({
   expandedChevron: {
     position: "absolute",
-    display: { default: "inline-flex", "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", outlineBlock)]: "block" } },
+  },
+  dropLine: {
+    pointerEvents: "none",
+    position: "absolute",
+    right: "0",
+    height: "calc(var(--spacing) * .5)",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-water)",
+  },
+  dropBefore: {
+    top: "-1px",
+  },
+  dropAfter: {
+    bottom: "-1px",
   },
   rowSpan: {
     position: "absolute",
     insetBlock: "0",
     borderLeftStyle: "solid",
     borderLeftWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   pkmBullet: {
     position: "relative",
@@ -100,17 +93,24 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-xs)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
+  rowBody: {
+    minWidth: "0",
+    flex: "1",
+  },
+  rowDone: {
+    color: "var(--color-muted)",
+  },
   rowSpan2: {
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   pkmBubble: {
     marginTop: "calc(var(--spacing) * .5)",
@@ -121,21 +121,21 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * .5)",
     borderRadius: "2147483647px",
     backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 20%, transparent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-wheat)",
+        ":hover": "var(--color-wheat)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-wheat) 30%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-wheat) 30%, transparent)",
         },
       },
     },
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
-    color: "var(--wb-warn-ink)",
+    color: "var(--color-warn-ink)",
   },
   editorDiv: {
     position: "relative",
@@ -147,11 +147,11 @@ const viewStyles = stylex.create({
     resize: "none",
     overflow: "hidden",
     borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-sm)",
     lineHeight: "calc(var(--spacing) * 6)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
     outlineStyle: "none",
   },
   pkmComplete: {
@@ -169,10 +169,25 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "var(--spacing)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 8px 24px var(--wb-float)",
+    boxShadow: "var(--shadow-float)",
+  },
+  editorLi: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    backgroundColor: {
+      default: null,
+      ":is([aria-selected=true])": "var(--color-selected)",
+    },
   },
   editorSpan: {
     minWidth: "0",
@@ -188,7 +203,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pkmToolbar: {
     position: "sticky",
@@ -202,8 +217,8 @@ const viewStyles = stylex.create({
     justifyContent: "space-around",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingBlock: "var(--spacing)",
   },
   toolbarButton: {
@@ -215,17 +230,17 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -283,7 +298,6 @@ export function Row(props: {
       data-picked={props.picked ? "" : undefined}
       class={[
         "group relative flex items-start gap-1 rounded-sm py-px transition-colors duration-280",
-        stylex.attrs(outlineBlock).class,
         props.picked ? "bg-selected" : props.lit ? "bg-wheat/20" : "",
       ]}
       style={{ "padding-left": `${props.block.depth * indentPx}px` }}
@@ -296,7 +310,7 @@ export function Row(props: {
             aria-hidden="true"
             data-testid="pkm-drop"
             data-at={at()}
-            {...stylex.attrs(variantStyles.rowSpan, at() === "before" ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}
+            {...stylex.attrs(viewStyles.dropLine, at() === "before" ? viewStyles.dropBefore : viewStyles.dropAfter)}
             style={{ left: `${(props.block.depth + (at() === "inside" ? 2 : 1)) * indentPx}px` }}
           />
         )}
@@ -337,7 +351,7 @@ export function Row(props: {
           </button>
         )}
       </Show>
-      <div {...stylex.attrs(variantStyles.rowDiv, done() ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}>
+      <div {...stylex.attrs(viewStyles.rowBody, done() && viewStyles.rowDone)}>
         <Show
           when={props.focus}
           fallback={
@@ -351,7 +365,7 @@ export function Row(props: {
               // A Shift+click picks blocks; it does not select the words between.
               onMouseDown={(e) => e.shiftKey && e.preventDefault()}
               onKeyDown={(e) => e.key === "Enter" && props.onOpen("end", false)}
-              class={["min-h-6 cursor-text rounded-sm px-1 text-sm leading-6", done() ? "line-through decoration-faint" : ""]}
+              {...stylex.attrs(recipeStyles.rowDiv, done() ? recipeStyles.rowDivVariant1Case2 : recipeStyles.rowDivVariant1Case1)}
             >
               <Show when={props.block.body} fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{"\u00a0"}</span>}>
                 <Body text={props.block.body} refs={props.refs} />
@@ -622,7 +636,7 @@ export function Editor(props: {
                   e.preventDefault();
                   c().pick();
                 }}
-                {...stylex.attrs(variantStyles.editorLi)}
+                {...stylex.attrs(viewStyles.editorLi)}
               >
                 <span {...stylex.attrs(viewStyles.editorSpan)}>{c().label}</span>
                 <Show when={c().hint}>{(h) => <span {...stylex.attrs(viewStyles.editorSpan2)}>{h()}</span>}</Show>

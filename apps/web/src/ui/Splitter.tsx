@@ -1,6 +1,47 @@
+import * as stylex from "@stylexjs/stylex";
 import { type Accessor, createSignal } from "solid-js";
 
 import { setWidth, usePrefs } from "#/state/prefs.ts";
+
+import { splitterHandle } from "./tabs.stylex";
+
+const viewStyles = stylex.create({
+  handle: {
+    position: "absolute",
+    insetBlock: "0",
+    zIndex: "10",
+    width: "calc(var(--spacing) * 2)",
+    cursor: "col-resize",
+    touchAction: "none",
+    outlineStyle: "none",
+  },
+  left: {
+    left: "calc(var(--spacing) * -1)",
+  },
+  right: {
+    right: "calc(var(--spacing) * -1)",
+  },
+  line: {
+    position: "absolute",
+    insetBlock: "0",
+    left: "50%",
+    width: "calc(var(--spacing) * 0.5)",
+    translate: "-50% 0",
+    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionDuration: "120ms",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+  },
+  lineIdle: {
+    backgroundColor: {
+      default: "transparent",
+      [stylex.when.ancestor(":focus-visible", splitterHandle)]: "var(--color-focus)",
+      "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", splitterHandle)]: "var(--color-focus)" },
+    },
+  },
+  lineDragging: {
+    backgroundColor: "var(--color-focus)",
+  },
+});
 
 /** A pane's width: the one the owner dragged it to on this machine, else its default, kept between min and max. */
 export function usePaneWidth(pane: string, fallback: number, min: number, max: number): Accessor<number> {
@@ -24,7 +65,7 @@ export function Splitter(props: { pane: string; side: "left" | "right"; width: n
       aria-valuemin={props.min}
       aria-valuemax={props.max}
       tabindex="0"
-      class={["group absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none outline-none", props.side === "left" ? "-left-1" : "-right-1"]}
+      {...stylex.attrs(viewStyles.handle, props.side === "left" ? viewStyles.left : viewStyles.right, splitterHandle)}
       onPointerDown={(e) => {
         e.preventDefault();
         const from = e.clientX;
@@ -50,12 +91,7 @@ export function Splitter(props: { pane: string; side: "left" | "right"; width: n
         to(props.width + (e.key === "ArrowRight" ? 16 : -16) * sign());
       }}
     >
-      <span
-        class={[
-          "absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 transition-colors duration-120 group-hover:bg-focus group-focus-visible:bg-focus",
-          dragging() ? "bg-focus" : "bg-transparent",
-        ]}
-      />
+      <span {...stylex.attrs(viewStyles.line, dragging() ? viewStyles.lineDragging : viewStyles.lineIdle)} />
     </div>
   );
 }

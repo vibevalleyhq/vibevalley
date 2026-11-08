@@ -48,14 +48,14 @@ const viewStyles = stylex.create({
   statSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   barSpan: {
     display: "block",
     height: "calc(var(--spacing) * 1.5)",
     overflow: "hidden",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   barSpan2: {
     display: "block",
@@ -67,7 +67,7 @@ const viewStyles = stylex.create({
     height: "calc(var(--spacing) * 14)",
     overflow: "hidden",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-bark)",
+    backgroundColor: "var(--color-bark)",
     padding: "var(--spacing)",
   },
   languagesSpan: {
@@ -104,16 +104,16 @@ const viewStyles = stylex.create({
     fontWeight: "var(--font-weight-medium)",
   },
   languagesSpan4: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   languagesDiv4: {
     height: "calc(var(--spacing) * 12)",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   codeCode: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "1px",
     fontFamily: "var(--font-mono)",
@@ -125,7 +125,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
     borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     padding: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -155,7 +155,7 @@ const viewStyles = stylex.create({
     top: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   commitCalendarDiv5: {
     marginTop: "var(--spacing)",
@@ -171,7 +171,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     fontSize: "var(--text-2xs)",
     lineHeight: "1",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   commitCalendarDiv7: {
     display: "flex",
@@ -190,7 +190,7 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   handsDiv: {
     display: "grid",
@@ -208,7 +208,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
@@ -221,12 +221,12 @@ const viewStyles = stylex.create({
   newRepoFormP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   newRepoFormP2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   newRepoFormDiv: {
     display: "flex",

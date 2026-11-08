@@ -80,6 +80,12 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
           if (specifier.type === "ImportNamespaceSpecifier" || specifier.type === "ImportDefaultSpecifier") stylexNamespaces.add(local);
           if (nameOf(specifier.imported) === "attrs") stylexAttrs.add(local);
         }
+      if (source !== undefined && /(?:^|\/)positioner(?:\.ts)?$/u.test(source))
+        for (const value of childrenOf(node, "specifiers")) {
+          const specifier = nodeOf(value);
+          const local = nameOf(specifier.local);
+          if (local !== undefined && ["styleProps", "positionerAttrs"].includes(nameOf(specifier.imported) ?? "")) stylexAttrs.add(local);
+        }
     }
   });
   const attrsCall = (input: unknown): boolean => {
@@ -204,6 +210,17 @@ export function scanStyleSource(path: string, text: string, semanticClasses: Rea
         ["create", "defineConsts", "defineVars", "createTheme", "keyframes", "defineMarker", "props"].includes(nameOf(callee.property) ?? "")
       ) {
         classify(node, `stylex-${nameOf(callee.property) ?? "unknown"}`);
+        for (const argument of childrenOf(node, "arguments"))
+          walk(argument, (property) => {
+            if (property.type !== "Property" || nameOf(property.key) === "content") return;
+            const value = nodeOf(property.value);
+            if (value.type === "Literal" && typeof value.value === "string" && /var\(--color-[\w-]+\)[\da-f]{2}\b/iu.test(value.value))
+              finding(
+                "invalid-color-variable-suffix",
+                value,
+                `${value.value}; Fix: use an owned alpha-color token, not a suffix on var(). See docs/style/design.md.`,
+              );
+          });
       }
       const args = childrenOf(node, "arguments");
       const method = nameOf(callee.property);

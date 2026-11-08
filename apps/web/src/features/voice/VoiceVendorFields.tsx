@@ -52,14 +52,14 @@ const variantStyles = stylex.create({
   },
   miniMaxVoicesDivVariant: {
     borderColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 40%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
     },
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   miniMaxVoicesDivVariant2: {
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
   },
   miniMaxVoicesButton: {
     height: "100%",
@@ -83,7 +83,7 @@ const variantStyles = stylex.create({
       default: "var(--color-bark-800)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -112,7 +112,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   labeledSpan2: {
     flex: "1",
@@ -126,7 +126,7 @@ const viewStyles = stylex.create({
   voiceAgentSectionP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   miniMaxVoicesDiv: {
     display: "grid",
@@ -153,7 +153,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     opacity: {

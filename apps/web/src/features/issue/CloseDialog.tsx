@@ -30,21 +30,21 @@ const recipeStyles = stylex.create({
   },
   patchDivVariant1Case1: {
     backgroundColor: {
-      default: "var(--wb-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 20%, transparent)",
+      default: "var(--color-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 20%, transparent)",
     },
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
   patchDivVariant1Case2: {
     backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 10%, transparent)",
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 10%, transparent)",
     },
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   patchDivVariant1Case3: {
     backgroundColor: null,
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
   },
   patchDivVariant1Case4: {
     backgroundColor: null,
@@ -76,7 +76,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   fileRowSpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   fileRowSpanVariant2: {},
 });
@@ -98,10 +98,10 @@ const viewStyles = stylex.create({
     textAlign: "center",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   changesReviewSpan: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   changesReviewDiv: {
     display: "flex",
@@ -109,11 +109,11 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
   },
   changesReviewSpan2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   changesReviewDiv2: {
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   changesReviewDiv3: {
     marginTop: "calc(var(--spacing) * 1.5)",
@@ -123,27 +123,27 @@ const viewStyles = stylex.create({
   },
   changesReviewSpan3: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   changesReviewDiv4: {
     marginTop: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   changesReviewP2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   changesReviewSpan4: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontFamily: "var(--font-mono)",
@@ -165,7 +165,7 @@ const viewStyles = stylex.create({
   },
   changesHeadSpan: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
@@ -181,7 +181,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   changesBodyDiv: {
     display: "flex",
@@ -193,7 +193,7 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   changesBodySpan2: {
     minWidth: "0",
@@ -207,21 +207,21 @@ const viewStyles = stylex.create({
   changesBodySpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   plusMinusSpan: {
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
   fileRowSpan: {
     borderRadius: ".25rem",
     backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 15%, transparent)",
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   patchPre: {
     marginInline: "calc(var(--spacing) * 2)",
@@ -229,7 +229,7 @@ const viewStyles = stylex.create({
     maxHeight: "calc(var(--spacing) * 80)",
     overflow: "auto",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingBlock: "var(--spacing)",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",

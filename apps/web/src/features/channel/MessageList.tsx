@@ -31,40 +31,50 @@ import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools
 import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
-const variantStyles3 = stylex.create({
-  messageListIcon: {
-    rotate: "90deg",
+const recipeStyles = stylex.create({
+  messageListDiv: {
+    borderRadius: "var(--radius-md)",
+    transitionProperty: "opacity,translate,background-color",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".28s",
   },
-});
-
-const variantStyles2 = stylex.create({
-  dispatchA: {
-    minWidth: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-water)",
-    textDecorationLine: {
+  messageListDivVariant1Case1: {
+    translate: null,
+    opacity: null,
+  },
+  messageListDivVariant1Case2: {
+    translate: {
       default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
+      "@starting-style": "0 calc(var(--spacing) * 2)",
+    },
+    opacity: {
+      default: null,
+      "@starting-style": "0",
+    },
+  },
+  messageListDivVariant2Case1: {
+    backgroundColor: null,
+  },
+  messageListDivVariant2Case2: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 25%, transparent)",
     },
   },
 });
 
-const variantStyles = stylex.create({
-  messageListDiv: {
+const viewStyles = stylex.create({
+  messageListRoot: {
     position: "relative",
     display: "flex",
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
   },
-  pendingLinesDiv: {},
-  pendingLinesDivVariant: {
+  toLatestIcon: {
+    rotate: "90deg",
+  },
+  pendingSending: {
     opacity: ".6",
   },
   dayLineDiv: {
@@ -75,26 +85,38 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  dayLineDivVariant: {
-    color: "var(--wb-berry)",
+  dayLineNew: {
+    color: "var(--color-berry)",
   },
-  dayLineDivVariant2: {
-    color: "var(--wb-muted)",
+  dayLineNormal: {
+    color: "var(--color-muted)",
   },
   dayLineSpan: {
     height: "1px",
     flex: "1",
   },
-  dayLineSpanVariant: {
-    backgroundColor: "var(--wb-berry)",
+  dayLineRuleNew: {
+    backgroundColor: "var(--color-berry)",
   },
-  dayLineSpanVariant2: {
-    backgroundColor: "var(--wb-line)",
+  dayLineRuleNormal: {
+    backgroundColor: "var(--color-line)",
   },
-});
-
-const viewStyles = stylex.create({
   dispatchRow: { display: "flex", alignItems: "flex-start", gap: "calc(var(--spacing) * 1.5)" },
+  dispatchA: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
   dispatchIcon: { opacity: { default: 0.5, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", dispatchRow)]: 1 } } },
   threadIcon: { opacity: { default: 0.6, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", threadPreview)]: 1 } } },
   threadButton: {
@@ -129,7 +151,7 @@ const viewStyles = stylex.create({
   messageListSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   messageListButton: {
     cursor: "pointer",
@@ -139,10 +161,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-faint)",
+      default: "var(--color-faint)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -150,7 +172,7 @@ const viewStyles = stylex.create({
     marginBottom: "calc(var(--spacing) * 2)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingBottom: "calc(var(--spacing) * 2)",
   },
   messagesFailed: {
@@ -158,14 +180,14 @@ const viewStyles = stylex.create({
     textAlign: "center",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   messagesEmpty: {
     paddingBlock: "calc(var(--spacing) * 8)",
     textAlign: "center",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   messageListP: {
     paddingInline: "calc(var(--spacing) * 6)",
@@ -173,7 +195,7 @@ const viewStyles = stylex.create({
     textAlign: "center",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--leading-relaxed)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   messageListDiv4: {
     display: "flex",
@@ -199,7 +221,7 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   pendingRetry: {
     display: "inline-flex",
@@ -210,17 +232,17 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -262,7 +284,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dispatchDiv: {
     minWidth: "0",
@@ -294,7 +316,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dispatchButton2: {
     marginTop: "5px",
@@ -317,13 +339,13 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderLeftStyle: "solid",
     borderLeftWidth: "2px",
-    borderColor: "var(--wb-wheat)",
-    backgroundColor: "var(--wb-hover)",
+    borderColor: "var(--color-wheat)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   messageRowSpan: {
     minWidth: "0",
@@ -339,7 +361,7 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   threadPreviewSpan: {
     display: "flex",
@@ -351,7 +373,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
   threadPreviewSpan3: {
     flex: "1",
@@ -364,7 +386,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   threadPreviewSpan5: {
     display: "flex",
@@ -384,7 +406,7 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -492,7 +514,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div {...stylex.attrs(variantStyles.messageListDiv)}>
+    <div {...stylex.attrs(viewStyles.messageListRoot)}>
       <Show when={awayFrom() !== undefined}>
         <button
           type="button"
@@ -500,7 +522,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           onClick={toLatest}
           class="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 animate-pop-in cursor-pointer items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 text-xs text-ink shadow-float transition-colors duration-120 hover:bg-hover"
         >
-          <Icon name="expand" size={12} styles={[variantStyles3.messageListIcon]} />
+          <Icon name="expand" size={12} styles={viewStyles.toLatestIcon} />
           {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
         </button>
       </Show>
@@ -571,13 +593,13 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                 data-kind={item().message.kind}
                 data-lit={lit() === item().message.number && item().message.channel === id() ? "" : undefined}
                 data-number={item().message.channel === id() ? item().message.number : undefined}
-                class={[
-                  "rounded-md transition-[opacity,translate,background-color] duration-280",
-                  {
-                    "starting:translate-y-2 starting:opacity-0": item().message.at > shownAt,
-                    "bg-wheat/25": lit() === item().message.number && item().message.channel === id(),
-                  },
-                ]}
+                {...stylex.attrs(
+                  recipeStyles.messageListDiv,
+                  item().message.at > shownAt ? recipeStyles.messageListDivVariant1Case2 : recipeStyles.messageListDivVariant1Case1,
+                  lit() === item().message.number && item().message.channel === id()
+                    ? recipeStyles.messageListDivVariant2Case2
+                    : recipeStyles.messageListDivVariant2Case1,
+                )}
               >
                 <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
                 <Show when={item().message.id === firstNew()}>
@@ -632,12 +654,7 @@ function PendingLines(props: { channel: string | undefined; messages: readonly C
   return (
     <For each={lines()} keyed={(l) => l.key}>
       {(l) => (
-        <div
-          data-testid="pending-line"
-          data-key={l().key}
-          data-state={l().state}
-          {...stylex.attrs(variantStyles.pendingLinesDiv, l().state === "sending" ? variantStyles.pendingLinesDivVariant : variantStyles.pendingLinesDiv)}
-        >
+        <div data-testid="pending-line" data-key={l().key} data-state={l().state} {...stylex.attrs(l().state === "sending" && viewStyles.pendingSending)}>
           <Frame
             face={<OwnerFace size={36} />}
             name={t("web.channel.messages.owner")}
@@ -671,13 +688,10 @@ const litMs = 2500;
 
 function DayLine(props: { label: string; tone?: "new" }) {
   return (
-    <div
-      {...stylex.attrs(variantStyles.dayLineDiv, props.tone === "new" ? variantStyles.dayLineDivVariant : variantStyles.dayLineDivVariant2)}
-      role="separator"
-    >
-      <span {...stylex.attrs(variantStyles.dayLineSpan, props.tone === "new" ? variantStyles.dayLineSpanVariant : variantStyles.dayLineSpanVariant2)} />
+    <div {...stylex.attrs(viewStyles.dayLineDiv, props.tone === "new" ? viewStyles.dayLineNew : viewStyles.dayLineNormal)} role="separator">
+      <span {...stylex.attrs(viewStyles.dayLineSpan, props.tone === "new" ? viewStyles.dayLineRuleNew : viewStyles.dayLineRuleNormal)} />
       {props.label}
-      <span {...stylex.attrs(variantStyles.dayLineSpan, props.tone === "new" ? variantStyles.dayLineSpanVariant : variantStyles.dayLineSpanVariant2)} />
+      <span {...stylex.attrs(viewStyles.dayLineSpan, props.tone === "new" ? viewStyles.dayLineRuleNew : viewStyles.dayLineRuleNormal)} />
     </div>
   );
 }
@@ -753,7 +767,7 @@ function Dispatch(props: { m: ChatMessage }) {
               {(i) => (
                 <p {...stylex.attrs(viewStyles.dispatchP)}>
                   <span {...stylex.attrs(viewStyles.dispatchSpan)}>{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
-                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" {...stylex.attrs(variantStyles2.dispatchA)}>
+                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" {...stylex.attrs(viewStyles.dispatchA)}>
                     #{i().number} {i().title}
                   </A>
                   <Show when={i().repo}>{(p) => <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{p()}</span>}</Show>

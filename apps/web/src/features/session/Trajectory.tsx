@@ -36,6 +36,15 @@ import {
   waterfallOf,
 } from "./runs";
 
+const recipeStyles2 = stylex.create({
+  toolDetailPre: {
+    fontFamily: "var(--font-mono)",
+    whiteSpace: "pre-wrap",
+    WebkitUserSelect: "text",
+    userSelect: "text",
+  },
+});
+
 const recipeStyles = stylex.create({
   rowSpan: {
     width: "calc(var(--spacing) * 15)",
@@ -47,7 +56,7 @@ const recipeStyles = stylex.create({
     paddingLeft: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowSpan2: {
     marginTop: "1px",
@@ -105,8 +114,8 @@ const variantStyles = stylex.create({
   },
   rowDivVariant: {
     backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 35%, transparent)",
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 35%, transparent)",
     },
   },
   rowDivVariant2: {
@@ -114,7 +123,7 @@ const variantStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -125,7 +134,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   rowSpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   rowSpanVariant2: {},
   toolLineSpan: {
@@ -142,7 +151,7 @@ const variantStyles = stylex.create({
     textAlign: "left",
   },
   trajectoryListButtonVariant: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
 });
 
@@ -183,20 +192,20 @@ const viewStyles = stylex.create({
     overflowY: "auto",
     borderBlockStyle: "solid",
     borderBlockWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingBlock: "var(--spacing)",
   },
   stepsEmpty: {
     paddingTop: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   trajectoryP: {
     paddingTop: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowButton: {
     display: "flex",
@@ -224,11 +233,11 @@ const viewStyles = stylex.create({
     paddingLeft: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   toolLineSpan: {
     fontFamily: "var(--font-mono)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   toolDetailDiv: {
     display: "flex",
@@ -241,7 +250,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   toolDetailSpan: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   waterfallViewDiv: {
     display: "flex",
@@ -249,7 +258,7 @@ const viewStyles = stylex.create({
   waterfallViewSpan: {
     fontSize: "var(--text-2xs)",
     lineHeight: "1",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   waterfallViewDiv2: {
     position: "relative",
@@ -261,7 +270,7 @@ const viewStyles = stylex.create({
     position: "absolute",
     insetInline: "0",
     borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   markableDiv: {
     marginBlock: "calc(var(--spacing) * .5)",
@@ -272,8 +281,8 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     borderRadius: "var(--radius-md)",
     backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 12%, transparent)",
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 12%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
@@ -293,11 +302,11 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     cursor: "pointer",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-accent)",
+    backgroundColor: "var(--color-accent)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-page)",
+    color: "var(--color-page)",
     opacity: {
       default: null,
       ":disabled": ".5",
@@ -310,7 +319,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -354,7 +363,7 @@ const viewStyles = stylex.create({
   trajectoryListSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   trajectoryListSpan4: {
     borderRadius: ".25rem",
@@ -388,7 +397,7 @@ const laneNames: Record<Lane, string> = {
 };
 
 // Usage is not a step of the work: the page's own hover ground, with the theme's ink, in either theme.
-const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "var(--wb-hover)" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
+const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "var(--color-hover)" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
 
 const lightInk = "#fffaf0";
 const darkInk = "#2f1f13";
@@ -403,7 +412,7 @@ const luminance = (hex: string) => {
 
 /** The words on a fill: whichever ink stands out more from it (WCAG's ratio), so a mid-tone fill gets the readable one. */
 function inkOn(fill: string) {
-  if (!/^#[0-9a-f]{6}$/iu.test(fill)) return "var(--wb-ink)";
+  if (!/^#[0-9a-f]{6}$/iu.test(fill)) return "var(--color-ink)";
   const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   const l = luminance(fill);
   return ratio(l, luminance(lightInk)) >= ratio(l, luminance(darkInk)) ? lightInk : darkInk;
@@ -700,7 +709,7 @@ function ToolDetail(props: { step: SessionEvent }) {
       </span>
       <Show when={input()}>
         <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.input")}</span>
-        <pre class="font-mono whitespace-pre-wrap select-text">{input()}</pre>
+        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{input()}</pre>
       </Show>
       <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.output")}</span>
       <Show
@@ -711,7 +720,7 @@ function ToolDetail(props: { step: SessionEvent }) {
           </span>
         }
       >
-        <pre class="font-mono whitespace-pre-wrap select-text">{props.step.output}</pre>
+        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{props.step.output}</pre>
       </Show>
     </div>
   );

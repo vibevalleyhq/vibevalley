@@ -41,7 +41,7 @@ const recipeStyles = stylex.create({
     width: "352px",
     backgroundColor: "var(--color-cream-50)",
     padding: "calc(var(--spacing) * 3)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
 });
 
@@ -79,7 +79,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "var(--spacing)",
     color: "var(--color-cream-50)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
   repoSignSpan2: {
     fontSize: "10px",
@@ -124,7 +124,7 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     borderStyle: "solid",
     borderWidth: "2px",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
   topLeftSpan3: {
     display: "inline-block",
@@ -141,7 +141,7 @@ const viewStyles = stylex.create({
     borderWidth: "2px",
     paddingInline: "calc(var(--spacing) * 1.5)",
     paddingBlock: "calc(var(--spacing) * .5)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
   topLeftSpan5: {
     display: "flex",
@@ -171,7 +171,7 @@ const viewStyles = stylex.create({
     alignItems: "flex-start",
   },
   topRightSpan: {
-    backgroundColor: "var(--wb-berry)",
+    backgroundColor: "var(--color-berry)",
     paddingInline: "var(--spacing)",
     fontSize: "10px",
     color: "var(--color-cream-50)",
@@ -196,7 +196,7 @@ const viewStyles = stylex.create({
     gap: "3px",
     borderStyle: "solid",
     borderWidth: "2px",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
   toolBarSpan2: {
     fontSize: "12px",
@@ -270,7 +270,7 @@ const viewStyles = stylex.create({
   machineP2: {
     marginTop: "calc(var(--spacing) * .5)",
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   machineDiv3: {
     display: "flex",

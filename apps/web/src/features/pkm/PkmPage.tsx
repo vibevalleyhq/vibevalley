@@ -28,17 +28,17 @@ const variantStyles2 = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -49,8 +49,8 @@ const variantStyles = stylex.create({
     minHeight: "0",
     flexShrink: "0",
     flexDirection: "column",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
     padding: "calc(var(--spacing) * 3)",
     width: {
       default: null,
@@ -141,7 +141,7 @@ const viewStyles = stylex.create({
       default: "1px",
       "@media (width>=80rem)": "0",
     },
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
     position: {

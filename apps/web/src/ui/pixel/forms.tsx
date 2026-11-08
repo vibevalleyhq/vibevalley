@@ -5,10 +5,10 @@ import { t } from "@vibevalley/i18n";
 
 import { splitChips } from "./cells";
 import { SpriteIcon } from "./icons";
-import { pxFocus } from "./style";
+import { pxFocus, pxStyle } from "./style";
 
-const recipeStyles = stylex.create({
-  pxChipsInputDiv: {
+const viewStyles = stylex.create({
+  box: {
     display: "flex",
     minHeight: "calc(var(--spacing) * 9)",
     flexWrap: "wrap",
@@ -16,15 +16,11 @@ const recipeStyles = stylex.create({
     gap: "var(--spacing)",
     backgroundColor: "var(--color-cream-100)",
     padding: "calc(var(--spacing) * 1.5)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-cream-300)",
   },
-  pxChipsInputDivVariant1Case1: {
-    opacity: null,
-  },
-  pxChipsInputDivVariant1Case2: {
+  disabled: {
     opacity: ".5",
   },
-  pxChipsInputSpan: {
+  chip: {
     display: "inline-flex",
     alignItems: "center",
     gap: "var(--spacing)",
@@ -32,40 +28,24 @@ const recipeStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * .5)",
     paddingRight: "var(--spacing)",
     paddingLeft: "calc(var(--spacing) * 2)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
     color: "var(--color-bark-800)",
-    fontSynthesis: "none",
   },
-  pxChipsInputInput: {
+  input: {
     height: "calc(var(--spacing) * 6)",
     backgroundColor: "transparent",
     paddingInline: "var(--spacing)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
     color: {
       default: "var(--color-bark-900)",
       "::placeholder": "var(--color-bark-500)",
     },
     caretColor: "var(--color-bark-900)",
     outlineStyle: "none",
-    fontSynthesis: "none",
   },
-  pxChipsInputInputVariant1Case1: {
+  inputAfterChips: {
     width: "calc(var(--spacing) * 24)",
     flexGrow: "1",
-    minWidth: null,
-    flex: null,
   },
-  pxChipsInputInputVariant1Case2: {
-    width: null,
-    flexGrow: null,
+  inputEmpty: {
     minWidth: "0",
     flex: "1",
   },
@@ -87,15 +67,10 @@ export function PxChipsInput(props: {
     setDraft("");
   };
   return (
-    <div
-      {...stylex.attrs(
-        recipeStyles.pxChipsInputDiv,
-        !(props.disabled !== true) ? recipeStyles.pxChipsInputDivVariant1Case2 : recipeStyles.pxChipsInputDivVariant1Case1,
-      )}
-    >
+    <div {...stylex.attrs(pxStyle.ring, viewStyles.box, props.disabled === true && viewStyles.disabled)}>
       <For each={props.value}>
         {(chip) => (
-          <span {...stylex.attrs(recipeStyles.pxChipsInputSpan)}>
+          <span {...stylex.attrs(pxStyle.xs, viewStyles.chip)}>
             {chip}
             <button
               type="button"
@@ -128,10 +103,7 @@ export function PxChipsInput(props: {
           }
         }}
         // The box takes the whole row while there are no chips (room for the placeholder) and 96 px after them.
-        {...stylex.attrs(
-          recipeStyles.pxChipsInputInput,
-          props.value.length === 0 ? recipeStyles.pxChipsInputInputVariant1Case2 : recipeStyles.pxChipsInputInputVariant1Case1,
-        )}
+        {...stylex.attrs(pxStyle.sm, viewStyles.input, props.value.length === 0 ? viewStyles.inputEmpty : viewStyles.inputAfterChips)}
       />
     </div>
   );

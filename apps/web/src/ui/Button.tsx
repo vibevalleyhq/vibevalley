@@ -4,6 +4,7 @@ import { omit } from "solid-js";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { styleProps } from "./positioner";
 
 export type Tone = "plain" | "primary" | "quiet" | "danger";
 
@@ -61,10 +62,15 @@ export function Button(
     ),
 ) {
   const rest = omit(props, "tone", "icon", "children", "styles", "style");
-  const appearance = () => stylex.props(styles.button, tones[props.tone ?? "plain"], props.styles);
-  const inline = () => (typeof props.style === "object" || props.style === undefined ? { ...appearance().style, ...props.style } : props.style);
+  const appearance = () => {
+    const composed = styleProps([styles.button, tones[props.tone ?? "plain"], props.styles]);
+    return {
+      ...composed,
+      style: typeof props.style === "object" || props.style === undefined ? { ...composed.style, ...props.style } : props.style,
+    };
+  };
   return (
-    <button type="button" {...rest} class={appearance().className} style={inline()}>
+    <button type="button" {...rest} {...appearance()}>
       {props.icon && <Icon name={props.icon} size={14} />}
       {props.children}
     </button>

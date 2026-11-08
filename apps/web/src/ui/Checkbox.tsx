@@ -4,8 +4,9 @@ import { omit } from "solid-js";
 import { Checkbox as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
+import { styleProps } from "./positioner";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   box: {
     display: "flex",
     width: "calc(var(--spacing) * 4)",
@@ -29,7 +30,7 @@ const variantStyles = stylex.create({
     transitionTimingFunction: "var(--default-transition-timing-function)",
     opacity: { default: null, ":disabled": 0.5 },
   },
-  checkboxBaseIndicator: {
+  indicator: {
     display: "flex",
   },
 });
@@ -47,10 +48,6 @@ export function Checkbox(props: {
   "data-key"?: string | number;
 }) {
   const rest = omit(props, "checked", "onChange", "label", "indeterminate", "disabled", "testid", "styles");
-  const appearance = () => {
-    const { className, ...attributes } = stylex.props(variantStyles.box, props.styles);
-    return { ...attributes, class: className };
-  };
   return (
     <Base.Root
       {...rest}
@@ -60,9 +57,9 @@ export function Checkbox(props: {
       disabled={props.disabled}
       aria-label={props.label}
       data-testid={props.testid}
-      {...appearance()}
+      {...styleProps([styles.box, props.styles])}
     >
-      <Base.Indicator {...stylex.attrs(variantStyles.checkboxBaseIndicator)}>
+      <Base.Indicator {...stylex.attrs(styles.indicator)}>
         <Icon name={props.indeterminate === true ? "partly" : "ticked"} size={12} />
       </Base.Indicator>
     </Base.Root>

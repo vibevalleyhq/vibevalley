@@ -28,7 +28,7 @@ const viewStyles = stylex.create({
   formP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   formDiv: {
     display: "flex",
@@ -47,7 +47,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingTop: "calc(var(--spacing) * 4)",
   },
   channelDangerDiv2: {
@@ -61,7 +61,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   channelDangerP: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   channelDangerUl: {
     listStyleType: "disc",

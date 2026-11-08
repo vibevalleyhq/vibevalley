@@ -32,30 +32,30 @@ const recipeStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   monthButtonVariant1Case1: {
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   monthButtonVariant1Case2: {
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   monthButtonVariant2Case1: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     fontWeight: null,
   },
   monthButtonVariant2Case2: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-semibold)",
   },
   monthButtonVariant3Case1: {
     boxShadow: null,
   },
   monthButtonVariant3Case2: {
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 0 calc(1px + 0) var(--wb-accent), 0 0 transparent",
+    boxShadow: "0 0 0 calc(1px + 0) var(--color-accent)",
   },
 });
 
@@ -74,10 +74,10 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -89,7 +89,7 @@ const viewStyles = stylex.create({
     flex: "1",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   monthDiv2: {
     display: "grid",
@@ -97,7 +97,7 @@ const viewStyles = stylex.create({
     textAlign: "center",
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   monthDiv3: {
     display: "grid",
@@ -120,7 +120,7 @@ const viewStyles = stylex.create({
     width: "var(--spacing)",
     height: "var(--spacing)",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-accent)",
+    backgroundColor: "var(--color-accent)",
   },
 });
 

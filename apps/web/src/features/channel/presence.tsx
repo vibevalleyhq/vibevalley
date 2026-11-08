@@ -23,12 +23,12 @@ const viewStyles = stylex.create({
   countSpan: {
     flexShrink: "0",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-accent)",
+    backgroundColor: "var(--color-accent)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-page)",
+    color: "var(--color-page)",
     fontVariantNumeric: "tabular-nums",
   },
 });

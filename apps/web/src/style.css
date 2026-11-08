@@ -264,6 +264,20 @@
   --color-px-shade: #3a2a1899;
   --color-px-dent: #2f1f1340;
   --color-px-scrim: #1e140a73;
+  /* Pre-color-mix fallbacks retain the original 8-bit alpha, not rounded percentages. */
+  --color-px-leaf-wash: #b4cb7c99;
+  --color-px-leaf-strong: #b4cb7cb3;
+  --color-px-leaf-hover: #b4cb7c66;
+  --color-px-leaf-soft: #b4cb7c80;
+  --color-px-paper-glass: #f7e8c4cc;
+  --color-px-debug-surface: #14110ef5;
+  --color-lcd-panel: #c9dc9acc;
+  --color-px-canvas-shade: #2f1f1399;
+  --color-px-choice-well: #c8a46eb3;
+  --color-avatar-paper: #fffaf0eb;
+  --color-avatar-soft-paper: #fffaf0bf;
+  --color-catalog-shade: #2f1f13b3;
+  --color-px-dialog-backdrop: #2f1f134d;
   --color-water-500: #4f8fbd;
   --color-wheat-700: #b8682a;
   --color-berry-500: #c84a3a;

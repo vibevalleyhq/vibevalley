@@ -10,15 +10,15 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   splitterStoriesDiv2: {
     position: "relative",
     flexShrink: "0",
     borderRightStyle: "solid",
     borderRightWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
     padding: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -28,7 +28,7 @@ const viewStyles = stylex.create({
     padding: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

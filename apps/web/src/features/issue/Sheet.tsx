@@ -58,10 +58,10 @@ const variantStyles = stylex.create({
     flex: "1",
   },
   stagesDivVariant3: {
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
   },
   stagesDivVariant4: {
-    backgroundColor: "var(--wb-line)",
+    backgroundColor: "var(--color-line)",
   },
   stagesSpan: {
     width: "calc(var(--spacing) * 2)",
@@ -69,7 +69,7 @@ const variantStyles = stylex.create({
     borderRadius: "2147483647px",
   },
   stagesSpanVariant: {
-    backgroundColor: "var(--wb-wheat)",
+    backgroundColor: "var(--color-wheat)",
   },
 });
 
@@ -95,7 +95,7 @@ const viewStyles = stylex.create({
   propertySpan: {
     width: "calc(var(--spacing) * 16)",
     flexShrink: "0",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   propertyDiv2: {
     minWidth: "0",
@@ -111,7 +111,7 @@ const viewStyles = stylex.create({
       default: "1px",
       ":last-child": "0",
     },
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   foldButton: {
     display: "flex",
@@ -125,7 +125,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -142,7 +142,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   foldDiv2: {
     paddingBottom: "calc(var(--spacing) * 3)",
@@ -160,10 +160,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -173,7 +173,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   stagesDiv: {
     display: "flex",

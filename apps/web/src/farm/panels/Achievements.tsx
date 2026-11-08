@@ -26,7 +26,7 @@ const recipeStyles = stylex.create({
     overflowY: "auto",
     backgroundColor: "var(--color-cream-50)",
     padding: "calc(var(--spacing) * 1.5)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
 });
 

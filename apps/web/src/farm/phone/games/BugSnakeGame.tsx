@@ -26,7 +26,7 @@ const recipeStyles = stylex.create({
     display: "grid",
     placeItems: "center",
     backgroundColor: {
-      default: "var(--color-lcd-paper)cc",
+      default: "var(--color-lcd-panel)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
     },
     textAlign: "center",

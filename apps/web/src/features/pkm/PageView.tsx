@@ -42,10 +42,10 @@ const variantStyles2 = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     textDecorationLine: {
@@ -118,7 +118,7 @@ const viewStyles = stylex.create({
       default: "1px",
       "@media (width>=80rem)": "0",
     },
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
     position: {
@@ -174,7 +174,7 @@ const viewStyles = stylex.create({
   headerP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pkmProps: {
     display: "flex",
@@ -196,11 +196,11 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
   },
   pkmProp2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pkmProp3: {
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "var(--text-xs)",
@@ -211,10 +211,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -230,7 +230,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pkmComment: {
     display: "flex",
@@ -239,7 +239,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     padding: "calc(var(--spacing) * 2.5)",
   },
   pkmCommentAt: {
@@ -251,10 +251,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -268,12 +268,12 @@ const viewStyles = stylex.create({
     whiteSpace: "pre-wrap",
   },
   commentCardDel: {
-    backgroundColor: "var(--wb-bad-soft)",
-    color: "var(--wb-berry)",
+    backgroundColor: "var(--color-bad-soft)",
+    color: "var(--color-berry)",
   },
   commentCardIns: {
-    backgroundColor: "var(--wb-ok-soft)",
-    color: "var(--wb-ok-ink)",
+    backgroundColor: "var(--color-ok-soft)",
+    color: "var(--color-ok-ink)",
     textDecorationLine: "none",
   },
   commentCardDiv: {
@@ -284,7 +284,7 @@ const viewStyles = stylex.create({
   backlinksP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   backlinksDiv: {
     display: "flex",
@@ -294,7 +294,7 @@ const viewStyles = stylex.create({
   backlinksH3: {
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   pkmBacklink: {
     display: "flex",
@@ -306,7 +306,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -321,17 +321,17 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },

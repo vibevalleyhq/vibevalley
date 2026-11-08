@@ -8,43 +8,50 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { defineAtom } from "#/state/atom.ts";
 
 import { SpriteIcon } from "./icons";
-import { pxDrop } from "./style";
+import { pxStyle } from "./style";
 
 const recipeStyles = stylex.create({
-  toastCardSpan: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-leaf-700)",
-    fontSynthesis: "none",
-  },
-  toastCardSpan2: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  toastCardSpan3: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-600)",
-    fontSynthesis: "none",
-  },
-});
-
-const variantStyles = stylex.create({
   toastCardDiv: {
     display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
+    transformOrigin: "50%",
+    touchAction: "none",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    alignSelf: "flex-start",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 3)",
+    color: "var(--color-bark-900)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-drop)",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: ".3s",
+    translate: {
+      default: null,
+      "@starting-style": "0 calc(120% * -1)",
+    },
+  },
+  toastCardDivVariant1Case1: {
+    transitionProperty: {
+      default: "translate,transform,opacity",
+      "@media (prefers-reduced-motion:reduce)": "none",
+    },
+  },
+  toastCardDivVariant1Case2: {
+    transitionProperty: {
+      default: "none",
+      "@media (prefers-reduced-motion:reduce)": "none",
+    },
+  },
+  toastCardDivVariant2Case1: {
+    opacity: "1",
+  },
+  toastCardDivVariant2Case2: {
+    opacity: "0",
+  },
+  toastCardDivVariant3Case1: {
+    pointerEvents: "none",
+  },
+  toastCardDivVariant3Case2: {
+    pointerEvents: "auto",
   },
 });
 
@@ -56,6 +63,18 @@ const viewStyles = stylex.create({
     zIndex: "50",
     display: "flex",
     justifyContent: "center",
+  },
+  toastCardBody: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  toastKicker: {
+    color: "var(--color-leaf-700)",
+  },
+  toastDescription: {
+    color: "var(--color-bark-600)",
   },
 });
 
@@ -201,14 +220,12 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
         "z-index": 100 - props.index,
         transform: `translate(${drag().x}px, ${props.index * 9.6 + drag().y}px) scale(${1 - props.index * 0.05})`,
       }}
-      class={[
-        "flex origin-center touch-none items-center gap-3 self-start bg-cream-50 p-3 text-bark-900",
-        pxDrop,
-        "transition-[translate,transform,opacity] duration-300 ease-out motion-reduce:transition-none starting:-translate-y-[120%]",
-        { "transition-none": drag().x > 0 || drag().y > 0 },
-        props.hidden ? "opacity-0" : "opacity-100",
-        front() ? "pointer-events-auto" : "pointer-events-none",
-      ]}
+      {...stylex.attrs(
+        recipeStyles.toastCardDiv,
+        drag().x > 0 || drag().y > 0 ? recipeStyles.toastCardDivVariant1Case2 : recipeStyles.toastCardDivVariant1Case1,
+        props.hidden ? recipeStyles.toastCardDivVariant2Case2 : recipeStyles.toastCardDivVariant2Case1,
+        front() ? recipeStyles.toastCardDivVariant3Case2 : recipeStyles.toastCardDivVariant3Case1,
+      )}
       onPointerDown={(e) => {
         from = { x: e.clientX, y: e.clientY };
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -236,13 +253,13 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
       >
         {props.leading}
       </Show>
-      <div {...stylex.attrs(variantStyles.toastCardDiv)}>
+      <div {...stylex.attrs(viewStyles.toastCardBody)}>
         <Show when={props.kicker}>
-          <span {...stylex.attrs(recipeStyles.toastCardSpan)}>{props.kicker}</span>
+          <span {...stylex.attrs(pxStyle.xs, viewStyles.toastKicker)}>{props.kicker}</span>
         </Show>
-        <span {...stylex.attrs(recipeStyles.toastCardSpan2)}>{props.toast.title}</span>
+        <span {...stylex.attrs(pxStyle.sm)}>{props.toast.title}</span>
         <Show when={props.toast.description}>
-          <span {...stylex.attrs(recipeStyles.toastCardSpan3)}>{props.toast.description}</span>
+          <span {...stylex.attrs(pxStyle.xs, viewStyles.toastDescription)}>{props.toast.description}</span>
         </Show>
       </div>
     </div>

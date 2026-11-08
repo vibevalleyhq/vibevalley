@@ -19,17 +19,17 @@ const recipeStyles = stylex.create({
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -44,10 +44,10 @@ const variantStyles = stylex.create({
     overflow: "hidden",
   },
   actLinesSpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   actLinesSpanVariant2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   actLinesSpan2: {
     flexShrink: "0",

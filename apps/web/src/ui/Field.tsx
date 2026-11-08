@@ -5,7 +5,7 @@ import { For, omit } from "solid-js";
 import { Select as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
-import { positionerAttrs } from "./positioner";
+import { positionerAttrs, styleProps } from "./positioner";
 import { Hint } from "./Tip";
 
 const styles = stylex.create({
@@ -117,19 +117,14 @@ const styles = stylex.create({
 type ControlAppearance = { styles?: stylex.StyleXStyles; style?: JSX.CSSProperties | undefined };
 export type TextInputProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "class" | "style"> & ControlAppearance;
 
-function controlAttrs(props: ControlAppearance, shape: stylex.StyleXStyles) {
-  const appearance = stylex.props(styles.box, shape, props.styles);
-  return { class: appearance.className, style: { ...appearance.style, ...props.style } };
-}
-
 export function TextInput(props: TextInputProps) {
   const rest = omit(props, "styles", "style");
-  return <input {...rest} {...controlAttrs(props, styles.input)} />;
+  return <input {...rest} {...styleProps([styles.box, styles.input, props.styles], props.style)} />;
 }
 
 export function TextArea(props: Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "class" | "style"> & ControlAppearance) {
   const rest = omit(props, "styles", "style");
-  return <textarea {...rest} {...controlAttrs(props, styles.textarea)} />;
+  return <textarea {...rest} {...styleProps([styles.box, styles.textarea, props.styles], props.style)} />;
 }
 
 /** A label over its control; what it means is behind an info icon beside the label. */
@@ -166,13 +161,6 @@ export function Select<V extends string>(props: {
 }) {
   const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false }] : []), ...props.options];
   const offered = (v: string): v is V => all().some((o) => o.value === v);
-  const trigger = () =>
-    stylex.props(
-      styles.trigger,
-      props.size === "control" ? styles.control : styles.field,
-      props.quiet === true ? styles.quiet : props.filter === true && props.value !== "" ? styles.filter : styles.normal,
-      props.styles,
-    );
   return (
     <Base.Root value={props.value} onValueChange={(v) => offered(v) && props.onChange(v)} items={all()} disabled={props.disabled}>
       <Base.Trigger
@@ -181,8 +169,12 @@ export function Select<V extends string>(props: {
         data-state={props.state}
         aria-busy={props.state === "pending" ? "true" : undefined}
         aria-label={props.label}
-        class={trigger().className}
-        style={trigger().style}
+        {...styleProps([
+          styles.trigger,
+          props.size === "control" ? styles.control : styles.field,
+          props.quiet === true ? styles.quiet : props.filter === true && props.value !== "" ? styles.filter : styles.normal,
+          props.styles,
+        ])}
       >
         <Base.Value class={stylex.attrs(styles.value).class} placeholder={props.placeholder} />
         <Icon name="choose" size={12} styles={styles.chevron} />

@@ -12,6 +12,39 @@ import { type MemoryItem, type MemoryKind, type MemoryTree, TreeStageValues } fr
 import type { SceneHover } from "./Scene";
 import { type Ties, tiesOf } from "./sky";
 
+const recipeStyles2 = stylex.create({
+  panelPxWindow: {
+    position: "absolute",
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  panelPxWindowVariant1Case1: {
+    top: "calc(var(--spacing) * 3)",
+    right: "calc(var(--spacing) * 3)",
+    bottom: "calc(var(--spacing) * 3)",
+    insetInline: null,
+    height: null,
+  },
+  panelPxWindowVariant1Case2: {
+    top: null,
+    right: null,
+    bottom: "calc(var(--spacing) * 2)",
+    insetInline: "calc(var(--spacing) * 2)",
+    height: "48%",
+  },
+  tipPxWindow: {
+    pointerEvents: "none",
+    position: "fixed",
+    zIndex: 40,
+    width: "256px",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+});
+
 const recipeStyles = stylex.create({
   panelH1: {
     fontFamily: "var(--font-pixel)",
@@ -291,7 +324,7 @@ export function Panel(props: {
   return (
     <PxWindow
       testid="tree-panel"
-      class={["absolute flex flex-col gap-3 overflow-y-auto p-4", props.narrow ? "inset-x-2 bottom-2 h-[48%]" : "top-3 right-3 bottom-3"]}
+      styles={[recipeStyles2.panelPxWindow, props.narrow ? recipeStyles2.panelPxWindowVariant1Case2 : recipeStyles2.panelPxWindowVariant1Case1]}
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
       <header {...stylex.attrs(viewStyles.panelHeader)}>
@@ -464,7 +497,7 @@ export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id
   const left = () => Math.min(props.hover.x + 14, window.innerWidth - 270);
   const top = () => Math.min(props.hover.y + 14, window.innerHeight - 110);
   return (
-    <PxWindow class="pointer-events-none fixed z-40 w-[256px] px-2.5 py-2" style={{ left: `${left()}px`, top: `${top()}px` }}>
+    <PxWindow styles={[recipeStyles2.tipPxWindow]} style={{ left: `${left()}px`, top: `${top()}px` }}>
       <div {...stylex.attrs(viewStyles.sectionDiv)}>
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
         <span {...stylex.attrs(recipeStyles.tipSpan)}>

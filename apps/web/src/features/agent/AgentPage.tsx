@@ -36,7 +36,7 @@ const variantStyles2 = stylex.create({
   creatorA: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -60,8 +60,8 @@ const variantStyles = stylex.create({
     color: "var(--color-bark-900)",
   },
   creatorSpanVariant2: {
-    backgroundColor: "var(--wb-hover)",
-    color: "var(--wb-muted)",
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
   },
   creatorDiv: {
     display: "flex",
@@ -72,8 +72,8 @@ const variantStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
   },
   creatorButton: {
     height: "calc(var(--spacing) * 6)",
@@ -84,15 +84,15 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   creatorButtonVariant: {
-    backgroundColor: "var(--wb-ink)",
-    color: "var(--wb-page)",
+    backgroundColor: "var(--color-ink)",
+    color: "var(--color-page)",
   },
   creatorButtonVariant2: {
     backgroundColor: {
-      default: "var(--wb-hover)",
+      default: "var(--color-hover)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-selected)",
+        ":hover": "var(--color-selected)",
       },
     },
   },
@@ -104,10 +104,10 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   problemsLiVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   problemsLiVariant2: {
-    color: "var(--wb-warn-ink)",
+    color: "var(--color-warn-ink)",
   },
 });
 
@@ -116,7 +116,7 @@ const viewStyles = stylex.create({
     padding: "calc(var(--spacing) * 8)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   profileBar: {
     display: "flex",
@@ -126,13 +126,13 @@ const viewStyles = stylex.create({
     rowGap: "calc(var(--spacing) * 2)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingBlock: "calc(var(--spacing) * 3)",
   },
   barSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   barSpan2: {
     display: "flex",
@@ -173,7 +173,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -204,8 +204,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 4)",
     width: {
       default: null,
@@ -231,8 +231,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     width: {
       default: null,
       "@media (width>=64rem)": "calc(var(--spacing) * 108)",
@@ -244,12 +244,12 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-ok-ink)",
+    color: "var(--color-ok-ink)",
   },
   problemsUl: {
     display: "flex",
@@ -259,7 +259,7 @@ const viewStyles = stylex.create({
     overflowY: "auto",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 3)",
   },

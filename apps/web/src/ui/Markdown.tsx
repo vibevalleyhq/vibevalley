@@ -8,6 +8,7 @@ import { type Plugin, unified } from "unified";
 
 import { useRouter } from "#/infra/router.ts";
 
+import { styleProps } from "./positioner";
 import { fragmentOf, remarkIssueRefs, remarkMentions, richen } from "./richText";
 
 const styles = stylex.create({
@@ -32,7 +33,10 @@ const withMentions = unified()
 
 /** Chat text, descriptions and reports: GitHub markdown, made richer in place (richText.ts): safe links, code, Mermaid. */
 export function Markdown(props: { text: string; styles?: stylex.StyleXStyles; mentions?: boolean }) {
-  const appearance = () => stylex.props(styles.text, props.styles);
+  const appearance = () => {
+    const composed = styleProps([styles.text, props.styles]);
+    return { ...composed, class: ["markdown", composed.class] };
+  };
   const router = useRouter();
   // Read through a memo of the text alone.
   const text = createMemo(() => props.text);
@@ -43,9 +47,5 @@ export function Markdown(props: { text: string; styles?: stylex.StyleXStyles; me
     onCleanup(richen(root, { navigate: (to) => router.navigate(to) }));
     return [...root.childNodes];
   });
-  return (
-    <div class={["markdown", appearance().className]} style={appearance().style}>
-      {nodes()}
-    </div>
-  );
+  return <div {...appearance()}>{nodes()}</div>;
 }

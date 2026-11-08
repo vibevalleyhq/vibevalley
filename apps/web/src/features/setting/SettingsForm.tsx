@@ -44,7 +44,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 4)",
   },
   memoryFormP: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   sourceMark: {
     display: "inline-flex",
@@ -59,7 +59,7 @@ const viewStyles = stylex.create({
     },
     outlineColor: {
       default: null,
-      ":focus-visible": "var(--wb-focus)",
+      ":focus-visible": "var(--color-focus)",
     },
   },
   sourceFieldDiv: {
@@ -83,7 +83,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 3)",
   },
@@ -110,7 +110,7 @@ const viewStyles = stylex.create({
   gitHubP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 

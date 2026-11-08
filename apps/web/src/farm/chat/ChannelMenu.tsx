@@ -23,7 +23,7 @@ const recipeStyles = stylex.create({
     width: "calc(var(--spacing) * 72)",
     backgroundColor: "var(--color-cream-50)",
     padding: "calc(var(--spacing) * 2)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
   channelItemButton: {
     display: "flex",
@@ -45,7 +45,7 @@ const recipeStyles = stylex.create({
   },
   channelItemButtonVariant1Case2: {
     backgroundColor: {
-      default: "var(--color-leaf-300)80",
+      default: "var(--color-px-leaf-soft)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
     },
   },
@@ -79,7 +79,7 @@ const viewStyles = stylex.create({
   },
   channelMenuSpan2: {
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   channelMenuDiv2: {
     display: "flex",
@@ -140,7 +140,7 @@ const viewStyles = stylex.create({
     color: "var(--color-bark-500)",
   },
   channelItemSpan4: {
-    backgroundColor: "var(--wb-berry)",
+    backgroundColor: "var(--color-berry)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "12px",
     color: "var(--color-cream-50)",

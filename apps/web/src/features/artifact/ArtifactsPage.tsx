@@ -52,30 +52,30 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   shownButtonVariant1Case2: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
 });
 
 const variantStyles3 = stylex.create({
   artifactsPageIcon: {
     flexShrink: "0",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   artifactsPageIcon2: {
     marginTop: "calc(var(--spacing) * .5)",
     flexShrink: "0",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
 const variantStyles2 = stylex.create({
   shownA: {
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -91,10 +91,10 @@ const variantStyles2 = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -106,8 +106,8 @@ const variantStyles = stylex.create({
     flexShrink: "0",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 3)",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-side)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
     padding: "calc(var(--spacing) * 3)",
     width: {
       default: null,
@@ -140,12 +140,12 @@ const variantStyles = stylex.create({
   },
   artifactsPageSpanVariant: {
     color: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 75%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 75%, transparent)",
     },
   },
   artifactsPageSpanVariant2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   artifactsPageDiv: {
     minHeight: "0",
@@ -217,10 +217,10 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus-within": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
     },
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 2)",
   },
   artifactSearch: {
@@ -232,20 +232,20 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   artifactsPageP: {
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   artifactsPageP2: {
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     display: {
       default: null,
       "@media (width>=64rem)": "none",
@@ -255,7 +255,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   artifactGroup: {
     display: "flex",
@@ -273,16 +273,16 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
   artifactsPageSpan: {
     fontWeight: "var(--font-weight-normal)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   artifactsPageSpan2: {
     display: "flex",
@@ -309,9 +309,9 @@ const viewStyles = stylex.create({
       default: "transparent",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
-      ":focus": "var(--wb-hover)",
+      ":focus": "var(--color-hover)",
     },
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-xl)",
@@ -338,14 +338,14 @@ const viewStyles = stylex.create({
     rowGap: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   shownSpan: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   artifactFrame: {
     minHeight: {
@@ -357,13 +357,13 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
   },
   shownP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   artifactRail: {
     display: "flex",
@@ -378,7 +378,7 @@ const viewStyles = stylex.create({
       default: "1px",
       "@media (width>=80rem)": "0",
     },
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
     width: {
@@ -413,7 +413,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   shownSpan2: {
     fontSize: "var(--text-sm)",
@@ -424,12 +424,12 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-normal)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   shownSpan4: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   shownDiv6: {
     display: "flex",

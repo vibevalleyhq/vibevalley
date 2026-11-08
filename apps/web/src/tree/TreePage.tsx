@@ -15,6 +15,29 @@ import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
 
+const recipeStyles3 = stylex.create({
+  treePageDiv: {
+    position: "fixed",
+    inset: "0",
+    overflow: "hidden",
+    backgroundColor: "var(--color-ground)",
+    fontFamily: "var(--font-pixel)",
+    color: "var(--color-bark-900)",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  treePagePxWindow: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 3)",
+    left: "calc(var(--spacing) * 3)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+});
+
 const recipeStyles = stylex.create({
   treePageDiv: {
     fontFamily: "var(--font-pixel)",
@@ -54,6 +77,18 @@ const recipeStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  controls: {
+    position: "absolute",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  skyControls: { insetInline: "calc(var(--spacing) * 3)", bottom: "calc(var(--spacing) * 3)", marginInline: "auto", maxWidth: "760px" },
+  narrowControls: { insetInline: "calc(var(--spacing) * 2)", top: "calc(52% - 56px)" },
+  groundControls: { bottom: "calc(var(--spacing) * 3)", left: "calc(var(--spacing) * 3)" },
   treePageDiv: {
     position: "absolute",
     top: "calc(var(--spacing) * 3)",
@@ -116,7 +151,7 @@ export function TreePage() {
 
   // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div data-theme="light" class="fixed inset-0 overflow-hidden bg-ground font-pixel text-bark-900 select-none" data-testid="memory-tree">
+    <div data-theme="light" {...stylex.attrs(recipeStyles3.treePageDiv)} data-testid="memory-tree">
       <Scene
         tree={tree}
         filter={filter()}
@@ -151,7 +186,7 @@ export function TreePage() {
           />
         }
       >
-        <PxWindow class="absolute top-3 left-3 px-3 py-2">
+        <PxWindow styles={[recipeStyles2.treePagePxWindow]}>
           <div {...stylex.attrs(recipeStyles.treePageDiv)}>{t("web.tree.sky")}</div>
           <div {...stylex.attrs(recipeStyles.treePageDiv2)}>{t("web.tree.skyHint")}</div>
         </PxWindow>
@@ -167,10 +202,7 @@ export function TreePage() {
         </PxButton>
       </div>
       <PxWindow
-        class={[
-          "absolute flex flex-wrap items-center gap-3 px-3 py-2",
-          sky() ? "inset-x-3 bottom-3 mx-auto max-w-[760px]" : narrow() ? "inset-x-2 top-[calc(52%-56px)]" : "bottom-3 left-3",
-        ]}
+        styles={[viewStyles.controls, sky() ? viewStyles.skyControls : narrow() ? viewStyles.narrowControls : viewStyles.groundControls]}
         style={sky() || narrow() ? undefined : { width: `${Math.min(520, area().w - 24)}px` }}
       >
         <Show when={sky()}>

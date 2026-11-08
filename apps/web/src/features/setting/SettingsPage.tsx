@@ -32,23 +32,23 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   sectionLinkAVariant: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   sectionLinkAVariant2: {
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -70,7 +70,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 4)",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     padding: "calc(var(--spacing) * 3)",
     width: {
       default: null,
@@ -106,14 +106,14 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   settingsPageDiv4: {
     display: "flex",
     flexDirection: "column",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingTop: "calc(var(--spacing) * 3)",
     marginTop: {
       default: null,

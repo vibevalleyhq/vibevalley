@@ -33,7 +33,7 @@ const variantStyles = stylex.create({
     fontSize: "12px",
   },
   reportPVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   reportPVariant2: {
     color: "var(--color-bark-600)",

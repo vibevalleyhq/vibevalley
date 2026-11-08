@@ -18,6 +18,21 @@ import { feedPhoneCalls } from "./phone/calls";
 import { farm, useFarm } from "./store";
 import { farmKeys } from "./tools";
 
+const recipeStyles = stylex.create({
+  farmPageDiv: {
+    position: "relative",
+    isolation: "isolate",
+    height: "100%",
+    overflow: "hidden",
+    backgroundColor: "var(--color-ground)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    color: "var(--color-bark-900)",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  },
+});
+
 const viewStyles = stylex.create({
   farmPageP: {
     position: "absolute",
@@ -54,7 +69,7 @@ export function FarmPage(props: { repo: string }) {
   });
   // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div data-theme="light" class="relative isolate h-full overflow-hidden bg-ground font-pixel text-[12px] text-bark-900 select-none" data-testid="farm">
+    <div data-theme="light" {...stylex.attrs(recipeStyles.farmPageDiv)} data-testid="farm">
       <FarmSounds />
       <FramesContext value={scoped}>
         <VillageCanvas />

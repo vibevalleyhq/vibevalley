@@ -18,6 +18,23 @@ import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "#/
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import { Qr } from "#/ui/Qr.tsx";
 
+const recipeStyles = stylex.create({
+  connectorCardSpan: {
+    display: "inline-block",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--wb-hover)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-3xl)",
+    lineHeight: "var(--text-3xl--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    letterSpacing: "4px",
+    WebkitUserSelect: "all",
+    userSelect: "all",
+  },
+});
+
 const variantStyles = stylex.create({
   qqLoginTextInput: {
     fontFamily: "var(--font-mono)",
@@ -31,7 +48,7 @@ const viewStyles = stylex.create({
     paddingBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   connectorsPageDiv: {
     display: "flex",
@@ -56,7 +73,7 @@ const viewStyles = stylex.create({
     height: "var(--spacing)",
     flexShrink: "0",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-faint)",
+    backgroundColor: "var(--color-faint)",
   },
   rowDiv: {
     display: "flex",
@@ -67,7 +84,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowDiv2: {
     minWidth: "0",
@@ -78,7 +95,7 @@ const viewStyles = stylex.create({
   connectorCardSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   connectorCardP: {
     fontSize: "var(--text-sm)",
@@ -87,12 +104,12 @@ const viewStyles = stylex.create({
   connectorCardP2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   connectorCardP3: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   channelPickSpan: {
     display: "flex",
@@ -103,7 +120,7 @@ const viewStyles = stylex.create({
   channelPickSpan2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   qqLoginForm: {
     display: "flex",
@@ -128,7 +145,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: "var(--color-white)",
     padding: "calc(var(--spacing) * 2)",
   },
@@ -293,7 +310,7 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
         <Match when={state() === "pairing"}>
           <p {...stylex.attrs(viewStyles.connectorCardP)}>{t("web.connector.connectors.pairing", { app: label() })}</p>
           <div>
-            <span class="inline-block rounded-lg bg-hover px-4 py-2 font-mono text-3xl font-semibold tracking-[4px] select-all">{props.status.pairCode}</span>
+            <span {...stylex.attrs(recipeStyles.connectorCardSpan)}>{props.status.pairCode}</span>
           </div>
           <p {...stylex.attrs(viewStyles.connectorCardP2)}>{t("web.connector.connectors.pairingNote")}</p>
           {disconnect()}

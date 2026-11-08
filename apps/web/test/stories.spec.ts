@@ -7,6 +7,36 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: pixel windows and fields preserve composed variables, editing and node identity", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/像素/base:Composition", theme: "light", w: "500" })}`);
+  const window = page.getByTestId("pixel-window-composition");
+  const input = page.getByTestId("pixel-input-composition");
+  const area = window.locator("textarea");
+  const original = await input.elementHandle();
+  await expect(window).toHaveCSS("width", "300px");
+  await expect(window).toHaveCSS("margin-top", "8px");
+  await expect(input.locator("..")).toHaveCSS("margin-left", "4px");
+  await input.fill("登");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(input).toHaveValue("登录页");
+  await expect(area).toHaveValue("登录页");
+  await page.getByTestId("resize-pixel-composition").click();
+  await expect(window).toHaveCSS("width", "360px");
+  await expect(input.locator("..")).toHaveCSS("margin-left", "16px");
+  await expect(area.locator("..")).toHaveCSS("margin-left", "16px");
+  expect(await input.evaluate((current, before) => current === before, original)).toBe(true);
+  await expect(area).toHaveCSS("line-height", "17.1432px");
+  await page.locator('[data-testid="story-arg"][data-name="reading"]').getByRole("checkbox").check();
+  await expect(area).toHaveCSS("line-height", "23.8px");
+  await page.locator('[data-testid="story-arg"][data-name="disabled"]').getByRole("checkbox").check();
+  await expect(input).toBeDisabled();
+  await expect(area).toBeDisabled();
+  await expect(input.locator("..")).toHaveCSS("opacity", "0.5");
+  check();
+});
+
 test("regression: icon buttons retain keyboard selection and disabled styling", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {

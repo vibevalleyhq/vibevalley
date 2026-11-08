@@ -4,69 +4,33 @@ import { For, Match, Switch } from "solid-js";
 import type { BadgeTone } from "@vibevalley/protocol";
 
 import type { SpriteAtlas, SpriteInfo } from "./atlas";
+import { pxStyle } from "./style";
 
-const recipeStyles2 = stylex.create({
+const viewStyles = stylex.create({
   animalFaceSpan: {
     position: "relative",
     display: "inline-block",
     flexShrink: "0",
     overflow: "hidden",
     backgroundColor: {
-      default: "var(--color-leaf-300)99",
+      default: "var(--color-px-leaf-wash)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
     },
   },
-});
-
-const recipeStyles = stylex.create({
-  pieceViewSpan: {
-    fontFamily: "var(--font-pixel)",
-    fontWeight: "var(--font-weight-normal)",
-  },
-  pieceViewSpanVariant1Case1: {
-    overflow: null,
-  },
-  pieceViewSpanVariant1Case2: {
-    overflow: "hidden",
-  },
-  pieceViewSpanVariant2Case1: {
-    textAlign: null,
-  },
-  pieceViewSpanVariant2Case2: {
-    textAlign: "center",
-  },
-});
-
-const variantStyles = stylex.create({
-  pixelCardDiv: {
-    boxSizing: "border-box",
-    display: "flex",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
-  },
-  pixelCardDivVariant: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pixelCardDivVariant2: {},
-  pixelCardDiv2: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  pixelCardDivVariant3: {
-    alignItems: "center",
-  },
-  pixelCardDivVariant4: {
-    alignItems: "flex-start",
-  },
-});
-
-const viewStyles = stylex.create({
   animalFaceImg: {
     position: "absolute",
     maxWidth: "none",
     imageRendering: "pixelated",
+  },
+  pieceWords: {
+    fontFamily: "var(--font-pixel)",
+    fontWeight: "var(--font-weight-normal)",
+  },
+  pieceWordsClamped: {
+    overflow: "hidden",
+  },
+  pieceWordsCenter: {
+    textAlign: "center",
   },
   pieceViewImg: {
     flexShrink: "0",
@@ -88,12 +52,32 @@ const viewStyles = stylex.create({
     insetBlock: "0",
     left: "0",
   },
-  pixelCardDiv: {
+  pixelCardOuter: {
     display: "inline-block",
     paddingRight: "calc(var(--spacing) * .5)",
     paddingBottom: "calc(var(--spacing) * .5)",
   },
-  pixelCardDiv2: {
+  pixelCardBox: {
+    boxSizing: "border-box",
+    display: "flex",
+    borderStyle: "solid",
+    borderWidth: "2px",
+  },
+  pixelCardCentred: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pixelCardRows: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  pixelCardRowsCenter: {
+    alignItems: "center",
+  },
+  pixelCardRowsStart: {
+    alignItems: "flex-start",
+  },
+  pixelCardRow: {
     display: "flex",
     alignItems: "center",
     gap: "3px",
@@ -146,7 +130,7 @@ export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: numb
     return { url: sp.url, left: props.size / 2 - (sp.w / 2) * k, top: props.size / 2 - (sp.h * 0.25 + sp.h * 0.03) * k, width: sp.w * k, height: sp.h * k };
   };
   return (
-    <span {...stylex.attrs(recipeStyles2.animalFaceSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }} aria-hidden="true">
+    <span {...stylex.attrs(viewStyles.animalFaceSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }} aria-hidden="true">
       <img
         src={cut().url}
         alt=""
@@ -164,11 +148,7 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
       <Match when={props.piece.kind === "words" ? props.piece : undefined}>
         {(p) => (
           <span
-            {...stylex.attrs(
-              recipeStyles.pieceViewSpan,
-              props.maxLines !== undefined ? recipeStyles.pieceViewSpanVariant1Case2 : recipeStyles.pieceViewSpanVariant1Case1,
-              props.center ? recipeStyles.pieceViewSpanVariant2Case2 : recipeStyles.pieceViewSpanVariant2Case1,
-            )}
+            {...stylex.attrs(viewStyles.pieceWords, props.maxLines !== undefined && viewStyles.pieceWordsClamped, props.center && viewStyles.pieceWordsCenter)}
             style={{
               "font-size": `${p().size ?? 12}px`,
               "line-height": `${(p().size ?? 12) + 2}px`,
@@ -263,9 +243,9 @@ export function PixelCard(props: {
 }) {
   const centred = () => !(props.center !== true) || props.width !== undefined || props.height !== undefined;
   return (
-    <div {...stylex.attrs(viewStyles.pixelCardDiv)}>
+    <div {...stylex.attrs(viewStyles.pixelCardOuter)}>
       <div
-        {...stylex.attrs(variantStyles.pixelCardDiv, centred() ? variantStyles.pixelCardDivVariant : variantStyles.pixelCardDivVariant2)}
+        {...stylex.attrs(pxStyle.shade, viewStyles.pixelCardBox, centred() && viewStyles.pixelCardCentred)}
         style={{
           background: props.paper ?? CardColors.paper,
           "border-color": CardColors.ink,
@@ -274,10 +254,10 @@ export function PixelCard(props: {
           "min-height": props.height !== undefined ? `${props.height}px` : undefined,
         }}
       >
-        <div {...stylex.attrs(variantStyles.pixelCardDiv2, props.center === true ? variantStyles.pixelCardDivVariant3 : variantStyles.pixelCardDivVariant4)}>
+        <div {...stylex.attrs(viewStyles.pixelCardRows, props.center === true ? viewStyles.pixelCardRowsCenter : viewStyles.pixelCardRowsStart)}>
           <For each={props.rows} keyed={false}>
             {(row) => (
-              <div {...stylex.attrs(viewStyles.pixelCardDiv2)}>
+              <div {...stylex.attrs(viewStyles.pixelCardRow)}>
                 <For each={row()} keyed={false}>
                   {(p) => (
                     <PieceView

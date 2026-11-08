@@ -36,7 +36,7 @@ const recipeStyles2 = stylex.create({
     borderColor: "var(--color-cream-300)",
     backgroundColor: "var(--color-cream-50)",
     paddingBlock: "var(--spacing)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
   messageMenuButton: {
     cursor: "pointer",
@@ -46,7 +46,7 @@ const recipeStyles2 = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--color-leaf-300)66",
+        ":hover": "var(--color-px-leaf-hover)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
           ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
@@ -61,7 +61,7 @@ const recipeStyles2 = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--color-leaf-300)66",
+        ":hover": "var(--color-px-leaf-hover)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
           ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
@@ -81,7 +81,7 @@ const recipeStyles2 = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--color-leaf-300)66",
+        ":hover": "var(--color-px-leaf-hover)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
           ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
@@ -96,12 +96,12 @@ const recipeStyles2 = stylex.create({
     paddingBlock: "var(--spacing)",
     textAlign: "left",
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--color-leaf-300)66",
+        ":hover": "var(--color-px-leaf-hover)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
           ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
@@ -119,7 +119,7 @@ const recipeStyles2 = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--color-cream-300)",
     backgroundColor: {
-      default: "var(--color-cream-50)cc",
+      default: "var(--color-px-paper-glass)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-cream-50) 80%, transparent)",
       "@media (hover:hover)": {
         default: null,
@@ -217,14 +217,14 @@ const variantStyles = stylex.create({
   },
   chatRowDivVariant3: {
     backgroundColor: "var(--color-leaf-500)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 2px 0 0 var(--color-leaf-700)",
+    boxShadow: "0 2px 0 0 var(--color-leaf-700)",
   },
   chatRowDivVariant4: {
     borderStyle: "solid",
     borderWidth: "1.5px",
     borderColor: "var(--color-cream-300)",
     backgroundColor: "var(--color-cream-100)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 2px 0 0 var(--color-leaf-edge)",
+    boxShadow: "0 2px 0 0 var(--color-leaf-edge)",
   },
 });
 
@@ -278,15 +278,15 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     color: "var(--color-bark-900)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-cream-300)",
+    boxShadow: "inset 0 0 0 2px var(--color-cream-300)",
     outlineStyle: "none",
   },
   chatBubbleSpan: {
     marginBottom: "var(--spacing)",
     display: "inline-block",
     backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 40%, transparent)",
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 40%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "12px",
@@ -337,7 +337,7 @@ const viewStyles = stylex.create({
     color: "var(--color-leaf-700)",
   },
   threadChipSpan2: {
-    backgroundColor: "var(--wb-berry)",
+    backgroundColor: "var(--color-berry)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "12px",
     color: "var(--color-cream-50)",

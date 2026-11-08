@@ -18,7 +18,7 @@ const variantStyles = stylex.create({
     gap: "calc(var(--spacing) * 4)",
   },
   formStoriesSpan: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 

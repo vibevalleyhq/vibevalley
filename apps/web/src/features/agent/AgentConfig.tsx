@@ -57,7 +57,7 @@ const variantStyles2 = stylex.create({
   skillPickerA: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: "underline",
   },
 });
@@ -91,18 +91,18 @@ const variantStyles = stylex.create({
   },
   runtimeChoiceButtonVariant: {
     borderColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 40%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
     },
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   runtimeChoiceButtonVariant2: {
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -132,10 +132,10 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   runtimeChoiceSpanVariant4: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runtimeChoiceSpanVariant5: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   skillPickerButton: {
     display: "flex",
@@ -159,15 +159,15 @@ const variantStyles = stylex.create({
     borderRadius: ".25rem",
     borderStyle: "solid",
     borderWidth: "1px",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
   },
   skillPickerSpanVariant: {
-    borderColor: "var(--wb-accent)",
+    borderColor: "var(--color-accent)",
   },
   skillPickerSpanVariant2: {
     borderColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 25%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 25%, transparent)",
     },
   },
   toolsDiv: {
@@ -184,7 +184,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   inventorySpanVariant: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: "line-through",
   },
 });
@@ -193,7 +193,7 @@ const viewStyles = stylex.create({
   runtimeChoiceSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runtimeChoiceDiv: {
     display: "grid",
@@ -215,7 +215,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     padding: "calc(var(--spacing) * 3)",
   },
   supportH3: {
@@ -237,11 +237,11 @@ const viewStyles = stylex.create({
   supportSpan3: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   supportSpan4: {
     fontFamily: "var(--font-mono)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   skillPickerDiv: {
     display: "flex",
@@ -264,13 +264,13 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
   toolsSpan: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
@@ -284,17 +284,17 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   toolsButton: {
     cursor: "pointer",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-berry)",
+        ":hover": "var(--color-berry)",
       },
     },
   },
@@ -315,12 +315,12 @@ const viewStyles = stylex.create({
     borderRadius: ".25rem",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 1.5)",
@@ -329,10 +329,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
   },
@@ -354,7 +354,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   inventorySpan2: {
     maxWidth: "calc(var(--spacing) * 40)",
@@ -363,7 +363,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

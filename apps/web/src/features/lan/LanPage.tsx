@@ -15,6 +15,24 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { Qr } from "#/ui/Qr.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+const recipeStyles = stylex.create({
+  lanPageSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    WebkitUserSelect: "all",
+    userSelect: "all",
+  },
+  pairingP: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+    wordBreak: "break-all",
+    WebkitUserSelect: "all",
+    userSelect: "all",
+  },
+});
+
 const variantStyles = stylex.create({
   lanPageSpan: {
     display: "flex",
@@ -34,7 +52,7 @@ const viewStyles = stylex.create({
   lanPageSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   lanPageP: {
     fontSize: "var(--text-sm)",
@@ -49,7 +67,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   lanPageDiv3: {
     display: "flex",
@@ -59,7 +77,7 @@ const viewStyles = stylex.create({
   lanPageP2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   lanPageUl: {
     display: "flex",
@@ -67,7 +85,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 1.5)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingTop: "calc(var(--spacing) * 3)",
   },
   lanPageLi: {
@@ -75,7 +93,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   lanPageSpan3: {
     marginTop: "calc(var(--spacing) * 2)",
@@ -83,7 +101,7 @@ const viewStyles = stylex.create({
     height: "var(--spacing)",
     flexShrink: "0",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-faint)",
+    backgroundColor: "var(--color-faint)",
   },
   lanPageDiv4: {
     display: "flex",
@@ -104,7 +122,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pairing: {
     display: "flex",
@@ -115,7 +133,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: "var(--color-white)",
     padding: "calc(var(--spacing) * 2)",
   },
@@ -129,7 +147,7 @@ const viewStyles = stylex.create({
   pairingP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pairingDiv2: {
     display: "flex",
@@ -191,7 +209,7 @@ export function LanPage() {
               >
                 <div {...stylex.attrs(viewStyles.lanPageDiv2)}>
                   <span {...stylex.attrs(viewStyles.lanPageSpan2)}>{t("web.lan.lan.address")}</span>
-                  <span data-testid="lan-url" class="font-mono text-sm select-all">
+                  <span data-testid="lan-url" {...stylex.attrs(recipeStyles.lanPageSpan)}>
                     {s().url ?? "—"}
                   </span>
                 </div>
@@ -295,7 +313,7 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
           </div>
           <div {...stylex.attrs(viewStyles.pairingDiv)}>
             <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.scan")}</p>
-            <p data-testid="pairing-link" class="font-mono text-2xs break-all select-all">
+            <p data-testid="pairing-link" {...stylex.attrs(recipeStyles.pairingP)}>
               {props.pairing.link}
             </p>
             <p {...stylex.attrs(viewStyles.pairingP)}>{t("web.lan.lan.left", { s: left() })}</p>

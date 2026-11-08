@@ -29,12 +29,12 @@ const variantStyles2 = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
-      default: "var(--wb-page)",
+      default: "var(--color-page)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 2.5)",
@@ -50,10 +50,10 @@ const variantStyles = stylex.create({
     borderRadius: "2147483647px",
   },
   deskSpanVariant: {
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
   },
   deskSpanVariant2: {
-    backgroundColor: "var(--wb-faint)",
+    backgroundColor: "var(--color-faint)",
   },
   shellDiv: {
     display: "flex",
@@ -91,13 +91,13 @@ const viewStyles = stylex.create({
     right: "var(--spacing)",
     minWidth: "calc(var(--spacing) * 4)",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-wheat)",
+    backgroundColor: "var(--color-wheat)",
     paddingInline: "var(--spacing)",
     textAlign: "center",
     fontSize: "var(--text-2xs)",
     lineHeight: "calc(var(--spacing) * 4)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   rail: {
     display: "flex",
@@ -111,8 +111,8 @@ const viewStyles = stylex.create({
     overflowY: "auto",
     borderRightStyle: "solid",
     borderRightWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-rail)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-rail)",
     paddingBottom: "calc(var(--spacing) * 3)",
   },
   railDiv: {
@@ -135,8 +135,8 @@ const viewStyles = stylex.create({
     height: "1px",
     width: "calc(var(--spacing) * 8)",
     backgroundColor: {
-      default: "var(--wb-on-rail)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-on-rail) 10%, transparent)",
+      default: "var(--color-on-rail)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-on-rail) 10%, transparent)",
     },
   },
   railDiv4: {
@@ -170,7 +170,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 5)",
   },
   deskSpan: {
@@ -222,7 +222,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
         // The farm's face at the top is a square picture.
         props.name === undefined ? "size-11 sm:size-12" : "size-12 sm:size-14",
       ]}
-      style={props.current === true ? { background: "color-mix(in srgb, var(--wb-on-rail) 9%, transparent)" } : undefined}
+      style={props.current === true ? { background: "color-mix(in srgb, var(--color-on-rail) 9%, transparent)" } : undefined}
     >
       {props.children}
       <Show when={props.name}>{(name) => <span {...stylex.attrs(viewStyles.slotSpan)}>{name()}</span>}</Show>

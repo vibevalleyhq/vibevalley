@@ -32,10 +32,24 @@ test.each([
 });
 
 test("inventory recognizes the imported StyleX attrs boundary, not an arbitrary lookalike", () => {
-  const result = source('import * as sx from "@stylexjs/stylex"; const View=()=> <div {...sx.attrs(styles.root)} class={sx.attrs(styles.other).class} />;');
+  const result = source(
+    'import * as sx from "@stylexjs/stylex"; import { styleProps } from "./positioner"; const View=()=> <div {...sx.attrs(styles.root)} {...styleProps(styles.other)} class={sx.attrs(styles.other).class} />;',
+  );
   expect(result.findings).toEqual([]);
   expect(result.classifications.every((classification) => classification.kind === "stylex-attrs")).toBe(true);
   expect(categories("<div class={sx.attrs(styles.root).class} />")).toContain("unresolved-class-member");
+});
+
+test("regression: inventory rejects alpha suffixes left after replacing a hex color with a variable", () => {
+  const result = source(`import * as sx from "@stylexjs/stylex";
+    const styles = sx.create({ root: {
+      backgroundColor: { default: "var(--color-leaf-300)99", ":hover": "var(--color-cream-50)CC" },
+      color: "var(--color-ink)",
+      boxShadow: "0 0 2px var(--color-px-leaf-wash)",
+      content: '"var(--color-leaf-300)99"',
+    } });`);
+  expect(result.findings.map((finding) => finding.category)).toEqual(["invalid-color-variable-suffix", "invalid-color-variable-suffix"]);
+  expect(result.findings.every((finding) => finding.evidence.includes("Fix:") && finding.evidence.includes("See docs/style/design.md"))).toBe(true);
 });
 
 test("inventory checks imperative DOM class producers", () => {

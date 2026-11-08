@@ -32,12 +32,25 @@ import { issueState, noStepsText, stageTone } from "./overview";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { issueDeliver, shownDeliver } from "./write";
 
+const recipeStyles2 = stylex.create({
+  issueDetailSpan: {
+    minWidth: "0",
+    flex: "1",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    wordBreak: "break-all",
+    WebkitUserSelect: "text",
+    userSelect: "text",
+  },
+});
+
 const recipeStyles = stylex.create({
   issueDetailSpan: {
     flexShrink: "0",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     flexBasis: {
       default: null,
       "@container not (width>=560px)": "100%",
@@ -49,7 +62,7 @@ const variantStyles3 = stylex.create({
   issueDetailMarkdown: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
 });
 
@@ -73,12 +86,12 @@ const variantStyles = stylex.create({
   },
   issueDetailSpan: {},
   issueDetailSpanVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   issueDetailSpanVariant2: {
     color: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 80%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 80%, transparent)",
     },
   },
   issueDetailDiv: {
@@ -99,7 +112,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -119,7 +132,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   issueNow: {
     marginTop: "calc(var(--spacing) * 1.5)",
@@ -154,18 +167,18 @@ const viewStyles = stylex.create({
     marginBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
   },
   issueDetailDiv7: {
     marginBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   issueDetailP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   issueDetailDiv8: {
     marginTop: "calc(var(--spacing) * 2)",
@@ -173,12 +186,12 @@ const viewStyles = stylex.create({
   issueDetailDiv9: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   issueDetailDiv10: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   issueDetailDiv11: {
     display: "flex",
@@ -194,7 +207,7 @@ const viewStyles = stylex.create({
     display: "block",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -206,13 +219,13 @@ const viewStyles = stylex.create({
   issueDetailP2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   issueDetailDiv13: {
     marginTop: "calc(var(--spacing) * 3)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   issueDetailSummary: {
     cursor: "pointer",
@@ -224,7 +237,7 @@ const viewStyles = stylex.create({
   issueDetailSpan3: {
     marginLeft: "calc(var(--spacing) * 2)",
     fontWeight: "var(--font-weight-normal)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   issueDetailDiv14: {
     marginBottom: "calc(var(--spacing) * 3)",
@@ -233,7 +246,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
   },
   issueDetailSpan4: {
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
   },
   issueDetailSpan5: {
     fontFamily: "var(--font-mono)",
@@ -253,12 +266,12 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   issueDetailDiv15: {
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
     textDecorationLine: "line-through",
   },
 });
@@ -603,7 +616,7 @@ export function IssueDetail(props: {
           {(worktree) => (
             <Property label="worktree">
               <span {...stylex.attrs(viewStyles.issueDetailSpan6)}>
-                <span class="min-w-0 flex-1 font-mono text-xs break-all select-text">{worktree()}</span>
+                <span {...stylex.attrs(recipeStyles2.issueDetailSpan)}>{worktree()}</span>
                 <button
                   type="button"
                   aria-label={t("web.issue.detail.copyPath")}

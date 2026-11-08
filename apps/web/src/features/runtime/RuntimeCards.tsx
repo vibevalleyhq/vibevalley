@@ -69,7 +69,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   usagePVariant: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   usagePVariant2: {},
   supportCardSpan: {
@@ -80,13 +80,13 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
   },
   supportCardSpanVariant: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   supportCardSpanVariant2: {
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    color: "var(--wb-muted)",
+    borderColor: "var(--color-line)",
+    color: "var(--color-muted)",
     textDecorationLine: "line-through",
   },
   inventoryCardSpan: {
@@ -95,7 +95,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
   },
   inventoryCardSpanVariant: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
     textDecorationLine: "line-through",
   },
 });
@@ -104,7 +104,7 @@ const viewStyles = stylex.create({
   usageP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-warn-ink)",
+    color: "var(--color-warn-ink)",
   },
   usageDiv: {
     display: "flex",
@@ -125,7 +125,7 @@ const viewStyles = stylex.create({
   usageP2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   windowDiv: {
     display: "flex",
@@ -139,12 +139,12 @@ const viewStyles = stylex.create({
   },
   windowSpan2: {
     flex: "1",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   windowSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   supportCardDiv: {
     display: "flex",
@@ -163,7 +163,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   supportCardSpan3: {
     fontFamily: "var(--font-mono)",
@@ -180,7 +180,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   settingsCardSpan: {
     display: "flex",
@@ -197,7 +197,7 @@ const viewStyles = stylex.create({
   settingsCardSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   modelsCardSpan: {
     fontFamily: "var(--font-mono)",
@@ -207,11 +207,11 @@ const viewStyles = stylex.create({
   modelsCardSpan2: {
     marginLeft: "calc(var(--spacing) * 2)",
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-ok-soft)",
+    backgroundColor: "var(--color-ok-soft)",
     paddingInline: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-ok-ink)",
+    color: "var(--color-ok-ink)",
   },
   inventoryCardLi: {
     display: "flex",
@@ -223,7 +223,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

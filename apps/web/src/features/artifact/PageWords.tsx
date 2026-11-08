@@ -23,11 +23,11 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     borderLeftStyle: "solid",
     borderLeftWidth: "2px",
-    borderColor: "var(--wb-wheat)",
+    borderColor: "var(--color-wheat)",
     paddingLeft: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -41,12 +41,12 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pageWordsP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   pageWordsDiv: {
     display: "flex",

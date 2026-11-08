@@ -31,7 +31,7 @@ const recipeStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowSpanVariant1Case1: {
     display: null,
@@ -54,7 +54,7 @@ const recipeStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowSpan3: {
     width: {
@@ -65,7 +65,7 @@ const recipeStyles = stylex.create({
     textAlign: "right",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -87,14 +87,14 @@ const variantStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2.5)",
   },
   rowDivVariant: {
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   rowDivVariant2: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -122,8 +122,8 @@ const viewStyles = stylex.create({
     alignItems: "center",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingRight: "var(--spacing)",
   },
   issueListButton: {
@@ -148,7 +148,7 @@ const viewStyles = stylex.create({
   issueListSpan2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   rowSpan: {
     display: "flex",

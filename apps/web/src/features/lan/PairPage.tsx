@@ -16,9 +16,9 @@ const viewStyles = stylex.create({
     minHeight: "100dvh",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "var(--wb-side)",
+    backgroundColor: "var(--color-side)",
     paddingInline: "calc(var(--spacing) * 4)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   pairPageForm: {
     display: "flex",
@@ -29,8 +29,8 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 5)",
   },
   pairPageH1: {
@@ -41,7 +41,7 @@ const viewStyles = stylex.create({
   pairPageP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   pairPageP2: {
     fontSize: "var(--text-sm)",
@@ -50,7 +50,7 @@ const viewStyles = stylex.create({
   pairPageP3: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
 });
 

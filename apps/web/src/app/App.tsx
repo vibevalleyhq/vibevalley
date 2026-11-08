@@ -34,7 +34,7 @@ import { Shell } from "./Shell";
 
 const variantStyles = stylex.create({
   missingPageLink: {
-    color: "var(--wb-accent)",
+    color: "var(--color-accent)",
     textDecorationLine: "underline",
   },
 });
@@ -45,9 +45,9 @@ const viewStyles = stylex.create({
     height: "100%",
     placeContent: "center",
     gap: "calc(var(--spacing) * 4)",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 6)",
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   missingPageH1: {
     fontSize: "var(--text-lg)",

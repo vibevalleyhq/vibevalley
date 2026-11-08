@@ -17,7 +17,7 @@ const variantStyles = stylex.create({
     padding: "calc(var(--spacing) * 4)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   feedbackStoriesLi: {
     paddingInline: "calc(var(--spacing) * 4)",

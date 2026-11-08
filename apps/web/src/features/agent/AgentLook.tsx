@@ -17,7 +17,7 @@ const recipeStyles = stylex.create({
   stageSpan: {
     borderRadius: "var(--radius-md)",
     backgroundColor: {
-      default: "var(--color-paper)eb",
+      default: "var(--color-avatar-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 92%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 3)",
@@ -29,7 +29,7 @@ const recipeStyles = stylex.create({
     maxWidth: "calc(var(--spacing) * 96)",
     borderRadius: ".25rem",
     backgroundColor: {
-      default: "var(--color-paper)bf",
+      default: "var(--color-avatar-soft-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 2)",
@@ -45,7 +45,7 @@ const recipeStyles = stylex.create({
     right: "calc(var(--spacing) * 4)",
     borderRadius: ".25rem",
     backgroundColor: {
-      default: "var(--color-paper)bf",
+      default: "var(--color-avatar-soft-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
     },
     paddingInline: "calc(var(--spacing) * 2)",
@@ -71,18 +71,18 @@ const variantStyles = stylex.create({
   },
   tileButtonVariant: {
     borderColor: {
-      default: "var(--wb-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 40%, transparent)",
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
     },
-    backgroundColor: "var(--wb-selected)",
+    backgroundColor: "var(--color-selected)",
   },
   tileButtonVariant2: {
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -94,7 +94,7 @@ const variantStyles = stylex.create({
     fontWeight: "var(--font-weight-semibold)",
   },
   tileSpanVariant2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -113,7 +113,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   labeledSpan2: {
     flex: "1",
@@ -121,7 +121,7 @@ const viewStyles = stylex.create({
   labeledSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   lookPanelDiv: {
     display: "flex",

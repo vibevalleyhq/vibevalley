@@ -21,7 +21,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   displayMenuDiv2: {
     marginTop: "calc(var(--spacing) * 2.5)",
@@ -34,14 +34,14 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--leading-relaxed)",
     whiteSpace: "pre-line",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   displayReset: {
     marginTop: "calc(var(--spacing) * 2)",
     cursor: "pointer",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {

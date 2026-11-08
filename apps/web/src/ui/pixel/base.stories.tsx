@@ -4,9 +4,36 @@ import { stories, story } from "@vibevalley/stories";
 
 import { DashedLine, PxCard, PxFrame, PxWindow } from "./base";
 import { PxButton } from "./button";
+import { PxTextArea, PxTextInput } from "./field";
 import { storyFrame } from "./story.stylex";
 
+const recipeStyles = stylex.create({
+  baseStoriesPxCard: {
+    width: "calc(var(--spacing) * 72)",
+  },
+  baseStoriesDashedLine: {
+    marginBlock: "calc(var(--spacing) * 3)",
+  },
+  baseStoriesPxWindow: {
+    width: "calc(var(--spacing) * 64)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  baseStoriesPxFrame: {
+    width: "calc(var(--spacing) * 56)",
+  },
+});
+
+const papers = stylex.create({
+  "bg-cream-50": { backgroundColor: "var(--color-cream-50)" },
+  "bg-cream-100": { backgroundColor: "var(--color-cream-100)" },
+  "bg-lcd-paper": { backgroundColor: "var(--color-lcd-paper)" },
+});
+
+const paperChoices: Record<string, stylex.StyleXStyles<{ backgroundColor?: string }>> = papers;
+
 const viewStyles = stylex.create({
+  composedWindow: (width: number) => ({ width, marginLeft: "12px", padding: "calc(var(--spacing) * 3)" }),
+  composedControl: (marginLeft: number) => ({ marginLeft, maxWidth: "240px" }),
   baseStoriesDiv: {
     padding: "calc(var(--spacing) * 3)",
   },
@@ -17,12 +44,42 @@ export default stories({
   themes: ["light"],
   frame: storyFrame.pixel,
   stories: {
+    Composition: story({
+      args: { width: 300, indent: 4, border: true, value: "", well: false, mono: false, disabled: false, reading: false },
+      render: (a, set) => (
+        <PxWindow testid="pixel-window-composition" border={a.border} styles={viewStyles.composedWindow(a.width)} style={{ "margin-top": "8px" }}>
+          <PxTextInput
+            testid="pixel-input-composition"
+            label="名字"
+            value={a.value}
+            onChange={(value) => set({ value })}
+            styles={viewStyles.composedControl(a.indent)}
+            well={a.well}
+            mono={a.mono}
+            disabled={a.disabled}
+            suggestions={["登录页", "首页"]}
+          />
+          <PxTextArea
+            label="说明"
+            value={a.value}
+            onChange={(value) => set({ value })}
+            styles={viewStyles.composedControl(a.indent)}
+            reading={a.reading}
+            mono={a.mono}
+            disabled={a.disabled}
+          />
+          <PxButton data-testid="resize-pixel-composition" onClick={() => set({ width: 360, indent: 16 })}>
+            改尺寸
+          </PxButton>
+        </PxWindow>
+      ),
+    }),
     Card: story({
       args: { title: "今天的收成", aside: "3 块地" },
       render: (a) => (
-        <PxCard title={a.title} aside={a.aside} class="w-72">
+        <PxCard title={a.title} aside={a.aside} styles={[recipeStyles.baseStoriesPxCard]}>
           <p>两块熟了，一块缺肥。</p>
-          <DashedLine class="my-3" />
+          <DashedLine styles={[recipeStyles.baseStoriesDashedLine]} />
           <PxButton tone="primary" onClick={() => undefined}>
             去看看
           </PxButton>
@@ -32,7 +89,7 @@ export default stories({
     Window: story({
       args: { border: true },
       render: (a) => (
-        <PxWindow border={a.border} class="w-64 p-4">
+        <PxWindow border={a.border} styles={[recipeStyles.baseStoriesPxWindow]}>
           窗子里的纸
         </PxWindow>
       ),
@@ -41,7 +98,7 @@ export default stories({
       args: { paper: "bg-cream-50" },
       controls: { paper: { kind: "choice", options: ["bg-cream-50", "bg-cream-100", "bg-lcd-paper"] } },
       render: (a) => (
-        <PxFrame paper={a.paper} class="w-56">
+        <PxFrame paper={paperChoices[a.paper]} styles={[recipeStyles.baseStoriesPxFrame]}>
           <div {...stylex.attrs(viewStyles.baseStoriesDiv)}>框里的东西离边 2 像素</div>
         </PxFrame>
       ),

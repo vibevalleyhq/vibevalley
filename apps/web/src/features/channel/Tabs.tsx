@@ -24,8 +24,8 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 3)",
   },
   cronCardDiv: {
@@ -34,8 +34,8 @@ const recipeStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     borderRadius: "var(--radius-lg)",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 3)",
   },
   cronCardDivVariant1Case1: {
@@ -82,7 +82,7 @@ const viewStyles = stylex.create({
   sessionsSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   sessionsSpan4: {
     display: "flex",
@@ -90,7 +90,7 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   sessionsSpan5: {
     textOverflow: "ellipsis",

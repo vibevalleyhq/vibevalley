@@ -39,7 +39,7 @@ const recipeStyles = stylex.create({
   },
   friendButtonVariant1Case2: {
     backgroundColor: {
-      default: "var(--color-leaf-300)99",
+      default: "var(--color-px-leaf-wash)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
     },
   },
@@ -53,7 +53,7 @@ const recipeStyles = stylex.create({
     backgroundColor: "var(--color-cream-50)",
     padding: "calc(var(--spacing) * 3)",
     textAlign: "left",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
 });
 

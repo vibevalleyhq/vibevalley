@@ -9,39 +9,6 @@ import { Icon } from "./Icon";
 import { IconButton, OutLink } from "./IconButton";
 import { Hint, Tip } from "./Tip";
 
-const variantStyles2 = stylex.create({
-  keyMarkIcon: {},
-  keyMarkIconVariant: {
-    color: "var(--wb-berry)",
-  },
-  keyMarkIconVariant2: {
-    color: "var(--wb-leaf)",
-  },
-});
-
-const variantStyles = stylex.create({
-  keyFieldSpan: {},
-  keyFieldSpanVariant: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--wb-muted)",
-  },
-  keyFieldSpanVariant2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  keyFieldDiv: {
-    minWidth: "0",
-    flex: "1",
-  },
-  keyFieldDivVariant: {
-    pointerEvents: "none",
-    opacity: ".4",
-  },
-});
-
 const viewStyles = stylex.create({
   keyMark: {
     display: "inline-flex",
@@ -62,15 +29,21 @@ const viewStyles = stylex.create({
     },
     outlineColor: {
       default: null,
-      ":focus-visible": "var(--wb-focus)",
+      ":focus-visible": "var(--color-focus)",
     },
   },
   keyMarkSpan: {
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   keyMarkSpan2: {
     fontFamily: "var(--font-mono)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
+  },
+  keyMarkRemoving: {
+    color: "var(--color-berry)",
+  },
+  keyMarkPresent: {
+    color: "var(--color-leaf)",
   },
   keyFieldDiv: {
     display: "flex",
@@ -82,6 +55,17 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 1.5)",
   },
+  keyFieldLabelSmall: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-muted)",
+  },
+  keyFieldLabelNormal: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
   keyFieldSpan: {
     flex: "1",
   },
@@ -89,6 +73,14 @@ const viewStyles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: "var(--spacing)",
+  },
+  keyFieldControlWrap: {
+    minWidth: "0",
+    flex: "1",
+  },
+  keyFieldControlRemoving: {
+    pointerEvents: "none",
+    opacity: ".4",
   },
   saveBar: {
     position: "sticky",
@@ -98,8 +90,8 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     paddingBlock: "calc(var(--spacing) * 2.5)",
   },
   saveBarDiv: {
@@ -119,17 +111,17 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -144,18 +136,18 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-accent)",
+    borderColor: "var(--color-accent)",
     backgroundColor: {
-      default: "var(--wb-accent)",
+      default: "var(--color-accent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-accent-hover)",
+        ":hover": "var(--color-accent-hover)",
       },
     },
     paddingInline: "calc(var(--spacing) * 2.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-page)",
+    color: "var(--color-page)",
     opacity: {
       default: null,
       ":disabled": ".5",
@@ -198,7 +190,7 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
           <Icon
             name={props.removing === true ? "cross" : "check"}
             size={12}
-            styles={[variantStyles2.keyMarkIcon, props.removing === true ? variantStyles2.keyMarkIconVariant : variantStyles2.keyMarkIconVariant2]}
+            styles={props.removing === true ? viewStyles.keyMarkRemoving : viewStyles.keyMarkPresent}
           />
           <Show when={props.removing !== true && props.status.hint}>
             <span {...stylex.attrs(viewStyles.keyMarkSpan2)} aria-hidden="true">
@@ -227,16 +219,14 @@ export function KeyField(props: {
   return (
     <div {...stylex.attrs(viewStyles.keyFieldDiv)}>
       <div {...stylex.attrs(viewStyles.keyFieldDiv2)}>
-        <span {...stylex.attrs(variantStyles.keyFieldSpan, props.small === true ? variantStyles.keyFieldSpanVariant : variantStyles.keyFieldSpanVariant2)}>
-          {props.label}
-        </span>
+        <span {...stylex.attrs(props.small === true ? viewStyles.keyFieldLabelSmall : viewStyles.keyFieldLabelNormal)}>{props.label}</span>
         <KeyMark status={props.status} removing={props.removing} />
         <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         <span {...stylex.attrs(viewStyles.keyFieldSpan)} />
         <Show when={props.link}>{(l) => <OutLink href={l().href} label={l().label} />}</Show>
       </div>
       <div {...stylex.attrs(viewStyles.keyFieldDiv3)}>
-        <div {...stylex.attrs(variantStyles.keyFieldDiv, props.removing ? variantStyles.keyFieldDivVariant : variantStyles.keyFieldSpan)}>{props.children}</div>
+        <div {...stylex.attrs(viewStyles.keyFieldControlWrap, props.removing && viewStyles.keyFieldControlRemoving)}>{props.children}</div>
         <Show when={props.status.source === "settings"}>
           <IconButton
             icon={props.removing ? "undo" : "delete"}

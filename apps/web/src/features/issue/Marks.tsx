@@ -20,7 +20,7 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
     fontSize: "var(--text-2xs)",
     lineHeight: "14px",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   progressMarkSvg: {
     rotate: "-90deg",

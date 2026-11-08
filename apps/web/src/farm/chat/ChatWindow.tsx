@@ -140,21 +140,21 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     cursor: "pointer",
     backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 15%, transparent)",
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-berry)",
+        ":hover": "var(--color-berry)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-berry) 25%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-berry) 25%, transparent)",
         },
       },
     },
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "1px",
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   farmChat: {
     position: "relative",
@@ -222,7 +222,7 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   pendingRetry: {
     cursor: "pointer",
@@ -261,7 +261,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   chatWindowButton: {
     maxWidth: "calc(var(--spacing) * 40)",
@@ -297,8 +297,8 @@ const viewStyles = stylex.create({
     borderBottomWidth: "1px",
     borderColor: "var(--color-cream-200)",
     backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 10%, transparent)",
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 10%, transparent)",
     },
   },
   callProblemDiv: {

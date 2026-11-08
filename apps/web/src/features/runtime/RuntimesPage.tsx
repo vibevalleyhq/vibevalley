@@ -24,10 +24,10 @@ const variantStyles2 = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     textDecorationLine: "underline",
@@ -39,7 +39,7 @@ const variantStyles2 = stylex.create({
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingBlock: "var(--spacing)",
     paddingRight: "calc(var(--spacing) * 3)",
     paddingLeft: "var(--spacing)",
@@ -49,7 +49,7 @@ const variantStyles2 = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -75,7 +75,7 @@ const viewStyles = stylex.create({
     padding: "calc(var(--spacing) * 8)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   runtimesPageDiv: {
     height: "100%",
@@ -86,7 +86,7 @@ const viewStyles = stylex.create({
     paddingBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runtimesPageSpan: {
     display: "flex",
@@ -118,7 +118,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   detailH2: {
     fontSize: "var(--text-xl)",
@@ -128,7 +128,7 @@ const viewStyles = stylex.create({
   detailP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   detailDiv3: {
     display: "flex",
@@ -138,22 +138,22 @@ const viewStyles = stylex.create({
     paddingTop: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   detailSpan2: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-ok-soft)",
+    backgroundColor: "var(--color-ok-soft)",
     paddingInline: "calc(var(--spacing) * 1.5)",
-    color: "var(--wb-ok-ink)",
+    color: "var(--color-ok-ink)",
   },
   detailSpan3: {
     fontFamily: "var(--font-mono)",
   },
   detailSpan4: {
     borderRadius: ".25rem",
-    backgroundColor: "var(--wb-bad-soft)",
+    backgroundColor: "var(--color-bad-soft)",
     paddingInline: "calc(var(--spacing) * 1.5)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   detailDiv4: {
     display: "grid",

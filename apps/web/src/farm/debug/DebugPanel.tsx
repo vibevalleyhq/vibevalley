@@ -30,14 +30,14 @@ const recipeStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     overflow: "hidden",
     backgroundColor: {
-      default: "var(--color-ink-950)f5",
+      default: "var(--color-px-debug-surface)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink-950) 96%, transparent)",
     },
     padding: "calc(var(--spacing) * 3)",
     fontFamily: "var(--font-mono)",
     fontSize: "12px",
     color: "var(--color-paper)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    boxShadow: "var(--shadow-px)",
   },
 });
 

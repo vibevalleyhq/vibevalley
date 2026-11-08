@@ -32,7 +32,7 @@ const recipeStyles = stylex.create({
     color: null,
   },
   storySpanVariant1Case2: {
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   storySpanVariant2Case1: {
     fontWeight: null,
@@ -52,7 +52,7 @@ const variantStyles2 = stylex.create({
 const variantStyles = stylex.create({
   criteriaSpan: {},
   criteriaSpanVariant: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runsSpan: {
     marginTop: "calc(var(--spacing) * .5)",
@@ -62,7 +62,7 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   workLogSpan: {
     WebkitLineClamp: "3",
@@ -112,7 +112,7 @@ const viewStyles = stylex.create({
     borderRadius: "2147483647px",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   criteriaSpan2: {
     minWidth: "0",
@@ -122,7 +122,7 @@ const viewStyles = stylex.create({
     display: "block",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   milestone: {
     display: "flex",
@@ -134,21 +134,21 @@ const viewStyles = stylex.create({
   storySpan: {
     width: "calc(var(--spacing) * 16)",
     flexShrink: "0",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   storySpan2: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runsP: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   runsDiv: {
     marginBottom: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   runsDiv2: {
     display: "flex",
@@ -160,7 +160,7 @@ const viewStyles = stylex.create({
   runsSpan: {
     width: "calc(var(--spacing) * 20)",
     flexShrink: "0",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   workLogOl: {
     maxHeight: "420px",
@@ -181,15 +181,15 @@ const viewStyles = stylex.create({
       ":last-child": "0",
     },
     borderColor: {
-      default: "var(--wb-line)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-line) 60%, transparent)",
+      default: "var(--color-line)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-line) 60%, transparent)",
     },
     paddingBlock: "var(--spacing)",
   },
   workLogSpan: {
     width: "calc(var(--spacing) * 14)",
     flexShrink: "0",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   orchestratorIssueDetailDiv: {
     display: "flex",
@@ -207,7 +207,7 @@ const viewStyles = stylex.create({
     marginTop: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   orchestratorIssueDetailDiv2: {
     marginTop: "calc(var(--spacing) * 3)",
@@ -222,7 +222,7 @@ const viewStyles = stylex.create({
   orchestratorIssueDetailSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   orchestratorIssueDetailDiv4: {
     marginTop: "calc(var(--spacing) * 4)",
@@ -244,7 +244,7 @@ const viewStyles = stylex.create({
   listDiv2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   listDiv3: {
     fontSize: "var(--text-sm)",

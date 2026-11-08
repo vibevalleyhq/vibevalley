@@ -21,8 +21,8 @@ const variantStyles = stylex.create({
     flexDirection: "column",
     borderLeftStyle: "solid",
     borderLeftWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
   },
   artifactCanvasSpan: {
     display: "flex",
@@ -48,7 +48,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 3)",
   },
   artifactCanvasSpan: {
@@ -59,8 +59,8 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-hover)",
-    color: "var(--wb-muted)",
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
   },
   artifactCanvasSpan2: {
     textOverflow: "ellipsis",
@@ -76,7 +76,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   artifactCanvasPage: {
     borderRadius: "var(--radius-md)",
@@ -85,17 +85,17 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -112,7 +112,7 @@ const viewStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -120,7 +120,7 @@ const viewStyles = stylex.create({
     padding: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   artifactCanvasIframe: {
     minHeight: "0",
@@ -128,13 +128,13 @@ const viewStyles = stylex.create({
     flex: "1",
     borderStyle: "solid",
     borderWidth: "0",
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
   },
   artifactCanvasP2: {
     padding: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 

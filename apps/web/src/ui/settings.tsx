@@ -12,67 +12,6 @@ import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";
 import { Hint } from "./Tip";
 
-const recipeStyles = stylex.create({
-  settingRowDiv: {
-    display: "flex",
-    columnGap: "calc(var(--spacing) * 6)",
-    rowGap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 3)",
-  },
-  settingRowDivVariant1Case1: {
-    flexWrap: "wrap",
-    alignItems: "center",
-    flexDirection: null,
-  },
-  settingRowDivVariant1Case2: {
-    flexWrap: null,
-    alignItems: null,
-    flexDirection: "column",
-  },
-  settingRowDivVariant2Case1: {
-    backgroundColor: null,
-  },
-  settingRowDivVariant2Case2: {
-    backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 15%, transparent)",
-    },
-  },
-});
-
-const variantStyles = stylex.create({
-  settingRowDiv: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
-  },
-  settingRowDiv2: {
-    display: "flex",
-    maxWidth: "100%",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-  },
-  settingRowDivVariant: {
-    width: "100%",
-  },
-  settingRowDivVariant2: {
-    flexShrink: "0",
-  },
-  keyRowDiv: {
-    width: "calc(var(--spacing) * 64)",
-    maxWidth: "100%",
-  },
-  keyRowDivVariant: {
-    pointerEvents: "none",
-    opacity: ".4",
-  },
-  keyRowDivVariant2: {},
-});
-
 const viewStyles = stylex.create({
   settingsPageDiv: {
     display: "flex",
@@ -114,7 +53,34 @@ const viewStyles = stylex.create({
   settingsGroupSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
+  },
+  settingRow: {
+    display: "flex",
+    columnGap: "calc(var(--spacing) * 6)",
+    rowGap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+  },
+  settingRowInline: {
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  settingRowWide: {
+    flexDirection: "column",
+  },
+  settingRowFound: {
+    backgroundColor: {
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 15%, transparent)",
+    },
+  },
+  settingRowText: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
   },
   settingRowDiv: {
     display: "flex",
@@ -125,6 +91,27 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
+  },
+  settingRowControls: {
+    display: "flex",
+    maxWidth: "100%",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  settingRowControlsWide: {
+    width: "100%",
+  },
+  settingRowControlsInline: {
+    flexShrink: "0",
+  },
+  keyRowDiv: {
+    width: "calc(var(--spacing) * 64)",
+    maxWidth: "100%",
+  },
+  keyRowRemoving: {
+    pointerEvents: "none",
+    opacity: ".4",
   },
 });
 
@@ -176,14 +163,14 @@ export function SettingRow(props: {
   return (
     <div
       {...stylex.attrs(
-        recipeStyles.settingRowDiv,
-        props.wide === true ? recipeStyles.settingRowDivVariant1Case2 : recipeStyles.settingRowDivVariant1Case1,
-        found() ? recipeStyles.settingRowDivVariant2Case2 : recipeStyles.settingRowDivVariant2Case1,
+        viewStyles.settingRow,
+        props.wide === true ? viewStyles.settingRowWide : viewStyles.settingRowInline,
+        found() && viewStyles.settingRowFound,
       )}
       data-found={found() ? "" : undefined}
       data-testid={props.testid}
     >
-      <div {...stylex.attrs(variantStyles.settingRowDiv)}>
+      <div {...stylex.attrs(viewStyles.settingRowText)}>
         <div {...stylex.attrs(viewStyles.settingRowDiv)}>
           <span {...stylex.attrs(viewStyles.settingRowSpan)}>{props.label}</span>
           <Show when={props.tip}>{(tip) => <Hint text={tip()} />}</Show>
@@ -191,7 +178,7 @@ export function SettingRow(props: {
         <Show when={props.hint}>{(hint) => <span {...stylex.attrs(viewStyles.settingsGroupSpan)}>{hint()}</span>}</Show>
       </div>
       <Show when={props.children}>
-        <div {...stylex.attrs(variantStyles.settingRowDiv2, props.wide === true ? variantStyles.settingRowDivVariant : variantStyles.settingRowDivVariant2)}>
+        <div {...stylex.attrs(viewStyles.settingRowControls, props.wide === true ? viewStyles.settingRowControlsWide : viewStyles.settingRowControlsInline)}>
           {props.children}
         </div>
       </Show>
@@ -218,7 +205,7 @@ export function KeyRow(props: {
   return (
     <SettingRow label={props.label} hint={props.hint} tip={props.tip} testid={props.testid}>
       <KeyMark status={props.status} removing={props.removing} />
-      <div {...stylex.attrs(variantStyles.keyRowDiv, props.removing ? variantStyles.keyRowDivVariant : variantStyles.keyRowDivVariant2)}>
+      <div {...stylex.attrs(viewStyles.keyRowDiv, props.removing && viewStyles.keyRowRemoving)}>
         <SecretInput
           {...props.control}
           data-testid="secret"

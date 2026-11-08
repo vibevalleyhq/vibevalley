@@ -42,7 +42,7 @@ const recipeStyles2 = stylex.create({
   },
   whoTileButtonVariant1Case2: {
     backgroundColor: {
-      default: "var(--color-leaf-300)b3",
+      default: "var(--color-px-leaf-strong)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 70%, transparent)",
     },
   },
@@ -73,7 +73,7 @@ const recipeStyles2 = stylex.create({
     borderColor: "var(--color-leaf-500)",
     color: "var(--color-bark-900)",
     backgroundColor: {
-      default: "var(--color-leaf-300)99",
+      default: "var(--color-px-leaf-wash)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
     },
   },
@@ -187,7 +187,7 @@ const viewStyles = stylex.create({
   },
   sowFormP3: {
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   sowFormDiv4: {
     marginTop: "calc(var(--spacing) * 1.5)",
@@ -223,7 +223,7 @@ const viewStyles = stylex.create({
   sowFormP4: {
     marginTop: "calc(var(--spacing) * 1.5)",
     fontSize: "12px",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   waterFormP: {
     fontSize: "13px",

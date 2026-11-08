@@ -11,13 +11,6 @@ import { Checkbox } from "./Checkbox";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 
-const variantStyles = stylex.create({
-  dataTableTbody: {},
-  dataTableTbodyVariant: {
-    opacity: ".6",
-  },
-});
-
 const viewStyles = stylex.create({
   dataTableDiv: {
     display: "flex",
@@ -32,7 +25,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dataTableSpan: {
     display: "flex",
@@ -42,7 +35,7 @@ const viewStyles = stylex.create({
   dataTableP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dataTableDiv3: {
     minWidth: "0",
@@ -50,7 +43,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   dataTableTable: {
     minWidth: "100%",
@@ -70,10 +63,10 @@ const viewStyles = stylex.create({
     overflow: "hidden",
   },
   dataTableThead: {
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dataTableTh: {
     paddingInline: "calc(var(--spacing) * 3)",
@@ -84,14 +77,17 @@ const viewStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 2)",
     fontWeight: "var(--font-weight-medium)",
   },
+  dataTableTbodyStale: {
+    opacity: ".6",
+  },
   tableRow: {
     borderTopStyle: "solid",
     borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   dataTableTd: {
     padding: "calc(var(--spacing) * 3)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   dataTableDiv4: {
     display: "flex",
@@ -100,7 +96,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -190,10 +186,7 @@ export function DataTable<T, K extends string>(props: {
               </For>
             </tr>
           </thead>
-          <tbody
-            inert={table().stale()}
-            {...stylex.attrs(variantStyles.dataTableTbody, table().stale() ? variantStyles.dataTableTbodyVariant : variantStyles.dataTableTbody)}
-          >
+          <tbody inert={table().stale()} {...stylex.attrs(table().stale() && viewStyles.dataTableTbodyStale)}>
             <For each={table().rows()} keyed={(row) => row.id}>
               {(row) => (
                 <tr

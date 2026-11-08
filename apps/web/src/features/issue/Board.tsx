@@ -47,13 +47,13 @@ const recipeStyles = stylex.create({
   },
   laneViewSectionVariant2Case1: {
     borderColor: "transparent",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
   laneViewSectionVariant2Case2: {
-    borderColor: "var(--wb-leaf)",
+    borderColor: "var(--color-leaf)",
     backgroundColor: {
-      default: "var(--wb-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 15%, transparent)",
+      default: "var(--color-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 15%, transparent)",
     },
   },
   laneViewButton: {
@@ -69,23 +69,23 @@ const recipeStyles = stylex.create({
     borderStyle: "dashed",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
+      default: "var(--color-line)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-faint)",
+        ":hover": "var(--color-faint)",
         "@supports (color:color-mix(in lab, red, red))": {
           default: null,
-          ":hover": "color-mix(in oklab, var(--wb-faint) 50%, transparent)",
+          ":hover": "color-mix(in oklab, var(--color-faint) 50%, transparent)",
         },
       },
     },
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: {
-      default: "var(--wb-faint)",
+      default: "var(--color-faint)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-muted)",
+        ":hover": "var(--color-muted)",
       },
     },
     transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
@@ -95,7 +95,7 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-page)",
+        ":hover": "var(--color-page)",
       },
     },
   },
@@ -127,10 +127,10 @@ const variantStyles = stylex.create({
     borderWidth: "1px",
   },
   laneViewDivVariant: {
-    borderColor: "var(--wb-leaf)",
+    borderColor: "var(--color-leaf)",
   },
   laneViewDivVariant2: {
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   cardViewDiv: {
     marginTop: "calc(var(--spacing) * .5)",
@@ -153,7 +153,7 @@ const viewStyles = stylex.create({
     paddingBlock: "var(--spacing)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-water)",
+    color: "var(--color-water)",
     textDecorationLine: {
       default: null,
       "@media (hover:hover)": {
@@ -184,19 +184,19 @@ const viewStyles = stylex.create({
   laneViewSpan: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   laneViewP: {
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
   cardViewDiv: {
     marginBottom: "var(--spacing)",
     height: "calc(var(--spacing) * .5)",
     borderRadius: "2147483647px",
-    backgroundColor: "var(--wb-leaf)",
+    backgroundColor: "var(--color-leaf)",
   },
   cardViewDiv2: {
     textOverflow: "ellipsis",
@@ -204,7 +204,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-2xs)",
     lineHeight: "14px",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   cardMarks: {
     marginTop: "calc(var(--spacing) * 2)",
@@ -221,7 +221,7 @@ const viewStyles = stylex.create({
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-berry)",
+    color: "var(--color-berry)",
   },
   cardViewSpan: {
     minWidth: "0",
@@ -239,17 +239,17 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
@@ -257,7 +257,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
 });
 

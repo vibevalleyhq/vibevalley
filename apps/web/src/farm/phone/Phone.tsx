@@ -123,8 +123,8 @@ const viewStyles = stylex.create({
     display: "block",
     width: "calc(var(--spacing) * 2.5)",
     height: "calc(var(--spacing) * 2.5)",
-    backgroundColor: "var(--wb-berry)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-px-dent)",
+    backgroundColor: "var(--color-berry)",
+    boxShadow: "inset 0 0 0 2px var(--color-px-dent)",
   },
   signalSpan: {
     display: "flex",

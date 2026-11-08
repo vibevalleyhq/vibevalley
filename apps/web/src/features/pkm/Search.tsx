@@ -31,29 +31,29 @@ const recipeStyles = stylex.create({
   },
   filterButtonVariant1Case1: {
     color: {
-      default: "var(--wb-muted)",
+      default: "var(--color-muted)",
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-ink)",
+        ":hover": "var(--color-ink)",
       },
     },
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
         default: null,
-        ":hover": "var(--wb-hover)",
+        ":hover": "var(--color-hover)",
       },
     },
   },
   filterButtonVariant1Case2: {
-    color: "var(--wb-ink)",
-    backgroundColor: "var(--wb-selected)",
+    color: "var(--color-ink)",
+    backgroundColor: "var(--color-selected)",
   },
 });
 
 const variantStyles2 = stylex.create({
   searchBodyIcon: {
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
 });
 
@@ -67,7 +67,7 @@ const variantStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 1.5)",
     backgroundColor: {
       default: null,
-      ":is([aria-selected=true])": "var(--wb-selected)",
+      ":is([aria-selected=true])": "var(--color-selected)",
     },
   },
   foundRowSpan: {
@@ -95,10 +95,10 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: {
-      default: "var(--wb-line)",
-      ":focus-within": "var(--wb-focus)",
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
     },
-    backgroundColor: "var(--wb-page)",
+    backgroundColor: "var(--color-page)",
     paddingInline: "calc(var(--spacing) * 3)",
   },
   pkmSearchInput: {
@@ -110,7 +110,7 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
     color: {
       default: null,
-      "::placeholder": "var(--wb-faint)",
+      "::placeholder": "var(--color-faint)",
     },
   },
   searchBodyDiv2: {
@@ -124,7 +124,7 @@ const viewStyles = stylex.create({
     height: "calc(var(--spacing) * 4)",
     borderLeftStyle: "solid",
     borderLeftWidth: "1px",
-    borderColor: "var(--wb-line)",
+    borderColor: "var(--color-line)",
   },
   searchBodyDiv3: {
     display: "flex",
@@ -138,7 +138,7 @@ const viewStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 4)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   searchBodySection: {
     display: "flex",
@@ -150,15 +150,15 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
-    color: "var(--wb-muted)",
+    color: "var(--color-muted)",
   },
   litMark: {
     borderRadius: "var(--radius-xs)",
     backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 30%, transparent)",
+      default: "var(--color-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 30%, transparent)",
     },
-    color: "var(--wb-ink)",
+    color: "var(--color-ink)",
   },
   foundRowSpan: {
     fontSize: "var(--text-sm)",
@@ -170,7 +170,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
-    color: "var(--wb-faint)",
+    color: "var(--color-faint)",
   },
 });
 

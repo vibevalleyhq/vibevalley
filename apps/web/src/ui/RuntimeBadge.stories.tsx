@@ -17,7 +17,7 @@ const viewStyles = stylex.create({
     width: "calc(var(--spacing) * 10)",
     height: "calc(var(--spacing) * 10)",
     borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--wb-hover)",
+    backgroundColor: "var(--color-hover)",
   },
 });
 
