@@ -7,6 +7,35 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: checked and mixed checkboxes retain the hover border without losing their fill", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Checkbox:Placement", theme, w: "400" })}`);
+    const box = page.getByTestId("checkbox-placement");
+    const resting = await box.evaluate((element) => getComputedStyle(element).borderTopColor);
+    await box.hover();
+    await box.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+    const hovered = await box.evaluate((element) => getComputedStyle(element).borderTopColor);
+    expect(hovered).not.toBe(resting);
+    for (const indeterminate of [false, true]) {
+      await page.locator('[data-testid="story-arg"][data-name="checked"]').getByRole("checkbox").setChecked(!indeterminate);
+      await page.locator('[data-testid="story-arg"][data-name="indeterminate"]').getByRole("checkbox").setChecked(indeterminate);
+      await expect(box).toHaveAttribute("aria-checked", indeterminate ? "mixed" : "true");
+      await box.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+      const before = await box.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { border: style.borderTopColor, fill: style.backgroundColor };
+      });
+      await box.hover();
+      await expect(box).toHaveCSS("border-top-color", hovered);
+      await expect(box).toHaveCSS("background-color", before.fill);
+      await page.mouse.move(0, 0);
+      await expect(box).toHaveCSS("border-top-color", before.border);
+    }
+    check();
+  }
+});
+
 test("regression: pixel rich text preserves nodes while typography and clamp variables change", async ({ page }) => {
   const check = diagnosticsOf(page);
   await page.goto(`/?${new URLSearchParams({ s: "组件/像素/PxMarkdown:Composition", theme: "light", w: "500" })}`);

@@ -21,7 +21,7 @@ const styles = stylex.create({
     borderColor: {
       default: "var(--color-line)",
       ":is([data-checked], [data-indeterminate])": "var(--color-accent)",
-      "@media (hover: hover)": { default: null, ":hover:not([data-checked]):not([data-indeterminate])": "var(--color-muted)" },
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-muted)" },
     },
     backgroundColor: { default: "var(--color-page)", ":is([data-checked], [data-indeterminate])": "var(--color-accent)" },
     color: "var(--color-page)",
