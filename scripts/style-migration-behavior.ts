@@ -70,7 +70,7 @@ const suites = [
       "regression: production hydration preserves top and offscreen DOM",
       "screenshot dialog traps focus, restores scrolling and survives interruption",
       "copy confirmation returns to idle and can be used again",
-      "hour controls select the scene and offscreen animations pause",
+      "regression: selected hour controls retain hover styling and offscreen animations pause",
       "scroll narrative reaches every step after viewport resize",
       "language links perform full-document navigation",
     ],

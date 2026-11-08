@@ -341,6 +341,9 @@ test("regression: styled tabs retain keyboard selection, navigation and dynamic 
     const issues = frame.locator('[role="tab"][data-key="issues"]');
     await page.mouse.move(0, 0);
     const selectedBackground = await chat.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await issues.hover();
+    const hoverBackground = await issues.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(hoverBackground).not.toBe(selectedBackground);
     await chat.hover();
     await expect(chat).toHaveCSS("background-color", selectedBackground);
     await chat.focus();
@@ -357,6 +360,14 @@ test("regression: styled tabs retain keyboard selection, navigation and dynamic 
     await expect(chat).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(chat).toHaveAttribute("aria-selected", "true");
+
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:States", theme, w: "400" })}`);
+    await page.mouse.move(0, 0);
+    const pills = page.getByTestId("story-grid").locator("tbody tr").first();
+    await expect(pills.locator('[data-testid="story-cell"]:not([data-pseudo]) [data-selected]')).toHaveCSS("background-color", selectedBackground);
+    for (const key of ["chat", "issues"]) {
+      await expect(pills.locator(`[data-pseudo="hover"] [role="tab"][data-key="${key}"]`)).toHaveCSS("background-color", hoverBackground);
+    }
 
     await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Tabs:Links", theme, w: "400" })}`);
     await expect(issues).toHaveAttribute("href", "/tabs/issues");
