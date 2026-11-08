@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -34,6 +35,8 @@ import { issueSearch } from "./navigation";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
+
+const selectStyles = stylex.create({ filter: { maxWidth: "calc(var(--spacing) * 48)" } });
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 
@@ -343,7 +346,7 @@ function Toolbar(props: {
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
           <Select
             size="control"
-            class="max-w-48"
+            styles={selectStyles.filter}
             label={t("web.issue.page.byRepo")}
             testid="filter-repo"
             filter
@@ -354,7 +357,7 @@ function Toolbar(props: {
           />
           <Select
             size="control"
-            class="max-w-48"
+            styles={selectStyles.filter}
             label={t("web.issue.page.byHelper")}
             testid="filter-agent"
             filter

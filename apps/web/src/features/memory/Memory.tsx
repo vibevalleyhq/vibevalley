@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -221,6 +222,8 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
   );
 }
 
+const selectStyles = stylex.create({ scope: { width: { default: null, "@media (width >= 40rem)": "calc(var(--spacing) * 40)" } } });
+
 /** The pick the server would make, without counting it (memory.recall). */
 function RecallPreview(props: { agent: string }) {
   const reposQuery = useRepos();
@@ -245,7 +248,7 @@ function RecallPreview(props: { agent: string }) {
     >
       <div class="flex flex-col gap-1.5 sm:flex-row">
         <Select
-          class="sm:w-40"
+          styles={selectStyles.scope}
           label={t("web.memory.memory.where")}
           placeholder={t("web.memory.memory.pick")}
           value={where()}

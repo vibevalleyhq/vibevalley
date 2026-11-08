@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -118,7 +119,8 @@ export function Stages(props: { at: Stage }) {
   );
 }
 
-/** A small menu-like pick in the side column. */
+const selectStyles = stylex.create({ property: { marginLeft: "calc(var(--spacing) * -2)", width: "calc(100% + 8px)" } });
+
 export function Pick<V extends string>(props: {
   label: string;
   value: V;
@@ -133,7 +135,7 @@ export function Pick<V extends string>(props: {
     <Select
       quiet
       size="control"
-      class="-ml-2 w-[calc(100%+8px)]"
+      styles={selectStyles.property}
       label={props.label}
       value={props.value}
       options={props.options}

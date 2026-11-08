@@ -203,6 +203,12 @@ The source/dependency scanners and exact pixel comparator have 33 passing tests.
 
 Tabs now composes typed StyleX styles instead of accepting a private class string. Its channel, orchestrator, agent configuration and story callers use local definitions. Selected appearance still follows Base UI's data attributes; line-tab icon states use a scoped marker. Browser regression coverage exercises keyboard focus/activation, link navigation and dynamic list width in both themes. All 12 component browser tests and all 26 `web:check` tasks pass. The 26 static visual scenarios retain zero differences. Real-server screenshots cover chat, orchestrator memory and the catalog at 1440×900 and 390×844; sandbox receipt `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-DF69Kb/result.json` records code 0 and successful cleanup. These screenshots verify those page layouts, not the outstanding full live-data comparison matrix.
 
+### Shared controls and reduced motion
+
+Field, its input/textarea/select, MoreMenu, Tip/Hint and Segmented use StyleX definitions. Select callers compose typed placement styles; the segmented thumb's measured geometry passes through StyleX runtime variables. Theme-dependent shadow aliases are restated on themed elements, and default spacing/weight/leading tokens used by migrated components remain explicit in the stylesheet.
+
+The static scenario manifest includes 58 cases, adding input and textarea frames, open selects and menus (including shadows), tooltips and segmented controls. This exposed animation-class-based reduced-motion rules that no longer reached migrated popups. Those popups now disable animation names through StyleX media conditions. Component regressions cover motion preference changes, select keyboard/focus behavior, disabled options, and segmented geometry after selection and resizing. The full component suite passes 15 tests; full repository acceptance remains outstanding.
+
 ## Alternatives considered
 
 - **Keep Astro with a local Solid renderer:** rejected by the owner after the delayed multi-root hydration failure. Do not keep this adapter as a second production route.

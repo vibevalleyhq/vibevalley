@@ -1,9 +1,55 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+
+const styles = stylex.create({
+  track: {
+    position: "relative",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 0.5)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--color-hover)",
+    padding: "calc(var(--spacing) * 0.5)",
+  },
+  block: { display: "flex", width: "100%" },
+  fitted: { display: "inline-flex", width: "fit-content" },
+  thumb: {
+    pointerEvents: "none",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-page)",
+    boxShadow: "var(--shadow-raise)",
+  },
+  place: (x: number, y: number, width: number, height: number) => ({ translate: `${x}px ${y}px`, width, height }),
+  moved: { transitionProperty: "translate, width", transitionDuration: "280ms", transitionTimingFunction: "var(--default-transition-timing-function)" },
+  option: {
+    position: "relative",
+    display: "inline-flex",
+    height: "calc(var(--spacing) * 6)",
+    cursor: { default: "pointer", ":disabled": "default" },
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    whiteSpace: "nowrap",
+    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionDuration: "120ms",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    opacity: { default: null, ":disabled": 0.5 },
+  },
+  stretched: { flex: 1 },
+  selected: { fontWeight: "var(--font-weight-medium)", color: "var(--color-ink)" },
+  idle: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
+});
 
 interface Place {
   readonly x: number;
@@ -58,17 +104,10 @@ export function Segmented<T extends string>(props: {
       }}
       aria-label={props.label}
       data-testid={props.testid}
-      // w-fit: in a column (a card's body) a track would otherwise stretch to its width, the thumb small at one end.
-      class={["relative flex-wrap gap-0.5 rounded-md bg-hover p-0.5", props.block === true ? "flex w-full" : "inline-flex w-fit"]}
+      class={stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted).class}
     >
       <Show when={thumb()}>
-        {(at) => (
-          <span
-            aria-hidden="true"
-            class={["pointer-events-none absolute top-0 left-0 rounded-sm bg-page shadow-raise", { "transition-[translate,width] duration-280": moved() }]}
-            style={{ translate: `${at().x}px ${at().y}px`, width: `${at().w}px`, height: `${at().h}px` }}
-          />
-        )}
+        {(at) => <span aria-hidden="true" {...stylex.attrs(styles.thumb, moved() && styles.moved, styles.place(at().x, at().y, at().w, at().h))} />}
       </Show>
       <For each={props.options}>
         {(o) => (
@@ -77,11 +116,7 @@ export function Segmented<T extends string>(props: {
             data-key={o.value}
             disabled={o.disabled}
             title={o.title}
-            class={[
-              "relative inline-flex h-6 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm whitespace-nowrap transition-colors duration-120 disabled:cursor-default disabled:opacity-50",
-              { "flex-1": !(props.block !== true) },
-              o.value === props.value ? "font-medium text-ink" : "text-muted hover:text-ink",
-            ]}
+            class={stylex.attrs(styles.option, props.block === true && styles.stretched, o.value === props.value ? styles.selected : styles.idle).class}
           >
             <Show when={o.icon}>{(name) => <Icon name={name()} size={14} />}</Show>
             {o.label}

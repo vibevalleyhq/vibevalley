@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 
 import { Tooltip } from "@vibevalley/base-ui";
 
@@ -7,23 +8,55 @@ import type { IconName } from "./icons";
 import { positionerAttrs } from "./positioner";
 
 const delay = 300;
+const styles = stylex.create({
+  trigger: { display: "inline-flex" },
+  bubble: {
+    width: "max-content",
+    maxWidth: "calc(var(--spacing) * 72)",
+    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "180ms",
+    animationTimingFunction: "var(--ease-out)",
+    animationFillMode: "both",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--color-ink)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--leading-snug)",
+    fontWeight: "var(--font-weight-normal)",
+    whiteSpace: "normal",
+    color: "var(--color-page)",
+    boxShadow: "var(--shadow-float)",
+  },
+  hint: {
+    display: "inline-flex",
+    cursor: "help",
+    borderRadius: "0.25rem",
+    color: "var(--color-faint)",
+    opacity: { default: 0.5, "@media (hover: hover)": { default: null, ":hover": 1 }, ":focus-visible": 1 },
+    transitionProperty: "opacity",
+    transitionDuration: "120ms",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    outlineStyle: "none",
+    outlineWidth: { default: null, ":focus-visible": 2 },
+    outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
+  },
+});
 
 function Bubble(props: { text: string }) {
   return (
     <Tooltip.Portal>
       <Tooltip.Positioner {...positionerAttrs()} sideOffset={6}>
-        <Tooltip.Popup class="w-max max-w-72 animate-fade-in rounded-md bg-ink px-2 py-1 text-xs leading-snug font-normal whitespace-normal text-page shadow-float">
-          {props.text}
-        </Tooltip.Popup>
+        <Tooltip.Popup class={stylex.attrs(styles.bubble).class}>{props.text}</Tooltip.Popup>
       </Tooltip.Positioner>
     </Tooltip.Portal>
   );
 }
 
-export function Tip(props: { text: string; children: JSX.Element; class?: string }) {
+export function Tip(props: { text: string; children: JSX.Element }) {
   return (
     <Tooltip.Root delay={delay}>
-      <Tooltip.Trigger render="span" class={["inline-flex", props.class]}>
+      <Tooltip.Trigger render="span" class={stylex.attrs(styles.trigger).class}>
         {props.children}
       </Tooltip.Trigger>
       <Bubble text={props.text} />
@@ -40,7 +73,7 @@ export function Hint(props: { text: string; icon?: IconName }) {
         render="span"
         tabindex={0}
         // A form of ten fields should not read as ten marks: help stays out of the way.
-        class="inline-flex cursor-help rounded text-faint opacity-50 transition-opacity duration-120 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
+        class={stylex.attrs(styles.hint).class}
       >
         <Icon name={props.icon ?? "info"} size={12} />
       </Tooltip.Trigger>

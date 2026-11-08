@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -195,6 +196,8 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
   );
 }
 
+const selectStyles = stylex.create({ channel: { width: "calc(var(--spacing) * 50)" } });
+
 function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
   const [error, setError] = createSignal<string>();
@@ -215,7 +218,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   return (
     <span class="flex flex-wrap items-center gap-2">
       <Select
-        class="w-50"
+        styles={selectStyles.channel}
         label={t("web.connector.connectors.whichChannel")}
         value={props.current}
         options={options()}

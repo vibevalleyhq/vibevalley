@@ -17,6 +17,7 @@ interface Scene {
   entry: "site" | "stories";
   route: string;
   width: number;
+  popup?: "select" | "menu" | "tooltip" | undefined;
 }
 
 const scenes: Scene[] = [];
@@ -34,12 +35,26 @@ for (const [name, story] of [
   ["button-tones", "组件/工作台/Button:Tones"],
   ["button-icons", "组件/工作台/Button:With icon"],
   ["field-states", "组件/工作台/Field:States"],
+  ["field-text", "组件/工作台/Field:Text"],
+  ["field-long-text", "组件/工作台/Field:Long text"],
+  ["field-popup", "组件/工作台/Field:Select"],
+  ["menu-popup", "组件/工作台/MoreMenu:A place's other actions"],
+  ["menu-above", "组件/工作台/MoreMenu:Opening upwards, from a toolbar"],
+  ["tooltip", "组件/工作台/Tip:Hover"],
+  ["segmented-states", "组件/工作台/Segmented:States"],
+  ["segmented-disabled", "组件/工作台/Segmented:Playground"],
   ["tabs-states", "组件/工作台/Tabs:States"],
 ])
   for (const theme of ["light", "dark"])
     for (const width of [400, 800]) {
       if (name === undefined || story === undefined) throw new Error("Incomplete story scene");
-      scenes.push({ id: `${name}-${theme}-${width}`, entry: "stories", route: `/?${new URLSearchParams({ s: story, theme, w: String(width) })}`, width: 1680 });
+      scenes.push({
+        id: `${name}-${theme}-${width}`,
+        entry: "stories",
+        route: `/?${new URLSearchParams({ s: story, theme, w: String(width) })}`,
+        width: 1680,
+        popup: name === "field-popup" ? "select" : name.startsWith("menu-") ? "menu" : name === "tooltip" ? "tooltip" : undefined,
+      });
     }
 const captureOptions = { locale: "en-US", timezoneId: "UTC", deviceScaleFactor: 1, clock: "2026-11-08T12:00:00.000Z", reducedMotion: "reduce" };
 const mime: Record<string, string> = {
@@ -113,6 +128,22 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       }
       await page.waitForFunction(() => document.querySelectorAll("astro-island[ssr]").length === 0);
     } else await page.getByTestId("story-frame").waitFor({ state: "visible" });
+    const popupRole = scene.popup === "select" ? "listbox" : scene.popup === "menu" ? "menu" : "tooltip";
+    if (scene.popup !== undefined) {
+      const frame = page.getByTestId("story-frame");
+      switch (scene.popup) {
+        case "select":
+          await frame.getByRole("combobox").click();
+          break;
+        case "menu":
+          await frame.locator('button[aria-haspopup="menu"]').click();
+          break;
+        case "tooltip":
+          await frame.locator('span[tabindex="0"]').first().focus();
+          break;
+      }
+      await page.getByRole(popupRole).waitFor({ state: "visible" });
+    }
     await page.evaluate(async (entry) => {
       await document.fonts.ready;
       await Promise.all(
@@ -130,10 +161,18 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       }
     }, scene.entry);
     await page.waitForTimeout(1200);
-    const target = scene.entry === "site" ? page.locator("body") : page.getByTestId("story-frame");
+    const target = scene.entry === "site" ? page.locator("body") : scene.popup !== undefined ? page.getByRole(popupRole) : page.getByTestId("story-frame");
     const textHash = hash(await target.innerText());
     if (scene.entry === "site") await page.screenshot({ path: destination, fullPage: true, animations: "disabled" });
-    else await target.screenshot({ path: destination, animations: "disabled" });
+    else if (scene.popup !== undefined) {
+      const box = await target.boundingBox();
+      if (box === null) throw new Error("Missing popup geometry");
+      await page.screenshot({
+        path: destination,
+        animations: "disabled",
+        clip: { x: box.x - 32, y: box.y - 32, width: box.width + 64, height: box.height + 64 },
+      });
+    } else await target.screenshot({ path: destination, animations: "disabled" });
     if (errors.length > 0) throw new Error(errors.join("\n"));
     return { path: destination, hash: hash(readFileSync(destination)), textHash };
   } finally {

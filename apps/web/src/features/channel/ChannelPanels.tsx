@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -151,6 +152,10 @@ export function Members(props: { channel: Channel }) {
   );
 }
 
+const selectStyles = stylex.create({
+  notifications: { width: "calc(var(--spacing) * 28)", fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)" },
+});
+
 export function ThreadPane(props: { thread: Channel; point: number | undefined; onClose: () => void }) {
   const core = useCore();
   const notifies = useIntents(notifySet);
@@ -184,7 +189,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
           label={t("web.channel.threadList.notify")}
           value={props.thread.notify ?? "all"}
           options={notifyOptions()}
-          class="w-28 text-xs"
+          styles={selectStyles.notifications}
           testid="thread-notify"
           state={markState(notifies.list(), (n) => n.id === props.thread.id)}
           onChange={(v) => {

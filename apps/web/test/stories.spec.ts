@@ -7,6 +7,92 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: migrated popups disable their animations for reduced motion", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const [story, kind, animation] of [
+    ["Field:Select", "select", "pop-in"],
+    ["MoreMenu:A place's other actions", "menu", "pop-in"],
+    ["Tip:Hover", "tooltip", "fade-in"],
+  ] as const) {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(`/?${new URLSearchParams({ s: `组件/工作台/${story}`, theme: "light", w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    switch (kind) {
+      case "select":
+        await frame.getByRole("combobox").click();
+        break;
+      case "menu":
+        await frame.locator('button[aria-haspopup="menu"]').click();
+        break;
+      case "tooltip":
+        await frame.locator('span[tabindex="0"]').first().focus();
+        break;
+    }
+    const popup = page.getByRole(kind === "select" ? "listbox" : kind);
+    await expect(popup).toBeVisible();
+    await expect(popup).toHaveCSS("animation-name", "none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(popup).toHaveCSS("animation-name", animation);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(popup).toHaveCSS("animation-name", "none");
+    check();
+  }
+});
+
+test("regression: segmented StyleX geometry follows selection and block resizing", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Segmented:Playground", theme, w: "400" })}`);
+    const frame = page.getByTestId("story-frame");
+    const board = frame.locator('button[data-key="board"]');
+    const thumb = frame.getByRole("group").locator('span[aria-hidden="true"]');
+    await expect(frame.locator('button[data-key="farm"]')).toBeDisabled();
+    await board.click();
+    await expect(board).toHaveAttribute("aria-pressed", "true");
+    const distance = async () => {
+      const a = await thumb.boundingBox();
+      const b = await board.boundingBox();
+      if (a === null || b === null) throw new Error("Missing segmented geometry");
+      return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.width - b.width), Math.abs(a.height - b.height));
+    };
+    await expect.poll(distance).toBeLessThan(0.5);
+    await page.locator('[data-testid="story-arg"][data-name="block"]').getByRole("checkbox").check();
+    await expect.poll(distance).toBeLessThan(0.5);
+    await board.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(frame.locator('button[data-key="list"]')).toBeFocused();
+    check();
+  }
+});
+
+test("regression: styled selects retain choices, disabled items and keyboard focus", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Field:Select", theme, w: "400" })}`);
+    const trigger = page.getByTestId("story-frame").getByRole("combobox");
+    await trigger.focus();
+    await page.keyboard.press("ArrowDown");
+    const popup = page.getByRole("listbox");
+    await expect(popup).toBeVisible();
+    await expect(popup.locator('[data-key="pi"]')).toHaveAttribute("aria-disabled", "true");
+    await popup.locator('[data-key="claude"]').click();
+    await expect(trigger).toHaveAttribute("data-value", "claude");
+    await expect(popup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(popup).toBeVisible();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Enter");
+    await expect(trigger).toHaveAttribute("data-value", "");
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await page.keyboard.press("Escape");
+    await expect(popup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    check();
+  }
+});
+
 test("regression: styled tabs retain keyboard selection, navigation and dynamic list styles", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {
