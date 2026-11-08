@@ -3,6 +3,24 @@ import * as stylex from "@stylexjs/stylex";
 
 import { CardColors } from "#/ui/pixel/index.ts";
 
+const variantStyles = stylex.create({
+  hudCardSpan: {
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+  },
+  hudCardSpanVariant: {
+    filter: "brightness(110%)",
+  },
+  hudCardSpanVariant2: {},
+});
+
 const viewStyles = stylex.create({
   hudCardSpan: {
     display: "inline-block",
@@ -16,7 +34,7 @@ export function HudCard(props: { height?: number; bright?: boolean; children: JS
   return (
     <span {...stylex.attrs(viewStyles.hudCardSpan)}>
       <span
-        class={["box-border flex items-center gap-1 border-2 px-2 font-pixel text-[12px]", { "brightness-110": !(props.bright !== true) }]}
+        {...stylex.attrs(variantStyles.hudCardSpan, !(props.bright !== true) ? variantStyles.hudCardSpanVariant : variantStyles.hudCardSpanVariant2)}
         style={{
           height: props.height !== undefined ? `${props.height}px` : undefined,
           background: CardColors.paper,

@@ -31,6 +31,20 @@ import { HudCard } from "./HudCard";
 import { Overlay } from "./Overlay";
 import { clockText, thousands } from "./readout";
 
+const recipeStyles = stylex.create({
+  quotaPillDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: "10",
+    marginTop: "calc(var(--spacing) * 2)",
+    width: "352px",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 3)",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+});
+
 const viewStyles = stylex.create({
   hudTapButton: {
     pointerEvents: "auto",
@@ -696,7 +710,7 @@ function QuotaPill(props: { height: number }) {
           </HudCard>
         </button>
         <Show when={open()}>
-          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label={t("web.farm.quota.left")}>
+          <div {...stylex.attrs(recipeStyles.quotaPillDiv)} role="dialog" aria-label={t("web.farm.quota.left")}>
             <div {...stylex.attrs(viewStyles.quotaPillDiv2)}>
               <span {...stylex.attrs(viewStyles.quotaPillSpan)}>{t("web.farm.quota.left")}</span>
               <PxButton

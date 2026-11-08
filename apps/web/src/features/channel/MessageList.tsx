@@ -26,11 +26,94 @@ import { toast } from "#/ui/toasts.ts";
 import { chatSay, editingId, pendingLines, setEditingId } from "./composing";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
+import { dispatchRow, threadPreview } from "./message.stylex";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
+const variantStyles3 = stylex.create({
+  messageListIcon: {
+    rotate: "90deg",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  dispatchA: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  messageListDiv: {
+    position: "relative",
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  pendingLinesDiv: {},
+  pendingLinesDivVariant: {
+    opacity: ".6",
+  },
+  dayLineDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  dayLineDivVariant: {
+    color: "var(--wb-berry)",
+  },
+  dayLineDivVariant2: {
+    color: "var(--wb-muted)",
+  },
+  dayLineSpan: {
+    height: "1px",
+    flex: "1",
+  },
+  dayLineSpanVariant: {
+    backgroundColor: "var(--wb-berry)",
+  },
+  dayLineSpanVariant2: {
+    backgroundColor: "var(--wb-line)",
+  },
+});
+
 const viewStyles = stylex.create({
+  dispatchRow: { display: "flex", alignItems: "flex-start", gap: "calc(var(--spacing) * 1.5)" },
+  dispatchIcon: { opacity: { default: 0.5, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", dispatchRow)]: 1 } } },
+  threadIcon: { opacity: { default: 0.6, "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", threadPreview)]: 1 } } },
+  threadButton: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    width: "100%",
+    maxWidth: "var(--container-xl)",
+    cursor: "pointer",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-lg)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus-visible": "var(--color-focus)" },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    textAlign: "left",
+    backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
+  },
   messageListDiv: {
     display: "flex",
     flexDirection: "column",
@@ -409,7 +492,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div class="relative flex min-h-0 flex-1 flex-col">
+    <div {...stylex.attrs(variantStyles.messageListDiv)}>
       <Show when={awayFrom() !== undefined}>
         <button
           type="button"
@@ -417,7 +500,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           onClick={toLatest}
           class="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 animate-pop-in cursor-pointer items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 text-xs text-ink shadow-float transition-colors duration-120 hover:bg-hover"
         >
-          <Icon name="expand" size={12} class="rotate-90" />
+          <Icon name="expand" size={12} styles={[variantStyles3.messageListIcon]} />
           {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
         </button>
       </Show>
@@ -549,7 +632,12 @@ function PendingLines(props: { channel: string | undefined; messages: readonly C
   return (
     <For each={lines()} keyed={(l) => l.key}>
       {(l) => (
-        <div data-testid="pending-line" data-key={l().key} data-state={l().state} class={l().state === "sending" ? "opacity-60" : ""}>
+        <div
+          data-testid="pending-line"
+          data-key={l().key}
+          data-state={l().state}
+          {...stylex.attrs(variantStyles.pendingLinesDiv, l().state === "sending" ? variantStyles.pendingLinesDivVariant : variantStyles.pendingLinesDiv)}
+        >
           <Frame
             face={<OwnerFace size={36} />}
             name={t("web.channel.messages.owner")}
@@ -583,10 +671,13 @@ const litMs = 2500;
 
 function DayLine(props: { label: string; tone?: "new" }) {
   return (
-    <div class={["flex items-center gap-3 py-3 text-xs", props.tone === "new" ? "text-berry" : "text-muted"]} role="separator">
-      <span class={["h-px flex-1", props.tone === "new" ? "bg-berry" : "bg-line"]} />
+    <div
+      {...stylex.attrs(variantStyles.dayLineDiv, props.tone === "new" ? variantStyles.dayLineDivVariant : variantStyles.dayLineDivVariant2)}
+      role="separator"
+    >
+      <span {...stylex.attrs(variantStyles.dayLineSpan, props.tone === "new" ? variantStyles.dayLineSpanVariant : variantStyles.dayLineSpanVariant2)} />
       {props.label}
-      <span class={["h-px flex-1", props.tone === "new" ? "bg-berry" : "bg-line"]} />
+      <span {...stylex.attrs(variantStyles.dayLineSpan, props.tone === "new" ? variantStyles.dayLineSpanVariant : variantStyles.dayLineSpanVariant2)} />
     </div>
   );
 }
@@ -646,7 +737,7 @@ function Dispatch(props: { m: ChatMessage }) {
     return id ? (core()?.issues ?? []).find((i) => i.id === id) : undefined;
   };
   return (
-    <div class="group/d flex items-start gap-1.5" data-testid="dispatch">
+    <div {...stylex.attrs(viewStyles.dispatchRow, dispatchRow)} data-testid="dispatch">
       <div {...stylex.attrs(viewStyles.dispatchDiv)}>
         <Show
           when={open()}
@@ -662,7 +753,7 @@ function Dispatch(props: { m: ChatMessage }) {
               {(i) => (
                 <p {...stylex.attrs(viewStyles.dispatchP)}>
                   <span {...stylex.attrs(viewStyles.dispatchSpan)}>{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
-                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" class="min-w-0 truncate font-medium text-water hover:underline">
+                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" {...stylex.attrs(variantStyles2.dispatchA)}>
                     #{i().number} {i().title}
                   </A>
                   <Show when={i().repo}>{(p) => <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{p()}</span>}</Show>
@@ -681,7 +772,7 @@ function Dispatch(props: { m: ChatMessage }) {
         aria-expanded={aria(open())}
         {...stylex.attrs(viewStyles.dispatchButton2)}
       >
-        <Icon name={open() ? "collapse" : "enlarge"} size={12} class="opacity-50 group-hover/d:opacity-100" />
+        <Icon name={open() ? "collapse" : "enlarge"} size={12} styles={viewStyles.dispatchIcon} />
       </button>
     </div>
   );
@@ -820,7 +911,7 @@ function ThreadPreview(props: { thread: Channel }) {
       data-key={props.thread.id}
       data-subject={props.thread.subjectKind}
       onClick={() => router.navigate(chatPath(props.thread))}
-      class="group/t mt-2 flex w-full max-w-xl cursor-pointer flex-col gap-1 rounded-lg border border-line px-3 py-2 text-left hover:bg-hover focus-visible:border-focus"
+      {...stylex.attrs(viewStyles.threadButton, threadPreview)}
     >
       <span {...stylex.attrs(viewStyles.threadPreviewSpan)}>
         <Icon name="thread" size={16} />
@@ -842,7 +933,7 @@ function ThreadPreview(props: { thread: Channel }) {
             </>
           )}
         </Show>
-        <Icon name="expand" size={12} class="opacity-60 group-hover/t:opacity-100" />
+        <Icon name="expand" size={12} styles={viewStyles.threadIcon} />
       </span>
       <Show when={last()}>
         {(m) => (

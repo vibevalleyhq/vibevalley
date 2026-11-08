@@ -4,6 +4,19 @@ import { createEffect } from "solid-js";
 
 import { Dialog as Base } from "@vibevalley/base-ui";
 
+const variantStyles = stylex.create({
+  dialogBaseTitle: {
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 5)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+});
+
 const viewStyles = stylex.create({
   dialogDiv: {
     display: "flex",
@@ -48,7 +61,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
         ]}
       >
         <div {...stylex.attrs(viewStyles.dialogDiv)}>
-          <Base.Title class="border-b border-line px-5 py-3 text-base font-semibold">{props.title}</Base.Title>
+          <Base.Title {...stylex.attrs(variantStyles.dialogBaseTitle)}>{props.title}</Base.Title>
           <div {...stylex.attrs(viewStyles.dialogDiv2)}>{props.children}</div>
         </div>
       </Base.Popup>

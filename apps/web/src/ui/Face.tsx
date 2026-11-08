@@ -10,6 +10,26 @@ import { ready, useAgents, useSprites } from "#/infra/query.ts";
 import { castPrefix } from "./cast";
 import { RuntimeBadge } from "./RuntimeBadge";
 
+const recipeStyles = stylex.create({
+  agentFaceSpan: {
+    position: "relative",
+    display: "block",
+    height: "100%",
+    width: "100%",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-leaf-300)99",
+  },
+  agentFaceSpanVariant1Case1: {
+    opacity: null,
+    filter: null,
+  },
+  agentFaceSpanVariant1Case2: {
+    opacity: ".6",
+    filter: "grayscale(100%)",
+  },
+});
+
 const viewStyles = stylex.create({
   agentFaceSpan: {
     position: "relative",
@@ -53,7 +73,10 @@ export function AgentFace(props: { agentId: string; runtime?: string | undefined
   return (
     <span {...stylex.attrs(viewStyles.agentFaceSpan)} style={{ width: `${size()}px`, height: `${size()}px` }}>
       <span
-        class={["relative block h-full w-full overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !(props.muted !== true) }]}
+        {...stylex.attrs(
+          recipeStyles.agentFaceSpan,
+          !(props.muted !== true) ? recipeStyles.agentFaceSpanVariant1Case2 : recipeStyles.agentFaceSpanVariant1Case1,
+        )}
         aria-hidden="true"
       >
         <Show when={cut()}>

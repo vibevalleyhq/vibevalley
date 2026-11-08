@@ -5,6 +5,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Checkbox } from "./Checkbox";
 
 const viewStyles = stylex.create({
+  placement: (offset: number) => ({ marginLeft: offset }),
   checkboxStoriesLabel: {
     display: "flex",
     alignItems: "center",
@@ -17,6 +18,21 @@ const viewStyles = stylex.create({
 export default stories({
   title: "组件/工作台/Checkbox",
   stories: {
+    Placement: story({
+      args: { checked: false, indeterminate: false, disabled: false, offset: 12 },
+      controls: { offset: { kind: "number", min: 0, max: 32 } },
+      render: (a, set) => (
+        <Checkbox
+          testid="checkbox-placement"
+          label="Placement"
+          checked={a.checked}
+          indeterminate={a.indeterminate}
+          disabled={a.disabled}
+          styles={viewStyles.placement(a.offset)}
+          onChange={(checked) => set({ checked })}
+        />
+      ),
+    }),
     States: story({
       args: { state: "on", disabled: false },
       grid: { rows: ["state", ["off", "on", "partly"]], cols: "pseudo" },

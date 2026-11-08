@@ -34,6 +34,72 @@ import { Hint } from "#/ui/Tip.tsx";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
+const variantStyles4 = stylex.create({
+  supportCardIcon: {
+    marginTop: "var(--spacing)",
+  },
+});
+
+const variantStyles3 = stylex.create({
+  numberInputTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  staminaMeterRoot: {
+    display: "inline-flex",
+    gap: "1px",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-bark-800)",
+    padding: "1px",
+  },
+});
+
+const variantStyles = stylex.create({
+  usageDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2.5)",
+  },
+  usageP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  usagePVariant: {
+    color: "var(--wb-berry)",
+  },
+  usagePVariant2: {},
+  supportCardSpan: {
+    borderRadius: ".25rem",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "1px",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  supportCardSpanVariant: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  supportCardSpanVariant2: {
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    color: "var(--wb-muted)",
+    textDecorationLine: "line-through",
+  },
+  inventoryCardSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  inventoryCardSpanVariant: {
+    color: "var(--wb-muted)",
+    textDecorationLine: "line-through",
+  },
+});
+
 const viewStyles = stylex.create({
   usageP: {
     fontSize: "var(--text-xs)",
@@ -182,7 +248,7 @@ export function Stamina(props: { quota: Quota; cells?: number; width: number; he
     <Meter.Root
       value={Math.round(props.quota.fill * 100)}
       aria-label={props.quota.text}
-      class="inline-flex gap-px rounded-sm bg-bark-800 p-px"
+      {...stylex.attrs(variantStyles2.staminaMeterRoot)}
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
@@ -211,12 +277,12 @@ export function Usage(props: { info: RuntimeInfo }) {
                 <SpriteIcon name={bottleSprite(quota())} size={52} />
                 <span {...stylex.attrs(viewStyles.usageSpan2)}>{quota().short || "—"}</span>
               </span>
-              <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+              <div {...stylex.attrs(variantStyles.usageDiv)}>
                 <Switch>
                   <Match when={variant(usage(), "status", "balance")}>
                     {(u) => (
                       <>
-                        <p class={["text-sm", { "text-berry": !u().available }]}>
+                        <p {...stylex.attrs(variantStyles.usageP, !u().available ? variantStyles.usagePVariant : variantStyles.usagePVariant2)}>
                           {t("web.runtime.balance", { provider: u().provider, enough: u().available })}
                         </p>
                         <p {...stylex.attrs(viewStyles.usageP2)}>
@@ -282,7 +348,7 @@ export function SupportCard(props: { info: RuntimeInfo }) {
     <Card title={t("web.runtime.can")}>
       <div {...stylex.attrs(viewStyles.supportCardDiv)}>
         <span {...stylex.attrs(viewStyles.supportCardSpan)}>
-          <Icon name={support().steer ? "check" : "cross"} size={12} class="mt-1" />
+          <Icon name={support().steer ? "check" : "cross"} size={12} styles={[variantStyles4.supportCardIcon]} />
           {support().steer ? t("web.runtime.steer") : t("web.runtime.noSteer")}
         </span>
         <span {...stylex.attrs(viewStyles.usageSpan2)}>{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
@@ -300,7 +366,12 @@ export function SupportCard(props: { info: RuntimeInfo }) {
         <div {...stylex.attrs(viewStyles.supportCardDiv2)}>
           <For each={RuntimeCapabilityValues}>
             {(c) => (
-              <span class={["rounded px-1.5 py-px text-xs", support().capabilities.includes(c) ? "bg-selected" : "border border-line text-muted line-through"]}>
+              <span
+                {...stylex.attrs(
+                  variantStyles.supportCardSpan,
+                  support().capabilities.includes(c) ? variantStyles.supportCardSpanVariant : variantStyles.supportCardSpanVariant2,
+                )}
+              >
                 {capabilityLabel[c]}
               </span>
             )}
@@ -318,7 +389,7 @@ function NumberInput(props: { value?: number | undefined; onChange: (n: number |
     <TextInput
       data-testid={props.testid}
       aria-label={props.label}
-      class="font-mono"
+      styles={variantStyles3.numberInputTextInput}
       placeholder={props.placeholder}
       inputmode="decimal"
       value={text()}
@@ -391,7 +462,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
         <Field label={t("web.runtime.binPath")} hint={t("web.runtime.binPathHint", { id: props.info.id.toUpperCase() })}>
           <TextInput
             aria-label={t("web.runtime.binPath")}
-            class="font-mono"
+            styles={variantStyles3.numberInputTextInput}
             placeholder={t("web.runtime.auto")}
             value={draft().binPath}
             onInput={(e) => setDraft({ ...draft(), binPath: e.currentTarget.value })}
@@ -502,7 +573,14 @@ export function InventoryCard(props: { title: string; entries: InventoryEntry[] 
             <For each={props.entries}>
               {(e) => (
                 <li {...stylex.attrs(viewStyles.inventoryCardLi)}>
-                  <span class={["font-mono text-sm", { "text-muted line-through": e.enabled === false }]}>{e.name}</span>
+                  <span
+                    {...stylex.attrs(
+                      variantStyles.inventoryCardSpan,
+                      e.enabled === false ? variantStyles.inventoryCardSpanVariant : variantStyles.usagePVariant2,
+                    )}
+                  >
+                    {e.name}
+                  </span>
                   <Show when={e.description}>
                     <span {...stylex.attrs(viewStyles.inventoryCardSpan)}>{e.description}</span>
                   </Show>

@@ -9,6 +9,53 @@ import { Icon } from "#/ui/Icon.tsx";
 import { issueMove, issueMoveOf } from "./moves";
 import type { PendingWords } from "./write";
 
+const recipeStyles = stylex.create({
+  actLinesButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 6)",
+    height: "calc(var(--spacing) * 6)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  actLinesSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  actLinesSpanVariant: {
+    color: "var(--wb-berry)",
+  },
+  actLinesSpanVariant2: {
+    color: "var(--wb-muted)",
+  },
+  actLinesSpan2: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+});
+
 const viewStyles = stylex.create({
   actLinesDiv: {
     marginBottom: "calc(var(--spacing) * 4)",
@@ -41,7 +88,7 @@ export function ActLines(props: {
 }) {
   const moves = useIntents(issueMove);
   const move = () => issueMoveOf(props.issue, moves.list());
-  const small = "inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink";
+
   return (
     <Show when={move() !== undefined || (props.words ?? []).length > 0}>
       <div {...stylex.attrs(viewStyles.actLinesDiv)}>
@@ -53,7 +100,10 @@ export function ActLines(props: {
               aria-busy={m().state === "moving" ? "true" : undefined}
               {...stylex.attrs(viewStyles.issueMove)}
             >
-              <span class={["min-w-0 flex-1 truncate", m().state === "failed" ? "text-berry" : "text-muted"]} title={m().reason}>
+              <span
+                {...stylex.attrs(variantStyles.actLinesSpan, m().state === "failed" ? variantStyles.actLinesSpanVariant : variantStyles.actLinesSpanVariant2)}
+                title={m().reason}
+              >
                 {m().state === "moving" ? t("web.issue.acts.moving") : (m().reason ?? t("web.issue.board.moveFailed"))}
               </span>
               <Show when={m().state === "failed"}>
@@ -63,7 +113,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.board.retryMove")}
                   title={t("web.issue.board.retryMove")}
                   onClick={() => void moves.retry(untrack(m).key)}
-                  class={small}
+                  {...stylex.attrs(recipeStyles.actLinesButton)}
                 >
                   <Icon name="retry" size={14} />
                 </button>
@@ -73,7 +123,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.board.putBack")}
                   title={t("web.issue.board.putBack")}
                   onClick={() => moves.drop(untrack(m).key)}
-                  class={small}
+                  {...stylex.attrs(recipeStyles.actLinesButton)}
                 >
                   <Icon name="close" size={14} />
                 </button>
@@ -85,7 +135,10 @@ export function ActLines(props: {
           {(w) => (
             <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(viewStyles.issueMove)}>
               <span {...stylex.attrs(viewStyles.actLinesSpan)}>{w().text}</span>
-              <span class={["shrink-0 text-xs", w().state === "failed" ? "text-berry" : "text-muted"]} title={w().reason}>
+              <span
+                {...stylex.attrs(variantStyles.actLinesSpan2, w().state === "failed" ? variantStyles.actLinesSpanVariant : variantStyles.actLinesSpanVariant2)}
+                title={w().reason}
+              >
                 {w().state === "sending" ? t("web.issue.acts.sending") : (w().reason ?? t("web.issue.acts.notSaid"))}
               </span>
               <Show when={w().state === "failed"}>
@@ -95,7 +148,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.acts.sayAgain")}
                   title={t("web.issue.acts.sayAgain")}
                   onClick={() => props.onSayAgain?.(untrack(w).key)}
-                  class={small}
+                  {...stylex.attrs(recipeStyles.actLinesButton)}
                 >
                   <Icon name="retry" size={14} />
                 </button>
@@ -105,7 +158,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.acts.takeBack")}
                   title={t("web.issue.acts.takeBack")}
                   onClick={() => props.onTakeBack?.(untrack(w).key)}
-                  class={small}
+                  {...stylex.attrs(recipeStyles.actLinesButton)}
                 >
                   <Icon name="close" size={14} />
                 </button>

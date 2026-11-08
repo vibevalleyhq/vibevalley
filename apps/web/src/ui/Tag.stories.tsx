@@ -7,6 +7,7 @@ import { icons, type IconName } from "./icons";
 import { Dot, type DotTone, Tag, type TagTone } from "./Tag";
 
 const viewStyles = stylex.create({
+  dotPlacement: (offset: number) => ({ marginLeft: offset }),
   tagStoriesDiv: {
     display: "flex",
     gap: "calc(var(--spacing) * 2)",
@@ -51,6 +52,11 @@ export default stories({
           <Tag tone="wait" icon="send" label="已发" />
         </div>
       ),
+    }),
+    "Dot placement": story({
+      args: { ring: true, size: 9, offset: 12 },
+      controls: { size: { kind: "number", min: 4, max: 16 }, offset: { kind: "number", min: 0, max: 32 } },
+      render: (a) => <Dot tone="leaf" ring={a.ring} size={a.size} styles={viewStyles.dotPlacement(a.offset)} />,
     }),
     "Dot tones": story({
       args: { ring: false, size: 8 },

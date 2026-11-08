@@ -8,7 +8,45 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { defineAtom } from "#/state/atom.ts";
 
 import { SpriteIcon } from "./icons";
-import { pxDrop, pxText } from "./style";
+import { pxDrop } from "./style";
+
+const recipeStyles = stylex.create({
+  toastCardSpan: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-leaf-700)",
+    fontSynthesis: "none",
+  },
+  toastCardSpan2: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  toastCardSpan3: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-600)",
+    fontSynthesis: "none",
+  },
+});
+
+const variantStyles = stylex.create({
+  toastCardDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+});
 
 const viewStyles = stylex.create({
   toastViewportDiv: {
@@ -198,13 +236,13 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
       >
         {props.leading}
       </Show>
-      <div class="flex min-w-0 flex-1 flex-col">
+      <div {...stylex.attrs(variantStyles.toastCardDiv)}>
         <Show when={props.kicker}>
-          <span class={[pxText.xs, "text-leaf-700"]}>{props.kicker}</span>
+          <span {...stylex.attrs(recipeStyles.toastCardSpan)}>{props.kicker}</span>
         </Show>
-        <span class={pxText.sm}>{props.toast.title}</span>
+        <span {...stylex.attrs(recipeStyles.toastCardSpan2)}>{props.toast.title}</span>
         <Show when={props.toast.description}>
-          <span class={[pxText.xs, "text-bark-600"]}>{props.toast.description}</span>
+          <span {...stylex.attrs(recipeStyles.toastCardSpan3)}>{props.toast.description}</span>
         </Show>
       </div>
     </div>

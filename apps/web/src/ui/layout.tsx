@@ -9,12 +9,132 @@ import { aria } from "#/base/dom.tsx";
 import { currentHost } from "#/infra/host.ts";
 import { Link as A } from "#/infra/router.ts";
 
-import { TextInput } from "./Field";
+import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Hint } from "./Tip";
 
+const variantStyles2 = stylex.create({
+  emptyIcon: {
+    color: "var(--wb-faint)",
+  },
+});
+
+const variantStyles = stylex.create({
+  toggleLabel: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  toggleLabelVariant: {
+    opacity: ".5",
+  },
+  toggleLabelVariant2: {
+    cursor: "pointer",
+  },
+});
+
 const viewStyles = stylex.create({
+  switchRoot: {
+    marginTop: "calc(var(--spacing) * 0.5)",
+    display: "flex",
+    height: "calc(var(--spacing) * 4)",
+    width: "calc(var(--spacing) * 7)",
+    flexShrink: 0,
+    alignItems: "center",
+    borderRadius: "2147483647px",
+    padding: "calc(var(--spacing) * 0.5)",
+    backgroundColor: { default: "var(--color-selected)", ":is([data-checked])": "var(--color-accent)" },
+    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionDuration: "var(--default-transition-duration)",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+  },
+  switchThumb: {
+    display: "block",
+    width: "calc(var(--spacing) * 3)",
+    height: "calc(var(--spacing) * 3)",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-page)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, var(--shadow-toggle-thumb)",
+    transitionProperty: "transform, translate, scale, rotate",
+    transitionDuration: "var(--default-transition-duration)",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    translate: { default: null, ":is([data-checked])": "calc(var(--spacing) * 3) 0" },
+  },
+  textLink: {
+    cursor: "pointer",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    textDecorationLine: "underline",
+    textDecorationColor: { default: "currentcolor", "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, currentcolor 50%, transparent)" },
+  },
+  quietLink: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
+  dangerLink: { color: { default: "var(--color-berry)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
+  windowStrip: { pointerEvents: "none", position: "fixed", insetInline: 0, top: 0 },
+  secretInput: { paddingRight: "calc(var(--spacing) * 9)", fontFamily: "var(--font-mono)" },
+  split: {
+    display: "flex",
+    height: "100%",
+    minHeight: 0,
+    flexDirection: { default: "column", "@media (width >= 48rem)": "row" },
+    overflowX: { default: null, "@media (width >= 48rem)": "hidden" },
+    overflowY: { default: "auto", "@media (width >= 48rem)": "hidden" },
+  },
+  splitGap: { gap: "calc(var(--spacing) * 3)" },
+  splitList: {
+    flexShrink: 0,
+    width: { default: null, "@media (width >= 48rem)": "calc(var(--spacing) * 70)" },
+    overflowY: { default: null, "@media (width >= 48rem)": "auto" },
+  },
+  splitEdge: {
+    borderBottomWidth: { default: 1, "@media (width >= 48rem)": 0 },
+    borderBottomStyle: "solid",
+    borderRightWidth: { default: null, "@media (width >= 48rem)": 1 },
+    borderRightStyle: "solid",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+  },
+  splitBody: { minWidth: 0, flex: "1", overflowY: { default: null, "@media (width >= 48rem)": "auto" } },
+  splitBodyEdge: { padding: "calc(var(--spacing) * 3)" },
+  column: { display: "flex", flexDirection: "column" },
+  listHeader: { display: "flex", flexShrink: 0, alignItems: "center", gap: "calc(var(--spacing) * 2)" },
+  listHeaderBare: { height: "calc(var(--spacing) * 8)", paddingInline: "calc(var(--spacing) * 2)" },
+  listHeaderBox: {
+    height: "calc(var(--spacing) * 10)",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 3)",
+  },
+  listTitle: { flex: "1", textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" },
+  listTitleBare: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-faint)",
+  },
+  listTitleBox: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", fontWeight: "var(--font-weight-semibold)" },
+  listBare: { gap: "1px" },
+  listBox: { padding: "var(--spacing)" },
+  listRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    backgroundColor: {
+      default: null,
+      ':where([aria-current="page"])': "var(--color-selected)",
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" },
+    },
+    outlineWidth: { default: null, ":focus-visible": 2 },
+    outlineStyle: { default: null, ":focus-visible": "solid" },
+    outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
+  },
+  rowText: { display: "flex", minWidth: 0, flex: "1", flexDirection: "column" },
   card: {
     display: "flex",
     flexDirection: "column",
@@ -143,11 +263,9 @@ const viewStyles = stylex.create({
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
 export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
   return (
-    <div class={["flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden", props.edge === true ? "" : "gap-3"]}>
-      <div class={["shrink-0 md:w-70 md:overflow-y-auto", props.edge === true ? "border-b border-line bg-side px-2 py-3 md:border-r md:border-b-0" : ""]}>
-        {props.list}
-      </div>
-      <div class={["min-w-0 flex-1 md:overflow-y-auto", props.edge === true ? "p-3" : ""]}>{props.children}</div>
+    <div {...stylex.attrs(viewStyles.split, props.edge !== true && viewStyles.splitGap)}>
+      <div {...stylex.attrs(viewStyles.splitList, props.edge === true && viewStyles.splitEdge)}>{props.list}</div>
+      <div {...stylex.attrs(viewStyles.splitBody, props.edge === true && viewStyles.splitBodyEdge)}>{props.children}</div>
     </div>
   );
 }
@@ -156,16 +274,12 @@ export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: 
 export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string; bare?: boolean }) {
   const bare = () => props.bare === true;
   return (
-    <section
-      aria-label={props.label ?? props.title}
-      data-testid={props.testid}
-      class={["flex flex-col", bare() ? "" : "rounded-lg border border-line bg-page"]}
-    >
-      <header class={["flex shrink-0 items-center gap-2", bare() ? "h-8 px-2" : "h-10 border-b border-line px-3"]}>
-        <h2 class={["flex-1 truncate", bare() ? "text-xs font-medium text-faint" : "text-sm font-semibold"]}>{props.title}</h2>
+    <section aria-label={props.label ?? props.title} data-testid={props.testid} {...stylex.attrs(bare() ? viewStyles.column : viewStyles.card)}>
+      <header {...stylex.attrs(viewStyles.listHeader, bare() ? viewStyles.listHeaderBare : viewStyles.listHeaderBox)}>
+        <h2 {...stylex.attrs(viewStyles.listTitle, bare() ? viewStyles.listTitleBare : viewStyles.listTitleBox)}>{props.title}</h2>
         {props.action}
       </header>
-      <ul class={["flex flex-col", bare() ? "gap-px" : "p-1"]}>{props.children}</ul>
+      <ul {...stylex.attrs(viewStyles.column, bare() ? viewStyles.listBare : viewStyles.listBox)}>{props.children}</ul>
     </section>
   );
 }
@@ -179,13 +293,10 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
         data-testid="list-row"
         data-key={props.item}
         aria-current={props.active === true ? "page" : undefined}
-        class={[
-          "flex items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus",
-          { "bg-selected": !(props.active !== true) },
-        ]}
+        {...stylex.attrs(viewStyles.listRow)}
       >
         {props.leading}
-        <span class="flex min-w-0 flex-1 flex-col">
+        <span {...stylex.attrs(viewStyles.rowText)}>
           <span {...stylex.attrs(viewStyles.listRowSpan)}>{props.title}</span>
           <Show when={props.line}>
             <span {...stylex.attrs(viewStyles.listRowSpan2)}>{props.line}</span>
@@ -230,7 +341,7 @@ export function Empty(props: { icon: IconName; children: JSX.Element; action?: J
   return (
     <div data-testid={props.testid ?? "empty"} {...stylex.attrs(viewStyles.emptyDiv)}>
       <div {...stylex.attrs(viewStyles.emptyDiv2)}>
-        <Icon name={props.icon} size={48} class="text-faint" />
+        <Icon name={props.icon} size={48} styles={[variantStyles2.emptyIcon]} />
         <p>{props.children}</p>
         {props.action}
       </div>
@@ -251,16 +362,16 @@ export function Toggle(props: {
   testid?: string;
 }) {
   return (
-    <label class={["flex items-start gap-2", props.disabled === true ? "opacity-50" : "cursor-pointer"]}>
+    <label {...stylex.attrs(variantStyles.toggleLabel, props.disabled === true ? variantStyles.toggleLabelVariant : variantStyles.toggleLabelVariant2)}>
       <Switch.Root
         data-testid={props.testid}
         checked={props.checked}
         onCheckedChange={props.onChange}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
-        class="mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full bg-selected p-0.5 transition-colors data-checked:bg-accent"
+        {...stylex.attrs(viewStyles.switchRoot)}
       >
-        <Switch.Thumb class="block size-3 rounded-full bg-page shadow transition-transform data-checked:translate-x-3" />
+        <Switch.Thumb {...stylex.attrs(viewStyles.switchThumb)} />
       </Switch.Root>
       <span {...stylex.attrs(viewStyles.toggleSpan)}>
         <span {...stylex.attrs(viewStyles.toggleSpan2)}>
@@ -276,12 +387,12 @@ export function Toggle(props: {
 }
 
 /** A key: hidden until the eye is pressed. */
-export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
+export function SecretInput(props: TextInputProps) {
   const [shown, setShown] = createSignal(false);
-  const rest = omit(props, "class");
+  const rest = omit(props, "styles");
   return (
     <span {...stylex.attrs(viewStyles.secretInputSpan)}>
-      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-9 font-mono", props.class]} />
+      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" styles={[viewStyles.secretInput, props.styles]} />
       <button
         type="button"
         data-testid="reveal"
@@ -299,17 +410,17 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
 
 /** A quiet underlined word: a page to open in the browser, or onClick. */
 export function TextLink(props: { children: JSX.Element; href?: string; onClick?: () => void; danger?: boolean }) {
-  const look = () => ["cursor-pointer text-xs underline decoration-current/50 hover:text-ink", props.danger === true ? "text-berry" : "text-muted"];
+  const look = () => stylex.attrs(viewStyles.textLink, props.danger === true ? viewStyles.dangerLink : viewStyles.quietLink);
   return (
     <Show
       when={props.href}
       fallback={
-        <button type="button" class={look()} onClick={() => props.onClick?.()}>
+        <button type="button" {...look()} onClick={() => props.onClick?.()}>
           {props.children}
         </button>
       }
     >
-      <a href={props.href} target="_blank" rel="noreferrer" class={look()}>
+      <a href={props.href} target="_blank" rel="noreferrer" {...look()}>
         {props.children}
       </a>
     </Show>
@@ -332,7 +443,7 @@ export const titleBar = {
 export function WindowStrip() {
   return (
     <Show when={titleBar.top > 0}>
-      <div aria-hidden="true" class="window-drag pointer-events-none fixed inset-x-0 top-0" style={{ height: `${titleBar.top}px` }} />
+      <div aria-hidden="true" class={["window-drag", stylex.attrs(viewStyles.windowStrip).class]} style={{ height: `${titleBar.top}px` }} />
     </Show>
   );
 }

@@ -15,6 +15,14 @@ import { Markdown } from "#/ui/Markdown.tsx";
 
 import { SheetLabel } from "./Sheet";
 
+const variantStyles = stylex.create({
+  issueThreadMarkdown: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    overflowWrap: "break-word",
+  },
+});
+
 const viewStyles = stylex.create({
   issueThreadP: {
     fontSize: "var(--text-sm)",
@@ -87,7 +95,7 @@ export function IssueThread(props: { issue: string }) {
                   <span {...stylex.attrs(viewStyles.issueThreadSpan)}>{message.name}</span>
                   <time>{wallClockText(message.at)}</time>
                 </div>
-                <Markdown class="text-sm break-words" text={message.text} />
+                <Markdown styles={variantStyles.issueThreadMarkdown} text={message.text} />
               </article>
             )}
           </For>

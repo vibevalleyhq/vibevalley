@@ -48,7 +48,8 @@ type Controls = {
   messages: () => readonly string[];
   submitError: () => string | undefined;
 };
-export function Form(props: { form: Controls; children: JSX.Element; class?: string; testid?: string }) {
+export function Form(props: { form: Controls; children: JSX.Element; styles?: stylex.StyleXStyles; testid?: string }) {
+  const appearance = () => stylex.props(props.styles);
   let element: HTMLFormElement | undefined;
   let frame: number | undefined;
   let alive = true;
@@ -69,7 +70,8 @@ export function Form(props: { form: Controls; children: JSX.Element; class?: str
         element = node;
       }}
       novalidate
-      class={props.class}
+      class={appearance().className}
+      style={appearance().style}
       data-testid={props.testid}
       aria-busy={props.form.submitting() ? "true" : undefined}
       onCompositionStart={() => props.form.composition(true)}

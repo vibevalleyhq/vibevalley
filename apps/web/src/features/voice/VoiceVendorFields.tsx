@@ -29,6 +29,66 @@ import { Card } from "#/ui/layout.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
+const variantStyles3 = stylex.create({
+  voiceAgentSectionTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  voiceAgentSectionA: {
+    textDecorationLine: "underline",
+  },
+});
+
+const variantStyles = stylex.create({
+  miniMaxVoicesDiv: {
+    display: "flex",
+    height: "34px",
+    alignItems: "center",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+  },
+  miniMaxVoicesDivVariant: {
+    borderColor: {
+      default: "var(--wb-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 40%, transparent)",
+    },
+    backgroundColor: "var(--wb-selected)",
+  },
+  miniMaxVoicesDivVariant2: {
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+  },
+  miniMaxVoicesButton: {
+    height: "100%",
+    minWidth: "0",
+    flex: "1",
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    paddingRight: "calc(var(--spacing) * 2)",
+    paddingLeft: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  miniMaxVoicesButtonVariant: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  miniMaxVoicesButtonVariant2: {
+    color: {
+      default: "var(--color-bark-800)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   colsDiv: {
     display: "grid",
@@ -242,7 +302,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
     <div {...stylex.attrs(viewStyles.voiceAgentSectionDiv)}>
       <p {...stylex.attrs(viewStyles.voiceAgentSectionP)}>
         {t("web.voice.voice.persona.intro")}
-        <A class="underline" href="/settings/call">
+        <A {...stylex.attrs(variantStyles2.voiceAgentSectionA)} href="/settings/call">
           {t("web.voice.voice.section.label")}
         </A>
         {t("web.voice.voice.persona.page")}
@@ -326,7 +386,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                 <Labeled label={t("web.voice.voice.azureArea")}>
                   <TextInput
                     aria-label={t("web.voice.voice.persona.ttsArea")}
-                    class="font-mono"
+                    styles={variantStyles3.voiceAgentSectionTextInput}
                     value={narrowed().region}
                     onInput={(e) => props.set({ ...props.draft, tts: { ...narrowed(), region: e.currentTarget.value } })}
                   />
@@ -334,7 +394,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                 <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.azureVoice")}>
                   <TextInput
                     aria-label={t("web.voice.voice.persona.microsoftVoice")}
-                    class="font-mono"
+                    styles={variantStyles3.voiceAgentSectionTextInput}
                     list="microsoft-voices"
                     value={narrowed().voiceName}
                     onInput={(e) => props.set({ ...props.draft, tts: { ...narrowed(), voiceName: e.currentTarget.value } })}
@@ -358,7 +418,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                 <Labeled label={t("web.voice.voice.persona.voiceId")}>
                   <TextInput
                     aria-label={t("web.voice.voice.persona.voiceId")}
-                    class="font-mono"
+                    styles={variantStyles3.voiceAgentSectionTextInput}
                     value={narrowed().voiceId}
                     onInput={(e) => props.set({ ...props.draft, tts: { ...narrowed(), voiceId: e.currentTarget.value } })}
                   />
@@ -394,7 +454,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
           const sample = voiceSample(v.id);
           const chosen = () => v.id === props.value;
           return (
-            <div class={["flex h-[34px] items-center rounded-md border", chosen() ? "border-ink/40 bg-selected" : "border-line bg-page"]}>
+            <div {...stylex.attrs(variantStyles.miniMaxVoicesDiv, chosen() ? variantStyles.miniMaxVoicesDivVariant : variantStyles.miniMaxVoicesDivVariant2)}>
               <button
                 type="button"
                 disabled={!sample}
@@ -409,10 +469,10 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
                 type="button"
                 title={v.id}
                 aria-pressed={aria(chosen())}
-                class={[
-                  "h-full min-w-0 flex-1 cursor-pointer truncate pr-2 pl-1 text-left text-sm",
-                  chosen() ? "font-semibold" : "text-bark-800 hover:text-ink",
-                ]}
+                {...stylex.attrs(
+                  variantStyles.miniMaxVoicesButton,
+                  chosen() ? variantStyles.miniMaxVoicesButtonVariant : variantStyles.miniMaxVoicesButtonVariant2,
+                )}
                 onClick={() => props.onChange(v.id)}
               >
                 {v.label}

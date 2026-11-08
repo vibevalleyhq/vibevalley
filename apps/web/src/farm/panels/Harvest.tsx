@@ -19,6 +19,39 @@ import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "#/ui/pixel/in
 
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./rows";
 
+const recipeStyles = stylex.create({
+  readyViewSpan: {
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  readyViewP: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  readyViewP2: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  warehouseSpan: {
+    marginTop: "var(--spacing)",
+    display: "block",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+});
+
+const variantStyles = stylex.create({
+  warehouseSpan: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "13px",
+  },
+});
+
 const viewStyles = stylex.create({
   harvestReviewDiv: {
     display: "flex",
@@ -136,8 +169,6 @@ const viewStyles = stylex.create({
   },
 });
 
-const xs = "text-[12px] text-bark-600";
-
 export function HarvestReview(props: { session: Session; onDone: () => void }) {
   const changes = useIssueChanges(() => issueOf(props.session));
   return (
@@ -191,7 +222,9 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         <Show when={props.changes.branch}>
           <FarmTag text={`${props.changes.branch} → ${props.changes.base}`} ink="#46301d" />
         </Show>
-        <span class={xs}>{t("web.farm.harvest.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}</span>
+        <span {...stylex.attrs(recipeStyles.readyViewSpan)}>
+          {t("web.farm.harvest.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}
+        </span>
         <Show when={props.changes.files.length > 0}>
           <PlusMinus added={counts()[0]} removed={counts()[1]} />
         </Show>
@@ -211,11 +244,11 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
           <div {...stylex.attrs(viewStyles.readyViewDiv3)}>
             <For each={conflicts()}>{(f) => <FarmTag text={f} fill="#f7e8c4" ink="#c84a3a" />}</For>
           </div>
-          <p class={["mt-1.5", xs]}>{t("web.farm.harvest.resolveHow", { base: props.changes.base })}</p>
+          <p {...stylex.attrs(recipeStyles.readyViewP)}>{t("web.farm.harvest.resolveHow", { base: props.changes.base })}</p>
         </Tinted>
       </Show>
       <Show when={props.changes.behind > 0 && conflicts().length === 0}>
-        <p class={["mt-2", xs]}>{t("web.farm.harvest.behind", { base: props.changes.base, n: Math.round(props.changes.behind) })}</p>
+        <p {...stylex.attrs(recipeStyles.readyViewP2)}>{t("web.farm.harvest.behind", { base: props.changes.base, n: Math.round(props.changes.behind) })}</p>
       </Show>
       <Show when={props.changes.uncommitted.length > 0}>
         <Tinted color={tint("#e5a93c", 0.2)} class="mt-3">
@@ -245,7 +278,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         <PxButton onClick={() => props.onDone()}>{t("web.farm.notNow")}</PxButton>
       </div>
       <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-        <p class={["mt-2", xs]}>{t("web.farm.water.moved")}</p>
+        <p {...stylex.attrs(recipeStyles.readyViewP2)}>{t("web.farm.water.moved")}</p>
       </Show>
       <Show when={props.changes.commits.length > 0}>
         <FarmSection title={t("web.farm.graph.commits")}>
@@ -298,8 +331,8 @@ export function Warehouse() {
             >
               <SpriteIcon name="icon-harvest" size={40} />
               <span {...stylex.attrs(viewStyles.warehouseSpan)}>
-                <span class="line-clamp-2 text-[13px]">{issueTitle(i, issues())}</span>
-                <span class={["mt-1 block", xs]}>
+                <span {...stylex.attrs(variantStyles.warehouseSpan)}>{issueTitle(i, issues())}</span>
+                <span {...stylex.attrs(recipeStyles.warehouseSpan)}>
                   {[agentName(i), i.repo, i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined]
                     .filter(Boolean)
                     .join(" · ")}

@@ -31,6 +31,12 @@ import { toast } from "#/ui/toasts.ts";
 
 import { DeepseekForm } from "./DeepseekForm";
 
+const variantStyles = stylex.create({
+  sourceFieldTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
 const viewStyles = stylex.create({
   memoryFormForm: {
     display: "flex",
@@ -298,7 +304,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
           <TextInput
             data-testid="source-address"
             aria-label={t("web.setting.source.address", { label: label() })}
-            class="font-mono"
+            styles={variantStyles.sourceFieldTextInput}
             placeholder={sourceAddress[props.draft.kind]}
             value={props.draft.url}
             onInput={(e) => props.set({ url: e.currentTarget.value })}

@@ -20,6 +20,40 @@ import { dateText, type Recency, recencyOf, recencyText, since } from "./calenda
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
 
+const recipeStyles = stylex.create({
+  overviewSpan: {
+    borderRadius: ".25rem",
+    backgroundColor: {
+      default: "var(--color-leaf-300)80",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
+    },
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+});
+
+const variantStyles = stylex.create({
+  reposPageDiv: {
+    display: "flex",
+    minHeight: {
+      default: "480px",
+      "@media (width>=48rem)": "0",
+    },
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  overviewDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+});
+
 const viewStyles = stylex.create({
   reposPageDiv: {
     maxHeight: {
@@ -270,7 +304,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
           </Switch>
         </ListCard>
       </div>
-      <div class="flex min-h-[480px] min-w-0 flex-1 flex-col p-3 md:min-h-0">
+      <div {...stylex.attrs(variantStyles.reposPageDiv)}>
         {/* Keyed by the name, a plain value: the panel's queries are still settling when the page moves back to the map, and a read through a narrowed accessor then would halt the page. */}
         <Show when={selected()?.name} keyed fallback={<props.skin.Map />}>
           {(name) => <RepoPanel name={name} repos={sorted} now={now()} Head={props.skin.Head} />}
@@ -353,10 +387,10 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
       <span {...stylex.attrs(viewStyles.overviewSpan)}>
         <SpriteIcon name={recencyPicture[recency()]} size={80} label={t("web.repo.recency.label", { label: recencyText(recency()) })} />
       </span>
-      <div class="flex min-w-0 flex-1 flex-col gap-3">
+      <div {...stylex.attrs(variantStyles.overviewDiv)}>
         <div {...stylex.attrs(viewStyles.overviewDiv)}>
           <h2 {...stylex.attrs(viewStyles.overviewH2)}>{props.repo.name}</h2>
-          <span class="rounded bg-leaf-300/50 px-1.5 text-xs">{recencyText(recency())}</span>
+          <span {...stylex.attrs(recipeStyles.overviewSpan)}>{recencyText(recency())}</span>
         </div>
         <div {...stylex.attrs(viewStyles.overviewDiv2)}>
           <Stat label={t("web.repo.firstCommit")} value={firstCommit()} />

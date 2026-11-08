@@ -17,6 +17,111 @@ import { Button } from "#/ui/Button.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Quiet } from "#/ui/layout.tsx";
 
+const recipeStyles = stylex.create({
+  memoryPanelDiv: {
+    display: "flex",
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+  },
+  sourcesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 2)",
+    rowGap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  recallPreviewP: {
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    whiteSpace: "pre-wrap",
+  },
+  archivePanelDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  archivePanelDiv2: {
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  writeNoteTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
+const variantStyles = stylex.create({
+  pillButton: {
+    height: "calc(var(--spacing) * 6)",
+    cursor: "pointer",
+    borderRadius: "2147483647px",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  pillButtonVariant: {
+    backgroundColor: "var(--wb-ink)",
+    color: "var(--wb-page)",
+  },
+  pillButtonVariant2: {
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-selected)",
+      },
+    },
+  },
+  sourcesSpan: {},
+  sourcesSpanVariant: {
+    color: "var(--wb-accent)",
+  },
+  sourcesSpanVariant2: {
+    color: "var(--wb-berry)",
+  },
+  memoryItemSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  memoryItemSpanVariant: {
+    color: "var(--wb-muted)",
+  },
+});
+
 const viewStyles = stylex.create({
   sectionSection: {
     display: "flex",
@@ -251,7 +356,7 @@ function Pill(props: { label: string; on: boolean; onClick: () => void }) {
       type="button"
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      class={["h-6 cursor-pointer rounded-full px-2.5 text-xs", props.on ? "bg-ink text-page" : "bg-hover hover:bg-selected"]}
+      {...stylex.attrs(variantStyles.pillButton, props.on ? variantStyles.pillButtonVariant : variantStyles.pillButtonVariant2)}
     >
       {props.label}
     </button>
@@ -291,7 +396,7 @@ export function MemoryPanel(props: { agent: string }) {
         <Show when={done().length > 0} fallback={<Quiet>{t("web.memory.memory.noIssues")}</Quiet>}>
           <For each={done()} keyed={(m) => m.id}>
             {(m) => (
-              <div class={[item, "flex overflow-hidden"]}>
+              <div {...stylex.attrs(recipeStyles.memoryPanelDiv)}>
                 <span {...stylex.attrs(viewStyles.memoryPanelSpan)} />
                 <div {...stylex.attrs(viewStyles.memoryPanelDiv2)}>
                   <span {...stylex.attrs(viewStyles.memoryPanelSpan2)}>
@@ -369,9 +474,11 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
     <Section title={t("web.memory.memory.sources")} count={props.sources.filter((s) => s.on).length}>
       <For each={props.sources}>
         {(s) => (
-          <div class={[item, "flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-xs text-muted"]}>
+          <div {...stylex.attrs(recipeStyles.sourcesDiv)}>
             <span {...stylex.attrs(viewStyles.sourcesSpan)}>{s.label}</span>
-            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}</span>
+            <span {...stylex.attrs(variantStyles.sourcesSpan, s.on ? variantStyles.sourcesSpanVariant : variantStyles.sourcesSpanVariant2)}>
+              {s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}
+            </span>
             <Show when={s.on}>
               <span>{s.canList ? t("web.memory.memory.listed") : t("web.memory.memory.unlisted")}</span>
               <span>{s.canForget ? t("web.memory.memory.forgettable") : t("web.memory.memory.forgetElsewhere")}</span>
@@ -428,7 +535,7 @@ function RecallPreview(props: { agent: string }) {
         />
       </div>
       <Show when={lines().length > 0} fallback={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
-        <p class={[item, "px-3 py-2 text-sm whitespace-pre-wrap"]}>{lines().join("\n")}</p>
+        <p {...stylex.attrs(recipeStyles.recallPreviewP)}>{lines().join("\n")}</p>
       </Show>
     </Section>
   );
@@ -510,7 +617,7 @@ export function ArchivePanel(props: { agent: string }) {
         <Section title={t("web.memory.memory.found")} count={hits().length}>
           <For each={hits()}>
             {(h) => (
-              <div class={[item, "flex flex-col gap-0.5 px-3 py-2"]}>
+              <div {...stylex.attrs(recipeStyles.archivePanelDiv)}>
                 <span {...stylex.attrs(viewStyles.archivePanelSpan)}>
                   {h.file}:{Math.round(h.line)}
                 </span>
@@ -526,7 +633,7 @@ export function ArchivePanel(props: { agent: string }) {
             <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
                 {(f) => (
-                  <div class={[item, "overflow-hidden"]}>
+                  <div {...stylex.attrs(recipeStyles.archivePanelDiv2)}>
                     <button
                       type="button"
                       aria-expanded={aria(open()?.name === f().name)}
@@ -589,7 +696,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         <Show when={props.withRepo} fallback={<span {...stylex.attrs(viewStyles.sectionSpan2)} />}>
           <TextInput
             aria-label={t("web.memory.memory.repo")}
-            class="font-mono"
+            styles={variantStyles2.writeNoteTextInput}
             placeholder={t("web.memory.memory.repoHint")}
             list="memory-repos"
             value={repo()}
@@ -626,7 +733,9 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
       data-faded={props.faded === true ? "" : undefined}
     >
       <div {...stylex.attrs(viewStyles.memoryItemDiv)}>
-        <span class={["text-sm", { "text-muted": !(props.faded !== true) }]}>{props.memory.text}</span>
+        <span {...stylex.attrs(variantStyles.memoryItemSpan, !(props.faded !== true) ? variantStyles.memoryItemSpanVariant : variantStyles.sourcesSpan)}>
+          {props.memory.text}
+        </span>
         <span {...stylex.attrs(viewStyles.memoryItemSpan)}>
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>

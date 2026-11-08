@@ -18,6 +18,12 @@ import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "#/
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import { Qr } from "#/ui/Qr.tsx";
 
+const variantStyles = stylex.create({
+  qqLoginTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
 const viewStyles = stylex.create({
   connectorsPageLi: {
     paddingInline: "calc(var(--spacing) * 2.5)",
@@ -378,7 +384,7 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
         <TextInput
           data-testid="qq-app-id"
           aria-label="AppID"
-          class="font-mono"
+          styles={variantStyles.qqLoginTextInput}
           placeholder="102xxxxxx"
           value={appId()}
           onInput={(e) => setAppId(e.currentTarget.value)}

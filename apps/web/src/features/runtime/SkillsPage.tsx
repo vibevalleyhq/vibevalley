@@ -25,6 +25,67 @@ import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";
 
+const variantStyles = stylex.create({
+  skillsPageA: {
+    display: "inline-flex",
+    height: "calc(var(--spacing) * 6)",
+    alignItems: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: "var(--wb-accent)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-accent-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-page)",
+  },
+  entryA: {
+    display: "flex",
+    flexDirection: "column",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+  },
+  entryAVariant: {
+    backgroundColor: {
+      default: "var(--wb-selected)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  entryAVariant2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  skillEditorA: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-selected)",
+      },
+    },
+    paddingBlock: "var(--spacing)",
+    paddingRight: "calc(var(--spacing) * 3)",
+    paddingLeft: "var(--spacing)",
+  },
+});
+
 const viewStyles = stylex.create({
   skillCard: { maxWidth: "var(--container-3xl)" },
   skillsBook: {
@@ -260,11 +321,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
         </ul>
         <div {...stylex.attrs(viewStyles.skillsPageDiv)}>
           <h3 {...stylex.attrs(viewStyles.skillsPageH32)}>{t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}</h3>
-          <A
-            href={skillPath("new")}
-            data-testid="new-skill"
-            class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-accent-hover"
-          >
+          <A href={skillPath("new")} data-testid="new-skill" {...stylex.attrs(variantStyles.skillsPageA)}>
             {t("web.runtime.library.newSkill")}
           </A>
         </div>
@@ -305,7 +362,7 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
         href={props.to}
         data-testid="skill-entry"
         aria-current={props.on ? "page" : undefined}
-        class={["flex flex-col rounded-md px-2 py-1.5 hover:bg-hover", { "bg-selected": props.on }]}
+        {...stylex.attrs(variantStyles.entryA, props.on ? variantStyles.entryAVariant : variantStyles.entryAVariant2)}
       >
         <span {...stylex.attrs(viewStyles.entrySpan)}>{props.title}</span>
         <Show when={props.detail}>
@@ -445,7 +502,7 @@ function SkillEditor(props: { skill?: Skill }) {
             <div {...stylex.attrs(viewStyles.skillEditorDiv2)}>
               <For each={agents()}>
                 {(a) => (
-                  <A href={`/agents/${encodeURIComponent(a.id)}`} class="flex items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 hover:bg-selected">
+                  <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(variantStyles.skillEditorA)}>
                     <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
                     <span {...stylex.attrs(viewStyles.skillEditorSpan2)}>{a.name}</span>
                   </A>

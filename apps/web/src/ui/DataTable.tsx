@@ -11,6 +11,13 @@ import { Checkbox } from "./Checkbox";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 
+const variantStyles = stylex.create({
+  dataTableTbody: {},
+  dataTableTbodyVariant: {
+    opacity: ".6",
+  },
+});
+
 const viewStyles = stylex.create({
   dataTableDiv: {
     display: "flex",
@@ -183,7 +190,10 @@ export function DataTable<T, K extends string>(props: {
               </For>
             </tr>
           </thead>
-          <tbody inert={table().stale()} class={table().stale() ? "opacity-60" : ""}>
+          <tbody
+            inert={table().stale()}
+            {...stylex.attrs(variantStyles.dataTableTbody, table().stale() ? variantStyles.dataTableTbodyVariant : variantStyles.dataTableTbody)}
+          >
             <For each={table().rows()} keyed={(row) => row.id}>
               {(row) => (
                 <tr

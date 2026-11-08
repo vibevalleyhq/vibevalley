@@ -7,6 +7,86 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: icon buttons retain keyboard selection and disabled styling", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/IconButton:Playground", theme, w: "400" })}`);
+    const button = page.getByTestId("icon-button-control");
+    await button.focus();
+    await page.keyboard.press("Space");
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await page.locator('[data-testid="story-arg"][data-name="disabled"]').getByRole("checkbox").check();
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveCSS("opacity", "0.5");
+    check();
+  }
+});
+
+test("regression: markdown styling preserves rendered nodes and link behavior", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Markdown:Composition", theme, w: "400" })}`);
+    const wrapper = page.getByTestId("markdown-composition");
+    const markdown = wrapper.locator(":scope > div");
+    const link = wrapper.getByRole("link");
+    const original = await link.elementHandle();
+    await expect(markdown).toHaveCSS("max-width", "240px");
+    await expect(link).toHaveCSS("text-decoration-line", "underline");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noreferrer noopener");
+    await page.getByTestId("resize-markdown").click();
+    await expect(markdown).toHaveCSS("max-width", "320px");
+    expect(await link.evaluate((current, before) => current === before, original)).toBe(true);
+    check();
+  }
+});
+
+test("regression: icon composition preserves semantic tones and object style variables", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "设计体系/图标:Composition", theme, w: "400" })}`);
+    const icons = page.getByTestId("story-frame").getByRole("img");
+    await expect(icons).toHaveCount(3);
+    const tone = await icons.nth(0).evaluate((element) => getComputedStyle(element).color);
+    await expect(icons.nth(1)).toHaveCSS("color", tone);
+    await expect(icons.nth(2)).not.toHaveCSS("color", tone);
+    await expect(icons.nth(1)).toHaveCSS("margin-left", "12px");
+    await page.getByTestId("move-icons").click();
+    await expect(icons.nth(1)).toHaveCSS("margin-left", "28px");
+    await expect(icons.nth(2)).toHaveCSS("margin-left", "28px");
+    await expect(icons.nth(1)).toHaveCSS("color", tone);
+    check();
+  }
+});
+
+test("regression: text controls retain object styles, dynamic variables and input identity", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Field:Dynamic controls", theme, w: "400" })}`);
+    const input = page.getByTestId("dynamic-input");
+    const textarea = page.getByTestId("dynamic-textarea");
+    const original = await input.elementHandle();
+    await expect(input).toHaveCSS("max-width", "240px");
+    await expect(textarea).toHaveCSS("max-width", "240px");
+    await expect(input).toHaveCSS("height", "48px");
+    await expect(textarea).toHaveCSS("height", "80px");
+    await input.fill("changed");
+    await expect(textarea).toHaveValue("changed");
+    await page.getByTestId("resize-controls").dispatchEvent("click");
+    await expect(input).toHaveCSS("max-width", "320px");
+    await expect(textarea).toHaveCSS("max-width", "320px");
+    await expect(input).toBeFocused();
+    expect(await input.evaluate((current, before) => current === before, original)).toBe(true);
+    await page.keyboard.press("Tab");
+    await expect(textarea).toBeFocused();
+    await textarea.fill("edited");
+    await expect(input).toHaveValue("edited");
+    check();
+  }
+});
+
 test("regression: migrated popups disable their animations for reduced motion", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const [story, kind, animation] of [
@@ -168,6 +248,44 @@ test("regression: StyleX variables survive Base UI positioning and reactive vari
     await branch.click();
     await expect(branch).toHaveAttribute("aria-expanded", "false");
     await expect(icon).toHaveCSS("rotate", "none");
+    check();
+  }
+});
+
+test("regression: split layouts retain breakpoint borders, bare cards and selected hover", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/layout:Split boundaries", theme, w: "800" })}`);
+    const split = page.getByTestId("split-boundaries").locator(":scope > div");
+    const list = split.locator(":scope > div").first();
+    const card = page.getByTestId("split-list");
+    await expect(split).toHaveCSS("flex-direction", "row");
+    await expect(list).toHaveCSS("width", "280px");
+    await expect(list).toHaveCSS("border-right-width", "1px");
+    await expect(list).toHaveCSS("border-bottom-width", "0px");
+    await expect(card).toHaveCSS("border-top-width", "0px");
+    await expect(card.locator("header")).toHaveCSS("height", "32px");
+    const selected = card.getByTestId("list-row").first();
+    const other = card.getByTestId("list-row").nth(1);
+    await expect(selected).toHaveAttribute("aria-current", "page");
+    const resting = await selected.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await selected.hover();
+    const hovered = await selected.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await other.hover();
+    await expect(other).toHaveCSS("background-color", hovered);
+    await expect(selected).toHaveCSS("background-color", resting);
+    await page.setViewportSize({ width: 767, height: 900 });
+    await expect(split).toHaveCSS("flex-direction", "column");
+    await expect(list).toHaveCSS("border-right-width", "0px");
+    await expect(list).toHaveCSS("border-bottom-width", "1px");
+    await page.setViewportSize({ width: 768, height: 900 });
+    await expect(split).toHaveCSS("flex-direction", "row");
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.getByTestId("story-arg").and(page.locator('[data-name="edge"]')).getByRole("checkbox").uncheck();
+    await expect(split).toHaveCSS("gap", "12px");
+    await expect(card).toHaveCSS("border-top-width", "1px");
+    await expect(card.locator("header")).toHaveCSS("height", "40px");
     check();
   }
 });

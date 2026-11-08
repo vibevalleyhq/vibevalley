@@ -37,6 +37,82 @@ import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
+const recipeStyles = stylex.create({
+  chatWindowP: {
+    display: "flex",
+    height: "calc(var(--spacing) * 4)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+  chatWindowButton: {
+    alignSelf: "center",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: {
+      default: "var(--color-bark-500)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-bark-800)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  chatWindowP2: {
+    paddingBlock: "calc(var(--spacing) * 4)",
+    textAlign: "center",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+  threadHeadP: {
+    height: "calc(var(--spacing) * 4)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+  itemP: {
+    paddingInline: "calc(var(--spacing) * 4)",
+    textAlign: "center",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.625",
+    color: "var(--color-bark-500)",
+  },
+});
+
+const variantStyles = stylex.create({
+  chatWindowDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column-reverse",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  chatWindowDiv2: {},
+  chatWindowDivVariant: {
+    opacity: ".7",
+  },
+});
+
 const viewStyles = stylex.create({
   dotsSpan: {
     display: "inline-flex",
@@ -292,8 +368,6 @@ const phaseWords: Record<ChatPhase, string> = {
   error: t("web.farm.chat.phase.error"),
 };
 
-const small = "font-pixel text-[12px] leading-4 text-bark-500";
-
 /** What the orchestrator is doing: on a call, what the call says; else from the farm's state. */
 const phaseOf = (v: VoiceCall, s: SpaceState | undefined): ChatPhase => {
   if (v.phase === "connecting" || v.phase === "ending") return "connecting";
@@ -422,7 +496,7 @@ export function ChatWindow() {
                   </span>
                   <NewElsewhere except={shown()?.id} />
                 </div>
-                <p class={["flex h-4 items-center gap-1.5", small]} aria-live="polite">
+                <p {...stylex.attrs(recipeStyles.chatWindowP)} aria-live="polite">
                   <span {...stylex.attrs(viewStyles.chatWindowSpan2)}>{phaseWords[phase()]}</span>
                   <Show when={phase() === "thinking" || phase() === "connecting"}>
                     <Dots />
@@ -443,18 +517,14 @@ export function ChatWindow() {
         </Show>
         <CallProblem call={call()} />
         <div
-          class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto p-3"
+          {...stylex.attrs(variantStyles.chatWindowDiv)}
           aria-label={thread() ? t("web.farm.chat.thread") : farmChannelLabel(shown())}
           role="log"
           data-testid="messages"
         >
           <div {...stylex.attrs(viewStyles.chatWindowDiv5)}>
             <Show when={hasOlder() && shown()}>
-              <button
-                type="button"
-                onClick={() => void followed.loadOlder(shown()!.id)}
-                class={["self-center px-2.5 py-0.5 hover:bg-cream-200 hover:text-bark-800", small]}
-              >
+              <button type="button" onClick={() => void followed.loadOlder(shown()!.id)} {...stylex.attrs(recipeStyles.chatWindowButton)}>
                 {t("web.farm.chat.older")}
               </button>
             </Show>
@@ -465,7 +535,7 @@ export function ChatWindow() {
               </ChatRow>
             </Show>
             <Show when={items().length === 0 && thread()}>
-              <p class={["py-4 text-center", small]}>{t("web.farm.chat.threadEmpty")}</p>
+              <p {...stylex.attrs(recipeStyles.chatWindowP2)}>{t("web.farm.chat.threadEmpty")}</p>
             </Show>
             <For each={items()} keyed={(item) => item.message.id}>
               {(item, i) => (
@@ -491,7 +561,7 @@ export function ChatWindow() {
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
                 <div
-                  class={p().state === "failed" ? "" : "opacity-70"}
+                  {...stylex.attrs(variantStyles.chatWindowDiv2, p().state === "failed" ? variantStyles.chatWindowDiv2 : variantStyles.chatWindowDivVariant)}
                   aria-label={p().state === "failed" ? t("web.farm.chat.notSentLine") : t("web.farm.chat.sending")}
                   data-testid="message"
                   data-key={p().key}
@@ -650,7 +720,7 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
           <Show when={session()}>{(s) => <span {...stylex.attrs(viewStyles.threadHeadSpan2)}>@{s().id}</span>}</Show>
           <NewElsewhere except={props.thread.id} />
         </div>
-        <p class={["h-4 truncate", small]}>{status()}</p>
+        <p {...stylex.attrs(recipeStyles.threadHeadP)}>{status()}</p>
       </div>
       <HeadButton
         testid="chat-large"
@@ -692,7 +762,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
       }
     >
       <Match when={props.m.kind === "notice" || props.m.fromKind === "system"}>
-        <p class={["px-4 text-center leading-[1.625]", small]}>{props.m.text}</p>
+        <p {...stylex.attrs(recipeStyles.itemP)}>{props.m.text}</p>
       </Match>
       <Match when={props.m.kind === "report"}>
         <ChatReport

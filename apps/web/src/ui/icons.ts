@@ -168,9 +168,6 @@ export const icons = {
 
 export type IconName = keyof typeof icons;
 
-/** The marks keep their colour wherever they stand: met is green, unmet red, unsure amber. */
-export const iconTone: Partial<Record<IconName, string>> = { check: "text-leaf", cross: "text-berry", warn: "text-wheat" };
-
 /** What a helper is doing, as the workbench draws it. */
 export const actionIcon: Record<SessionAction, IconName> = {
   run_command: "terminal",

@@ -31,6 +31,166 @@ import type { BlockEditor } from "./editor";
 import { PageWords } from "./PageWords";
 import { shellPath } from "./shell";
 
+const recipeStyles = stylex.create({
+  shownButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  shownButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  shownButtonVariant1Case2: {
+    backgroundColor: "var(--wb-selected)",
+  },
+});
+
+const variantStyles3 = stylex.create({
+  artifactsPageIcon: {
+    flexShrink: "0",
+    color: "var(--wb-muted)",
+  },
+  artifactsPageIcon2: {
+    marginTop: "calc(var(--spacing) * .5)",
+    flexShrink: "0",
+    color: "var(--wb-muted)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  shownA: {
+    color: "var(--wb-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  shownA2: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  artifactsPageNav: {
+    minHeight: "0",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-side)",
+    padding: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 64)",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=64rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=64rem)": "1px",
+    },
+  },
+  artifactsPageNavVariant: {
+    display: {
+      default: "none",
+      "@media (width>=64rem)": "flex",
+    },
+  },
+  artifactsPageNavVariant2: {
+    display: "flex",
+  },
+  artifactsPageSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  artifactsPageSpanVariant: {
+    color: {
+      default: "var(--wb-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 75%, transparent)",
+    },
+  },
+  artifactsPageSpanVariant2: {
+    color: "var(--wb-muted)",
+  },
+  artifactsPageDiv: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  shownSection: {
+    display: "flex",
+    minHeight: {
+      default: "70vh",
+      "@media (width>=80rem)": "0",
+    },
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+  shownDiv: {
+    display: "flex",
+    minHeight: "0",
+    width: "100%",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  shownDivVariant: {},
+  shownDivVariant2: {
+    marginInline: "auto",
+    maxWidth: "var(--container-3xl)",
+  },
+  shownHeader: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  shownHeaderVariant: {
+    paddingLeft: {
+      default: null,
+      "@media (width>=64rem)": "35px",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   replyAction: { alignSelf: "flex-end" },
   artifactsPageDiv: {
@@ -337,11 +497,11 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
       <nav
         aria-label={t("web.artifact.page.list")}
         data-testid="artifact-list"
-        class={[id() ? "hidden lg:flex" : "flex", "min-h-0 shrink-0 flex-col gap-3 border-line bg-side p-3 lg:w-64 lg:border-r"]}
+        {...stylex.attrs(variantStyles.artifactsPageNav, id() ? variantStyles.artifactsPageNavVariant : variantStyles.artifactsPageNavVariant2)}
       >
         <div {...stylex.attrs(viewStyles.artifactsPageDiv2)}>
           <label {...stylex.attrs(viewStyles.artifactsPageLabel)}>
-            <Icon name="search" size={14} class="shrink-0 text-muted" />
+            <Icon name="search" size={14} styles={[variantStyles3.artifactsPageIcon]} />
             <input
               data-testid="artifact-search"
               value={query()}
@@ -394,11 +554,16 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
                               a().id === id() ? "bg-selected" : a().id === open() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
                             ]}
                           >
-                            <Icon name={bodyIcon[a().body]} size={16} class="mt-0.5 shrink-0 text-muted" />
+                            <Icon name={bodyIcon[a().body]} size={16} styles={[variantStyles3.artifactsPageIcon2]} />
                             <span {...stylex.attrs(viewStyles.artifactsPageSpan2)}>
                               <span {...stylex.attrs(viewStyles.artifactsPageSpan3)}>{a().title}</span>
                               {/* On the selected row's darker ground the line takes more ink, to stay readable. */}
-                              <span class={["truncate text-xs", a().id === open() ? "text-ink/75" : "text-muted"]}>
+                              <span
+                                {...stylex.attrs(
+                                  variantStyles.artifactsPageSpan,
+                                  a().id === open() ? variantStyles.artifactsPageSpanVariant : variantStyles.artifactsPageSpanVariant2,
+                                )}
+                              >
                                 {a().byName} · {ago(a().updated, now())}
                               </span>
                             </span>
@@ -413,7 +578,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
           </For>
         </div>
       </nav>
-      <div class={[id() ? "flex" : "hidden lg:flex", "min-h-0 min-w-0 flex-1 flex-col"]}>
+      <div {...stylex.attrs(variantStyles.artifactsPageDiv, id() ? variantStyles.artifactsPageNavVariant2 : variantStyles.artifactsPageNavVariant)}>
         <Show
           when={open()}
           fallback={
@@ -563,16 +728,16 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
       data-version={version()?.version}
       class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden"
     >
-      <section class="flex min-h-[70vh] min-w-0 flex-1 flex-col px-4 py-4 xl:min-h-0">
+      <section {...stylex.attrs(variantStyles.shownSection)}>
         {/* A page is shown as wide as there is room; written blocks read in a column. */}
-        <div class={["flex min-h-0 w-full flex-1 flex-col gap-3", html() ? "" : "mx-auto max-w-3xl"]}>
+        <div {...stylex.attrs(variantStyles.shownDiv, html() ? variantStyles.shownDivVariant : variantStyles.shownDivVariant2)}>
           <div {...stylex.attrs(viewStyles.shownDiv)}>
             <Button icon="back" onClick={() => router.navigate("/artifacts")}>
               {t("web.artifact.page.all")}
             </Button>
           </div>
           {/* A blocks one's header lines up with its text, past the gutter of faces and author bars (BlocksView). */}
-          <header class={["flex flex-col gap-1", html() ? "" : "lg:pl-[35px]"]}>
+          <header {...stylex.attrs(variantStyles.shownHeader, html() ? variantStyles.shownDivVariant : variantStyles.shownHeaderVariant)}>
             <div {...stylex.attrs(viewStyles.shownDiv2)}>
               <Title artifact={props.artifact} />
               <IconButton
@@ -600,7 +765,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                 {(i) => (
                   <>
                     <span aria-hidden="true">·</span>
-                    <A href={`/issues/${i().id}`} data-testid="artifact-issue" class="text-water hover:underline">
+                    <A href={`/issues/${i().id}`} data-testid="artifact-issue" {...stylex.attrs(variantStyles2.shownA)}>
                       {t("web.artifact.page.forIssue", { number: i().number })}
                     </A>
                   </>
@@ -672,10 +837,10 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                         data-key={v().version}
                         aria-pressed={v().version === version()?.version ? "true" : "false"}
                         onClick={() => pick(v().version)}
-                        class={[
-                          "flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left transition-colors duration-120",
-                          v().version === version()?.version ? "bg-selected" : "hover:bg-hover",
-                        ]}
+                        {...stylex.attrs(
+                          recipeStyles.shownButton,
+                          v().version === version()?.version ? recipeStyles.shownButtonVariant1Case2 : recipeStyles.shownButtonVariant1Case1,
+                        )}
                       >
                         <span {...stylex.attrs(viewStyles.shownSpan2)}>
                           {t("web.artifact.card.version", { version: v().version })}{" "}
@@ -703,7 +868,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               <div {...stylex.attrs(viewStyles.shownDiv5)}>
                 <div {...stylex.attrs(viewStyles.shownDiv6)}>
                   <h2 {...stylex.attrs(viewStyles.shownH2)}>{version() ? t("web.artifact.talk.replyVersion") : t("web.artifact.talk.reply")}</h2>
-                  <A href={messageHref(at())} data-testid="artifact-message" class="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
+                  <A href={messageHref(at())} data-testid="artifact-message" {...stylex.attrs(variantStyles2.shownA2)}>
                     <Icon name="chat" size={12} />
                     {t("web.artifact.talk.atMessage")}
                   </A>

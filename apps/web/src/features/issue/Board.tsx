@@ -14,6 +14,137 @@ import { laneOrder, type Ordering } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
+const recipeStyles = stylex.create({
+  issueBoardDiv: {
+    marginBottom: "calc(var(--spacing) * 2)",
+    display: {
+      default: null,
+      "@container (width>=700px)": "none",
+    },
+  },
+  laneViewSection: {
+    height: "fit-content",
+    maxHeight: "100%",
+    minWidth: "220px",
+    flex: "1",
+    flexDirection: "column",
+    alignSelf: "flex-start",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingTop: "calc(var(--spacing) * 1.5)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+  },
+  laneViewSectionVariant1Case1: {
+    display: {
+      default: "none",
+      "@container (width>=700px)": "flex",
+    },
+  },
+  laneViewSectionVariant1Case2: {
+    display: "flex",
+  },
+  laneViewSectionVariant2Case1: {
+    borderColor: "transparent",
+    backgroundColor: "var(--wb-hover)",
+  },
+  laneViewSectionVariant2Case2: {
+    borderColor: "var(--wb-leaf)",
+    backgroundColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 15%, transparent)",
+    },
+  },
+  laneViewButton: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    height: "calc(var(--spacing) * 9)",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "dashed",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--wb-line)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-faint)",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--wb-faint) 50%, transparent)",
+        },
+      },
+    },
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: {
+      default: "var(--wb-faint)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-muted)",
+      },
+    },
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-page)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  issueBoardDiv: {
+    containerType: "inline-size",
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 3)",
+  },
+  laneViewDiv: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    overflowY: "auto",
+  },
+  laneViewDiv2: {
+    height: "calc(var(--spacing) * 12)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "dashed",
+    borderWidth: "1px",
+  },
+  laneViewDivVariant: {
+    borderColor: "var(--wb-leaf)",
+  },
+  laneViewDivVariant2: {
+    borderColor: "var(--wb-line)",
+  },
+  cardViewDiv: {
+    marginTop: "calc(var(--spacing) * .5)",
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    overflowWrap: "break-word",
+  },
+});
+
 const viewStyles = stylex.create({
   olderLinkButton: {
     marginInline: "auto",
@@ -171,8 +302,8 @@ export function IssueBoard(props: BoardProps) {
   const [dragging, setDragging] = createSignal<BoardCard>();
   const drag: Drag = { dragging, setDragging: (c) => setDragging(() => c) };
   return (
-    <div class="@container flex min-h-0 flex-1 flex-col px-3 pb-3">
-      <div class="mb-2 @min-[700px]:hidden">
+    <div {...stylex.attrs(variantStyles.issueBoardDiv)}>
+      <div {...stylex.attrs(recipeStyles.issueBoardDiv)}>
         <Segmented
           label={t("web.issue.board.whichLane")}
           block
@@ -222,12 +353,11 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
         if (d && accepts(d)) p().onDrop(d, props.lane);
         props.drag.setDragging(undefined);
       }}
-      class={[
-        // As tall as what it holds: an empty lane is its head and a place to drop, not a column of nothing.
-        "h-fit max-h-full min-w-[220px] flex-1 flex-col self-start rounded-lg border px-2 pt-1.5 pb-2",
-        props.shownNarrow ? "flex" : "hidden @min-[700px]:flex",
-        over() ? "border-leaf bg-leaf/15" : "border-transparent bg-hover",
-      ]}
+      {...stylex.attrs(
+        recipeStyles.laneViewSection,
+        props.shownNarrow ? recipeStyles.laneViewSectionVariant1Case2 : recipeStyles.laneViewSectionVariant1Case1,
+        over() ? recipeStyles.laneViewSectionVariant2Case2 : recipeStyles.laneViewSectionVariant2Case1,
+      )}
     >
       <header {...stylex.attrs(viewStyles.laneViewHeader)}>
         <StatusMark status={laneStatus[props.lane]} />
@@ -241,13 +371,13 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
           data-testid="issue-new"
           onClick={() => p().onNew()}
           aria-label={t("web.issue.new.title")}
-          class="mt-1.5 flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-line text-sm text-faint transition-colors duration-120 hover:border-faint/50 hover:bg-page hover:text-muted"
+          {...stylex.attrs(recipeStyles.laneViewButton)}
         >
           <Icon name="add" size={14} />
           {t("web.issue.new.card")}
         </button>
       </Show>
-      <div class="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+      <div {...stylex.attrs(variantStyles.laneViewDiv)}>
         <Switch
           fallback={
             <>
@@ -276,7 +406,10 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
           </Match>
           {/* The todo lane has its placeholder card: no second empty box under it. */}
           <Match when={props.cards.length === 0 && props.lane !== "todo"}>
-            <div data-testid="lane-empty" class={["h-12 rounded-md border border-dashed", over() ? "border-leaf" : "border-line"]} />
+            <div
+              data-testid="lane-empty"
+              {...stylex.attrs(variantStyles.laneViewDiv2, over() ? variantStyles.laneViewDivVariant : variantStyles.laneViewDivVariant2)}
+            />
           </Match>
         </Switch>
       </div>
@@ -367,7 +500,7 @@ function CardView(props: {
         <Show when={where()}>
           <div {...stylex.attrs(viewStyles.cardViewDiv2)}>{where()}</div>
         </Show>
-        <div class="mt-0.5 line-clamp-2 text-sm font-medium break-words">{look().title}</div>
+        <div {...stylex.attrs(variantStyles.cardViewDiv)}>{look().title}</div>
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <Show when={marks()}>
           <div data-testid="card-marks" {...stylex.attrs(viewStyles.cardMarks)}>

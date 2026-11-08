@@ -5,6 +5,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Field, Select, TextArea, TextInput } from "./Field";
 
 const styles = stylex.create({
+  dynamicWidth: (width: number) => ({ maxWidth: width }),
   states: { width: "calc(var(--spacing) * 48)" },
   text: { width: "calc(var(--spacing) * 80)" },
   longText: { width: "calc(var(--spacing) * 96)" },
@@ -21,6 +22,32 @@ const runtimes = [
 export default stories({
   title: "组件/工作台/Field",
   stories: {
+    "Dynamic controls": story({
+      args: { width: 240, value: "draft" },
+      render: (a, set) => (
+        <div {...stylex.attrs(styles.longText)}>
+          <TextInput
+            data-testid="dynamic-input"
+            aria-label="Input"
+            value={a.value}
+            onInput={(event) => set({ value: event.currentTarget.value })}
+            styles={styles.dynamicWidth(a.width)}
+            style={{ height: "48px" }}
+          />
+          <TextArea
+            data-testid="dynamic-textarea"
+            aria-label="Text area"
+            value={a.value}
+            onInput={(event) => set({ value: event.currentTarget.value })}
+            styles={styles.dynamicWidth(a.width)}
+            style={{ height: "80px" }}
+          />
+          <button type="button" data-testid="resize-controls" onClick={() => set({ width: a.width === 240 ? 320 : 240 })}>
+            Resize
+          </button>
+        </div>
+      ),
+    }),
     States: story({
       note: "输入框和选择框：静止、指针下、聚焦，和不能改的。",
       args: { kind: "text", value: "vibevalley", disabled: false },

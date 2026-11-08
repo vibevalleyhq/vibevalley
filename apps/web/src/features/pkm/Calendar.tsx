@@ -16,6 +16,49 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { dayKey, dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";
 
+const recipeStyles = stylex.create({
+  monthButton: {
+    position: "relative",
+    marginInline: "auto",
+    display: "flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  monthButtonVariant1Case1: {
+    color: "var(--wb-faint)",
+  },
+  monthButtonVariant1Case2: {
+    color: "var(--wb-ink)",
+  },
+  monthButtonVariant2Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    fontWeight: null,
+  },
+  monthButtonVariant2Case2: {
+    backgroundColor: "var(--wb-selected)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  monthButtonVariant3Case1: {
+    boxShadow: null,
+  },
+  monthButtonVariant3Case2: {
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 0 calc(1px + 0) var(--wb-accent), 0 0 transparent",
+  },
+});
+
 const viewStyles = stylex.create({
   pkmCalendar: {
     display: "flex",
@@ -149,12 +192,12 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
                   aria-current={d.day === props.open ? "date" : undefined}
                   disabled={act.busy()}
                   onClick={() => go(d.day)}
-                  class={[
-                    "relative mx-auto flex size-7 cursor-pointer flex-col items-center justify-center rounded-md text-xs",
-                    d.inMonth ? "text-ink" : "text-faint",
-                    d.day === props.open ? "bg-selected font-semibold" : "hover:bg-hover",
-                    d.day === today ? "ring-1 ring-accent" : "",
-                  ]}
+                  {...stylex.attrs(
+                    recipeStyles.monthButton,
+                    d.inMonth ? recipeStyles.monthButtonVariant1Case2 : recipeStyles.monthButtonVariant1Case1,
+                    d.day === props.open ? recipeStyles.monthButtonVariant2Case2 : recipeStyles.monthButtonVariant2Case1,
+                    d.day === today ? recipeStyles.monthButtonVariant3Case2 : recipeStyles.monthButtonVariant3Case1,
+                  )}
                 >
                   {Number(d.day.slice(8))}
                   <span {...stylex.attrs(viewStyles.monthSpan2)}>{dayTitle(d.day, today)}</span>

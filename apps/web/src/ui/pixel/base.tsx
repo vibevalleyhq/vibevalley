@@ -2,7 +2,27 @@ import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
-import { pxFrame, pxText, pxWindow } from "./style";
+import { pxFrame, pxWindow } from "./style";
+
+const recipeStyles = stylex.create({
+  pxCardDiv: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  pxCardDiv2: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-500)",
+    fontSynthesis: "none",
+  },
+});
 
 const viewStyles = stylex.create({
   pxCardDiv: {
@@ -47,9 +67,9 @@ export function PxCard(props: { title?: JSX.Element; aside?: JSX.Element; childr
       <Show when={props.title != null}>
         {/* The aside wraps under the title when both do not fit, instead of squeezing the title to a letter a line. */}
         <div {...stylex.attrs(viewStyles.pxCardDiv)}>
-          <div class={pxText.sm}>{props.title}</div>
+          <div {...stylex.attrs(recipeStyles.pxCardDiv)}>{props.title}</div>
           <Show when={props.aside != null}>
-            <div class={[pxText.xs, "text-bark-500"]}>{props.aside}</div>
+            <div {...stylex.attrs(recipeStyles.pxCardDiv2)}>{props.aside}</div>
           </Show>
         </div>
       </Show>

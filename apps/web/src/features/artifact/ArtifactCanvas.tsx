@@ -12,6 +12,33 @@ import { Icon } from "#/ui/Icon.tsx";
 import { bodyIcon, bodyLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
 
+const variantStyles = stylex.create({
+  artifactCanvasSection: {
+    display: "flex",
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+  },
+  artifactCanvasSpan: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  artifactCanvasDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    padding: "calc(var(--spacing) * 3)",
+  },
+});
+
 const viewStyles = stylex.create({
   artifactCanvasHeader: {
     display: "flex",
@@ -124,7 +151,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
       aria-label={t("web.artifact.canvas.label")}
       data-testid="artifact-canvas"
       data-key={props.id}
-      class="flex min-h-0 min-w-0 flex-1 flex-col border-l border-line bg-page"
+      {...stylex.attrs(variantStyles.artifactCanvasSection)}
     >
       <header {...stylex.attrs(viewStyles.artifactCanvasHeader)}>
         <Show when={shown()}>
@@ -133,7 +160,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
               <span {...stylex.attrs(viewStyles.artifactCanvasSpan)}>
                 <Icon name={bodyIcon[a().body]} size={16} />
               </span>
-              <span class="flex min-w-0 flex-1 flex-col">
+              <span {...stylex.attrs(variantStyles.artifactCanvasSpan)}>
                 <span {...stylex.attrs(viewStyles.artifactCanvasSpan2)}>{a().title}</span>
                 <span {...stylex.attrs(viewStyles.artifactCanvasSpan3)}>
                   {bodyLabel[a().body]}
@@ -175,7 +202,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
               />
             }
           >
-            <div class="flex min-h-0 flex-1 flex-col p-3">
+            <div {...stylex.attrs(variantStyles.artifactCanvasDiv)}>
               <BlocksView id={a().id} {...(props.onQuote ? { onQuote: props.onQuote } : {})} />
             </div>
           </Show>

@@ -9,6 +9,43 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 
+const recipeStyles = stylex.create({
+  blocksGameDiv: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-lcd-paper)cc",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
+    },
+    textAlign: "center",
+  },
+});
+
+const variantStyles = stylex.create({
+  blocksGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingTop: "calc(var(--spacing) * 2)",
+  },
+  blocksGameDivVariant: {
+    gap: "calc(var(--spacing) * 4)",
+  },
+  blocksGameDivVariant2: {
+    gap: "calc(var(--spacing) * 2)",
+  },
+  blocksGameDiv2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 const viewStyles = stylex.create({
   blocksGameDiv: {
     position: "relative",
@@ -145,7 +182,7 @@ export function BlocksGame(props: { big?: boolean }) {
     <div
       data-testid="blocks"
       data-state={!g() ? "ready" : g()!.over ? "over" : playing() ? "playing" : "paused"}
-      class={["flex min-h-0 flex-1 px-2 pt-2", props.big === true ? "gap-4" : "gap-2"]}
+      {...stylex.attrs(variantStyles.blocksGameDiv, props.big === true ? variantStyles.blocksGameDivVariant : variantStyles.blocksGameDivVariant2)}
     >
       <div {...stylex.attrs(viewStyles.blocksGameDiv)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
@@ -157,7 +194,7 @@ export function BlocksGame(props: { big?: boolean }) {
           role="img"
         />
         <Show when={!g() || g()!.over || !playing()}>
-          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
+          <div {...stylex.attrs(recipeStyles.blocksGameDiv)}>
             <span>
               {g()?.over === true ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
@@ -168,7 +205,7 @@ export function BlocksGame(props: { big?: boolean }) {
           </div>
         </Show>
       </div>
-      <div class="flex min-w-0 flex-1 flex-col gap-2">
+      <div {...stylex.attrs(variantStyles.blocksGameDiv2)}>
         <Next kind={g()?.next} />
         <Stat label={t("web.farm.phone.blocks.score")} value={g()?.score ?? 0} />
         <Stat label={t("web.farm.phone.blocks.lines")} value={g()?.lines ?? 0} />

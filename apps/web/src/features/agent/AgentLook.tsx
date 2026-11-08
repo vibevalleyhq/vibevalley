@@ -13,6 +13,91 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { PoseSprite } from "#/ui/PoseSprite.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
+const recipeStyles = stylex.create({
+  stageSpan: {
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: "var(--color-paper)eb",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 92%, transparent)",
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+  },
+  stageSpan2: {
+    maxWidth: "calc(var(--spacing) * 96)",
+    borderRadius: ".25rem",
+    backgroundColor: {
+      default: "var(--color-paper)bf",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "1px",
+    textAlign: "center",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  stageSpan3: {
+    pointerEvents: "none",
+    position: "absolute",
+    top: "calc(var(--spacing) * 3)",
+    right: "calc(var(--spacing) * 4)",
+    borderRadius: ".25rem",
+    backgroundColor: {
+      default: "var(--color-paper)bf",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "1px",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+});
+
+const variantStyles = stylex.create({
+  tileButton: {
+    display: "flex",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    paddingInline: "var(--spacing)",
+    paddingTop: "var(--spacing)",
+    paddingBottom: "calc(var(--spacing) * 1.5)",
+  },
+  tileButtonVariant: {
+    borderColor: {
+      default: "var(--wb-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 40%, transparent)",
+    },
+    backgroundColor: "var(--wb-selected)",
+  },
+  tileButtonVariant2: {
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  tileSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  tileSpanVariant: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  tileSpanVariant2: {
+    color: "var(--wb-muted)",
+  },
+});
+
 const viewStyles = stylex.create({
   labeledDiv: {
     display: "flex",
@@ -174,13 +259,10 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       aria-label={props.label}
       aria-pressed={aria(props.active)}
       onClick={() => props.onClick()}
-      class={[
-        "flex cursor-pointer flex-col items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5",
-        props.active ? "border-ink/40 bg-selected" : "border-line hover:bg-hover",
-      ]}
+      {...stylex.attrs(variantStyles.tileButton, props.active ? variantStyles.tileButtonVariant : variantStyles.tileButtonVariant2)}
     >
       {props.children}
-      <span class={["text-xs", props.active ? "font-semibold" : "text-muted"]}>{props.label}</span>
+      <span {...stylex.attrs(variantStyles.tileSpan, props.active ? variantStyles.tileSpanVariant : variantStyles.tileSpanVariant2)}>{props.label}</span>
     </button>
   );
 }
@@ -204,12 +286,12 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
         </div>
       </div>
       <div {...stylex.attrs(viewStyles.stageDiv4)}>
-        <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || t("web.agent.unnamedAgent")}</span>
+        <span {...stylex.attrs(recipeStyles.stageSpan)}>{props.draft.name || t("web.agent.unnamedAgent")}</span>
         <Show when={props.draft.duty}>
-          <span class="max-w-96 rounded bg-paper/75 px-2 py-px text-center text-xs">{props.draft.duty}</span>
+          <span {...stylex.attrs(recipeStyles.stageSpan2)}>{props.draft.duty}</span>
         </Show>
       </div>
-      <span class="pointer-events-none absolute top-3 right-4 rounded bg-paper/75 px-2 py-px text-xs">
+      <span {...stylex.attrs(recipeStyles.stageSpan3)}>
         {speciesLabel[cast().species]} · {outfitLabel[cast().outfit]}
       </span>
     </div>

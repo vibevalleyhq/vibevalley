@@ -31,9 +31,54 @@ import {
   pasteAction,
   saved,
 } from "./editing";
+import { outlineBlock } from "./outline.stylex";
 import type { DropAt } from "./selection";
 
+const variantStyles = stylex.create({
+  rowSpan: {
+    pointerEvents: "none",
+    position: "absolute",
+    right: "0",
+    height: "calc(var(--spacing) * .5)",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-water)",
+  },
+  rowSpanVariant: {
+    top: "-1px",
+  },
+  rowSpanVariant2: {
+    bottom: "-1px",
+  },
+  rowDiv: {
+    minWidth: "0",
+    flex: "1",
+  },
+  rowDivVariant: {
+    color: "var(--wb-muted)",
+  },
+  rowDivVariant2: {},
+  editorLi: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    backgroundColor: {
+      default: null,
+      ":is([aria-selected=true])": "var(--wb-selected)",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
+  expandedChevron: {
+    position: "absolute",
+    display: { default: "inline-flex", "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", outlineBlock)]: "block" } },
+  },
   rowSpan: {
     position: "absolute",
     insetBlock: "0",
@@ -238,6 +283,7 @@ export function Row(props: {
       data-picked={props.picked ? "" : undefined}
       class={[
         "group relative flex items-start gap-1 rounded-sm py-px transition-colors duration-280",
+        stylex.attrs(outlineBlock).class,
         props.picked ? "bg-selected" : props.lit ? "bg-wheat/20" : "",
       ]}
       style={{ "padding-left": `${props.block.depth * indentPx}px` }}
@@ -250,7 +296,7 @@ export function Row(props: {
             aria-hidden="true"
             data-testid="pkm-drop"
             data-at={at()}
-            class={["pointer-events-none absolute right-0 h-0.5 rounded-full bg-water", at() === "before" ? "-top-px" : "-bottom-px"]}
+            {...stylex.attrs(variantStyles.rowSpan, at() === "before" ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}
             style={{ left: `${(props.block.depth + (at() === "inside" ? 2 : 1)) * indentPx}px` }}
           />
         )}
@@ -272,7 +318,7 @@ export function Row(props: {
       >
         <span class={["size-1.5 rounded-full bg-muted", props.parent ? (props.folded ? "ring-3 ring-line" : "group-hover:hidden") : ""]} />
         <Show when={props.parent && !props.folded}>
-          <Icon name="choose" size={12} class="absolute hidden group-hover:block" />
+          <Icon name="choose" size={12} styles={viewStyles.expandedChevron} />
         </Show>
       </button>
       <Show when={props.block.marker && markerLook[props.block.marker]}>
@@ -291,7 +337,7 @@ export function Row(props: {
           </button>
         )}
       </Show>
-      <div class={["min-w-0 flex-1", done() ? "text-muted" : ""]}>
+      <div {...stylex.attrs(variantStyles.rowDiv, done() ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}>
         <Show
           when={props.focus}
           fallback={
@@ -576,7 +622,7 @@ export function Editor(props: {
                   e.preventDefault();
                   c().pick();
                 }}
-                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm aria-selected:bg-selected"
+                {...stylex.attrs(variantStyles.editorLi)}
               >
                 <span {...stylex.attrs(viewStyles.editorSpan)}>{c().label}</span>
                 <Show when={c().hint}>{(h) => <span {...stylex.attrs(viewStyles.editorSpan2)}>{h()}</span>}</Show>

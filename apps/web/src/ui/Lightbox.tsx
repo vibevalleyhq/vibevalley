@@ -7,6 +7,34 @@ import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 
+const recipeStyles = stylex.create({
+  lightboxA: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-selected)",
+      },
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   lightboxDiv: {
     pointerEvents: "none",
@@ -106,7 +134,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
                 data-testid="lightbox-original"
                 aria-label={t("web.base.lightbox.original")}
                 title={t("web.base.lightbox.original")}
-                class="inline-flex size-7 items-center justify-center rounded-md text-muted transition-colors duration-120 hover:bg-selected hover:text-ink"
+                {...stylex.attrs(recipeStyles.lightboxA)}
               >
                 <Icon name="open" size={16} />
               </a>

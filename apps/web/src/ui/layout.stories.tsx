@@ -5,10 +5,11 @@ import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
-import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } from "./layout";
+import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, Split, TextLink, Toggle } from "./layout";
 import { Dot } from "./Tag";
 
 const viewStyles = stylex.create({
+  splitExample: { height: "calc(var(--spacing) * 100)", width: "100%" },
   dynamicCard: (width: number) => ({ width, maxWidth: width }),
   layoutStoriesDiv: {
     width: "calc(var(--spacing) * 72)",
@@ -42,6 +43,26 @@ const repos = [
 export default stories({
   title: "组件/工作台/layout",
   stories: {
+    "Split boundaries": story({
+      args: { edge: true },
+      render: (a) => (
+        <div data-testid="split-boundaries" {...stylex.attrs(viewStyles.splitExample)}>
+          <Split
+            edge={a.edge}
+            list={
+              <ListCard title="List" bare={a.edge} testid="split-list">
+                <ListRow to="/repos/first" item="first" title="First" active />
+                <ListRow to="/repos/second" item="second" title="Second" />
+              </ListCard>
+            }
+          >
+            <Card title="Detail">
+              <Quiet>Content</Quiet>
+            </Card>
+          </Split>
+        </div>
+      ),
+    }),
     "List card": story({
       note: "列表和详情怎么放在一起，见「交互 / 列表和详情」。",
       args: { active: "vibevalley" },

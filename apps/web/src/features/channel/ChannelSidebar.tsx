@@ -21,7 +21,120 @@ import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 
+const recipeStyles = stylex.create({
+  sidebarDiv: {
+    display: "flex",
+    height: "66px",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 5)",
+  },
+  sidebarButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelRowButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  channelRowButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  channelRowButtonVariant1Case2: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  channelRowButtonVariant2Case1: {
+    boxShadow: null,
+  },
+  channelRowButtonVariant2Case2: {
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 2px 0 var(--color-accent)",
+  },
+  channelRowSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  channelRowSpanVariant1Case1: {
+    fontWeight: null,
+  },
+  channelRowSpanVariant1Case2: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  channelRowSpanVariant2Case1: {
+    color: null,
+  },
+  channelRowSpanVariant2Case2: {
+    color: "var(--wb-muted)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  sectionIcon: {
+    opacity: ".6",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  sectionIconVariant: {
+    rotate: "90deg",
+  },
+  sectionIconVariant2: {},
+});
+
+const variantStyles = stylex.create({
+  sectionSection: {},
+  sectionSectionVariant: {
+    marginTop: "var(--spacing)",
+    marginBottom: "var(--spacing)",
+  },
+  sectionSectionVariant2: {
+    marginBottom: "calc(var(--spacing) * 4)",
+  },
+});
+
 const viewStyles = stylex.create({
+  helperDot: { position: "absolute", right: "calc(var(--spacing) * -0.5)", bottom: "calc(var(--spacing) * -0.5)" },
+  typingDot: { marginLeft: "var(--spacing)" },
   channelsSide: {
     display: "flex",
     width: "100%",
@@ -233,11 +346,11 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   );
   return (
     <aside aria-label={t("web.channel.side")} data-testid="channels-side" {...stylex.attrs(viewStyles.channelsSide)}>
-      <div class={[channelHeadClass, "gap-2 px-5"]}>
+      <div {...stylex.attrs(recipeStyles.sidebarDiv)}>
         <span {...stylex.attrs(viewStyles.sidebarSpan)}>{t("web.channel.tab.chat")}</span>
         <button
           type="button"
-          class={channelIconButtonClass}
+          {...stylex.attrs(recipeStyles.sidebarButton)}
           data-testid="farm-search-open"
           aria-label={t("web.channel.farmSearch.open")}
           title={t("web.channel.farmSearch.open")}
@@ -258,7 +371,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           action={
             <button
               type="button"
-              class={[channelIconButtonClass, "size-6"]}
+              {...stylex.attrs(recipeStyles.sidebarButton)}
               data-testid="new-channel"
               aria-label={t("web.channel.newChannel")}
               title={t("web.channel.newChannel")}
@@ -288,7 +401,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
             <div {...stylex.attrs(viewStyles.sidebarDiv)}>
               <button
                 type="button"
-                class={[channelIconButtonClass, "size-6"]}
+                {...stylex.attrs(recipeStyles.sidebarButton)}
                 data-testid="new-direct"
                 aria-label={t("web.channel.direct.add")}
                 title={t("web.channel.direct.add")}
@@ -366,7 +479,12 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
 function Section(props: { title: string; item: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
   const [open, setOpen] = createSignal(untrack(() => props.closed !== true));
   return (
-    <section class={props.nested === true ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
+    <section
+      {...stylex.attrs(variantStyles.sectionSection, props.nested === true ? variantStyles.sectionSectionVariant : variantStyles.sectionSectionVariant2)}
+      aria-label={props.title}
+      data-testid="side-section"
+      data-key={props.item}
+    >
       <div {...stylex.attrs(viewStyles.sectionDiv)}>
         <button
           type="button"
@@ -375,7 +493,11 @@ function Section(props: { title: string; item: string; count: number; action?: J
           onClick={() => setOpen(!open())}
           {...stylex.attrs(viewStyles.sideSectionToggle)}
         >
-          <Icon name="expand" size={10} class={["opacity-60 transition-transform duration-120", { "rotate-90": open() }]} />
+          <Icon
+            name="expand"
+            size={10}
+            styles={[variantStyles2.sectionIcon, open() ? variantStyles2.sectionIconVariant : variantStyles2.sectionIconVariant2]}
+          />
           <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.title}</span>
           <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{props.count}</span>
         </button>
@@ -427,16 +549,22 @@ function ChannelRow(props: {
         setOver(false);
         untrack(() => props.onDrop)?.();
       }}
-      class={[
-        "flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm",
-        props.here ? "bg-selected" : "hover:bg-hover",
-        { "shadow-[inset_0_2px_0_var(--color-accent)]": over() },
-      ]}
+      {...stylex.attrs(
+        recipeStyles.channelRowButton,
+        props.here ? recipeStyles.channelRowButtonVariant1Case2 : recipeStyles.channelRowButtonVariant1Case1,
+        over() ? recipeStyles.channelRowButtonVariant2Case2 : recipeStyles.channelRowButtonVariant2Case1,
+      )}
     >
       <span {...stylex.attrs(viewStyles.channelRowSpan)} aria-hidden="true">
         {markOf(props.channel)}
       </span>
-      <span class={["min-w-0 flex-1 truncate", { "font-semibold": props.here || props.unread > 0, "text-muted": quiet() && !props.here }]}>
+      <span
+        {...stylex.attrs(
+          recipeStyles.channelRowSpan,
+          props.here || props.unread > 0 ? recipeStyles.channelRowSpanVariant1Case2 : recipeStyles.channelRowSpanVariant1Case1,
+          quiet() && !props.here ? recipeStyles.channelRowSpanVariant2Case2 : recipeStyles.channelRowSpanVariant2Case1,
+        )}
+      >
         {channelName(props.channel)}
       </span>
       <Show when={props.channel.notify && props.channel.notify !== "all"}>
@@ -473,7 +601,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
     >
       <span {...stylex.attrs(viewStyles.sessionRowSpan)}>
         <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={24} />
-        <Dot tone={phaseDot(props.h.phase)} class="absolute -right-0.5 -bottom-0.5" />
+        <Dot tone={phaseDot(props.h.phase)} styles={viewStyles.helperDot} />
       </span>
       <span {...stylex.attrs(viewStyles.sessionRowSpan2)}>{props.h.name}</span>
       <PhaseGlyph phase={props.h.phase} />
@@ -505,7 +633,7 @@ function OrchestratorLine(props: { agent: string }) {
     >
       <OrchestratorFace size={32} agent={props.agent} />
       {profile()?.name || t("web.channel.orchestrator")}
-      <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
+      <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} styles={viewStyles.typingDot} />
       <span {...stylex.attrs(viewStyles.orchestratorLineSpan)}>{orchestratorMoodLabels[now()]}</span>
       <Show when={since()}>{(at) => <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{tookText(Math.max(0, clock() - at()))}</span>}</Show>
       <Show when={now() === "thinking"}>

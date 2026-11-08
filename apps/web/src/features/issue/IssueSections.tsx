@@ -22,7 +22,65 @@ import { issueMove, issueMoveOf, sendMove } from "./moves";
 import type { CriterionRow } from "./overview";
 import { Property } from "./Sheet";
 
+const recipeStyles = stylex.create({
+  storySpan: {
+    minWidth: "0",
+    flex: "1",
+    overflowWrap: "break-word",
+  },
+  storySpanVariant1Case1: {
+    color: null,
+  },
+  storySpanVariant1Case2: {
+    color: "var(--wb-berry)",
+  },
+  storySpanVariant2Case1: {
+    fontWeight: null,
+  },
+  storySpanVariant2Case2: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  criteriaIcon: {
+    marginTop: "calc(var(--spacing) * .5)",
+    flexShrink: "0",
+  },
+});
+
+const variantStyles = stylex.create({
+  criteriaSpan: {},
+  criteriaSpanVariant: {
+    color: "var(--wb-muted)",
+  },
+  runsSpan: {
+    marginTop: "calc(var(--spacing) * .5)",
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "block",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  workLogSpan: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    minWidth: "0",
+    flex: "1",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    overflowWrap: "break-word",
+    whiteSpace: "pre-wrap",
+  },
+});
+
 const viewStyles = stylex.create({
+  checklistControl: { marginTop: "calc(var(--spacing) * 0.5)" },
   questionDiv: {
     marginTop: "calc(var(--spacing) * 2.5)",
   },
@@ -243,14 +301,16 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
                 label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
-                class="mt-0.5"
+                styles={viewStyles.checklistControl}
               />
             </Show>
             <Show when={r().result} fallback={<span {...stylex.attrs(viewStyles.criteriaSpan)} title={t("web.issue.detail.unsaid")} />}>
-              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} class="mt-0.5 shrink-0" />}
+              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} styles={[variantStyles2.criteriaIcon]} />}
             </Show>
             <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
-              <span class={{ "text-muted": ticked().has(i()) }}>{r().text}</span>
+              <span {...stylex.attrs(variantStyles.criteriaSpan, ticked().has(i()) ? variantStyles.criteriaSpanVariant : variantStyles.criteriaSpan)}>
+                {r().text}
+              </span>
               <Show when={r().proof}>
                 <span {...stylex.attrs(viewStyles.criteriaSpan3)}>{r().proof}</span>
               </Show>
@@ -270,7 +330,13 @@ export function Story(props: { milestones: Milestone[] }) {
         {(m) => (
           <li data-testid="milestone" data-kind={m.kind} {...stylex.attrs(viewStyles.milestone)}>
             <span {...stylex.attrs(viewStyles.storySpan)}>{wallClockText(m.at)}</span>
-            <span class={["min-w-0 flex-1 break-words", { "text-berry": m.kind === "failed" || m.kind === "rejected", "font-semibold": m.kind === "asked" }]}>
+            <span
+              {...stylex.attrs(
+                recipeStyles.storySpan,
+                m.kind === "failed" || m.kind === "rejected" ? recipeStyles.storySpanVariant1Case2 : recipeStyles.storySpanVariant1Case1,
+                m.kind === "asked" ? recipeStyles.storySpanVariant2Case2 : recipeStyles.storySpanVariant2Case1,
+              )}
+            >
               <Show when={m.who}>
                 <span {...stylex.attrs(viewStyles.storySpan2)}>{m.who} · </span>
               </Show>
@@ -302,7 +368,7 @@ export function Runs(props: { issue: string; version: string }) {
               <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
                 {runText(r, now(), tookText)}
                 <Show when={r.summary}>
-                  <span class="mt-0.5 line-clamp-2 block text-xs text-muted">{r.summary}</span>
+                  <span {...stylex.attrs(variantStyles.runsSpan)}>{r.summary}</span>
                 </Show>
               </span>
             </div>
@@ -342,9 +408,7 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
             <span class={["w-12 shrink-0", e.type === "run/error" ? "text-berry" : e.type === "tool/call" ? "text-water" : "text-muted"]}>
               {stepWord[e.type]}
             </span>
-            <span class="line-clamp-3 min-w-0 flex-1 font-sans text-sm break-words whitespace-pre-wrap">
-              {e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}
-            </span>
+            <span {...stylex.attrs(variantStyles.workLogSpan)}>{e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}</span>
           </li>
         )}
       </For>

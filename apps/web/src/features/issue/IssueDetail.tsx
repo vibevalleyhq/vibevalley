@@ -32,6 +32,64 @@ import { issueState, noStepsText, stageTone } from "./overview";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { issueDeliver, shownDeliver } from "./write";
 
+const recipeStyles = stylex.create({
+  issueDetailSpan: {
+    flexShrink: "0",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+    flexBasis: {
+      default: null,
+      "@container not (width>=560px)": "100%",
+    },
+  },
+});
+
+const variantStyles3 = stylex.create({
+  issueDetailMarkdown: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-ink)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  issueDetailTextArea: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+  },
+});
+
+const variantStyles = stylex.create({
+  issueDetailH1: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  issueDetailSpan: {},
+  issueDetailSpanVariant: {
+    color: "var(--wb-berry)",
+  },
+  issueDetailSpanVariant2: {
+    color: {
+      default: "var(--wb-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-ink) 80%, transparent)",
+    },
+  },
+  issueDetailDiv: {
+    marginTop: "var(--spacing)",
+    WebkitLineClamp: "4",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+  },
+});
+
 const viewStyles = stylex.create({
   issueDetailDiv: {
     paddingRight: "calc(var(--spacing) * 10)",
@@ -267,17 +325,19 @@ export function IssueDetail(props: {
       </Show>
       <div {...stylex.attrs(viewStyles.issueDetailDiv2)}>
         <span {...stylex.attrs(viewStyles.issueDetailSpan)}>#{props.issue.number}</span>
-        <h1 class="line-clamp-2 min-w-0 flex-1 text-lg font-semibold" title={s().title}>
+        <h1 {...stylex.attrs(variantStyles.issueDetailH1)} title={s().title}>
           {s().title}
         </h1>
-        <span class="shrink-0 text-xs text-muted @max-[560px]:basis-full">
-          {[s().repo, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
-        </span>
+        <span {...stylex.attrs(recipeStyles.issueDetailSpan)}>{[s().repo, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}</span>
       </div>
       <div {...stylex.attrs(viewStyles.issueNow)} aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
         <Dot tone={tone()} size={8} ring={false} />
         <span>{t(`shared.status.${props.issue.status}`)} ·</span>
-        <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
+        <span
+          {...stylex.attrs(variantStyles.issueDetailSpan, tone() === "berry" ? variantStyles.issueDetailSpanVariant : variantStyles.issueDetailSpanVariant2)}
+        >
+          {s().statusLine(now(), timeline()?.spent?.cny)}
+        </span>
       </div>
     </div>
   );
@@ -287,7 +347,7 @@ export function IssueDetail(props: {
       <Show when={s().description}>
         <section data-testid="issue-requirement">
           <SheetLabel>{t("web.issue.detail.full")}</SheetLabel>
-          <Markdown class="text-sm text-ink" text={s().description} />
+          <Markdown styles={variantStyles3.issueDetailMarkdown} text={s().description} />
         </section>
       </Show>
       <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
@@ -297,7 +357,7 @@ export function IssueDetail(props: {
             <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <div {...stylex.attrs(viewStyles.issueDetailDiv3)}>{ask().head}</div>
-              <Show when={ask().line}>{(line) => <div class="mt-1 line-clamp-4">{plainText(line())}</div>}</Show>
+              <Show when={ask().line}>{(line) => <div {...stylex.attrs(variantStyles.issueDetailDiv)}>{plainText(line())}</div>}</Show>
               <Show when={s().stage.state === "asking"}>
                 <For each={props.issue.questions}>
                   {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
@@ -308,7 +368,7 @@ export function IssueDetail(props: {
               <TextArea
                 data-testid="issue-words"
                 data-box={box()}
-                class="mt-2.5"
+                styles={variantStyles2.issueDetailTextArea}
                 rows={box() === "reject" ? 3 : 2}
                 value={text()}
                 disabled={busy()}

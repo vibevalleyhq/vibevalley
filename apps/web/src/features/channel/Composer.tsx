@@ -25,6 +25,85 @@ import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";
 
+const variantStyles2 = stylex.create({
+  composerProgressRoot: {
+    position: "relative",
+    display: "flex",
+    height: "calc(var(--spacing) * 10)",
+    alignItems: "center",
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  composerProgressIndicator: {
+    position: "absolute",
+    insetBlock: "0",
+    left: "0",
+    backgroundColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 20%, transparent)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  composerDiv: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+  },
+  composerDivVariant: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  composerDivVariant2: {},
+  composerButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+  },
+  composerButtonVariant: {
+    borderColor: "var(--wb-accent)",
+    backgroundColor: {
+      default: "var(--wb-accent)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-accent-hover)",
+      },
+    },
+  },
+  composerButtonVariant2: {
+    borderColor: "transparent",
+    opacity: ".5",
+  },
+  fileDropDiv: {
+    position: "relative",
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+});
+
 const viewStyles = stylex.create({
   composer: {
     borderTopStyle: "solid",
@@ -361,7 +440,7 @@ export function Composer(props: {
                   e.preventDefault();
                   box.choose(n());
                 }}
-                class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", { "bg-selected": i() === box.active() }]}
+                {...stylex.attrs(variantStyles.composerDiv, i() === box.active() ? variantStyles.composerDivVariant : variantStyles.composerDivVariant2)}
               >
                 <Show
                   when={n().session}
@@ -438,12 +517,8 @@ export function Composer(props: {
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (
-              <Progress.Root
-                value={u().percent}
-                aria-label={u().name}
-                class="relative flex h-10 items-center overflow-hidden rounded-md border border-line bg-page px-2 text-xs text-muted"
-              >
-                <Progress.Indicator class="absolute inset-y-0 left-0 bg-leaf/20" />
+              <Progress.Root value={u().percent} aria-label={u().name} {...stylex.attrs(variantStyles2.composerProgressRoot)}>
+                <Progress.Indicator {...stylex.attrs(variantStyles2.composerProgressIndicator)} />
                 <span {...stylex.attrs(viewStyles.composerSpan6)}>{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
               </Progress.Root>
             )}
@@ -560,10 +635,7 @@ export function Composer(props: {
               disabled={!box.canSend()}
               aria-label={t("web.channel.composer.send")}
               title={t("web.channel.composer.sendHint")}
-              class={[
-                "inline-flex size-7 cursor-pointer items-center justify-center rounded-md border disabled:cursor-default",
-                box.canSend() ? "border-accent bg-accent hover:bg-accent-hover" : "border-transparent opacity-50",
-              ]}
+              {...stylex.attrs(variantStyles.composerButton, box.canSend() ? variantStyles.composerButtonVariant : variantStyles.composerButtonVariant2)}
             >
               <Icon name="send" size={16} />
             </button>
@@ -580,7 +652,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   const files = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
   return (
     <div
-      class="relative flex min-w-0 flex-1 flex-col"
+      {...stylex.attrs(variantStyles.fileDropDiv)}
       onDragOver={(e) => {
         if (!files(e) || !props.channel) return;
         e.preventDefault();

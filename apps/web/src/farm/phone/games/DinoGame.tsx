@@ -9,6 +9,18 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 
+const variantStyles = stylex.create({
+  dinoGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingInline: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 3)",
+  },
+});
+
 const viewStyles = stylex.create({
   dinoGameDiv: {
     display: "flex",
@@ -192,7 +204,7 @@ export function DinoGame(props: { big?: boolean }) {
     return now ? dinoScore(now) : 0;
   };
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
+    <div {...stylex.attrs(variantStyles.dinoGameDiv)}>
       <div {...stylex.attrs(viewStyles.dinoGameDiv)}>
         <span>{t("web.farm.phone.game.dino")}</span>
         <span {...stylex.attrs(viewStyles.dinoGameSpan)}>

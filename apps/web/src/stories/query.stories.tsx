@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createMemo, createSignal, Show } from "solid-js";
 
@@ -5,6 +6,15 @@ import { stories, story } from "@vibevalley/stories";
 
 import { createQueryClient, defineQuery, QueryProvider, useQuery, type QueryDescriptor } from "#/infra/query.ts";
 import { Button } from "#/ui/Button.tsx";
+
+const variantStyles = stylex.create({
+  queriesDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+});
 
 function Observer(props: { id: () => number; query: (id: number) => QueryDescriptor<{ id: number }>; enabled: () => boolean; name: string }) {
   const result = useQuery(() => props.query(props.id()), { enabled: () => props.enabled(), keepPrevious: true });
@@ -45,7 +55,7 @@ function Queries() {
   });
   return (
     <QueryProvider client={createQueryClient()}>
-      <div class="flex flex-col gap-3 p-4">
+      <div {...stylex.attrs(variantStyles.queriesDiv)}>
         <Observer name="one" id={id} query={query} enabled={enabled} />
         <Show when={second()}>
           <Observer name="two" id={id} query={query} enabled={enabled} />

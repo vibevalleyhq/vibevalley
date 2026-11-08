@@ -14,6 +14,32 @@ import { DashedLine, PxMarkdown } from "#/ui/pixel/index.ts";
 
 import { clockOf, FarmEmpty, FarmTag } from "./rows";
 
+const variantStyles = stylex.create({
+  saidDiv: {
+    marginTop: "calc(var(--spacing) * .5)",
+    fontSize: "13px",
+  },
+  saidDivVariant: {
+    color: "var(--color-bark-900)",
+  },
+  saidDivVariant2: {
+    color: "var(--color-bark-800)",
+  },
+  reportP: {
+    WebkitLineClamp: "4",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "12px",
+  },
+  reportPVariant: {
+    color: "var(--wb-berry)",
+  },
+  reportPVariant2: {
+    color: "var(--color-bark-600)",
+  },
+});
+
 const viewStyles = stylex.create({
   farmLogDiv: {
     display: "flex",
@@ -126,7 +152,7 @@ function Said(props: { m: ChatMessage }) {
           <span {...stylex.attrs(viewStyles.saidSpan2)}>{you() ? t("web.farm.log.you") : t("web.farm.orchestrator")}</span>
           <FarmTag text={you() ? t("web.farm.log.said") : t("web.farm.log.answered")} ink="#67482d" />
         </div>
-        <div class={["mt-0.5 text-[13px]", you() ? "text-bark-900" : "text-bark-800"]}>
+        <div {...stylex.attrs(variantStyles.saidDiv, you() ? variantStyles.saidDivVariant : variantStyles.saidDivVariant2)}>
           <PxMarkdown text={props.m.text} />
         </div>
       </div>
@@ -151,7 +177,7 @@ function Report(props: { r: ChatMessage; issue?: Issue | undefined }) {
         <Show when={props.issue}>
           <p {...stylex.attrs(viewStyles.reportP)}>{props.issue!.title}</p>
         </Show>
-        <p class={["line-clamp-4 text-[12px]", outcome() === "failed" ? "text-berry" : "text-bark-600"]}>{props.r.text}</p>
+        <p {...stylex.attrs(variantStyles.reportP, outcome() === "failed" ? variantStyles.reportPVariant : variantStyles.reportPVariant2)}>{props.r.text}</p>
         <Show when={props.r.spent}>{(spent) => <p {...stylex.attrs(viewStyles.reportP2)}>{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
       </div>
     </>

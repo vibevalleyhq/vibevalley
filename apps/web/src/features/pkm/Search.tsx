@@ -17,6 +17,69 @@ import { titleFor } from "./days";
 import { tierOrder } from "./outline";
 import { pkmHref, usePkmVault } from "./vault";
 
+const recipeStyles = stylex.create({
+  filterButton: {
+    height: "calc(var(--spacing) * 6)",
+    cursor: "pointer",
+    borderRadius: "2147483647px",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  filterButtonVariant1Case1: {
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  filterButtonVariant1Case2: {
+    color: "var(--wb-ink)",
+    backgroundColor: "var(--wb-selected)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  searchBodyIcon: {
+    color: "var(--wb-muted)",
+  },
+});
+
+const variantStyles = stylex.create({
+  searchBodyDiv: {
+    display: "flex",
+    cursor: "pointer",
+    flexDirection: "column",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    backgroundColor: {
+      default: null,
+      ":is([aria-selected=true])": "var(--wb-selected)",
+    },
+  },
+  foundRowSpan: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
+
 const viewStyles = stylex.create({
   searchBodyDiv: {
     display: "flex",
@@ -203,7 +266,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
   return (
     <div {...stylex.attrs(viewStyles.searchBodyDiv)}>
       <label {...stylex.attrs(viewStyles.searchBodyLabel)}>
-        <Icon name="search" size={16} class="text-muted" />
+        <Icon name="search" size={16} styles={[variantStyles2.searchBodyIcon]} />
         <input
           ref={autofocus()}
           data-testid="pkm-search-input"
@@ -264,7 +327,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
                     aria-selected={active() === r().index ? "true" : "false"}
                     onPointerMove={() => setActive(r().index)}
                     onClick={() => open(r().row)}
-                    class="flex cursor-pointer flex-col rounded-md px-2 py-1.5 aria-selected:bg-selected"
+                    {...stylex.attrs(variantStyles.searchBodyDiv)}
                   >
                     <FoundRow row={r().row} words={words()} />
                   </div>
@@ -308,7 +371,7 @@ function FoundRow(props: { row: Found; words: readonly string[] }) {
       {(h) => (
         <>
           <Show when={h().path}>{(path) => <span {...stylex.attrs(viewStyles.foundRowSpan2)}>{path()}</span>}</Show>
-          <span class="line-clamp-2 text-sm">
+          <span {...stylex.attrs(variantStyles.foundRowSpan)}>
             <Lit text={h().plain} words={props.words} />
           </span>
         </>
@@ -324,10 +387,7 @@ function Filter(props: { on: boolean; label: string; testid: string; onToggle: (
       data-testid={props.testid}
       aria-pressed={props.on ? "true" : "false"}
       onClick={() => props.onToggle()}
-      class={[
-        "h-6 cursor-pointer rounded-full px-2.5 text-xs transition-colors duration-120",
-        props.on ? "bg-selected text-ink" : "text-muted hover:bg-hover hover:text-ink",
-      ]}
+      {...stylex.attrs(recipeStyles.filterButton, props.on ? recipeStyles.filterButtonVariant1Case2 : recipeStyles.filterButtonVariant1Case1)}
     >
       {props.label}
     </button>

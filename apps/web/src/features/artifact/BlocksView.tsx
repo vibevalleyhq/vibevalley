@@ -18,7 +18,32 @@ import { Icon } from "#/ui/Icon.tsx";
 import { knownTypes, plainOf } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
 
+const variantStyles = stylex.create({
+  blocksViewArticle: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  blocksViewP: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    paddingBottom: "calc(var(--spacing) * 2)",
+    paddingLeft: "35px",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  blocksViewPVariant: {
+    color: "var(--wb-berry)",
+  },
+  blocksViewPVariant2: {
+    color: "var(--wb-muted)",
+  },
+});
+
 const viewStyles = stylex.create({
+  taskCheckbox: { marginTop: "var(--spacing)" },
   blocksViewDiv: {
     minHeight: "0",
     flex: "1",
@@ -343,12 +368,18 @@ export function BlocksView(props: {
       data-state={(version(), editor.error ? "error" : editor.busy ? "saving" : "saved")}
       data-blocks={(version(), editor.blocks.length)}
       data-writing={(version(), editor.othersWriting) ? "" : undefined}
-      class="flex min-h-0 flex-1 flex-col"
+      {...stylex.attrs(variantStyles.blocksViewArticle)}
     >
       <Show when={props.suggestionsAt} fallback={suggestionsList()}>
         {(at) => <Portal mount={at()}>{suggestionsList()}</Portal>}
       </Show>
-      <p role="status" class={["truncate pb-2 pl-[35px] text-xs", (version(), editor.error !== undefined) ? "text-berry" : "text-muted"]}>
+      <p
+        role="status"
+        {...stylex.attrs(
+          variantStyles.blocksViewP,
+          (version(), editor.error !== undefined) ? variantStyles.blocksViewPVariant : variantStyles.blocksViewPVariant2,
+        )}
+      >
         {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
       </p>
       <div {...stylex.attrs(viewStyles.blocksViewDiv)}>
@@ -528,7 +559,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       case "todo":
         return (
           <Checkbox
-            class="mt-1"
+            styles={viewStyles.taskCheckbox}
             checked={r().attrs.checked ?? false}
             label={r().attrs.checked === true ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
             onChange={() => props.editor.toggle(r().block)}

@@ -23,6 +23,22 @@ import { playSound } from "#/ui/pixel/sound.ts";
 import { startScene, type Scene } from "./scene";
 import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./screen";
 
+const recipeStyles = stylex.create({
+  enteringDiv: {
+    height: "calc(var(--spacing) * 4)",
+    width: "calc(var(--spacing) * 64)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: {
+      default: "var(--color-bark-900)99",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 60%, transparent)",
+    },
+    padding: "calc(var(--spacing) * .5)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+  },
+});
+
 const viewStyles = stylex.create({
   villageCanvasDiv: {
     position: "absolute",
@@ -219,7 +235,7 @@ function Entering(props: { mapped: boolean }) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fill() * 100)}
-          class="h-4 w-64 border-2 border-bark-900 bg-bark-900/60 p-0.5 shadow-px-shade"
+          {...stylex.attrs(recipeStyles.enteringDiv)}
         >
           <div {...stylex.attrs(viewStyles.enteringDiv3)} style={{ width: `${fill() * 100}%` }} />
         </div>

@@ -14,6 +14,24 @@ import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";
 
+const variantStyles = stylex.create({
+  orchestratorOfA: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  orchestratorOfA2: {
+    textDecorationLine: "underline",
+  },
+});
+
 const viewStyles = stylex.create({
   headDiv: {
     display: "flex",
@@ -121,14 +139,14 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
         <OrchestratorFace size={64} agent={props.agent} />
       </span>
       <div {...stylex.attrs(viewStyles.headDiv2)}>
-        <A href="/agents" class="text-xs text-muted hover:underline">
+        <A href="/agents" {...stylex.attrs(variantStyles.orchestratorOfA)}>
           {t("web.orchestrator.orchestrator.all")}
         </A>
         <h1 {...stylex.attrs(viewStyles.headH1)}>{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
         <p {...stylex.attrs(viewStyles.headP)}>
           {t("web.orchestrator.orchestrator.intro")}
           {look() ? t("web.orchestrator.orchestrator.look", { name: look()?.name ?? "" }) : ""}{" "}
-          <A href={`/agents/${encodeURIComponent(props.agent)}`} class="underline">
+          <A href={`/agents/${encodeURIComponent(props.agent)}`} {...stylex.attrs(variantStyles.orchestratorOfA2)}>
             {t("web.orchestrator.orchestrator.profile")}
           </A>
         </p>

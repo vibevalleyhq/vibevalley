@@ -9,6 +9,33 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 
+const recipeStyles = stylex.create({
+  mergeGameDiv: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-lcd-paper)cc",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
+    },
+    textAlign: "center",
+  },
+});
+
+const variantStyles = stylex.create({
+  mergeGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingTop: "calc(var(--spacing) * 2)",
+  },
+});
+
 const viewStyles = stylex.create({
   mergeGameDiv: {
     display: "flex",
@@ -327,7 +354,7 @@ export function MergeGame() {
             : undefined;
   };
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center gap-1.5 px-2 pt-2">
+    <div {...stylex.attrs(variantStyles.mergeGameDiv)}>
       <div {...stylex.attrs(viewStyles.mergeGameDiv)}>
         <span>{t("web.farm.phone.game.merge")}</span>
         <span {...stylex.attrs(viewStyles.mergeGameSpan)}>
@@ -382,7 +409,7 @@ export function MergeGame() {
         </For>
         <Show when={overlay()}>
           {(o) => (
-            <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
+            <div {...stylex.attrs(recipeStyles.mergeGameDiv)}>
               <span>
                 {o()[0]}
                 <br />

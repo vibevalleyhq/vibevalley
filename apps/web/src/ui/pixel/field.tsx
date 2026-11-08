@@ -11,6 +11,44 @@ import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
 import { cx, pxRing, pxText } from "./style";
 
+const recipeStyles = stylex.create({
+  pxFieldLabel: {
+    minWidth: "0",
+    flex: "1",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-600)",
+    fontSynthesis: "none",
+  },
+  pxFieldDiv: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-500)",
+    fontSynthesis: "none",
+  },
+  pxFieldDiv2: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  pxFieldDivVariant1Case1: {
+    color: "var(--color-bark-500)",
+  },
+  pxFieldDivVariant1Case2: {
+    color: "var(--wb-berry)",
+  },
+});
+
 const viewStyles = stylex.create({
   pxFieldDiv: {
     display: "flex",
@@ -64,7 +102,7 @@ export function PxField(props: {
   return (
     <div {...stylex.attrs(viewStyles.pxFieldDiv)}>
       <div {...stylex.attrs(viewStyles.pxFieldDiv2)}>
-        <label for={bound() ? target() : undefined} class={[pxText.xs, "min-w-0 flex-1 text-bark-600"]}>
+        <label for={bound() ? target() : undefined} {...stylex.attrs(recipeStyles.pxFieldLabel)}>
           <PxTip tip={props.tip}>{props.label}</PxTip>
           <Show when={props.required}>
             <span {...stylex.attrs(viewStyles.pxFieldSpan)}> *</span>
@@ -74,12 +112,15 @@ export function PxField(props: {
           </Show>
         </label>
         <Show when={props.aside != null}>
-          <div class={[pxText.xs, "text-bark-500"]}>{props.aside}</div>
+          <div {...stylex.attrs(recipeStyles.pxFieldDiv)}>{props.aside}</div>
         </Show>
       </div>
       {typeof props.children === "function" ? props.children(target()) : props.children}
       <Show when={note() != null && note() !== ""}>
-        <div class={[pxText.xs, "mt-1.5 leading-[1.625]", props.error ? "text-berry" : "text-bark-500"]} role={props.error ? "alert" : undefined}>
+        <div
+          {...stylex.attrs(recipeStyles.pxFieldDiv2, props.error ? recipeStyles.pxFieldDivVariant1Case2 : recipeStyles.pxFieldDivVariant1Case1)}
+          role={props.error ? "alert" : undefined}
+        >
           {note()}
         </div>
       </Show>

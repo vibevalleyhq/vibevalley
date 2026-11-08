@@ -95,7 +95,7 @@ export function Tabs<T extends string>(props: {
               render={item.href === undefined ? undefined : (p) => <A {...p} href={item.href ?? ""} />}
               class={[stylex.attrs(styles.tab, looks[props.look ?? "pills"].tab).class, props.look === "line" && stylex.attrs(lineTab).class]}
             >
-              <Show when={item.icon}>{(icon) => <Icon name={icon()} size={props.look === "line" ? 16 : 14} class={stylex.attrs(styles.icon).class} />}</Show>
+              <Show when={item.icon}>{(icon) => <Icon name={icon()} size={props.look === "line" ? 16 : 14} styles={styles.icon} />}</Show>
               {item.label}
             </Base.Tab>
           )}

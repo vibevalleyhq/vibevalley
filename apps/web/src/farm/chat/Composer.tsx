@@ -17,6 +17,42 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { createPixelAct, SpriteIcon, toasts } from "#/ui/pixel/index.ts";
 import { typeMarks } from "#/ui/typedMarks.ts";
 
+const recipeStyles = stylex.create({
+  farmComposerDiv: {
+    position: "absolute",
+    right: "calc(var(--spacing) * 2)",
+    bottom: "100%",
+    left: "calc(var(--spacing) * 2)",
+    marginBottom: "var(--spacing)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: "var(--color-cream-50)",
+    paddingBlock: "var(--spacing)",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+  farmComposerButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "12px",
+  },
+  farmComposerButtonVariant1Case1: {
+    backgroundColor: null,
+  },
+  farmComposerButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-leaf-300)66",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   pickChipSpan: {
     marginRight: "var(--spacing)",
@@ -230,11 +266,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
       </Show>
       <div {...stylex.attrs(viewStyles.farmComposerDiv)}>
         <Show when={box.offered().length > 0}>
-          <div
-            class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
-            role="listbox"
-            aria-label={t("web.farm.chat.who")}
-          >
+          <div {...stylex.attrs(recipeStyles.farmComposerDiv)} role="listbox" aria-label={t("web.farm.chat.who")}>
             <For each={box.offered()} keyed={(n) => n.token}>
               {(n, i) => (
                 <button
@@ -243,7 +275,10 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
                   aria-selected={aria(i() === box.active())}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => box.choose(n())}
-                  class={["flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px]", { "bg-leaf-300/40": i() === box.active() }]}
+                  {...stylex.attrs(
+                    recipeStyles.farmComposerButton,
+                    i() === box.active() ? recipeStyles.farmComposerButtonVariant1Case2 : recipeStyles.farmComposerButtonVariant1Case1,
+                  )}
                 >
                   <span {...stylex.attrs(viewStyles.farmComposerSpan2)}>{n().name}</span>
                   <span {...stylex.attrs(viewStyles.farmComposerSpan3)}>{n().note}</span>

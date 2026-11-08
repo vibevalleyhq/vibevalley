@@ -13,6 +13,44 @@ import { useRouter } from "#/infra/router.ts";
 import { PxButton, PxTextInput, SpriteIcon } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
+const recipeStyles = stylex.create({
+  channelMenuDiv: {
+    position: "absolute",
+    top: "100%",
+    left: "0",
+    zIndex: "20",
+    marginTop: "calc(var(--spacing) * 1.5)",
+    width: "calc(var(--spacing) * 72)",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 2)",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+  channelItemButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  channelItemButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  channelItemButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-leaf-300)80",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   channelMenuDiv: {
     position: "relative",
@@ -175,12 +213,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         <SpriteIcon name="button-next" size={10} class="rotate-90" />
       </button>
       <Show when={open()}>
-        <div
-          class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px"
-          role="dialog"
-          aria-label={t("web.farm.chat.channels")}
-          data-testid="channels"
-        >
+        <div {...stylex.attrs(recipeStyles.channelMenuDiv)} role="dialog" aria-label={t("web.farm.chat.channels")} data-testid="channels">
           <Switch>
             <Match when={mode() === "list"}>
               <div {...stylex.attrs(viewStyles.channelMenuDiv2)}>
@@ -240,7 +273,7 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
         props.onPick();
         farm.showChat(c().default ? undefined : c().id);
       }}
-      class={["flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left", here() ? "bg-leaf-300/50" : "hover:bg-cream-200"]}
+      {...stylex.attrs(recipeStyles.channelItemButton, here() ? recipeStyles.channelItemButtonVariant1Case2 : recipeStyles.channelItemButtonVariant1Case1)}
     >
       <span {...stylex.attrs(viewStyles.channelItemSpan)}>
         <span {...stylex.attrs(viewStyles.channelItemSpan2)}>{farmChannelLabel(c())}</span>

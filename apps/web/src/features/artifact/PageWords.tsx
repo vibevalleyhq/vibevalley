@@ -15,6 +15,22 @@ import { toast } from "#/ui/toasts.ts";
 import { artifactHref } from "./ArtifactCard";
 import { selectionOf } from "./shell";
 
+const variantStyles = stylex.create({
+  pageWordsBlockquote: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "2px",
+    borderColor: "var(--wb-wheat)",
+    paddingLeft: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
+
 const viewStyles = stylex.create({
   artifactWords: {
     display: "flex",
@@ -79,7 +95,7 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: H
         <Show when={latest() ? picked() : undefined} fallback={<p {...stylex.attrs(viewStyles.pageWordsP)}>{t("web.artifact.edit.older")}</p>}>
           {(p) => (
             <>
-              <blockquote data-testid="artifact-words-quote" class="line-clamp-3 border-l-2 border-wheat pl-2 text-xs text-muted">
+              <blockquote data-testid="artifact-words-quote" {...stylex.attrs(variantStyles.pageWordsBlockquote)}>
                 {p().exact.trim()}
               </blockquote>
               <TextArea

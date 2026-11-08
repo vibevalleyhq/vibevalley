@@ -20,6 +20,25 @@ import { Segmented } from "#/ui/Segmented.tsx";
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
 import { langIcon, languageShares, number, percent } from "./repos";
 
+const variantStyles = stylex.create({
+  statSpan: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  languagesDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+});
+
 const viewStyles = stylex.create({
   statDiv: {
     display: "flex",
@@ -223,7 +242,7 @@ export function Stat(props: { label: string; value: string }) {
   return (
     <div {...stylex.attrs(viewStyles.statDiv)}>
       <span {...stylex.attrs(viewStyles.statSpan)}>{props.label}</span>
-      <span class="line-clamp-2 text-sm font-medium">{props.value}</span>
+      <span {...stylex.attrs(variantStyles.statSpan)}>{props.value}</span>
     </div>
   );
 }
@@ -272,7 +291,7 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
                 {(s) => (
                   <div {...stylex.attrs(viewStyles.languagesDiv3)}>
                     <SpriteIcon name={langIcon(s.id)} size={32} />
-                    <div class="flex min-w-0 flex-1 flex-col gap-1">
+                    <div {...stylex.attrs(variantStyles.languagesDiv)}>
                       <span {...stylex.attrs(viewStyles.languagesSpan2)}>
                         <span {...stylex.attrs(viewStyles.languagesSpan3)}>{s.label}</span>
                         <span {...stylex.attrs(viewStyles.languagesSpan4)}>{percent(s.share)}</span>
@@ -441,7 +460,7 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
                   <Show when={agent()} fallback={<span {...stylex.attrs(viewStyles.handsSpan)}>{[...author.name][0] ?? ""}</span>}>
                     {(a) => <AgentFace agentId={a().id} look={a().look} runtime={a().runtime} size={32} />}
                   </Show>
-                  <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <div {...stylex.attrs(variantStyles.languagesDiv)}>
                     <span {...stylex.attrs(viewStyles.languagesSpan2)}>
                       <span {...stylex.attrs(viewStyles.languagesSpan3)}>{author.name}</span>
                       <span {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.times", { n: number(author.commits) })}</span>

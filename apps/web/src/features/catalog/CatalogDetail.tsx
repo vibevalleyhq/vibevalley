@@ -16,6 +16,72 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { framesOf, type Picture, remakeOf } from "./shelves";
 
+const variantStyles2 = stylex.create({
+  detailSliderRoot: {
+    width: "calc(var(--spacing) * 24)",
+  },
+  detailSliderControl: {
+    position: "relative",
+    display: "flex",
+    height: "calc(var(--spacing) * 4)",
+    cursor: "pointer",
+    alignItems: "center",
+  },
+  detailSliderTrack: {
+    position: "relative",
+    height: "var(--spacing)",
+    width: "100%",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-selected)",
+  },
+  detailSliderIndicator: {
+    height: "100%",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--wb-leaf)",
+  },
+  detailSliderThumb: {
+    top: "50%",
+    width: "calc(var(--spacing) * 3)",
+    height: "calc(var(--spacing) * 3)",
+    translate: "0 calc(calc(1 / 2 * 100%) * -1)",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-leaf)",
+    backgroundColor: "var(--wb-page)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 1px 2px var(--wb-raise)",
+    outlineStyle: {
+      default: "none",
+      ":focus-visible": "none",
+    },
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--wb-focus)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  detailButton: {
+    display: "flex",
+    width: "calc(var(--spacing) * 11)",
+    height: "calc(var(--spacing) * 11)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: ".25rem",
+  },
+  detailButtonVariant: {
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 0 calc(2px + 0) var(--wb-focus), 0 0 transparent",
+  },
+  detailButtonVariant2: {},
+});
+
 const viewStyles = stylex.create({
   imgImg: {
     maxWidth: "none",
@@ -322,14 +388,11 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
               </Button>
               <span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.catalog.frames", { n: f().length })}</span>
               <span {...stylex.attrs(viewStyles.detailSpan5)} />
-              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} class="w-24">
-                <Slider.Control class="relative flex h-4 cursor-pointer items-center">
-                  <Slider.Track class="relative h-1 w-full rounded-full bg-selected">
-                    <Slider.Indicator class="h-full rounded-full bg-leaf" />
-                    <Slider.Thumb
-                      aria-label={t("web.catalog.fps")}
-                      class="top-1/2 size-3 -translate-y-1/2 rounded-full border border-leaf bg-page shadow-raise outline-none focus-visible:outline-2 focus-visible:outline-focus"
-                    />
+              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} {...stylex.attrs(variantStyles2.detailSliderRoot)}>
+                <Slider.Control {...stylex.attrs(variantStyles2.detailSliderControl)}>
+                  <Slider.Track {...stylex.attrs(variantStyles2.detailSliderTrack)}>
+                    <Slider.Indicator {...stylex.attrs(variantStyles2.detailSliderIndicator)} />
+                    <Slider.Thumb aria-label={t("web.catalog.fps")} {...stylex.attrs(variantStyles2.detailSliderThumb)} />
                   </Slider.Track>
                 </Slider.Control>
               </Slider.Root>
@@ -345,10 +408,10 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                         title={name}
                         aria-label={name}
                         onClick={() => router.navigate(`/catalog/${encodeURIComponent(name)}`)}
-                        class={[
-                          "flex size-11 cursor-pointer items-center justify-center overflow-hidden rounded",
-                          { "ring-2 ring-focus": playing() && i() === frame() % f().length },
-                        ]}
+                        {...stylex.attrs(
+                          variantStyles.detailButton,
+                          playing() && i() === frame() % f().length ? variantStyles.detailButtonVariant : variantStyles.detailButtonVariant2,
+                        )}
                         style={groundStyle(props.ground)}
                       >
                         <Img p={p()} scale={fitScale(p(), 38)} />

@@ -23,6 +23,211 @@ import { useIntents } from "#/state/intent.ts";
 import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 
+const recipeStyles2 = stylex.create({
+  messageMenuDiv: {
+    position: "absolute",
+    right: "0",
+    bottom: "100%",
+    zIndex: "30",
+    marginBottom: "var(--spacing)",
+    width: "calc(var(--spacing) * 40)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: "var(--color-cream-50)",
+    paddingBlock: "var(--spacing)",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+  messageMenuButton: {
+    cursor: "pointer",
+    paddingInline: "var(--spacing)",
+    fontSize: "14px",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-leaf-300)66",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
+        },
+      },
+    },
+  },
+  messageMenuButton2: {
+    cursor: "pointer",
+    paddingInline: "var(--spacing)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-leaf-300)66",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
+        },
+      },
+    },
+  },
+  messageMenuButton3: {
+    width: "100%",
+    cursor: "pointer",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "12px",
+    color: "var(--color-bark-900)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-leaf-300)66",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
+        },
+      },
+    },
+  },
+  messageMenuButton4: {
+    width: "100%",
+    cursor: "pointer",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "12px",
+    color: "var(--wb-berry)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-leaf-300)66",
+        "@supports (color:color-mix(in lab, red, red))": {
+          default: null,
+          ":hover": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
+        },
+      },
+    },
+  },
+  threadChipButton: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: {
+      default: "var(--color-cream-50)cc",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-cream-50) 80%, transparent)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-50)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  chatRowSpan: {
+    marginInline: "var(--spacing)",
+    marginBottom: "calc(var(--spacing) * .5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+  farmEditSpan: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+  chatBubbleP: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+    fontStyle: "italic",
+  },
+  answersP: {
+    marginBottom: "calc(var(--spacing) * .5)",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+  chatReportP: {
+    marginTop: "var(--spacing)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "calc(var(--spacing) * 4)",
+    color: "var(--color-bark-500)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  chatBubbleA: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-500)",
+    backgroundColor: {
+      default: "var(--color-cream-50)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "12px",
+    color: "var(--color-bark-900)",
+  },
+});
+
+const variantStyles = stylex.create({
+  chatRowDiv: {
+    display: "flex",
+    maxWidth: "84%",
+    flexDirection: "column",
+  },
+  chatRowDivVariant: {
+    alignItems: "flex-end",
+  },
+  chatRowDivVariant2: {
+    alignItems: "flex-start",
+  },
+  chatRowDiv2: {
+    maxWidth: "100%",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "12px",
+    lineHeight: "1.625",
+    color: "var(--color-bark-900)",
+  },
+  chatRowDivVariant3: {
+    backgroundColor: "var(--color-leaf-500)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 2px 0 0 var(--color-leaf-700)",
+  },
+  chatRowDivVariant4: {
+    borderStyle: "solid",
+    borderWidth: "1.5px",
+    borderColor: "var(--color-cream-300)",
+    backgroundColor: "var(--color-cream-100)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 2px 0 0 var(--color-leaf-edge)",
+  },
+});
+
 const viewStyles = stylex.create({
   chatTextDiv: {
     display: "flex",
@@ -152,8 +357,6 @@ const viewStyles = stylex.create({
   },
 });
 
-const small = "font-pixel text-[12px] leading-4 text-bark-500";
-
 /** A message's text; a long one shows its first lines until opened. */
 function ChatText(props: { text: string; link?: string }) {
   const [open, setOpen] = createSignal(false);
@@ -234,20 +437,11 @@ export function ChatRow(props: {
       <Show when={!props.mine}>
         <span {...stylex.attrs(viewStyles.chatRowSpan)}>{props.first ? props.face : null}</span>
       </Show>
-      <div class={["flex max-w-[84%] flex-col", props.mine ? "items-end" : "items-start"]}>
+      <div {...stylex.attrs(variantStyles.chatRowDiv, props.mine ? variantStyles.chatRowDivVariant : variantStyles.chatRowDivVariant2)}>
         <Show when={!props.mine && props.first && props.name}>
-          <span class={["mx-1 mb-0.5", small]}>{props.name}</span>
+          <span {...stylex.attrs(recipeStyles.chatRowSpan)}>{props.name}</span>
         </Show>
-        <div
-          title={props.title}
-          class={[
-            // Capped by its column: a one-line dispatch note is as wide as its whole line until it truncates.
-            "max-w-full px-3 py-2 text-[12px] leading-[1.625]",
-            props.mine
-              ? "bg-leaf-500 text-bark-900 shadow-[0_2px_0_0_var(--color-leaf-700)]"
-              : "border-[1.5px] border-cream-300 bg-cream-100 text-bark-900 shadow-[0_2px_0_0_var(--color-leaf-edge)]",
-          ]}
-        >
+        <div title={props.title} {...stylex.attrs(variantStyles.chatRowDiv2, props.mine ? variantStyles.chatRowDivVariant3 : variantStyles.chatRowDivVariant4)}>
           {props.children}
         </div>
       </div>
@@ -255,8 +449,6 @@ export function ChatRow(props: {
     </div>
   );
 }
-
-const menuItem = "w-full cursor-pointer px-2 py-1 text-left text-[12px] text-bark-900 hover:bg-leaf-300/40";
 
 /** What the owner can do to a message from the farm's window: the same requests as the workbench's tools. */
 function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
@@ -299,12 +491,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
         <SpriteIcon name="button-more" size={16} />
       </button>
       <Show when={open()}>
-        <div
-          role="menu"
-          data-testid="message-menu"
-          aria-label={t("web.farm.chat.actions.open")}
-          class="absolute right-0 bottom-full z-30 mb-1 w-40 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
-        >
+        <div role="menu" data-testid="message-menu" aria-label={t("web.farm.chat.actions.open")} {...stylex.attrs(recipeStyles2.messageMenuDiv)}>
           <div role="group" aria-label={t("web.farm.chat.actions.react")} {...stylex.attrs(viewStyles.messageMenuDiv2)}>
             <For each={quickReactions}>
               {(emoji) => (
@@ -313,7 +500,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
                   data-testid="quick-reaction"
                   data-key={emoji}
                   aria-label={emoji}
-                  class="cursor-pointer px-1 text-[14px] hover:bg-leaf-300/40"
+                  {...stylex.attrs(recipeStyles2.messageMenuButton)}
                   onClick={() => react(props.m, emoji)}
                 >
                   {emoji}
@@ -325,7 +512,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               ref={(el) => (plus = el)}
               aria-label={t("web.farm.chat.actions.moreEmoji")}
               aria-expanded={aria(every())}
-              class="cursor-pointer px-1 hover:bg-leaf-300/40"
+              {...stylex.attrs(recipeStyles2.messageMenuButton2)}
               onClick={() => setEvery(!every())}
             >
               <SpriteIcon name="button-add" size={12} />
@@ -335,7 +522,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             type="button"
             role="menuitem"
             data-key="reply"
-            class={menuItem}
+            {...stylex.attrs(recipeStyles2.messageMenuButton3)}
             onClick={() => {
               close();
               drafts.reply(props.m.channel, props.m);
@@ -347,7 +534,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             type="button"
             role="menuitem"
             data-key="copy-link"
-            class={menuItem}
+            {...stylex.attrs(recipeStyles2.messageMenuButton3)}
             onClick={() =>
               run(async () => {
                 await navigator.clipboard.writeText(location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number));
@@ -362,7 +549,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               type="button"
               role="menuitem"
               data-key="edit"
-              class={menuItem}
+              {...stylex.attrs(recipeStyles2.messageMenuButton3)}
               onClick={() => {
                 setOpen(false);
                 untrack(() => props.onEdit)();
@@ -376,7 +563,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             role="menuitem"
             data-key="delete"
             data-sure={sure() ? "" : undefined}
-            class={[menuItem, "text-berry"]}
+            {...stylex.attrs(recipeStyles2.messageMenuButton4)}
             onClick={() => {
               if (!sure()) return void setSure(true);
               const id = props.m.id;
@@ -438,7 +625,7 @@ function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
         }}
         {...stylex.attrs(viewStyles.messageEdit)}
       />
-      <span class={small}>{t("web.farm.chat.actions.editHint")}</span>
+      <span {...stylex.attrs(recipeStyles.farmEditSpan)}>{t("web.farm.chat.actions.editHint")}</span>
     </div>
   );
 }
@@ -466,7 +653,7 @@ export function ChatBubble(props: {
         <span {...stylex.attrs(viewStyles.chatBubbleSpan)}>{props.tag}</span>
       </Show>
       <Show when={props.m.replyTo}>{(n) => <Answers channel={props.m.channel} number={n()} />}</Show>
-      <Show when={props.m.deleted === undefined} fallback={<p class={["italic", small]}>{t("web.farm.chat.deleted")}</p>}>
+      <Show when={props.m.deleted === undefined} fallback={<p {...stylex.attrs(recipeStyles.chatBubbleP)}>{t("web.farm.chat.deleted")}</p>}>
         <Show
           when={editing()}
           fallback={
@@ -478,7 +665,7 @@ export function ChatBubble(props: {
           <FarmEdit m={props.m} onDone={() => setEditing(false)} />
         </Show>
         <Show when={props.m.edited !== undefined}>
-          <span class={small}>{t("web.farm.chat.edited")}</span>
+          <span {...stylex.attrs(recipeStyles.farmEditSpan)}>{t("web.farm.chat.edited")}</span>
         </Show>
         <Show when={props.m.attachments.length > 0 ? props.m.attachments : undefined}>
           {(files) => (
@@ -504,7 +691,7 @@ export function ChatBubble(props: {
             data-testid="artifact-card"
             data-key={card().id}
             data-version={card().version}
-            class="mt-1 flex items-center gap-2 border-2 border-bark-500 bg-cream-50 px-2 py-1 text-[12px] text-bark-900 hover:bg-cream-hover"
+            {...stylex.attrs(variantStyles2.chatBubbleA)}
           >
             <SpriteIcon name="icon-deed" size={14} />
             <span {...stylex.attrs(viewStyles.chatBubbleSpan2)}>
@@ -532,7 +719,7 @@ export function ChatBubble(props: {
 function Answers(props: { channel: string; number: number }) {
   const m = useMessage(() => ({ channel: props.channel, number: props.number }));
   return (
-    <p class={["mb-0.5 truncate", small]}>
+    <p {...stylex.attrs(recipeStyles.answersP)}>
       {replyTo(m()?.name ?? `#${props.number}`, m()?.deleted === undefined ? (m()?.text ?? "") : t("web.farm.chat.deleted"))}
     </p>
   );
@@ -552,7 +739,9 @@ export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.El
         {tag()[0]}
       </span>
       <ChatText text={props.m.text} />
-      <Show when={props.m.spent}>{(spent) => <p class={["mt-1", small]}>{t("web.farm.chat.spent", { spent: spentText(spent()) })}</p>}</Show>
+      <Show when={props.m.spent}>
+        {(spent) => <p {...stylex.attrs(recipeStyles.chatReportP)}>{t("web.farm.chat.spent", { spent: spentText(spent()) })}</p>}
+      </Show>
       {props.steps}
     </ChatRow>
   );
@@ -560,11 +749,7 @@ export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.El
 
 export function ThreadChip(props: { thread: Channel; unread: number; onOpen: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={() => props.onOpen()}
-      class="mt-1.5 flex cursor-pointer items-center gap-1.5 border border-cream-300 bg-cream-50/80 px-2 py-0.5 hover:bg-cream-50"
-    >
+    <button type="button" onClick={() => props.onOpen()} {...stylex.attrs(recipeStyles2.threadChipButton)}>
       <SpriteIcon name="button-thread" size={12} />
       <span {...stylex.attrs(viewStyles.threadChipSpan)}>
         {props.thread.replies > 0 ? t("web.farm.chat.replies", { n: props.thread.replies }) : t("web.farm.chat.thread")}
@@ -582,7 +767,7 @@ export function ParentMessage(props: { m: ChatMessage; face: JSX.Element }) {
     <div {...stylex.attrs(viewStyles.parentMessageDiv)}>
       {props.face}
       <div {...stylex.attrs(viewStyles.dispatchNoteSpan)}>
-        <p class={small}>
+        <p {...stylex.attrs(recipeStyles.farmEditSpan)}>
           <SenderName m={props.m} /> · {farmClock(props.m.at)}
         </p>
         <div {...stylex.attrs(viewStyles.parentMessageDiv2)}>

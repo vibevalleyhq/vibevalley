@@ -25,6 +25,145 @@ import { useMessage } from "./follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
 import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messagePath } from "./places";
 
+const recipeStyles = stylex.create({
+  messageToolsToolbarButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: ".25rem",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  messageToolsToolbarButton2: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: ".25rem",
+  },
+  messageToolsToolbarButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  messageToolsToolbarButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--wb-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 15%, transparent)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
+const variantStyles2 = stylex.create({
+  replyQuoteIcon: {
+    opacity: ".6",
+  },
+  messageToolsIcon: {},
+});
+
+const variantStyles = stylex.create({
+  embedsSpan: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  embedsSpan2: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--wb-ok-ink)",
+  },
+  embedsSpan3: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  reactionsButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  reactionsButtonVariant: {
+    borderColor: "var(--wb-accent)",
+    backgroundColor: "var(--wb-selected)",
+  },
+  reactionsButtonVariant2: {
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  editBoxButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  editBoxButtonVariant: {
+    borderStyle: "solid",
+    backgroundColor: "var(--wb-page)",
+  },
+  editBoxButtonVariant2: {
+    borderStyle: "dashed",
+    color: "var(--wb-faint)",
+    textDecorationLine: "line-through",
+  },
+  linkedCardSpan: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
+
 const viewStyles = stylex.create({
   quote: {
     marginBottom: "calc(var(--spacing) * .5)",
@@ -319,7 +458,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
       onClick={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
       {...stylex.attrs(viewStyles.quote)}
     >
-      <Icon name="reply" size={10} class="opacity-60" />
+      <Icon name="reply" size={10} styles={[variantStyles2.replyQuoteIcon]} />
       <Show when={answered()} fallback={<span>#{props.number}</span>}>
         {(m) => (
           <Show when={m().deleted === undefined} fallback={<span {...stylex.attrs(viewStyles.replyQuoteSpan)}>{t("web.channel.messages.replyGone")}</span>}>
@@ -467,15 +606,15 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
       <For each={props.embeds} keyed={(e) => e.url}>
         {(e) => (
           <a href={e().url} target="_blank" rel="noreferrer noopener" {...stylex.attrs(viewStyles.embedsA)}>
-            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span {...stylex.attrs(variantStyles.embedsSpan)}>
               <Show when={e().site}>
                 <span {...stylex.attrs(viewStyles.embedsSpan)}>{e().site}</span>
               </Show>
               <Show when={e().title}>
-                <span class="line-clamp-2 text-sm font-semibold text-ok-ink">{e().title}</span>
+                <span {...stylex.attrs(variantStyles.embedsSpan2)}>{e().title}</span>
               </Show>
               <Show when={e().description}>
-                <span class="line-clamp-3 text-xs">{e().description}</span>
+                <span {...stylex.attrs(variantStyles.embedsSpan3)}>{e().description}</span>
               </Show>
             </span>
             <Show when={e().image}>
@@ -504,10 +643,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
               aria-pressed={aria(mine())}
               title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: list(r().by.map(props.names)) })}
               onClick={() => react(props.m, r().emoji, !mine())}
-              class={[
-                "flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
-                mine() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover",
-              ]}
+              {...stylex.attrs(variantStyles.reactionsButton, mine() ? variantStyles.reactionsButtonVariant : variantStyles.reactionsButtonVariant2)}
             >
               <span>{r().emoji}</span>
               <span>{r().by.length}</span>
@@ -558,8 +694,6 @@ function AddReaction(props: { m: ChatMessage }) {
   );
 }
 
-const tool = "inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-hover";
-
 export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit: () => void }) {
   const router = useRouter();
   const core = useCore();
@@ -599,7 +733,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           <For each={quickReactions}>
             {(emoji) => (
               <Toolbar.Button
-                class={tool}
+                {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
                 data-testid="quick-reaction"
                 data-key={emoji}
                 aria-label={emoji}
@@ -615,7 +749,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           </For>
           <Toolbar.Button
             ref={(el) => (moreEmoji = el)}
-            class={tool}
+            {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
             data-testid="more-emoji"
             aria-label={t("web.channel.emoji.more")}
             title={t("web.channel.emoji.more")}
@@ -639,7 +773,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         />
       </Show>
       <Toolbar.Button
-        class={tool}
+        {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
         data-testid="message-tool"
         data-key="react"
         aria-label={t("web.channel.tools.react")}
@@ -649,7 +783,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <Icon name="react" size={16} />
       </Toolbar.Button>
       <Toolbar.Button
-        class={tool}
+        {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
         data-testid="message-tool"
         data-key="reply"
         aria-label={t("web.channel.tools.reply")}
@@ -660,7 +794,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       </Toolbar.Button>
       <Show when={props.inChannel}>
         <Toolbar.Button
-          class={tool}
+          {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
           data-testid="message-tool"
           data-key="thread"
           aria-label={t("web.channel.tools.thread")}
@@ -677,7 +811,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         </Toolbar.Button>
       </Show>
       <Toolbar.Button
-        class={tool}
+        {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
         data-testid="message-tool"
         data-key="pin"
         aria-label={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
@@ -688,11 +822,15 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           setMark(pins, { channel: m.channel, id: m.id, on: m.pinned === undefined, at: Date.now() }, sameMessage, bad);
         }}
       >
-        <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
+        <Icon
+          name="pin"
+          size={16}
+          styles={[variantStyles2.messageToolsIcon, props.m.pinned !== undefined ? variantStyles2.messageToolsIcon : variantStyles2.replyQuoteIcon]}
+        />
       </Toolbar.Button>
       <Show when={editable()}>
         <Toolbar.Button
-          class={tool}
+          {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
           data-testid="message-tool"
           data-key="edit"
           aria-label={t("web.channel.tools.edit")}
@@ -716,7 +854,10 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         ]}
       />
       <Toolbar.Button
-        class={[tool, { "bg-berry/15": sure() }]}
+        {...stylex.attrs(
+          recipeStyles.messageToolsToolbarButton2,
+          sure() ? recipeStyles.messageToolsToolbarButtonVariant1Case2 : recipeStyles.messageToolsToolbarButtonVariant1Case1,
+        )}
         data-testid="message-tool"
         data-key="delete"
         data-sure={sure() ? "" : undefined}
@@ -787,10 +928,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
                   aria-pressed={aria(keeps())}
                   aria-label={keeps() ? t("web.channel.media.takeOff", { name: f.name }) : t("web.channel.media.keep", { name: f.name })}
                   onClick={() => setKept((k) => (keeps() ? k.filter((x) => x !== f.id) : [...k, f.id]))}
-                  class={[
-                    "flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs",
-                    keeps() ? "border-line bg-page" : "border-dashed border-line text-faint line-through",
-                  ]}
+                  {...stylex.attrs(variantStyles.editBoxButton, keeps() ? variantStyles.editBoxButtonVariant : variantStyles.editBoxButtonVariant2)}
                 >
                   <Icon name="attach" size={12} />
                   <span {...stylex.attrs(viewStyles.editBoxSpan)}>{f.name}</span>
@@ -847,7 +985,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
       <Show when={m()}>
         {(said) => (
           <Show when={said().deleted === undefined} fallback={<span {...stylex.attrs(viewStyles.messageBodyP)}>{t("web.channel.messages.replyGone")}</span>}>
-            <span class="line-clamp-3 text-sm">{said().text || list(said().attachments.map((a) => a.name))}</span>
+            <span {...stylex.attrs(variantStyles.linkedCardSpan)}>{said().text || list(said().attachments.map((a) => a.name))}</span>
           </Show>
         )}
       </Show>

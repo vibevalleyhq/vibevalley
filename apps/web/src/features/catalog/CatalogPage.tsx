@@ -19,6 +19,93 @@ import { Tabs } from "#/ui/Tabs.tsx";
 import { CursorTile, Detail, fitScale, type Ground, grounds, groundStyle, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
 
+const recipeStyles = stylex.create({
+  spritesSpan: {
+    position: "absolute",
+    top: "calc(var(--spacing) * .5)",
+    right: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-xs)",
+    backgroundColor: {
+      default: "var(--color-bark-900)b3",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 70%, transparent)",
+    },
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "14px",
+    color: "var(--color-paper)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  searchTextInput: {
+    minWidth: "calc(var(--spacing) * 48)",
+    flex: "1",
+  },
+});
+
+const variantStyles = stylex.create({
+  layoutDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    padding: "calc(var(--spacing) * 3)",
+    overflowY: {
+      default: null,
+      "@media (width>=64rem)": "auto",
+    },
+  },
+  spritesButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  spritesButtonVariant: {
+    backgroundColor: "var(--wb-selected)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  spritesButtonVariant2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  spritesButton2: {
+    display: "flex",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-lg)",
+    padding: "var(--spacing)",
+    outlineStyle: {
+      default: null,
+      ":focus-visible": "solid",
+    },
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--wb-focus)",
+    },
+  },
+  spritesButtonVariant3: {
+    backgroundColor: "var(--wb-selected)",
+  },
+});
+
 const viewStyles = stylex.create({
   catalogPageDiv: {
     height: "100%",
@@ -239,7 +326,7 @@ function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.E
       <Show when={props.right}>
         <div class="shrink-0 p-3 xl:order-last xl:w-88 xl:overflow-y-auto xl:pl-0">{props.right}</div>
       </Show>
-      <div class="flex min-w-0 flex-1 flex-col gap-3 p-3 lg:overflow-y-auto">{props.children}</div>
+      <div {...stylex.attrs(variantStyles.layoutDiv)}>{props.children}</div>
     </div>
   );
 }
@@ -250,7 +337,7 @@ function Search(props: { query: string; onChange: (q: string) => void; placehold
       <TextInput
         data-testid="catalog-search"
         aria-label={t("web.catalog.find")}
-        class="min-w-48 flex-1"
+        styles={variantStyles2.searchTextInput}
         placeholder={props.placeholder}
         value={props.query}
         onInput={(e) => props.onChange(e.currentTarget.value)}
@@ -297,7 +384,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
       data-key={b.id}
       aria-pressed={aria(shelf() === b.id)}
       onClick={() => setShelf(b.id)}
-      class={["flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-sm", shelf() === b.id ? "bg-selected font-semibold" : "hover:bg-hover"]}
+      {...stylex.attrs(variantStyles.spritesButton, shelf() === b.id ? variantStyles.spritesButtonVariant : variantStyles.spritesButtonVariant2)}
     >
       <span {...stylex.attrs(viewStyles.shelfButtonSpan)}>{b.label}</span>
       <span {...stylex.attrs(viewStyles.shelfButtonSpan2)}>{b.count}</span>
@@ -352,17 +439,15 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                   data-key={p.name}
                                   aria-current={selected()?.name === p.name ? "true" : undefined}
                                   onClick={() => router.navigate(`/catalog/${encodeURIComponent(p.name)}`)}
-                                  class={[
-                                    "flex cursor-pointer flex-col items-center gap-1 rounded-lg p-1 focus-visible:outline-2 focus-visible:outline-focus",
-                                    selected()?.name === p.name ? "bg-selected" : "hover:bg-hover",
-                                  ]}
+                                  {...stylex.attrs(
+                                    variantStyles.spritesButton2,
+                                    selected()?.name === p.name ? variantStyles.spritesButtonVariant3 : variantStyles.spritesButtonVariant2,
+                                  )}
                                 >
                                   <span {...stylex.attrs(viewStyles.spritesSpan3)} style={groundStyle(ground())}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
-                                      <span class="absolute top-0.5 right-0.5 rounded-xs bg-bark-900/70 px-1 text-2xs leading-[14px] text-paper">
-                                        {t("web.catalog.moves")}
-                                      </span>
+                                      <span {...stylex.attrs(recipeStyles.spritesSpan)}>{t("web.catalog.moves")}</span>
                                     </Show>
                                   </span>
                                   <span {...stylex.attrs(viewStyles.spritesSpan4)}>{p.name}</span>

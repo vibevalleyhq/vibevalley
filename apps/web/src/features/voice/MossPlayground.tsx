@@ -12,6 +12,39 @@ import { Hint, Tip } from "#/ui/Tip.tsx";
 
 import { type MossLine, mossLine, type MossSetup } from "./mossLine";
 
+const variantStyles = stylex.create({
+  statSpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  statSpanVariant: {
+    color: "var(--wb-berry)",
+  },
+  statSpanVariant2: {
+    color: "var(--wb-ink)",
+  },
+  mossLineViewDiv: {
+    display: "flex",
+  },
+  mossLineViewDivVariant: {
+    justifyContent: "flex-end",
+  },
+  mossLineViewDivVariant2: {
+    justifyContent: "flex-start",
+  },
+  mossLineViewSpan: {
+    marginRight: "calc(var(--spacing) * 1.5)",
+  },
+  mossLineViewSpanVariant: {
+    color: "var(--wb-water)",
+  },
+  mossLineViewSpanVariant2: {
+    color: "var(--wb-leaf)",
+  },
+});
+
 const viewStyles = stylex.create({
   levelSpan: {
     display: "flex",
@@ -139,7 +172,9 @@ function Stat(props: { label: string; value: string; tip: string; bad?: boolean 
     <Tip text={props.tip}>
       <span {...stylex.attrs(viewStyles.statSpan)} tabindex={0}>
         <span {...stylex.attrs(viewStyles.statSpan2)}>{props.label}</span>
-        <span class={["font-mono text-sm tabular-nums", props.bad === true ? "text-berry" : "text-ink"]}>{props.value}</span>
+        <span {...stylex.attrs(variantStyles.statSpan, props.bad === true ? variantStyles.statSpanVariant : variantStyles.statSpanVariant2)}>
+          {props.value}
+        </span>
       </span>
     </Tip>
   );
@@ -255,7 +290,12 @@ export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossS
           <Show when={line().turns.length > 0} fallback={<p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.moss.nothingSaid")}</p>}>
             <For each={line().turns}>
               {(turn) => (
-                <div class={["flex", turn.who === "owner" ? "justify-end" : "justify-start"]}>
+                <div
+                  {...stylex.attrs(
+                    variantStyles.mossLineViewDiv,
+                    turn.who === "owner" ? variantStyles.mossLineViewDivVariant : variantStyles.mossLineViewDivVariant2,
+                  )}
+                >
                   <p
                     class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "owner" ? "bg-ok-soft" : "bg-hover", { italic: !turn.done }]}
                     data-done={turn.done ? "" : undefined}
@@ -273,7 +313,9 @@ export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossS
           <For each={line().events}>
             {(e) => (
               <li {...stylex.attrs(viewStyles.mossLineViewLi)} title={e.text}>
-                <span class={["mr-1.5", e.up ? "text-water" : "text-leaf"]}>{e.up ? t("web.voice.moss.up") : t("web.voice.moss.down")}</span>
+                <span {...stylex.attrs(variantStyles.mossLineViewSpan, e.up ? variantStyles.mossLineViewSpanVariant : variantStyles.mossLineViewSpanVariant2)}>
+                  {e.up ? t("web.voice.moss.up") : t("web.voice.moss.down")}
+                </span>
                 {e.text}
               </li>
             )}

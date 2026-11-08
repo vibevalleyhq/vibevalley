@@ -18,6 +18,62 @@ import { PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { HudCard } from "./HudCard";
 
+const recipeStyles = stylex.create({
+  friendButton: {
+    position: "relative",
+    display: "flex",
+    width: "72px",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingBlock: "var(--spacing)",
+  },
+  friendButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  friendButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-leaf-300)99",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
+    },
+  },
+  friendDiv: {
+    position: "absolute",
+    bottom: "100%",
+    left: "0",
+    zIndex: "10",
+    marginBottom: "calc(var(--spacing) * 2.5)",
+    width: "calc(var(--spacing) * 72)",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 3)",
+    textAlign: "left",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+});
+
+const variantStyles = stylex.create({
+  friendSpan: {
+    marginTop: "calc(var(--spacing) * .5)",
+    maxWidth: "68px",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "12px",
+  },
+  friendSpanVariant: {
+    color: "var(--color-bark-900)",
+  },
+  friendSpanVariant2: {
+    color: "var(--color-bark-400)",
+  },
+});
+
 const viewStyles = stylex.create({
   staminaSpan: {
     display: "flex",
@@ -219,12 +275,14 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
         aria-label={t("shared.join.and", { a: props.agent.name, b: status[props.st].label })}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
-        class={["relative flex w-[72px] cursor-pointer flex-col items-center py-1", picked() ? "bg-leaf-300/60" : "hover:bg-cream-200"]}
+        {...stylex.attrs(recipeStyles.friendButton, picked() ? recipeStyles.friendButtonVariant1Case2 : recipeStyles.friendButtonVariant1Case1)}
       >
         <span {...stylex.attrs(viewStyles.friendSpan)} style={{ background: picked() ? "#74a046" : "#c8a46e" }}>
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={46} muted={!props.agent.enabled} />
         </span>
-        <span class={["mt-0.5 max-w-[68px] truncate text-[12px]", props.agent.enabled ? "text-bark-900" : "text-bark-400"]}>{props.agent.name}</span>
+        <span {...stylex.attrs(variantStyles.friendSpan, props.agent.enabled ? variantStyles.friendSpanVariant : variantStyles.friendSpanVariant2)}>
+          {props.agent.name}
+        </span>
         <Show when={quota().level !== "unknown"} fallback={<span {...stylex.attrs(viewStyles.friendSpan2)} />}>
           <Stamina fill={quota().fill} />
         </Show>
@@ -233,12 +291,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
         </Show>
       </button>
       <Show when={open()}>
-        <div
-          data-testid="friend-card"
-          class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px"
-          role="dialog"
-          aria-label={props.agent.name}
-        >
+        <div data-testid="friend-card" {...stylex.attrs(recipeStyles.friendDiv)} role="dialog" aria-label={props.agent.name}>
           <div {...stylex.attrs(viewStyles.friendDiv)}>
             <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={60} muted={!props.agent.enabled} />
             <div {...stylex.attrs(viewStyles.friendDiv2)}>

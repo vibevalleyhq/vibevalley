@@ -7,6 +7,33 @@ import { type Attachment, attachmentPath } from "@vibevalley/protocol";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
+const recipeStyles = stylex.create({
+  attachmentTileButton: {
+    marginLeft: "auto",
+    flexShrink: "0",
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    padding: "var(--spacing)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   attachmentTileSpan: {
     display: "flex",
@@ -88,7 +115,7 @@ export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void
         {(remove) => (
           <button
             type="button"
-            class="ml-auto shrink-0 cursor-pointer rounded-sm p-1 text-muted transition-colors duration-120 hover:bg-hover hover:text-ink"
+            {...stylex.attrs(recipeStyles.attachmentTileButton)}
             aria-label={t("web.base.file.remove", { name: props.file.name })}
             onClick={() => remove()()}
           >

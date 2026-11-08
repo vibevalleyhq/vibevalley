@@ -16,7 +16,8 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: { default: "var(--color-line)", ":focus": "var(--color-focus)" },
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingLeft: "calc(var(--spacing) * 2.5)",
+    paddingRight: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -113,14 +114,22 @@ const styles = stylex.create({
   indicator: { display: "flex", flexShrink: 0, color: "var(--color-accent)" },
 });
 
-export function TextInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
-  const rest = omit(props, "class");
-  return <input {...rest} class={[stylex.attrs(styles.box, styles.input).class, props.class]} />;
+type ControlAppearance = { styles?: stylex.StyleXStyles; style?: JSX.CSSProperties | undefined };
+export type TextInputProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "class" | "style"> & ControlAppearance;
+
+function controlAttrs(props: ControlAppearance, shape: stylex.StyleXStyles) {
+  const appearance = stylex.props(styles.box, shape, props.styles);
+  return { class: appearance.className, style: { ...appearance.style, ...props.style } };
 }
 
-export function TextArea(props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const rest = omit(props, "class");
-  return <textarea {...rest} class={[stylex.attrs(styles.box, styles.textarea).class, props.class]} />;
+export function TextInput(props: TextInputProps) {
+  const rest = omit(props, "styles", "style");
+  return <input {...rest} {...controlAttrs(props, styles.input)} />;
+}
+
+export function TextArea(props: Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "class" | "style"> & ControlAppearance) {
+  const rest = omit(props, "styles", "style");
+  return <textarea {...rest} {...controlAttrs(props, styles.textarea)} />;
 }
 
 /** A label over its control; what it means is behind an info icon beside the label. */
@@ -176,7 +185,7 @@ export function Select<V extends string>(props: {
         style={trigger().style}
       >
         <Base.Value class={stylex.attrs(styles.value).class} placeholder={props.placeholder} />
-        <Icon name="choose" size={12} class={stylex.attrs(styles.chevron).class} />
+        <Icon name="choose" size={12} styles={styles.chevron} />
       </Base.Trigger>
       <Base.Portal>
         <Base.Positioner {...positionerAttrs()} sideOffset={4}>

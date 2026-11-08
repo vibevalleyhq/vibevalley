@@ -112,7 +112,7 @@ export function MoreMenu(props: {
                     <Menu.Separator class={stylex.attrs(styles.separator).class} />
                   </Show>
                   <Menu.Item data-key={item.key} onClick={() => item.onSelect()} class={stylex.attrs(styles.item, item.danger === true && styles.danger).class}>
-                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} class={stylex.attrs(item.danger !== true && styles.icon).class} />}</Show>
+                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} styles={item.danger !== true && styles.icon} />}</Show>
                     {item.label}
                   </Menu.Item>
                 </>

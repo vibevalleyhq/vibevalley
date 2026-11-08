@@ -25,6 +25,56 @@ import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
 
+const variantStyles2 = stylex.create({
+  shownA: {
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  backlinkRowA: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  shownDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=80rem)": "row",
+    },
+    overflowY: "auto",
+    alignItems: {
+      default: null,
+      "@media (width>=80rem)": "flex-start",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   pkmDay: {
     display: "flex",
@@ -337,7 +387,7 @@ function Shown(props: {
       fallback={
         <article data-testid="pkm-day" data-key={page().slug} {...stylex.attrs(viewStyles.pkmDay)}>
           <h2 {...stylex.attrs(viewStyles.shownH2)}>
-            <A href={pkmHref(page().slug)} class="hover:underline">
+            <A href={pkmHref(page().slug)} {...stylex.attrs(variantStyles2.shownA)}>
               {titleFor(page().title, props.summary?.day)}
             </A>
           </h2>
@@ -345,7 +395,7 @@ function Shown(props: {
         </article>
       }
     >
-      <div data-testid="pkm-page" data-key={page().slug} class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:items-start">
+      <div data-testid="pkm-page" data-key={page().slug} {...stylex.attrs(variantStyles.shownDiv)}>
         <article {...stylex.attrs(viewStyles.shownArticle)}>
           <Header view={props.view} summary={props.summary} />
           {outline()}
@@ -639,7 +689,7 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
 function BacklinkRow(props: { link: PkmBacklink; refs: PkmPageView["transclusions"]; day: string | undefined }) {
   return (
     <div data-testid="pkm-backlink" data-key={props.link.block} {...stylex.attrs(viewStyles.pkmBacklink)}>
-      <A href={pkmHref(props.link.page, props.link.block)} data-testid="pkm-backlink-page" class="truncate text-xs text-muted hover:text-ink hover:underline">
+      <A href={pkmHref(props.link.page, props.link.block)} data-testid="pkm-backlink-page" {...stylex.attrs(variantStyles2.backlinkRowA)}>
         {titleFor(props.link.pageTitle, props.day)}
         <Show when={props.link.path}> › {props.link.path}</Show>
       </A>

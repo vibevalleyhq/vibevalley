@@ -18,6 +18,50 @@ import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { lcd, phoneCells } from "./lcd";
 
+const variantStyles = stylex.create({
+  ringingScreenDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingTop: "calc(var(--spacing) * 5)",
+    textAlign: "center",
+  },
+  ringingScreenP: {
+    marginTop: "calc(var(--spacing) * 2)",
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    lineHeight: "1.625",
+  },
+  listScreenButton: {
+    flex: "1",
+    cursor: "pointer",
+    paddingBlock: "var(--spacing)",
+  },
+  listScreenButtonVariant: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-lcd-light)",
+      },
+    },
+  },
+  listScreenButtonVariant2: {},
+  orchestratorLineP: {
+    marginTop: "calc(var(--spacing) * 3)",
+    WebkitLineClamp: "4",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    lineHeight: "1.625",
+  },
+});
+
 const viewStyles = stylex.create({
   cellsSvg: {
     flexShrink: "0",
@@ -210,7 +254,7 @@ const SmallFace = (props: { children: JSX.Element }) => (
 
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
-    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
+    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} {...stylex.attrs(variantStyles.ringingScreenDiv)}>
       <span class="phone-blink">{t("web.farm.phone.ringing")}</span>
       <span {...stylex.attrs(viewStyles.ringingScreenSpan)}>
         <BigFace shake>
@@ -221,7 +265,7 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
       <p {...stylex.attrs(viewStyles.ringingScreenP2)} style={{ background: lcd.dark, color: lcd.pale }}>
         {props.call.words.label}
       </p>
-      <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
+      <p {...stylex.attrs(variantStyles.ringingScreenP)}>{props.call.text}</p>
       <div {...stylex.attrs(viewStyles.ringingScreenDiv)}>
         <RoundKey answer={false} testid="decline" label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
         <RoundKey answer testid="answer" label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
@@ -289,7 +333,10 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
               data-key={s}
               onClick={() => props.onScreen(s)}
               aria-pressed={aria(props.screen === s)}
-              class={["flex-1 cursor-pointer py-1", { "hover:bg-lcd-light": props.screen !== s }]}
+              {...stylex.attrs(
+                variantStyles.listScreenButton,
+                props.screen !== s ? variantStyles.listScreenButtonVariant : variantStyles.listScreenButtonVariant2,
+              )}
               style={props.screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
             >
               {s === "missed" ? t("web.farm.phone.missed", { n: missed().length }) : t("web.farm.phone.log")}
@@ -391,13 +438,13 @@ export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; 
       data-testid="orchestrator-line"
       data-state={props.phase}
       data-problem={props.problem ? "" : undefined}
-      class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center"
+      {...stylex.attrs(variantStyles.ringingScreenDiv)}
     >
       <BigFace shake={props.phase === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
       <p {...stylex.attrs(viewStyles.orchestratorLineP)}>{t("web.farm.phone.manager")}</p>
-      <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: props.phase === "idle" && props.problem ? failedInk : undefined }}>
+      <p {...stylex.attrs(variantStyles.orchestratorLineP)} style={{ color: props.phase === "idle" && props.problem ? failedInk : undefined }}>
         {line()}
       </p>
       <div {...stylex.attrs(viewStyles.orchestratorLineDiv)}>

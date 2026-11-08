@@ -13,6 +13,33 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
+const recipeStyles = stylex.create({
+  artifactCardA: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    width: "100%",
+    maxWidth: "var(--container-md)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+});
+
 const viewStyles = stylex.create({
   artifactCardSpan: {
     display: "flex",
@@ -89,7 +116,7 @@ export function ArtifactCard(props: { card: Card }) {
       data-key={props.card.id}
       data-version={props.card.version}
       aria-label={t("web.artifact.card.open", { title: props.card.title })}
-      class="mt-1 flex w-full max-w-md items-center gap-3 rounded-lg border border-line bg-page px-3 py-2 transition-colors duration-120 hover:bg-hover"
+      {...stylex.attrs(recipeStyles.artifactCardA)}
     >
       <span {...stylex.attrs(viewStyles.artifactCardSpan)}>
         <Icon name={bodyIcon[props.card.body]} size={20} />

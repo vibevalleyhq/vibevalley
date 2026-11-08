@@ -9,6 +9,24 @@ import { aria } from "#/base/dom.tsx";
 import { changeKind, patchLines, patchMarkOf } from "#/features/issue/index.ts";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 
+const variantStyles = stylex.create({
+  fileRowSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "12.5px",
+  },
+  fileRowSpanVariant: {
+    color: "var(--wb-berry)",
+  },
+  fileRowSpanVariant2: {
+    color: "var(--color-bark-800)",
+  },
+});
+
 const viewStyles = stylex.create({
   farmTagSpan: {
     display: "inline-flex",
@@ -153,7 +171,10 @@ export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         <span title={kind().label} {...stylex.attrs(viewStyles.fileRowSpan)} style={{ background: look().fill, color: look().ink }}>
           {kind().mark}
         </span>
-        <span title={props.file.path} class={["min-w-0 flex-1 truncate font-mono text-[12.5px]", props.conflict ? "text-berry" : "text-bark-800"]}>
+        <span
+          title={props.file.path}
+          {...stylex.attrs(variantStyles.fileRowSpan, props.conflict ? variantStyles.fileRowSpanVariant : variantStyles.fileRowSpanVariant2)}
+        >
           {props.file.path}
         </span>
         <Show when={props.conflict}>

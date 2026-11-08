@@ -19,6 +19,57 @@ import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { quotaOf } from "./quota";
 import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } from "./RuntimeCards";
 
+const variantStyles2 = stylex.create({
+  detailA: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    textDecorationLine: "underline",
+  },
+  detailA2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingBlock: "var(--spacing)",
+    paddingRight: "calc(var(--spacing) * 3)",
+    paddingLeft: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  runtimesPageSpan: {},
+  runtimesPageSpanVariant: {
+    opacity: ".5",
+    filter: "grayscale(100%)",
+  },
+  detailDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+});
+
 const viewStyles = stylex.create({
   runtimesPageP: {
     padding: "calc(var(--spacing) * 8)",
@@ -177,7 +228,7 @@ export function RuntimesPage(props: { rest: string }) {
                       title={r.preset.label}
                       line={`${statusOf(r)}${using() > 0 ? t("web.runtime.usedBy", { n: using() }) : ""}`}
                       leading={
-                        <span class={{ "opacity-50 grayscale": !ok() }}>
+                        <span {...stylex.attrs(variantStyles.runtimesPageSpan, !ok() ? variantStyles.runtimesPageSpanVariant : variantStyles.runtimesPageSpan)}>
                           <RuntimeIcon runtime={r.id} size={36} />
                         </span>
                       }
@@ -221,11 +272,16 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
           {...stylex.attrs(viewStyles.detailSpan)}
           style={{ background: `radial-gradient(70% 70% at 50% 70%, ${props.info.preset.look.hat}33, var(--color-page))` }}
         >
-          <span class={{ "opacity-50 grayscale": inst().status !== "available" }}>
+          <span
+            {...stylex.attrs(
+              variantStyles.runtimesPageSpan,
+              inst().status !== "available" ? variantStyles.runtimesPageSpanVariant : variantStyles.runtimesPageSpan,
+            )}
+          >
             <RuntimeIcon runtime={props.info.id} size={60} />
           </span>
         </span>
-        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div {...stylex.attrs(variantStyles.detailDiv)}>
           <h2 {...stylex.attrs(viewStyles.detailH2)}>{props.info.preset.label}</h2>
           <p {...stylex.attrs(viewStyles.detailP)}>{props.info.preset.blurb}</p>
           <div {...stylex.attrs(viewStyles.detailDiv3)}>
@@ -273,7 +329,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <Card
         title={t("web.runtime.agents")}
         action={
-          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" class="text-xs text-muted underline hover:text-ink">
+          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" {...stylex.attrs(variantStyles2.detailA)}>
             {t("web.runtime.makeAgent")}
           </A>
         }
@@ -282,10 +338,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
           <div {...stylex.attrs(viewStyles.detailDiv6)}>
             <For each={props.agents}>
               {(a) => (
-                <A
-                  href={`/agents/${encodeURIComponent(a.id)}`}
-                  class="flex items-center gap-1.5 rounded-md border border-line py-1 pr-3 pl-1 text-sm hover:bg-hover"
-                >
+                <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(variantStyles2.detailA2)}>
                   <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
                   {a.name}
                 </A>

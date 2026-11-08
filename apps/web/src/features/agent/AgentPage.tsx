@@ -23,6 +23,94 @@ import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 
+const variantStyles3 = stylex.create({
+  problemsIcon: {
+    marginTop: "var(--spacing)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  agentPageA: {
+    textDecorationLine: "underline",
+  },
+  creatorA: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  creatorSpan: {
+    flexShrink: "0",
+    borderRadius: ".25rem",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  creatorSpanVariant: {
+    backgroundColor: "var(--color-hat)",
+    color: "var(--color-bark-900)",
+  },
+  creatorSpanVariant2: {
+    backgroundColor: "var(--wb-hover)",
+    color: "var(--wb-muted)",
+  },
+  creatorDiv: {
+    display: "flex",
+    minHeight: "calc(var(--spacing) * 104)",
+    flex: "1",
+    flexDirection: "column",
+    overflow: "hidden",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+  },
+  creatorButton: {
+    height: "calc(var(--spacing) * 6)",
+    cursor: "pointer",
+    borderRadius: "2147483647px",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  creatorButtonVariant: {
+    backgroundColor: "var(--wb-ink)",
+    color: "var(--wb-page)",
+  },
+  creatorButtonVariant2: {
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-selected)",
+      },
+    },
+  },
+  problemsLi: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  problemsLiVariant: {
+    color: "var(--wb-berry)",
+  },
+  problemsLiVariant2: {
+    color: "var(--wb-warn-ink)",
+  },
+});
+
 const viewStyles = stylex.create({
   agentPageP: {
     padding: "calc(var(--spacing) * 8)",
@@ -227,7 +315,7 @@ export function AgentPage(props: { id: string }) {
       <Match when={!isNew() && !saved()}>
         <p data-testid="agent-missing" {...stylex.attrs(viewStyles.agentPageP)}>
           {t("web.agent.noSuch")}
-          <A href="/agents" class="underline">
+          <A href="/agents" {...stylex.attrs(variantStyles2.agentPageA)}>
             {t("web.agent.backToAll")}
           </A>
         </p>
@@ -273,13 +361,13 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
 
   const bar = () => (
     <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(viewStyles.profileBar)}>
-      <A href="/agents" data-testid="back" class="text-sm text-muted hover:underline">
+      <A href="/agents" data-testid="back" {...stylex.attrs(variantStyles2.creatorA)}>
         {t("web.agent.all")}
       </A>
       <span {...stylex.attrs(viewStyles.barSpan)}>/</span>
       <span {...stylex.attrs(viewStyles.barSpan2)}>
         <span {...stylex.attrs(viewStyles.barSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
-        <span class={["shrink-0 rounded px-1.5 text-xs", isNew || dirty() ? "bg-hat text-bark-900" : "bg-hover text-muted"]}>
+        <span {...stylex.attrs(variantStyles.creatorSpan, isNew || dirty() ? variantStyles.creatorSpanVariant : variantStyles.creatorSpanVariant2)}>
           {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
         </span>
       </span>
@@ -341,7 +429,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
           <div {...stylex.attrs(viewStyles.creatorDiv5)}>
             <LookPanel draft={draft()} onChange={(look) => setDraft({ ...draft(), look })} />
           </div>
-          <div class="flex min-h-104 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-page">
+          <div {...stylex.attrs(variantStyles.creatorDiv)}>
             <Stage draft={draft()} pose={pose()} />
             <div {...stylex.attrs(viewStyles.creatorDiv6)}>
               <For each={stagePoses}>
@@ -350,7 +438,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                     type="button"
                     aria-pressed={aria(pose() === p.pose)}
                     onClick={() => setPose(p.pose)}
-                    class={["h-6 cursor-pointer rounded-full px-2.5 text-xs", pose() === p.pose ? "bg-ink text-page" : "bg-hover hover:bg-selected"]}
+                    {...stylex.attrs(variantStyles.creatorButton, pose() === p.pose ? variantStyles.creatorButtonVariant : variantStyles.creatorButtonVariant2)}
                   >
                     {p.label}
                   </button>
@@ -404,8 +492,8 @@ function Problems(props: { problems: AgentProblem[] }) {
       <ul aria-label={t("web.agent.problems")} {...stylex.attrs(viewStyles.problemsUl)}>
         <For each={props.problems}>
           {(i) => (
-            <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-warn-ink"]}>
-              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} class="mt-1" />
+            <li {...stylex.attrs(variantStyles.problemsLi, i.level === "error" ? variantStyles.problemsLiVariant : variantStyles.problemsLiVariant2)}>
+              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} styles={[variantStyles3.problemsIcon]} />
               {i.level === "error" ? t("web.agent.cannot") : ""}
               {i.text}
             </li>

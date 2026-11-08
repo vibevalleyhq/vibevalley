@@ -7,6 +7,7 @@ import { Icon, type IconSize } from "./Icon";
 import { icons, type IconName } from "./icons";
 
 const viewStyles = stylex.create({
+  placement: (offset: number) => ({ marginLeft: offset, color: "var(--color-ink)" }),
   iconStoriesDiv: {
     display: "grid",
     width: "100%",
@@ -63,6 +64,19 @@ const names = Object.keys(icons) as IconName[];
 export default stories({
   title: "设计体系/图标",
   stories: {
+    Composition: story({
+      args: { offset: 12 },
+      render: (a, set) => (
+        <div>
+          <Icon name="check" label="Reference" />
+          <Icon name="check" label="Composed" styles={viewStyles.placement(a.offset)} />
+          <Icon name="file" label="Document" styles={viewStyles.placement(a.offset)} />
+          <button type="button" data-testid="move-icons" onClick={() => set({ offset: 28 })}>
+            Move
+          </button>
+        </div>
+      ),
+    }),
     All: story({
       note: "一个意思一个图（ui/icons.ts）；名字就是 <Icon name> 收的。",
       args: { size: 20 },

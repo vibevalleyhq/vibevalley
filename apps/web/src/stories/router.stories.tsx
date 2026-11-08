@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createSignal } from "solid-js";
 
@@ -19,6 +20,24 @@ import {
   search,
   searchParam,
 } from "#/infra/router.ts";
+
+const variantStyles = stylex.create({
+  controlsDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  controlsNav: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  routerStoriesDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+});
 
 const detail = route("/demo/:id");
 
@@ -45,8 +64,8 @@ function Controls() {
   const [, update] = useSearchParams();
   const [prevented, setPrevented] = createSignal(0);
   return (
-    <div class="flex flex-col gap-3">
-      <nav aria-label="示例导航" class="flex gap-3">
+    <div {...stylex.attrs(variantStyles.controlsDiv)}>
+      <nav aria-label="示例导航" {...stylex.attrs(variantStyles.controlsNav)}>
         <NavLink href="/demo/one" end data-testid="router-one">
           One
         </NavLink>
@@ -73,7 +92,7 @@ function Controls() {
           New tab
         </Link>
       </nav>
-      <div class="flex gap-3">
+      <div {...stylex.attrs(variantStyles.controlsNav)}>
         <button type="button" data-testid="router-back" onClick={() => router.history.back()}>
           Back
         </button>
@@ -164,7 +183,7 @@ export default stories({
     Navigation: story({
       render: () => (
         <Router history={memoryHistory("/demo/one")}>
-          <div class="flex flex-col gap-4 p-4">
+          <div {...stylex.attrs(variantStyles.routerStoriesDiv)}>
             <Controls />
             <Routes
               routes={[

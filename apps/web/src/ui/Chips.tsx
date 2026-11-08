@@ -3,7 +3,52 @@ import { createSignal, For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+const variantStyles = stylex.create({
+  keyValueEditorDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  keyValueEditorDivVariant: {
+    opacity: ".5",
+  },
+  keyValueEditorDivVariant2: {},
+});
+
 const viewStyles = stylex.create({
+  box: {
+    display: "flex",
+    minHeight: "calc(var(--spacing) * 8)",
+    width: "100%",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus-within": "var(--color-focus)" },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "var(--spacing)",
+  },
+  disabledBox: { opacity: 0.5 },
+  field: {
+    height: "calc(var(--spacing) * 8)",
+    minWidth: 0,
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: { default: "var(--color-line)", ":focus": "var(--color-focus)" },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: { default: null, "::placeholder": "var(--color-faint)" },
+  },
+  valueField: { flex: 1 },
+  nameField: { width: "calc(var(--spacing) * 40)" },
   chipsInputSpan: {
     display: "flex",
     alignItems: "center",
@@ -101,8 +146,6 @@ const viewStyles = stylex.create({
   },
 });
 
-const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";
-
 /** Words as chips: enter (or a comma) adds the typed one, backspace on an empty box takes the last off. */
 export function ChipsInput(props: { value: readonly string[]; onChange: (v: string[]) => void; placeholder?: string; label: string; disabled?: boolean }) {
   const [text, setText] = createSignal("");
@@ -112,7 +155,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
     setText("");
   };
   return (
-    <div class={[box, { "opacity-50": !(props.disabled !== true) }]}>
+    <div {...stylex.attrs(viewStyles.box, props.disabled === true && viewStyles.disabledBox)}>
       <For each={props.value}>
         {(v) => (
           <span {...stylex.attrs(viewStyles.chipsInputSpan)}>
@@ -154,9 +197,13 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
   const [key, setKey] = createSignal("");
   const [val, setVal] = createSignal("");
   const rows = () => Object.entries(props.value);
-  const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2 font-mono text-sm outline-none placeholder:text-faint focus:border-focus";
   return (
-    <div class={["flex flex-col gap-1.5", { "opacity-50": !(props.disabled !== true) }]}>
+    <div
+      {...stylex.attrs(
+        variantStyles.keyValueEditorDiv,
+        !(props.disabled !== true) ? variantStyles.keyValueEditorDivVariant : variantStyles.keyValueEditorDivVariant2,
+      )}
+    >
       {/* By name: a keystroke makes new pairs, and a row made again would lose its input's focus. */}
       <For each={rows()} keyed={([k]) => k}>
         {(row) => {
@@ -169,7 +216,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
                 data-key={k()}
                 aria-label={t("web.base.chips.valueOf", { k: k() })}
                 disabled={props.disabled}
-                class={[field, "flex-1"]}
+                {...stylex.attrs(viewStyles.field, viewStyles.valueField)}
                 value={row()[1]}
                 onInput={(e) => props.onChange({ ...props.value, [k()]: e.currentTarget.value })}
               />
@@ -201,7 +248,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           aria-label={t("web.base.chips.name")}
           disabled={props.disabled}
           placeholder="NAME"
-          class={[field, "w-40"]}
+          {...stylex.attrs(viewStyles.field, viewStyles.nameField)}
           value={key()}
           onInput={(e) => setKey(e.currentTarget.value)}
         />
@@ -210,7 +257,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           aria-label={t("web.base.chips.value")}
           disabled={props.disabled}
           placeholder={t("web.base.chips.valueHint")}
-          class={[field, "flex-1"]}
+          {...stylex.attrs(viewStyles.field, viewStyles.valueField)}
           value={val()}
           onInput={(e) => setVal(e.currentTarget.value)}
         />

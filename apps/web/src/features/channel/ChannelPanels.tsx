@@ -19,13 +19,83 @@ import { Select } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-import { channelHeadClass, channelIconButtonClass, orchestratorMoodLabels } from "./ChannelSidebar";
+import { channelIconButtonClass, orchestratorMoodLabels } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
 import { notifyOptions } from "./Dialogs";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
 import { chatPath, messagePath, threadOwnerOf, threadsIn, threadTitle, workbenchClock } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
+
+const recipeStyles = stylex.create({
+  membersButton: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  threadPaneHeader: {
+    display: "flex",
+    height: "66px",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  threadListIcon: {
+    opacity: ".6",
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: "var(--default-transition-duration)",
+  },
+  threadListIconVariant: {
+    rotate: "90deg",
+  },
+  threadListIconVariant2: {},
+});
+
+const variantStyles = stylex.create({
+  pinsSpan: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "block",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  farmSearchBodySpan: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
 
 const viewStyles = stylex.create({
   pinsP: {
@@ -367,7 +437,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
               <span {...stylex.attrs(viewStyles.pinsSpan2)}>{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
               <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(m().at)}</span>
             </span>
-            <span class="line-clamp-3 block text-sm">{m().text}</span>
+            <span {...stylex.attrs(variantStyles.pinsSpan)}>{m().text}</span>
           </button>
         )}
       </For>
@@ -414,7 +484,7 @@ export function Members(props: { channel: Channel }) {
             <PhaseGlyph phase={h().phase} />
             <button
               type="button"
-              class={[channelIconButtonClass, "size-6"]}
+              {...stylex.attrs(recipeStyles.membersButton)}
               aria-label={t("web.channel.direct.open", { name: h().name })}
               title={t("web.channel.direct.open", { name: h().name })}
               onClick={() => {
@@ -454,7 +524,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
   };
   return (
     <section aria-label={t("web.channel.thread")} {...stylex.attrs(viewStyles.membersSpan2)}>
-      <header class={[channelHeadClass, "gap-2.5 px-4"]}>
+      <header {...stylex.attrs(recipeStyles.threadPaneHeader)}>
         <span {...stylex.attrs(viewStyles.threadPaneSpan)}>
           <Show when={session()} fallback={<Icon name="thread" size={16} />}>
             {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
@@ -480,7 +550,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         />
         <button
           type="button"
-          class={channelIconButtonClass}
+          {...stylex.attrs(recipeStyles.membersButton)}
           aria-label={t("web.channel.closeThread")}
           title={t("web.channel.closeThread")}
           onClick={() => props.onClose()}
@@ -530,7 +600,11 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
           {...stylex.attrs(viewStyles.threadsArchived)}
           onClick={() => setShowArchived(!showArchived())}
         >
-          <Icon name="expand" size={10} class={["opacity-60 transition-transform", { "rotate-90": showArchived() }]} />
+          <Icon
+            name="expand"
+            size={10}
+            styles={[variantStyles2.threadListIcon, showArchived() ? variantStyles2.threadListIconVariant : variantStyles2.threadListIconVariant2]}
+          />
           {t("web.channel.threadList.archived", { n: archived().length })}
         </button>
         <Show when={showArchived()}>
@@ -704,7 +778,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
                 <span {...stylex.attrs(viewStyles.pinsSpan2)}>{h().message.from === ownerId ? t("web.channel.messages.owner") : h().message.name}</span>
                 <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(h().message.at)}</span>
               </span>
-              <span class="line-clamp-2 text-sm">{h().message.text}</span>
+              <span {...stylex.attrs(variantStyles.farmSearchBodySpan)}>{h().message.text}</span>
             </button>
           )}
         </For>

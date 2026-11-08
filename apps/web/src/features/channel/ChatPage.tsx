@@ -15,13 +15,136 @@ import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { FarmSearch, Members, Pins, ThreadList, ThreadPane } from "./ChannelPanels";
-import { channelHeadClass, channelIconButtonClass, markOf, Sidebar } from "./ChannelSidebar";
+import { markOf, Sidebar } from "./ChannelSidebar";
 import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "./places";
 import { Crons, Sessions } from "./Tabs";
+
+const recipeStyles = stylex.create({
+  channelMainHeader: {
+    display: "flex",
+    height: "66px",
+    flexShrink: "0",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--wb-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+  },
+  channelMainButton: {
+    display: {
+      default: "inline-flex",
+      "@media (width>=48rem)": "none",
+    },
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelMainButton2: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelMainButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  channelMainButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--wb-selected)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  channelMainButton3: {
+    display: {
+      default: "inline-flex",
+      "@media not all and (width>=48rem)": "none",
+    },
+    width: "auto",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  channelMainButton4: {
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 8)",
+    height: "calc(var(--spacing) * 8)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+});
 
 const viewStyles = stylex.create({
   chatDiv: {
@@ -282,8 +405,8 @@ function ChannelMain(props: {
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
     <section {...stylex.attrs(viewStyles.channelMainSection)} aria-label={channelLabel(props.channel)}>
-      <header data-testid="channel-head" data-key={props.channel?.id} class={[channelHeadClass, "gap-3 px-4"]}>
-        <button type="button" class={[channelIconButtonClass, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
+      <header data-testid="channel-head" data-key={props.channel?.id} {...stylex.attrs(recipeStyles.channelMainHeader)}>
+        <button type="button" {...stylex.attrs(recipeStyles.channelMainButton)} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={20} />
         </button>
         <span {...stylex.attrs(viewStyles.channelMainSpan)}>{markOf(props.channel)}</span>
@@ -312,7 +435,10 @@ function ChannelMain(props: {
         </Show>
         <button
           type="button"
-          class={[channelIconButtonClass, { "bg-selected": search() !== undefined }]}
+          {...stylex.attrs(
+            recipeStyles.channelMainButton2,
+            search() !== undefined ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+          )}
           data-testid="message-search-toggle"
           aria-label={t("web.channel.findMessages")}
           aria-pressed={aria(search() !== undefined)}
@@ -329,7 +455,10 @@ function ChannelMain(props: {
             <div {...stylex.attrs(viewStyles.channelMainDiv)}>
               <button
                 type="button"
-                class={[channelIconButtonClass, { "bg-selected": threadsOpen() }]}
+                {...stylex.attrs(
+                  recipeStyles.channelMainButton2,
+                  threadsOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+                )}
                 data-testid="threads-toggle"
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
@@ -347,7 +476,10 @@ function ChannelMain(props: {
         <div {...stylex.attrs(viewStyles.channelMainDiv)}>
           <button
             type="button"
-            class={[channelIconButtonClass, { "bg-selected": pinsOpen() }]}
+            {...stylex.attrs(
+              recipeStyles.channelMainButton2,
+              pinsOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+            )}
             data-testid="pins-toggle"
             aria-label={t("web.channel.pins.open")}
             aria-expanded={aria(pinsOpen())}
@@ -362,7 +494,10 @@ function ChannelMain(props: {
         <button
           type="button"
           // The members panel is beside the list, which a phone has no room for.
-          class={[channelIconButtonClass, "w-auto px-2 text-sm max-md:hidden", { "bg-selected": membersOpen() }]}
+          {...stylex.attrs(
+            recipeStyles.channelMainButton3,
+            membersOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+          )}
           data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
@@ -372,7 +507,7 @@ function ChannelMain(props: {
         </button>
         <button
           type="button"
-          class={channelIconButtonClass}
+          {...stylex.attrs(recipeStyles.channelMainButton4)}
           data-testid="channel-settings-open"
           aria-label={t("web.channel.settings")}
           title={t("web.channel.settings")}

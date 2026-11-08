@@ -9,6 +9,18 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
 
+const variantStyles = stylex.create({
+  sokobanGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+});
+
 const viewStyles = stylex.create({
   sokobanGameDiv: {
     display: "flex",
@@ -89,7 +101,7 @@ export function SokobanGame() {
   const tiles = () => level().rows.flatMap((row, y) => [...row].map((tile, x) => ({ tile, x, y, p: y * width() + x })));
 
   return (
-    <div class="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
+    <div {...stylex.attrs(variantStyles.sokobanGameDiv)}>
       <div {...stylex.attrs(viewStyles.sokobanGameDiv)}>
         <span>{t("web.farm.phone.sokoban.title", { level: g().level + 1, of: warehouses.length })}</span>
         <span>{t("web.farm.phone.sokoban.moves", { moves: g().moves, pushes: g().pushes })}</span>

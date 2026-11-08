@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Switch } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -6,6 +7,25 @@ import { Button } from "#/ui/Button.tsx";
 import { Empty } from "#/ui/layout.tsx";
 import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
+
+const variantStyles = stylex.create({
+  feedbackStoriesDiv: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  feedbackStoriesP: {
+    padding: "calc(var(--spacing) * 4)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-faint)",
+  },
+  feedbackStoriesLi: {
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
 
 export default stories({
   title: "交互/空的、加载和出错",
@@ -18,7 +38,7 @@ export default stories({
       render: (a, set) => {
         const [rows, setRows] = createSignal<string[]>([]);
         return (
-          <div class="flex flex-col">
+          <div {...stylex.attrs(variantStyles.feedbackStoriesDiv)}>
             <Switch>
               <Match when={a.state === "empty"}>
                 <Empty
@@ -40,7 +60,7 @@ export default stories({
                 </Empty>
               </Match>
               <Match when={a.state === "loading"}>
-                <p class="p-4 text-xs text-faint" aria-busy="true">
+                <p {...stylex.attrs(variantStyles.feedbackStoriesP)} aria-busy="true">
                   在读……
                 </p>
               </Match>
@@ -51,7 +71,9 @@ export default stories({
               </Match>
               <Match when={a.state === "full"}>
                 <ul class="divide-y divide-line rounded-lg border border-line">
-                  <For each={rows().length > 0 ? rows() : ["修好登录", "补齐看板的测试"]}>{(r) => <li class="px-4 py-2.5 text-sm">{r}</li>}</For>
+                  <For each={rows().length > 0 ? rows() : ["修好登录", "补齐看板的测试"]}>
+                    {(r) => <li {...stylex.attrs(variantStyles.feedbackStoriesLi)}>{r}</li>}
+                  </For>
                 </ul>
               </Match>
             </Switch>

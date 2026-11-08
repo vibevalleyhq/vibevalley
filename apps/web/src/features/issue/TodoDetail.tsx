@@ -25,6 +25,26 @@ import { IssueThread } from "./IssueThread";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
+const variantStyles2 = stylex.create({
+  todoDetailTextArea: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+  },
+});
+
+const variantStyles = stylex.create({
+  todoDetailSpan: {
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+  },
+  todoDetailSpanVariant: {
+    backgroundColor: "var(--wb-wheat)",
+  },
+  todoDetailSpanVariant2: {
+    backgroundColor: "var(--wb-water)",
+  },
+});
+
 const viewStyles = stylex.create({
   unqueueAction: { marginTop: "calc(var(--spacing) * 1.5)" },
   parentIssue: {
@@ -380,7 +400,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </For>
         </Note>
         <TextArea
-          class="mt-2.5"
+          styles={variantStyles2.todoDetailTextArea}
           rows={2}
           value={word()}
           onInput={(e) => setWord(e.currentTarget.value)}
@@ -464,7 +484,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     <>
       <Property label={t("web.issue.todo.status")}>
         <span {...stylex.attrs(viewStyles.todoDetailSpan)}>
-          <span class={["size-2 rounded-full", backlog() ? "bg-wheat" : "bg-water"]} />
+          <span {...stylex.attrs(variantStyles.todoDetailSpan, backlog() ? variantStyles.todoDetailSpanVariant : variantStyles.todoDetailSpanVariant2)} />
           {backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
         </span>
       </Property>

@@ -29,6 +29,67 @@ import {
   spansOf,
 } from "./runs";
 
+const variantStyles2 = stylex.create({
+  runStepsIcon: {
+    opacity: ".6",
+  },
+  runFoldIcon: {
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  runFoldIconVariant: {
+    rotate: "90deg",
+  },
+  runFoldIconVariant2: {},
+  lineIcon: {
+    marginTop: "var(--spacing)",
+  },
+});
+
+const variantStyles = stylex.create({
+  runFoldDiv: {},
+  runFoldDivVariant: {
+    marginLeft: "calc(var(--spacing) * 5)",
+    borderLeftStyle: "solid",
+    borderLeftWidth: "2px",
+    borderColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 50%, transparent)",
+    },
+    paddingLeft: "calc(var(--spacing) * 2.5)",
+  },
+  toolStepButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    textAlign: "left",
+  },
+  toolStepButtonVariant: {
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  toolStepButtonVariant2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   runStepsDiv: {
     marginTop: "calc(var(--spacing) * 1.5)",
@@ -250,7 +311,7 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
           <button type="button" onClick={() => setOpen(!open())} aria-expanded={aria(open())} {...stylex.attrs(viewStyles.runStepsButton)}>
             <Icon name="log" size={14} />
             {text()}
-            <Icon name={open() ? "collapse" : "enlarge"} size={10} class="opacity-60" />
+            <Icon name={open() ? "collapse" : "enlarge"} size={10} styles={[variantStyles2.runStepsIcon]} />
           </button>
           <Show when={open()}>
             <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />
@@ -302,7 +363,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
         aria-label={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
         {...stylex.attrs(viewStyles.runFoldButton)}
       >
-        <Icon name="expand" size={12} class={["transition-transform duration-120", { "rotate-90": open() }]} />
+        <Icon name="expand" size={12} styles={[variantStyles2.runFoldIcon, open() ? variantStyles2.runFoldIconVariant : variantStyles2.runFoldIconVariant2]} />
         <span {...stylex.attrs(viewStyles.runFoldSpan)}>{props.label}</span>
         <span {...stylex.attrs(viewStyles.runFoldSpan2)}>
           {t("web.session.log.steps", { n: props.run.steps.length, took: tookText(runMs(props.run, end())) })}
@@ -322,7 +383,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       </Show>
       <For each={shown()} keyed={(s) => s.seq}>
         {(s) => (
-          <div class={s().under !== undefined ? "ml-5 border-l-2 border-leaf/50 pl-2.5" : ""}>
+          <div {...stylex.attrs(variantStyles.runFoldDiv, s().under !== undefined ? variantStyles.runFoldDivVariant : variantStyles.runFoldDiv)}>
             <Step step={s()} now={props.now} />
           </div>
         )}
@@ -400,7 +461,7 @@ function Box(props: { tint?: string; edge?: boolean; faint?: boolean; label: str
 function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: string; ink: string }) {
   return (
     <div class={["flex items-start gap-2 rounded-md px-3 py-1.5", props.tint]}>
-      <Icon name={props.mark} size={12} class="mt-1" />
+      <Icon name={props.mark} size={12} styles={[variantStyles2.lineIcon]} />
       <span class={["min-w-0 flex-1 text-sm", props.ink]}>{props.step.text}</span>
       <When at={props.step.time} now={props.now} />
     </div>
@@ -460,7 +521,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         type="button"
         onClick={() => setOpen(!open())}
         aria-expanded={aria(open())}
-        class={["flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-hover", { "bg-hover": open() }]}
+        {...stylex.attrs(variantStyles.toolStepButton, open() ? variantStyles.toolStepButtonVariant : variantStyles.toolStepButtonVariant2)}
       >
         <Icon name={actionIcon[props.step.action ?? "other"]} size={16} />
         <span {...stylex.attrs(viewStyles.toolStepSpan)}>{kind()}</span>

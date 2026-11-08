@@ -24,6 +24,63 @@ import { issueTitle } from "./issue";
 import { issueMove, sendMove } from "./moves";
 import { Note } from "./Sheet";
 
+const recipeStyles = stylex.create({
+  patchDiv: {
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  patchDivVariant1Case1: {
+    backgroundColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 20%, transparent)",
+    },
+    color: "var(--wb-accent)",
+  },
+  patchDivVariant1Case2: {
+    backgroundColor: {
+      default: "var(--wb-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 10%, transparent)",
+    },
+    color: "var(--wb-berry)",
+  },
+  patchDivVariant1Case3: {
+    backgroundColor: null,
+    color: "var(--wb-water)",
+  },
+  patchDivVariant1Case4: {
+    backgroundColor: null,
+    color: null,
+  },
+});
+const recipeStylesChoices1 = {
+  added: recipeStyles.patchDivVariant1Case1,
+  removed: recipeStyles.patchDivVariant1Case2,
+  hunk: recipeStyles.patchDivVariant1Case3,
+  plain: recipeStyles.patchDivVariant1Case4,
+};
+
+const variantStyles2 = stylex.create({
+  reopenDialogTextArea: {
+    marginTop: "calc(var(--spacing) * 4)",
+  },
+});
+
+const variantStyles = stylex.create({
+  fileRowSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  fileRowSpanVariant: {
+    color: "var(--wb-berry)",
+  },
+  fileRowSpanVariant2: {},
+});
+
 const viewStyles = stylex.create({
   doneAction: { marginTop: "calc(var(--spacing) * 4)" },
   closeIssueDialogP: {
@@ -430,7 +487,10 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         >
           {kind().mark}
         </span>
-        <span title={props.file.path} class={["min-w-0 flex-1 truncate font-mono text-xs", { "text-berry": props.conflict }]}>
+        <span
+          title={props.file.path}
+          {...stylex.attrs(variantStyles.fileRowSpan, props.conflict ? variantStyles.fileRowSpanVariant : variantStyles.fileRowSpanVariant2)}
+        >
           {props.file.path}
         </span>
         <Show when={props.conflict}>
@@ -444,8 +504,6 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
     </div>
   );
 }
-
-const patchLook = { added: "bg-leaf/20 text-accent", removed: "bg-berry/10 text-berry", hunk: "text-water", plain: "" } as const;
 
 /** A file's patch: each line marked added or removed, its code coloured in the file's language once the colours come (ui/code: off the page's thread. */
 function Patch(props: { text: string; path: string }) {
@@ -479,7 +537,7 @@ function Patch(props: { text: string; path: string }) {
           const mark = patchMarkOf(line);
           const coloured = () => (mark === "hunk" ? undefined : tokens()?.[row(i())]);
           return (
-            <div class={["px-2", patchLook[mark]]}>
+            <div {...stylex.attrs(recipeStyles.patchDiv, recipeStylesChoices1[mark])}>
               <Show when={coloured()} fallback={line || " "}>
                 {(toks) => (
                   <>
@@ -513,7 +571,7 @@ export function ReopenDialog(props: { issue: Issue; lane?: Lane | undefined; onC
       <p {...stylex.attrs(viewStyles.closeIssueDialogP)}>{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</p>
       <TextArea
         ref={autofocus()}
-        class="mt-4"
+        styles={variantStyles2.reopenDialogTextArea}
         rows={3}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}

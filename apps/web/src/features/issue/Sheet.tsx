@@ -12,6 +12,67 @@ import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";
 import { toneVar } from "./Marks";
 
+const recipeStyles = stylex.create({
+  issueSheetDiv: {
+    marginTop: "calc(var(--spacing) * 4)",
+    display: "flex",
+    flexDirection: {
+      default: "column",
+      "@container (width>=760px)": "row",
+    },
+    gap: {
+      default: "calc(var(--spacing) * 4)",
+      "@container (width>=760px)": "calc(var(--spacing) * 6)",
+    },
+    alignItems: {
+      default: null,
+      "@container (width>=760px)": "flex-start",
+    },
+  },
+});
+
+const variantStyles2 = stylex.create({
+  foldIcon: {
+    transitionProperty: "transform,translate,scale,rotate",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: "var(--default-transition-duration)",
+  },
+  foldIconVariant: {
+    rotate: "90deg",
+  },
+  foldIconVariant2: {},
+});
+
+const variantStyles = stylex.create({
+  stagesDiv: {
+    display: "flex",
+    alignItems: "center",
+  },
+  stagesDivVariant: {
+    flex: "1",
+  },
+  stagesDivVariant2: {},
+  stagesDiv2: {
+    marginInline: "calc(var(--spacing) * 2)",
+    height: "1px",
+    flex: "1",
+  },
+  stagesDivVariant3: {
+    backgroundColor: "var(--wb-leaf)",
+  },
+  stagesDivVariant4: {
+    backgroundColor: "var(--wb-line)",
+  },
+  stagesSpan: {
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+  },
+  stagesSpanVariant: {
+    backgroundColor: "var(--wb-wheat)",
+  },
+});
+
 const viewStyles = stylex.create({
   issueSheetDiv: {
     containerType: "inline-size",
@@ -133,7 +194,7 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
   return (
     <div {...stylex.attrs(viewStyles.issueSheetDiv)}>
       {props.heading}
-      <div class="mt-4 flex flex-col gap-4 @min-[760px]:flex-row @min-[760px]:items-start @min-[760px]:gap-6">
+      <div {...stylex.attrs(recipeStyles.issueSheetDiv)}>
         <div {...stylex.attrs(viewStyles.issueSheetDiv2)}>{props.main}</div>
         <aside class="flex flex-col rounded-lg bg-hover p-3 @min-[760px]:w-[260px] @min-[760px]:shrink-0 @min-[760px]:rounded-none @min-[760px]:border-l @min-[760px]:border-line @min-[760px]:bg-transparent @min-[760px]:py-0 @min-[760px]:pr-0 @min-[760px]:pl-5">
           {props.side}
@@ -159,7 +220,7 @@ export function Fold(props: { label: string; summary?: string | undefined; open?
   return (
     <div {...stylex.attrs(viewStyles.foldDiv)}>
       <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.foldButton)}>
-        <Icon name="expand" size={10} class={["transition-transform", { "rotate-90": open() }]} />
+        <Icon name="expand" size={10} styles={[variantStyles2.foldIcon, open() ? variantStyles2.foldIconVariant : variantStyles2.foldIconVariant2]} />
         {props.leading}
         <span {...stylex.attrs(viewStyles.foldSpan)}>{props.label}</span>
         <Show when={props.summary}>
@@ -180,7 +241,7 @@ export function More(props: { children: JSX.Element }) {
   return (
     <div {...stylex.attrs(viewStyles.moreDiv)}>
       <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.moreButton)}>
-        <Icon name="expand" size={10} class={{ "rotate-90": open() }} />
+        <Icon name="expand" size={10} styles={[variantStyles2.foldIconVariant2, open() ? variantStyles2.foldIconVariant : variantStyles2.foldIconVariant2]} />
         {open() ? t("web.issue.sheet.less") : t("web.issue.sheet.more")}
       </button>
       <Show when={open()}>
@@ -213,12 +274,17 @@ export function Stages(props: { at: Stage }) {
     <div {...stylex.attrs(viewStyles.stagesDiv)} aria-label={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
       <For each={stages}>
         {(s, i) => (
-          <div class={["flex items-center", { "flex-1": i() > 0 }]}>
+          <div {...stylex.attrs(variantStyles.stagesDiv, i() > 0 ? variantStyles.stagesDivVariant : variantStyles.stagesDivVariant2)}>
             <Show when={i() > 0}>
-              <div class={["mx-2 h-px flex-1", i() <= ati() ? "bg-leaf" : "bg-line"]} />
+              <div {...stylex.attrs(variantStyles.stagesDiv2, i() <= ati() ? variantStyles.stagesDivVariant3 : variantStyles.stagesDivVariant4)} />
             </Show>
             <span {...stylex.attrs(viewStyles.stagesSpan)}>
-              <Show when={i() < ati()} fallback={<span class={["size-2 rounded-full", s === props.at ? "bg-wheat" : "bg-line"]} />}>
+              <Show
+                when={i() < ati()}
+                fallback={
+                  <span {...stylex.attrs(variantStyles.stagesSpan, s === props.at ? variantStyles.stagesSpanVariant : variantStyles.stagesDivVariant4)} />
+                }
+              >
                 <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s] })} />
               </Show>
               <span class={s === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}>{stageLabel[s]}</span>

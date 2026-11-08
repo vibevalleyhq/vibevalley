@@ -16,6 +16,51 @@ import { Empty } from "#/ui/layout.tsx";
 import { chatPath, sessionThreadOf } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
 
+const recipeStyles = stylex.create({
+  sessionsDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  cronCardDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-page)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  cronCardDivVariant1Case1: {
+    borderStyle: "solid",
+  },
+  cronCardDivVariant1Case2: {
+    borderStyle: "dashed",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  cronCardIcon: {
+    marginTop: "calc(var(--spacing) * .5)",
+  },
+});
+
+const variantStyles = stylex.create({
+  sessionsDiv: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+});
+
 const viewStyles = stylex.create({
   sessionsDiv: {
     display: "flex",
@@ -62,8 +107,6 @@ const viewStyles = stylex.create({
   },
 });
 
-const card = "rounded-lg border border-line bg-page p-3";
-
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
 export function Sessions(props: { channel: Channel }) {
   const core = useCore();
@@ -84,9 +127,9 @@ export function Sessions(props: { channel: Channel }) {
           {(h) => {
             const thread = () => sessionThreadOf(core()?.chat, h);
             return (
-              <div class={[card, "flex items-center gap-3"]}>
+              <div {...stylex.attrs(recipeStyles.sessionsDiv)}>
                 <HelperFace agent={h.agent} runtime={h.runtime} size={36} />
-                <div class="flex min-w-0 flex-1 flex-col">
+                <div {...stylex.attrs(variantStyles.sessionsDiv)}>
                   <span {...stylex.attrs(viewStyles.sessionsSpan)}>
                     <span {...stylex.attrs(viewStyles.sessionsSpan2)}>{h.name}</span>
                     <span {...stylex.attrs(viewStyles.sessionsSpan3)}>
@@ -167,11 +210,14 @@ export function CronCard(props: { s: CronView }) {
     <div
       data-testid="cron"
       data-key={props.s.id}
-      class={[card, "flex items-start gap-3", { "border-dashed": !(props.s.enabled || props.s.pending) }]}
+      {...stylex.attrs(
+        recipeStyles.cronCardDiv,
+        !(props.s.enabled || props.s.pending) ? recipeStyles.cronCardDivVariant1Case2 : recipeStyles.cronCardDivVariant1Case1,
+      )}
       aria-label={t("web.channel.crons.label", { name: props.s.name })}
     >
-      <Icon name="clock" size={20} class="mt-0.5" />
-      <div class="flex min-w-0 flex-1 flex-col">
+      <Icon name="clock" size={20} styles={[variantStyles2.cronCardIcon]} />
+      <div {...stylex.attrs(variantStyles.sessionsDiv)}>
         <span {...stylex.attrs(viewStyles.cronCardSpan)}>
           <span {...stylex.attrs(viewStyles.sessionsSpan2)}>{props.s.name}</span>
           <span {...stylex.attrs(viewStyles.sessionsSpan3)}>

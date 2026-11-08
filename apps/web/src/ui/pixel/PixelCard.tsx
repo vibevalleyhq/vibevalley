@@ -5,6 +5,63 @@ import type { BadgeTone } from "@vibevalley/protocol";
 
 import type { SpriteAtlas, SpriteInfo } from "./atlas";
 
+const recipeStyles2 = stylex.create({
+  animalFaceSpan: {
+    position: "relative",
+    display: "inline-block",
+    flexShrink: "0",
+    overflow: "hidden",
+    backgroundColor: {
+      default: "var(--color-leaf-300)99",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
+    },
+  },
+});
+
+const recipeStyles = stylex.create({
+  pieceViewSpan: {
+    fontFamily: "var(--font-pixel)",
+    fontWeight: "var(--font-weight-normal)",
+  },
+  pieceViewSpanVariant1Case1: {
+    overflow: null,
+  },
+  pieceViewSpanVariant1Case2: {
+    overflow: "hidden",
+  },
+  pieceViewSpanVariant2Case1: {
+    textAlign: null,
+  },
+  pieceViewSpanVariant2Case2: {
+    textAlign: "center",
+  },
+});
+
+const variantStyles = stylex.create({
+  pixelCardDiv: {
+    boxSizing: "border-box",
+    display: "flex",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-shade)",
+  },
+  pixelCardDivVariant: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pixelCardDivVariant2: {},
+  pixelCardDiv2: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  pixelCardDivVariant3: {
+    alignItems: "center",
+  },
+  pixelCardDivVariant4: {
+    alignItems: "flex-start",
+  },
+});
+
 const viewStyles = stylex.create({
   animalFaceImg: {
     position: "absolute",
@@ -89,11 +146,7 @@ export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: numb
     return { url: sp.url, left: props.size / 2 - (sp.w / 2) * k, top: props.size / 2 - (sp.h * 0.25 + sp.h * 0.03) * k, width: sp.w * k, height: sp.h * k };
   };
   return (
-    <span
-      class="relative inline-block shrink-0 overflow-hidden bg-leaf-300/60"
-      style={{ width: `${props.size}px`, height: `${props.size}px` }}
-      aria-hidden="true"
-    >
+    <span {...stylex.attrs(recipeStyles2.animalFaceSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }} aria-hidden="true">
       <img
         src={cut().url}
         alt=""
@@ -111,7 +164,11 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
       <Match when={props.piece.kind === "words" ? props.piece : undefined}>
         {(p) => (
           <span
-            class={["font-pixel font-normal", { "overflow-hidden": props.maxLines !== undefined, "text-center": props.center }]}
+            {...stylex.attrs(
+              recipeStyles.pieceViewSpan,
+              props.maxLines !== undefined ? recipeStyles.pieceViewSpanVariant1Case2 : recipeStyles.pieceViewSpanVariant1Case1,
+              props.center ? recipeStyles.pieceViewSpanVariant2Case2 : recipeStyles.pieceViewSpanVariant2Case1,
+            )}
             style={{
               "font-size": `${p().size ?? 12}px`,
               "line-height": `${(p().size ?? 12) + 2}px`,
@@ -208,7 +265,7 @@ export function PixelCard(props: {
   return (
     <div {...stylex.attrs(viewStyles.pixelCardDiv)}>
       <div
-        class={["box-border flex border-2 shadow-px-shade", { "items-center justify-center": centred() }]}
+        {...stylex.attrs(variantStyles.pixelCardDiv, centred() ? variantStyles.pixelCardDivVariant : variantStyles.pixelCardDivVariant2)}
         style={{
           background: props.paper ?? CardColors.paper,
           "border-color": CardColors.ink,
@@ -217,7 +274,7 @@ export function PixelCard(props: {
           "min-height": props.height !== undefined ? `${props.height}px` : undefined,
         }}
       >
-        <div class={["flex flex-col", props.center === true ? "items-center" : "items-start"]}>
+        <div {...stylex.attrs(variantStyles.pixelCardDiv2, props.center === true ? variantStyles.pixelCardDivVariant3 : variantStyles.pixelCardDivVariant4)}>
           <For each={props.rows} keyed={false}>
             {(row) => (
               <div {...stylex.attrs(viewStyles.pixelCardDiv2)}>

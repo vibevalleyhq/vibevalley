@@ -147,6 +147,17 @@ Dynamic findings are the sum of `unresolved-class-member`, `unknown-class-call`,
 
 The baseline stays fixed. Update the execution ledger after each verified batch with before/after counts, touched areas, checks and remaining blockers. The inventory JSON is the current machine-readable source; unknown areas and categories must remain visible. Fewer findings do not establish visual or behavioral acceptance. Do not shrink the scanned scope to improve progress.
 
+### Validation cadence
+
+The owner requested larger implementation batches rather than repeated full acceptance after each small conversion. During phases 1–5:
+
+- Run type/lint and the affected production compiler after a substantial batch. Use AST comparison for mechanical conversions and focused unit tests for changed tooling or rules.
+- Probe a new compiler mechanism or style boundary once before bulk use. On a failure, reproduce and fix the narrow case; do not repeatedly run unrelated suites.
+- Update source counts and the ledger per batch. An implementation checkpoint may be committed with acceptance explicitly pending; it is not an accepted phase or an overall completion claim.
+- Defer repeated full visual captures, full browser integration, live screenshot tours and host checks until the phase 6 acceptance pass, after phases 1–5 implementation is complete. The final gates and zero-pixel threshold do not change.
+
+The 170-scene full capture was interrupted at the owner's request while still running. It has no complete accepted receipt and must not be resumed as a claimed pass from its partial log. The interrupted runner has exited. Rebuild and capture against final sources in phase 6.
+
 ### Phase 0 — Make progress reproducible
 
 - [x] Record a fixed source baseline, units, disjoint area totals and final exit conditions in this Note.
@@ -159,11 +170,11 @@ The baseline stays fixed. Update the execution ledger after each verified batch 
 - [x] Locate all 23 contract findings and 10 helper-call findings in the scanner output; record their ownership below. These are findings, not 23 confirmed public APIs or 10 distinct helper functions.
 - [ ] Trace each contract's callers and distinguish actual style APIs, story data and native/externally owned attributes before converting or classifying it.
 - [ ] Convert workbench layout, status/icon/avatar and remaining UI contracts with all callers in the same batch. Start with `apps/web/src/ui/layout.tsx` (100 token occurrences at baseline).
-- [x] First layout slice: replace Card's class-string prop with typed StyleX composition and migrate all six skill/voice callers; preserve dynamic variables as object styles. Split, ListCard, ListRow, Toggle and the remaining layout styles are still open.
+- [x] First layout slice: replace Card's class-string prop with typed StyleX composition and migrate all six skill/voice callers; preserve dynamic variables as object styles. Split, ListCard, ListRow, Toggle, SecretInput and TextLink are also converted; their consolidated acceptance is pending phase 6.
 - [ ] Convert pixel component contracts, starting with `apps/web/src/ui/pixel/choice.tsx` (88 occurrences); keep positioning and animation values under one owner.
 - [ ] Convert remaining app shell and web story styles; change each affected component's story alongside its API.
 - [ ] Resolve the Base UI finding without introducing styles into the unstyled package.
-- [ ] Prove dynamic object variables, refs, focus, disabled/data states and responsive composition in production component tests and exact fixtures before closing each batch.
+- [ ] Add coverage for dynamic object variables, refs, focus, disabled/data states and responsive composition. Reuse the proven boundaries during bulk conversion; execute the complete component/visual acceptance in phase 6.
 
 ### Phase 2 — Convert business pages (2,269 tokens / 61 files at baseline)
 
@@ -172,7 +183,7 @@ The baseline stays fixed. Update the execution ledger after each verified batch 
 - [ ] Issue: detail, lists, board, completion and queued-work surfaces; preserve all state-specific layouts.
 - [ ] Artifact: start with `ArtifactsPage.tsx` (107 occurrences); include document, HTML sandbox, versions and reply controls.
 - [ ] Memory, orchestrator, repository, settings, inbox, knowledge and pairing: cover remaining inventory findings; start memory with `Memory.tsx` (86 occurrences).
-- [ ] For each domain batch, run relevant integration tests and exact populated fixtures, then inspect isolated-server desktop and 390px screenshots. Empty states alone cannot close populated acceptance.
+- [ ] Keep relevant domain integration tests and populated fixture scenarios current as callers change. Run their complete acceptance and isolated-server desktop/390px inspection in phase 6; empty states alone cannot close populated acceptance.
 
 ### Phase 3 — Convert farm and tree DOM (931 tokens / 30 files at baseline)
 
@@ -211,14 +222,14 @@ The baseline stays fixed. Update the execution ledger after each verified batch 
 
 | Owner | Contract findings | Definition files | Next action |
 |---|---:|---|---|
-| Workbench UI | 5 | `Checkbox.tsx`, `Form.tsx`, `Markdown.tsx`, `Tag.tsx`, `layout.tsx` | Trace callers and replace private style props; preserve rich-text semantic classes |
+| Workbench UI | 5 | `Checkbox.tsx`, `Form.tsx`, `Markdown.tsx`, `Tag.tsx`, `layout.tsx` | These baseline contracts and their callers are migrated; finish remaining literal styles and phase 6 acceptance |
 | Pixel UI | 9 | `PxMarkdown.tsx` (2), `base.tsx` (3), `dialog.tsx` (1), `field.tsx` (3) | Replace class composition while preserving positioning, themed chrome and rich text |
 | Token stories | 1 | `ui/tokens.stories.tsx` | Migrate class-bearing story data; do not count this as a public component API |
 | Business features | 5 | `issue/Sheet.tsx` (1), `session/WorkLog.tsx` (1), `voice/DictationButton.tsx` (3) | Trace wrapper and render-prop forwarding before replacing contracts |
 | Farm | 2 | `farm/map/RepoMap.tsx`, `farm/panels/rows.tsx` | Coordinate with phase 3 DOM conversion |
 | Tree | 1 | `tree/TreePanel.tsx` | Coordinate with phase 3 overlay conversion |
 
-The ten helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Their definitions must be removed only after all callers are migrated. Card in `layout.tsx` is converted, reducing contract findings to 22. The next layout slice is Split/ListCard/ListRow and their responsive, bare and selected states; the queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
+The ten helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Their definitions must be removed only after all callers are migrated. The five baseline workbench contracts are now converted, reducing contract findings from 23 to 18. Additional native-attribute interfaces (TextInput, TextArea, SecretInput and Icon) were migrated as well, but were not counted in that baseline category. Split/ListCard/ListRow, Toggle and TextLink are converted. Next are the remaining ordinary UI literals, pixel contracts and their callers. The queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
 
 ### Execution ledger
 
@@ -227,6 +238,11 @@ The ten helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), an
 | Quantified baseline (`ab18831c`) | 4,751 / 151 | Inventory; source conversion and final acceptance still open | Recorded |
 | Phase 0: reproducible progress; phase 1: definition census | 4,751 / 151 → 4,751 / 151 | 37 scanner/dependency/pixel/progress tests pass; inventory emits reconciled area totals and still fails on remaining findings | Phase 0 complete; no style-conversion reduction claimed |
 | Phase 1: Card and six skill/voice callers | 4,751 / 151 → 4,739 / 151 | Contract findings 23 → 22; 18 component and 13 focused integration tests; 4 exact Card comparisons; 26 web-check tasks | Verified slice; phase 1 remains open |
+| Shared list layouts and closed native variants across phases 1–3 | 4,739 / 151 → 3,457 / 135 | 223 expressions in 85 mechanically converted files retain their non-styling AST; 19 component and 167 integration tests pass; 26 web-check tasks pass | Full capture interrupted at owner's request; acceptance deferred to phase 6; contracts remain 22 |
+| Phase 1: Tag/Dot, Checkbox and Form contracts | 3,457 / 135 → 3,412 / 131 | All private class callers migrated; contract findings 22 → 19; clean type/lint and production stories compilation | Implementation checkpoint; browser and pixel acceptance deferred to phase 6 |
+| Phase 1: text controls, remaining layout controls and Icon | 3,412 / 131 → 3,273 / 125 | 25 text-control and 31 Icon call sites migrated; clean 1,295-file type/lint and production stories compilation; non-styling AST comparison passes for 28 caller files | Implementation checkpoint; 19 contract findings remain; new browser tests and full visual acceptance pending phase 6 |
+| Phase 1: Markdown, IconButton and Chips | 3,273 / 125 → 3,199 / 123 | Markdown's two callers migrated; its 40 descendant utility rules become owned rich-text CSS; IconButton and Chips use StyleX; contract findings 19 → 18 | Implementation checkpoint; browser and visual acceptance pending phase 6 |
+| Cross-phase mechanical sweep: constants, maps and independent conditions | 3,199 / 123 → 2,021 / 108 | 229 expressions across 53 files; non-styling AST comparison passes; clean type/lint and production stories compilation | Implementation checkpoint; 18 contract findings remain; full acceptance pending phase 6 |
 
 Card live inspection covers the new-skill and voice configuration forms at 1440×900 and 390×844. Desktop receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-IR07mx/result.json`. Narrow receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-bjJzVX/result.json`. Both record code 0, stopped true and no cleanup errors. The default narrow navigation leaves the cards below the fold; the inspected narrow card captures use the real settings-search control to filter navigation and then scroll to the card. This is scoped form evidence, not a default-state full-page comparison or final populated-data acceptance.
 
@@ -275,7 +291,7 @@ Verify Hero parallax and scene transitions, How's scroll narrative, Screens' ima
 
 Convert shared UI contracts first, then consumers, stories, pixel DOM, and website components. Replace class-string composition with local StyleX definitions and explicit typed variants. Do not mechanically put utility strings into inline styles or add a general Tailwind compatibility helper.
 
-Preserve public component behavior, CSS precedence, data/ARIA selectors, pseudo states, media rules, and inherited defaults. Update each affected component story. Run the narrowest behavior and visual checks after each batch.
+Preserve public component behavior, CSS precedence, data/ARIA selectors, pseudo states, media rules, and inherited defaults. Update each affected component story. Follow the validation cadence above: use lightweight batch checks during implementation and consolidate full behavior and visual acceptance in phase 6.
 
 ### 6. Remove obsolete paths and verify the whole result
 
@@ -286,6 +302,46 @@ Run root checks, targeted tests, `web:check`, website checks/build/browser tests
 Update design rules, web and site READMEs, the app/site/foundation subsystem documents, Base UI and stories contracts, and root instructions. Remove this Note after the completed decisions are documented. Open one PR with evidence and explicit unverified items.
 
 ## Execution evidence
+
+### Cross-phase mechanical sweep
+
+The implementation now proceeds by syntax pattern across phases 1–4, rather than finishing individual components in isolation. The temporary converter resolves static constants, readonly exported maps and their barrel re-exports, static template fragments, and independent conditional class combinations. It enumerates bounded combinations against the original production stylesheet and only separates properties whose values depend on at most one condition. Coupled properties, unresolved calls, mutable/escaped maps and complex selectors remain exceptions. Generated production code contains StyleX definitions and typed lookups, not a runtime utility resolver.
+
+The sweep converts 229 expressions in 53 files: 135 in its first web pass, 80 in the extended web pass and 14 in the stories accessibility panel. The website pass converts none and retains its explicit exceptions. The extended pass supports container queries, reuses fixed owned shadow/color tokens and removes unused Tailwind gradient transition targets only when the converted recipe has no gradient declarations. Original stylesheet order, rather than class-string order, determines the result; for example, the original `leading-[1.3333]` overrides `leading-[1.625]` in the pixel note recipe.
+
+`/tmp/vv-wide-proof.json` restores exactly 229 converted attributes across 53 files, permits only generated styling declarations and removed styling-only constants/imports, and reports no non-styling AST differences. `/tmp/vv-wide-all-check.log` records the clean 1,295-file type/lint check; `/tmp/vv-wide-commit-build.log` records the successful production stories compilation. Inventory remains failed at 2,021 tokens / 108 files / 18 styled-contract findings. Browser, exact visual and host acceptance are still deferred to phase 6. These checks establish an implementation checkpoint, not completed migration acceptance.
+
+### Markdown, icon buttons and chips
+
+Markdown's root and both styled callers use typed StyleX composition. Its 40 descendant utility rules are now scoped to `.markdown` in `apps/web/src/ui/Markdown.css`, the explicitly allowed rich-text CSS boundary, without Tailwind variables or directives. Parsing, safe links, issue references, mentions, code highlighting and diagram lifetimes are unchanged. The stylesheet is imported through the host stylesheet: importing it from the component hoisted the `components` layer before `base` in the production asset. The compiled first-encounter layer order is now verified as theme → base → components → stylex → utilities (`/tmp/vv-richtext-layer-order.json`); minification may remove a redundant textual prelude, so the check reads semantic layer order rather than a literal prefix.
+
+IconButton retains pressed, danger, hover, active and disabled states through composed styles. ChipsInput and KeyValueEditor retain their handlers and keyed rows while replacing their class-string recipes. Their stories expose keyboard selection and disabled controls. The added browser regressions (text controls, icons, Markdown and icon buttons) remain unrun until phase 6.
+
+The expanded caller AST proof now covers 29 files, with no non-styling differences. Its 155 restored attributes include unchanged styling attributes; the mechanical conversion count is 51 expressions, not 155. The current inventory remains failed at 3,199 tokens / 123 files / 18 styled-contract findings. The canonical visual manifest now has 202 scenes; there is no complete refreshed acceptance receipt.
+
+### Text controls, layout controls and icons
+
+TextInput, TextArea and SecretInput share typed StyleX composition with object-only inline styles. All 25 explicit text-control class callers moved together; a separate spread audit found only the form-control bindings, the typed SecretInput forwarding and the settings control's narrow attribute Pick. A new story and regression cover camel-cased runtime variables, native inline height, editing, keyboard focus and input identity. The input's horizontal padding has separate physical slots so SecretInput's right padding does not discard its left padding during composition.
+
+Toggle and TextLink now own their styles directly. The toggle thumb's original two-shadow paint is retained in the control-specific `--shadow-toggle-thumb` token, including the original transparent shadow layers. The desktop strip retains its existing semantic `window-drag` CSS for the external Electron drag region; its ordinary layout styles use StyleX.
+
+Icon and its 31 explicit class callers now compose typed styles. Semantic marks retain their fixed tones; a new composition story and regression cover tone precedence and dynamic variables. Dispatch/thread and knowledge-sidebar hover/focus relationships use exported StyleX markers. The outline chevron deliberately retains its visible `inline-flex` rest state: in the original production stylesheet `.inline-flex` follows and overrides `.hidden`. Changing it to hidden would be a behavior change, not a migration. Its existing group remains for the not-yet-converted bullet; the chevron uses the new marker.
+
+The mechanical tools converted 49 expressions (25 text-control and 24 Icon expressions); the other seven Icon calls were migrated explicitly. The initial caller proof covered 28 files with no non-styling differences. `/tmp/vv-control-callers-proof.json` has since been expanded to include Markdown callers (29 files); its restored styling attributes include unchanged attributes and are **not** a conversion count. Type/lint and production compilation pass; the added browser regressions have not yet been run. This slice expanded the canonical manifest to 190 scenes with the existing layout controls and toggle-state grid; the later Markdown/IconButton/Chips slice brings it to 202. No complete new visual receipt is claimed.
+
+### Status and form contracts
+
+Tag and Dot use typed tone maps. Dot, Checkbox and Form now accept `StyleXStyles`, forwarding runtime variables as objects. Their channel, artifact, issue, settings and story callers are migrated. Dot retains the original five-shadow ring composition; Tag retains the original color-mix support fallback. Checkbox's checked/indeterminate border continues to override hover, matching the original stylesheet order. The component stories include dynamic placement and sizing; the final visual manifest also includes the original Tag states, tones and Dot tones. These changes have type/lint and production-compiler checks only so far; full behavior and visual acceptance is deferred under the revised cadence.
+
+### Closed variants and responsive list layouts
+
+Split, ListCard and ListRow now use local StyleX definitions. Selected rows retain hover precedence through a zero-specificity selected-state selector. The new production regression checks edge borders at the 767/768px boundary, bare/card headers, selected hover and reactive switching in both themes. Twenty scoped layout comparisons pass with zero pixels changed, including newly added Split captures with genuinely narrow viewports rather than only narrow story frames.
+
+A temporary AST converter derives complete styles for each branch of a closed class expression from the original production CSS. It factors out only properties that are identical across all branches, so composing variants cannot discard a default or pseudo-state value. It converts 223 expressions across 85 files, including qualified unstyled Base UI elements and the router's native-attribute forwarding link. Custom renderers, spread-prop Base UI boundaries, unknown expressions, ancestor selectors and cross-condition Tailwind-variable dependencies are skipped. Multi-condition expressions remain manual work: an initial decision-tree experiment introduced impossible TypeScript narrowing, so its complete affected batch was restored before the conservative single-condition pass. Production code has no numeric variant dispatch or utility-string resolver.
+
+The combined AST comparison restores only converted class applications and removes only added StyleX definitions/imports: 85 files, 223 expressions, no non-styling differences. Two explicit WebKit line-clamp properties were separately probed against the original agent-card fixtures before the wider pass. The 19 component tests and full 167-test serial integration suite pass. Artifact-reply and farm-harvest integration scenes exceed twice their timing budget; no budgets or timeouts were raised. The interrupted canonical run contained 170 scenes; subsequent Tag, Dot, layout-control, icon-button and chip scenarios bring the current manifest to 202. It still requires a complete refreshed receipt in phase 6.
+
+The isolated receipt `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-URYUIN/result.json` records code 0, stopped true and no cleanup errors. Eighteen screenshots were manually inspected at desktop and 390px widths: issues, a newly created Markdown artifact, agents, chat, settings, farm, orchestrator memory, runtimes and repositories. The issue, artifact and resulting chat messages contain created data; empty repository/memory and resting farm captures do not establish populated-state acceptance. Narrow settings/runtime captures cover their visible navigation and partial content, not every below-fold control.
 
 ### Workspace relocation
 

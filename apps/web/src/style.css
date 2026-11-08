@@ -1,5 +1,6 @@
 @layer theme, base, components, stylex, utilities;
 @import "tailwindcss";
+@import "./ui/Markdown.css";
 
 /* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets
    <html data-theme>). Paper and ink are near neutral, so that colour is left for what means something: green to go,
@@ -176,6 +177,7 @@
   --color-idle: var(--wb-idle);
   --color-code-bg: var(--wb-code-bg);
   --color-code-ink: var(--wb-code-ink);
+  --shadow-toggle-thumb: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;
   /* Two heights only (docs/style/design.md): raise lies on its surface, float is over the page (menus, dialogs, toasts). */
   --shadow-raise: 0 1px 2px var(--wb-raise);
   --shadow-float: 0 8px 24px var(--wb-float);

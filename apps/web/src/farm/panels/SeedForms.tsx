@@ -22,6 +22,119 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
+const recipeStyles2 = stylex.create({
+  whoTileButton: {
+    display: "flex",
+    width: "calc(var(--spacing) * 16)",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingBlock: "var(--spacing)",
+  },
+  whoTileButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  whoTileButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-leaf-300)b3",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 70%, transparent)",
+    },
+  },
+  sowFormButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingRight: "calc(var(--spacing) * 2)",
+    paddingLeft: "var(--spacing)",
+    fontSize: "12px",
+  },
+  sowFormButtonVariant1Case1: {
+    borderColor: "transparent",
+    color: "var(--color-bark-800)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  sowFormButtonVariant1Case2: {
+    borderColor: "var(--color-leaf-500)",
+    color: "var(--color-bark-900)",
+    backgroundColor: {
+      default: "var(--color-leaf-300)99",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
+    },
+  },
+});
+
+const recipeStyles = stylex.create({
+  sowFormP: {
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  sowFormSpan: {
+    marginLeft: "calc(var(--spacing) * 2)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  sowFormP2: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  sowFormP3: {
+    marginTop: "calc(var(--spacing) * 3)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  sowFormP4: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  waterFormP: {
+    marginTop: "var(--spacing)",
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+});
+
+const variantStyles = stylex.create({
+  chipButton: {
+    cursor: "pointer",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "12px",
+  },
+  chipButtonVariant: {
+    backgroundColor: "var(--color-leaf-500)",
+    color: "var(--color-bark-900)",
+  },
+  chipButtonVariant2: {
+    backgroundColor: {
+      default: "var(--color-cream-200)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-300)",
+      },
+    },
+    color: "var(--color-bark-800)",
+  },
+});
+
 const viewStyles = stylex.create({
   whoTileSpan: {
     marginTop: "calc(var(--spacing) * .5)",
@@ -145,7 +258,6 @@ const repoTemplatesQuery = defineQuery({
   ...retryRead,
 });
 
-const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
 const byOrchestrator = "auto";
 
@@ -165,7 +277,7 @@ function Chip(props: { text: string; on: boolean; onClick: () => void; testid: s
       data-key={props.item}
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      class={["cursor-pointer px-3 py-1 text-[12px]", props.on ? "bg-leaf-500 text-bark-900" : "bg-cream-200 text-bark-800 hover:bg-cream-300"]}
+      {...stylex.attrs(variantStyles.chipButton, props.on ? variantStyles.chipButtonVariant : variantStyles.chipButtonVariant2)}
     >
       {props.text}
     </button>
@@ -179,7 +291,7 @@ function WhoTile(props: { active: boolean; label: string; onClick: () => void; c
       aria-pressed={aria(props.active)}
       aria-label={props.label}
       onClick={() => props.onClick()}
-      class={["flex w-16 cursor-pointer flex-col items-center py-1", props.active ? "bg-leaf-300/70" : "hover:bg-cream-200"]}
+      {...stylex.attrs(recipeStyles2.whoTileButton, props.active ? recipeStyles2.whoTileButtonVariant1Case2 : recipeStyles2.whoTileButtonVariant1Case1)}
     >
       {props.children}
       <span {...stylex.attrs(viewStyles.whoTileSpan)}>{props.label}</span>
@@ -251,7 +363,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
       fallback={
         <div data-testid="sow-homeless" {...stylex.attrs(viewStyles.sowHomeless)}>
           <p {...stylex.attrs(viewStyles.sowFormP)}>{t("web.farm.sow.homeless")}</p>
-          <p class={xs}>{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
+          <p {...stylex.attrs(recipeStyles.sowFormP)}>{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
           <PxButton tone="primary" data-testid="sow-to-map" onClick={() => (props.onDone(), router.navigate("/repos"))}>
             {repos().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeRepo")}
           </PxButton>
@@ -264,14 +376,14 @@ export function SowForm(props: { station: number; onDone: () => void }) {
             <p {...stylex.attrs(viewStyles.sowFormP2)}>
               {t("web.farm.sow.plantIn", { repo: p() })}
               <Show when={bag()?.stack.label}>
-                <span class={["ml-2", xs]}>{bag()!.stack.label}</span>
+                <span {...stylex.attrs(recipeStyles.sowFormSpan)}>{bag()!.stack.label}</span>
               </Show>
             </p>
           </div>
           <div {...stylex.attrs(viewStyles.sowFormDiv2)}>
             <Switch>
               <Match when={templates.status() === "pending" && !!repo()}>
-                <p class={["mt-2.5", xs]}>{t("web.farm.sow.rummaging")}</p>
+                <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.rummaging")}</p>
               </Match>
               <Match when={templates.error()}>
                 {(e) => (
@@ -288,13 +400,13 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </Match>
             </Switch>
             <Show when={seeds().recent.length > 0}>
-              <p class={["mt-2.5", xs]}>{t("web.farm.sow.recent")}</p>
+              <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.recent")}</p>
               <div {...stylex.attrs(viewStyles.sowFormDiv4)}>
                 <For each={seeds().recent}>{(r) => <Chip testid="seed-recent" text={r} on={text() === r} onClick={() => take(r)} />}</For>
               </div>
             </Show>
             <Show when={seeds().kinds.length > 0}>
-              <p class={["mt-2.5", xs]}>{t("web.farm.sow.kinds")}</p>
+              <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.kinds")}</p>
               {/* One kind at a time: its tab, then its seeds. */}
               <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" {...stylex.attrs(viewStyles.seedKinds)}>
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
@@ -305,12 +417,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                       data-key={k().kind.id}
                       aria-selected={aria(k().kind.id === kind()?.kind.id)}
                       onClick={() => setKindId(k().kind.id)}
-                      class={[
-                        "flex cursor-pointer items-center gap-1 border-2 py-0.5 pr-2 pl-1 text-[12px]",
-                        k().kind.id === kind()?.kind.id
-                          ? "border-leaf-500 bg-leaf-300/60 text-bark-900"
-                          : "border-transparent text-bark-800 hover:bg-cream-200",
-                      ]}
+                      {...stylex.attrs(
+                        recipeStyles2.sowFormButton,
+                        k().kind.id === kind()?.kind.id ? recipeStyles2.sowFormButtonVariant1Case2 : recipeStyles2.sowFormButtonVariant1Case1,
+                      )}
                     >
                       <SpriteIcon name={k().kind.icon} size={20} />
                       {k().kind.name}
@@ -328,7 +438,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </Show>
             </Show>
-            <p class={["mt-2.5", xs]}>{t("web.farm.sow.own")}</p>
+            <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.own")}</p>
             <div {...stylex.attrs(viewStyles.sowFormDiv5)}>
               <PxTextArea
                 ref={(el) => (words = el)}
@@ -340,7 +450,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 label={t("web.farm.sow.job")}
               />
             </div>
-            <p class={["mt-3", xs]}>{t("web.farm.sow.who")}</p>
+            <p {...stylex.attrs(recipeStyles.sowFormP3)}>{t("web.farm.sow.who")}</p>
             <div {...stylex.attrs(viewStyles.seedKinds)} role="group" aria-label={t("web.farm.sow.who")}>
               <WhoTile active={sower() === byOrchestrator} label={t("web.farm.sow.orchestratorPicks")} onClick={() => setWho(byOrchestrator)}>
                 <span {...stylex.attrs(viewStyles.sowFormSpan)}>?</span>
@@ -354,7 +464,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </For>
             </div>
             <div {...stylex.attrs(viewStyles.sowFormDiv6)}>
-              <p class={["min-w-0 flex-1", xs]}>{t("web.farm.sow.how", { repo: p() })}</p>
+              <p {...stylex.attrs(recipeStyles.sowFormP4)}>{t("web.farm.sow.how", { repo: p() })}</p>
               <PxButton data-testid="sow-draft" disabled={!canSow()} onClick={() => void write()}>
                 {t("web.farm.sow.draft")}
               </PxButton>
@@ -395,8 +505,8 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
   return (
     <div {...stylex.attrs(viewStyles.sowForm)}>
       <p {...stylex.attrs(viewStyles.waterFormP)}>{props.session.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</p>
-      <p class={["mt-1", xs]}>{t("web.farm.water.thread")}</p>
-      <p class={["mt-1", xs]}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
+      <p {...stylex.attrs(recipeStyles.waterFormP)}>{t("web.farm.water.thread")}</p>
+      <p {...stylex.attrs(recipeStyles.waterFormP)}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
       <div {...stylex.attrs(viewStyles.waterFormDiv)}>
         <For each={dropsOfAdvice}>{(s) => <Chip testid="water-advice" text={s} on={text() === s} onClick={() => setText(s)} />}</For>
       </div>

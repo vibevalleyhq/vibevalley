@@ -19,6 +19,32 @@ import {
   steerBugSnake,
 } from "./bugSnake";
 
+const recipeStyles = stylex.create({
+  bugSnakeGameDiv: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-lcd-paper)cc",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
+    },
+    textAlign: "center",
+  },
+});
+
+const variantStyles = stylex.create({
+  bugSnakeGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingInline: "var(--spacing)",
+    paddingTop: "calc(var(--spacing) * 3)",
+  },
+});
+
 const viewStyles = stylex.create({
   bugSnakeGameDiv: {
     display: "flex",
@@ -164,7 +190,7 @@ export function BugSnakeGame() {
 
   const score = () => g()?.score ?? 0;
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
+    <div {...stylex.attrs(variantStyles.bugSnakeGameDiv)}>
       <div {...stylex.attrs(viewStyles.bugSnakeGameDiv)}>
         <span>{t("web.farm.phone.game.bugs")}</span>
         <span {...stylex.attrs(viewStyles.bugSnakeGameSpan)}>
@@ -186,7 +212,7 @@ export function BugSnakeGame() {
           style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
         <Show when={!g() || g()!.over !== undefined || !playing()}>
-          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
+          <div {...stylex.attrs(recipeStyles.bugSnakeGameDiv)}>
             <span>
               {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />

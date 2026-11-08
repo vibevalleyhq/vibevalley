@@ -33,14 +33,15 @@ export default stories({
     Playground: story({
       args: { icon: "search", label: "搜索", pressed: false, danger: false, disabled: false },
       controls: { icon: { kind: "choice", options: Object.keys(icons) } },
-      render: (a) => (
+      render: (a, set) => (
         <IconButton
           icon={a.icon as IconName}
           label={a.label}
+          testid="icon-button-control"
           pressed={a.pressed}
           tone={a.danger ? "danger" : undefined}
           disabled={a.disabled}
-          onClick={() => undefined}
+          onClick={() => set({ pressed: !a.pressed })}
         />
       ),
     }),

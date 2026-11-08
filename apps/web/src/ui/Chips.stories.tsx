@@ -33,11 +33,12 @@ export default stories({
       ),
     }),
     "Key and value": story({
-      render: () => {
+      args: { disabled: false },
+      render: (a) => {
         const [env, setEnv] = createSignal<Record<string, string>>({ NODE_ENV: "development", PORT: "8787" });
         return (
           <div {...stylex.attrs(viewStyles.chipsStoriesDiv2)}>
-            <KeyValueEditor value={env()} onChange={setEnv} />
+            <KeyValueEditor value={env()} onChange={setEnv} disabled={a.disabled} />
           </div>
         );
       },

@@ -17,6 +17,41 @@ import { achievementsQuery as achievementCatalog, ready, useQuery } from "#/infr
 import { createPixelAct } from "#/ui/pixel/index.ts";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
 
+const recipeStyles = stylex.create({
+  panelAside: {
+    position: "absolute",
+    top: "calc(var(--spacing) * 2)",
+    right: "calc(var(--spacing) * 2)",
+    bottom: "calc(var(--spacing) * 2)",
+    zIndex: "50",
+    display: "flex",
+    width: "380px",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflow: "hidden",
+    backgroundColor: {
+      default: "var(--color-ink-950)f5",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink-950) 96%, transparent)",
+    },
+    padding: "calc(var(--spacing) * 3)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "12px",
+    color: "var(--color-paper)",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+});
+
+const variantStyles = stylex.create({
+  panelDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+  },
+});
+
 const viewStyles = stylex.create({
   sectionSection: {
     display: "flex",
@@ -203,18 +238,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
-    <aside
-      aria-label={t("web.farm.debug.title")}
-      data-testid="debug"
-      class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-ink-950/96 p-3 font-mono text-[12px] text-paper shadow-px"
-    >
+    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(recipeStyles.panelAside)}>
       <header {...stylex.attrs(viewStyles.panelHeader)}>
         <span {...stylex.attrs(viewStyles.panelSpan)}>{t("web.farm.debug.title")}</span>
         <button type="button" data-testid="debug-close" class={btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
-      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <div {...stylex.attrs(variantStyles.panelDiv)}>
         <Section
           title={t("web.farm.debug.call")}
           aside={

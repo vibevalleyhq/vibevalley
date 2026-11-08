@@ -20,6 +20,57 @@ import { Hint } from "#/ui/Tip.tsx";
 
 import { type Place, places, settingsPlace } from "./places";
 
+const variantStyles2 = stylex.create({
+  deskA: {
+    display: "flex",
+    height: "calc(var(--spacing) * 7)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+    backgroundColor: {
+      default: "var(--wb-page)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+});
+
+const variantStyles = stylex.create({
+  deskSpan: {
+    height: "calc(var(--spacing) * 2)",
+    width: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+  },
+  deskSpanVariant: {
+    backgroundColor: "var(--wb-leaf)",
+  },
+  deskSpanVariant2: {
+    backgroundColor: "var(--wb-faint)",
+  },
+  shellDiv: {
+    display: "flex",
+    height: "100%",
+  },
+  shellDivVariant: {
+    zoom: "var(--workbench-zoom,1)",
+  },
+  shellDivVariant2: {},
+  shellMain: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+});
+
 const viewStyles = stylex.create({
   slotSpan: {
     display: {
@@ -289,14 +340,8 @@ function Desk(props: { place?: Place | undefined }) {
           </>
         )}
       </Show>
-      <A
-        href="/farm"
-        aria-label={status()}
-        data-testid="desk-status"
-        data-state={live() ? "live" : "off"}
-        class="flex h-7 items-center gap-1.5 rounded-md border border-line bg-page px-2.5 text-xs hover:bg-hover"
-      >
-        <span class={["h-2 w-2 rounded-full", live() ? "bg-leaf" : "bg-faint"]} aria-hidden="true" />
+      <A href="/farm" aria-label={status()} data-testid="desk-status" data-state={live() ? "live" : "off"} {...stylex.attrs(variantStyles2.deskA)}>
+        <span {...stylex.attrs(variantStyles.deskSpan, live() ? variantStyles.deskSpanVariant : variantStyles.deskSpanVariant2)} aria-hidden="true" />
         {status()}
       </A>
     </div>
@@ -320,12 +365,12 @@ export function Shell(props: { children: JSX.Element }) {
   });
   return (
     // The farm keeps integer art pixels; only workbench pages follow the interface zoom.
-    <div class={["flex h-full", !inFarm() && "[zoom:var(--workbench-zoom,1)]"]}>
+    <div {...stylex.attrs(variantStyles.shellDiv, !inFarm() ? variantStyles.shellDivVariant : variantStyles.shellDivVariant2)}>
       <QuickSwitcher />
       <NotesSearch />
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
-      <main class="flex min-w-0 flex-1 flex-col">
+      <main {...stylex.attrs(variantStyles.shellMain)}>
         <Show when={!inFarm() && here()?.id !== "chat"}>
           <Desk place={here()} />
         </Show>

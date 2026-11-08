@@ -6,7 +6,7 @@ import { isOneOf } from "@vibevalley/protocol/rules";
 
 import { useNow, useViewport } from "#/base/dom.tsx";
 import { useRouter, useSearch } from "#/infra/router.ts";
-import { PxButton, PxWindow, pxText } from "#/ui/pixel/index.ts";
+import { PxButton, PxWindow } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 import { toast } from "#/ui/toasts.ts";
 
@@ -14,6 +14,44 @@ import { allOf, counts, kept, newest, type TreeFilter } from "./memories";
 import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
+
+const recipeStyles = stylex.create({
+  treePageDiv: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  treePageDiv2: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-500)",
+    fontSynthesis: "none",
+  },
+  treePageSpan: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  treePageSpan2: {
+    width: "64px",
+    textAlign: "right",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+});
 
 const viewStyles = stylex.create({
   treePageDiv: {
@@ -114,8 +152,8 @@ export function TreePage() {
         }
       >
         <PxWindow class="absolute top-3 left-3 px-3 py-2">
-          <div class={pxText.sm}>{t("web.tree.sky")}</div>
-          <div class={[pxText.xs, "text-bark-500"]}>{t("web.tree.skyHint")}</div>
+          <div {...stylex.attrs(recipeStyles.treePageDiv)}>{t("web.tree.sky")}</div>
+          <div {...stylex.attrs(recipeStyles.treePageDiv2)}>{t("web.tree.skyHint")}</div>
         </PxWindow>
         <div {...stylex.attrs(viewStyles.treePageDiv)}>
           <PxButton icon="icon-tree" data-testid="tree-back" onClick={() => lookUp(false)}>
@@ -139,7 +177,7 @@ export function TreePage() {
           <Filters tree={tree} filter={filter()} setFilter={setFilter} class="min-w-[220px] flex-1" />
         </Show>
         <label {...stylex.attrs(viewStyles.treePageLabel)}>
-          <span class={pxText.xs}>{t("web.tree.earliest")}</span>
+          <span {...stylex.attrs(recipeStyles.treePageSpan)}>{t("web.tree.earliest")}</span>
           <input
             type="range"
             min="0"
@@ -150,7 +188,7 @@ export function TreePage() {
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
             {...stylex.attrs(viewStyles.treePageInput)}
           />
-          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} class={[pxText.xs, "w-[64px] text-right"]}>
+          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} {...stylex.attrs(recipeStyles.treePageSpan2)}>
             {until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}
           </span>
         </label>

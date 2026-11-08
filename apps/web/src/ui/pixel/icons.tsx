@@ -6,6 +6,17 @@ import type { Phase, SessionAction } from "@vibevalley/protocol";
 
 import { useInterval } from "#/base/timer.ts";
 
+const variantStyles = stylex.create({
+  bobSpan: {
+    display: "inline-flex",
+    flexShrink: "0",
+  },
+  bobSpanVariant: {
+    translate: "0 -1px",
+  },
+  bobSpanVariant2: {},
+});
+
 const viewStyles = stylex.create({
   phaseGlyphSpan: {
     display: "inline-block",
@@ -95,7 +106,7 @@ function Bob(props: { children: JSX.Element }) {
   const still = reducedMotion();
   const [up, setUp] = createSignal(false);
   useInterval(() => setUp((u) => !still() && !u), 450);
-  return <span class={["inline-flex shrink-0", { "-translate-y-px": up() }]}>{props.children}</span>;
+  return <span {...stylex.attrs(variantStyles.bobSpan, up() ? variantStyles.bobSpanVariant : variantStyles.bobSpanVariant2)}>{props.children}</span>;
 }
 
 /** A sprite before a line, at its first line's height. */

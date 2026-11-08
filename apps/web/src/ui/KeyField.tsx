@@ -9,6 +9,39 @@ import { Icon } from "./Icon";
 import { IconButton, OutLink } from "./IconButton";
 import { Hint, Tip } from "./Tip";
 
+const variantStyles2 = stylex.create({
+  keyMarkIcon: {},
+  keyMarkIconVariant: {
+    color: "var(--wb-berry)",
+  },
+  keyMarkIconVariant2: {
+    color: "var(--wb-leaf)",
+  },
+});
+
+const variantStyles = stylex.create({
+  keyFieldSpan: {},
+  keyFieldSpanVariant: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-muted)",
+  },
+  keyFieldSpanVariant2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  keyFieldDiv: {
+    minWidth: "0",
+    flex: "1",
+  },
+  keyFieldDivVariant: {
+    pointerEvents: "none",
+    opacity: ".4",
+  },
+});
+
 const viewStyles = stylex.create({
   keyMark: {
     display: "inline-flex",
@@ -162,7 +195,11 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
             </span>
           }
         >
-          <Icon name={props.removing === true ? "cross" : "check"} size={12} class={props.removing === true ? "text-berry" : "text-leaf"} />
+          <Icon
+            name={props.removing === true ? "cross" : "check"}
+            size={12}
+            styles={[variantStyles2.keyMarkIcon, props.removing === true ? variantStyles2.keyMarkIconVariant : variantStyles2.keyMarkIconVariant2]}
+          />
           <Show when={props.removing !== true && props.status.hint}>
             <span {...stylex.attrs(viewStyles.keyMarkSpan2)} aria-hidden="true">
               {props.status.hint}
@@ -190,14 +227,16 @@ export function KeyField(props: {
   return (
     <div {...stylex.attrs(viewStyles.keyFieldDiv)}>
       <div {...stylex.attrs(viewStyles.keyFieldDiv2)}>
-        <span class={props.small === true ? "text-xs font-medium text-muted" : "text-sm font-semibold"}>{props.label}</span>
+        <span {...stylex.attrs(variantStyles.keyFieldSpan, props.small === true ? variantStyles.keyFieldSpanVariant : variantStyles.keyFieldSpanVariant2)}>
+          {props.label}
+        </span>
         <KeyMark status={props.status} removing={props.removing} />
         <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         <span {...stylex.attrs(viewStyles.keyFieldSpan)} />
         <Show when={props.link}>{(l) => <OutLink href={l().href} label={l().label} />}</Show>
       </div>
       <div {...stylex.attrs(viewStyles.keyFieldDiv3)}>
-        <div class={["min-w-0 flex-1", { "pointer-events-none opacity-40": props.removing }]}>{props.children}</div>
+        <div {...stylex.attrs(variantStyles.keyFieldDiv, props.removing ? variantStyles.keyFieldDivVariant : variantStyles.keyFieldSpan)}>{props.children}</div>
         <Show when={props.status.source === "settings"}>
           <IconButton
             icon={props.removing ? "undo" : "delete"}

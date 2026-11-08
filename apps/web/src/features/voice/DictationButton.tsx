@@ -11,6 +11,20 @@ import type { IconName } from "#/ui/icons.ts";
 
 import { dictation, type DictationPhase, insertDictated } from "./dictation";
 
+const variantStyles = stylex.create({
+  dictationBarSpan: {
+    marginInline: "var(--spacing)",
+    display: "flex",
+    height: "calc(var(--spacing) * 5)",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    overflow: "hidden",
+  },
+});
+
 const viewStyles = stylex.create({
   dictationBar: {
     display: "flex",
@@ -317,7 +331,7 @@ export function DictationBar(props: { dictating: Dictating }) {
         <span {...stylex.attrs(viewStyles.dictationBarSpan)} role="timer" aria-label={t("web.voice.dictation.listening")}>
           {clock(elapsed())}
         </span>
-        <span aria-hidden="true" class="mx-1 flex h-5 min-w-0 flex-1 flex-row-reverse items-center justify-between overflow-hidden">
+        <span aria-hidden="true" {...stylex.attrs(variantStyles.dictationBarSpan)}>
           <For each={bars().toReversed()} keyed={false}>
             {(level) => <span {...stylex.attrs(viewStyles.dictationBarSpan2)} style={{ height: `${Math.max(3, level() * 20)}px` }} />}
           </For>

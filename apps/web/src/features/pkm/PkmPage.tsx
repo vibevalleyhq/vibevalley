@@ -17,6 +17,85 @@ import { Opened } from "./PageView";
 import { Sidebar } from "./Sidebar";
 import { refreshVault, usePkmVault } from "./vault";
 
+const variantStyles2 = stylex.create({
+  daysA: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  pkmPageNav: {
+    minHeight: "0",
+    flexShrink: "0",
+    flexDirection: "column",
+    borderColor: "var(--wb-line)",
+    backgroundColor: "var(--wb-side)",
+    padding: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 64)",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=64rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=64rem)": "1px",
+    },
+  },
+  pkmPageNavVariant: {
+    display: "flex",
+  },
+  pkmPageNavVariant2: {
+    display: {
+      default: "none",
+      "@media (width>=64rem)": "flex",
+    },
+  },
+  pkmPageMain: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  daysDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=80rem)": "row",
+    },
+    overflowY: "auto",
+    alignItems: {
+      default: null,
+      "@media (width>=80rem)": "flex-start",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   pkmPageDiv: {
     display: "flex",
@@ -100,11 +179,11 @@ export function PkmPage(props: { rest: string }) {
       <nav
         aria-label={t("web.pkm.list.label")}
         data-testid="pkm-nav"
-        class={[nav() ? "flex" : "hidden lg:flex", "min-h-0 shrink-0 flex-col border-line bg-side p-3 lg:w-64 lg:border-r"]}
+        {...stylex.attrs(variantStyles.pkmPageNav, nav() ? variantStyles.pkmPageNavVariant : variantStyles.pkmPageNavVariant2)}
       >
         <Sidebar slug={slug()} pages={pages()} error={vault.error} />
       </nav>
-      <main class={[nav() ? "hidden lg:flex" : "flex", "min-h-0 min-w-0 flex-1 flex-col"]}>
+      <main {...stylex.attrs(variantStyles.pkmPageMain, nav() ? variantStyles.pkmPageNavVariant2 : variantStyles.pkmPageNavVariant)}>
         <Show when={slug()} fallback={<Days pages={pages()} />}>
           {(s) => <Keyed key={s()}>{() => <Opened slug={s()} pages={pages()} point={search().get("b") ?? undefined} />}</Keyed>}
         </Show>
@@ -134,10 +213,10 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
       .toSorted((a, b) => (b.day ?? "").localeCompare(a.day ?? ""))
       .slice(0, daysShown);
   return (
-    <div data-testid="pkm-days" class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:items-start">
+    <div data-testid="pkm-days" {...stylex.attrs(variantStyles.daysDiv)}>
       <div {...stylex.attrs(viewStyles.daysDiv)}>
         <div {...stylex.attrs(viewStyles.daysDiv2)}>
-          <A href="/pkm?nav" class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink">
+          <A href="/pkm?nav" {...stylex.attrs(variantStyles2.daysA)}>
             <Icon name="calendar" size={14} />
             {t("web.pkm.list.label")}
           </A>

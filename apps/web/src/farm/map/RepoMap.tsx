@@ -46,6 +46,24 @@ import {
   spotText,
 } from "./islands";
 
+const variantStyles = stylex.create({
+  islandDetailSpan: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  islandDetailSpan2: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+});
+
 const viewStyles = stylex.create({
   repoMapDiv: {
     display: "flex",
@@ -774,9 +792,9 @@ function IslandDetail(props: { island: Island }) {
                 {...stylex.attrs(viewStyles.islandDetailButton)}
               >
                 <AgentFace agentId={slot.session.agent} runtime={slot.session.runtime} size={32} />
-                <span class="flex min-w-0 flex-1 flex-col">
+                <span {...stylex.attrs(variantStyles.islandDetailSpan)}>
                   <span {...stylex.attrs(viewStyles.repoMapSpan)}>{slot.session.name}</span>
-                  <span class="line-clamp-2 text-xs text-muted">{phaseText(slot.session, now())}</span>
+                  <span {...stylex.attrs(variantStyles.islandDetailSpan2)}>{phaseText(slot.session, now())}</span>
                   <Show when={slot.session.branch}>
                     <span {...stylex.attrs(viewStyles.islandDetailSpan2)}>
                       <SpriteIcon name="icon-branch" size={14} />

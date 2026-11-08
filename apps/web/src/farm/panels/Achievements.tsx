@@ -14,6 +14,72 @@ import { createPixelAct, numberText, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { tint, Tinted } from "./rows";
 
+const recipeStyles = stylex.create({
+  titlePickerDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: "10",
+    marginTop: "calc(var(--spacing) * 2)",
+    maxHeight: "calc(var(--spacing) * 80)",
+    width: "calc(var(--spacing) * 64)",
+    overflowY: "auto",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 1.5)",
+    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+  },
+});
+
+const variantStyles = stylex.create({
+  medalImg: {
+    position: "absolute",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  medalImgVariant: {
+    opacity: ".5",
+    filter: "grayscale(100%)",
+  },
+  medalImgVariant2: {},
+  titlePickerSpan: {
+    flex: "1",
+    fontSize: "13px",
+  },
+  titlePickerSpanVariant: {
+    color: "var(--color-leaf-700)",
+  },
+  starterImg: {
+    height: "calc(var(--spacing) * 9)",
+    width: "calc(var(--spacing) * 9)",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  starterImgVariant: {
+    opacity: ".6",
+  },
+  starterSpan: {
+    display: "block",
+    fontSize: "13px",
+  },
+  starterSpanVariant: {
+    color: "var(--color-bark-800)",
+  },
+  starterSpanVariant2: {
+    color: "var(--color-bark-900)",
+  },
+  cardSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "13px",
+  },
+  cardSpanVariant: {
+    color: "var(--color-bark-600)",
+  },
+});
+
 const viewStyles = stylex.create({
   medalSpan: {
     position: "relative",
@@ -298,7 +364,7 @@ function Medal(props: { a: Achievement; tier: number; size: number }) {
         src={`/pixel/emblem-${props.a.id}.png`}
         onError={(ev) => (ev.currentTarget.src = "/pixel/emblem-wreath.png")}
         alt=""
-        class={["absolute object-contain [image-rendering:pixelated]", { "opacity-50 grayscale": !earned() }]}
+        {...stylex.attrs(variantStyles.medalImg, !earned() ? variantStyles.medalImgVariant : variantStyles.medalImgVariant2)}
         style={{ left: `${place().left}px`, top: `${place().top}px`, width: `${place().e}px`, height: `${place().e}px` }}
       />
     </span>
@@ -452,11 +518,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
         </span>
       </button>
       <Show when={open()}>
-        <div
-          class="absolute top-full right-0 z-10 mt-2 max-h-80 w-64 overflow-y-auto bg-cream-50 p-1.5 shadow-px"
-          role="menu"
-          aria-label={t("web.farm.achievements.titles")}
-        >
+        <div {...stylex.attrs(recipeStyles.titlePickerDiv)} role="menu" aria-label={t("web.farm.achievements.titles")}>
           <p {...stylex.attrs(viewStyles.titlePickerP)}>{t("web.farm.achievements.titles")}</p>
           <For each={earned()}>
             {(e) => {
@@ -472,7 +534,9 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
                   {...stylex.attrs(viewStyles.titlePickerButton)}
                 >
                   <Medal a={e.a} tier={e.tier} size={28} />
-                  <span class={["flex-1 text-[13px]", { "text-leaf-700": on() }]}>{tierTitle(e.a, e.tier)}</span>
+                  <span {...stylex.attrs(variantStyles.titlePickerSpan, on() ? variantStyles.titlePickerSpanVariant : variantStyles.medalImgVariant2)}>
+                    {tierTitle(e.a, e.tier)}
+                  </span>
                   <Show when={on()}>
                     <SpriteIcon name="mark-check" size={14} label={t("web.farm.achievements.worn")} />
                   </Show>
@@ -527,14 +591,16 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
                       src={`/pixel/emblem-${a.id}.png`}
                       onError={(ev) => (ev.currentTarget.src = "/pixel/emblem-wreath.png")}
                       alt=""
-                      class={["h-9 w-9 object-contain [image-rendering:pixelated]", { "opacity-60": !ok() }]}
+                      {...stylex.attrs(variantStyles.starterImg, !ok() ? variantStyles.starterImgVariant : variantStyles.medalImgVariant2)}
                     />
                     <Show when={ok()}>
                       <SpriteIcon name="stamp-done" size={20} label={t("web.farm.achievements.done")} class="absolute -right-1.5 -bottom-1" />
                     </Show>
                   </span>
                   <span {...stylex.attrs(viewStyles.starterSpan3)}>
-                    <span class={["block text-[13px]", ok() ? "text-bark-800" : "text-bark-900"]}>{a.title}</span>
+                    <span {...stylex.attrs(variantStyles.starterSpan, ok() ? variantStyles.starterSpanVariant : variantStyles.starterSpanVariant2)}>
+                      {a.title}
+                    </span>
                     <span {...stylex.attrs(viewStyles.starterSpan4)} title={a.detail}>
                       {a.detail}
                     </span>
@@ -566,7 +632,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
       <Medal a={props.a} tier={standing().tier} size={60} />
       <div {...stylex.attrs(viewStyles.starterSpan3)}>
         <div {...stylex.attrs(viewStyles.cardDiv2)}>
-          <span class={["min-w-0 flex-1 truncate text-[13px]", standing().tier > 0 ? "text-bark-900" : "text-bark-600"]}>
+          <span {...stylex.attrs(variantStyles.cardSpan, standing().tier > 0 ? variantStyles.starterSpanVariant2 : variantStyles.cardSpanVariant)}>
             {tierTitle(props.a, standing().tier < 1 ? 1 : standing().tier)}
           </span>
           <Show when={props.a.tiers.length > 1}>

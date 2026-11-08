@@ -15,6 +15,15 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { Qr } from "#/ui/Qr.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+const variantStyles = stylex.create({
+  lanPageSpan: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+});
+
 const viewStyles = stylex.create({
   lanPageDiv: {
     display: "flex",
@@ -237,7 +246,7 @@ export function LanPage() {
             <For each={s().devices}>
               {(d) => (
                 <div {...stylex.attrs(viewStyles.lanPageDiv4)}>
-                  <span class="flex min-w-0 flex-1 flex-col">
+                  <span {...stylex.attrs(variantStyles.lanPageSpan)}>
                     <span {...stylex.attrs(viewStyles.lanPageSpan4)}>{d.name}</span>
                     <span {...stylex.attrs(viewStyles.lanPageSpan5)}>
                       {d.lastSeen != null && d.lastSeen !== 0

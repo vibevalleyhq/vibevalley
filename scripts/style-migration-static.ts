@@ -47,14 +47,23 @@ for (const [name, story] of [
   ["segmented-states", "组件/工作台/Segmented:States"],
   ["segmented-disabled", "组件/工作台/Segmented:Playground"],
   ["tabs-states", "组件/工作台/Tabs:States"],
+  ["tag-states", "组件/工作台/Tag:States"],
+  ["tag-tones", "组件/工作台/Tag:Tones"],
+  ["dot-tones", "组件/工作台/Tag:Dot tones"],
   ["attachment-kinds", "组件/工作台/AttachmentTile:Kinds"],
   ["checkbox-states", "组件/工作台/Checkbox:States"],
   ["chips-values", "组件/工作台/Chips:Key and value"],
+  ["chips-words", "组件/工作台/Chips:Words"],
+  ["icon-button-states", "组件/工作台/IconButton:States"],
+  ["icon-button-kinds", "组件/工作台/IconButton:Kinds"],
   ["agent-faces", "组件/工作台/Face:Agents"],
   ["form-receipts", "组件/工作台/Form:Receipts"],
   ["icon-catalog", "设计体系/图标:All"],
   ["key-marks", "组件/工作台/KeyField:Marks"],
   ["layout-card", "组件/工作台/layout:Card"],
+  ["layout-toggle", "组件/工作台/layout:Toggle states"],
+  ["layout-controls", "组件/工作台/layout:Controls"],
+  ["layout-list", "组件/工作台/layout:List card"],
   ["layout-rows", "组件/工作台/layout:Row states"],
   ["layout-empty", "组件/工作台/layout:Empty with a next step"],
   ["markdown-message", "组件/工作台/Markdown:Message"],
@@ -81,6 +90,14 @@ for (const [name, story] of [
         popup: name === "field-popup" ? "select" : name.startsWith("menu-") ? "menu" : name === "tooltip" ? "tooltip" : undefined,
       });
     }
+for (const theme of ["light", "dark"])
+  for (const width of [390, 900])
+    scenes.push({
+      id: `layout-split-${theme}-${width}`,
+      entry: "stories",
+      route: `/?${new URLSearchParams({ s: "交互/列表和详情:Pick a row", theme, w: width === 390 ? "400" : "800" })}`,
+      width,
+    });
 for (const theme of ["light", "dark"])
   for (const width of [1440, 900, 390])
     for (const viewerState of width === 390 ? (["rest"] as const) : (["rest", "input", "hover"] as const))

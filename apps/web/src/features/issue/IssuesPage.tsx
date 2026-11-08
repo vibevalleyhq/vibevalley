@@ -36,6 +36,50 @@ import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
 
+const recipeStyles = stylex.create({
+  issueViewButton: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    display: "inline-flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  toolbarDiv: {
+    display: "flex",
+    flexDirection: {
+      default: "column-reverse",
+      "@container (width>=760px)": "row",
+    },
+    gap: "calc(var(--spacing) * 2)",
+    alignItems: {
+      default: null,
+      "@container (width>=760px)": "center",
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   issuesPage: {
     position: "relative",
@@ -422,12 +466,7 @@ function IssueView(props: { onBack: () => void; children: JSX.Element }) {
   return (
     <div {...stylex.attrs(viewStyles.issueViewDiv)}>
       <div data-testid="issue" {...stylex.attrs(viewStyles.issue)}>
-        <button
-          type="button"
-          data-testid="issue-close"
-          onClick={() => props.onBack()}
-          class="mb-3 inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-muted transition-colors duration-120 hover:bg-hover hover:text-ink"
-        >
+        <button type="button" data-testid="issue-close" onClick={() => props.onBack()} {...stylex.attrs(recipeStyles.issueViewButton)}>
           <Icon name="back" size={14} />
           {t("web.issue.page.backToBoard")}
         </button>
@@ -451,7 +490,7 @@ function Toolbar(props: {
   return (
     // Narrow, the views go on their own line above the filters, at the right where the Display panel opens leftwards.
     <div {...stylex.attrs(viewStyles.toolbarDiv)}>
-      <div class="flex flex-col-reverse gap-2 @min-[760px]:flex-row @min-[760px]:items-center">
+      <div {...stylex.attrs(recipeStyles.toolbarDiv)}>
         <div {...stylex.attrs(viewStyles.toolbarDiv2)}>
           <label {...stylex.attrs(viewStyles.toolbarLabel)}>
             <Icon name="search" size={14} />

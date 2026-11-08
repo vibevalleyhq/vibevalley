@@ -36,6 +36,116 @@ import {
   waterfallOf,
 } from "./runs";
 
+const recipeStyles = stylex.create({
+  rowSpan: {
+    width: "calc(var(--spacing) * 15)",
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    paddingTop: "calc(var(--spacing) * .5)",
+    paddingLeft: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+  },
+  rowSpan2: {
+    marginTop: "1px",
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    borderRadius: ".25rem",
+    paddingInline: "var(--spacing)",
+    paddingBlock: "1px",
+    textAlign: "center",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  rowSpanVariant1Case1: {
+    width: "calc(var(--spacing) * 22)",
+    marginLeft: null,
+  },
+  rowSpanVariant1Case2: {
+    width: "78px",
+    marginLeft: "calc(var(--spacing) * 2.5)",
+  },
+  waterfallViewDiv: {
+    display: "flex",
+    width: "calc(var(--spacing) * 15)",
+    flexShrink: "0",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    paddingLeft: "calc(var(--spacing) * 2)",
+  },
+});
+
+const variantStyles3 = stylex.create({
+  rowIcon: {
+    marginTop: "var(--spacing)",
+    marginRight: "var(--spacing)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  trajectoryTextInput: {
+    width: {
+      default: "calc(var(--spacing) * 36)",
+      "@media (width>=40rem)": "calc(var(--spacing) * 56)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  rowDiv: {
+    borderRadius: "var(--radius-md)",
+    paddingBlock: "3px",
+    paddingRight: "calc(var(--spacing) * 2)",
+  },
+  rowDivVariant: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 35%, transparent)",
+    },
+  },
+  rowDivVariant2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  rowSpan: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  rowSpanVariant: {
+    color: "var(--wb-berry)",
+  },
+  rowSpanVariant2: {},
+  toolLineSpan: {
+    fontFamily: "var(--font-mono)",
+  },
+  trajectoryListButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    flexDirection: "column",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  trajectoryListButtonVariant: {
+    backgroundColor: "var(--wb-selected)",
+  },
+});
+
 const viewStyles = stylex.create({
   headSpan: {
     textOverflow: "ellipsis",
@@ -428,7 +538,7 @@ export function Trajectory(props: {
           data-testid="trajectory-search"
           aria-label={t("web.session.trajectory.search")}
           placeholder={t("web.session.trajectory.searchHint")}
-          class="w-36 sm:w-56"
+          styles={variantStyles2.trajectoryTextInput}
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
@@ -494,9 +604,6 @@ export function Trajectory(props: {
   );
 }
 
-const gutterW = "w-15";
-const tagW = "w-22";
-
 function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el: HTMLElement) => void; onToggle: () => void }) {
   const step = () => props.spec.step;
   const fill = () => tagFill(step());
@@ -508,7 +615,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
       ref={(el) => props.refTo(el)}
       data-testid="step"
       data-type={step().type}
-      class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}
+      {...stylex.attrs(variantStyles.rowDiv, props.marked ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}
     >
       <button
         type="button"
@@ -517,18 +624,18 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
         onClick={() => props.onToggle()}
         {...stylex.attrs(viewStyles.rowButton)}
       >
-        <span class={[gutterW, "shrink-0 truncate pt-0.5 pl-2 text-xs text-muted"]}>{props.spec.gutter}</span>
+        <span {...stylex.attrs(recipeStyles.rowSpan)}>{props.spec.gutter}</span>
         <span
-          class={["mt-px shrink-0 truncate rounded px-1 py-px text-center text-xs font-medium", sub() ? "ml-2.5 w-[78px]" : tagW]}
+          {...stylex.attrs(recipeStyles.rowSpan2, sub() ? recipeStyles.rowSpanVariant1Case2 : recipeStyles.rowSpanVariant1Case1)}
           style={{ background: sub() && fill().startsWith("#") ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
         >
           {props.spec.tag}
         </span>
         <span {...stylex.attrs(viewStyles.rowSpan)} />
         <Show when={failed() && tool()}>
-          <Icon name="cross" size={12} class="mt-1 mr-1" />
+          <Icon name="cross" size={12} styles={[variantStyles3.rowIcon]} />
         </Show>
-        <span class={["min-w-0 flex-1 text-sm", { "text-berry": failed() }]}>
+        <span {...stylex.attrs(variantStyles.rowSpan, failed() ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
           <Switch fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{oneLine(step().text).trim()}</span>}>
             <Match when={tool()}>
               <ToolLine step={step()} />
@@ -563,7 +670,13 @@ function ToolLine(props: { step: SessionEvent }) {
         <span {...stylex.attrs(viewStyles.toolLineSpan)}> {args()}</span>
       </Show>
       {" → "}
-      <Switch fallback={<span class={["font-mono", { "text-berry": props.step.ok === false }]}>{out()}</span>}>
+      <Switch
+        fallback={
+          <span {...stylex.attrs(variantStyles.toolLineSpan, props.step.ok === false ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
+            {out()}
+          </span>
+        }
+      >
         <Match when={props.step.ok === undefined}>{t("web.session.trajectory.pending")}</Match>
         <Match when={!out()}>{t("web.session.trajectory.noOutput")}</Match>
       </Switch>
@@ -655,7 +768,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   });
   return (
     <div {...stylex.attrs(viewStyles.waterfallViewDiv)} style={{ height: `${lane * 3 + gap * 2}px` }}>
-      <div class={[gutterW, "flex shrink-0 flex-col justify-between pl-2"]}>
+      <div {...stylex.attrs(recipeStyles.waterfallViewDiv)}>
         <For each={lanes}>{(l) => <span {...stylex.attrs(viewStyles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
       </div>
       <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.waterfallViewDiv2)}>
@@ -784,10 +897,10 @@ export function TrajectoryList(props: { agent: string }) {
                         type="button"
                         aria-current={h().id === open()?.id ? "true" : undefined}
                         onClick={() => setPicked(h().id)}
-                        class={[
-                          "flex w-full cursor-pointer flex-col rounded-md px-2.5 py-1.5 text-left",
-                          h().id === open()?.id ? "bg-selected" : "hover:bg-hover",
-                        ]}
+                        {...stylex.attrs(
+                          variantStyles.trajectoryListButton,
+                          h().id === open()?.id ? variantStyles.trajectoryListButtonVariant : variantStyles.rowDivVariant2,
+                        )}
                       >
                         <span {...stylex.attrs(viewStyles.trajectoryListSpan)}>
                           <span {...stylex.attrs(viewStyles.trajectoryListSpan2)}>{h().name}</span>

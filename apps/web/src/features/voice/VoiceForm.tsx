@@ -52,6 +52,38 @@ import {
   withPart,
 } from "./VoiceVendorFields";
 
+const variantStyles2 = stylex.create({
+  formTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
+const variantStyles = stylex.create({
+  formDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: "auto",
+  },
+  formSpan: {
+    borderRadius: ".25rem",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  formSpanVariant: {
+    backgroundColor: "var(--wb-ok-soft)",
+    color: "var(--wb-ok-ink)",
+  },
+  formSpanVariant2: {
+    backgroundColor: "var(--wb-bad-soft)",
+    color: "var(--wb-berry)",
+  },
+});
+
 const viewStyles = stylex.create({
   voiceCard: { maxWidth: "var(--container-4xl)" },
   barP: {
@@ -208,7 +240,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     <Labeled label={numberLabel[k]} hint={t("web.voice.voice.range", { min: voiceLimits[k].min, max: voiceLimits[k].max, fallback: base().voiceDefaults[k] })}>
       <TextInput
         aria-label={numberLabel[k]}
-        class="font-mono"
+        styles={variantStyles2.formTextInput}
         inputmode="numeric"
         value={String(draft()[k])}
         onInput={(e) => set({ ...draft(), [k]: Number(e.currentTarget.value.replace(/\D/gu, "")) })}
@@ -258,7 +290,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       when={props.part === "agent"}
       fallback={
         <div {...stylex.attrs(viewStyles.formDiv)}>
-          <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          <div {...stylex.attrs(variantStyles.formDiv)}>
             <Show when={props.view === "moss"}>
               <SettingsGroup>
                 <KeyRow
@@ -276,7 +308,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             </Show>
             <Show when={props.view === "call"}>
               <div {...stylex.attrs(viewStyles.formDiv2)}>
-                <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-ok-soft text-ok-ink" : "bg-bad-soft text-berry"]}>
+                <span {...stylex.attrs(variantStyles.formSpan, credentialsReady() ? variantStyles.formSpanVariant : variantStyles.formSpanVariant2)}>
                   {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
                 </span>
                 <Hint
@@ -296,7 +328,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     <TextInput
                       data-testid="agora-app-id"
                       aria-label="Agora App ID"
-                      class="font-mono"
+                      styles={variantStyles2.formTextInput}
                       placeholder={t("web.voice.voice.hex")}
                       value={appId()}
                       onInput={(e) => {
@@ -358,7 +390,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                         <Labeled label={t("web.voice.voice.azureArea")} hint={t("web.voice.voice.azureAreaHint")}>
                           <TextInput
                             aria-label={t("web.voice.voice.asrArea")}
-                            class="font-mono"
+                            styles={variantStyles2.formTextInput}
                             value={a().region}
                             onInput={(e) => set({ ...draft(), asr: { vendor: "microsoft", region: e.currentTarget.value } })}
                           />
@@ -412,7 +444,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.deepseekModel")}>
                       <TextInput
                         aria-label={t("web.voice.voice.deepseekModelLabel")}
-                        class="font-mono"
+                        styles={variantStyles2.formTextInput}
                         value={a().model}
                         onInput={(e) => set({ ...draft(), answer: { vendor: "deepseek", model: e.currentTarget.value } })}
                       />
@@ -425,7 +457,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.llmAddress")}>
                         <TextInput
                           aria-label={t("web.voice.voice.llmAddressLabel")}
-                          class="font-mono"
+                          styles={variantStyles2.formTextInput}
                           value={a().url}
                           onInput={(e) => set({ ...draft(), answer: { ...a(), url: e.currentTarget.value } })}
                         />
@@ -433,7 +465,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <Labeled label={t("web.voice.voice.model")}>
                         <TextInput
                           aria-label={t("web.voice.voice.llmModel")}
-                          class="font-mono"
+                          styles={variantStyles2.formTextInput}
                           value={a().model}
                           onInput={(e) => set({ ...draft(), answer: { ...a(), model: e.currentTarget.value } })}
                         />
@@ -483,7 +515,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <TextInput
                         aria-label={t("web.voice.voice.dictationAddressLabel")}
                         data-testid="dictation-url"
-                        class="font-mono"
+                        styles={variantStyles2.formTextInput}
                         placeholder={t("web.base.form.example", { value: "http://127.0.0.1:8080/v1" })}
                         value={dictation().url}
                         onInput={(e) => {
@@ -495,7 +527,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <TextInput
                         aria-label={t("web.voice.voice.dictationModelLabel")}
                         data-testid="dictation-model"
-                        class="font-mono"
+                        styles={variantStyles2.formTextInput}
                         placeholder={t("web.base.form.example", { value: "qwen3" })}
                         value={dictation().model}
                         onInput={(e) => {

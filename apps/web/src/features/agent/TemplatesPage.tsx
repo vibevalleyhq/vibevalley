@@ -17,6 +17,57 @@ import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+const variantStyles3 = stylex.create({
+  templatesPageTextInput: {
+    minWidth: "0",
+    flex: "1",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  templatesPageA: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--wb-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  templateCardSpan: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  templateCardSpan2: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--wb-muted)",
+  },
+  templateCardSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  templateCardSpanVariant: {
+    color: "var(--wb-muted)",
+  },
+  templateCardSpanVariant2: {
+    color: "var(--wb-warn-ink)",
+  },
+});
+
 const viewStyles = stylex.create({
   templatesPageDiv: {
     height: "100%",
@@ -164,7 +215,7 @@ export function TemplatesPage() {
     <div {...stylex.attrs(viewStyles.templatesPageDiv)}>
       <div {...stylex.attrs(viewStyles.templatesPageDiv2)}>
         <div {...stylex.attrs(viewStyles.templatesPageDiv3)}>
-          <A href="/agents" class="text-xs text-muted hover:underline">
+          <A href="/agents" {...stylex.attrs(variantStyles2.templatesPageA)}>
             {t("web.agent.all")}
           </A>
           <div {...stylex.attrs(viewStyles.templatesPageDiv4)}>
@@ -185,7 +236,7 @@ export function TemplatesPage() {
             placeholder={t("web.agent.templates.folderHint")}
             value={path()}
             onInput={(e) => setPath(e.currentTarget.value)}
-            class="min-w-0 flex-1"
+            styles={variantStyles3.templatesPageTextInput}
           />
           <Button type="submit" data-testid="template-add" disabled={adding.busy() || !path().trim()}>
             {t("web.agent.templates.add")}
@@ -242,13 +293,13 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
             <OrchestratorFace size={56} look={template().look.orchestrator ?? "farmer"} />
           </Show>
         </span>
-        <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span {...stylex.attrs(variantStyles.templateCardSpan)}>
           <span {...stylex.attrs(viewStyles.templatesPageForm)}>
             <span {...stylex.attrs(viewStyles.templateCardSpan2)}>{template().name}</span>
             <span {...stylex.attrs(viewStyles.templateCardSpan3)}>{t(`web.agent.role.${template().role}`)}</span>
           </span>
-          <span class="line-clamp-2 text-sm text-muted">{template().duty}</span>
-          <span class={["text-xs", here() ? "text-muted" : "text-warn-ink"]}>
+          <span {...stylex.attrs(variantStyles.templateCardSpan2)}>{template().duty}</span>
+          <span {...stylex.attrs(variantStyles.templateCardSpan3, here() ? variantStyles.templateCardSpanVariant : variantStyles.templateCardSpanVariant2)}>
             {orchestrator()
               ? t("web.agent.templates.onServer")
               : here()

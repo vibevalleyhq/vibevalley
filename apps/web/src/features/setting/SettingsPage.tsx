@@ -20,6 +20,40 @@ import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
+const variantStyles = stylex.create({
+  sectionLinkA: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  sectionLinkAVariant: {
+    backgroundColor: "var(--wb-selected)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--wb-ink)",
+  },
+  sectionLinkAVariant2: {
+    color: {
+      default: "var(--wb-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+});
+
 const viewStyles = stylex.create({
   settingsPageDiv: {
     display: "flex",
@@ -236,10 +270,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       href={`/settings/${props.section.id}`}
       data-key={props.section.id}
       aria-current={props.current ? "page" : undefined}
-      class={[
-        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
-        props.current ? "bg-selected font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink",
-      ]}
+      {...stylex.attrs(variantStyles.sectionLinkA, props.current ? variantStyles.sectionLinkAVariant : variantStyles.sectionLinkAVariant2)}
     >
       <Icon name={props.section.icon} size={16} />
       {props.section.label}

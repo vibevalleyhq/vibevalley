@@ -9,7 +9,66 @@ import { createModal } from "#/ui/Dialog.tsx";
 import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
-import { pxFocus, pxText, pxWindow } from "./style";
+import { pxFocus, pxWindow } from "./style";
+
+const recipeStyles = stylex.create({
+  farmDialogDiv: {
+    display: "flex",
+    height: "100%",
+    flexDirection: "column",
+    overflow: "hidden",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  farmDialogH2: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "24px",
+    lineHeight: "1.5556",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  farmSectionH3: {
+    marginBottom: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-600)",
+    fontSynthesis: "none",
+  },
+  pxDialogDiv: {
+    maxHeight: "85dvh",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 6)",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+  pxDialogH2: {
+    minWidth: "0",
+    flex: "1",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "24px",
+    lineHeight: "1.4",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    fontSynthesis: "none",
+  },
+});
 
 const viewStyles = stylex.create({
   farmDialogDiv: {
@@ -108,10 +167,10 @@ export function FarmDialog(props: {
       backdrop="backdrop:bg-bark-900/30"
       class={farmSizes[props.size]}
     >
-      <div class={[pxText.sm, "flex h-full flex-col overflow-hidden"]}>
+      <div {...stylex.attrs(recipeStyles.farmDialogDiv)}>
         <div {...stylex.attrs(viewStyles.farmDialogDiv)}>
           <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={32} />}</Show>
-          <h2 class={[pxText.lg, "min-w-0 flex-1 truncate"]}>{props.title}</h2>
+          <h2 {...stylex.attrs(recipeStyles.farmDialogH2)}>{props.title}</h2>
           <button
             type="button"
             aria-label={t("web.ui.pixel.close")}
@@ -133,7 +192,7 @@ export function FarmDialog(props: {
 export function FarmSection(props: { title: string; children?: JSX.Element }) {
   return (
     <section {...stylex.attrs(viewStyles.farmSectionSection)}>
-      <h3 class={[pxText.xs, "mb-1.5 text-bark-600"]}>{props.title}</h3>
+      <h3 {...stylex.attrs(recipeStyles.farmSectionH3)}>{props.title}</h3>
       {props.children}
     </section>
   );
@@ -150,9 +209,9 @@ export function PxDialog(props: { title: string; open?: boolean; testid?: string
       backdrop="backdrop:bg-px-scrim"
       class="w-[min(512px,calc(100vw-32px))] border-2 border-bark-500"
     >
-      <div class={[pxText.sm, "max-h-[85dvh] overflow-y-auto p-6"]}>
+      <div {...stylex.attrs(recipeStyles.pxDialogDiv)}>
         <div {...stylex.attrs(viewStyles.pxDialogDiv)}>
-          <h2 class={[pxText.xl, "min-w-0 flex-1"]}>{props.title}</h2>
+          <h2 {...stylex.attrs(recipeStyles.pxDialogH2)}>{props.title}</h2>
           <PxButton size="icon" label={t("web.ui.pixel.close")} onClick={() => props.onClose()}>
             <SpriteIcon name="button-close" size={16} />
           </PxButton>

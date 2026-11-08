@@ -32,6 +32,13 @@ import { places } from "./places";
 import { Root } from "./Root";
 import { Shell } from "./Shell";
 
+const variantStyles = stylex.create({
+  missingPageLink: {
+    color: "var(--wb-accent)",
+    textDecorationLine: "underline",
+  },
+});
+
 const viewStyles = stylex.create({
   routeMissing: {
     display: "grid",
@@ -91,7 +98,7 @@ function MissingPage(props: { invalid?: boolean }) {
   return (
     <main data-testid="route-missing" {...stylex.attrs(viewStyles.routeMissing)}>
       <h1 {...stylex.attrs(viewStyles.missingPageH1)}>{props.invalid === true ? t("web.base.route.invalid") : t("web.base.route.missing")}</h1>
-      <Link href="/" class="text-accent underline">
+      <Link href="/" {...stylex.attrs(variantStyles.missingPageLink)}>
         {t("web.base.route.home")}
       </Link>
     </main>

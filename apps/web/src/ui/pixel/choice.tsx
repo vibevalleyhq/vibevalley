@@ -7,7 +7,187 @@ import { PxWindow } from "./base";
 import { type PickOption, pickItems } from "./cells";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
-import { pxDrop, pxFocus, pxRing, pxText } from "./style";
+import { pxFocus, pxRing, pxText } from "./style";
+
+const recipeStyles2 = stylex.create({
+  pxSwitchFieldSpan: {
+    display: "flex",
+    height: "calc(var(--spacing) * 6)",
+    width: "calc(var(--spacing) * 10)",
+    flexShrink: "0",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+    transitionProperty: {
+      default: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+      "@media (prefers-reduced-motion:reduce)": "none",
+    },
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".15s",
+  },
+  pxSwitchFieldSpanVariant1Case1: {
+    backgroundColor: {
+      default: "var(--color-cream-300)b3",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-cream-300) 70%, transparent)",
+    },
+  },
+  pxSwitchFieldSpanVariant1Case2: {
+    backgroundColor: "var(--color-leaf-500)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  pxPickButton: {
+    display: "flex",
+    height: "calc(var(--spacing) * 9)",
+    width: "100%",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    textAlign: "left",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.4286",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-cream-300)",
+    outlineStyle: {
+      default: "none",
+      ":focus-visible": "solid",
+    },
+    fontSynthesis: "none",
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineOffset: {
+      default: null,
+      ":focus-visible": "1px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--color-leaf-500)",
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  pxPickSpan: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.3333",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-600)",
+    fontSynthesis: "none",
+  },
+  pxSwitchFieldButton: {
+    display: "inline-flex",
+    maxWidth: "100%",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+    textAlign: "left",
+    color: "var(--color-bark-900)",
+    outlineStyle: {
+      default: "none",
+      ":focus-visible": "solid",
+    },
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineOffset: {
+      default: null,
+      ":focus-visible": "1px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--color-leaf-500)",
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+  pxSwitchFieldSpan: {
+    width: "calc(var(--spacing) * 5)",
+    height: "calc(var(--spacing) * 5)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 2px 2px 0 0 var(--color-px-drop)",
+    transitionProperty: {
+      default: "transform,translate,scale,rotate",
+      "@media (prefers-reduced-motion:reduce)": "none",
+    },
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".15s",
+  },
+  pxSwitchFieldSpanVariant1Case1: {
+    translate: null,
+  },
+  pxSwitchFieldSpanVariant1Case2: {
+    translate: "calc(var(--spacing) * 4) 0",
+  },
+  pxSwitchFieldSpan2: {
+    fontFamily: "var(--font-pixel)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+    fontWeight: "var(--font-weight-normal)",
+    letterSpacing: "var(--tracking-normal)",
+    color: "var(--color-bark-500)",
+    fontSynthesis: "none",
+  },
+});
+
+const variantStyles = stylex.create({
+  pxSegmentedDiv: {
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+    backgroundColor: "var(--color-cream-200)",
+    padding: "var(--spacing)",
+  },
+  pxSegmentedDivVariant: {
+    display: "flex",
+  },
+  pxSegmentedDivVariant2: {
+    display: "inline-flex",
+  },
+  pxPickSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  pxPickSpanVariant: {
+    color: "var(--color-bark-600)",
+  },
+  pxPickSpanVariant2: {
+    color: "var(--color-bark-900)",
+  },
+  pxPickLi: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "baseline",
+    gap: "calc(var(--spacing) * 3)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    whiteSpace: "nowrap",
+  },
+  pxPickLiVariant: {
+    backgroundColor: "var(--color-cream-200)",
+  },
+  pxPickLiVariant2: {},
+});
 
 const viewStyles = stylex.create({
   pxPickDiv: {
@@ -42,7 +222,11 @@ export function PxSegmented<T extends string | number | boolean>(props: {
   label?: string;
 }) {
   return (
-    <div role="group" aria-label={props.label} class={[(props.block ?? true) ? "flex" : "inline-flex", "flex-wrap gap-1 bg-cream-200 p-1"]}>
+    <div
+      role="group"
+      aria-label={props.label}
+      {...stylex.attrs(variantStyles.pxSegmentedDiv, (props.block ?? true) ? variantStyles.pxSegmentedDivVariant : variantStyles.pxSegmentedDivVariant2)}
+    >
       <For each={props.options}>
         {(o) => (
           <button
@@ -139,14 +323,11 @@ export function PxPick(props: {
           else return;
           e.preventDefault();
         }}
-        class={[
-          pxText.sm,
-          pxRing,
-          pxFocus,
-          "flex h-9 w-full cursor-pointer items-center gap-2 bg-cream-100 px-3 text-left disabled:cursor-default disabled:opacity-50",
-        ]}
+        {...stylex.attrs(recipeStyles.pxPickButton)}
       >
-        <span class={["min-w-0 flex-1 truncate", current().value === "" ? "text-bark-600" : "text-bark-900"]}>{current().label}</span>
+        <span {...stylex.attrs(variantStyles.pxPickSpan, current().value === "" ? variantStyles.pxPickSpanVariant : variantStyles.pxPickSpanVariant2)}>
+          {current().label}
+        </span>
         <SpriteIcon name="button-next" size={12} class="rotate-90" />
       </button>
       <Show when={open()}>
@@ -165,13 +346,13 @@ export function PxPick(props: {
                     e.preventDefault();
                     pick(o.value);
                   }}
-                  class={["flex cursor-pointer items-baseline gap-3 px-2.5 py-1.5 whitespace-nowrap", { "bg-cream-200": i() === highlight() }]}
+                  {...stylex.attrs(variantStyles.pxPickLi, i() === highlight() ? variantStyles.pxPickLiVariant : variantStyles.pxPickLiVariant2)}
                 >
                   <span class={[pxText.sm, "flex-1", o.value === "" ? "text-bark-600" : o.value === props.value ? "text-leaf-700" : "text-bark-800"]}>
                     {o.label}
                   </span>
                   <Show when={o.detail}>
-                    <span class={[pxText.xs, "text-bark-600"]}>{o.detail}</span>
+                    <span {...stylex.attrs(recipeStyles.pxPickSpan)}>{o.detail}</span>
                   </Show>
                 </li>
               )}
@@ -198,23 +379,28 @@ export function PxSwitchField(props: {
       aria-checked={aria(props.checked)}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
-      class={[pxFocus, "inline-flex max-w-full cursor-pointer items-center gap-3 text-left text-bark-900 disabled:cursor-default disabled:opacity-50"]}
+      {...stylex.attrs(recipeStyles.pxSwitchFieldButton)}
     >
       {/* The inner line is the padding: the 20 px thumb travels 16 px. */}
       <span
-        class={[
-          "flex h-6 w-10 shrink-0 border-2 border-cream-300 transition-colors duration-150 motion-reduce:transition-none",
-          props.checked ? "bg-leaf-500" : "bg-cream-300/70",
-        ]}
+        {...stylex.attrs(
+          recipeStyles2.pxSwitchFieldSpan,
+          props.checked ? recipeStyles2.pxSwitchFieldSpanVariant1Case2 : recipeStyles2.pxSwitchFieldSpanVariant1Case1,
+        )}
       >
-        <span class={["size-5 bg-cream-50 transition-transform duration-150 motion-reduce:transition-none", pxDrop, { "translate-x-4": props.checked }]} />
+        <span
+          {...stylex.attrs(
+            recipeStyles.pxSwitchFieldSpan,
+            props.checked ? recipeStyles.pxSwitchFieldSpanVariant1Case2 : recipeStyles.pxSwitchFieldSpanVariant1Case1,
+          )}
+        />
       </span>
       <span {...stylex.attrs(viewStyles.pxSwitchFieldSpan)}>
         <PxTip tip={props.tip} class={pxText.sm}>
           {props.label}
         </PxTip>
         <Show when={props.hint}>
-          <span class={[pxText.fine, "text-bark-500"]}>{props.hint}</span>
+          <span {...stylex.attrs(recipeStyles.pxSwitchFieldSpan2)}>{props.hint}</span>
         </Show>
       </span>
     </button>
