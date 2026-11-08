@@ -10,6 +10,7 @@ import { ago, tookText } from "#/base/format.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import { actionIcon, type IconName } from "#/ui/icons.ts";
 import { Markdown } from "#/ui/Markdown.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { createSessionEvents } from "./events";
 import {
@@ -28,6 +29,12 @@ import {
   spanLabel,
   spansOf,
 } from "./runs";
+
+const recipeStyles = stylex.create({
+  runStepsWorkLog: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+  },
+});
 
 const variantStyles2 = stylex.create({
   runStepsIcon: {
@@ -91,6 +98,22 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  workLog: {
+    maxHeight: "352px",
+    overflowY: "auto",
+    borderRadius: "var(--radius-md)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+  },
+  runDivider: {
+    borderTopWidth: { default: null, ":not(:last-child)": 0 },
+    borderBottomWidth: { default: null, ":not(:last-child)": 1 },
+    borderTopStyle: { default: null, ":not(:last-child)": "solid" },
+    borderBottomStyle: { default: null, ":not(:last-child)": "solid" },
+    borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
+  },
   runStepsDiv: {
     marginTop: "calc(var(--spacing) * 1.5)",
   },
@@ -314,7 +337,7 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
             <Icon name={open() ? "collapse" : "enlarge"} size={10} styles={[variantStyles2.runStepsIcon]} />
           </button>
           <Show when={open()}>
-            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />
+            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} styles={[recipeStyles.runStepsWorkLog]} />
           </Show>
         </div>
       )}
@@ -323,15 +346,12 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
 }
 
 /** A session's steps by run, each run folded to its answer but the last. */
-export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; class?: string }) {
+export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; styles?: stylex.StyleXStyles }) {
   const shown = () => shownEvents(props.steps);
   const runs = () => runsOf(shown());
   const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
   return (
-    <div
-      class={["max-h-[352px] divide-y divide-line overflow-y-auto rounded-md border border-line bg-page", props.class]}
-      aria-label={t("web.session.log.process")}
-    >
+    <div {...styleProps([viewStyles.workLog, props.styles])} aria-label={t("web.session.log.process")}>
       <For each={runs()} keyed={(r) => r.run ?? (r.asked ?? r.steps[0])?.seq ?? -1}>
         {(r, i) => (
           <RunFold
@@ -356,7 +376,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
     return open() ? props.run.steps : answer ? [answer] : [];
   };
   return (
-    <div {...stylex.attrs(viewStyles.runFoldDiv)}>
+    <div {...stylex.attrs(viewStyles.runFoldDiv, viewStyles.runDivider)}>
       <button
         type="button"
         onClick={() => setToggled(!open())}

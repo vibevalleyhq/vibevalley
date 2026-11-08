@@ -7,6 +7,65 @@ test.use({ viewport: { width: 1680, height: 1000 } });
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
 
+test("regression: pixel rich text preserves nodes while typography and clamp variables change", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/像素/PxMarkdown:Composition", theme: "light", w: "500" })}`);
+  const frame = page.getByTestId("pixel-rich-composition");
+  const markdown = frame.locator("[data-pixel-markdown]");
+  const heading = markdown.locator("h1");
+  const original = await heading.elementHandle();
+  const plain = frame.locator(":scope > p");
+  await expect(markdown).toHaveCSS("margin-left", "4px");
+  await expect(plain).toHaveCSS("-webkit-line-clamp", "2");
+  await expect(markdown.getByRole("link")).toHaveAttribute("target", "_blank");
+  await expect(markdown.getByRole("link")).toHaveAttribute("rel", "noreferrer");
+  await page.locator('[data-testid="story-arg"][data-name="reading"]').getByRole("checkbox").check();
+  await expect(heading).toHaveCSS("font-size", "24px");
+  expect(await heading.evaluate((current, before) => current === before, original)).toBe(true);
+  await page.locator('[data-testid="story-arg"][data-name="indent"]').getByRole("spinbutton").fill("16");
+  await expect(markdown).toHaveCSS("margin-left", "16px");
+  await expect(plain).toHaveCSS("margin-left", "16px");
+  await page.locator('[data-testid="story-arg"][data-name="maxLines"]').getByRole("spinbutton").fill("3");
+  await expect(plain).toHaveCSS("-webkit-line-clamp", "3");
+  check();
+});
+
+test("regression: dictation surface hover retains the recording fill and object variables", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/语音/听写:Composition", theme, w: "400" })}`);
+    const button = page.getByTestId("dictate");
+    await expect(button).toHaveCSS("margin-left", "4px");
+    const rest = await button.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(rest).not.toBe("rgba(0, 0, 0, 0)");
+    await button.hover();
+    await expect(button).not.toHaveCSS("background-color", rest);
+    await page.mouse.move(0, 0);
+    await expect(button).toHaveCSS("background-color", rest);
+    await page.locator('[data-testid="story-arg"][data-name="indent"]').getByRole("spinbutton").fill("16");
+    await expect(button).toHaveCSS("margin-left", "16px");
+    await page.locator('[data-testid="story-arg"][data-name="recording"]').getByRole("checkbox").uncheck();
+    await expect(button).toHaveAttribute("data-state", "idle");
+    await expect(button).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    check();
+  }
+});
+
+test("regression: work log composition keeps run separators and mounted folds", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "界面/执行/干活的经过:Composition", theme: "light", w: "600" })}`);
+  const log = page.getByTestId("work-log-composition").locator(":scope > div");
+  const runs = log.locator(":scope > div");
+  await expect(runs).toHaveCount(2);
+  await expect(runs.first()).toHaveCSS("border-bottom-width", "1px");
+  await expect(runs.last()).toHaveCSS("border-bottom-width", "0px");
+  const original = await runs.first().elementHandle();
+  await page.locator('[data-testid="story-arg"][data-name="maxHeight"]').getByRole("spinbutton").fill("320");
+  await expect(log).toHaveCSS("max-height", "320px");
+  expect(await runs.first().evaluate((current, before) => current === before, original)).toBe(true);
+  check();
+});
+
 test("regression: pixel windows and fields preserve composed variables, editing and node identity", async ({ page }) => {
   const check = diagnosticsOf(page);
   await page.goto(`/?${new URLSearchParams({ s: "组件/像素/base:Composition", theme: "light", w: "500" })}`);

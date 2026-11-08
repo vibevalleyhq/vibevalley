@@ -15,6 +15,13 @@ import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
 
+const recipeStyles4 = stylex.create({
+  treePageFilters: {
+    minWidth: "220px",
+    flex: "1",
+  },
+});
+
 const recipeStyles3 = stylex.create({
   treePageDiv: {
     position: "fixed",
@@ -206,7 +213,7 @@ export function TreePage() {
         style={sky() || narrow() ? undefined : { width: `${Math.min(520, area().w - 24)}px` }}
       >
         <Show when={sky()}>
-          <Filters tree={tree} filter={filter()} setFilter={setFilter} class="min-w-[220px] flex-1" />
+          <Filters tree={tree} filter={filter()} setFilter={setFilter} styles={[recipeStyles4.treePageFilters]} />
         </Show>
         <label {...stylex.attrs(viewStyles.treePageLabel)}>
           <span {...stylex.attrs(recipeStyles.treePageSpan)}>{t("web.tree.earliest")}</span>

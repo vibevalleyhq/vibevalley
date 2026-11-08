@@ -25,6 +25,14 @@ import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";
 
+const recipeStyles = stylex.create({
+  composerDictationKey: {
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    borderRadius: "var(--radius-md)",
+  },
+});
+
 const variantStyles2 = stylex.create({
   composerProgressRoot: {
     position: "relative",
@@ -614,7 +622,7 @@ export function Composer(props: {
           >
             <DictationBar dictating={dictating} />
           </Show>
-          <DictationKey dictating={dictating} bar size={16} class="size-7 rounded-md hover:bg-hover" />
+          <DictationKey dictating={dictating} bar surface size={16} styles={[recipeStyles.composerDictationKey]} />
           <Show when={!listening()}>
             <Show when={box.stoppable()}>
               <button

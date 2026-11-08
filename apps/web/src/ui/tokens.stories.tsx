@@ -5,8 +5,26 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
+import { styleProps } from "./positioner";
 
 const viewStyles = stylex.create({
+  colour: (value: string) => ({ backgroundColor: value }),
+  radius: (value: string) => ({ borderRadius: value }),
+  shadow: (value: string) => ({ boxShadow: value }),
+  timing: (value: string) => ({ transitionTimingFunction: value }),
+  swatch: { height: "calc(var(--spacing) * 8)", borderRadius: "var(--radius-md)", borderWidth: 1, borderStyle: "solid", borderColor: "var(--color-line)" },
+  pixelSwatch: { width: "calc(var(--spacing) * 7)", height: "calc(var(--spacing) * 7)" },
+  typeSample: { textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" },
+  shape: {
+    width: "calc(var(--spacing) * 10)",
+    height: "calc(var(--spacing) * 10)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+  },
+  raised: { backgroundColor: "var(--color-page)", borderRadius: "var(--radius-md)" },
+  hidden: { display: "none" },
   nameSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
@@ -88,67 +106,76 @@ const viewStyles = stylex.create({
 });
 
 const colours: [string, string][] = [
-  ["page", "bg-page"],
-  ["side", "bg-side"],
-  ["hover", "bg-hover"],
-  ["selected", "bg-selected"],
-  ["line", "bg-line"],
-  ["faint", "bg-faint"],
-  ["muted", "bg-muted"],
-  ["ink", "bg-ink"],
-  ["accent", "bg-accent"],
-  ["focus", "bg-focus"],
-  ["leaf", "bg-leaf"],
-  ["wheat", "bg-wheat"],
-  ["berry", "bg-berry"],
-  ["water", "bg-water"],
-  ["bark", "bg-bark"],
-  ["idle", "bg-idle"],
-  ["ok-soft", "bg-ok-soft"],
-  ["ok-ink", "bg-ok-ink"],
-  ["bad-soft", "bg-bad-soft"],
-  ["warn-ink", "bg-warn-ink"],
-  ["rail", "bg-rail"],
-  ["code-bg", "bg-code-bg"],
+  ["page", "var(--color-page)"],
+  ["side", "var(--color-side)"],
+  ["hover", "var(--color-hover)"],
+  ["selected", "var(--color-selected)"],
+  ["line", "var(--color-line)"],
+  ["faint", "var(--color-faint)"],
+  ["muted", "var(--color-muted)"],
+  ["ink", "var(--color-ink)"],
+  ["accent", "var(--color-accent)"],
+  ["focus", "var(--color-focus)"],
+  ["leaf", "var(--color-leaf)"],
+  ["wheat", "var(--color-wheat)"],
+  ["berry", "var(--color-berry)"],
+  ["water", "var(--color-water)"],
+  ["bark", "var(--color-bark)"],
+  ["idle", "var(--color-idle)"],
+  ["ok-soft", "var(--color-ok-soft)"],
+  ["ok-ink", "var(--color-ok-ink)"],
+  ["bad-soft", "var(--color-bad-soft)"],
+  ["warn-ink", "var(--color-warn-ink)"],
+  ["rail", "var(--color-rail)"],
+  ["code-bg", "var(--color-code-bg)"],
 ];
 
 // The pixel skin's families, darkest last.
 const palette: [string, string[]][] = [
-  ["cream", ["bg-cream-50", "bg-cream-100", "bg-cream-200", "bg-cream-300"]],
-  ["bark", ["bg-bark-400", "bg-bark-500", "bg-bark-600", "bg-bark-800", "bg-bark-900"]],
-  ["leaf", ["bg-leaf-300", "bg-leaf-500", "bg-leaf-600", "bg-leaf-700"]],
-  ["wheat · berry · water", ["bg-hat", "bg-wheat-700", "bg-berry-500", "bg-berry-800", "bg-water-500"]],
-  ["ink", ["bg-ink-100", "bg-ink-300", "bg-ink-500", "bg-ink-700", "bg-ink-900"]],
-  ["lcd · dusk · glow", ["bg-lcd-pale", "bg-lcd-paper", "bg-lcd-light", "bg-dusk-800", "bg-glow"]],
+  ["cream", ["var(--color-cream-50)", "var(--color-cream-100)", "var(--color-cream-200)", "var(--color-cream-300)"]],
+  ["bark", ["var(--color-bark-400)", "var(--color-bark-500)", "var(--color-bark-600)", "var(--color-bark-800)", "var(--color-bark-900)"]],
+  ["leaf", ["var(--color-leaf-300)", "var(--color-leaf-500)", "var(--color-leaf-600)", "var(--color-leaf-700)"]],
+  ["wheat · berry · water", ["var(--color-hat)", "var(--color-wheat-700)", "var(--color-berry-500)", "var(--color-berry-800)", "var(--color-water-500)"]],
+  ["ink", ["var(--color-ink-100)", "var(--color-ink-300)", "var(--color-ink-500)", "var(--color-ink-700)", "var(--color-ink-900)"]],
+  ["lcd · dusk · glow", ["var(--color-lcd-pale)", "var(--color-lcd-paper)", "var(--color-lcd-light)", "var(--color-dusk-800)", "var(--color-glow)"]],
 ];
 
-const sizes: [string, string][] = [
-  ["text-2xs", "text-2xs"],
-  ["text-xs", "text-xs"],
-  ["text-sm", "text-sm"],
-  ["text-base", "text-base"],
-  ["text-lg", "text-lg"],
-  ["text-xl", "text-xl"],
+const typography = stylex.create({
+  tiny: { fontSize: "var(--text-2xs)", lineHeight: "var(--text-2xs--line-height)" },
+  xs: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)" },
+  sm: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
+  base: { fontSize: "var(--text-base)", lineHeight: "var(--text-base--line-height)" },
+  lg: { fontSize: "var(--text-lg)", lineHeight: "var(--text-lg--line-height)" },
+  xl: { fontSize: "var(--text-xl)", lineHeight: "var(--text-xl--line-height)" },
+});
+
+const sizes: [string, stylex.StyleXStyles][] = [
+  ["text-2xs", typography.tiny],
+  ["text-xs", typography.xs],
+  ["text-sm", typography.sm],
+  ["text-base", typography.base],
+  ["text-lg", typography.lg],
+  ["text-xl", typography.xl],
 ];
 
 const radii: [string, string][] = [
-  ["xs", "rounded-xs"],
-  ["sm", "rounded-sm"],
-  ["md", "rounded-md"],
-  ["lg", "rounded-lg"],
-  ["xl", "rounded-xl"],
+  ["xs", "var(--radius-xs)"],
+  ["sm", "var(--radius-sm)"],
+  ["md", "var(--radius-md)"],
+  ["lg", "var(--radius-lg)"],
+  ["xl", "var(--radius-xl)"],
 ];
 
 const shadows: [string, string][] = [
-  ["raise", "shadow-raise"],
-  ["float", "shadow-float"],
+  ["raise", "var(--shadow-raise)"],
+  ["float", "var(--shadow-float)"],
 ];
 
 const eases: [string, string][] = [
-  ["out", "ease-out"],
-  ["in", "ease-in"],
-  ["in-out", "ease-in-out"],
-  ["spring", "ease-spring"],
+  ["out", "var(--ease-out)"],
+  ["in", "var(--ease-in)"],
+  ["in-out", "var(--ease-in-out)"],
+  ["spring", "var(--ease-spring)"],
 ];
 
 function Name(props: { children: string }) {
@@ -165,9 +192,9 @@ const bezier = (v: string) => {
   return n.length === 4 ? (n as [number, number, number, number]) : undefined;
 };
 
-/** The curve on a 0–1 square, with room for spring's overshoot, read off an element wearing the class: the curve drawn
+/** The curve on a 0–1 square, with room for spring's overshoot, read off a styled element: the curve drawn
  * is the one the pages get. */
-function Curve(props: { name: string; class: string }) {
+function Curve(props: { name: string; styles: stylex.StyleXStyles }) {
   let probe!: HTMLSpanElement;
   const [p, setP] = createSignal<[number, number, number, number]>();
   onSettled(() => {
@@ -176,7 +203,7 @@ function Curve(props: { name: string; class: string }) {
   const y = (v: number) => 44 - v * 32;
   return (
     <div {...stylex.attrs(viewStyles.curveDiv)}>
-      <span ref={(el) => (probe = el)} class={["hidden", props.class]} />
+      <span ref={(el) => (probe = el)} {...styleProps([viewStyles.hidden, props.styles])} />
       <svg viewBox="0 0 48 56" {...stylex.attrs(viewStyles.curveSvg)} aria-hidden="true">
         <rect x="8" y="12" width="32" height="32" fill="none" stroke="currentColor" />
         <Show when={p()}>
@@ -203,9 +230,9 @@ export default stories({
       render: () => (
         <div {...stylex.attrs(viewStyles.tokensStoriesDiv)}>
           <For each={colours}>
-            {([name, cls]) => (
+            {([name, appearance]) => (
               <div {...stylex.attrs(viewStyles.tokensStoriesDiv2)}>
-                <span class={["h-8 rounded-md border border-line", cls]} />
+                <span {...styleProps([viewStyles.swatch, viewStyles.colour(appearance)])} />
                 <Name>{name}</Name>
               </div>
             )}
@@ -221,7 +248,7 @@ export default stories({
             {([name, list]) => (
               <div {...stylex.attrs(viewStyles.tokensStoriesDiv2)}>
                 <div {...stylex.attrs(viewStyles.tokensStoriesDiv4)}>
-                  <For each={list}>{(cls) => <span class={["size-7", cls]} />}</For>
+                  <For each={list}>{(appearance) => <span {...styleProps([viewStyles.pixelSwatch, viewStyles.colour(appearance)])} />}</For>
                 </div>
                 <span {...stylex.attrs(viewStyles.tokensStoriesSpan)}>{name}</span>
               </div>
@@ -235,12 +262,12 @@ export default stories({
       render: (a) => (
         <div {...stylex.attrs(viewStyles.tokensStoriesDiv5)}>
           <For each={sizes}>
-            {([name, cls]) => (
+            {([name, appearance]) => (
               <div {...stylex.attrs(viewStyles.tokensStoriesDiv6)}>
                 <span {...stylex.attrs(viewStyles.tokensStoriesSpan2)}>
                   <Name>{name}</Name>
                 </span>
-                <span class={["truncate", cls]}>{a.sample}</span>
+                <span {...styleProps([viewStyles.typeSample, appearance])}>{a.sample}</span>
               </div>
             )}
           </For>
@@ -251,17 +278,17 @@ export default stories({
       render: () => (
         <Grid>
           <For each={radii}>
-            {([name, cls]) => (
+            {([name, appearance]) => (
               <div {...stylex.attrs(viewStyles.curveDiv)}>
-                <span class={["size-10 border border-line bg-side", cls]} />
+                <span {...styleProps([viewStyles.shape, viewStyles.radius(appearance)])} />
                 <Name>{name}</Name>
               </div>
             )}
           </For>
           <For each={shadows}>
-            {([name, cls]) => (
+            {([name, appearance]) => (
               <div {...stylex.attrs(viewStyles.curveDiv)}>
-                <span class={["size-10 rounded-md border border-line bg-page", cls]} />
+                <span {...styleProps([viewStyles.shape, viewStyles.raised, viewStyles.shadow(appearance)])} />
                 <Name>{name}</Name>
               </div>
             )}
@@ -274,7 +301,7 @@ export default stories({
         const [replay, setReplay] = createSignal(0);
         return (
           <Grid>
-            <For each={eases}>{([name, cls]) => <Curve name={name} class={cls} />}</For>
+            <For each={eases}>{([name, appearance]) => <Curve name={name} styles={viewStyles.timing(appearance)} />}</For>
             {/* Keyed by the count, so each press mounts them again and they play again. */}
             <For each={[replay()]}>
               {() => (

@@ -8,6 +8,7 @@ import type { ChangedFile } from "@vibevalley/protocol";
 import { aria } from "#/base/dom.tsx";
 import { changeKind, patchLines, patchMarkOf } from "#/features/issue/index.ts";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 const variantStyles = stylex.create({
   fileRowSpan: {
@@ -28,6 +29,7 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  tinted: { paddingInline: "calc(var(--spacing) * 3)", paddingBlock: "calc(var(--spacing) * 2)" },
   farmTagSpan: {
     display: "inline-flex",
     alignItems: "center",
@@ -105,12 +107,8 @@ export function FarmTag(props: { text: string; fill?: string; ink?: string; icon
   );
 }
 
-export function Tinted(props: { children: JSX.Element; color?: string; class?: string; style?: JSX.CSSProperties }) {
-  return (
-    <div class={["px-3 py-2", props.class]} style={{ background: props.color ?? "#eedcb2", ...props.style }}>
-      {props.children}
-    </div>
-  );
+export function Tinted(props: { children: JSX.Element; color?: string; styles?: stylex.StyleXStyles; style?: JSX.CSSProperties }) {
+  return <div {...styleProps([viewStyles.tinted, props.styles], { background: props.color ?? "#eedcb2", ...props.style })}>{props.children}</div>;
 }
 
 export function FarmEmpty(props: { text: string }) {

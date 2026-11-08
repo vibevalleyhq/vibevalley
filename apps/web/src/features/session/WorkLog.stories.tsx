@@ -8,6 +8,7 @@ import { Trajectory } from "./Trajectory";
 import { WorkLog } from "./WorkLog";
 
 const viewStyles = stylex.create({
+  constrained: (maxHeight: number) => ({ maxHeight }),
   workLogStoriesDiv: {
     width: "100%",
     maxWidth: "var(--container-2xl)",
@@ -19,6 +20,14 @@ const twoRuns = [...finishedRun, ...liveRun];
 export default stories({
   title: "界面/执行/干活的经过",
   stories: {
+    Composition: story({
+      args: { maxHeight: 240 },
+      render: (a) => (
+        <div data-testid="work-log-composition">
+          <WorkLog steps={twoRuns} now={nowAfter(twoRuns)} styles={viewStyles.constrained(a.maxHeight)} />
+        </div>
+      ),
+    }),
     Finished: story({
       note: "一轮做完：交给它的话、想起的、想的、读改跑（失败的那次红着）、重试、用了多少、它说的。",
       render: () => (

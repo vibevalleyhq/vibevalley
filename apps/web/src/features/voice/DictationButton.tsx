@@ -8,6 +8,7 @@ import { ready, useSettings } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { Icon, type IconSize } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { dictation, type DictationPhase, insertDictated } from "./dictation";
 
@@ -25,7 +26,36 @@ const variantStyles = stylex.create({
   },
 });
 
+const recordingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
+
 const viewStyles = stylex.create({
+  mark: {
+    display: "inline-flex",
+    flexShrink: 0,
+    cursor: { default: "pointer", ":disabled": "default" },
+    touchAction: "none",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "var(--spacing)",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+    opacity: { default: null, ":disabled": 0.5 },
+  },
+  unset: { color: "var(--color-faint)" },
+  recording: {
+    color: "var(--color-berry)",
+    backgroundColor: {
+      default: "var(--color-berry)",
+      "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 12%, transparent)",
+    },
+    animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: { default: "2s", "@media (prefers-reduced-motion: reduce)": "0s" },
+    animationTimingFunction: { default: "cubic-bezier(0.4,0,0.6,1)", "@media (prefers-reduced-motion: reduce)": "ease" },
+    animationIterationCount: { default: "infinite", "@media (prefers-reduced-motion: reduce)": 1 },
+  },
+  recordingBar: { backgroundColor: { default: "var(--color-accent)", "@media (hover: hover)": { default: null, ":hover": "var(--color-accent-hover)" } } },
+  surface: { backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } } },
+  recordingSurface: { backgroundColor: { default: "var(--color-accent)", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } } },
   dictationBar: {
     display: "flex",
     minWidth: "0",
@@ -191,7 +221,7 @@ export type Dictating = ReturnType<typeof useDictation>;
 const holdMs = 400;
 
 /** Tap to start talking, tap again to stop, or hold to talk and let go. not set up, it opens where it is set. */
-export function DictationKey(props: { dictating: Dictating; bar?: boolean; size?: IconSize | undefined; class?: string | undefined }) {
+export function DictationKey(props: { dictating: Dictating; bar?: boolean; surface?: boolean; size?: IconSize | undefined; styles?: stylex.StyleXStyles }) {
   const d = () => props.dictating;
   // The press that started a recording, and whether letting go of it stopped it: its click is then not a tap.
   let pressed: number | undefined;
@@ -202,7 +232,8 @@ export function DictationKey(props: { dictating: Dictating; bar?: boolean; size?
       problem={d().problem()}
       bar={props.bar === true}
       size={props.size}
-      class={props.class}
+      styles={props.styles}
+      surface={props.surface}
       onPointerDown={(e) => {
         if (e.button !== 0 || d().state() !== "idle") return;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -232,10 +263,10 @@ export function DictationButton(props: {
   value: string;
   onValue: (v: string, caret: number) => void;
   size?: IconSize;
-  class?: string;
+  styles?: stylex.StyleXStyles;
 }) {
   const dictating = useDictation({ input: () => props.field(), value: () => props.value, onValue: (v, c) => props.onValue(v, c) });
-  return <DictationKey dictating={dictating} size={props.size} class={props.class} />;
+  return <DictationKey dictating={dictating} size={props.size} styles={props.styles} />;
 }
 
 /** The key as it looks in each state, the microphone and the server kept out: what DictationKey draws. */
@@ -245,7 +276,8 @@ export function DictationMark(props: {
   /** The box shows the recording (DictationBar): the key is its done, not a pulsing stop. */
   bar?: boolean | undefined;
   size?: IconSize | undefined;
-  class?: string | undefined;
+  styles?: stylex.StyleXStyles;
+  surface?: boolean | undefined;
   onClick: () => void;
   onPointerDown?: ((e: PointerEvent & { currentTarget: HTMLButtonElement }) => void) | undefined;
   onPointerUp?: (() => void) | undefined;
@@ -269,13 +301,18 @@ export function DictationMark(props: {
       onClick={() => props.onClick()}
       onPointerDown={(e) => props.onPointerDown?.(e)}
       onPointerUp={() => props.onPointerUp?.()}
-      class={[
-        "inline-flex shrink-0 cursor-pointer touch-none items-center justify-center p-1 select-none disabled:cursor-default disabled:opacity-50",
-        { "text-faint": props.state === "unset" },
-        { "animate-pulse bg-berry/12 text-berry": props.state === "recording" && props.bar !== true },
-        { "bg-accent hover:bg-accent-hover": props.state === "recording" && props.bar === true },
-        props.class,
-      ]}
+      {...styleProps([
+        viewStyles.mark,
+        props.state === "unset" && viewStyles.unset,
+        props.state === "recording"
+          ? props.bar === true
+            ? props.surface === true
+              ? viewStyles.recordingSurface
+              : viewStyles.recordingBar
+            : viewStyles.recording
+          : props.surface === true && viewStyles.surface,
+        props.styles,
+      ])}
     >
       <Icon name={look()[0]} size={props.size ?? 20} />
     </button>

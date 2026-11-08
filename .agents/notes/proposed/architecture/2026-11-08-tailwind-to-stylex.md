@@ -76,7 +76,7 @@ Use `stylex.attrs()` at ordinary Solid DOM boundaries. Its serialized `style` st
 - Place component defaults and semantic tone maps before caller `props.styles` (`styleProps([styles.base, defaultTone, props.styles])`) so explicit caller overrides work predictably.
 - Reference semantic tokens (`--color-*`, `--shadow-*`) in component styles rather than theme-internal `--wb-*` primitives.
 - Keep shared skin recipes (such as `apps/web/src/ui/pixel/style.ts` typography and chrome) in one `stylex.create` module and compose them at call sites rather than inlining duplicate per-file `recipeStyles` or four-layer `0 0 transparent` ring placeholders.
-- Keep owned rich-text CSS (`apps/web/src/ui/Markdown.css`) grouped by selector inside `@layer components`.
+- Keep owned rich-text CSS (`apps/web/src/ui/Markdown.css` and `apps/web/src/ui/pixel/PxMarkdown.css`) grouped by selector inside `@layer components` and imported through the host stylesheet.
 
 ### Machine-readable completion
 
@@ -174,7 +174,7 @@ The 170-scene full capture was interrupted at the owner's request while still ru
 ### Phase 1 — Close shared styling contracts (907 tokens / 43 files at baseline)
 
 - [x] Locate all 23 contract findings and 10 helper-call findings in the scanner output; record their ownership below. These are findings, not 23 confirmed public APIs or 10 distinct helper functions.
-- [ ] Trace each contract's callers and distinguish actual style APIs, story data and native/externally owned attributes before converting or classifying it.
+- [x] Trace each baseline contract's callers and distinguish actual style APIs, story data and native/externally owned attributes before converting or classifying it. The string-contract finding category is zero; remaining native interfaces and dynamic class producers still require review.
 - [ ] Convert workbench layout, status/icon/avatar and remaining UI contracts with all callers in the same batch. Start with `apps/web/src/ui/layout.tsx` (100 token occurrences at baseline).
 - [x] First layout slice: replace Card's class-string prop with typed StyleX composition and migrate all six skill/voice callers; preserve dynamic variables as object styles. Split, ListCard, ListRow, Toggle, SecretInput and TextLink are also converted; their consolidated acceptance is pending phase 6.
 - [ ] Convert pixel component contracts, starting with `apps/web/src/ui/pixel/choice.tsx` (88 occurrences); keep positioning and animation values under one owner.
@@ -229,13 +229,13 @@ The 170-scene full capture was interrupted at the owner's request while still ru
 | Owner | Baseline contract findings | Definition files | Next action |
 |---|---:|---|---|
 | Workbench UI | 5 | `Checkbox.tsx`, `Form.tsx`, `Markdown.tsx`, `Tag.tsx`, `layout.tsx` | These baseline contracts and their callers are migrated; finish remaining literal styles and phase 6 acceptance |
-| Pixel UI | 9 | `PxMarkdown.tsx` (2), `base.tsx` (3), `dialog.tsx` (1), `field.tsx` (3) | Base, modal and field contracts are migrated; the two Markdown contracts and remaining literal styles are open |
-| Token stories | 1 | `ui/tokens.stories.tsx` | Migrate class-bearing story data; do not count this as a public component API |
-| Business features | 5 | `issue/Sheet.tsx` (1), `session/WorkLog.tsx` (1), `voice/DictationButton.tsx` (3) | Trace wrapper and render-prop forwarding before replacing contracts |
-| Farm | 2 | `farm/map/RepoMap.tsx`, `farm/panels/rows.tsx` | Coordinate with phase 3 DOM conversion |
-| Tree | 1 | `tree/TreePanel.tsx` | Coordinate with phase 3 overlay conversion |
+| Pixel UI | 9 | `PxMarkdown.tsx` (2), `base.tsx` (3), `dialog.tsx` (1), `field.tsx` (3) | All baseline contracts are migrated; remaining literal styles and phase 6 acceptance are open |
+| Token stories | 1 | `ui/tokens.stories.tsx` | Curve and token data use typed styles / CSS-variable references; labels are unchanged |
+| Business features | 5 | `issue/Sheet.tsx` (1), `session/WorkLog.tsx` (1), `voice/DictationButton.tsx` (3) | All baseline contracts and explicit callers migrated; phase 6 acceptance pending |
+| Farm | 2 | `farm/map/RepoMap.tsx`, `farm/panels/rows.tsx` | Art and Tinted compose styles while retaining native geometry and color ownership |
+| Tree | 1 | `tree/TreePanel.tsx` | Filters and its placement caller migrated; remaining overlay styles are open |
 
-The ten baseline helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Field's three calls are removed; seven findings remain. Definitions must be removed only after all callers are migrated. The five baseline workbench contracts and seven pixel contracts are converted, reducing contract findings from 23 to 11. Additional native-attribute interfaces (TextInput, TextArea, SecretInput and Icon) were migrated as well, but were not counted in that baseline category. Split/ListCard/ListRow, Toggle and TextLink are converted. Next are the remaining ordinary UI literals, pixel contracts and their callers. The queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
+The ten baseline helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx` (3), and pixel `PxMarkdown.tsx` (2), `button.tsx` (1) and `field.tsx` (3). Field's three calls and PxMarkdown's two calls are removed; five findings remain. Definitions must be removed only after all callers are migrated. All baseline string-contract findings are resolved, reducing that category from 23 to zero. Additional native-attribute interfaces (TextInput, TextArea, SecretInput and Icon) were migrated as well, but were not counted in that baseline category. Split/ListCard/ListRow, Toggle and TextLink are converted. Next are the remaining ordinary/pixel literals, relational selectors, animations and native-style ownership. The queue is not an exemption list. Contract batches include all callers even when those callers belong to a later phase.
 
 ### Execution ledger
 
@@ -249,7 +249,8 @@ The ten baseline helper-call findings are in website `Bar.tsx` (1) and `Hero.tsx
 | Phase 1: text controls, remaining layout controls and Icon | 3,412 / 131 → 3,273 / 125 | 25 text-control and 31 Icon call sites migrated; clean 1,295-file type/lint and production stories compilation; non-styling AST comparison passes for 28 caller files | Implementation checkpoint; 19 contract findings remain; new browser tests and full visual acceptance pending phase 6 |
 | Phase 1: Markdown, IconButton and Chips | 3,273 / 125 → 3,199 / 123 | Markdown's two callers migrated; its 40 descendant utility rules become owned rich-text CSS; IconButton and Chips use StyleX; contract findings 19 → 18 | Implementation checkpoint; browser and visual acceptance pending phase 6 |
 | Cross-phase mechanical sweep: constants, maps and independent conditions | 3,199 / 123 → 2,021 / 108 | 229 expressions across 53 files; non-styling AST comparison passes; clean type/lint and production stories compilation | Implementation checkpoint; 18 contract findings remain; full acceptance pending phase 6 |
-| Pixel contracts, alpha fallbacks and remaining simple native patterns | 1,968 / 102 → 1,686 / 95 | Fresh working-tree starting scan; contract findings 18 → 11; 19 native expressions / 14 files and 9 caller expressions / 5 files; core and native non-styling AST proofs; 38 migration unit tests | Implementation checkpoint; new browser regression and complete visual/live/host acceptance remain pending phase 6 |
+| Pixel contracts, alpha fallbacks and remaining simple native patterns | 1,968 / 102 → 1,686 / 95 | Fresh working-tree starting scan; contract findings 18 → 11; 19 native expressions / 14 files and 9 caller expressions / 5 files; core and native non-styling AST proofs; 38 migration unit tests | Committed as `f54f809f`; browser and complete visual/live/host acceptance pending phase 6 |
+| Remaining string contracts, pixel rich text and token data | 1,686 / 95 → 1,544 / 92 | Contract findings 11 → 0; helpers 7 → 5; 12 mechanical caller expressions / 7 files; non-styling AST proof across 13 files; original rich-text declarations preserved in 25 scoped CSS rules | Implementation checkpoint; native boundaries, remaining classes and full acceptance still open |
 
 Card live inspection covers the new-skill and voice configuration forms at 1440×900 and 390×844. Desktop receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-IR07mx/result.json`. Narrow receipt: `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-bjJzVX/result.json`. Both record code 0, stopped true and no cleanup errors. The default narrow navigation leaves the cards below the fold; the inspected narrow card captures use the real settings-search control to filter navigation and then scroll to the card. This is scoped form evidence, not a default-state full-page comparison or final populated-data acceptance.
 
@@ -309,6 +310,18 @@ Run root checks, targeted tests, `web:check`, website checks/build/browser tests
 Update design rules, web and site READMEs, the app/site/foundation subsystem documents, Base UI and stories contracts, and root instructions. Remove this Note after the completed decisions are documented. Open one PR with evidence and explicit unverified items.
 
 ## Execution evidence
+
+### Remaining string contracts and pixel rich text
+
+Sheet Note, WorkLog, the three dictation wrappers, farm Art/Tinted, tree Filters, PxMarkdown/PxReadText and the Curve story now accept typed styles with their callers. Native geometry and color objects retain their original priority. WorkLog draws the original top/bottom run separators on its direct run elements. The redundant `p-3` on one Tinted caller is removed because the original `px-3 py-2` won in production CSS; Note's important padding becomes a composed caller override without retaining an important utility.
+
+Dictation owns its pulse keyframes and reduced-motion branch. The workbench caller uses the explicit surface-hover variant: merging an external hover-only background recipe would clear the recording fill, so the component owns each complete background state. Pointer hold/tap timing and recorder lifetimes are unchanged.
+
+Pixel rich text keeps parsing, sanitization, mentions, links, cleanup and retained DOM nodes. Descendant utility declarations come from the immutable original stylesheet, folded in original order into `PxMarkdown.css`: 33 expanded selectors/conditions grouped into 25 rules. Reading-mode conditions use zero-specificity `:where` so their scope does not raise selector specificity. The stylesheet enters through `style.css`; the root, inserted links/mentions/separators and plain-text clamp use StyleX. `/tmp/vv-contracts-css-proof.json` verifies the grouped declaration maps against the extracted rules. Token stories use CSS-variable references and typed typography while keeping their displayed labels and curve measurements.
+
+The caller converter changes twelve expressions in seven files. `/tmp/vv-contracts-proof.json` compares thirteen implementation/token-story files against `f54f809f`, preserving non-style AST and independently checking token labels; new stories/tests are outside that proof. Type/lint, application and stories production builds, 38 migration unit tests and dead-code checks pass. The sixteen pixel-kit/session-run tests also pass, but their runner reports a close timeout for two Vite servers before exiting successfully; the cause is not established and no timeout was changed. The production CSS probe retains the expected layer order. Three new browser regressions cover rich-text identity/clamps, dictation surface hover and run separators; they remain unrun until phase 6.
+
+The fresh inventory remains failed at 1,544 class tokens / 92 files, five legacy-helper findings and two stale site graphs. Zero string-contract findings is not a claim that all native styling boundaries, dynamic class expressions, retained inline styles or migration acceptance are complete.
 
 ### Pixel contracts and malformed color fallbacks
 

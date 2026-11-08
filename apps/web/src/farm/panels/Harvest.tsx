@@ -19,6 +19,16 @@ import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "#/ui/pixel/in
 
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./rows";
 
+const recipeStyles2 = stylex.create({
+  readyViewTinted: {
+    marginTop: "calc(var(--spacing) * 3)",
+  },
+  readyViewTinted2: {
+    marginTop: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2.5)",
+  },
+});
+
 const recipeStyles = stylex.create({
   readyViewSpan: {
     fontSize: "12px",
@@ -233,13 +243,13 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         when={conflicts().length > 0}
         fallback={
           <Show when={empty()}>
-            <Tinted class="mt-3">
+            <Tinted styles={[recipeStyles2.readyViewTinted]}>
               <p {...stylex.attrs(viewStyles.readyViewP)}>{t("web.farm.harvest.none")}</p>
             </Tinted>
           </Show>
         }
       >
-        <Tinted color={tint("#c84a3a", 0.12)} class="mt-3 py-2.5">
+        <Tinted color={tint("#c84a3a", 0.12)} styles={[recipeStyles2.readyViewTinted2]}>
           <p {...stylex.attrs(viewStyles.harvestReviewP)}>{t("web.farm.harvest.conflict", { base: props.changes.base })}</p>
           <div {...stylex.attrs(viewStyles.readyViewDiv3)}>
             <For each={conflicts()}>{(f) => <FarmTag text={f} fill="#f7e8c4" ink="#c84a3a" />}</For>
@@ -251,7 +261,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         <p {...stylex.attrs(recipeStyles.readyViewP2)}>{t("web.farm.harvest.behind", { base: props.changes.base, n: Math.round(props.changes.behind) })}</p>
       </Show>
       <Show when={props.changes.uncommitted.length > 0}>
-        <Tinted color={tint("#e5a93c", 0.2)} class="mt-3">
+        <Tinted color={tint("#e5a93c", 0.2)} styles={[recipeStyles2.readyViewTinted]}>
           <p {...stylex.attrs(viewStyles.readyViewP2)}>{t("web.farm.harvest.uncommitted", { n: props.changes.uncommitted.length })}</p>
           <div {...stylex.attrs(viewStyles.readyViewDiv4)}>
             <For each={props.changes.uncommitted}>

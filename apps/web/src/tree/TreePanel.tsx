@@ -6,6 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { ago } from "#/base/format.ts";
 import { PxButton, PxPick, PxWindow, SpriteIcon } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { stageName, type TreeFilter } from "./memories";
 import { type MemoryItem, type MemoryKind, type MemoryTree, TreeStageValues } from "./mock";
@@ -165,6 +166,7 @@ const recipeStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  filters: { display: "flex", gap: "calc(var(--spacing) * 2)" },
   panelHeader: {
     textAlign: "center",
   },
@@ -270,9 +272,9 @@ function tieWords(kind: MemoryKind, ties: Ties): string[] {
   return words;
 }
 
-export function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: TreeFilter) => void; class?: string }) {
+export function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: TreeFilter) => void; styles?: stylex.StyleXStyles }) {
   return (
-    <div class={["flex gap-2", props.class]}>
+    <div {...styleProps([viewStyles.filters, props.styles])}>
       <PxPick
         label={t("web.tree.byHelper")}
         testid="tree-by-helper"

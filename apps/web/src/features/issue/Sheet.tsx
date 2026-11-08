@@ -7,6 +7,7 @@ import { t } from "@vibevalley/i18n";
 import { aria } from "#/base/dom.tsx";
 import { Select } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";
@@ -74,6 +75,13 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  note: {
+    borderRadius: "var(--radius-lg)",
+    paddingInline: "calc(var(--spacing) * 3.5)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
   issueSheetDiv: {
     containerType: "inline-size",
   },
@@ -256,11 +264,12 @@ export function SheetLabel(props: { children: JSX.Element }) {
 }
 
 /** A tinted box: the status, a conflict, nothing to merge. */
-export function Note(props: { tone?: Tone; children: JSX.Element; class?: string }) {
+export function Note(props: { tone?: Tone; children: JSX.Element; styles?: stylex.StyleXStyles }) {
   return (
     <div
-      class={["rounded-lg px-3.5 py-3 text-sm", props.class]}
-      style={{ background: props.tone ? `color-mix(in srgb, ${toneVar(props.tone)} 16%, transparent)` : "var(--color-hover)" }}
+      {...styleProps([viewStyles.note, props.styles], {
+        background: props.tone ? `color-mix(in srgb, ${toneVar(props.tone)} 16%, transparent)` : "var(--color-hover)",
+      })}
     >
       {props.children}
     </div>

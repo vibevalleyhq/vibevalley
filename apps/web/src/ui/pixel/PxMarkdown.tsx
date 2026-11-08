@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
@@ -5,9 +6,34 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
+import { styleProps } from "#/ui/positioner.ts";
 import { fragmentOf, remarkIssueRefs, richen } from "#/ui/richText.ts";
 
-import { cx, pxText } from "./style";
+import { pxStyle } from "./style";
+
+const styles = stylex.create({
+  root: { minWidth: 0, overflowWrap: "break-word" },
+  reading: { maxWidth: "560px" },
+  plain: { whiteSpace: "pre-wrap" },
+  clamped: (lines: number) => ({ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, overflow: "hidden" }),
+  mention: {
+    display: "inline-block",
+    paddingInline: "0.3em",
+    whiteSpace: "nowrap",
+    backgroundColor: { default: "currentColor", "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 13%, transparent)" },
+  },
+  link: {
+    textDecorationLine: "underline",
+    textDecorationColor: { default: "currentColor", "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 45%, transparent)" },
+    WebkitTextDecorationColor: { default: null, "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 45%, transparent)" },
+  },
+  rule: {
+    marginBlock: "calc(var(--spacing) * 2)",
+    height: "1.5px",
+    backgroundImage: "repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 6px)",
+    opacity: 0.4,
+  },
+});
 
 export { plainText } from "@vibevalley/protocol/rules";
 
@@ -30,22 +56,6 @@ export function withMentions(text: string): string {
   return out + mentionLinks(text.slice(at));
 }
 
-// Colours follow the text around it (currentColor), so the same rules read on cream paper and on a green bubble.
-// One weight and no italics: ** and * show as plain words.
-const common =
-  "min-w-0 break-words [&_strong]:font-normal [&_em]:not-italic [&_del]:line-through [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_blockquote]:border-l-2 [&_blockquote]:border-current/30 [&_blockquote]:pl-3 [&_blockquote]:opacity-80 [&_code]:bg-current/10 [&_code]:px-1 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:bg-current/10 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_td]:border [&_td]:border-current/25 [&_td]:px-2 [&_th]:border [&_th]:border-current/25 [&_th]:px-2 [&_th]:font-normal";
-
-const said = cx(
-  pxText.sm,
-  "[&_code]:font-mono [&_h1]:text-[1.05em] [&_h1,&_h2,&_h3,&_h4]:leading-[1.35] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-1.5 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal [&_h2]:text-[1.05em] [&_h3]:text-[1.05em] [&_h4]:text-[1.05em]",
-);
-
-// Reading, a heading is the pixel font at a size it is sharp at: 24 for a title, 12 for a section, as the labels around it.
-const reading = cx(
-  pxText.read,
-  "max-w-[560px] [&_code]:font-mono [&_code]:text-[0.9em] [&_h1]:text-[24px] [&_h1]:leading-[1.3333] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-2 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-pixel [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal [&_h2,&_h3,&_h4,&_h5,&_h6]:text-[12px] [&_h2,&_h3,&_h4,&_h5,&_h6]:leading-[1.5]",
-);
-
 // Raw HTML in the text is dropped (remark-rehype's default).
 const md = unified()
   .use(remarkParse)
@@ -62,12 +72,12 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
   for (const a of [...root.querySelectorAll("a")]) {
     if (a.getAttribute("href") === mentionHref) {
       const tag = document.createElement("span");
-      tag.className = "inline-block bg-current/13 px-[0.3em] whitespace-nowrap";
+      tag.className = stylex.attrs(styles.mention).class ?? "";
       tag.append(...a.childNodes);
       a.replaceWith(tag);
       continue;
     }
-    a.className = "underline decoration-current/45";
+    a.className = stylex.attrs(styles.link).class ?? "";
     a.rel = "noreferrer";
     if (!open) a.target = "_blank";
     else
@@ -79,7 +89,7 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
   for (const hr of [...root.querySelectorAll("hr")]) {
     const line = document.createElement("div");
     line.setAttribute("role", "separator");
-    line.className = "my-2 h-[1.5px] bg-[repeating-linear-gradient(to_right,currentColor_0_3px,transparent_3px_6px)] opacity-40";
+    line.className = stylex.attrs(styles.rule).class ?? "";
     hr.replaceWith(line);
   }
   return [...root.childNodes];
@@ -87,21 +97,26 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
 
 /**
  * GitHub-flavoured, no raw HTML. With `mentions`, @w3, @管家, @主人 and @所有人 outside code are small tags. A link
- * goes to `onOpenLink` when given, else opens in a new tab. `reading`: long text in pxText.read at most 40 characters
- * a line; headings stay pixel, code stays mono. `class` carries the colour.
+ * goes to `onOpenLink` when given, else opens in a new tab. `reading`: long text in pxStyle.read at most 40 characters
+ * a line; headings stay pixel, code stays mono. `styles` carries the colour.
  */
-export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; class?: string }) {
+export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; styles?: stylex.StyleXStyles }) {
   const nodes = createMemo(() => render(props.mentions === true ? withMentions(props.text) : props.text, props.onOpenLink));
-  return <div class={[common, props.reading === true ? reading : said, props.class]}>{nodes()}</div>;
+  return (
+    <div
+      data-pixel-markdown=""
+      data-reading={props.reading === true ? "true" : undefined}
+      {...styleProps([styles.root, props.reading === true ? [pxStyle.read, styles.reading] : pxStyle.sm, props.styles])}
+    >
+      {nodes()}
+    </div>
+  );
 }
 
 /** Plain text to read, as PxMarkdown with `reading` draws it. */
-export function PxReadText(props: { text: string; maxLines?: number; class?: string }) {
+export function PxReadText(props: { text: string; maxLines?: number; styles?: stylex.StyleXStyles }) {
   return (
-    <p
-      class={[pxText.read, "max-w-[560px] whitespace-pre-wrap", { "overflow-hidden": props.maxLines !== undefined }, props.class]}
-      style={props.maxLines !== undefined ? { display: "-webkit-box", "-webkit-box-orient": "vertical", "-webkit-line-clamp": props.maxLines } : undefined}
-    >
+    <p {...styleProps([pxStyle.read, styles.reading, styles.plain, props.styles, props.maxLines !== undefined && styles.clamped(props.maxLines)])}>
       {props.text}
     </p>
   );

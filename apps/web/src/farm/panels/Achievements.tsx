@@ -14,6 +14,21 @@ import { createPixelAct, numberText, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { tint, Tinted } from "./rows";
 
+const recipeStyles2 = stylex.create({
+  standingTinted: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 6)",
+    rowGap: "calc(var(--spacing) * 3)",
+  },
+  starterTinted: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 const recipeStyles = stylex.create({
   titlePickerDiv: {
     position: "absolute",
@@ -452,7 +467,7 @@ function Standing(props: { catalog: readonly Achievement[] }) {
   const commits = () => core()?.commits?.total ?? 0;
   const need = () => Math.round(lv().need);
   return (
-    <Tinted class="flex flex-wrap items-center gap-x-6 gap-y-3 p-3">
+    <Tinted styles={[recipeStyles2.standingTinted]}>
       <div {...stylex.attrs(viewStyles.standingDiv)}>
         <div {...stylex.attrs(viewStyles.standingDiv2)}>
           <span {...stylex.attrs(viewStyles.standingSpan)}>Lv.{Math.round(lv().level)}</span>
@@ -569,7 +584,7 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
     <Show
       when={!(props.list.length > 0 && done() === props.list.length)}
       fallback={
-        <Tinted color={tint("#b4cb7c", 0.4)} class="flex items-center gap-2">
+        <Tinted color={tint("#b4cb7c", 0.4)} styles={[recipeStyles2.starterTinted]}>
           <SpriteIcon name="emblem-starter" size={28} />
           <span {...stylex.attrs(viewStyles.starterSpan)}>{t("web.farm.achievements.starterDone")}</span>
         </Tinted>

@@ -6,6 +6,7 @@ import { PxMarkdown, PxReadText } from "./PxMarkdown";
 import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
+  indented: (marginLeft: number) => ({ marginLeft }),
   pxMarkdownStoriesDiv: {
     width: "calc(var(--spacing) * 96)",
   },
@@ -32,6 +33,20 @@ export default stories({
   themes: ["light"],
   frame: storyFrame.pixel,
   stories: {
+    Composition: story({
+      args: { reading: false, indent: 4, maxLines: 2 },
+      render: (a) => (
+        <div data-testid="pixel-rich-composition" {...stylex.attrs(viewStyles.pxMarkdownStoriesDiv)}>
+          <PxMarkdown
+            text={"# 交活了\n\n@w3 看 [说明](https://example.com)。\n\n> 引用\n\n`code` 和 **强调**。\n\n---"}
+            mentions
+            reading={a.reading}
+            styles={viewStyles.indented(a.indent)}
+          />
+          <PxReadText text={"一行\n二行\n三行\n四行"} maxLines={a.maxLines} styles={viewStyles.indented(a.indent)} />
+        </div>
+      ),
+    }),
     Report: story({
       args: { text: sample, reading: false },
       controls: { text: { kind: "text", long: true } },

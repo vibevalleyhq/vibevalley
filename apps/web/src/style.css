@@ -1,6 +1,7 @@
 @layer theme, base, components, stylex, utilities;
 @import "tailwindcss";
 @import "./ui/Markdown.css";
+@import "./ui/pixel/PxMarkdown.css";
 
 /* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets
    <html data-theme>). Paper and ink are near neutral, so that colour is left for what means something: green to go,

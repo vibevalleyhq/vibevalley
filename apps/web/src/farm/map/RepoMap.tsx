@@ -27,6 +27,7 @@ import { type SpriteAtlas, type SpriteInfo, useAtlas } from "#/ui/pixel/atlas.ts
 import { PixelCard, SpriteIcon } from "#/ui/pixel/index.ts";
 import { badgeColors, CardColors } from "#/ui/pixel/PixelCard.tsx";
 import { PoseSprite } from "#/ui/PoseSprite.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 
 import {
@@ -45,6 +46,24 @@ import {
   sessionInPlot,
   spotText,
 } from "./islands";
+
+const recipeStyles = stylex.create({
+  repoMapArt: {
+    pointerEvents: "none",
+    position: "absolute",
+    right: "calc(var(--spacing) * 4)",
+    bottom: "calc(var(--spacing) * 4)",
+    opacity: ".8",
+  },
+  cloudsArt: {
+    position: "absolute",
+    opacity: ".55",
+  },
+  islandViewArt: {
+    marginInline: "auto",
+    display: "block",
+  },
+});
 
 const variantStyles = stylex.create({
   islandDetailSpan: {
@@ -65,6 +84,7 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  art: { maxWidth: "none", imageRendering: "pixelated" },
   repoMapDiv: {
     display: "flex",
     height: "100%",
@@ -370,7 +390,7 @@ function RepoMap() {
         <Grid />
         <Show when={atlas()}>{(a) => <Clouds atlas={a()} />}</Show>
         <Show when={atlas()?.has("map-compass") === true && width() >= 700 ? atlas() : undefined}>
-          {(a) => <Art sp={a().get("map-compass")} scale={1.5} class="pointer-events-none absolute right-4 bottom-4 opacity-80" />}
+          {(a) => <Art sp={a().get("map-compass")} scale={1.5} styles={[recipeStyles.repoMapArt]} />}
         </Show>
         <div {...stylex.attrs(viewStyles.repoMapDiv4)}>
           <Switch
@@ -457,7 +477,7 @@ function Clouds(props: { atlas: SpriteAtlas }) {
                 <Art
                   sp={cloud()}
                   scale={2}
-                  class="absolute opacity-55"
+                  styles={[recipeStyles.cloudsArt]}
                   style={{
                     left: `${Math.round(((from * span() + t() * speed) % span()) - cloud().w * 4)}px`,
                     top: `${Math.round(y * (box?.clientHeight ?? 600))}px`,
@@ -472,14 +492,13 @@ function Clouds(props: { atlas: SpriteAtlas }) {
   );
 }
 
-function Art(props: { sp: SpriteInfo; scale: number; class?: string; style?: JSX.CSSProperties }) {
+function Art(props: { sp: SpriteInfo; scale: number; styles?: stylex.StyleXStyles; style?: JSX.CSSProperties }) {
   return (
     <img
       src={props.sp.url}
       alt=""
       draggable="false"
-      class={["max-w-none [image-rendering:pixelated]", props.class]}
-      style={{ width: `${props.sp.w * props.scale}px`, height: `${props.sp.h * props.scale}px`, ...props.style }}
+      {...styleProps([viewStyles.art, props.styles], { width: `${props.sp.w * props.scale}px`, height: `${props.sp.h * props.scale}px`, ...props.style })}
     />
   );
 }
@@ -550,7 +569,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
           onClick={open}
           {...stylex.attrs(viewStyles.island)}
         >
-          <Art sp={pic()} scale={s()} class="mx-auto block" />
+          <Art sp={pic()} scale={s()} styles={[recipeStyles.islandViewArt]} />
         </button>
         <For each={props.island.spots} keyed={false}>
           {(spot, i) => {

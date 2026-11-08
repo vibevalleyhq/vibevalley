@@ -25,6 +25,13 @@ import { IssueThread } from "./IssueThread";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
+const recipeStyles = stylex.create({
+  todoDetailNote: {
+    marginTop: "calc(var(--spacing) * 2)",
+    padding: "calc(var(--spacing) * 2.5)",
+  },
+});
+
 const variantStyles2 = stylex.create({
   todoDetailTextArea: {
     marginTop: "calc(var(--spacing) * 2.5)",
@@ -534,7 +541,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </More>
       <Show when={queued()}>
         {(at) => (
-          <Note tone="water" class="mt-2 !p-2.5">
+          <Note tone="water" styles={[recipeStyles.todoDetailNote]}>
             <div>{t("web.issue.todo.inQueue", { ago: ago(at(), Date.now()) })}</div>
             <Button styles={viewStyles.unqueueAction} disabled={busy()} onClick={() => void unqueue()}>
               {t("web.issue.todo.unqueue")}
