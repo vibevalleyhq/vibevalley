@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -406,7 +406,8 @@ async function main(): Promise<void> {
     builds = buildEvidence();
     assertCurrentBuilds(inputs);
     for (const name of ["desktop", "mobile"]) rmSync(join(output, name), { recursive: true, force: true });
-    temp = mkdtempSync(join(tmpdir(), "vibevalley-style-host-"));
+    // Keep nested desktop socket paths below macOS's 104-byte limit.
+    temp = mkdtempSync("/tmp/vv-style-host-");
     for (const [id, exercise] of [
       ["desktop-host", desktop],
       ["mobile-host", mobile],

@@ -96,7 +96,7 @@ const variantStyles = stylex.create({
     borderRadius: "var(--radius-sm)",
   },
   detailButtonVariant: {
-    boxShadow: "0 0 0 calc(2px + 0) var(--color-focus)",
+    boxShadow: "0 0 0 2px var(--color-focus)",
   },
   detailButtonVariant2: {},
 });

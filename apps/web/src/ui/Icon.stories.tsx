@@ -73,6 +73,7 @@ export default stories({
           <Icon name="file" label="Document" styles={viewStyles.placement(a.offset)} />
           <button type="button" data-testid="move-icons" onClick={() => set({ offset: 28 })}>
             Move
+            <Icon name="next" />
           </button>
         </div>
       ),

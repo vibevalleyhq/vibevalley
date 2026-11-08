@@ -700,25 +700,25 @@ const hourButtonColors = stylex.create({
   morning: {
     backgroundColor: {
       default: "var(--scene-morning-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--scene-morning-button, var(--color-cream-hover))" },
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
     },
   },
   day: {
     backgroundColor: {
       default: "var(--scene-day-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--scene-day-button, var(--color-cream-hover))" },
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
     },
   },
   evening: {
     backgroundColor: {
       default: "var(--scene-evening-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--scene-evening-button, var(--color-cream-hover))" },
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
     },
   },
   night: {
     backgroundColor: {
       default: "var(--scene-night-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--scene-night-button, var(--color-cream-hover))" },
+      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
     },
   },
 });

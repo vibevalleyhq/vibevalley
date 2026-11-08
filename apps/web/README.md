@@ -128,8 +128,8 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
   - A component runs once: what changes on its own (the window's size, the time) needs a signal (`useViewport`, `useNow`).
 - **Styles** use StyleX with the existing CSS tokens in `src/style.css`; typed composition and native-style ownership follow
   [vv-stylex](.agents/skills/vv-stylex/SKILL.md). Reset, fonts and owned rich-text descendants remain in CSS imported through
-  the host stylesheet. Source ownership and build outputs are checked by `vp run migration:inventory`; final acceptance
-  remains tracked in the [migration Note](.agents/notes/proposed/architecture/2026-11-08-tailwind-to-stylex.md).
+  the host stylesheet. Source ownership and build outputs are checked by `vp run migration:inventory`; the complete
+  comparison and host gate follows [migration acceptance](.agents/skills/vv-stylex/references/migration.md#运行最终验收).
   Comments are in English, only for what the code cannot say.
 
 ## Commands

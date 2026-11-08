@@ -24,7 +24,7 @@ export function Icon(props: { name: IconName; size?: IconSize; label?: string; s
       aria-hidden={props.label ? undefined : "true"}
       {...styleProps([styles.icon, props.styles, iconTone[props.name]])}
     >
-      {icons[props.name]({ size: props.size ?? 16 })}
+      {icons[props.name]({ size: props.size ?? 16, attrs: { "aria-hidden": "true", focusable: "false" } })}
     </span>
   );
 }

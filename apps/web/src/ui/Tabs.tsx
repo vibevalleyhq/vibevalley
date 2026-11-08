@@ -43,7 +43,7 @@ const styles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2.5)",
     backgroundColor: {
       default: null,
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" },
+      "@media (hover: hover)": { default: null, ":hover:not([data-selected])": "var(--color-hover)" },
       ":is([data-selected])": "var(--color-selected)",
     },
   },

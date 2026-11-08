@@ -1,6 +1,6 @@
 # 批量迁移到 StyleX
 
-保留外观、行为、内容和资源，改变样式的表达方式。阶段和完成条件以 [迁移 Note](.agents/notes/proposed/architecture/2026-11-08-tailwind-to-stylex.md) 为准；本篇只规定实施方法，不保存临时路径、库存数字或已通过场景数。
+保留外观、行为、内容和资源，改变样式的表达方式。本篇规定实施方法与完成条件；当前样式边界见[客户端](docs/subsystems/app.md)与[官网](docs/subsystems/site.md)，不保存临时路径、库存数字或已通过场景数。
 
 ## 1. 划定本轮范围
 
@@ -67,9 +67,27 @@ vp run migration:inventory
 
 ## 5. 完成和失败
 
-最终验收应由 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 和迁移 Note 规定的矩阵完成。精确视觉比较应先证明基准 A/A 稳定，再比较候选；保留零像素差异和文本一致要求，不用遮罩、放宽阈值或删场景来通过。
+最终验收按 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 与[场景清单](scripts/style-migration-scenes.ts)执行。清单覆盖静态组件与官网、真实服务端页面、浏览器行为以及 Electron/Android 宿主；缺一项都不是完成。精确视觉比较应先证明基准 A/A 稳定，再比较候选；保留零像素差异和文本一致要求，不用遮罩、放宽阈值或删场景来通过。
 
 - 未知表达式、扫描缺口、旧构建图和缺失场景仍是失败，不因其他场景通过而忽略。
 - 部分跑完、超时或中止的结果不是完整通过；源码改变后旧 receipt 不代表当前版本。
 - 可提交「实施检查点」，但应写明尚未验证的内容。移除 Tailwind 和最终验收通过之前，不宣称迁移完成。
 - 转换脚本写错时，应恢复它本轮改动前的快照，修脚本后重跑；不从主分支覆盖整个工作区，不撤销别人的改动，也不在未知范围的坏输出上逐处补丁。
+
+### 运行最终验收
+
+准备一份迁移前、已安装依赖的干净工作树作为基准。Android 宿主还需要 [手机分册](.agents/skills/vv-acceptance/references/mobile.md)里的 SDK、JDK 17 和已生成的原生工程；验收自己创建模拟器，不使用主人的设备或家目录。
+
+```bash
+vp run --no-cache --filter @vibevalley/web build
+vp run --no-cache --filter @vibevalley/web build:stories
+vp run --no-cache site:build
+vp run migration:verify --baseline <原始工作树> --run
+```
+
+应用、故事、官网 client/SSR 四份构建图都绑定源码、锁文件与版本；源码或文档改变后，应重新构建并采集，不能沿用旧收据。汇总结果在 `.test/style-migration/acceptance.json`，由库存、静态对照、行为、真实页面和宿主收据推导，不手写通过状态。
+
+- 库存独立枚举维护中的文件，检查解析覆盖、依赖与正式产物；未知表达式、过期登记、缺图与 Tailwind 残留都失败。官网额外禁止 Astro、React 及其运行时图；手机壳的 React 不在这个禁用范围。
+- 截图固定浏览器、视口、字体、语言、时区、时钟、主题、滚动、动效偏好与操作顺序。普通动效须固定可比较的动画时刻，不能改成减少动效来通过；尺寸不同也算失败。
+- 真实页面经隔离服务端的公开接口造数据，停止服务后保存数据库和文件，再为 A/A/B 恢复同一份数据。ID、文字、顺序、时间和附件字节必须相同，不手造帧，也不各造一座随机农场。
+- 像素一致不证明键盘、接管后的 DOM 身份、动画中断或资源释放。行为测试与宿主配对、通知、重开、退出清理分别留下证据；失败子进程、缺失或跳过的场景都使汇总失败。

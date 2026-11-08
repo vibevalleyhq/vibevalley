@@ -165,16 +165,57 @@ test("regression: icon composition preserves semantic tones and object style var
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {
     await page.goto(`/?${new URLSearchParams({ s: "设计体系/图标:Composition", theme, w: "400" })}`);
-    const icons = page.getByTestId("story-frame").getByRole("img");
-    await expect(icons).toHaveCount(3);
-    const tone = await icons.nth(0).evaluate((element) => getComputedStyle(element).color);
-    await expect(icons.nth(1)).toHaveCSS("color", tone);
-    await expect(icons.nth(2)).not.toHaveCSS("color", tone);
-    await expect(icons.nth(1)).toHaveCSS("margin-left", "12px");
-    await page.getByTestId("move-icons").click();
-    await expect(icons.nth(1)).toHaveCSS("margin-left", "28px");
-    await expect(icons.nth(2)).toHaveCSS("margin-left", "28px");
-    await expect(icons.nth(1)).toHaveCSS("color", tone);
+    const frame = page.getByTestId("story-frame");
+    await expect(frame.getByRole("img")).toHaveCount(3);
+    const reference = frame.getByRole("img", { name: "Reference", exact: true });
+    const composed = frame.getByRole("img", { name: "Composed", exact: true });
+    const document = frame.getByRole("img", { name: "Document", exact: true });
+    for (const icon of [reference, composed, document]) {
+      await expect(icon.locator("svg")).toHaveAttribute("aria-hidden", "true");
+      await expect(icon.locator("svg")).toHaveAttribute("focusable", "false");
+    }
+    const tone = await reference.evaluate((element) => getComputedStyle(element).color);
+    await expect(composed).toHaveCSS("color", tone);
+    await expect(document).not.toHaveCSS("color", tone);
+    await expect(composed).toHaveCSS("margin-left", "12px");
+    const move = frame.getByRole("button", { name: "Move", exact: true });
+    await expect(move.getByRole("img")).toHaveCount(0);
+    await expect(move.locator("svg")).toHaveAttribute("aria-hidden", "true");
+    await move.click();
+    await expect(composed).toHaveCSS("margin-left", "28px");
+    await expect(document).toHaveCSS("margin-left", "28px");
+    await expect(composed).toHaveCSS("color", tone);
+    check();
+  }
+});
+
+test("regression: key-value stories preserve the full canvas and editing controls", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  for (const theme of ["light", "dark"]) {
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Chips:Key and value", theme, w: "full" })}`);
+    await expect(page.getByTestId("story-args")).toHaveCount(0);
+    const frame = page.getByTestId("story-frame");
+    await expect(frame).toHaveCSS("width", "1360px");
+    await expect(frame.getByTestId("pair-value").first()).toHaveValue("development");
+    await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Chips:Value controls", theme, w: "400" })}`);
+    const value = page.locator('[data-testid="pair-value"][data-key="NODE_ENV"]');
+    const original = await value.elementHandle();
+    await value.fill("production");
+    await expect(value).toHaveValue("production");
+    await expect(value).toBeFocused();
+    expect(await value.evaluate((current, before) => current === before, original)).toBe(true);
+    await page.getByTestId("new-pair-name").fill("CI");
+    await page.getByTestId("new-pair-value").fill("1");
+    await page.getByTestId("new-pair-add").click();
+    await expect(page.locator('[data-testid="pair-value"][data-key="CI"]')).toHaveValue("1");
+    const disabled = page.locator('[data-testid="story-arg"][data-name="disabled"]').getByRole("checkbox");
+    await disabled.check();
+    for (const control of await frame.locator("input, button").all()) await expect(control).toBeDisabled();
+    await disabled.uncheck();
+    await expect(value).toBeEnabled();
+    await expect(value).toHaveValue("production");
+    await frame.getByRole("button", { name: /CI/u }).click();
+    await expect(page.locator('[data-testid="pair-value"][data-key="CI"]')).toHaveCount(0);
     check();
   }
 });
@@ -298,6 +339,10 @@ test("regression: styled tabs retain keyboard selection, navigation and dynamic 
     const frame = page.getByTestId("story-frame");
     const chat = frame.locator('[role="tab"][data-key="chat"]');
     const issues = frame.locator('[role="tab"][data-key="issues"]');
+    await page.mouse.move(0, 0);
+    const selectedBackground = await chat.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await chat.hover();
+    await expect(chat).toHaveCSS("background-color", selectedBackground);
     await chat.focus();
     await page.keyboard.press("ArrowRight");
     await expect(issues).toBeFocused();
@@ -305,6 +350,8 @@ test("regression: styled tabs retain keyboard selection, navigation and dynamic 
     await page.keyboard.press("Enter");
     await expect(issues).toHaveAttribute("aria-selected", "true");
     await expect(issues).toHaveCSS("font-weight", "600");
+    await issues.hover();
+    await expect(issues).toHaveCSS("background-color", selectedBackground);
     await expect(chat).toHaveAttribute("aria-selected", "false");
     await page.keyboard.press("Home");
     await expect(chat).toBeFocused();

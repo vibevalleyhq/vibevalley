@@ -159,12 +159,19 @@ test("copy confirmation returns to idle and can be used again", async ({ context
   await expect(button).toHaveAttribute("data-copied", "true");
 });
 
-test("hour controls select the scene and offscreen animations pause", async ({ page, website }) => {
+test("regression: selected hour controls retain hover styling and offscreen animations pause", async ({ page, website }) => {
   await page.goto(website, { waitUntil: "networkidle" });
+  const unselected = page.getByTestId("hero-hour-day");
+  await expect(unselected).toHaveAttribute("aria-pressed", "false");
+  const restingColor = await unselected.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await unselected.hover();
+  const hoverColor = await unselected.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(hoverColor).not.toBe(restingColor);
   for (const hour of ["day", "evening", "night", "morning"]) {
     await page.getByTestId(`hero-hour-${hour}`).click();
     await expect(page.locator("html")).toHaveAttribute("data-scene", hour);
     await expect(page.getByTestId(`hero-hour-${hour}`)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId(`hero-hour-${hour}`)).toHaveCSS("background-color", hoverColor);
   }
   await page.locator("#features").scrollIntoViewIfNeeded();
   await expect(page.locator("#top")).toHaveAttribute("data-off", "");

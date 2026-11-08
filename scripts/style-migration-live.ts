@@ -275,7 +275,8 @@ async function seed(api: VibeValleyApi, destination: string): Promise<Seed> {
     agent: agent.id,
     description: "Keep readable labels in the desktop and narrow layouts.",
   });
-  const channel = await api.channel.create({ name: "migration-garden", repo: repo.name, description: "Shared migration review, attachments and notes" });
+  const channelName = "migration-garden";
+  const channel = await api.channel.create({ name: channelName, repo: repo.name, description: "Shared migration review, attachments and notes" });
   await api.channel.default.set({ id: channel });
   const png = await sharp(
     Buffer.from(
@@ -300,7 +301,7 @@ async function seed(api: VibeValleyApi, destination: string): Promise<Seed> {
     markdown: "- Preserve the original appearance\n- Compare the same populated garden\n  - Keep attachment bytes unchanged\n",
   });
   const connectors = await api.connector.list();
-  for (const connector of connectors) await api.connector.channel.set({ id: connector.id, channel });
+  for (const connector of connectors) await api.connector.channel.set({ id: connector.id, channel: channelName });
   await sleep(1500);
   let frame = await firstFrame(api);
   const settledBy = Date.now() + 30_000;

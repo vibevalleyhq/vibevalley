@@ -55,7 +55,7 @@ const recipeStyles = stylex.create({
     boxShadow: null,
   },
   monthButtonVariant3Case2: {
-    boxShadow: "0 0 0 calc(1px + 0) var(--color-accent)",
+    boxShadow: "0 0 0 1px var(--color-accent)",
   },
 });
 

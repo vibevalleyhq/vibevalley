@@ -8,7 +8,7 @@ import { arch, release } from "node:os";
 import { extname, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, type Browser, type Page } from "@playwright/test";
 
 import { buildEvidence, originalRevision, type FileEvidence } from "./style-migration-evidence";
 import { hash, migrationInputs, migrationOutput, migrationRoot, sourceInputs } from "./style-migration-inputs";
@@ -17,6 +17,7 @@ import { staticScenes as scenes, type Scene } from "./style-migration-scenes";
 
 const viewerFiles = ["apps/web/test/migration/index.html", "apps/web/test/migration/viewer.tsx", "apps/web/test/migration/vite.config.ts"];
 const captureOptions = { locale: "en-US", timezoneId: "UTC", deviceScaleFactor: 1, clock: "2026-11-08T12:00:00.000Z", reducedMotion: "reduce" };
+const normalMotionCapture = { hydrationMs: 1000, scrollFrameMs: 32, settleMs: 5000, animationMs: 1200, nativePlaybackRate: 0 };
 const browserArgs = ["--disable-skia-runtime-opts", "--disable-partial-raster", "--num-raster-threads=1", "--force-color-profile=srgb"];
 const mediaPath = "scripts/testdata/style-migration/attachment.mp4";
 const mediaFixture = readFileSync(resolve(migrationRoot, mediaPath));
@@ -81,8 +82,23 @@ async function serve(root: string) {
   };
 }
 
+async function createPaintBarrier(page: Page) {
+  const session = await page.context().newCDPSession(page);
+  const { frameTree } = await session.send("Page.getFrameTree");
+  const { executionContextId } = await session.send("Page.createIsolatedWorld", { frameId: frameTree.frame.id, worldName: "migration-paint" });
+  // The main world's clock is paused; native scroll/visibility delivery still needs real rendering frames.
+  return () =>
+    session.send("Runtime.evaluate", {
+      contextId: executionContextId,
+      expression:
+        "(() => { const { promise, resolve } = Promise.withResolvers(); requestAnimationFrame(() => requestAnimationFrame(resolve)); return promise; })()",
+      awaitPromise: true,
+    });
+}
+
 async function capture(browser: Browser, origin: string, scene: Scene, destination: string) {
   const { clock, ...contextOptions } = captureOptions;
+  const normalMotion = scene.entry === "site" && scene.reducedMotion === "no-preference";
   const context = await browser.newContext({
     ...contextOptions,
     reducedMotion: scene.reducedMotion ?? "reduce",
@@ -96,16 +112,47 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
   });
   page.on("requestfailed", (request) => errors.push(`${request.url()}: ${request.failure()?.errorText}`));
   try {
+    if (normalMotion) {
+      // Playwright's clock controls JS, not Chromium's native animation timeline.
+      const nativeClock = await context.newCDPSession(page);
+      await nativeClock.send("Animation.enable");
+      await nativeClock.send("Animation.setPlaybackRate", { playbackRate: normalMotionCapture.nativePlaybackRate });
+      await page.clock.install({ time: new Date(clock) });
+      await page.clock.pauseAt(new Date(Date.parse(clock) + normalMotionCapture.hydrationMs));
+    }
     await page.clock.setFixedTime(new Date(clock));
     const response = await page.goto(`${origin}${scene.route}`, { waitUntil: "networkidle" });
     if (response?.status() !== 200) throw new Error(`Entry returned ${response?.status()}`);
     if ((await page.evaluate(() => document.compatMode)) !== "CSS1Compat") throw new Error("Comparison entry must render in HTML standards mode");
-    if (scene.entry === "site") {
-      for (const island of await page.locator("astro-island").all()) {
-        await island.evaluate((element) => element.querySelector(":scope > :not(link):not(style):not(script)")?.scrollIntoView({ block: "center" }));
-        await page.waitForFunction((element) => element !== null && !element.hasAttribute("ssr"), await island.elementHandle());
+    const paint = normalMotion ? await createPaintBarrier(page) : undefined;
+    const settle = async (milliseconds: number) => {
+      if (paint === undefined) await page.waitForTimeout(milliseconds);
+      else {
+        await paint();
+        await page.clock.runFor(milliseconds);
+        await paint();
       }
-      await page.waitForFunction(() => document.querySelectorAll("astro-island[ssr]").length === 0);
+    };
+    if (normalMotion) await page.clock.runFor(normalMotionCapture.hydrationMs);
+    if (scene.entry === "site") {
+      if (normalMotion) {
+        // Eager and island hydration must encounter the same reveal boundaries.
+        for (const section of await page.locator("header, section[id]").all()) {
+          await section.evaluate((element) => scrollTo({ top: element.getBoundingClientRect().top + scrollY - innerHeight + 1, behavior: "instant" }));
+          await page.waitForFunction(
+            (element) => element !== null && element.closest("astro-island")?.hasAttribute("ssr") !== true,
+            await section.elementHandle(),
+            { polling: 50 },
+          );
+          await settle(normalMotionCapture.scrollFrameMs);
+        }
+      } else {
+        for (const island of await page.locator("astro-island").all()) {
+          await island.evaluate((element) => element.querySelector(":scope > :not(link):not(style):not(script)")?.scrollIntoView({ block: "center" }));
+          await page.waitForFunction((element) => element !== null && !element.hasAttribute("ssr"), await island.elementHandle(), { polling: 50 });
+        }
+      }
+      await page.waitForFunction(() => document.querySelectorAll("astro-island[ssr]").length === 0, undefined, { polling: 50 });
     } else await page.getByTestId("story-frame").waitFor({ state: "visible" });
     if (scene.entry === "viewer") {
       switch (scene.viewerState) {
@@ -137,39 +184,61 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
       }
       await page.getByRole(popupRole).waitFor({ state: "visible" });
     }
-    await page.evaluate(async (entry) => {
-      await document.fonts.ready;
-      await Promise.all(
-        [...document.querySelectorAll<HTMLImageElement>("img[src]")].map((image) => {
-          image.loading = "eager";
-          return image.decode();
-        }),
-      );
-      for (const video of document.querySelectorAll<HTMLVideoElement>("video[src]")) {
-        if (video.error !== null) throw new Error(`Media fixture failed: ${video.currentSrc}`);
-        if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-          video.preload = "auto";
-          video.load();
+    await page.evaluate(
+      async ({ entry, controlled }) => {
+        await document.fonts.ready;
+        await Promise.all(
+          [...document.querySelectorAll<HTMLImageElement>("img[src]")].map((image) => {
+            image.loading = "eager";
+            return image.decode();
+          }),
+        );
+        for (const video of document.querySelectorAll<HTMLVideoElement>("video[src]")) {
+          if (video.error !== null) throw new Error(`Media fixture failed: ${video.currentSrc}`);
+          if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            video.preload = "auto";
+            video.load();
+          }
         }
-      }
-      if (entry === "site") {
-        for (let y = 0; y < document.documentElement.scrollHeight; y += 900) {
-          scrollTo(0, y);
-          await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+        if (entry === "site" && !controlled) {
+          for (let y = 0; y < document.documentElement.scrollHeight; y += 900) {
+            scrollTo(0, y);
+            await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+          }
+          scrollTo(0, 0);
         }
-        scrollTo(0, 0);
-      }
-    }, scene.entry);
-    await page.waitForFunction(() =>
-      [...document.querySelectorAll<HTMLVideoElement>("video[src]")].every((video) => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
+      },
+      { entry: scene.entry, controlled: normalMotion },
     );
-    await page.waitForTimeout(1200);
+    if (normalMotion) {
+      const height = await page.evaluate(() => document.documentElement.scrollHeight);
+      for (let y = 0; y < height; y += 900) {
+        await page.evaluate((top) => scrollTo({ top, behavior: "instant" }), y);
+        await settle(normalMotionCapture.scrollFrameMs);
+      }
+      await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+    }
+    await page.waitForFunction(
+      () => [...document.querySelectorAll<HTMLVideoElement>("video[src]")].every((video) => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
+      undefined,
+      { polling: 50 },
+    );
+    await settle(1200);
     if (scene.hour !== undefined) {
       const index = ["morning", "day", "evening", "night"].indexOf(scene.hour);
       const button = page.locator('#top [role="group"] button').nth(index);
       await button.click();
-      await page.waitForFunction((hour) => document.documentElement.dataset.scene === hour, scene.hour);
-      await page.waitForTimeout(1200);
+      if (normalMotion)
+        await page.waitForFunction(
+          (progress) => {
+            const hero = document.getElementById("top");
+            return hero !== null && scrollY === Math.round(progress * (hero.offsetHeight - innerHeight));
+          },
+          { morning: 0, day: 0.37, evening: 0.64, night: 1 }[scene.hour],
+          { polling: 50 },
+        );
+      await settle(normalMotion ? normalMotionCapture.settleMs : 1200);
+      await page.waitForFunction((hour) => document.documentElement.dataset.scene === hour, scene.hour, { polling: 50 });
     }
     if (scene.link !== undefined) {
       const link = page.locator(scene.link === "primary" ? '#top a[href="https://github.com/vibevalleyhq/vibevalley"]' : '#top a[href="#how"]');
@@ -202,7 +271,26 @@ async function capture(browser: Browser, origin: string, scene: Scene, destinati
           ? page.getByRole(popupRole)
           : page.getByTestId("story-frame");
     const textHash = hash(await target.innerText());
-    if (scene.entry === "site") await page.screenshot({ path: destination, fullPage: true, animations: "disabled" });
+    if (normalMotion) {
+      await page.evaluate(async (time) => {
+        const animations = document.getAnimations();
+        for (const animation of animations) {
+          if (animation instanceof CSSAnimation) {
+            animation.pause();
+            animation.currentTime = time;
+          } else if (
+            animation instanceof CSSTransition ||
+            (animation.timeline instanceof DocumentTimeline &&
+              animation.playState === "running" &&
+              animation.effect?.getComputedTiming().iterations !== Infinity)
+          )
+            animation.finish();
+        }
+        await Promise.all(animations.map((animation) => animation.ready));
+      }, normalMotionCapture.animationMs);
+      await paint?.();
+    }
+    if (scene.entry === "site") await page.screenshot({ path: destination, fullPage: true, animations: normalMotion ? "allow" : "disabled" });
     else if (scene.popup !== undefined) {
       const box = await target.boundingBox();
       if (box === null) throw new Error("Missing popup geometry");
@@ -357,6 +445,7 @@ await writeFile(
         browser: browser.version(),
         executableHash: hash(readFileSync(chromium.executablePath())),
         ...captureOptions,
+        normalMotionCapture,
       },
       expected: scenes.map((scene) => scene.id),
       scenarios: scenes,
