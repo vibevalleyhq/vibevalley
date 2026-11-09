@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（26 篇）
 
 ### feature
 
@@ -19,6 +19,7 @@
 
 ### architecture
 
+- 2026-11-08 [显式状态机分层体系、Effect v4 原语与全链路错误契约](.agents/notes/proposed/architecture/2026-11-08-explicit-state-machines-and-error-contracts.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
 - 2026-11-06 [Space 隔离单元（repos、worktrees、pkm）与 VibeValley 自举开发全链路收敛步骤](.agents/notes/proposed/architecture/2026-11-06-space-isolation-and-self-hosting.md)
 - 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
@@ -38,4 +39,5 @@
 
 ### testing
 
+- 2026-11-08 [把可控制、可观察和可关闭做成模块边界](.agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md)
 - 2026-10-26 [把模块层往下压：仓库检查成端口，仓库的决定成规则](.agents/notes/proposed/testing/2026-10-26-press-the-module-layer-down.md)

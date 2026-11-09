@@ -45,6 +45,8 @@
 
 ### 模块和服务
 
+架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
+
 - **13 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
