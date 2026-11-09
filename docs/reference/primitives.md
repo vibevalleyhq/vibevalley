@@ -76,7 +76,7 @@
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
-| `jsonText` | `json.ts` | value as JSON text, as JSON.stringify writes it; one JSON cannot hold (a cycle, a bigint) fails instead of throwing. |
+| `jsonText` | `json.ts` | As JSON.stringify writes it; a cycle or a bigint fails instead of throws. |
 | `jsonOrNone` | `json.ts` | Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. |
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
 | `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. |
@@ -122,7 +122,7 @@
 | `fileBlob` | `files.ts` |  |
 | `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` |  |
-| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read; one read fails on is set aside. |
+| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json); one whose read fails is set aside and read as undefined. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `HomeUnavailable` | `lease.ts` | The lock file could not be read or written for another reason (permissions, a missing home). |
