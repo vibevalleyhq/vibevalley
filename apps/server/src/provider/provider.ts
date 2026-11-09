@@ -95,7 +95,7 @@ export class Provider extends Context.Service<
     readonly vision: () => Effect.Effect<ProviderAccount, Refused>;
     readonly live: () => Effect.Effect<ProviderAccount, Refused>;
   }
->()("vibevalley/Provider") {
+>()("@vibevalley/server/provider/provider") {
   static readonly layer = Layer.effect(
     Provider,
     Effect.suspend(() => make),

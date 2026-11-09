@@ -1,3 +1,5 @@
+import { Formatter } from "effect";
+
 import type * as T from "@vibevalley/protocol";
 
 // What the issues say to models: the rules a helper's brief ends with, and the refusal the orchestrator gets for changing an issue the owner did not ask for.
@@ -35,7 +37,7 @@ const answerExample = {
 
 export const answerFormat = [
   "调用 issue_report 时，把 state 填 ready，并把 answer 填成这个形状：",
-  JSON.stringify(answerExample, null, 2),
+  Formatter.formatJson(answerExample, { space: 2 }),
   "conclusion 一两句说答案；evidence 是依据，至少一条：文件和行号看到了什么、跑了什么命令输出了什么；unsure 是拿不准的，next 是建议接着做的，没有就给空数组。",
 ].join("\n");
 
@@ -92,7 +94,7 @@ export function refinementBrief(
     "",
     "汇报的最后，用一个 json 代码块给出草稿，格式照这个：",
     "```json",
-    JSON.stringify(example, null, 2),
+    Formatter.formatJson(example, { space: 2 }),
     "```",
     "代码块之后写一句结论：草稿写好了没有，还要问主人什么。",
   );

@@ -25,10 +25,12 @@ describe("a session", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const first = mustHire(yield* issues.hire(lab(), "看看", "reach"));
+      const hired = yield* issues.hire(lab(), "看看", "reach");
+      const first = mustHire(hired);
       yield* w.nextReport;
       sessions.setAddress("127.0.0.1:54321");
-      mustHire(yield* issues.hire(lab(), "再看看", "reach"));
+      const hired2 = yield* issues.hire(lab(), "再看看", "reach");
+      mustHire(hired2);
       yield* w.nextReport;
       yield* sessions.dismiss(first.id);
       expect(urls).toEqual(["http://127.0.0.1:8787/mcp", "http://127.0.0.1:54321/mcp"]);

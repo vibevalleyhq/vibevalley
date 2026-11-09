@@ -243,7 +243,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       sessionSchemaTool(
         "artifact.block.create",
         Effect.fn("Tool.blockCreate")(function* (p: SessionInput<"artifact.block.create">) {
-          return yield* insert(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* insert(callerOf2, p);
         }),
       );
 
@@ -251,7 +252,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       tool(
         "artifact.block.create",
         Effect.fn("Tool.blockCreate")(function* (p: Orchestrator<"artifact.block.create">) {
-          return yield* insert(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* insert(callerOf2, p);
         }),
       );
 
@@ -259,7 +261,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       sessionSchemaTool(
         "artifact.block.update",
         Effect.fn("Tool.blockUpdate")(function* (p: SessionInput<"artifact.block.update">) {
-          return yield* update(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* update(callerOf2, p);
         }),
       );
 
@@ -267,7 +270,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       tool(
         "artifact.block.update",
         Effect.fn("Tool.blockUpdate")(function* (p: Orchestrator<"artifact.block.update">) {
-          return yield* update(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* update(callerOf2, p);
         }),
       );
 
@@ -275,7 +279,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       sessionSchemaTool(
         "artifact.block.delete",
         Effect.fn("Tool.blockDelete")(function* (p: SessionInput<"artifact.block.delete">) {
-          return yield* remove(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* remove(callerOf2, p);
         }),
       );
 
@@ -283,7 +288,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       tool(
         "artifact.block.delete",
         Effect.fn("Tool.blockDelete")(function* (p: Orchestrator<"artifact.block.delete">) {
-          return yield* remove(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* remove(callerOf2, p);
         }),
       );
 

@@ -74,8 +74,10 @@ describe("memory", () => {
       const core = yield* Core;
       const lastText = (id: string, summary: string) => sessions.lastTextOf(id) || summary;
 
-      const first = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
-      expect(yield* nextPrompt(f, next, 0)).toBe("写上班打卡，记一笔");
+      const hired = yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo");
+      const first = mustHire(hired);
+      const nextPrompt2 = yield* nextPrompt(f, next, 0);
+      expect(nextPrompt2).toBe("写上班打卡，记一笔");
       yield* sessions.report(first.id, {
         summary: "写好了",
         questions: [],
@@ -106,11 +108,14 @@ describe("memory", () => {
           .map((r) => r.join("|"))
           .toSorted(),
       );
-      expect(yield* memories.list(first.id)).toEqual([]);
+      const memories2 = yield* memories.list(first.id);
+      expect(memories2).toEqual([]);
 
       yield* sessions.dismiss(first.id);
-      const second = mustHire(yield* issues.hire(scribe(), "再加一个下班打卡", "memo"));
-      let [recalled, asked] = reminded(yield* nextPrompt(f, next, 1));
+      const hired2 = yield* issues.hire(scribe(), "再加一个下班打卡", "memo");
+      const second = mustHire(hired2);
+      const hiredPrompt = yield* nextPrompt(f, next, 1);
+      let [recalled, asked] = reminded(hiredPrompt);
       expect(asked).toBe("再加一个下班打卡");
       expect([...recalled].toSorted()).toEqual(
         ["- （这个仓库）这个仓库用 pnpm test 跑测试", "- （所有仓库）提交信息写中文", "- 做过（这个仓库）：" + done.text].toSorted(),
@@ -132,17 +137,22 @@ describe("memory", () => {
         by: owner,
       });
       expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
-      [recalled, asked] = reminded(yield* nextPrompt(f, next, 2));
+      const commentPrompt = yield* nextPrompt(f, next, 2);
+      [recalled, asked] = reminded(commentPrompt);
       expect([recalled, asked]).toEqual([["- （这个仓库）下班打卡也要有测试"], "顺手把下班打卡的测试也补上"]);
       yield* w.nextReport;
 
-      mustHire(yield* issues.hire(scribe(), "写一篇博客", "memo-blog"));
-      [recalled, asked] = reminded(yield* nextPrompt(f, next, 3));
+      const hired3 = yield* issues.hire(scribe(), "写一篇博客", "memo-blog");
+      mustHire(hired3);
+      const blogPrompt = yield* nextPrompt(f, next, 3);
+      [recalled, asked] = reminded(blogPrompt);
       expect([recalled, asked]).toEqual([["- （所有仓库）提交信息写中文"], "写一篇博客"]);
       yield* w.nextReport;
 
-      const other = mustHire(yield* issues.hire(refiner(), "跑一遍 pnpm test 测试，看看上班打卡", "memo"));
-      expect(yield* nextPrompt(f, next, 4)).toBe("跑一遍 pnpm test 测试，看看上班打卡");
+      const hired4 = yield* issues.hire(refiner(), "跑一遍 pnpm test 测试，看看上班打卡", "memo");
+      const other = mustHire(hired4);
+      const nextPrompt3 = yield* nextPrompt(f, next, 4);
+      expect(nextPrompt3).toBe("跑一遍 pnpm test 测试，看看上班打卡");
       yield* w.nextReport;
       const theirs = yield* kept("refiner", 1);
       expect(theirs.map((m) => [m.kind, m.session])).toEqual([["issue", other.id]]);
@@ -165,7 +175,8 @@ describe("memory", () => {
         const sessions = yield* Session;
         // Waking after the restart reads the agent from the store, as in real use.
         yield* (yield* Agent).save(scribe());
-        const noted = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
+        const hired = yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo");
+        const noted = mustHire(hired);
         yield* nextPrompt(before, next, 0);
         yield* sessions.report(noted.id, {
           summary: "写好了",
@@ -181,8 +192,10 @@ describe("memory", () => {
         yield* w.nextReport;
         yield* kept("scribe", 3);
         yield* sessions.dismiss(noted.id);
-        session = mustHire(yield* issues.hire(scribe(), "再加一个下班打卡", "memo")).id;
-        const [recalled] = reminded(yield* nextPrompt(before, next, 1));
+        const hired2 = yield* issues.hire(scribe(), "再加一个下班打卡", "memo");
+        session = mustHire(hired2).id;
+        const nextPrompt2 = yield* nextPrompt(before, next, 1);
+        const [recalled] = reminded(nextPrompt2);
         expect(recalled).toHaveLength(3);
         yield* w.nextReport;
       }).pipe(Effect.scoped, Effect.provide(before.layer));
@@ -194,7 +207,8 @@ describe("memory", () => {
         const sessions = yield* Session;
         yield* kept("scribe", 3);
         expect((yield* sessions.deliver(session, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
-        expect(yield* nextPrompt(after, again, 0)).toBe("顺手把下班打卡的测试也补上");
+        const nextPrompt2 = yield* nextPrompt(after, again, 0);
+        expect(nextPrompt2).toBe("顺手把下班打卡的测试也补上");
         yield* w.nextReport;
       }).pipe(Effect.scoped, Effect.provide(after.layer));
     });

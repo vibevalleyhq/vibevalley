@@ -56,12 +56,17 @@ export class Media extends Context.Service<
     readonly release: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
     readonly restore: () => Effect.Effect<void, ApiError>;
   }
->()("vibevalley/Media") {
+>()("@vibevalley/server/media/media") {
   static readonly layer = Layer.effect(
     Media,
     Effect.suspend(() => make),
   );
 }
+
+const attachmentJson = Schema.encodeEffect(Schema.fromJsonString(S.Attachment));
+const requestJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaImageRequest));
+const sourceJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSource));
+const usageJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaImageUsage));
 
 const make = Effect.gen(function* () {
   const db = yield* Db;
@@ -115,7 +120,8 @@ const make = Effect.gen(function* () {
     };
   });
   const list = Effect.fn("Media.list")(function* (): Effect.fn.Return<T.MediaJob[], ApiError> {
-    const images = yield* Effect.forEach(yield* db.run(q.recentGenerations()), view);
+    const recentGenerations2 = yield* db.run(q.recentGenerations());
+    const images = yield* Effect.forEach(recentGenerations2, view);
     const understood = yield* understanding.list();
     const spoken = yield* speech.list();
     const audioJobs = yield* audio.list();
@@ -155,7 +161,7 @@ const make = Effect.gen(function* () {
     yield* Effect.gen(function* () {
       const bytes = yield* downloadImage(row.result_url ?? "", request.width, request.height).pipe(Effect.provideService(PublicHttp, downloads));
       const attachment = yield* channel.attach({ name: `moss-${id}.png`, type: "image/png", data: bytes.toString("base64") });
-      yield* change(id, ["downloading"], { phase: "ready", attachment: JSON.stringify(attachment), result_url: null, problem: "" });
+      yield* change(id, ["downloading"], { phase: "ready", attachment: yield* attachmentJson(attachment), result_url: null, problem: "" });
     }).pipe(
       Effect.catch(() => change(id, ["downloading"], { phase: "download_failed", problem: t("server.media.downloadFailed") })),
       Effect.asVoid,
@@ -268,11 +274,11 @@ const make = Effect.gen(function* () {
       const input = yield* Schema.decodeEffect(S.MediaImageRequest)(given).pipe(Effect.mapError(() => refused(t("server.media.invalid"))));
       return yield* lock.withPermits(1)(
         Effect.gen(function* () {
-          const request = JSON.stringify(input);
+          const request = yield* requestJson(input).pipe(Effect.mapError(() => refused(t("server.media.invalid"))));
           const existing = yield* db.one(q.generation({ id: input.id }));
           if (existing) {
-            if (!same(yield* decodeRequest(existing.request), input) || !same((yield* view(existing)).source, source))
-              return yield* Effect.fail(refused(t("server.media.reusedId")));
+            const storedRequest = yield* decodeRequest(existing.request);
+            if (!same(storedRequest, input) || !same((yield* view(existing)).source, source)) return yield* Effect.fail(refused(t("server.media.reusedId")));
             return yield* view(existing);
           }
           if ((yield* understanding.has(input.id)) || (yield* speech.has(input.id)) || (yield* audio.has(input.id)))
@@ -298,7 +304,7 @@ const make = Effect.gen(function* () {
             q.insertGeneration({
               id: input.id,
               request,
-              source: JSON.stringify(source),
+              source: yield* sourceJson(source).pipe(Effect.mapError(() => refused(t("server.media.invalid")))),
               connection: connection.connection,
               revision: connection.revision,
               model: connection.model,
@@ -316,7 +322,11 @@ const make = Effect.gen(function* () {
                     yield* change(input.id, ["generating"], {
                       phase: "downloading",
                       result_url: result.url,
-                      usage: JSON.stringify({ images: result.usage.generated_images, width: result.usage.output_width, height: result.usage.output_height }),
+                      usage: yield* usageJson({
+                        images: result.usage.generated_images,
+                        width: result.usage.output_width,
+                        height: result.usage.output_height,
+                      }).pipe(Effect.mapError(() => refused(t("server.media.corrupt")))),
                     })
                   )
                     yield* download(input.id);
@@ -332,7 +342,8 @@ const make = Effect.gen(function* () {
             );
           });
           yield* run(input.id, work);
-          return yield* view(yield* found(input.id));
+          const found2 = yield* found(input.id);
+          return yield* view(found2);
         }).pipe(Effect.uninterruptible),
       );
     }),
@@ -387,7 +398,8 @@ const make = Effect.gen(function* () {
       yield* speech.restore();
       yield* audio.restore();
       yield* publish();
-      yield* Effect.forEach(yield* db.run(q.pendingGenerations()), (row) => (row.phase === "downloading" ? run(row.id, download(row.id)) : Effect.void), {
+      const pendingGenerations2 = yield* db.run(q.pendingGenerations());
+      yield* Effect.forEach(pendingGenerations2, (row) => (row.phase === "downloading" ? run(row.id, download(row.id)) : Effect.void), {
         discard: true,
       });
     }),

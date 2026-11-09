@@ -130,7 +130,7 @@ export function nowledge(c: MemorySourceConfig): Source {
         });
         const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(ToolAnswer)(res));
         const text = (parsed?.content ?? []).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-        if (parsed?.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
+        if (parsed?.isError === true) return yield* SourceError.make({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );
@@ -148,7 +148,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     };
     const text = yield* call("memory_search", args);
     return yield* Effect.mapBoth(Schema.decodeEffect(SearchResponse)(text), {
-      onFailure: () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
+      onFailure: () => SourceError.make({ message: "memory_search answered what it should not: " + head(text, 200) }),
       onSuccess: (r): Hit[] => r.results ?? [],
     });
   });
@@ -158,7 +158,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, repo), source_app: app });
     // The new memory's id, at the top or under memory. none when it found the same memory there already.
     const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
-    if (!added) return yield* new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) });
+    if (!added) return yield* SourceError.make({ message: "memory_add answered what it should not: " + head(answer, 200) });
     return added.memory_id || added.id || added.memory?.id || "";
   });
 
@@ -233,7 +233,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const at = yield* Clock.currentTimeMillis;
       return { id, agent: n.agent, kind: "note", text: n.text, author: "system", at, recalled: 0, fading: false, ...(repo ? { repo } : {}) } satisfies T.Memory;
     }),
-    forget: () => Effect.fail(new SourceError({ message: t("server.memory.nowledgeForget") })),
+    forget: () => Effect.fail(SourceError.make({ message: t("server.memory.nowledgeForget") })),
     can: { list: true, forget: false, transcripts: false },
   };
 }

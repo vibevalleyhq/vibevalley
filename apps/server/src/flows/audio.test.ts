@@ -110,6 +110,7 @@ it.effect("regression: audio tools reject autonomous and worker callers; cloning
       available.some((tool) => tool.name === "media_clone_create" || tool.name === "media_transcription_create" || tool.name === "media_audio_cleanup"),
     ).toBe(false);
     expect(tools.session(() => ({ ...caller(), session: "worker", actor: session("worker") })).filter((tool) => tool.name.startsWith("media_"))).toEqual([]);
-    expect(yield* (yield* Media).list()).toEqual([]);
+    const found = yield* (yield* Media).list();
+    expect(found).toEqual([]);
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });

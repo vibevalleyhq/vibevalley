@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { livePath, statePath } from "./shapes";
@@ -16,6 +17,8 @@ function serverStream() {
 
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
+const json = (value: unknown) => Result.getOrThrow(Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(value));
+
 const notice = { type: "notice", at: 1, level: "info", text: "hi" };
 
 test.each([false, true])("regression: LF and CRLF frames arrive once in order across chunks (fragmented: %s)", async (fragmented) => {
@@ -31,7 +34,7 @@ test.each([false, true])("regression: LF and CRLF frames arrive once in order ac
     () => Promise.resolve(server.response),
   ).catch((e: unknown) => e);
   const events = [notice, { ...notice, at: 2 }, { ...notice, at: 3 }];
-  const frames = events.map((event, i) => `data: ${JSON.stringify(event)}${i === 1 ? "\r\n\r\n" : "\n\n"}`);
+  const frames = events.map((event, i) => `data: ${json(event)}${i === 1 ? "\r\n\r\n" : "\n\n"}`);
   try {
     if (fragmented) {
       for (const [index, frame] of frames.entries()) {
@@ -67,7 +70,7 @@ test("a stream that only pings is alive; one silent past the limit is given up a
   );
   const ended = read.catch((e: unknown) => e);
   await settle();
-  server.write(`data: ${JSON.stringify(notice)}\n\n`);
+  server.write(`data: ${json(notice)}\n\n`);
   await settle();
   expect(heard).toEqual([notice]);
   // Five heartbeats: well past the silence limit in all, never past it between two.
@@ -137,7 +140,7 @@ for (const failure of ["frame", "callback", "http", "abort"] as const) {
       },
     ).catch((error: unknown) => error);
     if (failure === "abort") caller.abort();
-    else if (failure !== "http") server.write(`data: ${JSON.stringify(failure === "frame" ? { type: "notice", at: "soon" } : notice)}\n\n`);
+    else if (failure !== "http") server.write(`data: ${json(failure === "frame" ? { type: "notice", at: "soon" } : notice)}\n\n`);
     const error = await ended;
     expect(error).toBeInstanceOf(Error);
     if (failure === "callback") expect(error).toBe(callbackError);

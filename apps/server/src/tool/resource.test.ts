@@ -38,16 +38,19 @@ describe("resource_read", () => {
       const original = "甲".repeat(500);
       const message = (yield* channels.say(original, undefined, "")).message;
       const uri = `vv://envelope/${message.id}`;
-      let page = yield* decodePage(yield* textResult(read, { uri, offset: 0, limit: 120 }));
+      const firstText = yield* textResult(read, { uri, offset: 0, limit: 120 });
+      let page = yield* decodePage(firstText);
       let snapshot = page.text;
       yield* channels.edit(message.id, "乙".repeat(500));
       while (page.nextOffset !== undefined) {
-        page = yield* decodePage(yield* textResult(read, { uri, offset: page.nextOffset, limit: 120 }));
+        const textResult3 = yield* textResult(read, { uri, offset: page.nextOffset, limit: 120 });
+        page = yield* decodePage(textResult3);
         snapshot += page.text;
       }
       expect(snapshot).toContain(original);
       expect(snapshot).not.toContain("乙".repeat(100));
-      const refreshed = yield* decodePage(yield* textResult(read, { uri, offset: 0, limit: 4000 }));
+      const textResult2 = yield* textResult(read, { uri, offset: 0, limit: 4000 });
+      const refreshed = yield* decodePage(textResult2);
       expect(refreshed.text).toContain("乙".repeat(100));
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -57,7 +60,8 @@ describe("resource_read", () => {
     return Effect.gen(function* () {
       const channels = yield* Channel;
       const agents = yield* Agent;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const tools = yield* Tool;
       const secret = yield* channels.openChannel("secret", "", "");
       const message = (yield* channels.say("owner only", secret.id, "")).message;

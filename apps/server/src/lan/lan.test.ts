@@ -4,11 +4,12 @@ import type { Socket } from "node:net";
 import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Formatter, Layer, Schema } from "effect";
 
-import { attachmentPath, lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
+import { attachmentPath, lanKeyCookie } from "@vibevalley/protocol";
 import { pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
+import * as S from "@vibevalley/protocol/schema";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { app } from "#/testing/http.ts";
@@ -32,7 +33,7 @@ const request = async (method: string, url: string, key: string, body?: unknown,
   const res = await fetch(url, {
     method,
     headers: { ...(key ? { authorization: "Bearer " + key } : {}), ...headers },
-    ...(body !== undefined && method !== "GET" ? { body: JSON.stringify(body) } : {}),
+    ...(body !== undefined && method !== "GET" ? { body: Formatter.formatJson(body) } : {}),
   });
   return { status: res.status, body: await res.text() };
 };
@@ -40,7 +41,7 @@ const request = async (method: string, url: string, key: string, body?: unknown,
 const healthPath = pathOf("server.health.get");
 
 const ask = (addr: string, code: string, name: string) =>
-  fetch(addr + pathOf("lan.pair"), { method: "POST", body: JSON.stringify({ code, name }) }).then((r) => r.text());
+  fetch(addr + pathOf("lan.pair"), { method: "POST", body: Formatter.formatJson({ code, name }) }).then((r) => r.text());
 
 const open = (lan: Lan["Service"]) =>
   Effect.map(lan.setOpen(true), (s) => {
@@ -57,7 +58,8 @@ const pair = (lan: Lan["Service"], addr: string, name: string) =>
     const got = ask(addr, s.pairing!.code.toLowerCase(), name);
     yield* until(() => lan.status().pairing?.asking !== undefined, "it questions");
     yield* lan.answer(true);
-    const paired = JSON.parse(yield* Effect.promise(() => got)) as LanPaired;
+    const got2 = yield* Effect.promise(() => got);
+    const paired = yield* Schema.decodeEffect(Schema.fromJsonString(S.LanPaired))(got2);
     expect(paired.key).not.toBe("");
     return paired;
   });
@@ -92,7 +94,8 @@ describe("lan access", () => {
       const lan = yield* farm();
       expect(lan.status()).toMatchObject({ open: false, devices: [] });
       expect(lan.status().url).toBeUndefined();
-      expect(yield* Effect.flip(lan.startPairing())).toMatchObject({ _tag: "LanRefused" });
+      const pairingStartedFailure = yield* Effect.flip(lan.startPairing());
+      expect(pairingStartedFailure).toMatchObject({ _tag: "LanRefused" });
       const addr = yield* open(lan);
       expect((yield* Effect.promise(() => request("POST", addr + healthPath, ""))).status).toBe(401);
       // The page holds nothing of the farm's: a device not paired yet gets it, to pair on.
@@ -101,16 +104,15 @@ describe("lan access", () => {
         expect([path, page.status, page.body]).toEqual([path, 200, expect.stringContaining("VibeValley")]);
       }
       yield* lan.setOpen(false);
-      expect(
-        yield* Effect.promise(() =>
-          // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
-          // @effect-diagnostics-next-line globalFetchInEffect:off
-          fetch(addr + healthPath, { method: "POST" }).then(
-            () => "answered",
-            () => "shut",
-          ),
+      const then2 = yield* Effect.promise(() =>
+        // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
+        // @effect-diagnostics-next-line globalFetchInEffect:off
+        fetch(addr + healthPath, { method: "POST" }).then(
+          () => "answered",
+          () => "shut",
         ),
-      ).toBe("shut");
+      );
+      expect(then2).toBe("shut");
     }).pipe(Effect.scoped),
   );
 
@@ -146,7 +148,8 @@ describe("lan access", () => {
       expect([health.status, health.body]).toEqual([200, expect.stringContaining(`"ok":true`)]);
       const me = yield* Effect.promise(() => request("POST", addr + pathOf("lan.me.get"), paired.key));
       expect(me.status).toBe(200);
-      expect(JSON.parse(me.body)).toMatchObject({ id: paired.device, lastSeen: expect.any(Number) });
+      const device = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(me.body);
+      expect(device).toMatchObject({ id: paired.device, lastSeen: expect.any(Number) });
       // A paired browser's cookie is a key as the header is.
       const byCookie = yield* Effect.promise(() =>
         // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
@@ -175,7 +178,8 @@ describe("lan access", () => {
         expect([op, got.status, got.body.includes("LanRefused")]).toEqual([op, 403, true]);
       }
       expect((yield* Effect.promise(() => request("POST", addr + healthPath, paired.key + "x"))).status).toBe(401);
-      expect(yield* Effect.flip(lan.me(undefined))).toMatchObject({ _tag: "LanRefused" });
+      const meFailure = yield* Effect.flip(lan.me(undefined));
+      expect(meFailure).toMatchObject({ _tag: "LanRefused" });
     }).pipe(Effect.scoped),
   );
 
@@ -186,7 +190,8 @@ describe("lan access", () => {
       const s = yield* lan.startPairing();
       const got = ask(addr, s.pairing!.code, "陌生人");
       yield* until(() => lan.status().pairing?.asking === "陌生人", "it questions");
-      expect(yield* Effect.promise(() => ask(addr, s.pairing!.code, "又一个"))).toContain("另一台设备");
+      const answer2 = yield* Effect.promise(() => ask(addr, s.pairing!.code, "又一个"));
+      expect(answer2).toContain("另一台设备");
       yield* lan.answer(false);
       const body = yield* Effect.promise(() => got);
       expect(body).toContain("LanRefused");
@@ -201,8 +206,12 @@ describe("lan access", () => {
       const lan = yield* farm();
       const addr = yield* open(lan);
       const s = yield* lan.startPairing();
-      for (let i = 0; i < 5; i++) expect(yield* Effect.promise(() => ask(addr, "WRONGCODE", "猜码的"))).toContain("配对码不对");
-      expect(yield* Effect.promise(() => ask(addr, s.pairing!.code, "猜码的"))).toContain("过期");
+      for (let i = 0; i < 5; i++) {
+        const reply = yield* Effect.promise(() => ask(addr, "WRONGCODE", "猜码的"));
+        expect(reply).toContain("配对码不对");
+      }
+      const answer = yield* Effect.promise(() => ask(addr, s.pairing!.code, "猜码的"));
+      expect(answer).toContain("过期");
     }).pipe(Effect.scoped),
   );
 
@@ -226,7 +235,8 @@ describe("lan access", () => {
         }
       })();
       yield* lan.forget(paired.device);
-      expect(yield* Effect.promise(() => ended)).toBe("ended");
+      const ended2 = yield* Effect.promise(() => ended);
+      expect(ended2).toBe("ended");
       expect((yield* Effect.promise(() => request("POST", addr + healthPath, paired.key))).status).toBe(401);
     }).pipe(Effect.scoped),
   );
@@ -242,7 +252,8 @@ describe("lan access", () => {
       expect(status).toBe(101);
       const ended = new Promise<string>((resolve) => socket!.once("close", () => resolve("ended")));
       yield* lan.forget(paired.device);
-      expect(yield* Effect.promise(() => ended)).toBe("ended");
+      const ended2 = yield* Effect.promise(() => ended);
+      expect(ended2).toBe("ended");
     }).pipe(Effect.scoped),
   );
 });

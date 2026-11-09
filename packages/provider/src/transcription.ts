@@ -1,5 +1,5 @@
 import type { TranscriptionModelV4 } from "@ai-sdk/provider";
-import { type Cause, Clock, Effect, FiberSet, Schema } from "effect";
+import { type Cause, DateTime, Effect, FiberSet, Schema } from "effect";
 import { HttpBody, HttpClient, type HttpClientError } from "effect/http";
 
 import { mossTranscriptionModels } from "./moss/transcription-models.ts";
@@ -64,21 +64,22 @@ export const transcriptionModel = Effect.fn("Provider.transcriptionModel")(funct
             })
             .pipe(
               Effect.timeout("120 seconds"),
-              Effect.mapError((cause) => new TranscriptionRequestError({ reason: "Unreachable", message: causeText(cause), cause })),
+              Effect.mapError((cause) => TranscriptionRequestError.make({ reason: "Unreachable", message: causeText(cause), cause })),
             );
           const raw = (yield* res.text.pipe(
-            Effect.mapError((cause) => new TranscriptionRequestError({ reason: "Cut", message: causeText(cause), cause })),
+            Effect.mapError((cause) => TranscriptionRequestError.make({ reason: "Cut", message: causeText(cause), cause })),
           )).slice(0, 1 << 20);
           const got = Schema.decodeOption(ResponseSchema)(raw);
           const detail = got._tag === "Some" ? got.value.error?.message : undefined;
           if (res.status < 200 || res.status >= 300)
-            return yield* new TranscriptionRequestError({
+            return yield* TranscriptionRequestError.make({
               reason: "HttpStatus",
               status: res.status,
               message: [...(detail || raw.trim())].slice(0, 200).join(""),
             });
-          if (got._tag === "None") return yield* new TranscriptionRequestError({ reason: "InvalidResponse", message: "Invalid transcription response" });
+          if (got._tag === "None") return yield* TranscriptionRequestError.make({ reason: "InvalidResponse", message: "Invalid transcription response" });
           const usage = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.MutableJson))(got.value.usage);
+          const now = yield* DateTime.now;
           return {
             text: (got.value.text ?? "").trim(),
             segments: [],
@@ -86,7 +87,7 @@ export const transcriptionModel = Effect.fn("Provider.transcriptionModel")(funct
             durationInSeconds: undefined,
             ...(usage._tag === "Some" ? { usage: usage.value } : {}),
             warnings: [],
-            response: { timestamp: new Date(yield* Clock.currentTimeMillis), modelId: connection.model, headers: res.headers, body: raw },
+            response: { timestamp: DateTime.toDateUtc(now), modelId: connection.model, headers: res.headers, body: raw },
           };
         }),
         { signal: options.abortSignal },

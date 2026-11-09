@@ -70,7 +70,7 @@ export class Caller {
   }
 
   fail(cause: unknown) {
-    const failure = Cause.fail(new NotAnswered({ message: messageOf(cause), cause }));
+    const failure = Cause.fail(NotAnswered.make({ message: messageOf(cause), cause }));
     switch (this.state._tag) {
       case "buffering":
         this.state = { _tag: "failed", kept: this.state.kept, failure };
@@ -176,6 +176,8 @@ export interface AgentHost<R> {
 }
 
 /** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at the latest. */
+const encodePretty = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+
 export const makeHost = <R>(
   o: HostOptions<R> & { readonly memory: MemoryPort },
   journal: Journal,
@@ -344,8 +346,8 @@ export const makeHost = <R>(
     // Started on first use: loading it is not free, and a farm without a model works otherwise. Only ever under inputs.
     const start = Effect.gen(function* () {
       if (brain) return brain.brain;
-      if (closing) return yield* new CannotStart({ message: stopped() });
-      const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e), cause: e }) });
+      if (closing) return yield* CannotStart.make({ message: stopped() });
+      const llm = yield* Effect.try({ try: o.llm, catch: (e) => CannotStart.make({ message: messageOf(e), cause: e }) });
       const scope = yield* Scope.fork(owner);
       const made = yield* makeBrain({
         name: o.session.id,
@@ -399,9 +401,12 @@ export const makeHost = <R>(
             onSuccess: (b) =>
               Effect.gen(function* () {
                 if (closing) return closeInput(hosted);
-                const { text, heard } = yield* build(b.busy() || (yield* b.queued), yield* b.memoryNews);
+                const busy = b.busy() || (yield* b.queued);
+                const memoryNews = yield* b.memoryNews;
+                const { text, heard } = yield* build(busy, memoryNews);
                 if (closing) return closeInput(hosted);
-                const message = customMessage(o.inputType, text, yield* Clock.currentTimeMillis, { details: hosted.route });
+                const now2 = yield* Clock.currentTimeMillis;
+                const message = customMessage(o.inputType, text, now2, { details: hosted.route });
                 local.set(message, { ...hosted, run: { ...run, ...(heard ? { heard } : {}) } });
                 yield* now ? b.send(message) : b.later(message);
                 return { ok: true } as const;
@@ -476,8 +481,11 @@ export const makeHost = <R>(
           expect: [],
         };
         const file = join(o.home, "evals", id + ".json");
-        yield* fs.makeDirectory(join(o.home, "evals"), { recursive: true }).pipe(Effect.mapError((err) => refused(messageOf(err))));
-        yield* fs.writeFileString(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 }).pipe(Effect.mapError((err) => refused(messageOf(err))));
+        yield* fs.makeDirectory(join(o.home, "evals"), { recursive: true }).pipe(Effect.mapError((err) => err.pipe(messageOf, refused)));
+        yield* encodePretty(evalCase).pipe(
+          Effect.flatMap((text) => fs.writeFileString(file, text + "\n", { mode: 0o600 })),
+          Effect.mapError((err) => err.pipe(messageOf, refused)),
+        );
         return { id, file };
       });
 

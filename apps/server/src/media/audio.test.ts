@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { expect, it } from "@effect/vitest";
-import { Clock, Deferred, Effect, FileSystem, Layer, Semaphore, Stream } from "effect";
+import { Clock, Deferred, Effect, FileSystem, Layer, Schema, Semaphore, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -19,6 +19,12 @@ import { makeAudio } from "./audio.ts";
 import { makeInputs } from "./inputs.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
 import { wav } from "./testdata/audio.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const notIn = (value: unknown, secret: string) =>
+  Effect.map(json(value), (text) => {
+    expect(text).not.toContain(secret);
+  });
 
 const speakers: T.MediaSpeakersRequest = {
   id: "speakers-test",
@@ -94,7 +100,8 @@ it.effect("regression: async speakers persist task ID before polling, retain act
         return HttpClientResponse.fromWeb(request, Response.json({ task_id: "task-one" }, { status: 202 }));
       }
       polled++;
-      expect(yield* savedRow).toMatchObject({ remote_task_id: "task-one", phase: "generating" });
+      const savedRow2 = yield* savedRow;
+      expect(savedRow2).toMatchObject({ remote_task_id: "task-one", phase: "generating" });
       return HttpClientResponse.fromWeb(request, Response.json(success));
     }),
   );
@@ -113,18 +120,22 @@ it.effect("regression: async speakers persist task ID before polling, retain act
       metadata: { source: "file", sampleRate: 24000, channels: 1 },
       attachment: { type: "audio/wav" },
     });
-    expect(yield* audio.createSpeakers(submittedRequest, { kind: "owner" })).toEqual(ready);
-    expect(
-      yield* audio.createSpeakers({ ...submittedRequest, segments: [{ speaker: "host", text: "Changed" }] }, { kind: "owner" }).pipe(Effect.flip),
-    ).toMatchObject({ _tag: "Refused" });
-    expect(
-      yield* audio.createSpeakers(submittedRequest, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: true }).pipe(Effect.flip),
-    ).toMatchObject({ _tag: "Refused" });
+    const speakersCreated = yield* audio.createSpeakers(submittedRequest, { kind: "owner" });
+    expect(speakersCreated).toEqual(ready);
+    const speakersCreatedFailure = yield* audio
+      .createSpeakers({ ...submittedRequest, segments: [{ speaker: "host", text: "Changed" }] }, { kind: "owner" })
+      .pipe(Effect.flip);
+    expect(speakersCreatedFailure).toMatchObject({ _tag: "Refused" });
+    const speakersCreatedFailure2 = yield* audio
+      .createSpeakers(submittedRequest, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: true })
+      .pipe(Effect.flip);
+    expect(speakersCreatedFailure2).toMatchObject({ _tag: "Refused" });
     expect(submitted).toBe(1);
     expect(polled).toBe(1);
-    expect(JSON.stringify(ready)).not.toContain("signed");
-    expect(JSON.stringify(ready)).not.toContain("task-one");
-    expect(JSON.stringify(yield* (yield* Db).one(q.audio({ id: speakers.id })))).not.toContain("audio-private-key");
+    yield* notIn(ready, "signed");
+    yield* notIn(ready, "task-one");
+    const found = yield* (yield* Db).one(q.audio({ id: speakers.id }));
+    yield* notIn(found, "audio-private-key");
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
 });
 
@@ -160,13 +171,15 @@ it.effect("regression: design preview is not a voice; explicit owner consent clo
       consent: true,
       name: "Warm",
     };
-    expect(yield* audio.createClone(clone, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: true }).pipe(Effect.flip)).toMatchObject({
+    const cloneCreatedFailure = yield* audio.createClone(clone, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: true }).pipe(Effect.flip);
+    expect(cloneCreatedFailure).toMatchObject({
       _tag: "Refused",
     });
     yield* audio.createClone(clone, { kind: "owner" });
     const saved = yield* waitFor(audio.get(clone.id), (job) => job.phase === "ready", "voice cloned");
     expect(saved.result).toEqual({ kind: "clone", voice: { id: "saved-voice", name: "Warm", createdAtSeconds: 1 } });
-    expect(yield* audio.createClone(clone, { kind: "owner" })).toEqual(saved);
+    const cloneCreated = yield* audio.createClone(clone, { kind: "owner" });
+    expect(cloneCreated).toEqual(saved);
     expect(clones).toBe(1);
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
 });
@@ -183,8 +196,10 @@ it.effect("regression: unknown submission outcomes cannot be resubmitted or resu
     yield* audio.createSpeakers(speakers, { kind: "owner" });
     const unknown = yield* waitFor(audio.get(speakers.id), (job) => job.phase === "unknown", "unknown submit");
     expect(unknown.canResume).toBe(false);
-    expect(yield* audio.createSpeakers(speakers, { kind: "owner" })).toEqual(unknown);
-    expect(yield* audio.resume(speakers.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const speakersCreated = yield* audio.createSpeakers(speakers, { kind: "owner" });
+    expect(speakersCreated).toEqual(unknown);
+    const resumedFailure = yield* audio.resume(speakers.id).pipe(Effect.flip);
+    expect(resumedFailure).toMatchObject({ _tag: "Refused" });
     yield* audio.restore();
     expect(submitted).toBe(1);
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
@@ -214,10 +229,12 @@ it.effect("regression: local cancellation retains a known task; resume polls onl
       const { audio } = yield* harness;
       yield* audio.createSpeakers(speakers, { kind: "owner" });
       yield* Deferred.await(started);
-      expect(yield* audio.cancel(speakers.id)).toMatchObject({ phase: "canceled", canResume: true });
+      const cancel2 = yield* audio.cancel(speakers.id);
+      expect(cancel2).toMatchObject({ phase: "canceled", canResume: true });
       const provider = yield* Provider;
       yield* provider.update({ ...provider.status(), connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "rotated" }] });
-      expect(yield* audio.resume(speakers.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const resumedFailure = yield* audio.resume(speakers.id).pipe(Effect.flip);
+      expect(resumedFailure).toMatchObject({ _tag: "Refused" });
       yield* provider.update({ ...provider.status(), connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "audio-private-key" }] });
       ready = true;
       yield* audio.resume(speakers.id);
@@ -243,8 +260,8 @@ it.effect("regression: restored known tasks poll the original account while queu
         q.insertAudio({
           id,
           kind: "speakers",
-          request: JSON.stringify({ ...speakers, id, kind: "speakers" }),
-          source: JSON.stringify({ kind: "owner" }),
+          request: yield* json({ ...speakers, id, kind: "speakers" }),
+          source: yield* json({ kind: "owner" }),
           input: null,
           connection: "moss",
           revision: 1,
@@ -282,20 +299,28 @@ it.effect("regression: shared capacity and IDs apply across audio kinds and auto
     yield* Effect.gen(function* () {
       yield* configured();
       const { audio } = yield* harness;
-      expect(yield* audio.createSpeakers({ ...speakers, id: "image-id" }, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-      expect(yield* audio.createSpeakers(speakers, { kind: "orchestrator", agent: "agent", channel: "", forOwner: false }).pipe(Effect.flip)).toMatchObject({
+      const speakersCreatedFailure = yield* audio.createSpeakers({ ...speakers, id: "image-id" }, { kind: "owner" }).pipe(Effect.flip);
+      expect(speakersCreatedFailure).toMatchObject({ _tag: "Refused" });
+      const speakersCreatedFailure2 = yield* audio
+        .createSpeakers(speakers, { kind: "orchestrator", agent: "agent", channel: "", forOwner: false })
+        .pipe(Effect.flip);
+      expect(speakersCreatedFailure2).toMatchObject({
         _tag: "Refused",
       });
       yield* audio.createSpeakers(speakers, { kind: "owner" });
       yield* Deferred.await(started);
-      expect(yield* audio.createVoiceDesign({ ...design, id: speakers.id }, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const voiceDesignCreatedFailure = yield* audio.createVoiceDesign({ ...design, id: speakers.id }, { kind: "owner" }).pipe(Effect.flip);
+      expect(voiceDesignCreatedFailure).toMatchObject({ _tag: "Refused" });
       for (let index = 0; index < 7; index++) yield* audio.createVoiceDesign({ ...design, id: `queued-${index}` }, { kind: "owner" });
-      expect(yield* audio.pending()).toBe(8);
-      expect(yield* audio.createVoiceDesign(design, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const pending2 = yield* audio.pending();
+      expect(pending2).toBe(8);
+      const voiceDesignCreatedFailure2 = yield* audio.createVoiceDesign(design, { kind: "owner" }).pipe(Effect.flip);
+      expect(voiceDesignCreatedFailure2).toMatchObject({ _tag: "Refused" });
       expect(calls).toBe(1);
       yield* audio.cancel("queued-0");
       yield* audio.createVoiceDesign(design, { kind: "owner" });
-      expect(yield* audio.pending()).toBe(8);
+      const pending3 = yield* audio.pending();
+      expect(pending3).toBe(8);
     }).pipe(Effect.scoped, Effect.provide(layer(http)));
   }),
 );
@@ -372,10 +397,12 @@ it.effect("regression: oversized-duration clone samples are rejected from actual
     bytes.writeUInt32LE(bytes.length - 44, 40);
     const reserved = yield* inputs.create({ kind: "audio", name: "short-name.wav", mime: "audio/wav", size: bytes.length });
     yield* inputs.upload(reserved.id, Stream.make(bytes));
-    expect(
-      yield* audio.createClone({ id: "too-long", input: reserved.id, connection: "moss", revision: 1, consent: true }, { kind: "owner" }).pipe(Effect.flip),
-    ).toMatchObject({ _tag: "Refused" });
-    expect(yield* audio.has("too-long")).toBe(false);
+    const cloneCreatedFailure = yield* audio
+      .createClone({ id: "too-long", input: reserved.id, connection: "moss", revision: 1, consent: true }, { kind: "owner" })
+      .pipe(Effect.flip);
+    expect(cloneCreatedFailure).toMatchObject({ _tag: "Refused" });
+    const has2 = yield* audio.has("too-long");
+    expect(has2).toBe(false);
     expect((yield* inputs.get(reserved.id)).canDelete).toBe(true);
   }).pipe(Effect.scoped, Effect.provide(layer(HttpClient.make(() => Effect.die("Must not submit invalid sample"))))),
 );
@@ -402,7 +429,8 @@ it.effect("regression: failed result downloads retry only the persisted actual f
     yield* configured();
     const { audio } = yield* harness;
     yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "owner" });
-    expect(yield* waitFor(audio.get(speakers.id), (job) => job.phase === "download_failed", "download paused")).toMatchObject({
+    const forWaited = yield* waitFor(audio.get(speakers.id), (job) => job.phase === "download_failed", "download paused");
+    expect(forWaited).toMatchObject({
       canRetryDownload: true,
       format: "wav",
     });
@@ -437,7 +465,8 @@ it.effect("regression: transient polling failures have bounded backoff and prese
       );
       yield* TestClock.adjust(delay);
     }
-    expect(yield* waitFor(audio.get(speakers.id), (job) => job.phase === "unknown", "polling paused")).toMatchObject({
+    const forWaited = yield* waitFor(audio.get(speakers.id), (job) => job.phase === "unknown", "polling paused");
+    expect(forWaited).toMatchObject({
       canResume: true,
       canRetryDownload: false,
     });
@@ -585,8 +614,10 @@ it.effect("regression: unknown audio jobs refuse destructive cleanup even when a
     const unknown = yield* waitFor(audio.get("uncertain-cleanup"), (job) => job.phase === "unknown", "uncertain transcription");
     expect(unknown.canCleanup).toBe(false);
     expect(unknown.usage).toBeUndefined();
-    expect(yield* audio.previewCleanup(unknown.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* audio.cleanup(unknown.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const previewCleanupFailure = yield* audio.previewCleanup(unknown.id).pipe(Effect.flip);
+    expect(previewCleanupFailure).toMatchObject({ _tag: "Refused" });
+    const cleanupFailure = yield* audio.cleanup(unknown.id).pipe(Effect.flip);
+    expect(cleanupFailure).toMatchObject({ _tag: "Refused" });
     expect((yield* inputs.get(local.id)).canDelete).toBe(false);
     expect(deleted).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
@@ -654,7 +685,21 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
   Effect.gen(function* () {
     const terminal = yield* Deferred.make<void>();
     let submissions = 0;
-    const encode = (event: object) => new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+    const sse = (event: object) => json(event).pipe(Effect.map((text) => new TextEncoder().encode(`data: ${text}\n\n`)));
+    const opening = yield* Effect.forEach(
+      [
+        { type: "task.created", task_id: "stream-task", object: "audio.transcription", status: "PROCESSING", model: "moss-transcribe-diarize-pro" },
+        { type: "transcript.text.delta", delta: "Hello." },
+        { type: "transcript.segment.done", content_index: 0, speaker: "S01", start: 0, end: 0.12, text: "Hello." },
+        { type: "transcript.text.delta", delta: " partial" },
+      ],
+      sse,
+    );
+    const done = yield* sse({
+      type: "transcript.text.done",
+      text: "Hello. done",
+      usage: { type: "duration", prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, input_audio_seconds: 0.12 },
+    });
     const http = HttpClient.make((request) =>
       Effect.gen(function* () {
         if (request.url.endsWith("/files") && request.method === "POST")
@@ -674,25 +719,8 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
         expect(request.method).toBe("POST");
         expect(request.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
         submissions++;
-        const first = Stream.make(
-          encode({ type: "task.created", task_id: "stream-task", object: "audio.transcription", status: "PROCESSING", model: "moss-transcribe-diarize-pro" }),
-          encode({ type: "transcript.text.delta", delta: "Hello." }),
-          encode({ type: "transcript.segment.done", content_index: 0, speaker: "S01", start: 0, end: 0.12, text: "Hello." }),
-          encode({ type: "transcript.text.delta", delta: " partial" }),
-        );
-        const last = Stream.fromEffect(
-          Deferred.await(terminal).pipe(
-            Effect.as(
-              mode === "done"
-                ? encode({
-                    type: "transcript.text.done",
-                    text: "Hello. done",
-                    usage: { type: "duration", prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, input_audio_seconds: 0.12 },
-                  })
-                : new Uint8Array(0),
-            ),
-          ),
-        );
+        const first = Stream.fromIterable(opening);
+        const last = Stream.fromEffect(Deferred.await(terminal).pipe(Effect.as(mode === "done" ? done : new Uint8Array(0))));
         const body = yield* Stream.toReadableStreamEffect(Stream.concat(first, last));
         return HttpClientResponse.fromWeb(request, new Response(body, { headers: { "content-type": "text/event-stream" } }));
       }),
@@ -729,13 +757,15 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
       else expect(final.result).toMatchObject({ text: expect.stringContaining("Hello.") });
       expect((yield* inputs.get(reserved.id)).canDelete).toBe(false);
       expect((yield* inputs.content(reserved.id)).size).toBe(bytes.length);
-      expect(yield* audio.createTranscription(request, { kind: "owner" })).toEqual(final);
+      const transcriptionCreated = yield* audio.createTranscription(request, { kind: "owner" });
+      expect(transcriptionCreated).toEqual(final);
       expect(submissions).toBe(1);
       const row = yield* (yield* Db).one(q.audio({ id: request.id }));
       if (!row) return yield* Effect.die("Expected streamed task");
       yield* (yield* Db).run(q.changeAudio({ ...row, phase: "generating", now: yield* Clock.currentTimeMillis }));
       yield* audio.restore();
-      expect(yield* audio.get(request.id)).toMatchObject({ phase: "unknown", canResume: false, result: final.result });
+      const audio2 = yield* audio.get(request.id);
+      expect(audio2).toMatchObject({ phase: "unknown", canResume: false, result: final.result });
       expect(submissions).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(layer(http)));
   }),

@@ -108,7 +108,8 @@ it.live("regression: queued triggers enter the first model request in receipt or
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "work", agent: "lab", repo: "fifo" });
@@ -149,7 +150,8 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());

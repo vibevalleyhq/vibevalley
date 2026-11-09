@@ -37,6 +37,12 @@ const Authorization = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+const authorizationJson = Schema.encodeEffect(Schema.fromJsonString(Authorization));
+const requestJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaUnderstandingRequest));
+const referencesJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Array(S.MediaInputReference)));
+const sourceJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSource));
+const resultJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaUnderstandingResult));
+
 export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
   const provider = yield* Provider;
@@ -86,7 +92,8 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     };
   });
   const get = Effect.fn("Media.understandingGet")(function* (id: string) {
-    return yield* view(yield* found(id));
+    const found2 = yield* found(id);
+    return yield* view(found2);
   });
   const change = Effect.fnUntraced(
     function* (
@@ -152,7 +159,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       if (row.authorization !== null) {
         const valid = yield* approvedAccount(row).pipe(
           Effect.as(true),
-          Effect.catch(() => Effect.succeed(false)),
+          Effect.orElseSucceed(() => false),
         );
         if (!valid) return yield* expire(input.id);
       }
@@ -172,7 +179,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       if (
         yield* change(input.id, ["generating"], {
           phase: result.status === "completed" ? "ready" : "incomplete",
-          result: JSON.stringify(result),
+          result: yield* resultJson(result).pipe(Effect.mapError(invalid)),
           cleanup: "running",
           problem: "",
         })
@@ -208,7 +215,8 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       const input = yield* Schema.decodeEffect(S.MediaUnderstandingRequest)(given).pipe(Effect.mapError(invalid));
       const existing = yield* db.one(q.understanding({ id: input.id }));
       if (existing) {
-        if (!same(yield* request(existing), input) || (yield* authorization(existing))?.channel !== (channel ?? undefined))
+        const storedRequest = yield* request(existing);
+        if (!same(storedRequest, input) || (yield* authorization(existing))?.channel !== (channel ?? undefined))
           return yield* Effect.fail(refused(t("server.media.reusedId")));
         return yield* view(existing);
       }
@@ -233,13 +241,15 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
         db.run(
           q.insertUnderstanding({
             id: input.id,
-            request: JSON.stringify(input),
-            inputs: JSON.stringify(references),
-            source: JSON.stringify({ kind: "owner" }),
+            request: yield* requestJson(input).pipe(Effect.mapError(invalid)),
+            inputs: yield* referencesJson(references).pipe(Effect.mapError(invalid)),
+            source: yield* sourceJson({ kind: "owner" }).pipe(Effect.mapError(invalid)),
             authorization:
               channel === null
                 ? null
-                : JSON.stringify({ channel, expiresAt: now + 15 * 60_000, fingerprint: createHash("sha256").update(account.key).digest("hex") }),
+                : yield* authorizationJson({ channel, expiresAt: now + 15 * 60_000, fingerprint: createHash("sha256").update(account.key).digest("hex") }).pipe(
+                    Effect.mapError(invalid),
+                  ),
             connection: account.connection,
             revision: account.revision,
             model: account.model,
@@ -262,7 +272,8 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     has: (id: string) => db.one(q.understanding({ id })).pipe(Effect.map((row) => row !== undefined)),
     pending: () => db.run(q.activeUnderstanding()).pipe(Effect.map((rows) => rows.length)),
     list: Effect.fn("Media.understandingList")(function* () {
-      return yield* Effect.forEach(yield* db.run(q.recentUnderstanding()), view);
+      const recentUnderstanding2 = yield* db.run(q.recentUnderstanding());
+      return yield* Effect.forEach(recentUnderstanding2, view);
     }),
     create: (input: T.MediaUnderstandingRequest) => create(input, null),
     authorize: Effect.fn("Media.authorizeUnderstanding")(function* (given: T.MediaUnderstandingAuthorizationRequest) {
@@ -284,7 +295,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
         }
         const account = yield* approvedAccount(row);
         yield* channels.placeOf(ownerId, approval.channel);
-        const next = { ...row, source: JSON.stringify(source), phase: "queued" as const };
+        const next = { ...row, source: yield* sourceJson(source).pipe(Effect.mapError(invalid)), phase: "queued" as const };
         yield* db.run(q.changeUnderstanding({ ...next, now: yield* Clock.currentTimeMillis }));
         yield* ports.publish();
         yield* enqueue(next, account);

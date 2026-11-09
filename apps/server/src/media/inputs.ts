@@ -1,6 +1,4 @@
-import { join } from "node:path";
-
-import { Clock, Effect, Exit, FileSystem, Schema, Semaphore, type Scope, Stream } from "effect";
+import { Clock, Effect, Exit, FileSystem, Path, Schema, Semaphore, type Scope, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -19,8 +17,13 @@ import { stageAudioResult, stageMediaInput, type StagedAudioResult, verifyMediaI
 const lifetime = 24 * 60 * 60 * 1000;
 const quota = 2 * 1024 * 1024 * 1024;
 
+const storedMetadata = Schema.Struct({ kind: Schema.Literals(["image", "video", "audio"]), name: Schema.String, mime: Schema.String, size: Schema.Int });
+const metadataJson = Schema.encodeEffect(Schema.fromJsonString(storedMetadata));
+
 export const makeInputs = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const { join } = path;
   const db = yield* Db;
   const config = yield* ServerConfig;
   const directory = join(config.home, "media-inputs");
@@ -41,7 +44,6 @@ export const makeInputs = Effect.gen(function* () {
     if (!row) return yield* Effect.fail(refused(t("server.media.inputMissing")));
     return row;
   });
-  const storedMetadata = Schema.Struct({ kind: Schema.Literals(["image", "video", "audio"]), name: Schema.String, mime: Schema.String, size: Schema.Int });
   const metadata = (row: q.InputResult) => Schema.decodeEffect(Schema.fromJsonString(storedMetadata))(row.metadata).pipe(Effect.mapError(storageError));
   const canDelete = (row: q.InputResult) => row.pinned === 0 && !uploading.has(row.id);
   const view = Effect.fnUntraced(function* (row: q.InputResult): Effect.fn.Return<T.MediaInput, ApiError> {
@@ -56,10 +58,12 @@ export const makeInputs = Effect.gen(function* () {
     };
   });
   const get = Effect.fn("Media.inputGet")(function* (id: string) {
-    return yield* view(yield* found(id));
+    const found2 = yield* found(id);
+    return yield* view(found2);
   });
   const list = Effect.fn("Media.inputList")(function* () {
-    return yield* Effect.forEach(yield* db.run(q.inputs()), view);
+    const inputs2 = yield* db.run(q.inputs());
+    return yield* Effect.forEach(inputs2, view);
   });
   const change = (row: q.InputResult, phase: T.MediaInputPhase, hash = row.hash, expires = row.expires_at) =>
     persist(q.changeInput({ id: row.id, phase, hash, expires }));
@@ -75,8 +79,9 @@ export const makeInputs = Effect.gen(function* () {
   const sweep = Effect.fn("Media.inputSweep")(
     function* () {
       const now = yield* Clock.currentTimeMillis;
+      const expiredInputs2 = yield* db.run(q.expiredInputs({ now }));
       yield* Effect.forEach(
-        yield* db.run(q.expiredInputs({ now })),
+        expiredInputs2,
         (row) =>
           !uploading.has(row.id) ? remove(row).pipe(Effect.catch(() => Effect.logWarning("Media input cleanup is pending", { input: row.id }))) : Effect.void,
         { discard: true },
@@ -95,7 +100,8 @@ export const makeInputs = Effect.gen(function* () {
       format: T.MediaAudioFormat,
       source: Stream.Stream<Uint8Array, ApiError>,
     ): Effect.fn.Return<StagedAudioResult, ApiError, Scope.Scope> {
-      let reservation = newId(yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      let reservation = newId(now);
       yield* Effect.acquireRelease(
         lock.withPermits(1)(
           Effect.gen(function* () {
@@ -125,6 +131,7 @@ export const makeInputs = Effect.gen(function* () {
       );
       return yield* stageAudioResult(staging, name, format, capped).pipe(
         Effect.provideService(FileSystem.FileSystem, fs),
+        Effect.provideService(Path.Path, path),
         Effect.catchTags({
           MediaInputRejected: () => Effect.fail(refused(t("server.media.inputInvalid"))),
           PlatformError: () => Effect.fail(storageError()),
@@ -148,7 +155,9 @@ export const makeInputs = Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis;
         const id = newId(now);
         const input = { kind: "audio" as const, name: staged.name, mime: staged.mime, size: staged.size };
-        yield* persist(q.insertInput({ id, metadata: JSON.stringify(input), size: staged.size, now, expires: now + lifetime }));
+        yield* persist(
+          q.insertInput({ id, metadata: yield* metadataJson(input).pipe(Effect.mapError(storageError)), size: staged.size, now, expires: now + lifetime }),
+        );
         const row = yield* found(id);
         yield* Effect.gen(function* () {
           yield* fs.makeDirectory(content, { recursive: true, mode: 0o700 });
@@ -195,7 +204,9 @@ export const makeInputs = Effect.gen(function* () {
             return yield* Effect.fail(refused(t("server.media.inputQuota")));
           const now = yield* Clock.currentTimeMillis;
           const id = newId(now);
-          yield* persist(q.insertInput({ id, metadata: JSON.stringify(input), size: input.size, now, expires: now + lifetime }));
+          yield* persist(
+            q.insertInput({ id, metadata: yield* metadataJson(input).pipe(Effect.mapError(storageError)), size: input.size, now, expires: now + lifetime }),
+          );
           return yield* get(id);
         }).pipe(Effect.uninterruptible),
       );
@@ -219,7 +230,8 @@ export const makeInputs = Effect.gen(function* () {
           if (row.phase === "ready") return yield* view(row);
           yield* resume(
             Effect.gen(function* () {
-              const staged = yield* stageMediaInput(join(staging, id), yield* metadata(row), source).pipe(Effect.provideService(FileSystem.FileSystem, fs));
+              const declared = yield* metadata(row);
+              const staged = yield* stageMediaInput(join(staging, id), declared, source).pipe(Effect.provideService(FileSystem.FileSystem, fs));
               return yield* lock.withPermits(1)(
                 Effect.gen(function* () {
                   if (row.hash !== null && staged.hash !== row.hash) return yield* Effect.fail(refused(t("server.media.inputChanged")));
@@ -312,7 +324,8 @@ export const makeInputs = Effect.gen(function* () {
               )
                 return yield* Effect.fail(refused(t("server.media.inputMissing")));
               yield* persist(pins.pinInput({ id, holder }));
-              inputs.push(yield* view({ ...row, pinned: 1 }));
+              const found2 = yield* view({ ...row, pinned: 1 });
+              inputs.push(found2);
             }
             yield* admit;
             return inputs;
@@ -401,8 +414,9 @@ export const makeInputs = Effect.gen(function* () {
         yield* fs.makeDirectory(content, { recursive: true, mode: 0o700 }).pipe(Effect.mapError(storageError));
         const rows = yield* db.run(q.inputs());
         const hashes = new Set(rows.flatMap((row) => (row.hash ? [row.hash] : [])));
+        const directory2 = yield* fs.readDirectory(content).pipe(Effect.mapError(storageError));
         yield* Effect.forEach(
-          yield* fs.readDirectory(content).pipe(Effect.mapError(storageError)),
+          directory2,
           (name) =>
             /^[0-9a-f]{64}$/u.test(name) && !hashes.has(name)
               ? fs.remove(join(content, name), { force: true }).pipe(Effect.mapError(storageError))

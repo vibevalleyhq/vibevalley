@@ -36,34 +36,34 @@ class MossFileError extends Schema.TaggedError<MossFileError, { readonly brand: 
 
 const request = Effect.fn("Provider.mossFileRequest")(
   function* <A>(key: string, input: HttpClientRequest.HttpClientRequest, schema: Schema.Codec<A, string>) {
-    if (!key.trim() || /\s/u.test(key)) return yield* new MossFileError({ reason: "Credentials", outcome: "NotSubmitted" });
+    if (!key.trim() || /\s/u.test(key)) return yield* MossFileError.make({ reason: "Credentials", outcome: "NotSubmitted" });
     const http = yield* HttpClient.HttpClient;
     const response = yield* http.execute(input.pipe(HttpClientRequest.setHeaders({ authorization: `Bearer ${key}`, accept: "application/json" })));
     const raw = yield* readMossResponse(response).pipe(
-      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(new MossFileError({ reason: "TooLarge", outcome: "Unknown" }))),
+      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(MossFileError.make({ reason: "TooLarge", outcome: "Unknown" }))),
     );
     if (response.status < 200 || response.status >= 300)
-      return yield* new MossFileError({
+      return yield* MossFileError.make({
         reason: "HttpStatus",
         status: response.status,
         outcome: [400, 401, 403, 413, 422, 429].includes(response.status) ? "Rejected" : "Unknown",
       });
-    return yield* Schema.decodeEffect(schema)(raw).pipe(Effect.mapError(() => new MossFileError({ reason: "InvalidResponse", outcome: "Unknown" })));
+    return yield* Schema.decodeEffect(schema)(raw).pipe(Effect.mapError(() => MossFileError.make({ reason: "InvalidResponse", outcome: "Unknown" })));
   },
   Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
   Effect.timeout("300 seconds"),
   Effect.catchTags({
-    HttpClientError: () => Effect.fail(new MossFileError({ reason: "Network", outcome: "Unknown" })),
-    TimeoutError: () => Effect.fail(new MossFileError({ reason: "Timeout", outcome: "Unknown" })),
+    HttpClientError: () => Effect.fail(MossFileError.make({ reason: "Network", outcome: "Unknown" })),
+    TimeoutError: () => Effect.fail(MossFileError.make({ reason: "Timeout", outcome: "Unknown" })),
   }),
 );
 const fileId = Effect.fnUntraced(function* (id: string) {
-  return yield* Schema.decodeEffect(Id)(id).pipe(Effect.mapError(() => new MossFileError({ reason: "InvalidInput", outcome: "NotSubmitted" })));
+  return yield* Schema.decodeEffect(Id)(id).pipe(Effect.mapError(() => MossFileError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
 });
 
 export const uploadMossFile = Effect.fn("Provider.uploadMossFile")(function* (key: string, input: unknown) {
   const upload = yield* Schema.decodeUnknownEffect(Upload)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MossFileError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossFileError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   const form = new FormData();
   form.append("purpose", upload.purpose);
@@ -71,14 +71,14 @@ export const uploadMossFile = Effect.fn("Provider.uploadMossFile")(function* (ke
   form.append("file", upload.file, upload.filename);
   const result = yield* request(key, HttpClientRequest.post("https://api.mosi.cn/v1/files", { body: HttpBody.formData(form) }), Schema.fromJsonString(File));
   if (result.bytes !== upload.file.size || result.purpose !== upload.purpose)
-    return yield* new MossFileError({ reason: "InvalidResponse", outcome: "Unknown" });
+    return yield* MossFileError.make({ reason: "InvalidResponse", outcome: "Unknown" });
   return result;
 });
 
 export const getMossFile = Effect.fn("Provider.getMossFile")(function* (key: string, id: string) {
   const checked = yield* fileId(id);
   const result = yield* request(key, HttpClientRequest.get(`https://api.mosi.cn/v1/files/${encodeURIComponent(checked)}`), Schema.fromJsonString(File));
-  if (result.id !== checked) return yield* new MossFileError({ reason: "InvalidResponse", outcome: "Unknown" });
+  if (result.id !== checked) return yield* MossFileError.make({ reason: "InvalidResponse", outcome: "Unknown" });
   return result;
 });
 
@@ -89,19 +89,19 @@ export const deleteMossFile = Effect.fn("Provider.deleteMossFile")(function* (ke
     HttpClientRequest.delete(`https://api.mosi.cn/v1/files/${encodeURIComponent(checked)}`),
     Schema.fromJsonString(Schema.Struct({ id: Id, object: Schema.Literal("file"), deleted: Schema.Literal(true) })),
   );
-  if (result.id !== checked) return yield* new MossFileError({ reason: "InvalidResponse", outcome: "Unknown" });
+  if (result.id !== checked) return yield* MossFileError.make({ reason: "InvalidResponse", outcome: "Unknown" });
   return result;
 });
 
 export const listMossFiles = Effect.fn("Provider.listMossFiles")(function* (key: string, input: unknown) {
   const page = yield* Schema.decodeUnknownEffect(Page)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MossFileError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossFileError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   const result = yield* request(
     key,
     HttpClientRequest.get("https://api.mosi.cn/v1/files", { urlParams: { limit: page.limit ?? 20, offset: page.offset ?? 0 } }),
     Schema.fromJsonString(Schema.Struct({ object: Schema.Literal("list"), data: Schema.Array(File).check(Schema.isMaxLength(200)) })),
   );
-  if (result.data.length > (page.limit ?? 20)) return yield* new MossFileError({ reason: "InvalidResponse", outcome: "Unknown" });
+  if (result.data.length > (page.limit ?? 20)) return yield* MossFileError.make({ reason: "InvalidResponse", outcome: "Unknown" });
   return result.data;
 });

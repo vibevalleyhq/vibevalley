@@ -2,7 +2,7 @@ import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Option, Predicate, Schema } from "effect";
+import { Option, Predicate, Result, Schema } from "effect";
 
 import type { Locale } from "@vibevalley/i18n";
 
@@ -23,7 +23,8 @@ const alive = (pid: number) => {
 };
 
 /** server.json: where the server using this home listens, and its process. */
-const announcement = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ url: Schema.String, pid: Schema.Finite })));
+const Announcement = Schema.fromJsonString(Schema.Struct({ url: Schema.String, pid: Schema.Finite }));
+const announcement = Schema.decodeUnknownOption(Announcement);
 
 const read = (path: string) => {
   try {
@@ -36,7 +37,7 @@ const read = (path: string) => {
 /** Says where this server listens, for as long as it does; the function it returns takes it back. */
 export function announce(home: string, url: string): () => void {
   const path = join(home, "server.json");
-  writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", { mode: 0o600 });
+  writeFileSync(path, Result.getOrThrow(Schema.encodeResult(Announcement)({ url, pid: process.pid })) + "\n", { mode: 0o600 });
   return () => {
     const said = Option.flatMap(Option.fromNullishOr(read(path)), announcement);
     if (Option.isSome(said) && said.value.pid === process.pid) unlinkSync(path);

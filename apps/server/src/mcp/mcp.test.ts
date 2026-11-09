@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
@@ -44,7 +44,7 @@ const client = (mcp: Mcp["Service"], token: string) => {
             accept: "application/json, text/event-stream",
             ...(token ? { authorization: "Bearer " + token } : {}),
           },
-          body: JSON.stringify(body),
+          body: Formatter.formatJson(body),
         }),
       ),
     );
@@ -81,7 +81,8 @@ const hired = (core: Core["Service"], s: Partial<T.Session> & { id: string }) =>
 describe("mcp", () => {
   it.live("regression: a preflight identity can diagnose but cannot report or mutate", () =>
     Effect.gen(function* () {
-      const c = client(yield* Mcp, "pending");
+      const mcp = yield* Mcp;
+      const c = client(mcp, "pending");
       expect((yield* Effect.promise(() => c.result("session_list"))).result?.isError).not.toBe(true);
       expect((yield* Effect.promise(() => c.result("issue_report", { summary: "not registered" }))).result?.isError).toBe(true);
       expect((yield* Effect.promise(() => c.result("channel_message_send", { text: "not registered" }))).result?.isError).toBe(true);
@@ -153,15 +154,16 @@ describe("mcp", () => {
         (channel) => channel === thread,
         "the mailbox handoff",
       );
-      expect(yield* Effect.promise(() => c.tool("issue_handback", { envelope: extra.id, reason: "不是当前工单" }))).toContain("重新分流");
+      const tool2 = yield* Effect.promise(() => c.tool("issue_handback", { envelope: extra.id, reason: "不是当前工单" }));
+      expect(tool2).toContain("重新分流");
       expect(mailbox.pending(id).some((input) => input.envelope_id === extra.id)).toBe(false);
       expect((yield* Effect.promise(() => c.result("issue_pr_submit"))).result?.isError).toBe(true);
-      expect(yield* Effect.promise(() => c.tool("issue_pr_submit"))).toContain("没有主人明确授予");
-      expect(
-        yield* Effect.promise(() =>
-          c.tool("issue_report", { session: "another-session", summary: "需要端口", questions: [{ question: "端口用哪个？", options: ["8787", "8788"] }] }),
-        ),
-      ).toContain("报告已记录");
+      const tool3 = yield* Effect.promise(() => c.tool("issue_pr_submit"));
+      expect(tool3).toContain("没有主人明确授予");
+      const tool4 = yield* Effect.promise(() =>
+        c.tool("issue_report", { session: "another-session", summary: "需要端口", questions: [{ question: "端口用哪个？", options: ["8787", "8788"] }] }),
+      );
+      expect(tool4).toContain("报告已记录");
       proceed.resolve();
       const issue = got.session!.issue!;
       yield* waitFor(issues.get(issue), (item) => item.questions.length > 0, "the structured report");
@@ -170,13 +172,18 @@ describe("mcp", () => {
       expect(who).toMatch(new RegExp(`^- ${id} `, "mu"));
       // Names are listed without an @: models copy a wake.
       expect(who.split("\n").slice(0, -1).join("\n")).not.toContain("@");
-      expect(yield* Effect.promise(() => c.tool("channel_message_send", { text: "从 MCP 说一句", anyway: true }))).toContain("发出去了");
+      const tool5 = yield* Effect.promise(() => c.tool("channel_message_send", { text: "从 MCP 说一句", anyway: true }));
+      expect(tool5).toContain("发出去了");
       const m = saidIn(thread!).find((x) => x.text === "从 MCP 说一句");
       expect(m).toMatchObject({ from: id, fromKind: "session" });
-      expect(yield* Effect.promise(() => c.tool("channel_unread_list"))).not.toBe("");
-      expect(yield* Effect.promise(() => c.tool("channel_message_list"))).toContain("从 MCP 说一句");
-      expect(yield* Effect.promise(() => client(mcp, "").tool("session_list"))).toContain("没认出你是谁");
-      expect(yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" }))).toContain("没认出你是谁");
+      const tool6 = yield* Effect.promise(() => c.tool("channel_unread_list"));
+      expect(tool6).not.toBe("");
+      const tool7 = yield* Effect.promise(() => c.tool("channel_message_list"));
+      expect(tool7).toContain("从 MCP 说一句");
+      const tool8 = yield* Effect.promise(() => client(mcp, "").tool("session_list"));
+      expect(tool8).toContain("没认出你是谁");
+      const tool9 = yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" }));
+      expect(tool9).toContain("没认出你是谁");
       yield* (yield* Session).dismiss(id);
       expect((yield* Effect.promise(() => c.result("channel_message_send", { text: "revoked" }))).result?.isError).toBe(true);
       expect(saidIn(thread!).some((message) => ["revoked", "冒名"].includes(message.text))).toBe(false);
@@ -205,11 +212,14 @@ describe("mcp", () => {
       const found = yield* Effect.promise(() => c.tool("pkm_search", { text: "queens" }));
       expect(found).toContain("《Beehives》");
       const block = /〔([0-9a-f-]{36})〕/u.exec(found)?.[1] ?? "";
-      expect(yield* Effect.promise(() => c.tool("pkm_page_get", { page: "Beehives" }))).toContain(`〔${block}〕check the queens every week`);
-      expect(yield* Effect.promise(() => c.tool("pkm_capture", { text: "蜂箱要换新的框" }))).toContain("LATER");
+      const tool2 = yield* Effect.promise(() => c.tool("pkm_page_get", { page: "Beehives" }));
+      expect(tool2).toContain(`〔${block}〕check the queens every week`);
+      const tool3 = yield* Effect.promise(() => c.tool("pkm_capture", { text: "蜂箱要换新的框" }));
+      expect(tool3).toContain("LATER");
       const journal = (yield* pkm.list()).pages.find((p) => p.tier === "journal")!;
       expect((yield* pkm.page(journal.slug)).page.blocks.map((b) => b.body).join("\n")).toMatch(/蜂箱要换新的框（.+ 记） #inbox/u);
-      expect(yield* Effect.promise(() => c.tool("pkm_comment_suggest", { block, suggested: "check the queens every Monday" }))).toContain("接受");
+      const tool4 = yield* Effect.promise(() => c.tool("pkm_comment_suggest", { block, suggested: "check the queens every Monday" }));
+      expect(tool4).toContain("接受");
       expect((yield* pkm.page("beehives")).page.blocks[0]?.body).toBe("check the queens every week");
       expect((yield* pkm.comments("beehives")).map((x) => x.suggested)).toEqual(["check the queens every Monday"]);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
@@ -246,22 +256,31 @@ describe("mcp", () => {
       const [one] = yield* artifacts.list({ issue });
       expect(one).toMatchObject({ title: "两种详情", channel: thread, by: "lab", version: 1 });
       expect((yield* chat.history(thread!)).at(-1)!.artifact).toMatchObject({ id: one!.id, version: 1 });
-      expect(yield* artifacts.content(one!.id)).toMatchObject({ content: "<p>抽屉和整页</p>" });
-      expect(yield* Effect.promise(() => c.tool("artifact_list"))).toContain(one!.id);
-      expect(yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<p>改了</p>", note: "照评论改" }))).toContain("第 2 稿");
+      const content2 = yield* artifacts.content(one!.id);
+      expect(content2).toMatchObject({ content: "<p>抽屉和整页</p>" });
+      const tool2 = yield* Effect.promise(() => c.tool("artifact_list"));
+      expect(tool2).toContain(one!.id);
+      const tool3 = yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<p>改了</p>", note: "照评论改" }));
+      expect(tool3).toContain("第 2 稿");
       const refusedAnswer = yield* Effect.promise(() =>
         c.tool("artifact_version_create", { id: one!.id, content: '<p>x</p>\n<script src="https://unpkg.com/react"></script>' }),
       );
       expect([refusedAnswer.includes("没成"), refusedAnswer.includes("unpkg.com")]).toEqual([true, true]);
-      expect(yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<script>fetch('/x')</script>" }))).toContain("fetch");
-      expect(yield* Effect.promise(() => c.tool("artifact_content_get", { id: one!.id, version: 1 }))).toContain("<p>抽屉和整页</p>");
-      expect(yield* Effect.promise(() => c.tool("artifact_get", { id: one!.id }))).toContain("照评论改");
+      const tool4 = yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<script>fetch('/x')</script>" }));
+      expect(tool4).toContain("fetch");
+      const tool5 = yield* Effect.promise(() => c.tool("artifact_content_get", { id: one!.id, version: 1 }));
+      expect(tool5).toContain("<p>抽屉和整页</p>");
+      const tool6 = yield* Effect.promise(() => c.tool("artifact_get", { id: one!.id }));
+      expect(tool6).toContain("照评论改");
       // A file outside, and a link inside that leads to it.
       writeFileSync(join(cwd, "..", "secret.html"), "<p>外面的</p>");
       symlinkSync(join(cwd, "..", "secret.html"), join(cwd, "out", "link.html"));
-      for (const file of ["../secret.html", "/etc/hosts", "out", "out/link.html"])
-        expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "外面的", kind: "html", file }))).toContain("没成");
-      expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "两个都给", kind: "html", file: "out/two.html", content: "x" }))).toContain("没成");
+      for (const file of ["../secret.html", "/etc/hosts", "out", "out/link.html"]) {
+        const reply = yield* Effect.promise(() => c.tool("artifact_create", { title: "外面的", kind: "html", file }));
+        expect(reply).toContain("没成");
+      }
+      const tool7 = yield* Effect.promise(() => c.tool("artifact_create", { title: "两个都给", kind: "html", file: "out/two.html", content: "x" }));
+      expect(tool7).toContain("没成");
       expect((yield* artifacts.list({ issue })).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
@@ -296,7 +315,8 @@ describe("mcp", () => {
       yield* until(() => tokens.length > 0, "the channel context's token");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
-      expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的稿子", kind: "html", content: "inside" }))).toContain("做好了");
+      const tool2 = yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的稿子", kind: "html", content: "inside" }));
+      expect(tool2).toContain("做好了");
       const [inside] = yield* artifacts.list({ channel: direct });
       expect(inside).toMatchObject({ title: "这里的稿子", channel: direct, by: "lab" });
       const listed = yield* Effect.promise(() => c.tool("artifact_list"));
@@ -323,7 +343,8 @@ describe("mcp", () => {
       const c = client(mcp, "");
       for (const name of yield* Effect.promise(c.list)) {
         const args = name === "channel_message_send" || name === "memory_create" ? { text: "must not be posted" } : {};
-        expect(yield* Effect.promise(() => c.tool(name, args))).toContain("没认出你是谁");
+        const tool2 = yield* Effect.promise(() => c.tool(name, args));
+        expect(tool2).toContain("没认出你是谁");
       }
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -337,8 +358,10 @@ describe("mcp", () => {
       yield* memory.write({ agent: "scout", text: "这个仓库测试用 make check", repo: "demo", by: owner });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
-      expect(yield* tool("memory_create", { text: "这个仓库测试用 pnpm test" })).toContain("记下了（仓库 demo）");
-      expect(yield* tool("memory_create", { text: "提交信息写中文", repo: "" })).toContain("记下了（所有仓库）");
+      const tool2 = yield* tool("memory_create", { text: "这个仓库测试用 pnpm test" });
+      expect(tool2).toContain("记下了（仓库 demo）");
+      const tool3 = yield* tool("memory_create", { text: "提交信息写中文", repo: "" });
+      expect(tool3).toContain("记下了（所有仓库）");
       // There is no profile to name: what it writes is its own, whatever it says.
       yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
@@ -347,7 +370,8 @@ describe("mcp", () => {
       const found = yield* tool("memory_search", { text: "测试" });
       expect(found).toContain("pnpm test");
       expect(found).not.toContain("make check");
-      expect(yield* tool("memory_search", { text: "部署" })).toContain("没有搜到「部署」");
+      const tool4 = yield* tool("memory_search", { text: "部署" });
+      expect(tool4).toContain("没有搜到「部署」");
       expect((yield* Effect.promise(() => client(mcp, "w9").result("memory_search", { text: "测试" }))).result?.isError).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
@@ -364,12 +388,15 @@ describe("mcp", () => {
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       const added = yield* tool("artifact_block_create", { id: d.id, text: "这周做完了**第一步**" });
       const block = /加了一块〔(\S+)〕，第 (\d+) 版/u.exec(added)![1]!;
-      expect(yield* tool("artifact_block_create", { id: d.id, text: "下周", type: "heading", level: 1 })).toContain("加了一块");
-      expect(yield* tool("artifact_block_create", { id: d.id, text: "x", type: "table" })).toContain("没成：块的类型只能是");
+      const tool2 = yield* tool("artifact_block_create", { id: d.id, text: "下周", type: "heading", level: 1 });
+      expect(tool2).toContain("加了一块");
+      const tool3 = yield* tool("artifact_block_create", { id: d.id, text: "x", type: "table" });
+      expect(tool3).toContain("没成：块的类型只能是");
       const read = yield* tool("artifact_content_get", { id: d.id });
       expect(read).toContain("《周报》，2 块");
       expect(read).toContain("〔" + block + " · 第 1 版 · paragraph〕这周做完了第一步");
-      expect(yield* tool("artifact_block_update", { id: d.id, block, baseRev: 1, text: "这周做完了第一步和第二步" })).toContain("现在是第 2 版");
+      const tool4 = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 1, text: "这周做完了第一步和第二步" });
+      expect(tool4).toContain("现在是第 2 版");
       // The owner changes it in the editor; the helper's next rewrite was made against rev 2.
       yield* artifacts.submit(d.id, "owner", {
         batchId: "owner",
@@ -382,8 +409,10 @@ describe("mcp", () => {
       yield* artifacts.acceptSuggestion(d.id, open[0]!.id, "owner");
       const snap = yield* artifacts.blocks(d.id);
       expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["帮工建议的字", "owner", "lab"]);
-      expect(yield* artifacts.markdown(d.id)).toBe("帮工建议的字\n\n# 下周\n");
-      expect(yield* tool("artifact_content_get", { id: "nope" })).toContain("没成");
+      const markdown2 = yield* artifacts.markdown(d.id);
+      expect(markdown2).toBe("帮工建议的字\n\n# 下周\n");
+      const tool5 = yield* tool("artifact_content_get", { id: "nope" });
+      expect(tool5).toContain("没成");
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 });

@@ -31,7 +31,7 @@ export class Connector extends Context.Service<
     readonly logout: (id: ConnectorID) => Effect.Effect<ConnectorStatus>;
     readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
   }
->()("vibevalley/Connector") {
+>()("@vibevalley/server/connector/connector") {
   static readonly layer = (options?: ConnectorOptions) => Layer.effect(Connector, make(options));
 }
 
@@ -75,8 +75,9 @@ const make = (options: ConnectorOptions = {}) =>
       Effect.map(Effect.all({ outbox: Queue.sliding<void>(1), inbox: Queue.sliding<void>(1) }), (mail) => makeBridge(env, a, mail)),
     );
     yield* Effect.forEach(bridges, (b) => b.load, { discard: true });
+    const externalChanges2 = yield* inbox.externalChanges;
     yield* Effect.forkScoped(
-      Stream.runForEach(yield* inbox.externalChanges, () =>
+      Stream.runForEach(externalChanges2, () =>
         Effect.sync(() => {
           for (const bridge of bridges) bridge.changed();
         }),
@@ -84,11 +85,10 @@ const make = (options: ConnectorOptions = {}) =>
     );
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
+    const toOwner2 = yield* inbox.toOwner;
     // What the owner hears off the farm (the inbox says what) goes out on every app the owner has, each checking it is
     // its owner's channel.
-    yield* Effect.forkScoped(
-      Stream.runForEach(yield* inbox.toOwner, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })),
-    );
+    yield* Effect.forkScoped(Stream.runForEach(toOwner2, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })));
     for (const b of bridges) if (b.hasAccount()) forkHere(b.resume);
     // What came in and went out is kept for a while for replies to point at, then dropped, once at start and daily.
     const prune = Effect.gen(function* () {

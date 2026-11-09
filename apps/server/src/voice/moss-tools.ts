@@ -99,3 +99,24 @@ export const mossOrchestratorTool = {
     required: ["question"],
   },
 } as const;
+
+const MossFrame = Schema.Union([
+  Schema.Struct({
+    action: Schema.Literal("session.commentary.append"),
+    content: Schema.String,
+    status: Schema.Literal("completed"),
+    event_id: Schema.String,
+  }),
+  Schema.Struct({
+    action: Schema.Literal("session.update"),
+    session: Schema.Struct({ persona: Schema.Struct({ prompt: Schema.String }), instructions: Schema.String, tools: Schema.Array(Schema.Unknown) }),
+  }),
+  Schema.Struct({ action: Schema.Literal("response.create"), response: Schema.Struct({ call_ids: Schema.Array(Schema.String) }) }),
+  Schema.Struct({
+    action: Schema.Literal("conversation.item.create"),
+    item: Schema.Struct({ type: Schema.Literal("function_call_output"), call_id: Schema.String, output: Schema.String }),
+  }),
+]);
+
+/** A frame the farm says to MOSS Live, as its socket takes it; none for one that does not encode (each is built from strings). */
+export const mossFrame = Schema.encodeOption(Schema.fromJsonString(MossFrame));

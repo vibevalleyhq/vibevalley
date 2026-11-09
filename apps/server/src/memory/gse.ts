@@ -49,8 +49,14 @@ const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).
 export const loadSegmenter = Effect.fn("Gse.loadSegmenter")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
-  dictionary ??= dictionaryOf(yield* read(files.dictionary));
-  emitTable ??= yield* Schema.decodeEffect(Schema.fromJsonString(EmitTable))(yield* read(files.emit));
+  if (dictionary === undefined) {
+    const words = yield* read(files.dictionary);
+    dictionary = dictionaryOf(words);
+  }
+  if (emitTable === undefined) {
+    const emitJson = yield* read(files.emit);
+    emitTable = yield* Schema.decodeEffect(Schema.fromJsonString(EmitTable))(emitJson);
+  }
 }, Effect.orDie);
 
 const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));

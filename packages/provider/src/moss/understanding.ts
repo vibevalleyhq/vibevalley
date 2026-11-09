@@ -38,7 +38,7 @@ class MossUnderstandingError extends Schema.TaggedError<MossUnderstandingError, 
 
 export const prepareMossUnderstanding = Effect.fn("Provider.prepareMossUnderstanding")(function* (input: unknown) {
   const request = yield* Schema.decodeUnknownEffect(Input)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MossUnderstandingError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossUnderstandingError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   return {
     model: request.model,
@@ -60,22 +60,22 @@ export const prepareMossUnderstanding = Effect.fn("Provider.prepareMossUnderstan
 
 export const understandMossMedia = Effect.fn("Provider.understandMossMedia")(
   function* (key: string, input: unknown) {
-    if (!key.trim() || /\s/u.test(key)) return yield* new MossUnderstandingError({ reason: "Credentials", outcome: "NotSubmitted" });
+    if (!key.trim() || /\s/u.test(key)) return yield* MossUnderstandingError.make({ reason: "Credentials", outcome: "NotSubmitted" });
     const request = yield* prepareMossUnderstanding(input);
-    const body = yield* HttpBody.json(request).pipe(Effect.mapError(() => new MossUnderstandingError({ reason: "InvalidInput", outcome: "NotSubmitted" })));
+    const body = yield* HttpBody.json(request).pipe(Effect.mapError(() => MossUnderstandingError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
     const http = yield* HttpClient.HttpClient;
     const response = yield* http.post("https://api.mosi.cn/v1/responses", { headers: { authorization: `Bearer ${key}`, accept: "application/json" }, body });
     const raw = yield* readMossResponse(response).pipe(
-      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(new MossUnderstandingError({ reason: "TooLarge", outcome: "Unknown" }))),
+      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(MossUnderstandingError.make({ reason: "TooLarge", outcome: "Unknown" }))),
     );
     if (response.status !== 200)
-      return yield* new MossUnderstandingError({
+      return yield* MossUnderstandingError.make({
         reason: "HttpStatus",
         status: response.status,
         outcome: [400, 401, 403, 413, 422, 429].includes(response.status) ? "Rejected" : "Unknown",
       });
     const result = yield* Schema.decodeEffect(Response)(raw).pipe(
-      Effect.mapError(() => new MossUnderstandingError({ reason: "InvalidResponse", outcome: "Unknown" })),
+      Effect.mapError(() => MossUnderstandingError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
     );
     const incompleteReason: "max_output_tokens" | null =
       result.status === "incomplete" && result.incomplete_details?.reason === "max_output_tokens" ? "max_output_tokens" : null;
@@ -91,7 +91,7 @@ export const understandMossMedia = Effect.fn("Provider.understandMossMedia")(
   Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
   Effect.timeout("180 seconds"),
   Effect.catchTags({
-    HttpClientError: () => Effect.fail(new MossUnderstandingError({ reason: "Network", outcome: "Unknown" })),
-    TimeoutError: () => Effect.fail(new MossUnderstandingError({ reason: "Timeout", outcome: "Unknown" })),
+    HttpClientError: () => Effect.fail(MossUnderstandingError.make({ reason: "Network", outcome: "Unknown" })),
+    TimeoutError: () => Effect.fail(MossUnderstandingError.make({ reason: "Timeout", outcome: "Unknown" })),
   }),
 );

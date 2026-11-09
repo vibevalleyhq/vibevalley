@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Stream } from "effect";
+import { Deferred, Effect, Fiber, Formatter, Option, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { type MossTranscriptionEvent, streamMossTranscription } from "./transcription-stream.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = { model: "moss-transcribe-diarize-pro", fileId: "file-one", diarize: true, keyterms: ["MOSS"] };
 const task = { type: "task.created", task_id: "task-one", object: "audio.transcription", status: "PROCESSING", model: input.model };
@@ -23,7 +25,7 @@ const done = {
   usage: { type: "duration", prompt_tokens: 137, completion_tokens: 27, total_tokens: 164, input_audio_seconds: 4.08 },
   meta_info: { audio_duration_s: 4.08 },
 };
-const frame = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
+const frame = (value: unknown) => `data: ${Formatter.formatJson(value)}\n\n`;
 const encoder = new TextEncoder();
 const answer = (text: string, contentType = "text/event-stream") =>
   HttpClient.make((request) => Effect.succeed(HttpClientResponse.fromWeb(request, new Response(text, { headers: { "content-type": contentType } }))));
@@ -42,9 +44,10 @@ it.effect.each([1, 7, 65536])("diarization SSE survives %i-byte chunks and prese
       expect(request.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
       expect(request.headers.authorization).toBe("Bearer test-key");
       expect(request.headers.accept).toBe("text/event-stream");
-      expect(yield* Effect.serviceOption(FetchHttpClient.RequestInit)).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
+      const serviceOption2 = yield* Effect.serviceOption(FetchHttpClient.RequestInit);
+      expect(serviceOption2).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model: input.model,
         file_id: input.fileId,
         diarize: true,
@@ -63,7 +66,8 @@ it.effect.each([1, 7, 65536])("diarization SSE survives %i-byte chunks and prese
     }),
   );
   return Effect.gen(function* () {
-    expect(yield* streamMossTranscription("test-key", input).pipe(Stream.runCollect)).toEqual([
+    const streamMossTranscription2 = yield* streamMossTranscription("test-key", input).pipe(Stream.runCollect);
+    expect(streamMossTranscription2).toEqual([
       { type: task.type, taskId: task.task_id, model: input.model },
       { type: delta.type, text: delta.delta },
       { type: delta.type, text: "MOSS \u00e9\ud83c\udf0d" },
@@ -88,7 +92,8 @@ it.effect("named multiline frames do not require task metadata and absent counte
       { type: delta.type, text: "partial" },
       { type: done.type, text: "final" },
     ]);
-    expect(yield* collect(frame({ type: done.type, text: "" }))).toEqual([{ type: done.type, text: "" }]);
+    const collected = yield* collect(frame({ type: done.type, text: "" }));
+    expect(collected).toEqual([{ type: done.type, text: "" }]);
   }),
 );
 
@@ -133,8 +138,8 @@ it.effect.each([
   { text: frame(task) },
   { text: frame(delta) },
   { text: frame(delta) + frame(segment) },
-  { text: frame(delta) + `data: ${JSON.stringify(done)}` },
-  { text: frame(delta) + `data: ${JSON.stringify(done)}\n` },
+  { text: frame(delta) + `data: ${Formatter.formatJson(done)}` },
+  { text: frame(delta) + `data: ${Formatter.formatJson(done)}\n` },
   { text: frame(delta) + "data: [DONE]\n\n" },
   { text: frame(task) + frame(task) },
   { text: frame(delta) + frame(task) },
@@ -149,7 +154,8 @@ it.effect.each([
   { text: "retry: 1000\n\n" },
 ])("malformed or truncated stream %# never claims success", ({ text }) =>
   Effect.gen(function* () {
-    expect(yield* collect(text).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const collectedFailure = yield* collect(text).pipe(Effect.flip);
+    expect(collectedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }),
 );
 
@@ -167,7 +173,7 @@ it.effect("vendor failure preserves emitted partial results without exposing ven
     );
     expect(events.map((event) => event.type)).toEqual([delta.type, segment.type]);
     expect(error).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/private-key|signed-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/private-key|signed-url/u);
   }),
 );
 
@@ -181,7 +187,8 @@ it.effect.each([
   { response_format: "text" },
 ])("unsupported streaming request %# is rejected before submission", (patch) =>
   Effect.gen(function* () {
-    expect(yield* streamMossTranscription("test-key", { ...input, ...patch }).pipe(Stream.runDrain, Effect.flip)).toMatchObject({
+    const streamMossTranscriptionFailure = yield* streamMossTranscription("test-key", { ...input, ...patch }).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossTranscriptionFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });
@@ -195,7 +202,8 @@ it.effect.each([
 
 it.effect.each(["", "private\nheader"])("invalid credential %# cannot reach the network", (key) =>
   Effect.gen(function* () {
-    expect(yield* streamMossTranscription(key, input).pipe(Stream.runDrain, Effect.flip)).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const streamMossTranscriptionFailure = yield* streamMossTranscription(key, input).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossTranscriptionFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -224,14 +232,15 @@ it.effect.each(
   return Effect.gen(function* () {
     const error = yield* streamMossTranscription("test-key", input).pipe(Stream.runDrain, Effect.flip);
     expect(error).toMatchObject({ reason: "HttpStatus", status, outcome: status === 400 ? "Rejected" : "Unknown" });
-    expect(JSON.stringify(error)).not.toContain("private");
+    expect(Formatter.formatJson(error)).not.toContain("private");
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect("JSON cannot masquerade as SSE", () =>
   Effect.gen(function* () {
-    expect(yield* streamMossTranscription("test-key", input).pipe(Stream.runDrain, Effect.flip)).toMatchObject({
+    const streamMossTranscriptionFailure = yield* streamMossTranscription("test-key", input).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossTranscriptionFailure).toMatchObject({
       reason: "InvalidResponse",
       outcome: "Unknown",
     });
@@ -245,7 +254,8 @@ it.effect.each([
   { text: frame({ ...done, text: "x".repeat((1 << 20) + 1) }) },
 ])("event and cumulative text growth %# are bounded", ({ text }) =>
   Effect.gen(function* () {
-    expect(yield* collect(text).pipe(Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const collectedFailure = yield* collect(text).pipe(Effect.flip);
+    expect(collectedFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }),
 );
 
@@ -282,7 +292,8 @@ it.effect.each(["done", "cancel", "timeout"])("%s closes a pending body without 
     if (action === "cancel") yield* Fiber.interrupt(fiber);
     else if (action === "timeout") {
       yield* TestClock.adjust("900 seconds");
-      expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     } else {
       expect((yield* Fiber.join(fiber).pipe(Effect.flip)).at(-1)?.type).toBe(done.type);
     }
@@ -316,7 +327,8 @@ it.effect("the absolute deadline also interrupts waiting for headers", () =>
     );
     yield* Deferred.await(started);
     yield* TestClock.adjust("900 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(interrupted).toBe(true);
     expect(calls).toBe(1);
   }),
@@ -327,7 +339,7 @@ it.effect("the diarization snapshot preserves zero counters and does not invent 
   const http = HttpClient.make((request) =>
     Effect.gen(function* () {
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toMatchObject({ model, diarize: false, keyterms: [] });
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toMatchObject({ model, diarize: false, keyterms: [] });
       return HttpClientResponse.fromWeb(
         request,
         new Response(
@@ -373,7 +385,8 @@ it.effect("the wire response limit rejects an oversized chunk before SSE decodin
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body, { headers: { "content-type": "text/event-stream" } })));
   });
   return Effect.gen(function* () {
-    expect(yield* streamMossTranscription("test-key", input).pipe(Stream.runDrain, Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const streamMossTranscriptionFailure = yield* streamMossTranscription("test-key", input).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossTranscriptionFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
@@ -494,7 +507,8 @@ it.effect("regression: response headers and body share one absolute stream deadl
     yield* Deferred.succeed(headers, undefined);
     yield* Deferred.await(opened);
     yield* TestClock.adjust("1 second");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(canceled).toBe(true);
   }),
 );

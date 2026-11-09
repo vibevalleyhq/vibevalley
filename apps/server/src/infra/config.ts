@@ -49,7 +49,7 @@ export class ServerConfig extends Context.Service<
     /** The notes' vault (pkm/): its PARA folders and journals. Empty: <workRoot>/pkm. */
     readonly pkm: { readonly root: string };
   }
->()("vibevalley/ServerConfig") {}
+>()("@vibevalley/server/infra/config/ServerConfig") {}
 
 const noticeBatchMs = 3_000;
 
@@ -146,12 +146,12 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
   const fs = yield* FileSystem.FileSystem;
   if (!(yield* Effect.orElseSucceed(fs.exists(path), () => false))) {
     if (optional) return undefined;
-    return yield* new ConfigError({ message: t("server.base.noFile", { path }) });
+    return yield* ConfigError.make({ message: t("server.base.noFile", { path }) });
   }
-  const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}`, cause: e }));
+  const body = yield* Effect.mapError(fs.readFileString(path), (e) => ConfigError.make({ message: `${path}: ${e.message}`, cause: e }));
   return yield* Effect.try({
     try: (): unknown => parse(body),
-    catch: (e) => new ConfigError({ message: `${path}: ${messageOf(e)}`, cause: e }),
+    catch: (e) => ConfigError.make({ message: `${path}: ${messageOf(e)}`, cause: e }),
   });
 });
 
@@ -173,15 +173,15 @@ export const loadConfig = Effect.fnUntraced(function* (
     agora: { app_id: env.AGORA_APP_ID, app_certificate: env.AGORA_APP_CERTIFICATE },
   });
   const provider = ConfigProvider.orElse(fromEnv, ConfigProvider.orElse(ownNames, ConfigProvider.fromUnknown(given ?? {})));
-  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => new ConfigError({ message: `${path}: ${e.message}`, cause: e }));
+  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => ConfigError.make({ message: `${path}: ${e.message}`, cause: e }));
   for (const [name, n] of [
     ["port", read.port],
     ["voice.line.port", read.voice.line.port],
     ["lan.port", read.lan.port],
   ] as const) {
-    if (n < 0 || n > 65535) return yield* new ConfigError({ message: t("server.base.notPort", { path, name, port: n }) });
+    if (n < 0 || n > 65535) return yield* ConfigError.make({ message: t("server.base.notPort", { path, name, port: n }) });
   }
-  if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: t("server.base.prPoll") });
+  if (read.github.prPollSeconds <= 0) return yield* ConfigError.make({ message: t("server.base.prPoll") });
   const c: ServerConfig["Service"] = { ...base, ...read, home };
   return {
     ...c,

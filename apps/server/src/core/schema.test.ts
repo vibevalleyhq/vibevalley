@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 
-import { Effect, Schema } from "effect";
+import { Effect, Formatter, Schema } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import type { SpaceState } from "@vibevalley/protocol";
@@ -41,7 +41,7 @@ test("the golden runs and the frames made of them decode", async () => {
     // As /state sends it: the frame encoded by its Schema is the same JSON the plain object would make, so the Schema neither refuses a frame the farm makes nor drops a field of it.
     const frame = frameOf(state);
     const sent = Effect.runSync(encodeFrame(frame));
-    expect(JSON.parse(sent)).toEqual(JSON.parse(JSON.stringify(frame)));
+    expect(JSON.parse(sent)).toEqual(JSON.parse(Formatter.formatJson(frame)));
     decode.frame(JSON.parse(sent));
   }
   expect(() =>

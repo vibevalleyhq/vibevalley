@@ -40,7 +40,7 @@ const afterAll = "\uffff";
 
 export type { Info, Spoken, SayMore, OrchestratorNews, Delivered, LaunchActivity } from "./contracts.ts";
 
-export class Channel extends Context.Service<Channel, ChannelService>()("vibevalley/Channel") {
+export class Channel extends Context.Service<Channel, ChannelService>()("@vibevalley/server/channel/channel") {
   static readonly layer = Layer.effect(
     Channel,
     Effect.suspend(() => make),
@@ -386,7 +386,8 @@ const make = Effect.gen(function* () {
         ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
         meta: run ? { run } : {},
       });
-      yield* setRead(from, channel, written.row.number, yield* Clock.currentTimeMillis);
+      const now2 = yield* Clock.currentTimeMillis;
+      yield* setRead(from, channel, written.row.number, now2);
       return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
     }, locked),
     placeOf: Effect.fn("Channel.placeOf")(function* (from, channel) {
@@ -406,7 +407,10 @@ const make = Effect.gen(function* () {
         meta: { ...(run ? { run } : {}), artifact: card },
         ...(from === ownerId ? { readBy: ownerId } : {}),
       });
-      if (from !== ownerId) yield* setRead(from, where, written.row.number, yield* Clock.currentTimeMillis);
+      if (from !== ownerId) {
+        const now = yield* Clock.currentTimeMillis;
+        yield* setRead(from, where, written.row.number, now);
+      }
       return toMessage(written.row);
     }, locked),
     spoken: Effect.fn("Channel.spoken")(
@@ -492,15 +496,19 @@ const make = Effect.gen(function* () {
     ...dir,
     start,
   });
-  yield* Effect.forkScoped(Stream.runForEach(yield* sessions.news, onSessionNews));
-  yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(said)), onDirectMessage));
+  const news2 = yield* sessions.news;
+  yield* Effect.forkScoped(Stream.runForEach(news2, onSessionNews));
+  const subscribe2 = yield* PubSub.subscribe(said);
+  yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(subscribe2), onDirectMessage));
+  const consumed2 = yield* mailbox.consumed;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* mailbox.consumed, ({ session, message }) =>
+    Stream.runForEach(consumed2, ({ session, message }) =>
       reacting(message, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${message}`)),
     ),
   );
+  const breakerNotices2 = yield* mailbox.breakerNotices;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* mailbox.breakerNotices, ({ session, failed }) =>
+    Stream.runForEach(breakerNotices2, ({ session, failed }) =>
       Effect.gen(function* () {
         const where = (yield* shape.threadOfSession(session)) ?? model.defaultId();
         const name = sessions.sessionOf(session)?.name ?? session;

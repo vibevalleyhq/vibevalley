@@ -1,3 +1,4 @@
+import { Formatter } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
@@ -317,7 +318,7 @@ const spansText = (spans: readonly TextSpan[]) =>
   spans
     .map(
       (s) =>
-        JSON.stringify(s.t) +
+        Formatter.formatJson(s.t) +
         (s.marks.bold === true ? "B" : "") +
         (s.marks.italic === true ? "I" : "") +
         (s.marks.code === true ? "C" : "") +

@@ -1,3 +1,5 @@
+import { DateTime } from "effect";
+
 import type * as T from "@vibevalley/protocol";
 
 import { compactCard } from "#/base/clip.ts";
@@ -67,7 +69,14 @@ export function parseSearch(text: string): SearchQuery {
   const words = text
     .replace(filterPattern, (whole, key: string, value: string) => {
       const day = dayPattern.exec(value);
-      const at = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : undefined;
+      const at = day
+        ? DateTime.toEpochMillis(
+            DateTime.makeZonedUnsafe(
+              { year: Number(day[1]), month: Number(day[2]), day: Number(day[3]) },
+              { timeZone: DateTime.zoneMakeLocal(), adjustForTimeZone: true },
+            ),
+          )
+        : undefined;
       switch (key.toLowerCase()) {
         case "from":
           from = chatNamed[value.replace(/^@/u, "")] ?? value.replace(/^@/u, "");

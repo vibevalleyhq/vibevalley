@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Formatter, Layer } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import { VibeValleyApi } from "@vibevalley/protocol";
@@ -44,11 +44,12 @@ it.live("the owner previews an external checkout over HTTP and bearer callers ar
     const refused = yield* client.execute(
       HttpClientRequest.post(`http://${address}/api/v1/repo/pr/submit`).pipe(
         HttpClientRequest.setHeader("authorization", "Bearer worker-token"),
-        HttpClientRequest.bodyText(JSON.stringify(request), "application/json"),
+        HttpClientRequest.bodyText(Formatter.formatJson(request), "application/json"),
       ),
     );
     expect(refused.status).toBe(409);
-    expect(yield* refused.json).toMatchObject({ _tag: "Refused" });
+    const json2 = yield* refused.json;
+    expect(json2).toMatchObject({ _tag: "Refused" });
     expect(gitSync(cwd, "status", "--porcelain")).toBe("");
   }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer)),
 );

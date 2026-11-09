@@ -69,7 +69,8 @@ export const withAgent = <A, E, R>(dir: string, steps: readonly Step[], body: (r
       const { llm, requests, append, pending } = scriptedLLM(steps);
       const agent = yield* makeBrain(testBrain(dir, llm, extra));
       const events: BrainEvent[] = [];
-      yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
+      const events2 = yield* agent.events;
+      yield* Effect.forkScoped(Stream.runForEach(events2, (e) => Effect.sync(() => void events.push(e))));
       return yield* body({
         agent,
         events,
@@ -77,10 +78,10 @@ export const withAgent = <A, E, R>(dir: string, steps: readonly Step[], body: (r
         script: { append, pending },
         has: (type) => events.some((e) => e.type === type),
         ask: Effect.fnUntraced(function* (text: string) {
-          const answer = yield* agent.ask(userMessage(text, yield* Clock.currentTimeMillis));
+          const now = yield* Clock.currentTimeMillis;
+          const answer = yield* agent.ask(userMessage(text, now));
           const current = agent.progress().current;
-          // ask answers when its run settles; a current run that is not settled is one that began after it (a reminder,
-          // a queued input), so the answered run is the one before.
+          // A current run that is not settled began after ask's, so the answered run is the one before it.
           const target = current.settled ? current.id : current.id - 1;
           yield* waitFor(
             Effect.sync(() => events.some((e) => e.type === "agent_settled" && e.run.id === target)),

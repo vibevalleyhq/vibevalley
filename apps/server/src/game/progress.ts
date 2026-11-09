@@ -4,6 +4,7 @@ import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { type AchievementDef, achievements } from "#/agent/seed.ts";
+import { localParts } from "#/infra/time.ts";
 import { sessionOf, sessionOnIssue } from "#/session/roster.ts";
 
 import { achievementInWords, levelForCommits } from "./view.ts";
@@ -82,9 +83,9 @@ export function progressStep(folded: Folded, entry: T.LedgerEntry): [Folded, T.P
       if (seen.reviewed.includes(entry.session)) counts = atLeast(counts, "s_review", 1);
       seen = { ...seen, runtimes: added(seen.runtimes, entry.runtime) };
       counts = { ...counts, every_machine: seen.runtimes.length };
-      const when = new Date(entry.at);
-      if (when.getHours() < 5) counts = atLeast(counts, "night_owl", 1);
-      if (when.getDay() === 0 || when.getDay() === 6) counts = atLeast(counts, "weekend", 1);
+      const when = localParts(entry.at);
+      if (when.hour < 5) counts = atLeast(counts, "night_owl", 1);
+      if (when.weekDay === 0 || when.weekDay === 6) counts = atLeast(counts, "weekend", 1);
       break;
     }
     case "failed":

@@ -1,6 +1,6 @@
 import { delimiter, join } from "node:path";
 
-import { Config, Effect } from "effect";
+import { Config, Effect, type FileSystem } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
@@ -8,9 +8,9 @@ import { reason, type run } from "./git.ts";
 import { lexists } from "./stats.ts";
 import { MergeFailure } from "./workplace.ts";
 
-export const checkRepository = Effect.fn("Repo.checkRepository")(function* (cwd: string, timeoutMs: number, execute: typeof run) {
+export const checkRepository = Effect.fn("Repo.checkRepository")(function* (fs: FileSystem.FileSystem, cwd: string, timeoutMs: number, execute: typeof run) {
   const file = join(cwd, ".vibevalley", "check");
-  if (!(yield* lexists(file))) return "not-run" as const;
+  if (!(yield* lexists(fs, file))) return "not-run" as const;
   const inheritedPath = yield* Config.String("PATH").pipe(
     Config.withDefault(""),
     Effect.mapError((e) => MergeFailure.failedCheck(t("server.repo.check.failed", { why: e.message }))),

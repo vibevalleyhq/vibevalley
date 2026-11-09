@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Stream } from "effect";
+import { Deferred, Effect, Fiber, Formatter, Layer, Stream } from "effect";
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/http";
 
 import { mediaInputContentPath } from "@vibevalley/protocol";
@@ -28,7 +28,7 @@ const farm = Effect.gen(function* () {
   const client = yield* HttpClient.HttpClient;
   const base = `http://${address}`;
   const post = (op: string, body: unknown) =>
-    client.post(`${base}/api/v1/${op.replaceAll(".", "/")}`, { body: HttpBody.text(JSON.stringify(body), "application/json") });
+    client.post(`${base}/api/v1/${op.replaceAll(".", "/")}`, { body: HttpBody.text(Formatter.formatJson(body), "application/json") });
   const get = (id: string) => post("media.input.get", { id }).pipe(Effect.flatMap(HttpClientResponse.schemaBodyJson(MediaInput)));
   return { base, client, post, get };
 });
@@ -48,12 +48,14 @@ it.live("raw input upload is owner-only, immutable, and separate from JSON attac
     expect(ready).not.toHaveProperty("path");
     const downloaded = yield* client.get(url);
     expect(downloaded.status).toBe(200);
-    expect(Buffer.from(yield* downloaded.arrayBuffer)).toEqual(bytes);
+    const arrayBuffer2 = yield* downloaded.arrayBuffer;
+    expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
     expect((yield* client.get(url, { headers: { origin: "https://untrusted.example" } })).status).toBe(403);
     const part = yield* client.get(url, { headers: { range: "bytes=4-15" } });
     expect(part.status).toBe(206);
     expect(part.headers["content-range"]).toBe(`bytes 4-15/${bytes.length}`);
-    expect(Buffer.from(yield* part.arrayBuffer)).toEqual(bytes.subarray(4, 16));
+    const arrayBuffer3 = yield* part.arrayBuffer;
+    expect(Buffer.from(arrayBuffer3)).toEqual(bytes.subarray(4, 16));
     expect((yield* client.get(url, { headers: { range: `bytes=${bytes.length}-` } })).status).toBe(416);
     expect((yield* client.get(url, { headers: { range: "bytes=0-1,4-5" } })).status).toBe(416);
     expect((yield* post("media.input.delete", { id: input.id })).status).toBe(204);

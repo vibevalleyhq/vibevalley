@@ -1,8 +1,6 @@
-import { writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
-
-import { Effect, Schema, Stream } from "effect";
-import { describe, expect, it } from "vite-plus/test";
+import { NodeServices } from "@effect/platform-node";
+import { describe, expect, it } from "@effect/vitest";
+import { Config, Console, Effect, FileSystem, Path, Redacted, Schema, Stream } from "effect";
 
 import { makeBrain } from "@vibevalley/agent/brain";
 import { memoryFile } from "@vibevalley/agent/memory";
@@ -16,90 +14,110 @@ import { casesIn, check, committed, type EvalCase, isInput, replaySetup, replayW
 
 import { agentPrompt, systemPrompt } from "./prompts.ts";
 
-const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";
-const key = process.env.DEEPSEEK_API_KEY ?? "";
+const optional = (name: string) => Config.String(name).pipe(Config.withDefault(""));
+// Read as the file is collected: whether the suite runs at all is decided then.
+const env = Effect.runSync(
+  Config.all({
+    live: optional("VIBEVALLEY_EVALS_LIVE"),
+    key: Config.Redacted("DEEPSEEK_API_KEY").pipe(Config.withDefault(Redacted.make(""))),
+    n: optional("VIBEVALLEY_EVAL_N"),
+    only: optional("VIBEVALLEY_EVAL_ONLY"),
+    evals: optional("VIBEVALLEY_EVALS"),
+    model: optional("VIBEVALLEY_EVAL_MODEL"),
+  }),
+);
+const live = env.live === "1";
+const key = Redacted.value(env.key);
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 class EvalFailure extends Schema.TaggedError<EvalFailure, { readonly brand: unique symbol }>()("EvalFailure", { message: Schema.String }) {}
 
 /** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
-function replay(c: EvalCase, model: string): Promise<{ turn: BrainMessage[]; tokens: number }> {
+const replay = Effect.fnUntraced(function* (c: EvalCase, model: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
   const home = tempDir("vibevalley-eval-");
-  writeFileSync(memoryFile(home), c.memory);
-  writeFileSync(join(home, defaultOrchestrator + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
-  return Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const setup = yield* replaySetup(c);
-        const brain = yield* makeBrain({
-          name: defaultOrchestrator,
-          instructions: systemPrompt + agentPrompt,
-          llm: deepseek(model, key, standaloneLlm()),
-          home,
-          cwd: home,
-          tools: setup.tools,
-          noSkills: true,
-          noSubagents: true,
-          reminders: false,
-        });
-        const events = yield* brain.events;
-        const turn: BrainMessage[] = [];
-        let tokens = 0;
-        yield* Effect.andThen(
-          brain.send(setup.input),
-          events.pipe(
-            Stream.takeUntil((event) => event.type === "agent_settled"),
-            Stream.runForEach((event) =>
-              Effect.gen(function* () {
-                if (event.type !== "message_end" || isInput(event.message)) return;
-                if (event.message.role === "assistant") {
-                  tokens += event.message.usage.totalTokens;
-                  if (event.message.stopReason === "error") return yield* new EvalFailure({ message: "the model: " + (event.message.errorMessage ?? "") });
-                }
-                turn.push(event.message);
-              }),
-            ),
+  yield* fs.writeFileString(memoryFile(home), c.memory);
+  const before = yield* Effect.forEach(c.before, (m) => json(m));
+  yield* fs.writeFileString(path.join(home, defaultOrchestrator + ".jsonl"), before.map((line) => line + "\n").join(""));
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const setup = yield* replaySetup(c);
+      const brain = yield* makeBrain({
+        name: defaultOrchestrator,
+        instructions: systemPrompt + agentPrompt,
+        llm: deepseek(model, key, standaloneLlm()),
+        home,
+        cwd: home,
+        tools: setup.tools,
+        noSkills: true,
+        noSubagents: true,
+        reminders: false,
+      });
+      const events = yield* brain.events;
+      const turn: BrainMessage[] = [];
+      let tokens = 0;
+      yield* Effect.andThen(
+        brain.send(setup.input),
+        events.pipe(
+          Stream.takeUntil((event) => event.type === "agent_settled"),
+          Stream.runForEach((event) =>
+            Effect.gen(function* () {
+              if (event.type !== "message_end" || isInput(event.message)) return;
+              if (event.message.role === "assistant") {
+                tokens += event.message.usage.totalTokens;
+                if (event.message.stopReason === "error") return yield* EvalFailure.make({ message: "the model: " + (event.message.errorMessage ?? "") });
+              }
+              turn.push(event.message);
+            }),
           ),
-        ).pipe(Effect.timeoutOrElse({ duration: "5 minutes", orElse: () => new EvalFailure({ message: "the turn took too long" }) }));
-        return { turn, tokens };
-      }).pipe(Effect.provide(replayWorld(c))),
-    ),
+        ),
+      ).pipe(Effect.timeoutOrElse({ duration: "5 minutes", orElse: () => EvalFailure.make({ message: "the turn took too long" }) }));
+      return { turn, tokens };
+    }).pipe(Effect.provide(replayWorld(c))),
   );
-}
+});
 
 describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {
-  it("pass on the real model", { timeout: 60 * 60_000 }, async () => {
-    const n = Number(process.env.VIBEVALLEY_EVAL_N || 5);
-    expect(Number.isInteger(n) && n >= 1).toBe(true);
-    const need = Math.max(n - 1, 1);
-    const only = (process.env.VIBEVALLEY_EVAL_ONLY ?? "").split(",").filter(Boolean);
-    const cases = [...casesIn(committed), ...(process.env.VIBEVALLEY_EVALS ? casesIn(process.env.VIBEVALLEY_EVALS) : [])].filter(
-      ({ file }) => only.length === 0 || only.some((o) => basename(file).startsWith(o)),
-    );
-    expect(cases.length).toBeGreaterThan(0);
-    const rows = ["| case | model | passed | tokens |", "|---|---|---|---|"];
-    const short: string[] = [];
-    for (const { file, case: c } of cases) {
-      const name = basename(file);
-      if (c.expect.length === 0) {
-        console.log(`${name}: no expect yet, skipped`);
-        continue;
-      }
-      const model = process.env.VIBEVALLEY_EVAL_MODEL || c.model;
-      let passed = 0;
-      let tokens = 0;
-      for (let i = 0; i < n; i++) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- one request at a time to the live model, within its rate limit
-        const sample = await replay(c, model);
-        tokens += sample.tokens;
-        const missed = check(c.expect, sample.turn);
-        if (missed.length === 0) passed++;
-        else console.log(`${name}, sample ${i + 1}: missed ${missed.join("; ")}\n${transcript(sample.turn)}`);
-      }
-      rows.push(`| ${name} | ${model} | ${passed}/${n} | ${tokens} |`);
-      if (passed < need) short.push(`${name}: passed ${passed} of ${n}, needs ${need}`);
-    }
-    console.log("\n" + rows.join("\n"));
-    expect(short).toEqual([]);
-  });
+  it.live(
+    "pass on the real model",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const n = Number(env.n || 5);
+        expect(Number.isInteger(n) && n >= 1).toBe(true);
+        const need = Math.max(n - 1, 1);
+        const only = env.only.split(",").filter(Boolean);
+        const cases = [...casesIn(committed), ...(env.evals ? casesIn(env.evals) : [])].filter(
+          ({ file }) => only.length === 0 || only.some((o) => path.basename(file).startsWith(o)),
+        );
+        expect(cases.length).toBeGreaterThan(0);
+        const rows = ["| case | model | passed | tokens |", "|---|---|---|---|"];
+        const short: string[] = [];
+        for (const { file, case: c } of cases) {
+          const name = path.basename(file);
+          if (c.expect.length === 0) {
+            yield* Console.log(`${name}: no expect yet, skipped`);
+            continue;
+          }
+          const model = env.model || c.model;
+          let passed = 0;
+          let tokens = 0;
+          for (let i = 0; i < n; i++) {
+            // One request at a time to the live model, within its rate limit.
+            const sample = yield* replay(c, model);
+            tokens += sample.tokens;
+            const missed = check(c.expect, sample.turn);
+            if (missed.length === 0) passed++;
+            else yield* Console.log(`${name}, sample ${i + 1}: missed ${missed.join("; ")}\n${transcript(sample.turn)}`);
+          }
+          rows.push(`| ${name} | ${model} | ${passed}/${n} | ${tokens} |`);
+          if (passed < need) short.push(`${name}: passed ${passed} of ${n}, needs ${need}`);
+        }
+        yield* Console.log("\n" + rows.join("\n"));
+        expect(short).toEqual([]);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    60 * 60_000,
+  );
 });

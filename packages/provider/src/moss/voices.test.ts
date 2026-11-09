@@ -24,7 +24,8 @@ it.effect("voice pagination preserves names and opaque cursors without guessing 
     return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(page)));
   });
   return Effect.gen(function* () {
-    expect(yield* listMossVoices("test-key", { limit: 2, after: page.next_cursor, status: "future-state" })).toEqual({
+    const mossVoices = yield* listMossVoices("test-key", { limit: 2, after: page.next_cursor, status: "future-state" });
+    expect(mossVoices).toEqual({
       voices: [{ id: voice.id, name: "", createdAtSeconds: 1 }],
       hasMore: true,
       nextCursor: page.next_cursor,
@@ -42,7 +43,8 @@ it.effect("empty lists and an explicit zero offset are valid", () => {
     return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ object: "list", data: [], has_more: false })));
   });
   return Effect.gen(function* () {
-    expect(yield* listMossVoices("test-key", { offset: 0 })).toEqual({ voices: [], hasMore: false, nextCursor: null });
+    const mossVoices = yield* listMossVoices("test-key", { offset: 0 });
+    expect(mossVoices).toEqual({ voices: [], hasMore: false, nextCursor: null });
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
@@ -59,7 +61,8 @@ it.effect.each([
   { url: "https://example.com" },
 ])("invalid listing input %# never reaches the network", (input) =>
   Effect.gen(function* () {
-    expect(yield* listMossVoices("test-key", input).pipe(Effect.flip)).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+    const mossVoicesFailure = yield* listMossVoices("test-key", input).pipe(Effect.flip);
+    expect(mossVoicesFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -78,13 +81,15 @@ it.effect.each([
   { ...page, data: Array.from({ length: 151 }, (_, n) => ({ ...voice, id: `voice-${n}` })) },
 ])("invalid voice listing %# is not exposed as usable choices", (body) =>
   Effect.gen(function* () {
-    expect(yield* listMossVoices("test-key", {}).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossVoicesFailure = yield* listMossVoices("test-key", {}).pipe(Effect.flip);
+    expect(mossVoicesFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer(body))),
 );
 
 it.effect("voice lists have a byte bound independent of their item bound", () =>
   Effect.gen(function* () {
-    expect(yield* listMossVoices("test-key", {}).pipe(Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const mossVoicesFailure = yield* listMossVoices("test-key", {}).pipe(Effect.flip);
+    expect(mossVoicesFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...page, privatePadding: "x".repeat(1 << 20) }))),
 );
 
@@ -105,9 +110,11 @@ it.effect.each(["timeout", "cancel"])("%s stops a pending voice query without re
     if (action === "cancel") yield* Fiber.interrupt(fiber);
     else {
       yield* TestClock.adjust("30 seconds");
-      expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ reason: "Timeout" });
     }
-    expect(yield* Deferred.isDone(stopped)).toBe(true);
+    const isDone2 = yield* Deferred.isDone(stopped);
+    expect(isDone2).toBe(true);
     expect(calls).toBe(1);
   }),
 );
@@ -135,7 +142,8 @@ it.effect.each([undefined, "", "Narrator"])("voice cloning uploads an explicit B
     }),
   );
   return Effect.gen(function* () {
-    expect(yield* createMossVoice("clone-account", { ...clone, ...(name !== undefined ? { name } : {}) })).toEqual({
+    const mossVoiceCreated = yield* createMossVoice("clone-account", { ...clone, ...(name !== undefined ? { name } : {}) });
+    expect(mossVoiceCreated).toEqual({
       id: voice.id,
       name: name ?? "",
       createdAtSeconds: 1,
@@ -159,7 +167,8 @@ it.effect.each([
   { file_id: "file-one" },
 ])("invalid clone input %# cannot upload or create a voice", (patch) =>
   Effect.gen(function* () {
-    expect(yield* createMossVoice("clone-account", { ...clone, ...patch }).pipe(Effect.flip)).toMatchObject({
+    const mossVoiceCreatedFailure = yield* createMossVoice("clone-account", { ...clone, ...patch }).pipe(Effect.flip);
+    expect(mossVoiceCreatedFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });
@@ -175,7 +184,8 @@ it.effect.each([{ ...voice, object: "file" }, { ...voice, id: "../voice" }, { ..
   "invalid clone receipt %# does not invent a reusable voice",
   (body) =>
     Effect.gen(function* () {
-      expect(yield* createMossVoice("clone-account", clone).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+      const mossVoiceCreatedFailure = yield* createMossVoice("clone-account", clone).pipe(Effect.flip);
+      expect(mossVoiceCreatedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
     }).pipe(Effect.provideService(HttpClient.HttpClient, answer(body))),
 );
 
@@ -190,7 +200,8 @@ it.effect("a lost clone response is unknown and never retried", () =>
     const fiber = yield* createMossVoice("clone-account", clone).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(calls).toBe(1);
   }),
 );

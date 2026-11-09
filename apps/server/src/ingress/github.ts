@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Clock, Effect, Schema, Semaphore } from "effect";
+import { Clock, Effect, Formatter, Schema, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -118,7 +118,7 @@ const authorOf = (author: typeof Actor.Type) => ({
 export const githubSnapshot = (repos: Repo["Service"]) =>
   Effect.fn("Ingress.githubSnapshot")(function* (name: string, n: number): Effect.fn.Return<GitHubPullIngress, RepoError> {
     const repo = yield* repos.githubRemote(name);
-    const unread = () => new RepoError({ message: t("server.repo.github.stateUnread", { n }) });
+    const unread = () => RepoError.make({ message: t("server.repo.github.stateUnread", { n }) });
     const read = Effect.fn("Ingress.githubRead")(function* <A, I>(schema: Schema.Codec<A, I>, args: readonly string[]) {
       const response = yield* repos.githubRequest(...args);
       if (!response.ok) return yield* unread();
@@ -271,7 +271,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
       const base = { source: "github" as const, addressed: "thread_owner" as const, threads: [`issue:${issue.id}`, `github:${repo}#${pr.number}`], at };
       const checks = current.checks.toSorted((a, b) => or(compareText(a.name, b.name), compareText(a.url, b.url)));
       const fingerprint = createHash("sha256")
-        .update(JSON.stringify({ head: current.head, checks }))
+        .update(Formatter.formatJson({ head: current.head, checks }))
         .digest("hex");
       if (fingerprint !== cursor.check_fingerprint) {
         const revision = cursor.check_revision + 1;

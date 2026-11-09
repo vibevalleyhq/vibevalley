@@ -37,8 +37,8 @@ export function selfTools(o: SelfOptions): Tool[] {
     description: selfWords.rememberDescription,
     parameters: Schema.Struct({ note: Schema.String }),
     run: (p) => {
-      if (!p.note.trim()) return Effect.fail(new ToolFailed({ message: selfWords.emptyNote }));
-      if (!memory) return Effect.fail(new ToolFailed({ message: "Memory tools are disabled" }));
+      if (!p.note.trim()) return Effect.fail(ToolFailed.make({ message: selfWords.emptyNote }));
+      if (!memory) return Effect.fail(ToolFailed.make({ message: "Memory tools are disabled" }));
       return memory.remember(p.note).pipe(Effect.as(selfWords.remembered), Effect.mapError(toolFailed));
     },
   });
@@ -52,7 +52,7 @@ export function selfTools(o: SelfOptions): Tool[] {
             onSuccess: (n) => selfWords.rewritten(n),
             onFailure: toolFailed,
           })
-        : Effect.fail(new ToolFailed({ message: "Memory tools are disabled" })),
+        : Effect.fail(ToolFailed.make({ message: "Memory tools are disabled" })),
   });
   const search = schemaTool({
     name: "search_archive",
@@ -72,7 +72,7 @@ export const subagentTool = (spawn: Subagent) =>
     description: selfWords.spawnAgentDescription,
     parameters: Schema.Struct({ brief: Schema.String, label: Schema.optionalKey(Schema.String) }),
     run: (p) =>
-      p.brief.trim() ? spawn(p.brief, p.label ?? [...p.brief].slice(0, 20).join("")) : Effect.fail(new ToolFailed({ message: selfWords.emptyBrief })),
+      p.brief.trim() ? spawn(p.brief, p.label ?? [...p.brief].slice(0, 20).join("")) : Effect.fail(ToolFailed.make({ message: selfWords.emptyBrief })),
   });
 
 export const subagentInstructions = selfWords.subagentInstructions;

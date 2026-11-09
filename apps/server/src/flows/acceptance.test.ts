@@ -34,7 +34,8 @@ for (const mode of ["pass", "frozen", "failed"] as const) {
         }),
       });
       return Effect.gen(function* () {
-        const issues = testIssues(yield* Issue);
+        const issue = yield* Issue;
+        const issues = testIssues(issue);
         yield* (yield* Agent).save(lab());
         const parent = yield* issues.add({ title: "parent", agent: "lab", repo: "acceptance" });
         const acceptance = yield* issues.add({

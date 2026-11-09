@@ -8,6 +8,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { session as sessionActor } from "#/base/actor.ts";
 import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
 import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
@@ -141,7 +142,7 @@ export class Session extends Context.Service<
     /** Brings back the sessions the farm had when it stopped, once every service is ready. */
     readonly restore: Effect.Effect<void, NotRecorded>;
   }
->()("vibevalley/Session") {
+>()("@vibevalley/server/session/session") {
   static readonly layer = Layer.effect(
     Session,
     Effect.suspend(() => make),
@@ -237,9 +238,10 @@ const make = Effect.gen(function* () {
 
   const restore = Effect.gen(function* () {
     yield* expireLogs(config.session.trajectoryDays);
+    const runs2 = yield* db.run(qr.openRuns());
     // The runs still going when the server stopped stopped with it.
     yield* Effect.forEach(
-      yield* db.run(qr.openRuns()),
+      runs2,
       (r) =>
         Effect.gen(function* () {
           yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted"));
@@ -282,12 +284,14 @@ const make = Effect.gen(function* () {
         recalled: heardOf(row.recalled) ?? [],
         report: pendingReportOf(row.pending_report),
       };
+      const trajectory = yield* trajectories.openLog(session.id);
+      const journal = yield* logOf(session, trajectory);
       hands.set(session.id, {
         id: session.id,
         place: s.place,
         issue: session.issue ?? "",
         access: Semaphore.makeUnsafe(1),
-        journal: yield* logOf(session, yield* trajectories.openLog(session.id)),
+        journal,
         oarSessionId: s.oarSessionId,
         lastText: s.lastText,
         tracking: {},
@@ -323,7 +327,7 @@ const make = Effect.gen(function* () {
         yield* db.inTx(
           Effect.gen(function* () {
             const restored = core.session(session.id);
-            if (restored) yield* db.run(qs.keepSessionState(sessionState(restored)));
+            if (restored) yield* db.run(Effect.flatMap(sessionState(restored), qs.keepSessionState));
             yield* db.run(qs.clearPendingReport({ id: session.id }));
           }),
         );
@@ -346,7 +350,8 @@ const make = Effect.gen(function* () {
       return yield* freeing.pipe(Effect.match({ onFailure: (e) => ({ refused: reasonOf(e) }), onSuccess: () => ({ evicted: oldest.name }) }));
     }),
     send: Effect.fn("Session.send")(function* (agent, brief, where, opt) {
-      const permit = yield* Scope.fork(yield* Effect.scope);
+      const scope2 = yield* Effect.scope;
+      const permit = yield* Scope.fork(scope2);
       yield* Effect.acquireRelease(Effect.interruptible(admission.take(1)), (taken) => admission.release(taken)).pipe(
         Effect.provideService(Scope.Scope, permit),
       );
@@ -451,15 +456,19 @@ const make = Effect.gen(function* () {
               yield* logOf(session, journal);
               yield* db
                 .attempt(
-                  qs.keepHand({
-                    id,
-                    place: JSON.stringify(place),
-                    oar_session: opened.execution.sessionId ?? null,
-                    last_text: null,
-                    recalled: recalled.size > 0 ? JSON.stringify([...recalled]) : null,
-                  }),
+                  Effect.flatMap(
+                    Effect.all({ placeJson: jsonText(place), recalledJson: recalled.size > 0 ? jsonText([...recalled]) : Effect.succeed(null) }),
+                    ({ placeJson, recalledJson }) =>
+                      qs.keepHand({
+                        id,
+                        place: placeJson,
+                        oar_session: opened.execution.sessionId ?? null,
+                        last_text: null,
+                        recalled: recalledJson,
+                      }),
+                  ),
                 )
-                .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+                .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
             }),
           );
           registeredRow = true;
@@ -607,7 +616,8 @@ const make = Effect.gen(function* () {
       if (live) return live;
       const r = yield* db.run(Effect.catchNoSuchElement(qs.sessionByID({ id })));
       if (Option.isNone(r) || r.value.ended_at === null) return undefined;
-      return endedSession(r.value, yield* db.run(qr.runsOfSession({ session: id })));
+      const runsOfSession2 = yield* db.run(qr.runsOfSession({ session: id }));
+      return endedSession(r.value, runsOfSession2);
     }),
     issueRuns: Effect.fn("Session.issueRuns")(function* (issue) {
       const rows = yield* db.run(qr.runsOfIssue({ issue_id: issue }));
@@ -631,7 +641,9 @@ const make = Effect.gen(function* () {
       yield* h.access.withPermits(1)(
         Effect.gen(function* () {
           yield* flushRuns;
-          yield* db.attempt(qs.setPendingReport({ id, report: JSON.stringify(report) })).pipe(Effect.mapError((error) => refused(causeMessage(error))));
+          yield* db
+            .attempt(Effect.flatMap(jsonText(report), (text) => qs.setPendingReport({ id, report: text })))
+            .pipe(Effect.mapError((error) => error.pipe(causeMessage, refused)));
           h.report = report;
           if (h.settling && handsToOwner(report)) {
             const pending = h.settling;
@@ -672,11 +684,11 @@ const make = Effect.gen(function* () {
             });
         }),
       };
-      return yield* makeHost(
-        { ...o, memory: memories.forAgent(o.session.agent, o.session.id) },
-        yield* trajectories.openLog(o.session.id, o.keepEvents),
-        hostedRuns,
-      ).pipe(Effect.provideService(Core, core), Effect.provideService(FileSystem.FileSystem, fs));
+      const journal = yield* trajectories.openLog(o.session.id, o.keepEvents);
+      return yield* makeHost({ ...o, memory: memories.forAgent(o.session.agent, o.session.id) }, journal, hostedRuns).pipe(
+        Effect.provideService(Core, core),
+        Effect.provideService(FileSystem.FileSystem, fs),
+      );
     }),
     restore,
   });

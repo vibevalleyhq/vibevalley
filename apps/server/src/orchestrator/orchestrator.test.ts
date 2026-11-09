@@ -1,9 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Fiber, Layer, Stream } from "effect";
+import { Clock, Effect, Fiber, FileSystem, Layer, Path, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -27,11 +24,23 @@ import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
 import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
-import type { EvalCase } from "#/testing/evals.ts";
-import { starter, testConfig, aTurn, gate, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
+import { starter, testConfig, aTurn, gate, nextTurn, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
 import { Said, world } from "#/testing/world.ts";
 
 import { Orchestrator } from "./orchestrator.ts";
+
+/** A case markWrong wrote, as much of it as the test reads; every key is kept to be counted. */
+const SavedCase = Schema.fromJsonString(
+  Schema.StructWithRest(
+    Schema.Struct({
+      input: Schema.Struct({ customType: Schema.String }),
+      did: Schema.Array(Schema.Struct({ role: Schema.String })),
+      tools: Schema.Array(Schema.String),
+      want: Schema.String,
+    }),
+    [Schema.Record(Schema.String, Schema.Unknown)],
+  ),
+);
 import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorModel } from "./situation.ts";
 
@@ -127,7 +136,8 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       yield* (yield* Ingress).say("record the work", {}, undefined, "");
       yield* until(() => f.requests.some((request) => answeredWith(request)?.includes("30") === true), "the rejected note");
-      expect(yield* (yield* Issue).list()).toHaveLength(0);
+      const found = yield* (yield* Issue).list();
+      expect(found).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
   it("takes DeepSeek's models only", () => {
@@ -148,7 +158,8 @@ describe("the orchestrator", () => {
       yield* enableLab;
       const words = yield* said;
       yield* ingress.say("帮我在 demo 里加个 README", {}, undefined, "");
-      expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，记下了"]);
+      const reached = yield* until(() => words().length >= 1 && words(), "its words");
+      expect(reached).toEqual(["好，记下了"]);
       const origin = saidIn(chat.defaultChannel()).find((message) => message.from === "owner" && message.text.includes("加个 README"))!;
       const created = (yield* issues.list()).find((item) => item.title.includes("README"))!;
       expect(created.mandate).toMatchObject({ originTriggerId: origin.id, strength: "explicit", autoSubmitPr: false });
@@ -234,7 +245,10 @@ describe("the orchestrator", () => {
       yield* ingress.say("私下问你", {}, direct, "");
       expect((yield* until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");
       expect(asked("私下问你")[0]!.system).toContain("你是管家「阿青」");
-      expect(readFileSync(join(config.home, "agent", lead.id, `${lead.id}.jsonl`), "utf8")).toContain("私下问你");
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const log = yield* fs.readFileString(path.join(config.home, "agent", lead.id, `${lead.id}.jsonl`));
+      expect(log).toContain("私下问你");
 
       const notes = (yield* chat.openChannel("notes-room", "", "")).id;
       yield* chat.updateChannel(notes, { orchestrator: lead.id });
@@ -262,7 +276,9 @@ describe("the orchestrator", () => {
       // The owner speaking, from any door, opens the farm.
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
-      const kept = readFileSync(join(config.home, "agent", "orchestrator", "orchestrator.jsonl"), "utf8");
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const kept = yield* fs.readFileString(path.join(config.home, "agent", "orchestrator", "orchestrator.jsonl"));
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/u);
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/u);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -281,10 +297,12 @@ describe("the orchestrator", () => {
       });
       expect(got).toBe("收到\n");
       const sql = yield* SqlClient.SqlClient;
-      expect(
-        yield* sql<{ source: string; meta: string }>`select d.source, m.meta from mailbox_delivery d
-          join channel_message m on m.id = d.message_id where m.body = '现在地里怎么样'`,
-      ).toEqual([
+      const rows = yield* sql<{
+        source: string;
+        meta: string;
+      }>`select d.source, m.meta from mailbox_delivery d
+          join channel_message m on m.id = d.message_id where m.body = '现在地里怎么样'`;
+      expect(rows).toEqual([
         {
           source: "voice",
           meta: expect.stringMatching(/"ingressSource":"voice".*"responsePort":"[^"]+".*"voiceMode":"conversation"/u),
@@ -296,7 +314,8 @@ describe("the orchestrator", () => {
         saidIn(chat.defaultChannel())
           .filter((m) => m.spoken || m.from === defaultOrchestrator)
           .map((m) => m.from + "：" + m.text);
-      expect(yield* until(() => call().length === 2 && call(), "the call in the default channel")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
+      const reached = yield* until(() => call().length === 2 && call(), "the call in the default channel");
+      expect(reached).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -319,15 +338,18 @@ describe("the orchestrator", () => {
           for await (const _ of onPhone(response, "还有别的吗")) void _;
         })();
         // The call's line is taken in the next turn of the event loop; then the brief's answer may come.
-        await new Promise((r) => setImmediate(r));
+        await nextTurn();
         release.open();
         await joined;
       });
       const said = yield* Fiber.join(brief).pipe(Effect.timeoutOrElse({ duration: 4000, orElse: () => Effect.die(new Error("waited for the brief")) }));
       expect(said).toContain("#41 交回来了");
       const sql = yield* SqlClient.SqlClient;
-      expect(yield* sql`select id from channel_message where body like '%【要告诉主人】%'`).toHaveLength(0);
-      expect(yield* sql`select id from mailbox_trigger where payload_json->>'text' = '【要告诉主人】\n- #41 交回来了'`).toHaveLength(1);
+      const rows = yield* sql`select id from channel_message where body like '%【要告诉主人】%'`;
+      expect(rows).toHaveLength(0);
+      const rows2 = yield* sql`select id from mailbox_trigger where payload_json->>'text' = '【要告诉主人】
+- #41 交回来了'`;
+      expect(rows2).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -335,8 +357,9 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const response = yield* Orchestrator;
+      const childFiber = yield* Effect.forkChild(response.brief("【要告诉主人】\n- #41 交回来了"), { startImmediately: false });
       // A brief interrupted before it runs takes no line: nothing was started to wait for.
-      yield* Fiber.interrupt(yield* Effect.forkChild(response.brief("【要告诉主人】\n- #41 交回来了"), { startImmediately: false }));
+      yield* Fiber.interrupt(childFiber);
       expect(f.requests).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -355,11 +378,14 @@ describe("the orchestrator", () => {
   it.effect("a new interactive response ends the previous port that is still open", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const responses = makeResponses(yield* Ingress, yield* Channel);
+      const ingress = yield* Ingress;
+      const channel = yield* Channel;
+      const responses = makeResponses(ingress, channel);
       const first = responses.open(true);
       const second = responses.open(true);
+      const collectOutcome = yield* Stream.runCollect(first.caller.words);
       // The newer interactive response ends the older one's words.
-      expect(yield* Stream.runCollect(first.caller.words)).toEqual([]);
+      expect(collectOutcome).toEqual([]);
       // Taking a port hands it on and forgets it; dropping the last one leaves nothing to close.
       expect(responses.take(second.id)).toBe(second.caller);
       expect(responses.take(second.id)).toBeUndefined();
@@ -368,7 +394,8 @@ describe("the orchestrator", () => {
       const third = responses.open(false);
       const waiting = yield* Effect.forkChild(Stream.runCollect(third.caller.words));
       responses.closeAll();
-      expect(yield* Fiber.join(waiting)).toEqual([]);
+      const waiting2 = yield* Fiber.join(waiting);
+      expect(waiting2).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -377,7 +404,8 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const words = yield* said;
       yield* (yield* Ingress).owner({ source: "voice", voiceMode: "api", responsePort: "gone-after-restart", text: "重启后继续", envelope: "gone-1" });
-      expect(yield* until(() => words().at(-1), "the answer without its response port")).toBe("收到");
+      const reached = yield* until(() => words().at(-1), "the answer without its response port");
+      expect(reached).toBe("收到");
       expect(lastLine(f.requests.at(-1)!)).toContain("重启后继续");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -458,7 +486,8 @@ describe("the orchestrator", () => {
         for (const k of Object.keys(heard) as (keyof typeof heard)[]) if (text.includes(k)) heard[k]++;
       }
       expect(heard).toEqual({ 地里怎么样: 1, 电话里问一句: 1 });
-      expect(yield* Effect.flip(ingress.say("早", {}, undefined, "k".repeat(65)))).toBeDefined();
+      const saidFailure = yield* Effect.flip(ingress.say("早", {}, undefined, "k".repeat(65)));
+      expect(saidFailure).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -664,11 +693,8 @@ describe("the orchestrator", () => {
         "its log",
       ))!;
       const made = yield* (yield* Orchestrator).markWrong(asked.seq, "应该先看一眼地里");
-      const saved = JSON.parse(readFileSync(made.file, "utf8")) as Record<keyof EvalCase, unknown> & {
-        input: { customType: string };
-        did: { role: string }[];
-        tools: string[];
-      };
+      const text = yield* (yield* FileSystem.FileSystem).readFileString(made.file);
+      const saved = yield* Schema.decodeEffect(SavedCase)(text);
       // Written in session/host.ts, read as an EvalCase here: every field the reader expects is there.
       expect(Object.keys(saved).toSorted()).toEqual(["before", "createdAt", "did", "expect", "id", "input", "memory", "model", "tools", "want"]);
       expect(saved.want).toBe("应该先看一眼地里");
@@ -676,7 +702,8 @@ describe("the orchestrator", () => {
       expect(saved.did.map((m) => m.role)).toContain("assistant");
       expect(saved.tools).toContain("issue_create");
       expect(saved.tools).toContain("remember");
-      expect(yield* Effect.flip((yield* Orchestrator).markWrong(9_999, "x"))).toMatchObject({ _tag: "Missing" });
+      const markWrongFailure = yield* Effect.flip((yield* Orchestrator).markWrong(9999, "x"));
+      expect(markWrongFailure).toMatchObject({ _tag: "Missing" });
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

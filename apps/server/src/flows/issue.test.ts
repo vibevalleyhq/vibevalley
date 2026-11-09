@@ -51,7 +51,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const repo = join(f.config.workRoot, "repos", "clock");
@@ -69,7 +70,8 @@ describe("an issue", () => {
         );
       const mainLog = () => git(repo, "log", "--format=%s", "main");
 
-      const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
+      const hired = yield* issues.hire(lab(), "看看打卡页", "clock");
+      const looked = mustHire(hired);
       yield* w.nextReport;
       const before = mainLog();
       yield* issues.setStatus(looked.issue!, "done", "", "", owner);
@@ -79,7 +81,8 @@ describe("an issue", () => {
       expect(gone?.phase._tag === "closed" && gone.phase.closed).toBe("completed");
       expect(mainLog()).toBe(before);
 
-      const kept = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      const hired2 = yield* issues.hire(lab(), "写打卡并提交", "clock");
+      const kept = mustHire(hired2);
       yield* w.nextReport;
       const keptIssue = yield* issues.get(kept.issue!);
       yield* issues.edit(kept.issue!, { deliver: "branch" }, owner);
@@ -89,7 +92,8 @@ describe("an issue", () => {
       expect(mainLog()).toBe(before);
       expect(git(repo, "branch", "--list", `vibevalley/issue-${keptIssue.number}`)).not.toBe("");
 
-      const completed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      const hired3 = yield* issues.hire(lab(), "写打卡并提交", "clock");
+      const completed = mustHire(hired3);
       yield* w.nextReport;
       yield* issues.setStatus(completed.issue!, "done", "", "", owner);
       expect((yield* closed(completed.issue!)).delivered).toBe("merged");
@@ -101,14 +105,17 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
       yield* (yield* Agent).save(lab());
-      const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock-in"));
+      const hired = yield* issues.hire(lab(), "写打卡并提交", "clock-in");
+      const session = mustHire(hired);
       expect(session.issue).toBeTruthy();
       yield* w.nextReport;
-      refusedWith(yield* Effect.flip(issues.setStatus(session.id, "todo", "", "", owner)));
+      const setStatusFailure = yield* Effect.flip(issues.setStatus(session.id, "todo", "", "", owner));
+      refusedWith(setStatusFailure);
       yield* issues.setStatus(session.issue!, "done", "", "", owner);
       const ended = (yield* sessions.get(session.id))!;
       expect([ended.phase._tag === "closed" && ended.phase.closed, ended.lastRun?.outcome, !!ended.lastRun?.summary, ended.runs, ended.issue]).toEqual([
@@ -126,7 +133,8 @@ describe("an issue", () => {
         );
       yield* closedAs("merged");
 
-      const again = latest(yield* issues.setStatus(session.id, "todo", "打卡还要记下时区", "", owner));
+      const setStatus2 = yield* issues.setStatus(session.id, "todo", "打卡还要记下时区", "", owner);
+      const again = latest(setStatus2);
       yield* w.nextReport;
       const issue = yield* issues.get(again);
       expect([issue.id, sessionIdsOf(issue), issue.delivered, issue.canceled, issue.closedAt]).toEqual([
@@ -139,12 +147,14 @@ describe("an issue", () => {
       const reopened = (yield* sessions.get(again))!;
       expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`, "u"));
       expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/u);
-      refusedWith(yield* Effect.flip(issues.setStatus(session.issue!, "todo", "", "", owner)));
+      const setStatusFailure2 = yield* Effect.flip(issues.setStatus(session.issue!, "todo", "", "", owner));
+      refusedWith(setStatusFailure2);
       expect((yield* Effect.flip(issues.setStatus("w404", "todo", "", "", owner)))._tag).toBe("Missing");
       yield* sessions.dismiss(again);
       yield* closedAs("dismissed");
       yield* sql`update issue set delivered = 'merged_into_parent', canceled = null, closed_at = ${Date.now()} where id = ${issue.id}`.pipe(Effect.orDie);
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", owner)), "计划里的工单");
+      const setStatusFailure3 = yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", owner));
+      refusedWith(setStatusFailure3, "计划里的工单");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -152,7 +162,8 @@ describe("an issue", () => {
     const f = farm({ repos: ["board"] });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const me = { ...lab(), workdir: "board" };
       yield* (yield* Agent).save(me);
       const issue = yield* issues.add({ title: "看看", agent: me.id });
@@ -170,16 +181,19 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      refusedWith(yield* Effect.flip(issues.add({ title: "  " })));
+      const addedFailure = yield* Effect.flip(issues.add({ title: "  " }));
+      refusedWith(addedFailure);
       let issue = yield* issues.add({ title: "写打卡并提交" });
       expect(issue.status).toBe("backlog");
       const inState = (id: string) => core.state().issues.find((x) => x.id === id);
       expect(inState(issue.id)?.title).toBe("写打卡并提交");
-      refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
+      const startedFailure = yield* Effect.flip(issues.start(issue.id, ""));
+      refusedWith(startedFailure);
       issue = yield* issues.edit(issue.id, { repo: "backlog", agent: "lab" }, owner);
       expect([issue.repo, assignedAgentOf(issue)]).toEqual(["backlog", "lab"]);
       const got = yield* issues.start(issue.id, "");
@@ -192,8 +206,10 @@ describe("an issue", () => {
         const current = inState(issue.id);
         return current !== undefined && executionsOf(current).length === 1 && current.status === "in_review";
       }, "the core state follows its run");
-      refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
-      refusedWith(yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, owner)));
+      const startedFailure2 = yield* Effect.flip(issues.start(issue.id, ""));
+      refusedWith(startedFailure2);
+      const editedFailure = yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, owner));
+      refusedWith(editedFailure);
 
       const unsent = (all: T.Issue[]) => all.filter((i) => executionsOf(i).length === 0).map((i) => i.title);
       const a = yield* issues.add({ title: "一" });
@@ -201,9 +217,11 @@ describe("an issue", () => {
       const c = yield* issues.add({ title: "三" });
       expect([a.priority, b.priority]).toEqual(["medium", "urgent"]);
       yield* issues.edit(c.id, { before: a.id }, owner);
-      expect(unsent(yield* issues.list())).toEqual(["三", "一", "二"]);
+      const issues2 = yield* issues.list();
+      expect(unsent(issues2)).toEqual(["三", "一", "二"]);
       yield* issues.edit(c.id, { before: "" }, owner);
-      expect(unsent(yield* issues.list())).toEqual(["一", "二", "三"]);
+      const issues3 = yield* issues.list();
+      expect(unsent(issues3)).toEqual(["一", "二", "三"]);
       const d = yield* issues.add({ title: "四" });
       const all = yield* issues.list();
       expect(unsent(all)[3]).toBe(d.title);
@@ -215,7 +233,8 @@ describe("an issue", () => {
     const f = farm({ change: (c) => ({ ...c, repo: { ...c.repo, maxSessions: 1 } }) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
@@ -240,9 +259,11 @@ describe("an issue", () => {
       expect(got.session).toBeUndefined();
       expect(got.queued).toContain("排上队了");
       const status = () => Effect.map(issues.get(issue.id), (i) => i.status);
-      expect(yield* status()).toBe("todo");
+      const status2 = yield* status();
+      expect(status2).toBe("todo");
       yield* (yield* Issue).refreshQueue;
-      expect(yield* status()).toBe("todo");
+      const status3 = yield* status();
+      expect(status3).toBe("todo");
       const other = yield* issues.add({ title: "别排了", repo: "queue", agent: "lab" });
       const queued = yield* issues.setStatus(other.id, "todo", "", "", owner);
       const unqueued = yield* issues.setStatus(other.id, "backlog", "", "", owner);
@@ -250,7 +271,8 @@ describe("an issue", () => {
       yield* core.apply({ type: "sessionLeft", id: sessionId("w90") });
       yield* (yield* Issue).refreshQueue;
       yield* w.nextReport;
-      expect(yield* status()).toBe("in_review");
+      const status4 = yield* status();
+      expect(status4).toBe("in_review");
       expect((yield* sessions.list("lab")).some((s) => s.brief === "等空位的活")).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -259,7 +281,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue = yield* Issue;
+      const issues = testIssues(issue);
       const sessions = yield* Session;
       const crons = yield* Cron;
       yield* (yield* Agent).save({ ...lab(), enabled: true });
@@ -285,8 +308,10 @@ describe("an issue", () => {
 
       yield* due();
       expect((yield* ofCron()).id).toBe(first.id);
-      expect(sessionIdsOf(yield* ofCron())).toHaveLength(1);
-      expect(yield* runs()).toHaveLength(1);
+      const ofCron2 = yield* ofCron();
+      expect(sessionIdsOf(ofCron2)).toHaveLength(1);
+      const runs2 = yield* runs();
+      expect(runs2).toHaveLength(1);
       const sql = yield* SqlClient.SqlClient;
       const held = yield* sql.unsafe<{ state: string }>("select state from mailbox_issue where issue_id = ? and state = 'held'", [first.id]).pipe(Effect.orDie);
       expect(held).toHaveLength(1);
@@ -296,7 +321,8 @@ describe("an issue", () => {
       yield* due();
       yield* w.nextReport;
       expect((yield* ofCron()).id).toBe(first.id);
-      expect(sessionIdsOf(yield* ofCron())).toHaveLength(2);
+      const ofCron3 = yield* ofCron();
+      expect(sessionIdsOf(ofCron3)).toHaveLength(2);
       const two = yield* await_(runs, (r) => r.length === 2, "a second run");
       expect(two[1]!.triggeredBy.kind).toBe("cron");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -305,7 +331,8 @@ describe("an issue", () => {
   it.live("update changes only what it gives", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       let issue = yield* issues.add({
         title: "写打卡",
         description: "每天一次",
@@ -325,17 +352,20 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       yield* (yield* Agent).save(lab());
       const move = (id: string, to: T.Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
       let issue = yield* issues.add({ title: "写打卡并提交", repo: "clock", agent: "lab" });
       expect(issue.moves).toEqual(["todo", "canceled"]);
-      refusedWith(yield* Effect.flip(move(issue.id, "in_progress")));
+      const movedFailure = yield* Effect.flip(move(issue.id, "in_progress"));
+      refusedWith(movedFailure);
       issue = yield* move(issue.id, "todo");
       yield* w.nextReport;
       issue = yield* issues.get(issue.id);
       expect([issue.status, issue.moves]).toEqual(["in_review", ["todo", "done", "canceled"]]);
-      refusedWith(yield* Effect.flip(move(issue.id, "todo", " ")));
+      const movedFailure2 = yield* Effect.flip(move(issue.id, "todo", " "));
+      refusedWith(movedFailure2);
       yield* move(issue.id, "todo", "再写版本B");
       yield* w.nextReport;
       issue = yield* move(issue.id, "done");
@@ -355,10 +385,12 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
-      const helper = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      const hired = yield* issues.hire(lab(), "写打卡并提交", "clock");
+      const helper = mustHire(hired);
       yield* w.nextReport;
       const cwd = sessions.cwdOf(helper.id)!;
       mkdirSync(join(cwd, ".vibevalley"), { recursive: true });
@@ -367,7 +399,8 @@ describe("an issue", () => {
       git(cwd, "commit", "-qm", "the check that fails");
       const repo = join(f.config.workRoot, "repos", "clock");
       const before = git(repo, "rev-parse", "main");
-      refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "", owner)), "merge-check-failed");
+      const setStatusFailure = yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "", owner));
+      refusedWith(setStatusFailure, "merge-check-failed");
       // Not done; the helper is already told what failed (issue/merge.ts notTaken) and may be at it (in_progress).
       expect((yield* issues.get(helper.issue!)).status).not.toBe("done");
       yield* until(() => {
@@ -385,7 +418,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({
@@ -404,7 +438,8 @@ describe("an issue", () => {
         (i) => i.closedAt !== undefined,
         "cancelled",
       );
-      let again = latest(yield* issues.setStatus(issue.id, "todo", "接着做", "", owner));
+      const resumed = yield* issues.setStatus(issue.id, "todo", "接着做", "", owner);
+      let again = latest(resumed);
       yield* w.nextReport;
       const reopened = (yield* sessions.get(again))!;
       expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
@@ -416,7 +451,8 @@ describe("an issue", () => {
         (i) => i.delivered === "merged",
         "merged",
       );
-      again = latest(yield* issues.setStatus(issue.id, "todo", "再看看", "", owner));
+      const setStatus2 = yield* issues.setStatus(issue.id, "todo", "再看看", "", owner);
+      again = latest(setStatus2);
       yield* w.nextReport;
       expect((yield* sessions.get(again))!.brief).not.toContain("这条分支上已经有上次的提交，接着做。");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -426,7 +462,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
@@ -444,10 +481,12 @@ describe("an issue", () => {
         (i) => i.stage.stuck === "failed",
         "stuck: failed",
       );
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
+      const setStatusFailure = yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner));
+      refusedWith(setStatusFailure, "这一轮没做成");
       expect((yield* issues.get(issue.id)).stage.acts[0]).toEqual({ act: "cure", does: "move", status: "todo", words: "none" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
-      const running = latestSessionIdOf(yield* issues.get(issue.id));
+      const issue3 = yield* issues.get(issue.id);
+      const running = latestSessionIdOf(issue3);
       if (running === undefined) throw new Error("the issue has no execution session");
       const thread = (yield* chat.threadOfSession(running))!;
       yield* until(
@@ -460,7 +499,8 @@ describe("an issue", () => {
   it.live("regression: a dry run reads an unsaved agent through an Assignment", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "先选人再开工" });
       const preview = yield* issues.previewStatus(issue.id, "todo", "", {}, { agent: "lab" });
@@ -474,10 +514,12 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       yield* (yield* Agent).save(lab());
       const repo = join(f.config.workRoot, "repos", "clock");
-      const committed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      const hired = yield* issues.hire(lab(), "写打卡并提交", "clock");
+      const committed = mustHire(hired);
       yield* w.nextReport;
       const before = git(repo, "log", "--format=%s", "main");
       const merging = yield* issues.previewStatus(committed.issue!, "done", "");
@@ -493,11 +535,13 @@ describe("an issue", () => {
       );
       expect(done.delivered).toBe("merged");
 
-      const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
+      const hired2 = yield* issues.hire(lab(), "看看打卡页", "clock");
+      const looked = mustHire(hired2);
       yield* w.nextReport;
       expect((yield* issues.previewStatus(looked.issue!, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/u);
       expect((yield* issues.previewStatus(looked.issue!, "canceled", "")).does[0]).toMatch(/关成已取消$/u);
-      refusedWith(yield* Effect.flip(issues.previewStatus(looked.issue!, "todo", "")), "要说一句");
+      const previewStatusFailure = yield* Effect.flip(issues.previewStatus(looked.issue!, "todo", ""));
+      refusedWith(previewStatusFailure, "要说一句");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -508,7 +552,8 @@ describe("an issue", () => {
     const f = farm({ runtime: helper(turns, async (_turn, _input, n) => gates[n]?.promise ?? Promise.resolve()) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue = yield* Issue;
+      const issues = testIssues(issue);
       const sessions = yield* Session;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
@@ -523,7 +568,8 @@ describe("an issue", () => {
       expect(asked.deliver).toBe("answer");
       yield* issues.setStatus(asked.id, "todo", "", "", owner);
       yield* until(() => turns.length >= 1, "the answer run");
-      const firstSession = latestSessionIdOf(yield* issues.get(asked.id))!;
+      const issue2 = yield* issues.get(asked.id);
+      const firstSession = latestSessionIdOf(issue2)!;
       yield* sessions.report(firstSession, {
         summary: "查清楚了",
         questions: [],
@@ -577,7 +623,8 @@ describe("an issue", () => {
         "stuck: no answer read",
       );
       expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
-      refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner)), "这一轮没做成");
+      const setStatusFailure = yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner));
+      refusedWith(setStatusFailure, "这一轮没做成");
       yield* issues.setStatus(garbled.id, "todo", "", "", owner);
       const running = latestSessionIdOf(stuck);
       if (running === undefined) throw new Error("the issue has no execution session");
@@ -615,7 +662,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "这一单必败", repo: "fails", agent: "lab" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
@@ -627,8 +675,10 @@ describe("an issue", () => {
       );
       expect(failed.status).toBe("in_progress");
       expect(failed.moves).toEqual(["todo", "canceled"]);
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
+      const setStatusFailure = yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner));
+      refusedWith(setStatusFailure, "这一轮没做成");
+      const setStatusFailure2 = yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner));
+      refusedWith(setStatusFailure2, "这一轮没做成");
       expect((yield* issues.get(issue.id)).closedAt).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -640,7 +690,8 @@ describe("an issue", () => {
     const f = farm({ runtime: helper(turns, async (_turn, _input, n) => (n === 0 ? first.promise : Promise.resolve())) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const core = yield* Core;
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
@@ -651,7 +702,8 @@ describe("an issue", () => {
       });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* until(() => turns.length >= 1, "the asking run");
-      const firstSession = latestSessionIdOf(yield* issues.get(issue.id))!;
+      const issue3 = yield* issues.get(issue.id);
+      const firstSession = latestSessionIdOf(issue3)!;
       yield* sessions.report(firstSession, {
         summary: "需要端口",
         questions: [{ question: "用 8787 还是 8797？", options: [] }],
@@ -685,7 +737,8 @@ describe("an issue", () => {
       yield* until(() => crop() === "flowering", "抽穗：等验收");
 
       yield* issues.setStatus(issue.id, "todo", "再写版本B", "", owner);
-      expect(openFindings(yield* issues.get(issue.id))).toBe(1);
+      const issue4 = yield* issues.get(issue.id);
+      expect(openFindings(issue4)).toBe(1);
       yield* w.nextReport;
       yield* await_(
         () => issues.get(issue.id),
@@ -694,7 +747,8 @@ describe("an issue", () => {
       );
       // Handed back again it waits on the owner's acceptance, as its page says; the findings stay open until a pass.
       yield* until(() => crop() === "flowering", "waiting on the acceptance again");
-      expect(openFindings(yield* issues.get(issue.id))).toBe(1);
+      const issue5 = yield* issues.get(issue.id);
+      expect(openFindings(issue5)).toBe(1);
 
       issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
       expect([issue.status, openFindings(issue)]).toEqual(["done", 0]);
@@ -719,12 +773,14 @@ describe("an issue", () => {
         balances: [{ currency: "CNY", amount: 0 }],
       };
       yield* runtimes.refresh("pi");
-      expect(yield* hire()).toMatch(/余额用完了/u);
+      const hired = yield* hire();
+      expect(hired).toMatch(/余额用完了/u);
 
       usage = null;
       runtimes.spend("pi", 1.2);
       yield* runtimes.update("pi", { ...settings, dailyBudget: 1 });
-      expect(yield* hire()).toMatch(/每日预算 ¥1\.00/u);
+      const hired2 = yield* hire();
+      expect(hired2).toMatch(/每日预算 ¥1\.00/u);
 
       // A window used up would only fail with a quota error.
       const resets = new Date(2026, 9, 14, 8, 0).getTime();
@@ -737,7 +793,8 @@ describe("an issue", () => {
         ],
       };
       yield* runtimes.update("pi", settings);
-      expect(yield* hire()).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/u);
+      const hired3 = yield* hire();
+      expect(hired3).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/u);
 
       usage = {
         status: "ok",
@@ -745,7 +802,8 @@ describe("an issue", () => {
         windows: [{ label: "Codex · 1 week", usedPercent: 99, resetsAt: resets }],
       };
       yield* runtimes.refresh("pi");
-      expect(yield* hire()).toBe("");
+      const hired4 = yield* hire();
+      expect(hired4).toBe("");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

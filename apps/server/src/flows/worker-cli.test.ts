@@ -29,8 +29,10 @@ const listen = Effect.fnUntraced(function* (mcp: Mcp["Service"]) {
       "POST",
       "/mcp",
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.toWeb(yield* HttpServerRequest.HttpServerRequest);
-        return HttpServerResponse.fromWeb(yield* mcp.handle(request));
+        const httpServerRequest = yield* HttpServerRequest.HttpServerRequest;
+        const request = yield* HttpServerRequest.toWeb(httpServerRequest);
+        const handle2 = yield* mcp.handle(request);
+        return HttpServerResponse.fromWeb(handle2);
       }),
     ),
   );
@@ -120,7 +122,8 @@ it.live("regression: a real worker CLI submits its authorized PR and report as i
   const repo = join(config.workRoot, "repos", "demo");
   return Effect.gen(function* () {
     yield* Effect.addFinalizer(() => Effect.sync(() => gate.resolve()));
-    const endpoint = yield* listen(yield* Mcp);
+    const mcp = yield* Mcp;
+    const endpoint = yield* listen(mcp);
     const sessions = yield* Session;
     sessions.setAddress(new URL(endpoint).host);
     const issues = yield* Issue;
@@ -146,9 +149,11 @@ it.live("regression: a real worker CLI submits its authorized PR and report as i
           },
         }),
       );
-    expect(yield* run("pr-submit")).toBe(0);
+    const outcome = yield* run("pr-submit");
+    expect(outcome).toBe(0);
     expect((yield* issues.get(issue.id)).pullRequest?.number).toBe(1);
-    expect(yield* run(`report '{"summary":"CLI report","session":"someone-else","questions":[{"question":"Next?","options":["A","B"]}]}'`)).toBe(0);
+    const outcome2 = yield* run(`report '{"summary":"CLI report","session":"someone-else","questions":[{"question":"Next?","options":["A","B"]}]}'`);
+    expect(outcome2).toBe(0);
     gate.resolve();
     yield* waitFor(issues.get(issue.id), (item) => item.questions.length === 1, "CLI report");
     expect((yield* issues.get(issue.id)).questions[0]?.question).toBe("Next?");

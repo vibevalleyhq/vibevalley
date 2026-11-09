@@ -1,7 +1,4 @@
-import { readdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-
-import { Clock, Context, DateTime, Effect, FileSystem, Layer, Option, Predicate, Semaphore } from "effect";
+import { Clock, Context, DateTime, Effect, FileSystem, Layer, Option, Path, Predicate, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -32,7 +29,7 @@ import {
 
 export { activityOf, countsOf, githubOrigin, type GitHubRun, probeGitHub, tokeiArgs };
 
-const fail = (message: string) => Effect.fail(new RepoError({ message }));
+const fail = (message: string) => Effect.fail(RepoError.make({ message }));
 
 // The end of a check's output is kept: a test run's verdict is there.
 const runTimeoutMs = 10 * 60_000;
@@ -109,7 +106,7 @@ export class Repo extends Context.Service<
     readonly resolveReviewThread: (name: string, thread: string) => Effect.Effect<void, RepoError>;
     readonly finishPullRequest: (name: string, n: number) => Effect.Effect<Merged, RepoError>;
   }
->()("vibevalley/Repo") {
+>()("@vibevalley/server/repo/repo") {
   static readonly layer = (hooks: RepoHooks = {}) => Layer.effect(Repo, make(hooks));
 }
 
@@ -128,6 +125,8 @@ const make = (hooks: RepoHooks = {}) =>
     const root = reposDir(config);
     // A file call that fails where the sync one would have thrown: a defect, as before.
     const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const { dirname, join, resolve } = path;
     const exists = (path: string) => Effect.orDie(fs.exists(path));
     yield* Effect.orDie(fs.makeDirectory(root, { recursive: true }));
     const trees = worktreesDir(config);
@@ -182,16 +181,16 @@ const make = (hooks: RepoHooks = {}) =>
         }
         return path;
       },
-      Effect.mapError((e) => (Predicate.isTagged(e, "RepoError") ? e : new RepoError({ message: reason(e), cause: e }))),
+      Effect.mapError((e) => (Predicate.isTagged(e, "RepoError") ? e : RepoError.make({ message: reason(e), cause: e }))),
     );
 
     const list = Effect.fn("Repo.list")(function* () {
       if (!(yield* exists(root))) return [];
       const out: RepoFolder[] = [];
-      // node's readdir for the entries' kinds, which FileSystem does not give: a link to a folder is not a repo.
-      const entries = yield* Effect.tryPromise({ try: () => readdir(root, { withFileTypes: true }), catch: reason }).pipe(Effect.orElseSucceed(() => []));
+      // The entries' own kinds, links not followed: a link to a folder is not a repo.
+      const entries = yield* fs.readDirectoryEntries(root).pipe(Effect.orElseSucceed(() => []));
       for (const e of entries) {
-        if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
+        if (e.type !== "Directory" || e.name.startsWith(".") || pending.has(e.name)) continue;
         const real = yield* Effect.option(fs.realPath(join(root, e.name)));
         if (Option.isNone(real)) continue;
         const path = real.value;
@@ -219,7 +218,8 @@ const make = (hooks: RepoHooks = {}) =>
         pullRequest: github.capability(p.name),
       };
       if (p.git) {
-        const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
+        const gitQuiet2 = yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at");
+        const last = secondsOf(gitQuiet2);
         if (last > 0) s.last = last;
       }
       return s;
@@ -258,17 +258,17 @@ const make = (hooks: RepoHooks = {}) =>
     const describe = (repo: string, cwd: string, branch: string | undefined) =>
       repository(join(root, repo))
         .describe(repo, cwd, branch)
-        .pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
+        .pipe(Effect.mapError((e) => RepoError.make({ message: reason(e), cause: e })));
 
     /** Run outside the repo's turn, with the check's time limit. */
     const repoSetup = Effect.fn("Repo.repoSetup")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "setup");
-      if (!(yield* lexists(file))) return;
+      if (!(yield* lexists(fs, file))) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code !== 0) yield* Effect.logWarning(`${file} exited ${r.code}${r.timedOut ? " (timed out)" : ""}: ${(r.stdout + r.stderr).slice(-2000)}`);
     });
 
-    const repoCheck = (cwd: string) => checkRepository(cwd, checkTimeoutMs, hooks.command ?? run);
+    const repoCheck = (cwd: string) => checkRepository(fs, cwd, checkTimeoutMs, hooks.command ?? run);
 
     /** The helper commits its own work: a merge or a PR starts only from a clean worktree, under the repository's own commit rules. */
     const requireCommitted = Effect.fnUntraced(function* (cwd: string) {
@@ -324,6 +324,7 @@ const make = (hooks: RepoHooks = {}) =>
     const toMergeFailure = <A, R>(e: Effect.Effect<A, MergeFailure | GitError | RepoError, R>) => Effect.mapError(e, failed);
     const submitBranch = publisher({
       fs,
+      path,
       gh,
       glab: hooks.glab ?? runGitLab,
       timeoutMs: checkTimeoutMs,
@@ -334,6 +335,7 @@ const make = (hooks: RepoHooks = {}) =>
     const github = makeRepoGitHub({
       root,
       fs,
+      path,
       gh,
       submitBranch,
       prRepos,
@@ -393,7 +395,8 @@ const make = (hooks: RepoHooks = {}) =>
       list,
       summary,
       summaries: Effect.fn("Repo.summaries")(function* () {
-        return yield* Effect.forEach(yield* list(), summary);
+        const found = yield* list();
+        return yield* Effect.forEach(found, summary);
       }),
       stack: Effect.fn("Repo.stack")(function* (name) {
         const p = yield* find(name);
@@ -427,7 +430,8 @@ const make = (hooks: RepoHooks = {}) =>
         const log = yield* gitQuiet(p.path, "log", "--all", "--no-merges", "--since=" + since, "--format=%at%x09%aN");
         const total = yield* gitQuiet(p.path, "rev-list", "--all", "--no-merges", "--count");
         const roots = yield* gitQuiet(p.path, "log", "--all", "--max-parents=0", "--format=%at");
-        const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
+        const gitQuiet2 = yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at");
+        const last = secondsOf(gitQuiet2);
         Object.assign(out, activityOf(log), { total: numberIn(total) });
         const first = Math.min(
           ...roots
@@ -439,7 +443,7 @@ const make = (hooks: RepoHooks = {}) =>
         if (last > 0) out.last = last;
         return out;
       }),
-      contributions: (extra) => contributionsOf(root, extra),
+      contributions: (extra) => contributionsOf(fs, path, root, extra),
       workplace: Effect.fn("Repo.workplace")(
         function* (repo, issueNumber, worktree, baseBranch) {
           let made = false;
@@ -474,7 +478,7 @@ const make = (hooks: RepoHooks = {}) =>
             }),
           ).pipe(Effect.tap((place) => (made ? repoSetup(place.cwd) : Effect.void)));
         },
-        Effect.mapError((e) => (Predicate.isTagged(e, "RepoError") ? e : new RepoError({ message: reason(e), cause: e }))),
+        Effect.mapError((e) => (Predicate.isTagged(e, "RepoError") ? e : RepoError.make({ message: reason(e), cause: e }))),
       ),
       changes: Effect.fn("Repo.changes")(function* (place) {
         return yield* describe(place.repo, place.cwd, place.branch);
@@ -496,7 +500,7 @@ const make = (hooks: RepoHooks = {}) =>
           const added = yield* git(cwd, "ls-files", "--others", "--exclude-standard");
           return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].toSorted();
         },
-        Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })),
+        Effect.mapError((e) => RepoError.make({ message: reason(e), cause: e })),
       ),
       conflict: Effect.fn("Repo.conflict")(function* (place, baseBranch = "") {
         if (!place.branch) return undefined;
@@ -616,7 +620,7 @@ const make = (hooks: RepoHooks = {}) =>
             const main = yield* repository(join(root, place.repo)).main;
             yield* git(place.cwd, "checkout", "-q", "-f", "-B", branch, main);
             yield* git(place.cwd, "clean", "-q", "-f", "-d");
-          }).pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e }))),
+          }).pipe(Effect.mapError((e) => RepoError.make({ message: reason(e), cause: e }))),
         );
       }),
       clear: Effect.fn("Repo.clear")(function* (repo, issueNumber, work = "discard") {
@@ -658,7 +662,7 @@ const make = (hooks: RepoHooks = {}) =>
           repo,
           Effect.gen(function* () {
             const path = yield* ensure(repo);
-            yield* git(path, "branch", branch, from || "HEAD").pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
+            yield* git(path, "branch", branch, from || "HEAD").pipe(Effect.mapError((e) => RepoError.make({ message: reason(e), cause: e })));
           }),
         );
       }),

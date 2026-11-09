@@ -94,7 +94,8 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     if (waking.length === 0 || ports.breakerOpen(recipient)) return;
     const batch = rows.filter((row) => row.state === "pending");
     const messages = batch.map(ports.message);
-    const delivered = yield* deliver(recipient, yield* ports.wakeInput(recipient, batch, messages), batch);
+    const wakeInput2 = yield* ports.wakeInput(recipient, batch, messages);
+    const delivered = yield* deliver(recipient, wakeInput2, batch);
     if (delivered.kind === "refused") return yield* Effect.logInfo(`mailbox: ${recipient} not woken: ${delivered.reason}`);
     const now = yield* Clock.currentTimeMillis;
     yield* Effect.forEach(batch, (row) => ports.hand(recipient, row.envelope_id, delivered.launch ?? "", now), { discard: true });
@@ -107,7 +108,8 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     if (!isBusy(session)) return yield* kick(recipient);
     const rows = ports.readyInputs(recipient, ports.pending(recipient)).filter((row) => row.state === "pending" && row.urgency !== "queue");
     if (!rows.some((row) => row.urgency === "steer" && row.held_by === null)) return;
-    const delivered = yield* deliver(recipient, yield* ports.wakeInput(recipient, rows, rows.map(ports.message)), rows);
+    const wakeInput2 = yield* ports.wakeInput(recipient, rows, rows.map(ports.message));
+    const delivered = yield* deliver(recipient, wakeInput2, rows);
     if (delivered.kind === "refused") return;
     const now = yield* Clock.currentTimeMillis;
     yield* Effect.forEach(rows, (row) => ports.hand(recipient, row.envelope_id, delivered.launch ?? "", now), { discard: true });

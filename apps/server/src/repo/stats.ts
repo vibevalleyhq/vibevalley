@@ -1,7 +1,4 @@
-import { lstat, readdir } from "node:fs/promises";
-import { join } from "node:path";
-
-import { DateTime, Effect, Schema } from "effect";
+import { DateTime, Effect, type FileSystem, type Path, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -102,8 +99,8 @@ export const secondsOf = (text: string) => {
 };
 
 /** Whether there is anything at path, a link included (which FileSystem's exists follows). */
-export const lexists = (path: string) =>
-  Effect.tryPromise({ try: () => lstat(path), catch: () => false }).pipe(
+export const lexists = (fs: FileSystem.FileSystem, path: string) =>
+  fs.lstat(path).pipe(
     Effect.as(true),
     Effect.orElseSucceed(() => false),
   );
@@ -111,24 +108,24 @@ export const lexists = (path: string) =>
 const skipDirs = new Set(["node_modules", ".git", ".venv", "vendor", "dist", "build", "target", ".next"]);
 
 /** The repositories under dir, at most depth folders down; a repository's own folders are not looked into. */
-const repoDirs = (dir: string, depth: number): Effect.Effect<string[]> =>
+const repoDirs = (fs: FileSystem.FileSystem, path: Path.Path, dir: string, depth: number): Effect.Effect<string[]> =>
   Effect.gen(function* () {
-    const entries = yield* Effect.tryPromise({ try: () => readdir(dir, { withFileTypes: true }), catch: () => [] }).pipe(Effect.orElseSucceed(() => []));
+    const entries = yield* fs.readDirectoryEntries(dir).pipe(Effect.orElseSucceed(() => []));
     if (entries.some((e) => e.name === ".git")) return [dir];
     if (depth === 0) return [];
     const under = yield* Effect.forEach(
-      entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)),
-      (e) => repoDirs(join(dir, e.name), depth - 1),
+      entries.filter((e) => e.type === "Directory" && !skipDirs.has(e.name)),
+      (e) => repoDirs(fs, path, path.join(dir, e.name), depth - 1),
       { concurrency: 8 },
     );
     return under.flat();
   });
 
-export const contributionsOf = Effect.fn("Repo.contributions")(function* (root: string, extra: readonly string[]) {
+export const contributionsOf = Effect.fn("Repo.contributions")(function* (fs: FileSystem.FileSystem, path: Path.Path, root: string, extra: readonly string[]) {
   const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
   const seen = new Set<string>();
   const out: T.Repo[] = [];
-  for (const dir of yield* repoDirs(root, 3)) {
+  for (const dir of yield* repoDirs(fs, path, root, 3)) {
     // Worktrees share their repository's history: one count per repository.
     const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
     if (common === "" || seen.has(common)) continue;

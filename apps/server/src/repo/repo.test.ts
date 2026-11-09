@@ -3,7 +3,8 @@ import { dirname, join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer } from "effect";
+import { Clock, DateTime, Effect, Fiber, Formatter, Layer } from "effect";
+import { TestClock } from "effect/testing";
 
 import { ServerConfig } from "#/infra/config.ts";
 import { gitInEnv, gitSync, reposDir, repo, write } from "#/testing/git.ts";
@@ -107,9 +108,12 @@ describe("repos", () => {
         const changes = yield* p.branchChanges("task", "vibevalley/task-1");
         expect(changes!.files.map((f) => f.path)).toEqual(["a.txt"]);
         expect(changes!.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/u);
-        expect(yield* p.branchChanges("task", "vibevalley/missing")).toBeUndefined();
-        expect(yield* p.mergeBranch("task", "vibevalley/task-1")).toMatch(/1 个提交合进了 task 的 main/u);
-        expect(yield* p.run(join(root, "task"), "cat a.txt && exit 3")).toEqual({
+        const branchChanges2 = yield* p.branchChanges("task", "vibevalley/missing");
+        expect(branchChanges2).toBeUndefined();
+        const branchMerged = yield* p.mergeBranch("task", "vibevalley/task-1");
+        expect(branchMerged).toMatch(/1 个提交合进了 task 的 main/u);
+        const outcome = yield* p.run(join(root, "task"), "cat a.txt && exit 3");
+        expect(outcome).toEqual({
           ok: false,
           output: "a",
         });
@@ -215,7 +219,8 @@ describe("repos", () => {
         gitSync(third.cwd, "add", ".");
         gitSync(third.cwd, "commit", "-qm", "w3");
         yield* p.mergeInto(third, "vibevalley/task-1");
-        expect(yield* p.changedFiles(mine.cwd, "vibevalley/task-1")).toEqual(["a.txt", "b.txt", "c.txt", "new.txt"]);
+        const changedFiles2 = yield* p.changedFiles(mine.cwd, "vibevalley/task-1");
+        expect(changedFiles2).toEqual(["a.txt", "b.txt", "c.txt", "new.txt"]);
       }),
     );
   });
@@ -233,7 +238,7 @@ describe("repos", () => {
       reports,
       children: {},
     });
-    const body = JSON.stringify({
+    const body = Formatter.formatJson({
       TypeScript: lang(30, 400, 50, report("a.ts"), report("b.ts")),
       Markdown: lang(10, 0, 600, report("README.md")),
       Go: lang(5, 440, 0, report("main.go")),
@@ -263,7 +268,7 @@ describe("repos", () => {
       "garbage",
       `${at("2026-10-02T21:00:00Z")}\t`,
     ].join("\n");
-    const { days, authors } = activityOf(log, (ms) => new Date(ms).toISOString().slice(0, 10));
+    const { days, authors } = activityOf(log, (ms) => DateTime.formatIso(DateTime.makeUnsafe(ms)).slice(0, 10));
     expect(days).toEqual([
       { day: "2026-10-01", commits: 1 },
       { day: "2026-10-02", commits: 3 },
@@ -334,14 +339,14 @@ describe("repos", () => {
         [1, 1],
         [0, 6],
         [9, 6],
-      ] as const)
-        expect(
-          yield* repos(
-            reposDir(),
-            Effect.map(Repo, (p) => p.maxSessions()),
-            { repo: { maxSessions: limit, checkTimeoutSeconds: 1200 } },
-          ),
-        ).toBe(want);
+      ] as const) {
+        const maxSessions = yield* repos(
+          reposDir(),
+          Effect.map(Repo, (p) => p.maxSessions()),
+          { repo: { maxSessions: limit, checkTimeoutSeconds: 1200 } },
+        );
+        expect(maxSessions).toBe(want);
+      }
     }),
   );
 
@@ -358,10 +363,12 @@ describe("repos", () => {
           { name: "Colleague", commits: 1 },
           { name: "Me", commits: 1 },
         ]);
-        expect(activity.first).toBe(new Date(2026, 9, 1, 10).getTime());
+        const firstAt = DateTime.makeZonedUnsafe({ year: 2026, month: 10, day: 1, hour: 10 }, { timeZone: DateTime.zoneMakeLocal(), adjustForTimeZone: true });
+        expect(activity.first).toBe(DateTime.toEpochMillis(firstAt));
         const notes = (yield* p.activity("notes"))!;
         expect([notes.days.length, notes.total]).toEqual([0, 0]);
-        expect(yield* p.activity("../etc")).toBeUndefined();
+        const activity2 = yield* p.activity("../etc");
+        expect(activity2).toBeUndefined();
       }),
     );
   });
@@ -483,12 +490,14 @@ describe("repos", () => {
           );
           gitSync(place.cwd, "add", ".");
           gitSync(place.cwd, "commit", "-qm", "check");
-          const started = Date.now();
+          // The process's deadline is real time: so is how long the merge took.
+          const started = yield* TestClock.withLive(Clock.currentTimeMillis);
           const e = yield* Effect.flip(p.merge(place));
           expect(e.message).toMatch(/超时/u);
           expect(e.message).toMatch(/line-59/u);
           expect(e.message).not.toMatch(/discarded-first-line/u);
-          expect(Date.now() - started).toBeLessThan(10_000);
+          const ended = yield* TestClock.withLive(Clock.currentTimeMillis);
+          expect(ended - started).toBeLessThan(10_000);
           expect(existsSync(place.cwd)).toBe(true);
         }),
         { repo: { maxSessions: 3, checkTimeoutSeconds: 2 } },
@@ -525,7 +534,8 @@ describe("repos", () => {
         const path = join(root, "demo");
         renameSync(join(path, ".git"), join(path, ".git-held"));
         try {
-          expect(yield* p.clear("demo", 9)).toMatchObject({ kept: true });
+          const clear2 = yield* p.clear("demo", 9);
+          expect(clear2).toMatchObject({ kept: true });
         } finally {
           renameSync(join(path, ".git-held"), join(path, ".git"));
         }
@@ -554,20 +564,24 @@ describe("repos", () => {
         ]);
         yield* Effect.flip(p.reset({ repo: "demo", cwd: path }));
         writeFileSync(join(place.cwd, "scratch.txt"), "y");
-        expect(yield* p.clear("demo", 7, "preserve")).toMatchObject({ kept: true });
+        const clear2 = yield* p.clear("demo", 7, "preserve");
+        expect(clear2).toMatchObject({ kept: true });
         expect(existsSync(join(place.cwd, "scratch.txt"))).toBe(true);
-        expect(yield* p.clear("demo", 7)).toEqual({ kept: false });
+        const clear3 = yield* p.clear("demo", 7);
+        expect(clear3).toEqual({ kept: false });
         expect(existsSync(place.cwd)).toBe(false);
         expect(() => gitSync(path, "show-ref", "--verify", "refs/heads/" + place.branch)).toThrow();
         const kept = yield* p.workplace("demo", 8, true, "");
         writeFileSync(join(kept.cwd, "work.txt"), "z");
         gitSync(kept.cwd, "add", ".");
         gitSync(kept.cwd, "commit", "-qm", "work");
-        expect(yield* p.clear("demo", 8)).toMatchObject({
+        const clear4 = yield* p.clear("demo", 8);
+        expect(clear4).toMatchObject({
           kept: true,
           reason: expect.stringMatching(/分支留着/u),
         });
-        expect(yield* p.clear("missing", 9)).toEqual({ kept: false });
+        const clear5 = yield* p.clear("missing", 9);
+        expect(clear5).toEqual({ kept: false });
       }),
     );
   });

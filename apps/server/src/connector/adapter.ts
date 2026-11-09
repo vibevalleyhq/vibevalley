@@ -25,10 +25,10 @@ export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: u
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-export const failedWith = (message: string) => new AppFailed({ kind: "failed", message });
+export const failedWith = (message: string) => AppFailed.make({ kind: "failed", message });
 
 /** A thrown or rejected value, as an app's failure. */
-export const failedOf = (e: unknown) => new AppFailed({ kind: "failed", message: messageOf(e), cause: e });
+export const failedOf = (e: unknown) => AppFailed.make({ kind: "failed", message: messageOf(e), cause: e });
 
 export type Secrets = Readonly<Record<string, string>>;
 

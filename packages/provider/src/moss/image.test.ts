@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Formatter, Option, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { generateMossImage } from "./image.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = { model: "moss-image-base-1.0", prompt: "A small farm in pixel art" };
 const layout = {
@@ -26,10 +28,11 @@ it.effect.each(["moss-image-base-1.0", "moss-image-sft-1.0", "moss-image-base-1.
     const sent: { url: string; init: RequestInit | undefined }[] = [];
     const fetcher: typeof fetch = (url, init) => {
       sent.push({ url: url instanceof Request ? url.url : String(url), init });
-      return Promise.resolve(new Response(JSON.stringify(result)));
+      return Promise.resolve(new Response(Formatter.formatJson(result)));
     };
     return Effect.gen(function* () {
-      expect(yield* generateMossImage("test-key", { ...input, model })).toEqual({ url: result.data[0]?.url, created: result.created, usage: result.usage });
+      const generateMossImage2 = yield* generateMossImage("test-key", { ...input, model });
+      expect(generateMossImage2).toEqual({ url: result.data[0]?.url, created: result.created, usage: result.usage });
       expect(sent).toHaveLength(1);
       expect(sent[0]?.url).toBe("https://api.mosi.cn/v1/images/generations");
       const init = sent[0]?.init;
@@ -70,7 +73,7 @@ it.effect.each([
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
-      answer(JSON.stringify({ ...result, usage: { generated_images: 1, output_width: size.width, output_height: size.height } })),
+      answer(Formatter.formatJson({ ...result, usage: { generated_images: 1, output_width: size.width, output_height: size.height } })),
     ),
   ),
 );
@@ -79,15 +82,15 @@ it.effect("MOSS layout serializes centered coordinates and preserves explicit ze
   const sent: unknown[] = [];
   const http = HttpClient.make((request) => {
     expect(request.body._tag).toBe("Uint8Array");
-    if (request.body._tag === "Uint8Array") sent.push(JSON.parse(new TextDecoder().decode(request.body.body)));
-    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(JSON.stringify(result))));
+    if (request.body._tag === "Uint8Array") sent.push(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body))));
+    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(Formatter.formatJson(result))));
   });
   return Effect.gen(function* () {
     yield* generateMossImage("test-key", { ...input, prompt: layout, seed: 0, guidance: 0, steps: 1, watermark: false, enhance: false, negativePrompt: "" });
     expect(sent).toEqual([
       {
         model: input.model,
-        prompt: JSON.stringify(layout),
+        prompt: Formatter.formatJson(layout),
         size: "1024x1024",
         n: 1,
         response_format: "url",
@@ -138,14 +141,15 @@ it.effect.each([
   return Effect.gen(function* () {
     const error = yield* generateMossImage("test-key", request).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
-    expect(JSON.stringify(error)).not.toContain("test-key");
+    expect(Formatter.formatJson(error)).not.toContain("test-key");
     expect(calls).toBe(0);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect.each(["", " ", "key\nheader", "invalid key"])("invalid credential %# is refused locally", (key) =>
   Effect.gen(function* () {
-    expect(yield* generateMossImage(key, input).pipe(Effect.flip)).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const generateMossImageFailure = yield* generateMossImage(key, input).pipe(Effect.flip);
+    expect(generateMossImageFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -161,7 +165,7 @@ it.effect.each([301, 400, 401, 403, 404, 408, 429, 500, 502, 503])("HTTP %i neve
     return Effect.succeed(
       HttpClientResponse.fromWeb(
         request,
-        new Response(JSON.stringify({ error: { code: "safety_guardrail_blocked", message: "test-key private-prompt" } }), { status }),
+        new Response(Formatter.formatJson({ error: { code: "safety_guardrail_blocked", message: "test-key private-prompt" } }), { status }),
       ),
     );
   });
@@ -173,7 +177,7 @@ it.effect.each([301, 400, 401, 403, 404, 408, 429, 500, 502, 503])("HTTP %i neve
       code: "safety_guardrail_blocked",
       outcome: [400, 401, 403, 429].includes(status) ? "Rejected" : "Unknown",
     });
-    expect(JSON.stringify(error)).not.toMatch(/test-key|private-prompt/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/test-key|private-prompt/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -183,31 +187,32 @@ it.effect("unknown vendor error codes are not copied into public errors", () =>
     const error = yield* generateMossImage("test-key", input).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "HttpStatus", status: 403, outcome: "Rejected" });
     expect(error.code).toBeUndefined();
-    expect(JSON.stringify(error)).not.toContain("reflected-private-input");
+    expect(Formatter.formatJson(error)).not.toContain("reflected-private-input");
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer('{"error":{"code":"reflected-private-input"}}', 403))),
 );
 
 it.effect.each([
   "not-json",
   "{}",
-  JSON.stringify({ ...result, data: [] }),
-  JSON.stringify({ ...result, data: [...result.data, ...result.data] }),
-  JSON.stringify({ ...result, data: [{ url: "http://images.example.com/image.png" }] }),
-  JSON.stringify({ ...result, data: [{ url: "https://user:password@images.example.com/image.png" }] }),
-  JSON.stringify({ ...result, data: [{ url: "data:image/png;base64,AAAA" }] }),
-  JSON.stringify({ ...result, usage: { ...result.usage, generated_images: 2 } }),
-  JSON.stringify({ ...result, usage: { ...result.usage, output_width: 512 } }),
+  Formatter.formatJson({ ...result, data: [] }),
+  Formatter.formatJson({ ...result, data: [...result.data, ...result.data] }),
+  Formatter.formatJson({ ...result, data: [{ url: "http://images.example.com/image.png" }] }),
+  Formatter.formatJson({ ...result, data: [{ url: "https://user:password@images.example.com/image.png" }] }),
+  Formatter.formatJson({ ...result, data: [{ url: "data:image/png;base64,AAAA" }] }),
+  Formatter.formatJson({ ...result, usage: { ...result.usage, generated_images: 2 } }),
+  Formatter.formatJson({ ...result, usage: { ...result.usage, output_width: 512 } }),
 ])("invalid result %# means unknown outcome, not permission to generate again", (body) =>
   Effect.gen(function* () {
     const error = yield* generateMossImage("test-key", input).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toContain("private-result");
+    expect(Formatter.formatJson(error)).not.toContain("private-result");
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer(body))),
 );
 
 it.effect("oversized response stops reading instead of truncating a result", () =>
   Effect.gen(function* () {
-    expect(yield* generateMossImage("test-key", input).pipe(Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const generateMossImageFailure = yield* generateMossImage("test-key", input).pipe(Effect.flip);
+    expect(generateMossImageFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer(" ".repeat((1 << 20) + 1)))),
 );
 
@@ -220,7 +225,7 @@ it.effect("image transport errors are ambiguous and sanitized", () => {
   return Effect.gen(function* () {
     const error = yield* generateMossImage("test-key", input).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "Network", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/test-key|private-prompt/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/test-key|private-prompt/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provide(FetchHttpClient.layer), Effect.provideService(FetchHttpClient.Fetch, fetcher));
 });
@@ -229,7 +234,7 @@ it.effect("an interrupted response body does not leak the upstream exception", (
   Effect.gen(function* () {
     const error = yield* generateMossImage("test-key", input).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "Network", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toContain("private-body-error");
+    expect(Formatter.formatJson(error)).not.toContain("private-body-error");
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -266,8 +271,10 @@ it.effect("image timeout interrupts the transport once and preserves an unknown 
     const fiber = yield* generateMossImage("test-key", input).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     yield* TestClock.adjust("900 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
-    expect(yield* Deferred.isDone(stopped)).toBe(true);
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const isDone2 = yield* Deferred.isDone(stopped);
+    expect(isDone2).toBe(true);
     expect(calls).toBe(1);
   }),
 );
@@ -295,7 +302,8 @@ it.effect("image timeout includes reading the response body", () =>
     const fiber = yield* generateMossImage("test-key", input).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     yield* TestClock.adjust("900 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(canceled).toBe(true);
   }),
 );
@@ -313,6 +321,7 @@ it.effect("canceling local generation stops its transport without resubmission",
     const fiber = yield* generateMossImage("test-key", input).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.forkChild);
     yield* Deferred.await(started);
     yield* Fiber.interrupt(fiber);
-    expect(yield* Deferred.isDone(stopped)).toBe(true);
+    const isDone2 = yield* Deferred.isDone(stopped);
+    expect(isDone2).toBe(true);
   }),
 );

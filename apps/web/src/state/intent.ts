@@ -25,7 +25,7 @@ export interface Intent<I, R> {
   readonly replied?: { readonly reply: R };
   /** Why it failed, in the owner's words. */
   readonly reason?: string;
-  /** The structured fault when phase is "failed". */
+  /** Only when phase is "failed". */
   readonly fault?: UiFault;
 }
 

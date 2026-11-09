@@ -1,32 +1,37 @@
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
+import { Effect, FileSystem, Formatter, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { dshRuntime, modelId, optionValue, repoModels } from "./dsh.ts";
+import recorded from "./testdata/dsh-acp-0.2.1-rc.2.json" with { type: "json" };
 
 const answersFile = resolve(import.meta.dirname, "testdata/dsh-acp-0.2.1-rc.2.json");
-const answers = JSON.parse(readFileSync(answersFile, "utf8")) as Record<string, unknown>;
+const answers: Record<string, unknown> = recorded;
+const onDisk = <A, E>(work: (fs: FileSystem.FileSystem) => Effect.Effect<A, E>) =>
+  Effect.runPromise(Effect.flatMap(FileSystem.FileSystem, work).pipe(Effect.provide(NodeServices.layer)));
+const LoggedRequest = Schema.fromJsonString(
+  Schema.Struct({ method: Schema.String, params: Schema.Struct({ configId: Schema.optionalKey(Schema.String), value: Schema.optionalKey(Schema.String) }) }),
+);
 
 /** `dsh --profile acp` played: it answers with what dsh 0.2.1-rc.2 answered (testdata), and logs every request. */
-function fakeDsh() {
+async function fakeDsh() {
   const dir = tempDir("vibevalley-dsh-");
   const log = join(dir, "log.jsonl");
   const script = join(dir, "dsh");
-  writeFileSync(
-    script,
-    `#!${process.execPath}
+  const text = `#!${process.execPath}
 const fs = require("node:fs");
-const answers = JSON.parse(fs.readFileSync(${JSON.stringify(answersFile)}, "utf8"));
+const answers = JSON.parse(fs.readFileSync(${Formatter.format(answersFile)}, "utf8"));
 const rl = require("node:readline").createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   let m;
   try { m = JSON.parse(line); } catch { return; }
   if (m.id === undefined || !m.method) return;
-  fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ method: m.method, params: m.params }) + "\\n");
+  fs.appendFileSync(${Formatter.format(log)}, JSON.stringify({ method: m.method, params: m.params }) + "\\n");
   let answer = answers[m.method] ?? {};
   if (m.method === "session/set_config_option") {
     const opened = answers["session/new"];
@@ -36,9 +41,8 @@ rl.on("line", (line) => {
   if (m.method === "session/prompt") answer = { stopReason: "end_turn" };
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: answer }) + "\\n");
 });
-`,
-  );
-  chmodSync(script, 0o755);
+`;
+  await onDisk((fs) => Effect.andThen(fs.writeFileString(script, text), fs.chmod(script, 0o755)));
   return { dir, script, log };
 }
 
@@ -64,7 +68,7 @@ describe("DeepSeek Harness", () => {
   });
 
   it("sets a session's model by its pair, and its effort", async () => {
-    const fake = fakeDsh();
+    const fake = await fakeDsh();
     const session = await dshRuntime.session({ via: "executable", command: fake.script } as never, {
       cwd: fake.dir,
       model: "deepseek-flash",
@@ -72,18 +76,15 @@ describe("DeepSeek Harness", () => {
     });
     await session.prompt("hi");
     await session.dispose();
-    const values = readFileSync(fake.log, "utf8")
-      .trim()
-      .split("\n")
-      .map((l) => JSON.parse(l) as { method: string; params: { configId?: string; value?: string } })
-      .filter((e) => e.method === "session/set_config_option")
-      .map((e) => `${e.params.configId}=${e.params.value}`);
+    const logged = await onDisk((fs) => fs.readFileString(fake.log));
+    const requests = await Effect.runPromise(Effect.forEach(logged.trim().split("\n"), (l) => Schema.decodeEffect(LoggedRequest)(l)));
+    const values = requests.filter((e) => e.method === "session/set_config_option").map((e) => `${e.params.configId}=${e.params.value}`);
     expect(values).toContain(`model=["deepseek-official","deepseek-flash"]`);
     expect(values).toContain("reasoning_effort=low");
   });
 
   it("lists the models of a throwaway session", async () => {
-    const fake = fakeDsh();
+    const fake = await fakeDsh();
     const listed = await dshRuntime.listModels({ via: "executable", command: fake.script } as never, { cwd: fake.dir });
     expect(listed.kind === "ok" && listed.models.map((m) => m.id)).toEqual(["deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"]);
   });

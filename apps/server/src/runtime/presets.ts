@@ -6,6 +6,7 @@ import { sessionAppendSystemPrompt, sessionDisallowedTools, sessionEffort, sessi
 import * as S from "@vibevalley/protocol/schema";
 
 import { localizedJson } from "#/base/json.ts";
+import { localParts } from "#/infra/time.ts";
 
 import presetsEn from "./presets.en.json";
 import presetsZh from "./presets.json";
@@ -42,8 +43,8 @@ export function supportOf(runtime: string): T.RuntimeSupport {
 const two = (n: number) => String(n).padStart(2, "0");
 
 function whenText(at: number): string {
-  const d = new Date(at);
-  return t("server.runtime.date", { month: d.getMonth() + 1, day: d.getDate(), time: `${two(d.getHours())}:${two(d.getMinutes())}` });
+  const d = localParts(at);
+  return t("server.runtime.date", { month: d.month, day: d.day, time: `${two(d.hour)}:${two(d.minute)}` });
 }
 
 /** Why a runtime takes no work now because of money (quota gone, balance gone, the day's budget spent); "" when it does. */

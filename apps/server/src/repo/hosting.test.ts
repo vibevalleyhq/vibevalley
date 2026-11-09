@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 
 import { hosting } from "./hosting.ts";
 
@@ -17,9 +17,10 @@ for (const platform of ["github", "gitlab"] as const) {
             ? { number: 8, url, isCrossRepository: fork, state: closed ? "CLOSED" : "OPEN" }
             : { iid: 8, web_url: url, source_project_id: fork ? 2 : 1, target_project_id: 1, state: closed ? "closed" : "opened" };
         const host = hosting({ platform, host: platform + ".com", name: "team/repo" }, () =>
-          Effect.succeed({ ok: true, missing: false, out: JSON.stringify([item]) }),
+          Effect.succeed({ ok: true, missing: false, out: Formatter.formatJson([item]) }),
         );
-        expect(yield* host.find("feat/topic", "main")).toEqual(fork || closed ? undefined : { number: 8, url, state: "open" });
+        const host2 = yield* host.find("feat/topic", "main");
+        expect(host2).toEqual(fork || closed ? undefined : { number: 8, url, state: "open" });
       }
     }),
   );

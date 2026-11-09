@@ -29,7 +29,8 @@ it.live("regression: splitting an in-place session cannot create children with a
     const issues = testIssues(service);
     yield* (yield* Agent).save(lab());
     const parent = yield* issues.add({ title: "parent", repo: "in-place", agent: "lab" });
-    const helper = mustHire(yield* issues.hire(lab(), "work in place", "in-place", { issue: parent.id, worktree: false }));
+    const hired = yield* issues.hire(lab(), "work in place", "in-place", { issue: parent.id, worktree: false });
+    const helper = mustHire(hired);
     expect(helper.branch).toBeUndefined();
     expect((yield* Effect.flip(service.split(parent.id, "", steps, sessionActor(helper.id))))._tag).toBe("Refused");
     expect((yield* issues.list()).filter((issue) => issue.parent === parent.id)).toEqual([]);
@@ -57,14 +58,17 @@ it.live("regression: splitting preserves the parent's assignment and branch ance
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const sessions = yield* Session;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "整个看板重做", description: "像 Linear 那样", repo: "board", agent: "lab" });
     yield* issues.edit(issue.id, { criteria: ["卡片紧凑"] }, owner);
-    const helper = mustHire(yield* issues.hire(lab(), "hold-parent", "board", { issue: issue.id, worktree: true }));
+    const hired = yield* issues.hire(lab(), "hold-parent", "board", { issue: issue.id, worktree: true });
+    const helper = mustHire(hired);
     const service = yield* Issue;
-    expect(yield* service.split(issue.id, "", steps, sessionActor(helper.id))).toMatch(/3 张子工单/u);
+    const split2 = yield* service.split(issue.id, "", steps, sessionActor(helper.id));
+    expect(split2).toMatch(/3 张子工单/u);
     const children = (yield* issues.list()).filter((item) => item.parent === issue.id);
     expect(children).toHaveLength(3);
     const parent = yield* issues.get(issue.id);

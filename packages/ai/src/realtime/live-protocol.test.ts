@@ -1,9 +1,14 @@
+import { Option, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { mossTaggedFrameBytes } from "@vibevalley/provider/moss";
 
+import { jsonText, parsedJson } from "../json.ts";
 import { MossEngine } from "./moss.ts";
 import { Playback } from "./playback.ts";
+
+const actionOf = Schema.decodeOption(Schema.fromJsonString(Schema.Struct({ action: Schema.String })));
+const parsed = (text: string) => Option.getOrUndefined(parsedJson(text));
 
 const attached = { action: "session_attached", data: { session_id: "live-session-1", memory_scope: "session", delegation: "none" } };
 const updated = { action: "session.updated", data: { error: "", tools: ["ask_orchestrator"] } };
@@ -35,7 +40,7 @@ function fixture() {
     },
     onChange: () => {},
   });
-  const receive = (event: unknown) => engine.socketText(JSON.stringify(event));
+  const receive = (event: unknown) => engine.socketText(jsonText(event));
   const begin = () => {
     engine.begin({ persona: "private persona", instructions: "private instructions" });
     engine.socketOpened();
@@ -77,7 +82,7 @@ describe("official Live lifecycle fixtures", () => {
     expect(f.ended()).toBe(1);
     expect(f.binary).toEqual([]);
     expect(f.engine.phase).toBe("ending");
-    expect(JSON.stringify(f.engine.events)).not.toMatch(/secret|private/u);
+    expect(jsonText(f.engine.events)).not.toMatch(/secret|private/u);
     expect(f.engine.problem).toBe("live_configuration_rejected");
   });
 
@@ -92,7 +97,7 @@ describe("official Live lifecycle fixtures", () => {
     f.receive(updated);
     expect(f.ready()).toBe(1);
     expect(f.sent.filter((json) => json.includes("session.update"))).toHaveLength(1);
-    expect(f.sent.slice(-2).map((json) => JSON.parse(json).action)).toEqual(["media.mode", "mic_state"]);
+    expect(f.sent.slice(-2).map((json) => Option.getOrUndefined(actionOf(json))?.action)).toEqual(["media.mode", "mic_state"]);
   });
 
   it("regression: closing never resumes a session or account, even when vendor permits reconnect", () => {
@@ -109,7 +114,7 @@ describe("official Live lifecycle fixtures", () => {
     expect(f.ended()).toBe(1);
     f.engine.reset();
     f.begin();
-    expect(JSON.parse(f.sent.at(-1) ?? "{}")).toEqual({ action: "attach_session", memory_scope: "session" });
+    expect(parsed(f.sent.at(-1) ?? "{}")).toEqual({ action: "attach_session", memory_scope: "session" });
     expect(f.engine.turns).toEqual([]);
     expect(f.engine.events.some((event) => /live-session-1|private/u.test(event.text))).toBe(false);
   });
@@ -142,7 +147,7 @@ describe("official Live lifecycle fixtures", () => {
     expect(f.cut).toEqual(["r1"]);
     expect(f.sent.some((event) => event.includes("playback.stopped"))).toBe(false);
     f.engine.audioStopped("r1", "t1", 5);
-    expect(JSON.parse(f.sent.at(-1) ?? "{}")).toEqual({ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 5 });
+    expect(parsed(f.sent.at(-1) ?? "{}")).toEqual({ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 5 });
     f.receive(context("c3"));
     f.engine.socketBinary(new ArrayBuffer(960));
     f.receive({ action: "response.audio.done", data: { run_id: "r1", turn_id: "t1" } });
@@ -233,7 +238,7 @@ it("regression: scoped tool errors preserve audio but unscoped session errors re
   f.receive({ action: "error", data: { type: "error", error: { code: "invalid_public_request", message: "private media payload" } } });
   expect(f.engine.phase).toBe("ending");
   expect(f.ended()).toBe(1);
-  expect(JSON.stringify(f.engine.events)).not.toContain("private");
+  expect(jsonText(f.engine.events)).not.toContain("private");
 });
 
 it("regression: interrupted events without IDs affect only an unambiguous active response", () => {

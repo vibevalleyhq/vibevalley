@@ -98,7 +98,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     const answer = Effect.gen(function* () {
       const res = yield* http.execute(request);
       const text = (yield* res.text).slice(0, 4 << 20);
-      if (res.status < 200 || res.status >= 300) return yield* new SourceError({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` });
+      if (res.status < 200 || res.status >= 300) return yield* SourceError.make({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` });
       return text;
     }).pipe(Effect.catchTag("HttpClientError", (e) => Effect.fail(sourceError(e))));
     return closing ? answer : life.alive(answer);
@@ -123,9 +123,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
     };
     const text = yield* post("search", body);
-    const found = yield* Effect.mapError(
-      Schema.decodeEffect(FoundBodySchema)(text),
-      () => new SourceError({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
+    const found = yield* Effect.mapError(Schema.decodeEffect(FoundBodySchema)(text), () =>
+      SourceError.make({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
     );
     const ownership = (hit: { app_id?: string; repo_id?: string }): MemoryScope =>
       hit.app_id !== app || hit.repo_id !== scope ? { kind: "unknown" } : repo ? { kind: "repo", repo } : { kind: "global" };
@@ -199,7 +198,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
           })),
       };
     }),
-    list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
+    list: () => Effect.fail(SourceError.make({ message: t("server.memory.everosList") })),
     // The brief once per session, then what the helper said. a failed run says so.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (c.write !== true || run.outcome === "interrupted") return;
@@ -236,7 +235,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       );
       return undefined;
     }),
-    forget: () => Effect.fail(new SourceError({ message: t("server.memory.everosForget") })),
+    forget: () => Effect.fail(SourceError.make({ message: t("server.memory.everosForget") })),
     can: { list: false, forget: false, transcripts: true },
   };
 }

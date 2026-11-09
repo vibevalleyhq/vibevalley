@@ -109,7 +109,7 @@ export class Said extends Context.Service<
     readonly in: (channel: string) => ChatMessage[];
     readonly all: () => ChatMessage[];
   }
->()("vibevalley/testing/Said") {}
+>()("@vibevalley/server/testing/world/Said") {}
 
 export const said = Layer.effect(
   Said,

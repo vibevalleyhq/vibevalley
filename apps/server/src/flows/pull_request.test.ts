@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
@@ -23,6 +23,8 @@ import { gitIn } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab, until, watch } from "./farm.ts";
+
+const parsed = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const quiet = (cwd: string, ...args: string[]) => {
   try {
@@ -68,13 +70,13 @@ describe("a pull request", () => {
             for (const want of [`#${issue!.number}`, "写版本A", "检查"]) expect(body).toContain(want);
             return ok("https://github.com/test/clock/pull/7\n");
           }
-          if (args[0] === "pr" && args[1] === "view") return ok(JSON.stringify({ state, mergedAt: null, headRefOid: head }));
-          if (args[0] === "api" && args[1] === "user") return ok(JSON.stringify({ login: "gardener" }));
+          if (args[0] === "pr" && args[1] === "view") return ok(Formatter.formatJson({ state, mergedAt: null, headRefOid: head }));
+          if (args[0] === "api" && args[1] === "user") return ok(Formatter.formatJson({ login: "gardener" }));
           if (args[0] === "api" && args[1] === "graphql") {
             const thread = args.find((arg) => arg.startsWith("thread="))?.slice("thread=".length);
             if (thread) {
               resolvedThreads.push(thread);
-              return ok(JSON.stringify({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }));
+              return ok(Formatter.formatJson({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }));
             }
             expect(args).toContain("--paginate");
             expect(args).toContain("--slurp");
@@ -83,7 +85,7 @@ describe("a pull request", () => {
             const pull = (key: string, nodes: unknown[]) => ({ data: { repository: { pullRequest: { [key]: { nodes } } } } });
             if (query.startsWith("query IngressChecks("))
               return ok(
-                JSON.stringify([
+                Formatter.formatJson([
                   {
                     data: {
                       repository: {
@@ -99,7 +101,7 @@ describe("a pull request", () => {
               );
             if (query.startsWith("query IngressReviews("))
               return ok(
-                JSON.stringify(
+                Formatter.formatJson(
                   [
                     [1, 2],
                     [3, 4],
@@ -119,7 +121,7 @@ describe("a pull request", () => {
               );
             if (query.startsWith("query IngressComments("))
               return ok(
-                JSON.stringify([pull("comments", [{ id: "SELF", author: author("GARDENER"), body: "own", url: "", createdAt: "2026-11-01T00:00:00Z" }])]),
+                Formatter.formatJson([pull("comments", [{ id: "SELF", author: author("GARDENER"), body: "own", url: "", createdAt: "2026-11-01T00:00:00Z" }])]),
               );
             if (query.startsWith("query IngressThreads(")) {
               const nodes = Array.from({ length: head === "head-8" ? 7 : 6 }, (_, i) => ({
@@ -136,7 +138,7 @@ describe("a pull request", () => {
                 pullRequestReview: { id: "R1" },
               }));
               return ok(
-                JSON.stringify([
+                Formatter.formatJson([
                   pull("reviewThreads", [
                     {
                       id: "PRRT_9",
@@ -195,7 +197,8 @@ describe("a pull request", () => {
           const issues = yield* Issue;
           const sessions = yield* Session;
           const repos = yield* Repo;
-          const run = Effect.runPromiseWith(yield* Effect.context());
+          const context2 = yield* Effect.context();
+          const run = Effect.runPromiseWith(context2);
           handoff = () => run(sessions.report(id, { summary: "ready for review", questions: [], checks: [], remember: [], prSubmit: false }));
           yield* (yield* Agent).save(lab());
           issue = yield* issues.add({ title: "写版本A", repo: "clock", agent: "lab" }, explicitMandate("", true));
@@ -284,14 +287,18 @@ describe("a pull request", () => {
           expect((yield* sql<{ n: number }>`select count(*) as n from channel_message where body like '%round 1%'`)[0]?.n).toBe(0);
           const inline = yield* sql<{ data: string }>`
             select payload_json->'data' as data from mailbox_trigger where source_key = 'clock#7:comment:PRRC_9'`;
-          expect(JSON.parse(inline[0]?.data ?? "null")).toMatchObject({ path: "src/a.ts", line: 12, diffHunk: "@@\n-old\n+new", threadId: "PRRT_9" });
+          const inlineData = yield* parsed(inline[0]?.data ?? "null");
+          expect(inlineData).toMatchObject({ path: "src/a.ts", line: 12, diffHunk: "@@\n-old\n+new", threadId: "PRRT_9" });
           const rounds = yield* sql<{ round: number; reason: string }>`select (t.trigger_json->'meta'->>'botRound') as round, m.reason
             from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id where t.trigger_json->'meta'->>'kind' = 'comment'`;
           expect(rounds).toHaveLength(6);
           expect(rounds.every((row) => row.round === 1 && row.reason === "human")).toBe(true);
           const resource = yield* (yield* Resource).read(id, { uri: "vv://github/clock/pulls/7/thread/9", limit: 16_000 });
-          expect(JSON.parse(resource.text)).toMatchObject({ threadId: "PRRT_9", comments: expect.any(Array) });
-          expect(JSON.parse(resource.text).comments).toHaveLength(6);
+          const thread = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ threadId: Schema.String, comments: Schema.Array(Schema.Unknown) })))(
+            resource.text,
+          );
+          expect(thread.threadId).toBe("PRRT_9");
+          expect(thread.comments).toHaveLength(6);
           head = "head-8";
           yield* ingress.refreshGitHub;
           const late = yield* sql<{

@@ -7,7 +7,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import { errnoOf, messageOf, toolFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
-import { schemaEffectTool, schemaTool, stopped } from "./core/tool.ts";
+import { schemaEffectTool, schemaTool } from "./core/tool.ts";
 import { coding as words } from "./prompts.ts";
 import { afterRealTime } from "./realTime.ts";
 
@@ -45,12 +45,17 @@ export interface Ran {
 
 const outputCap = 200_000;
 
-/** Past timeout it gets SIGTERM, and SIGKILL 2 s later. when signal aborts it goes at once. */
-function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
+/** A command that could not start; code is the system call's (ENOENT…) when there is one. */
+class CommandFailed extends Schema.TaggedError<CommandFailed, { readonly brand: unique symbol }>()("CommandFailed", {
+  message: Schema.String,
+  code: Schema.optionalKey(Schema.String),
+}) {}
+
+/** Past timeout it gets SIGTERM, and SIGKILL 2 s later; interrupted, it goes at once. */
+function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv): Effect.Effect<Ran, CommandFailed> {
   const [command, ...args] = argv;
-  if (!command) return Promise.reject(new Error(words.noCommand));
-  if (signal?.aborted === true) return Promise.reject(new Error(stopped));
-  return new Promise((resolve, reject) => {
+  if (!command) return Effect.fail(CommandFailed.make({ message: words.noCommand }));
+  return Effect.callback<Ran, CommandFailed>((resume) => {
     const child = spawn(command, args, {
       cwd,
       env,
@@ -80,32 +85,28 @@ function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env
       timedOut = true;
       end();
     });
-    signal?.addEventListener("abort", end, { once: true });
     const done = () => {
       cancelTimer();
       killer?.();
-      signal?.removeEventListener("abort", end);
     };
     child.on("error", (e) => {
       done();
-      reject(
-        Object.assign(new Error(words.cannotRun(e.message)), {
-          code: errnoOf(e),
-        }),
-      );
+      const code = errnoOf(e);
+      resume(Effect.fail(CommandFailed.make({ message: words.cannotRun(e.message), ...(code === undefined ? {} : { code }) })));
     });
     // close waits for the output to end; a daemon that left the group may hold it open, so exit gives it 2 s.
     let exited: { code: number } | undefined;
     const finish = () => {
       if (!exited) return;
       done();
-      resolve({ code: exited.code, output, timedOut });
+      resume(Effect.succeed({ code: exited.code, output, timedOut }));
     };
     child.on("exit", (code) => {
       exited = { code: code ?? -1 };
       afterRealTime(2_000, finish, { unref: true });
     });
     child.on("close", finish);
+    return Effect.sync(end);
   });
 }
 
@@ -220,7 +221,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const grep = schemaTool({
+  const grep = schemaEffectTool({
     name: "grep",
     description: words.grepDescription,
     parameters: Schema.Struct({
@@ -229,7 +230,7 @@ export function codingTools(o: CodingOptions): Tool[] {
       glob: Schema.optionalKey(Schema.String),
       ignore_case: Schema.optionalKey(Schema.Boolean),
     }),
-    run: async (p, tc) => {
+    run: (p) => {
       const argv = [
         "rg",
         "--line-number",
@@ -242,28 +243,31 @@ export function codingTools(o: CodingOptions): Tool[] {
         p.pattern,
         at(p.path ?? "."),
       ];
-      let ran: Ran;
-      try {
-        ran = await runCommand(argv, cwd, 30_000, runEnv, tc.signal);
-      } catch (e) {
-        if (errnoOf(e) === "ENOENT") throw new Error(words.noRipgrep, { cause: e });
-        throw e;
-      }
-      if (ran.code === 1 || ran.output.trim() === "") return words.noMatches;
-      return ran.output.trim();
+      return runCommand(argv, cwd, 30_000, runEnv).pipe(
+        Effect.mapBoth({
+          onSuccess: (ran) => (ran.code === 1 || ran.output.trim() === "" ? words.noMatches : ran.output.trim()),
+          onFailure: (e) => toolFailed(e.code === "ENOENT" ? new Error(words.noRipgrep, { cause: e }) : e),
+        }),
+      );
     },
   });
 
-  const bash = schemaTool({
+  const bash = schemaEffectTool({
     name: "bash",
     description: words.bashDescription(formatSeconds(timeout)),
     parameters: Schema.Struct({ command: Schema.String, timeout_seconds: Schema.optionalKey(Schema.Finite) }),
-    run: async (p, tc) => {
+    run: (p) => {
       const limit = p.timeout_seconds != null && p.timeout_seconds !== 0 ? p.timeout_seconds * 1000 : timeout;
-      const ran = await runCommand(["/bin/bash", "-lc", p.command], cwd, limit, runEnv, tc.signal);
-      const output = ran.output.trim() || words.noOutput;
-      if (ran.timedOut) return output + words.timedOutNote;
-      return words.exitCodeNote(output, ran.code);
+      return runCommand(["/bin/bash", "-lc", p.command], cwd, limit, runEnv).pipe(
+        Effect.mapBoth({
+          onSuccess: (ran) => {
+            const output = ran.output.trim() || words.noOutput;
+            if (ran.timedOut) return output + words.timedOutNote;
+            return words.exitCodeNote(output, ran.code);
+          },
+          onFailure: toolFailed,
+        }),
+      );
     },
   });
 

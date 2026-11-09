@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Formatter, Layer, Schema } from "effect";
 
 import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
@@ -16,6 +16,8 @@ import { testConfig } from "#/testing/layers.ts";
 import { GitError, run } from "./git.ts";
 import { Repo, githubOrigin, type GitHubRun, probeGitHub, type RepoHooks } from "./repo.ts";
 import { repository } from "./repository.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 const gh =
@@ -102,12 +104,12 @@ describe("GitHub", () => {
       {},
       {
         gh: gh((args) => {
-          if (args[0] === "pr") return { out: JSON.stringify({ headRefOid: "abc" }) };
-          if (args[1] === "user") return { out: JSON.stringify({ login: "gardener" }) };
+          if (args[0] === "pr") return { out: Formatter.formatJson({ headRefOid: "abc" }) };
+          if (args[1] === "user") return { out: Formatter.formatJson({ login: "gardener" }) };
           const thread = args.find((arg) => arg.startsWith("thread="))?.slice(7);
           if (thread) {
             resolved.push(thread);
-            return { out: JSON.stringify({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }) };
+            return { out: Formatter.formatJson({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }) };
           }
           expect(args).toContain("--paginate");
           expect(args).toContain("--slurp");
@@ -115,7 +117,7 @@ describe("GitHub", () => {
           expect(query).not.toContain("databaseId");
           if (query.startsWith("query IngressChecks("))
             return {
-              out: JSON.stringify([
+              out: Formatter.formatJson([
                 {
                   data: {
                     repository: {
@@ -146,7 +148,7 @@ describe("GitHub", () => {
             return failReviews
               ? { out: "not available", ok: false }
               : {
-                  out: JSON.stringify(
+                  out: Formatter.formatJson(
                     [1, 2].map((i) =>
                       pull("reviews", [
                         {
@@ -162,7 +164,7 @@ describe("GitHub", () => {
                 };
           if (query.startsWith("query IngressComments("))
             return {
-              out: JSON.stringify(
+              out: Formatter.formatJson(
                 [1, 2].map((i) =>
                   pull("comments", [
                     {
@@ -178,7 +180,7 @@ describe("GitHub", () => {
             };
           if (query.startsWith("query IngressThreads("))
             return {
-              out: JSON.stringify([
+              out: Formatter.formatJson([
                 pull("reviewThreads", [
                   {
                     id: "PRRT_9",
@@ -194,7 +196,7 @@ describe("GitHub", () => {
           expect(query.startsWith("query IngressThreadComments(")).toBe(true);
           expect(args).toContain("id=PRRT_9");
           expect(args).toContain("endCursor=edge99");
-          return { out: JSON.stringify([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };
+          return { out: Formatter.formatJson([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };
         }),
       },
     );
@@ -221,7 +223,8 @@ describe("GitHub", () => {
       ] as const) {
         const got = yield* probeGitHub(gh((args) => (args[0] === "--version" ? version : auth)));
         expect(got, name).toMatchObject(want);
-        expect(JSON.stringify(got)).not.toContain("secret");
+        const shown = yield* json(got);
+        expect(shown).not.toContain("secret");
       }
     }),
   );

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { Result, Schema } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { pyramid } from "./pyramid.ts";
@@ -52,13 +53,15 @@ describe("test layer classification", () => {
   it("follows runtime package exports and patterns, not declaration files", () => {
     write({
       "pnpm-workspace.yaml": "packages: [apps/*, packages/*]",
-      "packages/port/package.json": JSON.stringify({
-        name: "@vibevalley/port",
-        exports: {
-          ".": { types: "./dist/index.d.ts", default: "./src/index.ts" },
-          "./*": "./src/*.ts",
-        },
-      }),
+      "packages/port/package.json": Result.getOrThrow(
+        Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))({
+          name: "@vibevalley/port",
+          exports: {
+            ".": { types: "./dist/index.d.ts", default: "./src/index.ts" },
+            "./*": "./src/*.ts",
+          },
+        }),
+      ),
       "packages/port/dist/index.d.ts": "export declare const value: number;",
       "packages/port/src/index.ts": 'export * from "./network.ts";',
       "packages/port/src/network.ts": 'import "node:net";',

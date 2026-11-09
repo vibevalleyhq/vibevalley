@@ -1,6 +1,4 @@
-import { join } from "node:path";
-
-import { Clock, Effect, type FileSystem, Schema } from "effect";
+import { Clock, Effect, type FileSystem, type Path, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -52,11 +50,12 @@ export const probeGitHub = Effect.fn("Repo.probeGitHub")(function* (gh: GitHubRu
   return { ...installed, loggedIn: true, account };
 });
 
-const fail = (message: string) => Effect.fail(new RepoError({ message }));
+const fail = (message: string) => Effect.fail(RepoError.make({ message }));
 
 export interface RepoGitHubEnv {
   readonly root: string;
   readonly fs: FileSystem.FileSystem;
+  readonly path: Path.Path;
   readonly gh: GitHubRun;
   readonly submitBranch: (req: T.SubmitBranch) => Effect.Effect<T.BranchPublication, MergeFailure | RepoError>;
   readonly prRepos: ReadonlySet<string>;
@@ -70,6 +69,7 @@ export interface RepoGitHubEnv {
 
 export const makeRepoGitHub = (env: RepoGitHubEnv) => {
   const { root, fs, gh, submitBranch, prRepos, list, exists, serially, issueBranch, issueWorkplace, syncMain } = env;
+  const { join } = env.path;
   let status: T.GitHubStatus | undefined;
   let capabilities = new Map<string, T.PullRequestCapability>();
 
@@ -93,13 +93,15 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
     refreshGitHub: Effect.fn("Repo.refreshGitHub")(function* () {
       const probed = yield* probeGitHub(gh);
       const next = new Map<string, T.PullRequestCapability>();
+      const found = yield* list();
       yield* Effect.forEach(
-        yield* list(),
+        found,
         (p) =>
           Effect.gen(function* () {
             let c: T.PullRequestCapability = { available: false, reason: probed.reason };
             if (probed.loggedIn) {
-              const repo = githubOrigin(yield* repository(p.path).origin);
+              const origin2 = yield* repository(p.path).origin;
+              const repo = githubOrigin(origin2);
               if (!p.git || repo === "") c = { available: false, reason: t("server.repo.github.notGithub") };
               else {
                 const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
@@ -124,11 +126,17 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       const branch = place.branch;
       if (!branch || branch !== issueBranch(issue.number)) return yield* fail(t("server.repo.github.wrongBranch"));
       const path = join(root, place.repo);
-      const sha = yield* repository(place.cwd).head.pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
-      const base = yield* repository(path).main.pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
+      const sha = yield* repository(place.cwd).head.pipe(Effect.mapError((e) => RepoError.make({ message: reason(e), cause: e })));
+      const base = yield* repository(path).main.pipe(Effect.mapError((e) => RepoError.make({ message: reason(e), cause: e })));
       const written = yield* gitQuiet(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", pullRequestFile);
-      const given = written === "" ? undefined : pullRequestText(yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")));
-      const check = (yield* lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.repo.github.checked") : t("server.repo.github.noCheck");
+      const given =
+        written === ""
+          ? undefined
+          : yield* fs.readFileString(written).pipe(
+              Effect.orElseSucceed(() => ""),
+              Effect.map(pullRequestText),
+            );
+      const check = (yield* lexists(fs, join(place.cwd, ".vibevalley/check"))) ? t("server.repo.github.checked") : t("server.repo.github.noCheck");
       const result = yield* submitBranch({
         cwd: place.cwd,
         branch,
@@ -141,7 +149,8 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       return { url: result.url, number: result.number, state: "open" as const };
     }),
     pullRequestState: Effect.fn("Repo.pullRequestState")(function* (name: string, n: number) {
-      const repo = githubOrigin(yield* repository(join(root, name)).origin);
+      const origin2 = yield* repository(join(root, name)).origin;
+      const repo = githubOrigin(origin2);
       if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
       const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
       if (!viewed.ok) return yield* fail(t("server.repo.github.viewFailed", { n }));
@@ -156,12 +165,14 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       return yield* gh(...args);
     }),
     githubRemote: Effect.fn("Repo.githubRemote")(function* (name: string) {
-      const repo = githubOrigin(yield* repository(join(root, name)).origin);
+      const origin2 = yield* repository(join(root, name)).origin;
+      const repo = githubOrigin(origin2);
       if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
       return repo;
     }),
     resolveReviewThread: Effect.fn("Repo.resolveReviewThread")(function* (name: string, thread: string) {
-      const repo = githubOrigin(yield* repository(join(root, name)).origin);
+      const origin2 = yield* repository(join(root, name)).origin;
+      const repo = githubOrigin(origin2);
       if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
       const resolved = yield* gh(
         "api",

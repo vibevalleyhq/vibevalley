@@ -39,7 +39,7 @@ export const triggerJournal = Effect.gen(function* () {
       const saved = yield* db.attempt(q.triggerById({ id: trigger.id }));
       return yield* decodeTrigger(saved.trigger_json);
     },
-    Effect.mapError((cause) => refused(causeMessage(cause))),
+    Effect.mapError((cause) => cause.pipe(causeMessage, refused)),
   );
 
   return {

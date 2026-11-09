@@ -40,7 +40,8 @@ export const Database = Layer.unwrap(
     const hash = baselineHash();
     let fresh = memory;
     if (!memory) {
-      const aside = setAsideStale(where, hash, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      const aside = setAsideStale(where, hash, now);
       if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
       fresh = !existsSync(join(where, dbFile));
       mkdirSync(where, { recursive: true });
@@ -82,7 +83,7 @@ export class Db extends Context.Service<
     /** work in one transaction, its queries' failures and the commit's kept: what a caller tells as a refusal. */
     readonly attemptTx: <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E | SqlError.SqlError>;
   }
->()("vibevalley/Db") {
+>()("@vibevalley/server/infra/db") {
   static readonly layer = Layer.effect(
     Db,
     Effect.gen(function* () {
@@ -107,14 +108,15 @@ export class Db extends Context.Service<
         run,
         attempt,
         one: Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>): Effect.fn.Return<A | undefined> {
-          return Option.getOrUndefined(yield* run(Effect.catchNoSuchElement(query)));
+          const outcome = yield* run(Effect.catchNoSuchElement(query));
+          return Option.getOrUndefined(outcome);
         }),
         inTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E>): Effect.fn.Return<A, Exclude<E, { _tag: "SqlError" }>> {
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- catchTag takes SqlError out of E; TypeScript cannot work that out for a generic E
           return yield* held(sql.withTransaction(work)).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
         }),
         attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E | SqlError.SqlError> {
-          return yield* attempt(held(sql.withTransaction(work)));
+          return yield* sql.withTransaction(work).pipe(held, attempt);
         }),
       });
     }),

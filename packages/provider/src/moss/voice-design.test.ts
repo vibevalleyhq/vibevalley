@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import { mossVoiceDesignModels } from "./voice-design-models.ts";
 import { createMossVoiceDesignTask } from "./voice-design.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = { model: "moss-voice-generator-1.0", text: "Synthetic preview", instruction: "A calm narrator", format: "wav" };
 
@@ -16,7 +18,7 @@ it.effect.each(mossVoiceDesignModels)("%s explicitly creates a preview, not an u
       expect(request.url).toBe("https://api.mosi.cn/v1/audio/voice/generations");
       expect(request.headers.authorization).toBe("Bearer design-account");
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model,
         input: input.text,
         instruction: input.instruction,
@@ -29,7 +31,8 @@ it.effect.each(mossVoiceDesignModels)("%s explicitly creates a preview, not an u
     }),
   );
   return Effect.gen(function* () {
-    expect(yield* createMossVoiceDesignTask("design-account", { ...input, model })).toEqual({ taskId: "design-one" });
+    const mossVoiceDesignTaskCreated = yield* createMossVoiceDesignTask("design-account", { ...input, model });
+    expect(mossVoiceDesignTaskCreated).toEqual({ taskId: "design-one" });
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -48,7 +51,8 @@ it.effect.each([
   { webhook_url: "https://example.com/callback" },
 ])("unsupported voice design input %# cannot create a billable request", (patch) =>
   Effect.gen(function* () {
-    expect(yield* createMossVoiceDesignTask("design-account", { ...input, ...patch }).pipe(Effect.flip)).toMatchObject({
+    const mossVoiceDesignTaskCreatedFailure = yield* createMossVoiceDesignTask("design-account", { ...input, ...patch }).pipe(Effect.flip);
+    expect(mossVoiceDesignTaskCreatedFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });

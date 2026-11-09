@@ -28,7 +28,8 @@ const event = (issue: string, key: string): SourceEvent => ({
 it.live("regression: a consumed trigger can be handed back once without losing its source or consumption receipt", () => {
   const f = farm({ runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("done") }) });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
     const sql = yield* SqlClient.SqlClient;
@@ -54,7 +55,8 @@ it.live("regression: a consumed trigger can be handed back once without losing i
       (yield* sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]?.state,
     ).toBe("consumed");
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
-    expect(yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`).toEqual(receipt);
+    const rows2 = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
+    expect(rows2).toEqual(receipt);
     yield* mailbox.restore;
     expect(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
     const ownerEpoch = yield* sql<{ position: number }>`select max(position) as position from mailbox_owner_route where scope = ${returned[0]!.scope}`;

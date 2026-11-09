@@ -63,7 +63,7 @@
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 5,
+    "lintOff": 4,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -192,7 +192,7 @@
   "packages/testkit": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 6,
+    "cast": 4,
     "lintOff": 1,
     "orDie": 0,
     "ignored": 0,

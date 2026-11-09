@@ -10,23 +10,23 @@ class DownloadFailed extends Schema.TaggedError<DownloadFailed, { readonly brand
 
 export const downloadImage = Effect.fn("Media.downloadImage")(
   function* (address: string, width: number, height: number) {
-    const url = yield* Schema.decodeEffect(Schema.URLFromString)(address).pipe(Effect.mapError(() => new DownloadFailed()));
-    if (!publicHttps(url)) return yield* new DownloadFailed();
+    const url = yield* Schema.decodeEffect(Schema.URLFromString)(address).pipe(Effect.mapError(() => DownloadFailed.make()));
+    if (!publicHttps(url)) return yield* DownloadFailed.make();
     const http = yield* PublicHttp;
     const response = yield* http.get(url, { headers: { accept: "image/png" } });
-    if (response.status !== 200 || response.headers["content-type"]?.split(";")[0]?.trim() !== "image/png") return yield* new DownloadFailed();
+    if (response.status !== 200 || response.headers["content-type"]?.split(";")[0]?.trim() !== "image/png") return yield* DownloadFailed.make();
     let size = 0;
     const chunks = yield* response.stream.pipe(
       Stream.mapEffect((chunk) => {
         size += chunk.byteLength;
-        return size > attachmentMax ? Effect.fail(new DownloadFailed()) : Effect.succeed(chunk);
+        return size > attachmentMax ? Effect.fail(DownloadFailed.make()) : Effect.succeed(chunk);
       }),
       Stream.runCollect,
     );
     const bytes = Buffer.concat(chunks);
-    if (!validPng(bytes, width, height)) return yield* new DownloadFailed();
+    if (!validPng(bytes, width, height)) return yield* DownloadFailed.make();
     return bytes;
   },
   Effect.timeout("60 seconds"),
-  Effect.catchTags({ HttpClientError: () => Effect.fail(new DownloadFailed()), TimeoutError: () => Effect.fail(new DownloadFailed()) }),
+  Effect.catchTags({ HttpClientError: () => Effect.fail(DownloadFailed.make()), TimeoutError: () => Effect.fail(DownloadFailed.make()) }),
 );

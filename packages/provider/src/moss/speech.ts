@@ -39,7 +39,7 @@ const Submission = Schema.fromJsonString(Schema.Struct({ task_id: AudioId }));
 
 export const prepareMossSpeech = Effect.fn("Provider.prepareMossSpeech")(function* (input: unknown) {
   const request = yield* Schema.decodeUnknownEffect(Input)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   return {
     model: request.model,
@@ -65,7 +65,7 @@ export const prepareMossSpeech = Effect.fn("Provider.prepareMossSpeech")(functio
 const post = Effect.fnUntraced(function* (key: string, input: unknown, asynchronous: boolean) {
   const request = yield* prepareMossSpeech(input);
   const body = yield* HttpBody.json({ ...request, async: asynchronous }).pipe(
-    Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   return yield* audioRequest(key, HttpClientRequest.post("https://api.mosi.cn/v1/audio/speech", { body }));
 });
@@ -74,7 +74,7 @@ export const generateMossSpeech = Effect.fn("Provider.generateMossSpeech")(
   function* (key: string, input: unknown) {
     const raw = yield* post(key, input, false);
     const result = yield* Schema.decodeEffect(SpeechResponse)(raw).pipe(
-      Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })),
+      Effect.mapError(() => MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
     );
     return {
       id: result.id,
@@ -85,18 +85,22 @@ export const generateMossSpeech = Effect.fn("Provider.generateMossSpeech")(
       ...(result.usage !== undefined ? { usage: audioUsage(result.usage) } : {}),
     };
   },
-  Effect.timeout("300 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(new MossAudioError({ reason: "Timeout", outcome: "Unknown" }))),
+  Effect.timeoutOrElse({
+    duration: "300 seconds",
+    orElse: () => Effect.fail(MossAudioError.make({ reason: "Timeout", outcome: "Unknown" })),
+  }),
 );
 
 export const createMossSpeechTask = Effect.fn("Provider.createMossSpeechTask")(
   function* (key: string, input: unknown) {
     const raw = yield* post(key, input, true);
     const result = yield* Schema.decodeEffect(Submission)(raw).pipe(
-      Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })),
+      Effect.mapError(() => MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
     );
     return { taskId: result.task_id };
   },
-  Effect.timeout("300 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(new MossAudioError({ reason: "Timeout", outcome: "Unknown" }))),
+  Effect.timeoutOrElse({
+    duration: "300 seconds",
+    orElse: () => Effect.fail(MossAudioError.make({ reason: "Timeout", outcome: "Unknown" })),
+  }),
 );

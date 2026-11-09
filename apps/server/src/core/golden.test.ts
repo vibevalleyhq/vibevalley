@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 
+import { Formatter } from "effect";
 import { describe, expect, test } from "vite-plus/test";
 
 import type { Channel, SpaceState, Fact, Issue, Cron, CronRequest, Session, Conflict } from "@vibevalley/protocol";
@@ -40,12 +41,12 @@ function failures(name: string, rows: Record<string, unknown>[]) {
       const d = jsonDiff(got, holder[key]);
       if (!d) return;
       if (updating) {
-        holder[key] = JSON.parse(JSON.stringify(got ?? null));
+        holder[key] = JSON.parse(Formatter.formatJson(got ?? null));
         changed = true;
       } else if (found.length < 20) found.push(`line ${line} ${what}: ${d}`);
     },
     async done() {
-      if (updating && changed) writeFileSync(new URL(name, testdata), gzipSync(rows.map((r) => JSON.stringify(r)).join("\n") + "\n"));
+      if (updating && changed) writeFileSync(new URL(name, testdata), gzipSync(rows.map((r) => Formatter.formatJson(r)).join("\n") + "\n"));
       expect(found).toEqual([]);
     },
   };
@@ -124,8 +125,8 @@ describe("the golden files", () => {
         case "cron": {
           const s = input.s as Cron;
           same("next", nextRun(s) ?? null);
-          if (!JSON.stringify(want.nextText).includes('"thrown"')) same("nextText", nextText(s));
-          if (!JSON.stringify(want.whenText).includes('"thrown"')) same("whenText", whenText(s.when, s.tz));
+          if (!Formatter.formatJson(want.nextText).includes('"thrown"')) same("nextText", nextText(s));
+          if (!Formatter.formatJson(want.whenText).includes('"thrown"')) same("whenText", whenText(s.when, s.tz));
           same("problem", cronProblem(input.req as CronRequest, input.now as number) || null);
           break;
         }

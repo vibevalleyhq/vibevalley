@@ -2,14 +2,17 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 
+import { Result, Schema } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { checkCases, goldenCasesAt, jsonDiff } from "./golden.ts";
 import { tempDir } from "./temp.ts";
 
+const Json = Schema.fromJsonString(Schema.Unknown);
+
 const file = (rows: object[]) => {
   const path = join(tempDir("golden-"), "rules.jsonl.gz");
-  writeFileSync(path, gzipSync(rows.map((r) => JSON.stringify(r)).join("\n") + "\n"));
+  writeFileSync(path, gzipSync(rows.map((r) => Result.getOrThrow(Schema.encodeResult(Json)(r))).join("\n") + "\n"));
   return path;
 };
 
@@ -33,6 +36,6 @@ describe("golden cases", () => {
     const path = file([{ fn: "double", in: 3, out: 7 }]);
     process.env.VIBEVALLEY_GOLDEN = "update";
     expect(checkCases(goldenCasesAt(path), (c) => (c.in as number) * 2)).toEqual([]);
-    expect(JSON.parse(gunzipSync(readFileSync(path)).toString("utf8"))).toEqual({ fn: "double", in: 3, out: 6 });
+    expect(Result.getOrThrow(Schema.decodeResult(Json)(gunzipSync(readFileSync(path)).toString("utf8")))).toEqual({ fn: "double", in: 3, out: 6 });
   });
 });

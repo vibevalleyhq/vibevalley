@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 
+import { jsonText } from "#/base/json.ts";
 import { resourceWords } from "#/resource/prompts.ts";
 import { Resource, ResourceRequest } from "#/resource/resource.ts";
 
@@ -15,7 +16,8 @@ export const resourceTools = Effect.gen(function* () {
       Schema.decodeUnknownEffect(ResourceRequest),
       Effect.fn("Tool.resourceRead")(function* (input) {
         const caller = yield* callerOf(who);
-        return JSON.stringify(yield* resource.read(caller.session || caller.agent, input));
+        const resource2 = yield* resource.read(caller.session || caller.agent, input);
+        return yield* jsonText(resource2);
       }),
     );
 });

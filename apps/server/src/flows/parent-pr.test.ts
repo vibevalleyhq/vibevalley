@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
@@ -35,7 +35,7 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
             if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
             if (args[0] === "pr" && args[1] === "list") return ok("[]");
             if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/family-pr/pull/1");
-            if (args[0] === "pr" && args[1] === "view") return ok(JSON.stringify({ state, mergedAt: null }));
+            if (args[0] === "pr" && args[1] === "view") return ok(Formatter.formatJson({ state, mergedAt: null }));
             return { out: "", ok: false, missing: false };
           }),
         publication: {

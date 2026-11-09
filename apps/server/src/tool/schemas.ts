@@ -404,13 +404,13 @@ export class ToolRefusal extends Schema.TaggedError<ToolRefusal, { readonly bran
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-export const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
+export const refuse = (message: string) => Effect.fail(ToolRefusal.make({ message }));
 
-const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
+const toFailed = (e: unknown): ToolFailed => ToolFailed.make({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
 
 export const said = (e: unknown) => toFailed(e).message;
 
-export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
+export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => ToolRefusal.make({ message: said(e), cause: e }) });
 
 /** An answer, or the refusal prefix and why. */
 export const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
@@ -447,11 +447,10 @@ export const customTool = <A, E>(
   parameters: JsonSchema,
   read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>,
   body: (input: A) => Effect.Effect<string, E>,
-) => {
-  return effectTool({
+) =>
+  effectTool({
     name,
     description,
     parameters,
     run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
   });
-};

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Formatter, Layer } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
@@ -114,7 +114,7 @@ describe("profiles", () => {
     const config = testConfig();
     const mine = { ...starter("lab"), id: "mine", name: "我的" };
     const { build: _, head: __, ...look } = mine.look;
-    const raw = JSON.stringify({
+    const raw = Formatter.formatJson({
       agents: [{ ...mine, look }],
       skills: [{ id: "s1", name: "tidy", description: "整理", body: "整理代码" }],
       settings: { pi: { ...defaultSettings(), defaultModel: "deepseek-chat" } },
@@ -241,17 +241,18 @@ describe("profiles", () => {
     const config = testConfig();
     const folder = join(config.home, "lead-template");
     mkdirSync(folder);
-    writeFileSync(join(folder, "agent.json"), JSON.stringify({ id: "lead", version: 2, role: "orchestrator", name: "组长", duty: "专管前端" }));
+    writeFileSync(join(folder, "agent.json"), Formatter.formatJson({ id: "lead", version: 2, role: "orchestrator", name: "组长", duty: "专管前端" }));
     writeFileSync(join(folder, "persona.md"), "你专管前端的工单。\n");
     writeFileSync(join(folder, "notes.txt"), "not a template's");
     const broken = join(config.home, "broken-template");
     mkdirSync(broken);
-    writeFileSync(join(broken, "agent.json"), JSON.stringify({ id: "Bad Id", version: 1, role: "worker", name: "坏的", runtime: "pi" }));
+    writeFileSync(join(broken, "agent.json"), Formatter.formatJson({ id: "Bad Id", version: 1, role: "worker", name: "坏的", runtime: "pi" }));
     return run(
       config,
       Effect.gen(function* () {
         const s = yield* Agent;
-        expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/u) });
+        const templateAddedFailure = yield* Effect.flip(s.addTemplate(broken));
+        expect(templateAddedFailure).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/u) });
         expect((yield* Effect.flip(s.addTemplate(join(config.home, "nowhere"))))._tag).toBe("Refused");
         const added = yield* s.addTemplate(folder);
         expect([added.source, added.runtime, added.persona]).toEqual(["added", orchestratorRuntime, "你专管前端的工单。"]);

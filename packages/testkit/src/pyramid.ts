@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 
+import { Result, Schema } from "effect";
+
 import { importsOf } from "./source.ts";
 
 export type Layer = "rule" | "module" | "flow";
@@ -21,6 +23,11 @@ interface SpacePackage {
 /** An export's target: a file, or by condition its built types and its source. */
 type Target = string | { readonly types?: string; readonly default?: string };
 
+const Target = Schema.Union([Schema.String, Schema.Struct({ types: Schema.optionalKey(Schema.String), default: Schema.optionalKey(Schema.String) })]);
+const Manifest = Schema.fromJsonString(
+  Schema.Struct({ name: Schema.String, exports: Schema.optionalKey(Schema.Union([Schema.String, Schema.Record(Schema.String, Target)])) }),
+);
+
 /** The source file an export leads to: what runs is the source (default); only types are built. */
 const sourceOf = (t: Target): string => (typeof t === "string" ? t : (t.default ?? ""));
 
@@ -36,7 +43,7 @@ function workspacePackages(root: string): Map<string, SpacePackage> {
   for (const d of readdirSync(join(at, "packages"))) {
     const manifest = join(at, "packages", d, "package.json");
     if (!existsSync(manifest)) continue;
-    const m = JSON.parse(readFileSync(manifest, "utf8")) as { name: string; exports?: string | Record<string, Target> };
+    const m = Result.getOrThrow(Schema.decodeResult(Manifest)(readFileSync(manifest, "utf8")));
     const exports = typeof m.exports === "string" ? { ".": m.exports } : (m.exports ?? {});
     out.set(m.name, { dir: join(at, "packages", d), exports: Object.fromEntries(Object.entries(exports).map(([k, v]) => [k, sourceOf(v)])) });
   }

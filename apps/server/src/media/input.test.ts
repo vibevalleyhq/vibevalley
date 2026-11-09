@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { NodeFileSystem } from "@effect/platform-node";
+import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, FileSystem, PlatformError, Sink, Stream } from "effect";
 import { TestClock } from "effect/testing";
@@ -24,13 +24,16 @@ it.effect("staging streams split headers into a private file and removes it when
         Stream.fromIterable([...Array.from(bytes.subarray(0, 16), (byte) => Uint8Array.of(byte)), bytes.subarray(16)]),
       );
       expect(staged.hash).toBe(createHash("sha256").update(bytes).digest("hex"));
-      expect(Buffer.from(yield* fs.readFile(staged.path))).toEqual(bytes);
+      const file = yield* fs.readFile(staged.path);
+      expect(Buffer.from(file)).toEqual(bytes);
       expect((yield* fs.stat(staged.path)).mode & 0o777).toBe(0o600);
       return staged.path;
     }).pipe(Effect.scoped);
-    expect(yield* fs.exists(path)).toBe(false);
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const exists2 = yield* fs.exists(path);
+    expect(exists2).toBe(false);
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect.each([
@@ -48,9 +51,11 @@ it.effect.each([
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped();
     const source = Stream.fromEffect(Effect.die("must not read invalid input"));
-    expect(yield* Effect.flip(stageMediaInput(root, { ...metadata, ...invalid }, source))).toMatchObject({ reason: "Metadata" });
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* Effect.flip(stageMediaInput(root, { ...metadata, ...invalid }, source));
+    expect(mediaInputStagedFailure).toMatchObject({ reason: "Metadata" });
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect.each([
@@ -63,8 +68,9 @@ it.effect.each([
     const root = yield* fs.makeTempDirectoryScoped();
     const error = yield* Effect.flip(stageMediaInput(root, metadata, Stream.make(body)).pipe(Effect.scoped));
     expect(error).toMatchObject({ reason });
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("regression: canceling an unfinished upload releases its writer and deletes partial bytes", () =>
@@ -78,10 +84,12 @@ it.effect("regression: canceling an unfinished upload releases its writer and de
     );
     const fiber = yield* stageMediaInput(root, metadata, source).pipe(Effect.scoped, Effect.forkChild);
     yield* Deferred.await(reading);
-    expect(yield* fs.readDirectory(root)).toHaveLength(1);
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toHaveLength(1);
     yield* Fiber.interrupt(fiber);
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const directory2 = yield* fs.readDirectory(root);
+    expect(directory2).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("a stalled input times out and removes its partial file", () =>
@@ -96,9 +104,11 @@ it.effect("a stalled input times out and removes its partial file", () =>
     const fiber = yield* stageMediaInput(root, metadata, source).pipe(Effect.scoped, Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ _tag: "TimeoutError" });
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ _tag: "TimeoutError" });
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect.each([
@@ -124,7 +134,7 @@ it.effect.each([
       Stream.make(content.subarray(0, 2), content.subarray(2)),
     );
     expect(staged.mime).toBe(mime);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("regression: high-bit bytes cannot impersonate an ASCII container signature", () =>
@@ -132,13 +142,13 @@ it.effect("regression: high-bit bytes cannot impersonate an ASCII container sign
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped();
     const disguised = Buffer.from("52494646080000005745425000000000", "hex").map((value) => value | 128);
-    expect(
-      yield* Effect.flip(
-        stageMediaInput(root, { kind: "image", name: "fake.webp", mime: "image/webp", size: disguised.length }, Stream.make(disguised)).pipe(Effect.scoped),
-      ),
-    ).toMatchObject({ reason: "Format" });
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* Effect.flip(
+      stageMediaInput(root, { kind: "image", name: "fake.webp", mime: "image/webp", size: disguised.length }, Stream.make(disguised)).pipe(Effect.scoped),
+    );
+    expect(mediaInputStagedFailure).toMatchObject({ reason: "Format" });
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("a partial disk write failure removes the staging directory", () =>
@@ -150,11 +160,13 @@ it.effect("a partial disk write failure removes the staging directory", () =>
       ...fs,
       sink: (path) => Sink.fromEffect(fs.writeFile(path, bytes.subarray(0, 8)).pipe(Effect.andThen(Effect.fail(diskFull)))),
     });
-    expect(
-      yield* Effect.flip(stageMediaInput(root, metadata, Stream.make(bytes)).pipe(Effect.provideService(FileSystem.FileSystem, failing), Effect.scoped)),
-    ).toBe(diskFull);
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* Effect.flip(
+      stageMediaInput(root, metadata, Stream.make(bytes)).pipe(Effect.provideService(FileSystem.FileSystem, failing), Effect.scoped),
+    );
+    expect(mediaInputStagedFailure).toBe(diskFull);
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("source failure keeps its typed error and cleans partial bytes", () =>
@@ -162,9 +174,11 @@ it.effect("source failure keeps its typed error and cleans partial bytes", () =>
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped();
     const source = Stream.concat(Stream.make(bytes.subarray(0, 32)), Stream.fail("source-disconnected"));
-    expect(yield* Effect.flip(stageMediaInput(root, metadata, source).pipe(Effect.scoped))).toBe("source-disconnected");
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* Effect.flip(stageMediaInput(root, metadata, source).pipe(Effect.scoped));
+    expect(mediaInputStagedFailure).toBe("source-disconnected");
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect.each([
@@ -185,7 +199,7 @@ it.effect.each([
     expect(metadata.duration).toBeGreaterThan(0);
     expect(metadata.sampleRate).toBe(24000);
     expect(metadata.channels).toBe(1);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("regression: valid RIFF metadata survives audio upload while oversized metadata chunks are rejected", () =>
@@ -201,11 +215,14 @@ it.effect("regression: valid RIFF metadata survives audio upload while oversized
     audio.writeUInt32LE(audio.length - 8, 4);
     const input = { kind: "audio", name: "generated.wav", mime: "audio/wav", size: audio.length };
     const staged = yield* stageMediaInput(root, input, Stream.make(audio));
-    expect(Buffer.from(yield* fs.readFile(staged.path))).toEqual(audio);
-    expect(yield* inspectAudio(new Blob([audio]))).toEqual({ format: "wav", duration: 0.2, sampleRate: 24000, channels: 1, bitDepth: 16 });
+    const file = yield* fs.readFile(staged.path);
+    expect(Buffer.from(file)).toEqual(audio);
+    const inspectAudio2 = yield* inspectAudio(new Blob([audio]));
+    expect(inspectAudio2).toEqual({ format: "wav", duration: 0.2, sampleRate: 24000, channels: 1, bitDepth: 16 });
     audio.writeUInt32LE(audio.length, 40);
-    expect(yield* stageMediaInput(root, input, Stream.make(audio)).pipe(Effect.scoped, Effect.flip)).toMatchObject({ reason: "Format" });
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* stageMediaInput(root, input, Stream.make(audio)).pipe(Effect.scoped, Effect.flip);
+    expect(mediaInputStagedFailure).toMatchObject({ reason: "Format" });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect.each([
@@ -216,11 +233,14 @@ it.effect.each([
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped();
-    expect(
-      yield* stageMediaInput(root, { kind: "audio", name: "fake-audio", mime, size: bytes.length }, Stream.make(bytes)).pipe(Effect.scoped, Effect.flip),
-    ).toMatchObject({ reason: "Format" });
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* stageMediaInput(root, { kind: "audio", name: "fake-audio", mime, size: bytes.length }, Stream.make(bytes)).pipe(
+      Effect.scoped,
+      Effect.flip,
+    );
+    expect(mediaInputStagedFailure).toMatchObject({ reason: "Format" });
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("regression: truncated audio and client-supplied duration are rejected before becoming reusable inputs", () =>
@@ -228,20 +248,19 @@ it.effect("regression: truncated audio and client-supplied duration are rejected
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped();
     const bytes = wav().subarray(0, 100);
-    expect(
-      yield* stageMediaInput(root, { kind: "audio", name: "short.wav", mime: "audio/wav", size: bytes.length }, Stream.make(bytes)).pipe(
-        Effect.scoped,
-        Effect.flip,
-      ),
-    ).toMatchObject({ reason: "Format" });
-    expect(
-      yield* stageMediaInput(
-        root,
-        { kind: "audio", name: "short.wav", mime: "audio/wav", size: bytes.length, duration: 1 },
-        Stream.fromEffect(Effect.die("Metadata must be rejected before upload")),
-      ).pipe(Effect.scoped, Effect.flip),
-    ).toMatchObject({ reason: "Metadata" });
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const mediaInputStagedFailure = yield* stageMediaInput(
+      root,
+      { kind: "audio", name: "short.wav", mime: "audio/wav", size: bytes.length },
+      Stream.make(bytes),
+    ).pipe(Effect.scoped, Effect.flip);
+    expect(mediaInputStagedFailure).toMatchObject({ reason: "Format" });
+    const mediaInputStagedFailure2 = yield* stageMediaInput(
+      root,
+      { kind: "audio", name: "short.wav", mime: "audio/wav", size: bytes.length, duration: 1 },
+      Stream.fromEffect(Effect.die("Metadata must be rejected before upload")),
+    ).pipe(Effect.scoped, Effect.flip);
+    expect(mediaInputStagedFailure2).toMatchObject({ reason: "Metadata" });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect("regression: generated streams enforce the actual 512MB cap without relying on Content-Length", () =>
@@ -258,12 +277,16 @@ it.effect("regression: generated streams enforce the actual 512MB cap without re
       ),
     );
     const discard = FileSystem.FileSystem.of({ ...fs, sink: () => Sink.drain });
-    expect(
-      yield* stageAudioResult(root, "large.pcm", "pcm", source).pipe(Effect.provideService(FileSystem.FileSystem, discard), Effect.scoped, Effect.flip),
-    ).toMatchObject({ reason: "Size" });
+    const audioResultStagedFailure = yield* stageAudioResult(root, "large.pcm", "pcm", source).pipe(
+      Effect.provideService(FileSystem.FileSystem, discard),
+      Effect.scoped,
+      Effect.flip,
+    );
+    expect(audioResultStagedFailure).toMatchObject({ reason: "Size" });
     expect(consumed).toBe(Math.floor(audioResultMax / chunk.length) + 1);
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.effect.each([
@@ -275,7 +298,9 @@ it.effect.each([
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped();
-    expect(yield* stageAudioResult(root, "result", format, Stream.make(bytes)).pipe(Effect.scoped, Effect.flip)).toMatchObject({ reason: "Format" });
-    expect(yield* fs.readDirectory(root)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
+    const audioResultStagedFailure = yield* stageAudioResult(root, "result", format, Stream.make(bytes)).pipe(Effect.scoped, Effect.flip);
+    expect(audioResultStagedFailure).toMatchObject({ reason: "Format" });
+    const directory = yield* fs.readDirectory(root);
+    expect(directory).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );

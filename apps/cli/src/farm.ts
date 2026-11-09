@@ -60,7 +60,7 @@ function innermost(e: unknown): string {
 }
 
 const unreachable = (base: string, e: unknown) =>
-  new Failure({
+  Failure.make({
     code: exit.unreachable,
     tag: "Unreachable",
     text: t("cli.failure.unreachable", { base, why: innermost(e) }),
@@ -71,9 +71,9 @@ const apiErrorOf = Schema.decodeUnknownOption(Schema.fromJsonString(ApiError));
 
 const failureOf = (status: number, text: string): Failure =>
   Option.match(apiErrorOf(text), {
-    onNone: () => new Failure({ code: status === 404 ? exit.missing : status === 400 ? exit.usage : exit.other, tag: "Server", text: text.trim(), status }),
+    onNone: () => Failure.make({ code: status === 404 ? exit.missing : status === 400 ? exit.usage : exit.other, tag: "Server", text: text.trim(), status }),
     onSome: (e) =>
-      new Failure({
+      Failure.make({
         code: codeOf[e._tag],
         tag: e._tag,
         text: e._tag === "Missing" ? e.what : e.reason,
@@ -88,7 +88,10 @@ export const frames = (base: string, path: string) =>
     Effect.gen(function* () {
       const request = HttpClientRequest.get(base + path).pipe(HttpClientRequest.accept("text/event-stream"));
       const res = yield* Effect.flatMap(HttpClient.HttpClient, (client) => client.execute(request)).pipe(Effect.mapError((e) => unreachable(base, e)));
-      if (res.status !== 200) return yield* failureOf(res.status, yield* res.text.pipe(Effect.mapError((e) => unreachable(base, e))));
+      if (res.status !== 200) {
+        const body = yield* res.text.pipe(Effect.mapError((e) => unreachable(base, e)));
+        return yield* failureOf(res.status, body);
+      }
       return res.stream.pipe(
         Stream.decodeText,
         Stream.pipeThroughChannel(Sse.decode()),
@@ -96,7 +99,7 @@ export const frames = (base: string, path: string) =>
         Stream.mapError((e) =>
           e._tag === "HttpClientError"
             ? unreachable(base, e)
-            : new Failure({
+            : Failure.make({
                 code: exit.other,
                 tag: "Server",
                 text: e._tag === "Retry" ? t("cli.failure.retry") : t("cli.failure.stream", { why: e.message }),
@@ -113,7 +116,7 @@ function failureFrom(base: string, e: unknown): Failure {
   if (!refusal(e)) return unreachable(base, e);
   const tag = e.error?._tag ?? e.tag;
   const code = e.error ? codeOf[e.error._tag] : e.status === 404 ? exit.missing : e.status === 400 ? exit.usage : exit.other;
-  return new Failure({ code, tag: tag ?? "Server", text: e.reason, status: e.status, next: nextOf(e.error) });
+  return Failure.make({ code, tag: tag ?? "Server", text: e.reason, status: e.status, next: nextOf(e.error) });
 }
 
 /** One question to the farm at --server, typed by the endpoint it calls. */
@@ -131,8 +134,9 @@ export const change = <A>(o: {
 }) =>
   Effect.gen(function* () {
     if (yield* DryRunFlag) {
-      if (!o.preview) return yield* new Failure({ code: exit.usage, tag: "NoDryRun", text: t("cli.failure.noDryRun", { command: o.name }) });
-      return yield* show(yield* ask(o.preview), (p) => p.does.join("\n"));
+      if (!o.preview) return yield* Failure.make({ code: exit.usage, tag: "NoDryRun", text: t("cli.failure.noDryRun", { command: o.name }) });
+      const answer = yield* ask(o.preview);
+      return yield* show(answer, (p) => p.does.join("\n"));
     }
     const done = yield* ask(o.does);
     yield* show(o.as ? o.as(done) : done, () => o.said(done));
@@ -151,7 +155,7 @@ export const farmHome = Config.String("VIBEVALLEY_HOME").pipe(
 export const launchedFrom = Config.String("VIBEVALLEY_APP").pipe(Config.withDefault(""));
 
 export const notOpen = (home: string, why: string) =>
-  new Failure({
+  Failure.make({
     code: exit.unreachable,
     tag: "AppNotOpen",
     text: t("cli.failure.appNotOpen", { home, why }),
@@ -175,7 +179,7 @@ export const askApp = <A>(use: (calls: AppCalls) => Promise<A>) =>
       const asked = connect(desktopControl, socketLink(socket));
       return yield* Effect.tryPromise({
         try: () => use(asked.call),
-        catch: (e) => new Failure({ code: exit.refused, tag: "AppRefused", text: e instanceof Error ? e.message : String(e) }),
+        catch: (e) => Failure.make({ code: exit.refused, tag: "AppRefused", text: e instanceof Error ? e.message : String(e) }),
       });
     }),
   );

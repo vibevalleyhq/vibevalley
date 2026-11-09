@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { Effect, Exit, FileSystem, Schema, Scope } from "effect";
+import { Effect, Exit, FileSystem, Formatter, Schema, Scope } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType, ToolConnection } from "@vibevalley/protocol";
@@ -72,7 +72,7 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     return [...steps, ...(d ? [{ ...d }] : [])];
   }
 
-  const body = () => JSON.stringify(steps);
+  const body = () => Formatter.formatJson(steps);
 
   const flush = () => {
     pushing?.();

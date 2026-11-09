@@ -1,4 +1,4 @@
-import { Cause, Clock, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Ref, Schema, Scope, SynchronizedRef } from "effect";
+import { Cause, Clock, Deferred, Effect, Equal, Exit, Fiber, FiberSet, Queue, Ref, Schema, Scope, SynchronizedRef } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -48,7 +48,7 @@ export class SourceError extends Schema.TaggedError<SourceError, { readonly bran
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-export const sourceError = (e: unknown) => new SourceError({ message: messageOf(e), cause: e });
+export const sourceError = (e: unknown) => SourceError.make({ message: messageOf(e), cause: e });
 
 /** Interrupting one of its operations ends it: a source outside the farm aborts its request. */
 export interface Source {
@@ -73,7 +73,7 @@ export interface Source {
  * that starts after fails at once. */
 export const sourceLife = (name: string) => {
   const stopped = Deferred.makeUnsafe<void>();
-  const why = new SourceError({ message: `${name} source has stopped` });
+  const why = SourceError.make({ message: `${name} source has stopped` });
   return {
     stopped: () => Deferred.isDoneUnsafe(stopped),
     alive: <A>(e: Effect.Effect<A, SourceError>): Effect.Effect<A, SourceError> =>
@@ -123,7 +123,8 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
             (agent) =>
               Effect.gen(function* () {
                 all.push(...(yield* m.list(agent)));
-                Object.assign(matches, yield* m.matches(agent, q.text));
+                const matches2 = yield* m.matches(agent, q.text);
+                Object.assign(matches, matches2);
               }),
             { discard: true },
           );
@@ -205,7 +206,7 @@ export function mergeRecalled(groups: readonly (readonly RecalledLine[])[]): Rec
 
 /** At most ms on the service's Clock: past it, the operation is interrupted and fails. */
 const within = <A>(e: Effect.Effect<A, SourceError>, ms: number) =>
-  Effect.timeoutOrElse(e, { duration: ms, orElse: () => Effect.fail(new SourceError({ message: "timed out" })) });
+  Effect.timeoutOrElse(e, { duration: ms, orElse: () => Effect.fail(SourceError.make({ message: "timed out" })) });
 
 /** The sources as one setting made them. Its scope holds what it does: the operations still going and the writer. */
 interface Generation {
@@ -252,7 +253,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     /** Every generation not yet stopped, the current one among them, for the service's end. */
     const generations = new Set<Generation>();
     /** The current generation and the settings it was made for. none once the service has stopped. */
-    const held = yield* SynchronizedRef.make<{ readonly key: string; readonly gen: Generation } | undefined>(undefined);
+    const held = yield* SynchronizedRef.make<{ readonly configs: readonly MemorySourceConfig[]; readonly gen: Generation } | undefined>(undefined);
     const stopped = yield* Ref.make(false);
 
     const outside = (g: Generation) => g.all.filter((one) => one !== local);
@@ -288,8 +289,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       Effect.gen(function* () {
         if (yield* Ref.get(stopped)) return [undefined, h] as const;
         const now = configured();
-        const key = JSON.stringify(now);
-        if (h && h.key === key) return [h.gen, h] as const;
+        if (h && Equal.equals(h.configs, now)) return [h.gen, h] as const;
         if (h) retire(h.gen, "memory sources changed; outside operation canceled");
         const all: [Source, ...Source[]] = [local];
         const off: T.MemorySourceInfo[] = [];
@@ -316,7 +316,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         }
         const gen = yield* generation(all, off);
         generations.add(gen);
-        return [gen, { key, gen }] as const;
+        return [gen, { configs: now, gen }] as const;
       }),
     );
 
@@ -325,7 +325,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       Effect.flatMap(FiberSet.run(g.operations, operation), (fiber) =>
         Fiber.join(fiber).pipe(
           Effect.onInterrupt(() => Fiber.interrupt(fiber)),
-          Effect.catchCauseIf(Cause.hasInterruptsOnly, () => Effect.fail(new SourceError({ message: g.why ?? "canceled" }))),
+          Effect.catchCauseIf(Cause.hasInterruptsOnly, () => Effect.fail(SourceError.make({ message: g.why ?? "canceled" }))),
         ),
       );
 
@@ -406,11 +406,11 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
 
     return {
       prefetch: (cue) =>
-        Effect.flatMap(snapshot, (g) => {
-          return g
+        Effect.flatMap(snapshot, (g) =>
+          g
             ? readAll(g, cue.agent, (one) => Effect.map(one.prefetch(cueFor(one, cue)), (lines) => lines.map((line) => ({ ...line, id: idOf(one, line.id) }))))
-            : Effect.succeed([]);
-        }),
+            : Effect.succeed([]),
+        ),
       list: (agent) =>
         Effect.flatMap(snapshot, (g) => {
           if (!g) return Effect.succeed({ memories: [], sources: [] });
@@ -447,7 +447,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         Effect.gen(function* () {
           const problem = yield* forgetProblem(id);
           const g = yield* snapshot;
-          if (problem || !g) return yield* new SourceError({ message: problem ?? t("server.memory.stopped") });
+          if (problem || !g) return yield* SourceError.make({ message: problem ?? t("server.memory.stopped") });
           const [one, own] = owner(g.all, id);
           return yield* one === local ? one.forget(agent, own) : leased(g, within(one.forget(agent, own), writeTimeoutMs));
         }),

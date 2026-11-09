@@ -33,10 +33,12 @@ describe("an artifact's content", () => {
         htmlPolicy,
       ]);
       expect([first.headers.get("x-content-type-options"), first.headers.get("cache-control")]).toEqual(["nosniff", "private, max-age=31536000, immutable"]);
-      expect(yield* Effect.promise(() => first.text())).toBe("<p>第一版</p>");
+      const text2 = yield* Effect.promise(() => first.text());
+      expect(text2).toBe("<p>第一版</p>");
       // The test reads the server as a browser does, through the platform's own fetch.
       // @effect-diagnostics-next-line globalFetchInEffect:off
-      expect(yield* Effect.promise(async () => (await fetch(`http://${address}${artifactPath(html.id, 2)}`)).text())).toBe("<p>第二版</p>");
+      const text3 = yield* Effect.promise(async () => (await fetch(`http://${address}${artifactPath(html.id, 2)}`)).text());
+      expect(text3).toBe("<p>第二版</p>");
       const shown = yield* get(`${artifactPath(html.id, 1)}?shell=1`);
       expect(shown.headers.get("content-security-policy")).toBe(htmlPolicy);
       const shownText = yield* Effect.promise(() => shown.text());

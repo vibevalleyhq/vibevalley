@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Formatter, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { sessionIdsOf } from "@vibevalley/protocol/rules";
@@ -17,7 +17,7 @@ export const nullText = (s: string | undefined) => {
   return text === "" ? null : text;
 };
 
-export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);
+export const jsonOrNull = (v: unknown, there: boolean) => (there ? Formatter.formatJson(v) : null);
 
 type Row = q.GetIssueResult;
 const strings = Schema.mutable(Schema.Array(Schema.String));

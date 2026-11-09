@@ -35,12 +35,15 @@ interface TextToolSpec {
 
 const answered = (text: string) => ({ content: [{ type: "text" as const, text: clip(text) }] });
 
+/** run's thrown or rejected error is the failed result. */
+const ranText = (run: (signal: AbortSignal) => string | Promise<string>) =>
+  Effect.map(Effect.tryPromise({ try: async (signal) => run(signal), catch: toolFailed }), answered);
+
 export const textTool = (spec: TextToolSpec): Tool => ({
   name: spec.name,
   description: spec.description,
   parameters: spec.parameters,
-  execute: (params, call) =>
-    Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params, { callId: call.id, signal }), catch: toolFailed }), answered),
+  execute: (params, call) => ranText((signal) => spec.run(params, { callId: call.id, signal })),
 });
 
 interface EffectToolSpec extends Omit<TextToolSpec, "run"> {
@@ -62,8 +65,13 @@ interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends 
 
 /** A tool whose parameters are a Schema. */
 export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields> & Schema.Codec<S["Type"]>>(spec: SchemaToolSpec<S>): Tool {
-  const read = Schema.decodeUnknownSync(spec.parameters);
-  return textTool({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
+  const read = Schema.decodeUnknownEffect(spec.parameters);
+  return {
+    name: spec.name,
+    description: spec.description,
+    parameters: parametersOf(spec.parameters),
+    execute: (params, call) => Effect.flatMap(Effect.mapError(read(params), toolFailed), (p) => ranText((signal) => spec.run(p, { callId: call.id, signal }))),
+  };
 }
 
 interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec, "parameters" | "run"> {

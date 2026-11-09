@@ -66,7 +66,7 @@ const textOnDisk =
         (e) => e.reason._tag === "NotFound",
         () => Effect.undefined,
       ),
-      Effect.mapError((e) => new TemplateProblem({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
+      Effect.mapError((e) => TemplateProblem.make({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
     );
 
 const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, schema: S, dir: string, file: string) =>
@@ -75,7 +75,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, sche
     const text = yield* textOf(path);
     if (text === undefined) return undefined;
     return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(text).pipe(
-      Effect.mapError((e) => new TemplateProblem({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
+      Effect.mapError((e) => TemplateProblem.make({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
     );
   });
 
@@ -83,7 +83,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, sche
 export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplateSource): Effect.Effect<T.AgentTemplate, TemplateProblem> =>
   Effect.gen(function* () {
     const item = yield* readJson(textOf, TemplateFile, dir, "agent.json");
-    const problem = (message: string) => Effect.fail(new TemplateProblem({ message }));
+    const problem = (message: string) => Effect.fail(TemplateProblem.make({ message }));
     if (!item) return yield* problem(t("server.agent.template.noFile", { file: join(dir, "agent.json") }));
     if (!idPattern.test(item.id)) return yield* problem(t("server.agent.template.badId", { file: join(dir, "agent.json"), id: item.id }));
     if (item.version < 1) return yield* problem(t("server.agent.template.badVersion", { file: join(dir, "agent.json") }));

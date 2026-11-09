@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Stream } from "effect";
+import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { HttpClient, type HttpClientRequest, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -16,6 +16,13 @@ import * as q from "#db/media_understanding.sql.ts";
 import { makeInputs } from "./inputs.ts";
 import { Media } from "./media.ts";
 import { png } from "./testdata/png.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const notIn = (value: unknown, secret: string) =>
+  Effect.map(json(value), (text) => {
+    expect(text).not.toContain(secret);
+  });
+const parsed = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const bytes = png();
 const result = {
@@ -76,23 +83,27 @@ it.effect.each(["completed", "incomplete"])("understanding persists %s text and 
         const file = request.body.formData.get("file");
         if (!(file instanceof File)) return yield* Effect.die("Expected file");
         expect(file.name).not.toContain("private-owner");
-        expect(Buffer.from(yield* Effect.promise(() => file.arrayBuffer()))).toEqual(bytes);
+        const arrayBuffer2 = yield* Effect.promise(() => file.arrayBuffer());
+        expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
       }
       if (request.url.endsWith("/responses")) {
         if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-        expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
-          model: "moss-vl-1.0",
-          max_output_tokens: 64,
-          input: [
-            {
-              role: "user",
-              content: [
-                { type: "input_text", text: "Describe this synthetic image." },
-                { type: "input_image", file_id: "file-one" },
-              ],
-            },
-          ],
-        });
+        const body = yield* Effect.option(parsed(new TextDecoder().decode(request.body.body)));
+        expect(body).toEqual(
+          Option.some({
+            model: "moss-vl-1.0",
+            max_output_tokens: 64,
+            input: [
+              {
+                role: "user",
+                content: [
+                  { type: "input_text", text: "Describe this synthetic image." },
+                  { type: "input_image", file_id: "file-one" },
+                ],
+              },
+            ],
+          }),
+        );
       }
       return reply(request, { ...result, status });
     }),
@@ -113,12 +124,16 @@ it.effect.each(["completed", "incomplete"])("understanding persists %s text and 
     expect(job.inputs[0]).toMatchObject({ id: input.id, name: input.name });
     expect((yield* Core).state().media).toEqual([job]);
     expect((yield* media.inputs.get(input.id)).canDelete).toBe(true);
-    expect(yield* media.createUnderstanding(request)).toEqual(job);
-    expect(yield* media.cleanupUnderstanding(request.id)).toEqual(job);
+    const understandingCreated = yield* media.createUnderstanding(request);
+    expect(understandingCreated).toEqual(job);
+    const cleanupUnderstanding2 = yield* media.cleanupUnderstanding(request.id);
+    expect(cleanupUnderstanding2).toEqual(job);
     expect(calls).toEqual(["POST https://api.mosi.cn/v1/files", "POST https://api.mosi.cn/v1/responses", "DELETE https://api.mosi.cn/v1/files/file-one"]);
-    expect(JSON.stringify(job)).not.toContain("test-only-understanding-key");
-    expect(JSON.stringify(yield* (yield* Db).one(q.understanding({ id: request.id })))).not.toContain("test-only-understanding-key");
-    expect(yield* media.createUnderstanding({ ...request, prompt: "Different question" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    yield* notIn(job, "test-only-understanding-key");
+    const found = yield* (yield* Db).one(q.understanding({ id: request.id }));
+    yield* notIn(found, "test-only-understanding-key");
+    const understandingCreatedFailure = yield* media.createUnderstanding({ ...request, prompt: "Different question" }).pipe(Effect.flip);
+    expect(understandingCreatedFailure).toMatchObject({ _tag: "Refused" });
   }).pipe(Effect.provide(layer(http)));
 });
 
@@ -130,10 +145,12 @@ it.effect("regression: stale consent and an image task ID cannot submit an under
   });
   return Effect.gen(function* () {
     const { media, request } = yield* fixture;
-    expect(yield* media.createUnderstanding({ ...request, revision: 0 }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const understandingCreatedFailure = yield* media.createUnderstanding({ ...request, revision: 0 }).pipe(Effect.flip);
+    expect(understandingCreatedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(0);
     yield* media.createImage({ id: request.id, prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true }, { kind: "owner" });
-    expect(yield* media.createUnderstanding(request).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const understandingCreatedFailure2 = yield* media.createUnderstanding(request).pipe(Effect.flip);
+    expect(understandingCreatedFailure2).toMatchObject({ _tag: "Refused" });
     yield* media.cancel(request.id);
   }).pipe(Effect.provide(layer(http)));
 });
@@ -181,7 +198,8 @@ it.effect("invalid input references, mixed media and bounds fail before retentio
       { discard: true },
     );
     expect(calls).toBe(0);
-    expect(yield* media.list()).toEqual([]);
+    const medias = yield* media.list();
+    expect(medias).toEqual([]);
     expect((yield* media.inputs.get(input.id)).canDelete).toBe(true);
     expect((yield* media.inputs.get(video.id)).canDelete).toBe(true);
   }).pipe(Effect.provide(layer(http)));
@@ -276,13 +294,15 @@ it.effect("image and understanding tasks share capacity, IDs and cancellation wi
       yield* media.createUnderstanding(request);
       yield* Deferred.await(started);
       const image = { id: request.id, prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true } as const;
-      expect(yield* media.createImage(image, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const imageCreatedFailure = yield* media.createImage(image, { kind: "owner" }).pipe(Effect.flip);
+      expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
       yield* Effect.forEach(
         Array.from({ length: 7 }, (_, n) => `queued-${n}`),
         (id) => media.createImage({ ...image, id }, { kind: "owner" }),
         { discard: true },
       );
-      expect(yield* media.createUnderstanding({ ...request, id: "overflow" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const understandingCreatedFailure = yield* media.createUnderstanding({ ...request, id: "overflow" }).pipe(Effect.flip);
+      expect(understandingCreatedFailure).toMatchObject({ _tag: "Refused" });
       yield* Effect.forEach(
         Array.from({ length: 7 }, (_, n) => `queued-${n}`),
         (id) => media.cancel(id),
@@ -315,7 +335,8 @@ it.effect("regression: disconnecting cleanup does not leave an unretryable runni
       const cleanup = yield* media.cleanupUnderstanding(request.id).pipe(Effect.forkChild);
       yield* Deferred.await(entered);
       yield* Fiber.interrupt(cleanup);
-      expect(yield* media.get(request.id)).toMatchObject({ kind: "understanding", phase: "ready", cleanup: "blocked", canCleanup: true });
+      const media2 = yield* media.get(request.id);
+      expect(media2).toMatchObject({ kind: "understanding", phase: "ready", cleanup: "blocked", canCleanup: true });
     }).pipe(Effect.provide(layer(http)));
   }),
 );
@@ -364,6 +385,10 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
       (phase) =>
         Effect.gen(function* () {
           const id = `restart-${phase}`;
+          const asked = yield* json({ ...request, id });
+          const pinned = yield* json([reference]);
+          const owned = yield* json({ kind: "owner" });
+          const kept = phase === "ready" ? yield* json(saved) : null;
           yield* inputs.pin(
             [input.id],
             id,
@@ -371,9 +396,9 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
               yield* db.run(
                 q.insertUnderstanding({
                   id,
-                  request: JSON.stringify({ ...request, id }),
-                  inputs: JSON.stringify([reference]),
-                  source: JSON.stringify({ kind: "owner" }),
+                  request: asked,
+                  inputs: pinned,
+                  source: owned,
                   authorization: null,
                   phase: "queued",
                   connection: "moss",
@@ -386,8 +411,8 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
                 q.changeUnderstanding({
                   id,
                   phase,
-                  source: JSON.stringify({ kind: "owner" }),
-                  result: phase === "ready" ? JSON.stringify(saved) : null,
+                  source: owned,
+                  result: kept,
                   cleanup: phase === "ready" ? "running" : "pending",
                   problem: "",
                   now: 1,
@@ -399,11 +424,16 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
       { discard: true },
     );
     yield* media.restore();
-    expect(yield* media.get("restart-queued")).toMatchObject({ phase: "canceled", cleanup: "done" });
-    expect(yield* inputs.blob(input.id, "restart-queued").pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.get("restart-uploading")).toMatchObject({ phase: "unknown", cleanup: "pending" });
-    expect(yield* media.get("restart-generating")).toMatchObject({ phase: "unknown", cleanup: "pending" });
-    expect(yield* media.get("restart-ready")).toMatchObject({ phase: "ready", result: saved, cleanup: "blocked" });
+    const media2 = yield* media.get("restart-queued");
+    expect(media2).toMatchObject({ phase: "canceled", cleanup: "done" });
+    const blobFailure = yield* inputs.blob(input.id, "restart-queued").pipe(Effect.flip);
+    expect(blobFailure).toMatchObject({ _tag: "Refused" });
+    const media3 = yield* media.get("restart-uploading");
+    expect(media3).toMatchObject({ phase: "unknown", cleanup: "pending" });
+    const media4 = yield* media.get("restart-generating");
+    expect(media4).toMatchObject({ phase: "unknown", cleanup: "pending" });
+    const media5 = yield* media.get("restart-ready");
+    expect(media5).toMatchObject({ phase: "ready", result: saved, cleanup: "blocked" });
     expect((yield* media.createUnderstanding({ ...request, id: "restart-generating" })).phase).toBe("unknown");
     expect((yield* Core).state().media).toHaveLength(4);
   }).pipe(Effect.provide(layer(http)));
@@ -424,19 +454,26 @@ it.effect("owner approval freezes inputs and authorizes only one trusted channel
     expect(granted.authorization?.channel).toBe(channel);
     expect((yield* media.inputs.get(input.id)).canDelete).toBe(false);
     expect(calls).toEqual([]);
-    for (const other of [{ kind: "owner" } as const, { ...caller, forOwner: false }, { ...caller, channel: "wrong-channel" }])
-      expect(yield* media.startUnderstanding(request.id, other).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.createUnderstanding(request).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.authorizeUnderstanding({ ...request, channel, prompt: "Different question" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    for (const other of [{ kind: "owner" } as const, { ...caller, forOwner: false }, { ...caller, channel: "wrong-channel" }]) {
+      const startFailure = yield* media.startUnderstanding(request.id, other).pipe(Effect.flip);
+      expect(startFailure).toMatchObject({ _tag: "Refused" });
+    }
+    const understandingCreatedFailure = yield* media.createUnderstanding(request).pipe(Effect.flip);
+    expect(understandingCreatedFailure).toMatchObject({ _tag: "Refused" });
+    const authorizeUnderstandingFailure = yield* media.authorizeUnderstanding({ ...request, channel, prompt: "Different question" }).pipe(Effect.flip);
+    expect(authorizeUnderstandingFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toEqual([]);
     yield* Effect.all([media.startUnderstanding(request.id, caller), media.startUnderstanding(request.id, caller)], { concurrency: 2 });
     const completed = yield* waitFor(media.get(request.id), (job) => job.kind === "understanding" && job.cleanup === "done", "authorized understanding");
     expect(completed).toMatchObject({ phase: "ready", source: { kind: "orchestrator", agent: caller.agent, channel } });
-    expect(yield* media.startUnderstanding(request.id, caller)).toEqual(completed);
-    expect(yield* media.startUnderstanding(request.id, { ...caller, agent: "other-agent" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const understandingStarted = yield* media.startUnderstanding(request.id, caller);
+    expect(understandingStarted).toEqual(completed);
+    const understandingStartedFailure = yield* media.startUnderstanding(request.id, { ...caller, agent: "other-agent" }).pipe(Effect.flip);
+    expect(understandingStartedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toEqual(["POST https://api.mosi.cn/v1/files", "POST https://api.mosi.cn/v1/responses", "DELETE https://api.mosi.cn/v1/files/file-one"]);
     expect((yield* media.inputs.get(input.id)).canDelete).toBe(true);
-    expect(JSON.stringify((yield* Core).state().media)).not.toContain("fingerprint");
+    const shown = (yield* Core).state().media;
+    yield* notIn(shown, "fingerprint");
   }).pipe(Effect.provide(layer(http)));
 });
 
@@ -455,14 +492,16 @@ it.effect.each(["cancel", "restart", "expire", "account"] as const)("unused appr
         break;
       case "expire":
         yield* TestClock.adjust("15 minutes");
-        expect(yield* media.startUnderstanding(request.id, caller).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+        const understandingStartedFailure = yield* media.startUnderstanding(request.id, caller).pipe(Effect.flip);
+        expect(understandingStartedFailure).toMatchObject({ _tag: "Refused" });
         yield* media.cancel(request.id);
         break;
       case "account": {
         const provider = yield* Provider;
         const state = provider.status();
         yield* provider.update({ ...state, connections: state.connections.map((item) => ({ ...item, key: "changed-account-key" })) });
-        expect(yield* media.startUnderstanding(request.id, caller).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+        const understandingStartedFailure2 = yield* media.startUnderstanding(request.id, caller).pipe(Effect.flip);
+        expect(understandingStartedFailure2).toMatchObject({ _tag: "Refused" });
         yield* media.cancel(request.id);
         break;
       }

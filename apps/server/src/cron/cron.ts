@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Config, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -9,7 +9,7 @@ import { Agent } from "#/agent/agent.ts";
 import type { Actor } from "#/base/actor.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { jsonOrNone } from "#/base/json.ts";
+import { jsonOrNone, jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
@@ -43,7 +43,7 @@ export class Cron extends Context.Service<
     /** What comes due from now on, subscribed before it returns. */
     readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
   }
->()("vibevalley/Cron") {
+>()("@vibevalley/server/cron/cron") {
   static readonly layer = Layer.effect(
     Cron,
     Effect.suspend(() => make),
@@ -51,10 +51,11 @@ export class Cron extends Context.Service<
 }
 
 /** $TZ when it names a zone, else the system's. */
-function localZone(): string {
-  const tz = process.env.TZ;
-  return tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
+const localZone = Config.String("TZ").pipe(
+  Config.withDefault(""),
+  Effect.orElseSucceed(() => ""),
+  Effect.map((tz) => (tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone)),
+);
 
 const whenOf = jsonOrNone(S.CronWhen);
 
@@ -191,7 +192,7 @@ const make = Effect.gen(function* () {
       if (named && !agent) return yield* Effect.fail(refused(t("server.cron.noProfile", { name: req.agent ?? "" }), [lookIn.agent]));
       const repo = (req.repo ?? "").trim();
       if (agent && !repo && !channel.repo) return yield* Effect.fail(refused(t("server.cron.noRepo", { channel: channel.name })));
-      const tz = req.tz ?? localZone();
+      const tz = req.tz ?? (yield* localZone);
       const pending = needsOK(req, by);
       const s: T.Cron = {
         id: newId(),
@@ -209,19 +210,21 @@ const make = Effect.gen(function* () {
         pending,
       };
       yield* db.run(
-        q.addCron({
-          id: s.id,
-          name: s.name,
-          body: s.text,
-          channel_id: s.channel,
-          agent: s.agent ?? null,
-          repo: s.repo ?? null,
-          spec: JSON.stringify(s.when),
-          tz,
-          set_by: by.kind,
-          pending,
-          created_at: at,
-        }),
+        Effect.flatMap(jsonText(s.when), (spec) =>
+          q.addCron({
+            id: s.id,
+            name: s.name,
+            body: s.text,
+            channel_id: s.channel,
+            agent: s.agent ?? null,
+            repo: s.repo ?? null,
+            spec,
+            tz,
+            set_by: by.kind,
+            pending,
+            created_at: at,
+          }),
+        ),
       );
       yield* core.apply({ type: "cronChanged", cron: s });
       return s;

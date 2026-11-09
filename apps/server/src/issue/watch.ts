@@ -1,4 +1,4 @@
-import { Effect, Stream } from "effect";
+import { Effect, Equal, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { sessionIdsOf, stageWantsOwner } from "@vibevalley/protocol/rules";
@@ -18,7 +18,7 @@ export const watchIssue = (
       let ids = new Set<string>(sessionIdsOf(initial).slice(-8));
       let loaded = false;
       let wasSettled = false;
-      let previous = "";
+      let previous: T.IssueWatch | undefined;
       const snapshots = core.states.pipe(
         Stream.mapEffect(
           Effect.fnUntraced(function* (frame) {
@@ -35,9 +35,8 @@ export const watchIssue = (
               settled,
               omittedSessions: Math.max(0, all.length - selected.length),
             };
-            const fingerprint = JSON.stringify(state);
-            if (fingerprint === previous) return [];
-            previous = fingerprint;
+            if (previous !== undefined && Equal.equals(state, previous)) return [];
+            previous = state;
             const rows: T.IssueWatch[] = [];
             for (const id of selected) {
               if (loaded && ids.has(id) && !(settled && !wasSettled)) continue;

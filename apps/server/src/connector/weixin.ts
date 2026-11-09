@@ -66,7 +66,8 @@ const UpdatesSchema = Schema.Struct({
 });
 export type Updates = typeof UpdatesSchema.Type;
 
-export const decodeUpdates = Schema.decodeUnknownSync(UpdatesSchema);
+export const decodeUpdates = Schema.decodeUnknownEffect(UpdatesSchema);
+const encodeBody = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const QrCodeResponse = Schema.Struct({
   qrcode: Schema.optionalKey(Schema.String),
@@ -137,7 +138,7 @@ const lossless = /"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)/gu;
 
 /** A refused send, by WeChat's code: a stale token or a closed reply window. */
 const sendFailure = (code: number, message: string) =>
-  new AppFailed({ kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed", message });
+  AppFailed.make({ kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed", message });
 
 export class WeixinClient implements WeixinApi {
   private readonly http: HttpClient.HttpClient;
@@ -157,7 +158,10 @@ export class WeixinClient implements WeixinApi {
   }
 
   private post<T>(label: string, url: string, body: unknown, token: string, schema: Schema.Codec<T>) {
-    return this.request(label, HttpClientRequest.bodyText(HttpClientRequest.post(url), JSON.stringify(body), "application/json"), token, true, schema);
+    return encodeBody(body).pipe(
+      Effect.mapError((e) => failedWith(label + ": " + e.message)),
+      Effect.flatMap((text) => this.request(label, HttpClientRequest.bodyText(HttpClientRequest.post(url), text, "application/json"), token, true, schema)),
+    );
   }
 
   private readonly qrCode = Effect.gen({ self: this }, function* () {
@@ -191,7 +195,8 @@ export class WeixinClient implements WeixinApi {
       let base = this.base;
       let refreshes = 0;
       for (;;) {
-        const status = yield* this.qrStatus(base, code, yield* verification);
+        const verifyCode = yield* verification;
+        const status = yield* this.qrStatus(base, code, verifyCode);
         switch (status.status) {
           case "scaned":
             yield* progress("scanned", show);
@@ -312,7 +317,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         for (;;) {
           const updates = yield* api.getUpdates(account, buf, timeout);
           const code = failed(updates.ret, updates.errcode);
-          if (code === staleToken) return yield* new AppFailed({ kind: "stale", message: t("server.connector.staleLogin") });
+          if (code === staleToken) return yield* AppFailed.make({ kind: "stale", message: t("server.connector.staleLogin") });
           if (code !== undefined) return yield* failedWith("getupdates: " + (updates.errmsg || String(code)));
           if (updates.longpolling_timeout_ms != null && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
           // Its own messages echo back; groups are not for the farm.

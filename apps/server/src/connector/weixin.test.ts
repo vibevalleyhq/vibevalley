@@ -1,9 +1,10 @@
 import { createServer, type Server } from "node:http";
 
-import { Effect } from "effect";
+import { Effect, Exit } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
+import { failedWith } from "./adapter.ts";
 import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient } from "./weixin.ts";
 
 const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
@@ -24,14 +25,14 @@ const serve = async (answer: (path: string) => string) => {
     res.end(answer(req.url ?? ""));
   });
   servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await run(Effect.callback<void>((resume) => void server.listen(0, "127.0.0.1", () => resume(Effect.void))));
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("no test port");
   return `http://127.0.0.1:${address.port}`;
 };
 
 describe("WeChat updates", () => {
-  it("decodes nested messages and rejects a wrong messages shape", () => {
+  it("decodes nested messages and rejects a wrong messages shape", async () => {
     const valid = {
       ret: 0,
       msgs: [
@@ -45,15 +46,15 @@ describe("WeChat updates", () => {
         },
       ],
     };
-    expect(decodeUpdates(valid)).toEqual(valid);
-    expect(() => decodeUpdates({ ret: 0, msgs: {} })).toThrow();
+    expect(await run(decodeUpdates(valid))).toEqual(valid);
+    expect(Exit.isFailure(await Effect.runPromiseExit(decodeUpdates({ ret: 0, msgs: {} })))).toBe(true);
   });
 
   it("returns a failure without accepting malformed updates", async () => {
     let accepted = 0;
     const api: WeixinApi = {
       login: () => Effect.die("not used"),
-      getUpdates: () => Effect.sync(() => decodeUpdates({ ret: 0, msgs: {} })),
+      getUpdates: () => decodeUpdates({ ret: 0, msgs: {} }).pipe(Effect.mapError((e) => failedWith(e.message))),
       sendText: () => Effect.die("not used"),
     };
     const adapter = weixinAdapter(api);

@@ -11,6 +11,7 @@ import { type Adapter, type AppFailed, failedOf, failedWith } from "./adapter.ts
 
 /** A text message's content: {"text": …}. */
 const textContent = jsonOrNone(Schema.Struct({ text: Schema.optionalKey(Schema.String) }));
+const encodeTextContent = Schema.encodeEffect(Schema.fromJsonString(Schema.Struct({ text: Schema.String })));
 
 type Domain = "feishu" | "lark";
 
@@ -141,7 +142,8 @@ export class FeishuClient implements FeishuApi {
       // Asked every interval, on the domain the last answer named, until it is done one way or the other.
       const domain = yield* Ref.make<Domain>("feishu");
       const once = Effect.gen({ self: this }, function* () {
-        const p: Polled = yield* this.poll(reg.deviceCode, yield* Ref.get(domain));
+        const current = yield* Ref.get(domain);
+        const p: Polled = yield* this.poll(reg.deviceCode, current);
         if (p.status === "succeeded") {
           if (!p.app.appId.trim() || !p.app.appSecret.trim()) return yield* failedWith(t("server.connector.feishu.incomplete"));
           return Option.some<LoginAccount>({ app: p.app, owner: p.owner });
@@ -153,7 +155,7 @@ export class FeishuClient implements FeishuApi {
       const polling: Effect.Effect<LoginAccount, AppFailed> = Effect.repeat(Effect.delay(once, reg.intervalMs), { until: Option.isSome }).pipe(
         Effect.flatMap(
           Option.match({
-            onNone: () => Effect.die(new Inconsistent({ message: "the login poll stopped without an account" })),
+            onNone: () => Effect.die(Inconsistent.make({ message: "the login poll stopped without an account" })),
             onSome: Effect.succeed,
           }),
         ),
@@ -206,11 +208,12 @@ export class FeishuClient implements FeishuApi {
   sendText(app: App, openId: string, text: string) {
     return Effect.gen(function* () {
       const client = new Lark.Client({ appId: app.appId, appSecret: app.appSecret, domain: larkDomain(app.domain), loggerLevel: Lark.LoggerLevel.warn });
+      const content = yield* encodeTextContent({ text }).pipe(Effect.mapError((e) => failedWith(t("server.connector.feishu.send", { why: e.message }))));
       const res = yield* Effect.tryPromise({
         try: () =>
           client.im.v1.message.create({
             params: { receive_id_type: "open_id" },
-            data: { receive_id: openId, msg_type: "text", content: JSON.stringify({ text }) },
+            data: { receive_id: openId, msg_type: "text", content },
           }),
         catch: (e) => failedWith(t("server.connector.feishu.send", { why: failedOf(e).message })),
       });

@@ -10,6 +10,7 @@ import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibeva
 import * as S from "@vibevalley/protocol/schema";
 
 import { type ApiError, Inconsistent, lookIn, missing, refused } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 import { defaultSettings } from "#/runtime/presets.ts";
@@ -23,7 +24,7 @@ interface Stored {
 }
 
 // A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed.
-const readFile = Schema.decodeUnknownSync(
+const readFile = Schema.decodeEffect(
   Schema.fromJsonString(
     Schema.Struct({
       agents: Schema.Array(Schema.Unknown),
@@ -32,7 +33,7 @@ const readFile = Schema.decodeUnknownSync(
     }),
   ),
 );
-const readAgent = Schema.decodeUnknownSync(S.Agent);
+const readAgent = Schema.decodeUnknownEffect(S.Agent);
 const lookFilled = (raw: unknown): unknown =>
   Predicate.isObject(raw) && Predicate.isObject(raw.look)
     ? {
@@ -40,14 +41,11 @@ const lookFilled = (raw: unknown): unknown =>
         look: { species: null, outfit: null, orchestrator: null, ...raw.look, build: raw.look.build ?? "biped", head: raw.look.head ?? "rounded" },
       }
     : raw;
-const readStored = (text: string): Stored => {
-  const file = readFile(text);
-  return {
-    agents: file.agents.map((a) => readAgent(lookFilled(a))),
-    skills: file.skills,
-    settings: file.settings,
-  };
-};
+const readStored = Effect.fnUntraced(function* (text: string) {
+  const file = yield* readFile(text);
+  const agents = yield* Effect.forEach(file.agents, (a) => readAgent(lookFilled(a)));
+  return { agents, skills: file.skills, settings: file.settings } satisfies Stored;
+});
 
 /** Over each code point's first UTF-16 unit, wrapping at 32 bits, as the client counts. */
 function castHash(s: string): number {
@@ -105,7 +103,7 @@ export class Agent extends Context.Service<
     readonly removeTemplate: (id: string) => Effect.Effect<void, ApiError>;
     readonly previewRemoveTemplate: (id: string) => Effect.Effect<T.Preview, ApiError>;
   }
->()("vibevalley/Agent") {
+>()("@vibevalley/server/agent/agent") {
   static readonly layer = Layer.effect(
     Agent,
     Effect.suspend(() => make),
@@ -165,18 +163,18 @@ const make = Effect.gen(function* () {
   s = (yield* readOrSetAside(file, readStored, "the profiles start from the starters")) ?? seed;
   // The default orchestrator is always there, and always an orchestrator: a farm is never without one.
   const orchestrator = builtInOf(defaultOrchestrator);
-  if (!orchestrator) return yield* Effect.die(new Inconsistent({ message: `the built-in template ${defaultOrchestrator} is not in agent/templates` }));
+  if (!orchestrator) return yield* Effect.die(Inconsistent.make({ message: `the built-in template ${defaultOrchestrator} is not in agent/templates` }));
   const agents = s.agents.some((a) => a.id === defaultOrchestrator)
     ? s.agents.map((a) => (a.id === defaultOrchestrator ? { ...a, role: "orchestrator" as const } : a))
     : [installed(orchestrator, s.agents, defaultOrchestrator), ...s.agents];
   s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
-  yield* Effect.orDie(disk.save(JSON.stringify(s)));
+  yield* Effect.orDie(Effect.flatMap(jsonText(s), disk.save));
 
   /** A change is kept only once it is on disk: one that cannot be written is refused and leaves the profiles as they were. */
   const change = (f: (s: Stored) => Stored) =>
     Effect.gen(function* () {
       const next = structuredClone(f(structuredClone(s)));
-      yield* disk.save(JSON.stringify(next)).pipe(Effect.mapError((e) => refused(t("server.agent.notSaved", { file, why: e.message }))));
+      yield* Effect.flatMap(jsonText(next), disk.save).pipe(Effect.mapError((e) => refused(t("server.agent.notSaved", { file, why: e.message }))));
       s = next;
     });
 

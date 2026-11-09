@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Formatter, Schema } from "effect";
 
 import {
   AssistantMessageSchema,
@@ -136,7 +136,7 @@ export function transcript(messages: readonly BrainMessage[]): string {
       case "assistant":
         for (const c of m.content) {
           if (c.type === "text" && c.text.trim() !== "") out.push(transcriptWords.replyHeading(c.text));
-          if (c.type === "toolCall") out.push(transcriptWords.toolCallHeading(c.name, JSON.stringify(c.arguments)));
+          if (c.type === "toolCall") out.push(transcriptWords.toolCallHeading(c.name, Formatter.formatJson(c.arguments)));
         }
         break;
       case "toolResult":

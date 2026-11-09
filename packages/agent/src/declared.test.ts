@@ -2,7 +2,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Clock, Effect } from "effect";
+import { Clock, Effect, Formatter } from "effect";
 import { TestClock } from "effect/testing";
 
 import { tempDir } from "@vibevalley/testkit/temp";
@@ -35,10 +35,10 @@ it.effect("the brain's tools are declared to the model as they always were", () 
       const declared = Object.fromEntries(
         Object.entries(sets).map(([set, tools]) => [
           set,
-          tools.map((t) => ({ name: t.name, description: t.description, parameters: JSON.stringify(t.parameters) })),
+          tools.map((t) => ({ name: t.name, description: t.description, parameters: Formatter.formatJson(t.parameters) })),
         ]),
       );
-      if (update) writeFileSync(file, JSON.stringify(declared, null, 1) + "\n");
+      if (update) writeFileSync(file, Formatter.formatJson(declared, { space: 1 }) + "\n");
       expect(declared).toEqual(JSON.parse(readFileSync(file, "utf8")));
     } finally {
       rmSync(dir, { recursive: true, force: true });

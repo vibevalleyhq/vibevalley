@@ -1,4 +1,4 @@
-import { Schema, type Effect, type Scope, type Stream } from "effect";
+import { type Effect, Formatter, Schema, type Scope, type Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
@@ -24,7 +24,7 @@ type Reactions = Record<string, string[]>;
 export const reactionsOf = (raw: string | null): Reactions => jsonOrNone(ReactionsSchema)(raw) ?? {};
 export const reactionsText = (r: Reactions) => {
   const kept = Object.entries(r).filter(([, by]) => by.length > 0);
-  return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
+  return kept.length > 0 ? Formatter.formatJson(Object.fromEntries(kept)) : null;
 };
 
 export const messageKind = (kind: string): T.MessageKind => (Schema.is(S.MessageKind)(kind) ? kind : "chat");

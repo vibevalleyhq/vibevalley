@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Effect, FileSystem, Layer } from "effect";
+import { Config, Effect, FileSystem, Formatter, Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Otlp, OtlpSerialization } from "effect/observability";
 
@@ -12,7 +12,7 @@ import type { ServerReady } from "@vibevalley/protocol";
 import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
 import { loadConfig, pkmDir, reposDir, worktreesDir } from "./infra/config.ts";
-import { leaseHome } from "./infra/lease.ts";
+import { HomeTaken, HomeUnavailable, leaseHome } from "./infra/lease.ts";
 import { PublicHttp } from "./infra/publicHttp.ts";
 
 const { values: flags } = parseArgs({
@@ -22,9 +22,6 @@ const { values: flags } = parseArgs({
     web: { type: "string", default: "" },
   },
 });
-
-// Read here, at the process's door, with the flags: the Effect code below is handed what it says.
-const testRuntimesAsked = process.env.VIBEVALLEY_TEST_RUNTIMES === "1";
 
 // The ready line goes through it too: it holds only the address and the pid.
 redactOutput(process.stdout);
@@ -39,6 +36,7 @@ const testRuntimes = Effect.gen(function* () {
 });
 
 const main = Effect.gen(function* () {
+  const testRuntimesAsked = (yield* Config.String("VIBEVALLEY_TEST_RUNTIMES").pipe(Config.withDefault(""))) === "1";
   const loaded = yield* loadConfig(flags.config);
   const config = flags.web ? { ...loaded, web: flags.web } : loaded;
   const options = testRuntimesAsked
@@ -62,7 +60,10 @@ const main = Effect.gen(function* () {
   yield* fs.makeDirectory(notes, { recursive: true });
   // The home is this server's until it stops.
   yield* Effect.acquireRelease(
-    Effect.try(() => leaseHome(config.home)),
+    Effect.try({
+      try: () => leaseHome(config.home),
+      catch: (cause) => (Schema.is(HomeTaken)(cause) ? cause : HomeUnavailable.make({ cause })),
+    }),
     (release) => Effect.sync(release),
   );
   // Said once it listens, taken back when it stops.
@@ -75,7 +76,7 @@ const main = Effect.gen(function* () {
       Effect.gen(function* () {
         yield* Effect.log(`vibevalley: listening on http://${address}`);
         withdraw = announce(config.home, `http://${address}`);
-        if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid } satisfies ServerReady) + "\n");
+        if (flags["ready-json"]) process.stdout.write(Formatter.formatJson({ url: `http://${address}`, pid: process.pid } satisfies ServerReady) + "\n");
       }),
     options,
   );

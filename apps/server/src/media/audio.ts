@@ -71,6 +71,15 @@ export interface AudioWorkflow {
   restore: () => Effect.Effect<void, ApiError>;
 }
 
+const encodeJson = <A, I>(schema: Schema.Codec<A, I>) => Schema.encodeEffect(Schema.fromJsonString(schema));
+const attachmentJson = encodeJson(S.Attachment);
+const referenceJson = encodeJson(S.MediaInputReference);
+const metadataJson = encodeJson(S.MediaAudioMetadata);
+const resultJson = encodeJson(S.MediaAudioResult);
+const usageJson = encodeJson(S.MediaAudioUsage);
+const requestJson = encodeJson(S.MediaAudioRequest);
+const sourceJson = encodeJson(S.MediaSource);
+
 export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
   const db = yield* Db;
   const provider = yield* Provider;
@@ -143,7 +152,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     }
   });
   const get = Effect.fn("Media.audioGet")(function* (id: string) {
-    return yield* view(yield* found(id));
+    const found2 = yield* found(id);
+    return yield* view(found2);
   });
   const change = Effect.fnUntraced(
     function* (
@@ -191,7 +201,10 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       remote,
       (file) =>
         Effect.gen(function* () {
-          if (file.phase !== "deleted") yield* ports.remote.remove(id, file.input_id, yield* originalAccount(row));
+          if (file.phase !== "deleted") {
+            const account = yield* originalAccount(row);
+            yield* ports.remote.remove(id, file.input_id, account);
+          }
         }),
       { discard: true },
     );
@@ -263,9 +276,9 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
                   q.changeAudio({
                     ...current,
                     phase: "ready",
-                    attachment: saved.attachment ? JSON.stringify(saved.attachment) : null,
-                    result_input: saved.resultInput ? JSON.stringify(saved.resultInput) : null,
-                    metadata: saved.metadata ? JSON.stringify(saved.metadata) : null,
+                    attachment: saved.attachment ? yield* attachmentJson(saved.attachment).pipe(Effect.mapError(corrupt)) : null,
+                    result_input: saved.resultInput ? yield* referenceJson(saved.resultInput).pipe(Effect.mapError(corrupt)) : null,
+                    metadata: saved.metadata ? yield* metadataJson(saved.metadata).pipe(Effect.mapError(corrupt)) : null,
                     result_url: null,
                     preview_input: preview?.id ?? null,
                     problem: "",
@@ -319,8 +332,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         const result: T.MediaAudioResult = { kind: "transcription", text: task.text, segments: [...(task.segments ?? [])] };
         yield* change(id, ["generating"], {
           phase: "ready",
-          result: JSON.stringify(result),
-          usage: task.usage === undefined ? null : JSON.stringify(task.usage),
+          result: yield* resultJson(result).pipe(Effect.mapError(corrupt)),
+          usage: task.usage === undefined ? null : yield* usageJson(task.usage).pipe(Effect.mapError(corrupt)),
           problem: "",
         });
       } else {
@@ -330,7 +343,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
             result_url: task.url,
             result_format: task.format,
             content_type: task.contentType,
-            usage: task.usage === undefined ? null : JSON.stringify(task.usage),
+            usage: task.usage === undefined ? null : yield* usageJson(task.usage).pipe(Effect.mapError(corrupt)),
             problem: "",
           })
         )
@@ -367,15 +380,18 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
   });
   const submit = Effect.fnUntraced(function* (id: string) {
     if (!(yield* change(id, ["queued"], { phase: "generating" }))) return;
-    const input = yield* request(yield* found(id));
+    const found2 = yield* found(id);
+    const input = yield* request(found2);
     let attempted = false;
     yield* Effect.gen(function* () {
-      const account = yield* originalAccount(yield* found(id));
+      const found3 = yield* found(id);
+      const account = yield* originalAccount(found3);
       if (input.kind === "clone") {
         const blob = yield* ports.inputs.blob(input.input, id);
         const metadata = yield* inspectAudio(blob).pipe(Effect.mapError(invalid));
         if (blob.size > 10_000_000 || metadata.duration > 30 || !["wav", "mp3", "m4a", "flac"].includes(metadata.format)) return yield* Effect.fail(invalid());
-        yield* originalAccount(yield* found(id));
+        const found5 = yield* found(id);
+        yield* originalAccount(found5);
         attempted = true;
         yield* Effect.uninterruptibleMask((resume) =>
           resume(
@@ -386,16 +402,16 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
               ...(input.name !== undefined ? { name: input.name } : {}),
             }).pipe(Effect.provideService(HttpClient.HttpClient, http)),
           ).pipe(
-            Effect.flatMap((voice) =>
-              change(id, ["generating", "canceled", "unknown"], { phase: "ready", result: JSON.stringify({ kind: "clone", voice }), problem: "" }),
-            ),
+            Effect.flatMap((voice) => resultJson({ kind: "clone", voice }).pipe(Effect.mapError(corrupt))),
+            Effect.flatMap((result) => change(id, ["generating", "canceled", "unknown"], { phase: "ready", result, problem: "" })),
           ),
         );
         return;
       }
       if (input.kind === "transcription" && input.streaming === true) {
         const fileId = yield* ports.remote.upload(id, input.input, account);
-        yield* originalAccount(yield* found(id));
+        const found6 = yield* found(id);
+        yield* originalAccount(found6);
         attempted = true;
         yield* receiveTranscriptionStream(
           account.key,
@@ -408,7 +424,10 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           {
             task: (taskId) => change(id, ["generating", "canceled"], { remote_task_id: taskId }).pipe(Effect.asVoid),
             save: Effect.fnUntraced(function* (checkpoint: TranscriptionCheckpoint) {
-              const patch = { result: JSON.stringify(checkpoint.result), usage: checkpoint.usage === undefined ? null : JSON.stringify(checkpoint.usage) };
+              const patch = {
+                result: yield* resultJson(checkpoint.result).pipe(Effect.mapError(corrupt)),
+                usage: checkpoint.usage === undefined ? null : yield* usageJson(checkpoint.usage).pipe(Effect.mapError(corrupt)),
+              };
               if (checkpoint.complete) {
                 if (!(yield* change(id, ["generating"], { ...patch, phase: "ready", problem: "" }))) yield* change(id, ["canceled", "unknown"], patch);
               } else yield* change(id, ["generating", "canceled", "unknown"], patch);
@@ -428,7 +447,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
                 ...(input.diarize !== undefined ? { diarize: input.diarize } : {}),
                 ...(input.keyterms !== undefined ? { keyterms: input.keyterms } : {}),
               });
-      yield* originalAccount(yield* found(id));
+      const found4 = yield* found(id);
+      yield* originalAccount(found4);
       attempted = true;
       // Only the HTTP wait is interruptible: a returned task ID must reach durable storage before polling or cancellation can intervene.
       yield* Effect.uninterruptibleMask((resume) =>
@@ -465,8 +485,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       Effect.gen(function* () {
         const existing = yield* db.one(q.audio({ id: input.id }));
         if (existing) {
-          if (!same(yield* request(existing), input) || !same((yield* view(existing)).source, source))
-            return yield* Effect.fail(refused(t("server.media.reusedId")));
+          const storedRequest = yield* request(existing);
+          if (!same(storedRequest, input) || !same((yield* view(existing)).source, source)) return yield* Effect.fail(refused(t("server.media.reusedId")));
           return yield* view(existing);
         }
         if (yield* ports.otherExists(input.id)) return yield* Effect.fail(refused(t("server.media.reusedId")));
@@ -487,7 +507,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           if (local.kind !== "audio" || local.phase !== "ready" || local.hash === null) return yield* Effect.fail(invalid());
           reference = { id: local.id, kind: local.kind, mime: local.mime, name: local.name, size: local.size, hash: local.hash };
           const content = yield* ports.inputs.content(input.input);
-          const metadata = yield* inspectAudio(yield* fileBlob(content.path, content.mime).pipe(Effect.mapError(invalid))).pipe(Effect.mapError(invalid));
+          const fileBlob2 = yield* fileBlob(content.path, content.mime).pipe(Effect.mapError(invalid));
+          const metadata = yield* inspectAudio(fileBlob2).pipe(Effect.mapError(invalid));
           if (
             metadata.duration > 3600 ||
             (input.kind === "clone" && (local.size > 10_000_000 || metadata.duration > 30 || !["wav", "mp3", "m4a", "flac"].includes(metadata.format)))
@@ -515,9 +536,9 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           q.insertAudio({
             id: input.id,
             kind: input.kind,
-            request: JSON.stringify(input),
-            source: JSON.stringify(source),
-            input: reference === null ? null : JSON.stringify(reference),
+            request: yield* requestJson(input).pipe(Effect.mapError(invalid)),
+            source: yield* sourceJson(source).pipe(Effect.mapError(invalid)),
+            input: reference === null ? null : yield* referenceJson(reference).pipe(Effect.mapError(invalid)),
             connection: account.connection,
             revision: account.revision,
             model: account.model,
@@ -540,7 +561,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     createTranscription: Effect.fn("Media.createTranscription")((input, caller) => create({ ...input, kind: "transcription" }, caller)),
     get,
     list: Effect.fn("Media.audioList")(function* () {
-      return yield* Effect.forEach(yield* db.run(q.recentAudio()), view);
+      const recentAudio2 = yield* db.run(q.recentAudio());
+      return yield* Effect.forEach(recentAudio2, view);
     }),
     has: (id) => db.one(q.audio({ id })).pipe(Effect.map((row) => row !== undefined)),
     pending: () => db.run(q.pendingAudio()).pipe(Effect.map((rows) => rows.length)),
@@ -603,8 +625,9 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     restore: Effect.fn("Media.audioRestore")(function* () {
       yield* db.run(q.interruptAudio({ now: yield* Clock.currentTimeMillis, problem: t("server.media.restarted") }));
       yield* ports.publish();
+      const pendingAudio2 = yield* db.run(q.pendingAudio());
       yield* Effect.forEach(
-        yield* db.run(q.pendingAudio()),
+        pendingAudio2,
         (row) =>
           Effect.gen(function* () {
             if (row.phase === "downloading") yield* run(row.id, download(row.id));
@@ -616,7 +639,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           }),
         { discard: true },
       );
-      yield* Effect.forEach(yield* db.run(q.audioCleanup()), (row) => cleanSafely(row.id), { discard: true });
+      const audioCleanup2 = yield* db.run(q.audioCleanup());
+      yield* Effect.forEach(audioCleanup2, (row) => cleanSafely(row.id), { discard: true });
     }),
   };
   return api;

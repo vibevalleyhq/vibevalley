@@ -21,7 +21,7 @@ export class Mcp extends Context.Service<
   {
     readonly handle: (request: Request) => Effect.Effect<Response>;
   }
->()("vibevalley/Mcp") {
+>()("@vibevalley/server/mcp/mcp") {
   static readonly layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));
 }
 

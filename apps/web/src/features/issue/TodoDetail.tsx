@@ -273,17 +273,15 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     setEdited(true);
   };
 
-  const update = (x: Draft): IssueUpdate => {
-    return {
-      title: x.title,
-      description: x.description,
-      repo: x.repo,
-      agent: x.agent,
-      priority: x.priority,
-      deliver: x.deliver,
-      criteria: criteriaList(x.criteria),
-    };
-  };
+  const update = (x: Draft): IssueUpdate => ({
+    title: x.title,
+    description: x.description,
+    repo: x.repo,
+    agent: x.agent,
+    priority: x.priority,
+    deliver: x.deliver,
+    criteria: criteriaList(x.criteria),
+  });
 
   // Saving goes with the act (edit): the server saves the fields before it acts on them. Taken when asked, so a call
   // that waits does not read them later.

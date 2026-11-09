@@ -8,6 +8,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { newId } from "#/base/ids.ts";
+import { jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core, type FactIn } from "#/core/core.ts";
 import { Executor, type ExecutionInput } from "#/executor/executor.ts";
@@ -79,7 +80,8 @@ export const sessionRegistry = Effect.gen(function* () {
   const executor = yield* Executor;
   const db = yield* Db;
   const clock = yield* Clock.Clock;
-  const runSync = Effect.runSyncWith(yield* Effect.context());
+  const context2 = yield* Effect.context();
+  const runSync = Effect.runSyncWith(context2);
   // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
   const forkHere = yield* FiberSet.makeRuntime();
   const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
@@ -136,21 +138,16 @@ export const sessionRegistry = Effect.gen(function* () {
   const who = (token: string) => tokens.get(token) ?? "";
 
   // A session's own row keeps what taking it up again needs, so it goes with the database.
-  const handRow = (h: Hand) => {
-    const oar = h.oarSessionId;
-    return {
-      id: h.id,
-      place: JSON.stringify(h.place),
-      oar_session: oar || null,
-      last_text: h.lastText || null,
-      recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].toSorted()) : null,
-    };
-  };
+  const handRow = (h: Hand) =>
+    Effect.map(
+      Effect.all({ place: jsonText(h.place), recalled: h.recalled.size > 0 ? jsonText([...h.recalled].toSorted()) : Effect.succeed(null) }),
+      ({ place, recalled }) => ({ id: h.id, place, oar_session: h.oarSessionId || null, last_text: h.lastText || null, recalled }),
+    );
   const keepHands = Effect.suspend(() =>
     db.inTx(
       Effect.gen(function* () {
-        yield* Effect.forEach(core.state().sessions, (session) => db.run(qs.keepSessionState(sessionState(session))), { discard: true });
-        yield* Effect.forEach([...hands.values()], (h) => db.run(qs.keepHand(handRow(h))), { discard: true });
+        yield* Effect.forEach(core.state().sessions, (session) => db.run(Effect.flatMap(sessionState(session), qs.keepSessionState)), { discard: true });
+        yield* Effect.forEach([...hands.values()], (h) => db.run(Effect.flatMap(handRow(h), qs.keepHand)), { discard: true });
       }),
     ),
   ).pipe(bestEffort("session: recovery state was not saved"));
@@ -168,8 +165,9 @@ export const sessionRegistry = Effect.gen(function* () {
       }),
     ),
   );
+  const activeSessions2 = yield* db.run(qs.activeSessions());
   yield* Effect.forEach(
-    yield* db.run(qs.activeSessions()),
+    activeSessions2,
     (row) =>
       Effect.gen(function* () {
         const session = restoredSession(row);
@@ -179,7 +177,7 @@ export const sessionRegistry = Effect.gen(function* () {
   );
 
   const keepRow = (row: qs.KeepSessionParams) =>
-    db.attempt(qs.keepSession(row)).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+    db.attempt(qs.keepSession(row)).pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
 
   const register = Effect.fn("Session.register")(function* (session: SessionIdentity) {
     const hiredAt = yield* Clock.currentTimeMillis;
@@ -230,7 +228,7 @@ export const sessionRegistry = Effect.gen(function* () {
   const forget = (id: string) => db.attempt(qs.forgetSession({ id })).pipe(bestEffort(`vibevalley: unstarted session ${id} not forgotten`));
 
   /** The session kept, with its log. */
-  const logOf = (s: T.Session, journal: Journal) => Effect.as(Effect.andThen(keep(s), db.run(qs.keepSessionState(sessionState(s)))), journal);
+  const logOf = (s: T.Session, journal: Journal) => Effect.as(Effect.andThen(keep(s), db.run(Effect.flatMap(sessionState(s), qs.keepSessionState))), journal);
 
   const runs = yield* recording;
 
@@ -284,7 +282,7 @@ export const sessionRegistry = Effect.gen(function* () {
           Effect.gen(function* () {
             yield* runs.finish(id, outcome, summary, spent);
             const session = core.session(h.id);
-            if (session) yield* db.run(qs.keepSessionState(sessionState(session)));
+            if (session) yield* db.run(Effect.flatMap(sessionState(session), qs.keepSessionState));
             yield* db.run(qs.clearPendingReport({ id: h.id }));
           }),
         )

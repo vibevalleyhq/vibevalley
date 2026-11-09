@@ -1,7 +1,5 @@
-import { join } from "node:path";
-
 import { expect, it } from "@effect/vitest";
-import { Context, Deferred, Effect, Fiber, FileSystem, Layer } from "effect";
+import { Context, Deferred, Effect, Fiber, FileSystem, Layer, Path, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import type { MediaImageRequest } from "@vibevalley/protocol";
@@ -17,6 +15,15 @@ import * as q from "#db/media_generation.sql.ts";
 
 import { Media, type MediaCaller } from "./media.ts";
 import { png } from "./testdata/png.ts";
+
+const pathOf = (...parts: readonly string[]) => Effect.map(Path.Path, (path) => path.join(...parts));
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const notIn = (value: unknown, secret: string) =>
+  Effect.map(json(value), (text) => {
+    expect(text).not.toContain(secret);
+  });
+const parsed = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const input: MediaImageRequest = { id: "image-test", prompt: "A quiet farm", format: "text", width: 256, height: 256, enhance: false, watermark: true };
 const response = {
@@ -77,17 +84,19 @@ it.effect("image tasks persist a result, keep bytes as an attachment, project sa
     expect(ready.attachment?.type).toBe("image/png");
     expect(ready.usage).toEqual({ images: 1, width: 256, height: 256 });
     expect(ready.canCancel).toBe(false);
-    expect(yield* (yield* Channel).attachment(ready.attachment?.id ?? "")).toBeDefined();
+    const attachment2 = yield* (yield* Channel).attachment(ready.attachment?.id ?? "");
+    expect(attachment2).toBeDefined();
     const { watermark, ...rest } = input;
     expect((yield* media.createImage({ watermark, ...rest }, { kind: "owner" })).id).toBe(input.id);
-    expect(yield* media.createImage({ ...input, prompt: "different" }, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const imageCreatedFailure = yield* media.createImage({ ...input, prompt: "different" }, { kind: "owner" }).pipe(Effect.flip);
+    expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(1);
     const row = yield* (yield* Db).one(q.generation({ id: input.id }));
     expect(row?.result_url).toBeNull();
-    expect(JSON.stringify(row)).not.toContain("test-private-key");
+    yield* notIn(row, "test-private-key");
     const state = (yield* Core).state();
     expect(state.media?.[0]).toMatchObject({ kind: "image", attachment: { id: ready.attachment?.id } });
-    expect(JSON.stringify(state.media)).not.toContain("token=private");
+    yield* notIn(state.media, "token=private");
   }).pipe(Effect.provide(layer(http)));
 });
 
@@ -134,7 +143,7 @@ it.effect("regression: an attachment disk failure preserves usage and retries on
   return Effect.gen(function* () {
     yield* configured;
     const fs = yield* FileSystem.FileSystem;
-    const blocked = join(config.home, "attachments");
+    const blocked = yield* pathOf(config.home, "attachments");
     yield* fs.writeFileString(blocked, "not a directory");
     const media = yield* Media;
     yield* media.createImage(input, { kind: "owner" });
@@ -267,7 +276,8 @@ it.effect("queued cancellation, capacity and in-flight cancellation do not creat
         (request) => media.createImage(request, { kind: "owner" }),
         { discard: true },
       );
-      expect(yield* media.createImage({ ...input, id: "overflow" }, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const imageCreatedFailure = yield* media.createImage({ ...input, id: "overflow" }, { kind: "owner" }).pipe(Effect.flip);
+      expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
       yield* Effect.forEach(
         Array.from({ length: 7 }, (_, n) => `queued-${n}`),
         (id) => media.cancel(id),
@@ -293,9 +303,10 @@ it.effect("ambiguous vendor failures are not retried and cannot use download ret
     yield* media.createImage(input, { kind: "owner" });
     const job = yield* waitFor(media.get(input.id), (row) => row.phase === "unknown", "unknown outcome");
     if (job.kind !== "image") return yield* Effect.die("Expected image task");
-    expect(JSON.stringify(job)).not.toContain("private upstream error");
+    yield* notIn(job, "private upstream error");
     expect(job.usage).toBeUndefined();
-    expect(yield* media.retryDownload(input.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const downloadRetriedFailure = yield* media.retryDownload(input.id).pipe(Effect.flip);
+    expect(downloadRetriedFailure).toMatchObject({ _tag: "Refused" });
     yield* media.createImage(input, { kind: "owner" });
     expect(calls).toBe(1);
   }).pipe(Effect.provide(layer(http)));
@@ -314,17 +325,23 @@ it.effect("generation source and reported usage survive restart without acceptin
       if (ready.kind !== "image") return yield* Effect.die("Expected image task");
       expect(ready.source).toEqual(source);
       const row = yield* (yield* Db).one(q.generation({ id: input.id }));
-      expect(row?.source).toBe(JSON.stringify(source));
-      expect(JSON.parse(row?.usage ?? "null")).toEqual(ready.usage);
+      const sourceJson = yield* json(source);
+      expect(row?.source).toBe(sourceJson);
+      const usage = yield* parsed(row?.usage ?? "null");
+      expect(usage).toEqual(ready.usage);
       return ready;
     }).pipe(Effect.provide(layer(generated, downloaded, config)));
     yield* Effect.gen(function* () {
       const media = yield* Media;
       yield* media.restore();
-      expect(yield* media.get(input.id)).toEqual(saved);
-      expect(yield* media.createImage(input, caller)).toEqual(saved);
-      expect(yield* media.createImage(input, { kind: "owner" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-      expect(yield* media.createImage(input, { ...caller, agent: "another-agent" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const media2 = yield* media.get(input.id);
+      expect(media2).toEqual(saved);
+      const imageCreated = yield* media.createImage(input, caller);
+      expect(imageCreated).toEqual(saved);
+      const imageCreatedFailure = yield* media.createImage(input, { kind: "owner" }).pipe(Effect.flip);
+      expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
+      const imageCreatedFailure2 = yield* media.createImage(input, { ...caller, agent: "another-agent" }).pipe(Effect.flip);
+      expect(imageCreatedFailure2).toMatchObject({ _tag: "Refused" });
       expect((yield* Core).state().media?.[0]?.source).toEqual(source);
     }).pipe(Effect.provide(layer(generated, downloaded, config)));
   });
@@ -334,10 +351,12 @@ it.effect("regression: autonomous patrols cannot admit a billable generation", (
   Effect.gen(function* () {
     yield* configured;
     const media = yield* Media;
-    expect(yield* media.createImage(input, { kind: "orchestrator", agent: "image-agent", channel: "", forOwner: false }).pipe(Effect.flip)).toMatchObject({
+    const imageCreatedFailure = yield* media.createImage(input, { kind: "orchestrator", agent: "image-agent", channel: "", forOwner: false }).pipe(Effect.flip);
+    expect(imageCreatedFailure).toMatchObject({
       _tag: "Refused",
     });
-    expect(yield* media.list()).toEqual([]);
+    const medias = yield* media.list();
+    expect(medias).toEqual([]);
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Autonomous generation must not reach HTTP"))))),
 );
 
@@ -353,8 +372,8 @@ it.effect("restart marks unsent and ambiguous tasks separately and resumes only 
       yield* db.run(
         q.insertGeneration({
           id: phase,
-          request: JSON.stringify({ ...input, id: phase }),
-          source: JSON.stringify({ kind: "owner" }),
+          request: yield* json({ ...input, id: phase }),
+          source: yield* json({ kind: "owner" }),
           connection: "moss",
           revision: 1,
           model: "moss-image-sft-1.0",

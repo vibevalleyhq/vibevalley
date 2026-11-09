@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Session as RuntimeSession } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Formatter, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -32,7 +32,7 @@ const worker = (turns: ScriptedTurn[]) =>
     id: "pi",
     turn: async (turn) => {
       turns.push(turn);
-      await turn.tool("bash", JSON.stringify({ command: `cd ${turn.options.cwd} && touch done.txt` }), () => {
+      await turn.tool("bash", Formatter.formatJson({ command: `cd ${turn.options.cwd} && touch done.txt` }), () => {
         writeFileSync(join(turn.options.cwd, `done-${turns.length}.txt`), "done\n");
         gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "add", "-A");
         gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "commit", "-qm", `做完第 ${turns.length} 轮`);
@@ -174,7 +174,7 @@ describe("sessions", () => {
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
       const resumed = yield* sessions.deliver(id, "resume the work", delivery({ kind: "comment" }));
       expect(resumed.kind).toBe("refused");
-      expect(JSON.stringify(resumed)).toContain("did not stop");
+      expect(Formatter.formatJson(resumed)).toContain("did not stop");
       expect(opens).toBe(2);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect((yield* sessions.deliver(id, "do not start again", delivery({ kind: "comment" }))).kind).toBe("refused");
@@ -224,7 +224,7 @@ describe("sessions", () => {
           ),
         );
         expect(result._tag).toBe("Failure");
-        expect(JSON.stringify(result)).toContain("did not stop");
+        expect(Formatter.formatJson(result)).toContain("did not stop");
         expect(sessions.lastTextOf(id)).toBe(before.lastText);
         expect(existsSync(before.cwd)).toBe(true);
       }
@@ -239,7 +239,8 @@ describe("sessions", () => {
       const sessions = yield* Session;
       const core = yield* Core;
       const seen: LaunchActivity[] = [];
-      const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
+      const launches2 = yield* sessions.launches;
+      const following = yield* Effect.forkScoped(Stream.runForEach(launches2, (a) => Effect.sync(() => seen.push(a))));
 
       const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", {
         context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
@@ -325,7 +326,8 @@ describe("sessions", () => {
       expect((yield* sessions.deliver(id, "second", delivery({ kind: "comment" }))).kind).toBe("run");
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect(phase(core, id)).toBe("done");
-      expect(yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.succeed({ text: "", commits: 0 })))).toMatchObject({ _tag: "Refused" });
+      const handOverFailure = yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.succeed({ text: "", commits: 0 })));
+      expect(handOverFailure).toMatchObject({ _tag: "Refused" });
       for (const step of ["pending", "started"]) {
         if (step === "started") {
           holding = false;
@@ -392,7 +394,8 @@ describe("sessions", () => {
       const sql = yield* SqlClient.SqlClient;
       const got = yield* sessions.send(lab(), "another", "demo", {
         context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
-        hiring: () => Effect.mapError(sql.unsafe("select no_such_column from issue_assignment"), (cause) => new NotRecorded({ message: cause.message, cause })),
+        hiring: () =>
+          Effect.mapError(sql.unsafe("select no_such_column from issue_assignment"), (cause) => NotRecorded.make({ message: cause.message, cause })),
       });
       expect(got.refused).toContain("工单没记下来");
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
@@ -451,7 +454,7 @@ describe("sessions", () => {
       );
       const errors = seen.filter((e) => e.type === "notice" && e.level === "error");
       expect(errors).toHaveLength(1);
-      expect(JSON.stringify(errors)).toContain("did not stop");
+      expect(Formatter.formatJson(errors)).toContain("did not stop");
       expect(closes).toBe(1);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect(sessions.presentSessions()).toEqual([]);
@@ -622,7 +625,8 @@ it.live("regression: reopening a session rotates its credential before deliverin
     const result = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("rotation"), number: 1 } }, worktree: true });
     const id = result.session!.id;
     yield* until(() => sessions.sessionOf(id)?.phase._tag !== "working", "first turn ended");
-    expect(yield* sessions.suspend(id)).toBe(true);
+    const suspend2 = yield* sessions.suspend(id);
+    expect(suspend2).toBe(true);
     expect((yield* sessions.deliver(id, "again", { trigger: { kind: "comment" }, envelopeIds: [], byOwnerComment: true })).kind).toBe("run");
     expect(tokens.length).toBe(2);
     expect(tokens[1] !== tokens[0]).toBe(true);

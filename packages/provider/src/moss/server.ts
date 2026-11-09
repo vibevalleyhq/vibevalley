@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { WebSocket } from "undici";
 
+import { jsonText } from "../json.ts";
 import { decodeMossFrame, mossErrorMessage, mossRealtimeUrl } from "../moss.ts";
 import { mossLiveModels } from "./live-models.ts";
 import { mossVisionModels } from "./vision-models.ts";
@@ -38,12 +39,6 @@ export interface MossTransport {
   readonly status: (key: string, model?: string) => Effect.Effect<{ readonly code: number; readonly body: string }, string>;
 }
 
-const defaultAfterRealTime = (ms: number, fn: () => void) => {
-  const t = setTimeout(fn, ms);
-  t.unref();
-  return () => clearTimeout(t);
-};
-
 export const nodeMossTransport: MossTransport = {
   connect: (key, on, model = "moss-live-1.0") => {
     if (!mossLiveModels.some((supported) => supported === model) && !mossVisionModels.some((supported) => supported === model))
@@ -78,20 +73,17 @@ export const nodeMossTransport: MossTransport = {
 const handshake = (key: string, transport: MossTransport, model: string) =>
   Effect.callback<"attached" | { readonly error: string } | { readonly down: string } | "silent">((resume) => {
     let settled = false;
-    let cancel = () => {};
     let link: MossLink | undefined;
     const settle = (r: "attached" | { readonly error: string } | { readonly down: string } | "silent") => {
       if (settled) return;
       settled = true;
-      cancel();
       link?.close();
       resume(Effect.succeed(r));
     };
-    cancel = defaultAfterRealTime(mossDeadlineMs, () => settle("silent"));
     link = transport.connect(
       key,
       {
-        open: () => link?.send(JSON.stringify({ action: "attach_session", memory_scope: "session" })),
+        open: () => link?.send(jsonText({ action: "attach_session", memory_scope: "session" })),
         text: (data) => {
           const decoded = decodeMossFrame(data);
           if (decoded._tag === "None") return;
@@ -107,7 +99,10 @@ const handshake = (key: string, transport: MossTransport, model: string) =>
       model,
     );
     return Effect.sync(() => settle("silent"));
-  });
+  }).pipe(
+    // Timing out interrupts the callback, whose finalizer closes the link.
+    Effect.timeoutOrElse({ duration: mossDeadlineMs, orElse: () => Effect.succeed("silent" as const) }),
+  );
 
 /** Whether MOSS Live takes key. */
 export const verifyMoss = Effect.fn("Moss.verify")(function* (

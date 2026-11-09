@@ -1,5 +1,7 @@
 import { Schema } from "effect";
 
+import { jsonText } from "../json.ts";
+
 export const visionFrameBytes = 256 * 1024;
 export const visionFrameIntervalMs = 1000;
 export const visionBufferedBytes = 512 * 1024;
@@ -227,7 +229,7 @@ export class VisionSession {
   }
 
   private send(event: object): void {
-    this.callbacks.sendText(JSON.stringify(event));
+    this.callbacks.sendText(jsonText(event));
   }
 
   private fail(problem: string): void {

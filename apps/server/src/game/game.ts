@@ -4,7 +4,7 @@ import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol
 import * as S from "@vibevalley/protocol/schema";
 
 import { newId } from "#/base/ids.ts";
-import { jsonOrNone } from "#/base/json.ts";
+import { jsonOrNone, jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
@@ -39,7 +39,7 @@ export class Game extends Context.Service<
     /** How many runs' ends asked for a count. */
     readonly asked: () => number;
   }
->()("vibevalley/Game") {
+>()("@vibevalley/server/game/game") {
   static readonly layer = Layer.effect(
     Game,
     Effect.suspend(() => make),
@@ -72,7 +72,7 @@ const make = Effect.gen(function* () {
       const at = yield* Clock.currentTimeMillis;
       const entry = { ...input, at };
       const { kind, at: _, ...payload } = entry;
-      yield* db.attempt(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
+      yield* db.attempt(Effect.flatMap(jsonText(payload), (text) => q.addLedgerEntry({ id: newId(at), kind, at, payload: text })));
       const [next, news] = progressStep(folded, entry);
       folded = next;
       yield* core.apply({ type: "progressChanged", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
@@ -128,8 +128,9 @@ const make = Effect.gen(function* () {
       }),
     ),
   );
+  const owner2 = yield* core.owner;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* core.owner, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
+    Stream.runForEach(owner2, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
   );
 
   return Game.of({

@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { DateTime, Effect } from "effect";
 
 import { transcriptionAudio, transcribeAudio } from "./transcription.ts";
 
@@ -24,7 +24,7 @@ it.effect("transcription uses one explicit model call and preserves warnings, us
           warnings: [{ type: "other", message: "fixture warning" }],
           usage: { seconds: 2 },
           providerMetadata: { fixture: { requestId: "request-1" } },
-          response: { timestamp: new Date(0), modelId: "test-transcription", headers: { "x-request-id": "request-1" } },
+          response: { timestamp: DateTime.toDateUtc(DateTime.makeUnsafe(0)), modelId: "test-transcription", headers: { "x-request-id": "request-1" } },
         });
       },
     };
@@ -63,8 +63,11 @@ it.effect("transcription validates the six existing formats and audio before cal
     for (const format of ["wav", "m4a", "mp3", "webm", "ogg", "flac"]) {
       expect((yield* transcriptionAudio("AAAA", ` .${format.toUpperCase()} `)).format).toBe(format);
     }
-    expect(yield* Effect.flip(transcriptionAudio("AAAA", "aac"))).toEqual({ _tag: "UnsupportedFormat", format: "aac" });
-    expect(yield* Effect.flip(transcriptionAudio("invalid!", "wav"))).toEqual({ _tag: "EmptyAudio" });
-    expect(yield* Effect.flip(transcriptionAudio("", "wav"))).toEqual({ _tag: "EmptyAudio" });
+    const transcriptionAudioFailure = yield* Effect.flip(transcriptionAudio("AAAA", "aac"));
+    expect(transcriptionAudioFailure).toEqual({ _tag: "UnsupportedFormat", format: "aac" });
+    const transcriptionAudioFailure2 = yield* Effect.flip(transcriptionAudio("invalid!", "wav"));
+    expect(transcriptionAudioFailure2).toEqual({ _tag: "EmptyAudio" });
+    const transcriptionAudioFailure3 = yield* Effect.flip(transcriptionAudio("", "wav"));
+    expect(transcriptionAudioFailure3).toEqual({ _tag: "EmptyAudio" });
   }),
 );

@@ -1,4 +1,4 @@
-import { Stream } from "effect";
+import { Effect, Schema, Stream } from "effect";
 import { HttpEffect } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -11,13 +11,21 @@ const chatCompletions = (c: ChatCompletions) => HttpEffect.toWebHandler(handlerO
 
 const only = (model: string, answer: Answer) => (m: string) => (m === model ? answer : undefined);
 
-const ask = (handle: (r: Request) => Promise<Response>, body: unknown, method = "POST") =>
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const parsed = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+const Chunk = Schema.fromJsonString(
+  Schema.Struct({ choices: Schema.Array(Schema.Struct({ delta: Schema.Struct({ content: Schema.optionalKey(Schema.String) }) })) }),
+);
+
+const ask = async (handle: (r: Request) => Promise<Response>, body: unknown, method = "POST") =>
   handle(
     new Request("http://127.0.0.1/v1/chat/completions", {
       method,
-      ...(method === "POST" ? { body: typeof body === "string" ? JSON.stringify(body) : JSON.stringify(body) } : {}),
+      ...(method === "POST" ? { body: await Effect.runPromise(json(body)) } : {}),
     }),
   );
+/** The chunk's JSON, without the blank line after it. */
+const chunkOf = (chunk: Effect.Effect<string, Schema.SchemaError>) => Effect.runPromise(Effect.flatMap(chunk, (text) => parsed(text.slice("data: ".length))));
 
 describe("chat/completions", () => {
   it("takes the newest user text", () => {
@@ -50,15 +58,21 @@ describe("chat/completions", () => {
     for (const [req, want] of cases) expect(newestUserText(req as never)).toBe(want);
   });
 
-  it("chunks as OpenAI does", () => {
-    expect(JSON.parse(chatChunk("id1", 7, "m", "好", false, true).slice("data: ".length))).toEqual({
+  it("chunks as OpenAI does", async () => {
+    expect(await chunkOf(chatChunk("id1", 7, "m", "好", false, true))).toEqual({
       id: "id1",
       object: "chat.completion.chunk",
       created: 7,
       model: "m",
       choices: [{ index: 0, delta: { role: "assistant", content: "好" }, finish_reason: null }],
     });
-    expect(JSON.parse(chatChunk("id1", 7, "m", "", true, false).slice("data: ".length)).choices[0]).toEqual({ index: 0, delta: {}, finish_reason: "stop" });
+    expect(await chunkOf(chatChunk("id1", 7, "m", "", true, false))).toEqual({
+      id: "id1",
+      object: "chat.completion.chunk",
+      created: 7,
+      model: "m",
+      choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+    });
   });
 
   it("answers whole without a stream", async () => {
@@ -92,7 +106,8 @@ describe("chat/completions", () => {
     });
     const lines = (await res.text()).split("\n\n").filter(Boolean);
     expect(lines.at(-1)).toBe("data: [DONE]");
-    expect(lines.slice(0, 2).map((l) => JSON.parse(l.slice(6)).choices[0].delta.content)).toEqual(["好，", "这就去。"]);
+    const chunks = await Effect.runPromise(Effect.forEach(lines.slice(0, 2), (l) => Schema.decodeEffect(Chunk)(l.slice(6))));
+    expect(chunks.map((c) => c.choices[0]?.delta.content)).toEqual(["好，", "这就去。"]);
   });
 
   it("refuses in OpenAI's shape", async () => {

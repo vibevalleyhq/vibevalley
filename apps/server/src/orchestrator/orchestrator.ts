@@ -86,7 +86,7 @@ export class Orchestrator extends Context.Service<
     readonly answerer: (on: "api" | "phone") => (model: string) => Answer<NotAnswered> | undefined;
     readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
   }
->()("vibevalley/Orchestrator") {
+>()("@vibevalley/server/orchestrator/orchestrator") {
   static readonly layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));
 }
 
@@ -284,14 +284,8 @@ const make = (options: OrchestratorOptions = {}) =>
             Effect.gen(function* () {
               const [heard, ids] = yield* news(me);
               // The log shows the line; the model also gets the time, the farm and the news before it.
-              const text = [
-                situationWords.now(localeMinute(new Date(yield* Clock.currentTimeMillis))),
-                yield* situationNow(me, busy, i.channel),
-                memoryNews,
-                yield* recall(i),
-                heard,
-                asked,
-              ]
+              const now = yield* Clock.currentTimeMillis;
+              const text = [situationWords.now(localeMinute(now)), yield* situationNow(me, busy, i.channel), memoryNews, yield* recall(i), heard, asked]
                 .filter((p) => p !== "")
                 .join("\n\n");
               return { text, heard: [...new Set([...ids, ...i.envelopes])] };
@@ -385,7 +379,8 @@ const make = (options: OrchestratorOptions = {}) =>
 
     // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
-      yield* Effect.forkScoped(Stream.runForEach(yield* mailbox.forOrchestrator, (n) => logged("a line", heardInChat(n))));
+      const forOrchestrator2 = yield* mailbox.forOrchestrator;
+      yield* Effect.forkScoped(Stream.runForEach(forOrchestrator2, (n) => logged("a line", heardInChat(n))));
       // Each orchestrator goes on with the run a stop cut off.
       yield* Effect.forEach(
         store.orchestrators(),

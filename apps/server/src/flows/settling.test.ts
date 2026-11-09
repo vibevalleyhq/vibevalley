@@ -42,9 +42,11 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
       return Effect.gen(function* () {
         const sessions = yield* Session;
         const executor = yield* Executor;
-        const issues = testIssues(yield* Issue);
+        const issue2 = yield* Issue;
+        const issues = testIssues(issue2);
         const events: LaunchActivity[] = [];
-        yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (event) => Effect.sync(() => events.push(event))));
+        const launches2 = yield* sessions.launches;
+        yield* Effect.forkScoped(Stream.runForEach(launches2, (event) => Effect.sync(() => events.push(event))));
         yield* (yield* Agent).save(lab());
         const issue = yield* issues.add({ title: "work", repo: "background", agent: "lab" });
         const sent = yield* issues.start(issue.id, "");
@@ -70,7 +72,8 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
           expect(sessions.noRoom("pi", "background")).toBe("");
         }
         if (mode === "stop") {
-          expect(yield* sessions.stop(id)).toBe(true);
+          const stopped = yield* sessions.stop(id);
+          expect(stopped).toBe(true);
           yield* until(() => sessions.sessionOf(id)?.phase._tag === "resting", "the stopped session");
           expect(executor.find(id)).toBeUndefined();
           expect(sessions.noRoom("pi", "background")).toBe("");

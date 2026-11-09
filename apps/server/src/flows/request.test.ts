@@ -43,15 +43,19 @@ describe("a request the page may send again", () => {
       // Without the key a second cancel is refused (the issue is closed); with it, the first answer comes back.
       const moved = yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" });
       expect(moved.status).toBe("canceled");
-      expect(yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" })).toEqual(moved);
-      expect(yield* Effect.flip(h["issue.status.update"]({ id: made.id, status: "canceled" }))).toMatchObject({ _tag: "Refused" });
+      const statusUpdate = yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" });
+      expect(statusUpdate).toEqual(moved);
+      const statusUpdateFailure = yield* Effect.flip(h["issue.status.update"]({ id: made.id, status: "canceled" }));
+      expect(statusUpdateFailure).toMatchObject({ _tag: "Refused" });
 
       const said = (yield* (yield* Channel).say("开个串", undefined, "")).message;
       const thread = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
-      expect(yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" })).toBe(thread);
+      const threadCreate = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
+      expect(threadCreate).toBe(thread);
 
       const kept = yield* h["memory.create"]({ agent: "lab", text: "打卡页用中文", requestKey: "memory-1" });
-      expect(yield* h["memory.create"]({ agent: "lab", text: "打卡页用中文", requestKey: "memory-1" })).toEqual(kept);
+      const memoryCreate = yield* h["memory.create"]({ agent: "lab", text: "打卡页用中文", requestKey: "memory-1" });
+      expect(memoryCreate).toEqual(kept);
       expect((yield* h["memory.list"]({ agent: "lab" })).memories.filter((m) => m.text === "打卡页用中文")).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(withDoors(f)));
   });

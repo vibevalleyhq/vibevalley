@@ -6,7 +6,7 @@ import {
   type Runtime as OarRuntime,
   RuntimeRegistry,
 } from "@botiverse/oar";
-import { Cache, Clock, Context, Effect, Exit, FiberMap, FiberSet, Layer, Option, Schedule } from "effect";
+import { Cache, Clock, Context, Effect, Equal, Exit, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule } from "effect";
 
 import { Llm } from "@vibevalley/ai/llm";
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
@@ -78,7 +78,7 @@ export class Runtime extends Context.Service<
     /** Reads the runtime's quota a little after a run, several runs sharing one read. */
     readonly usageSoon: (id: string) => void;
   }
->()("vibevalley/Runtime") {
+>()("@vibevalley/server/runtime/runtime") {
   static readonly layer = (options: RuntimeOptions = {}) =>
     Layer.effect(
       Runtime,
@@ -180,6 +180,7 @@ const defaultUsageOf: UsageOf = async (_id, runtime, found) => {
 const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
+    const fs = yield* FileSystem.FileSystem;
     const core = yield* Core;
     const store = yield* Agent;
     const registry = options.registry ?? registryOf();
@@ -189,14 +190,14 @@ const make = (options: RuntimeOptions = {}) =>
     /** null when the read fails. */
     const usageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) =>
       !options.usageOf && id === "pi"
-        ? piBalance(settings)
+        ? piBalance(fs, settings)
         : Effect.orElseSucceed(
             Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }),
             () => null,
           );
 
     /** pi's own default model, read again whenever pi is looked at: what a quote for pi's default prices. */
-    const readPiDefault = Effect.promise(piSettings);
+    const readPiDefault = piSettings(fs);
     let piDefault: PiDefault = yield* readPiDefault;
     /** Runtimes being looked at again in a new language: one probe each, the old words shown until it lands. */
     const relabeling = new Set<string>();
@@ -398,7 +399,7 @@ const make = (options: RuntimeOptions = {}) =>
       const now = yield* held(id);
       if (closed || !now || now.read !== before.read || (usageTaken.get(id) ?? 0) > asked) return;
       usageTaken.set(id, asked);
-      if (JSON.stringify(usage) === JSON.stringify(now.info.usage)) return;
+      if (Equal.equals(usage, now.info.usage)) return;
       yield* keep({ ...now, info: { ...now.info, usage, checkedAt: yield* Clock.currentTimeMillis } });
     });
 
@@ -474,7 +475,8 @@ const make = (options: RuntimeOptions = {}) =>
       assess,
       candidates,
       choose: Effect.fn("Runtime.choose")(function* (brief, named, picked) {
-        return chooseAgent(yield* candidates, brief, named, picked);
+        const candidates2 = yield* candidates;
+        return chooseAgent(candidates2, brief, named, picked);
       }),
       resolve: Effect.fn("Runtime.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);

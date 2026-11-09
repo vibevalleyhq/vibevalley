@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Formatter, Layer } from "effect";
 
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 import { blockId } from "@vibevalley/protocol/schema";
@@ -30,40 +30,56 @@ describe("the endpoints the agents' tools stand on", () => {
       const api = yield* farm;
       const channels = yield* call(() => api.channel.list());
       expect(channels.map((c) => c.type)).toEqual(["channel", "direct"]);
-      expect(yield* call(() => api.channel.unread.list())).toEqual([]);
+      const response = yield* call(() => api.channel.unread.list());
+      expect(response).toEqual([]);
 
       const open = yield* call(() => api.issue.create({ title: "修登录", repo: "app" }));
       const read = yield* call(() => api.issue.get({ id: open.id }));
       for (const id of [open.id, String(open.number), `#${open.number}`]) {
-        expect(yield* call(() => api.issue.get({ id }))).toEqual(read);
-        expect(yield* call(() => api.issue.run.list({ id }))).toEqual([]);
-        expect(yield* call(() => api.issue.timeline.get({ id }))).toEqual(yield* call(() => api.issue.timeline.get({ id: open.id })));
-        expect(yield* call(() => api.issue.status.previewUpdate({ id, status: "canceled" }))).toEqual(
-          yield* call(() => api.issue.status.previewUpdate({ id: open.id, status: "canceled" })),
-        );
-        expect(yield* refusal(() => api.issue.diff.get({ id }))).toEqual(yield* refusal(() => api.issue.diff.get({ id: open.id })));
-        expect(yield* call(() => api.issue.previewDelete({ id }))).toEqual(yield* call(() => api.issue.previewDelete({ id: open.id })));
+        const response7 = yield* call(() => api.issue.get({ id }));
+        expect(response7).toEqual(read);
+        const response8 = yield* call(() => api.issue.run.list({ id }));
+        expect(response8).toEqual([]);
+        const response9 = yield* call(() => api.issue.timeline.get({ id }));
+        const openTimeline = yield* call(() => api.issue.timeline.get({ id: open.id }));
+        expect(response9).toEqual(openTimeline);
+        const response10 = yield* call(() => api.issue.status.previewUpdate({ id, status: "canceled" }));
+        const openCancelPreview = yield* call(() => api.issue.status.previewUpdate({ id: open.id, status: "canceled" }));
+        expect(response10).toEqual(openCancelPreview);
+        const refusal5 = yield* refusal(() => api.issue.diff.get({ id }));
+        const openDiffRefusal = yield* refusal(() => api.issue.diff.get({ id: open.id }));
+        expect(refusal5).toEqual(openDiffRefusal);
+        const response11 = yield* call(() => api.issue.previewDelete({ id }));
+        const openDeletePreview = yield* call(() => api.issue.previewDelete({ id: open.id }));
+        expect(response11).toEqual(openDeletePreview);
       }
       yield* call(() => api.issue.create({ title: "加打卡" }));
       expect((yield* call(() => api.issue.list({}))).map((t) => t.title).toSorted()).toEqual(["修登录", "加打卡"]);
       expect((yield* call(() => api.issue.list({ repo: "app" }))).map((t) => t.title)).toEqual(["修登录"]);
-      expect(yield* call(() => api.issue.list({ status: "done" }))).toEqual([]);
+      const response2 = yield* call(() => api.issue.list({ status: "done" }));
+      expect(response2).toEqual([]);
+      const refusal2 = yield* refusal(() => api.issue.review({ id: `#${open.number}`, pass: true }));
       // Nothing was handed back to review, and no session works it to split it.
-      expect(yield* refusal(() => api.issue.review({ id: `#${open.number}`, pass: true }))).toBe("Refused");
-      expect(yield* refusal(() => api.issue.split({ id: open.id, tasks: [{ id: "a", brief: "前端" }] }))).toBe("Refused");
+      expect(refusal2).toBe("Refused");
+      const refusal3 = yield* refusal(() => api.issue.split({ id: open.id, tasks: [{ id: "a", brief: "前端" }] }));
+      expect(refusal3).toBe("Refused");
 
-      expect(yield* call(() => api.memory.search({ text: "登录" }))).toMatchObject({ found: [] });
+      const response3 = yield* call(() => api.memory.search({ text: "登录" }));
+      expect(response3).toMatchObject({ found: [] });
 
       const doc = yield* call(() => api.artifact.create({ title: "说明", kind: "markdown" }));
       const made = yield* call(() => api.artifact.block.create({ id: doc.id, type: "heading", level: 1, text: "开头" }));
       expect(made).toMatchObject({ status: "applied", rev: 1 });
-      expect(yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "新的开头" }))).toMatchObject({
+      const response4 = yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "新的开头" }));
+      expect(response4).toMatchObject({
         status: "applied",
       });
-      expect(yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "晚了" }))).toMatchObject({
+      const response5 = yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "晚了" }));
+      expect(response5).toMatchObject({
         status: "conflict",
       });
-      expect(yield* refusal(() => api.artifact.block.create({ id: doc.id, type: "divider", text: "" }))).toBe("Refused");
+      const refusal4 = yield* refusal(() => api.artifact.block.create({ id: doc.id, type: "divider", text: "" }));
+      expect(refusal4).toBe("Refused");
       const second = yield* call(() => api.artifact.block.create({ id: doc.id, text: "第二" }));
       yield* call(() => api.artifact.block.create({ id: doc.id, text: "中间", afterBlock: made.blockId }));
       expect((yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.map((b) => b.text.map((x) => x.t).join(""))).toEqual([
@@ -71,7 +87,8 @@ describe("the endpoints the agents' tools stand on", () => {
         "中间",
         "第二",
       ]);
-      expect(yield* call(() => api.artifact.block.delete({ id: doc.id, block: second.blockId }))).toMatchObject({ status: "applied" });
+      const response6 = yield* call(() => api.artifact.block.delete({ id: doc.id, block: second.blockId }));
+      expect(response6).toMatchObject({ status: "applied" });
       expect((yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.map((b) => b.id)).not.toContain(second.blockId);
       // A message pointing at a block carries its id, the version quoted, and how it reads now.
       const general = channels.find((c) => c.default)!.id;
@@ -181,7 +198,8 @@ describe("the endpoints the agents' tools stand on", () => {
     Effect.gen(function* () {
       const api = yield* farm;
       const made = yield* call(() => api.issue.create({ title: "带着改动开工之前" }));
-      expect(yield* refusal(() => api.issue.status.update({ id: made.id, status: "todo", edit: { title: "带着改动开工", priority: "high" } }))).toBe("Refused");
+      const refusal2 = yield* refusal(() => api.issue.status.update({ id: made.id, status: "todo", edit: { title: "带着改动开工", priority: "high" } }));
+      expect(refusal2).toBe("Refused");
       const got = yield* call(() => api.issue.get({ id: made.id }));
       expect([got.title, got.priority, got.status]).toEqual(["带着改动开工", "high", "backlog"]);
     }).pipe(Effect.scoped),
@@ -199,7 +217,7 @@ describe("the endpoints the agents' tools stand on", () => {
 
 /** A body of 3 MB, once with its length said and once streamed without it: the status, or "cut" when the connection is. */
 async function postBig(url: string) {
-  const big = JSON.stringify({ id: "x".repeat(3 * 1024 * 1024) });
+  const big = Formatter.formatJson({ id: "x".repeat(3 * 1024 * 1024) });
   const declared = (await fetch(url, { method: "POST", body: big })).status;
   const chunks = new ReadableStream<Uint8Array>({
     start(c) {

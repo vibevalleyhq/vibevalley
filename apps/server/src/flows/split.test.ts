@@ -163,8 +163,11 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
     expect((yield* issues.list()).map((item) => [item.id, item.title])).toEqual([[parent.id, "parent"]]);
     expect((yield* Core).state().issues.map((item) => item.id)).toEqual([parent.id]);
     expect((yield* Session).presentSessions()).toEqual([]);
-    expect(yield* sql.unsafe("select * from mailbox_trigger where trigger_json->'meta'->'dispatch' = 'true'").pipe(Effect.orDie)).toHaveLength(0);
-    expect(yield* sql.unsafe("select * from mailbox_issue").pipe(Effect.orDie)).toHaveLength(0);
-    expect(yield* sql.unsafe("select * from issue_assignment").pipe(Effect.orDie)).toHaveLength(1);
+    const unsafe2 = yield* sql.unsafe("select * from mailbox_trigger where trigger_json->'meta'->'dispatch' = 'true'").pipe(Effect.orDie);
+    expect(unsafe2).toHaveLength(0);
+    const unsafe3 = yield* sql.unsafe("select * from mailbox_issue").pipe(Effect.orDie);
+    expect(unsafe3).toHaveLength(0);
+    const unsafe4 = yield* sql.unsafe("select * from issue_assignment").pipe(Effect.orDie);
+    expect(unsafe4).toHaveLength(1);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });

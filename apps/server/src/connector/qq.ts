@@ -26,6 +26,18 @@ const GatewayEvent = Schema.Struct({
   d: Schema.optionalKey(Schema.Unknown),
 });
 export const decodeGatewayEvent = Schema.decodeUnknownEffect(Schema.fromJsonString(GatewayEvent));
+const encodeGatewayFrame = Schema.encodeEffect(Schema.fromJsonString(Schema.Struct({ op: Schema.Finite, d: Schema.Unknown })));
+const encodeTokenRequest = Schema.encodeEffect(Schema.fromJsonString(Schema.Struct({ appId: Schema.String, clientSecret: Schema.String })));
+const encodeSendRequest = Schema.encodeEffect(
+  Schema.fromJsonString(
+    Schema.Struct({
+      content: Schema.String,
+      msg_type: Schema.Finite,
+      msg_id: Schema.optionalKey(Schema.String),
+      msg_seq: Schema.optionalKey(Schema.Finite),
+    }),
+  ),
+);
 
 export interface App {
   readonly appId: string;
@@ -64,7 +76,7 @@ const Hello = Schema.Struct({ heartbeat_interval: Schema.optionalKey(Schema.Fini
 /** A refused send, by its status: a bad login is stale; a passive reply refused (too late, too many) waits for the owner's
  * next message. */
 const sendFailure = (status: number, message: string) =>
-  new AppFailed({ kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", message });
+  AppFailed.make({ kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", message });
 
 /** QQ takes passive replies to a message for minutes only: the counts of the latest messages answered are enough. */
 const repliesKept = 256;
@@ -101,11 +113,10 @@ export class QQClient implements QQApi {
       const now = yield* Clock.currentTimeMillis;
       const cached = this.tokenCache;
       if (cached?.key === key && cached.until > now) return cached.token;
-      const request = HttpClientRequest.bodyText(
-        HttpClientRequest.post(this.tokenAt),
-        JSON.stringify({ appId: app.appId, clientSecret: app.secret }),
-        "application/json",
+      const asked = yield* encodeTokenRequest({ appId: app.appId, clientSecret: app.secret }).pipe(
+        Effect.mapError((e) => failedWith(t("server.connector.qq.auth", { why: e.message }))),
       );
+      const request = HttpClientRequest.bodyText(HttpClientRequest.post(this.tokenAt), asked, "application/json");
       const body = yield* this.http.execute(request).pipe(
         Effect.flatMap((res) => res.json),
         Effect.flatMap(Schema.decodeUnknownEffect(TokenResponse)),
@@ -141,14 +152,17 @@ export class QQClient implements QQApi {
           Effect.sync(() => new WebSocket(gateway.url)),
           (socket) => Effect.sync(() => socket.close()),
         );
-        const send = (payload: unknown) =>
-          Effect.sync(() => {
-            try {
-              ws.send(JSON.stringify(payload));
-            } catch {
-              ws.close();
-            }
-          });
+        const send = (frame: { readonly op: number; readonly d: unknown }) =>
+          Effect.flatMap(Effect.option(encodeGatewayFrame(frame)), (text) =>
+            Effect.sync(() => {
+              if (Option.isNone(text)) return ws.close();
+              try {
+                ws.send(text.value);
+              } catch {
+                ws.close();
+              }
+            }),
+          );
         // The socket's frames, in order; its close or error ends them as a failure.
         const frames = Stream.callback<string, AppFailed>((queue) =>
           Effect.sync(() => {
@@ -204,15 +218,13 @@ export class QQClient implements QQApi {
   sendText(app: App, openId: string, text: string, msgId: string) {
     return Effect.gen({ self: this }, function* () {
       const token = yield* this.token(app).pipe(Effect.mapError((e) => sendFailure(401, e.message)));
-      const payload: Record<string, unknown> = { content: text, msg_type: 0 };
-      if (msgId) {
-        const next = nextReplySeq(this.replySeq, msgId);
-        payload.msg_id = msgId;
-        payload.msg_seq = next;
-      }
+      const reply = msgId ? { msg_id: msgId, msg_seq: nextReplySeq(this.replySeq, msgId) } : {};
+      const payload = yield* encodeSendRequest({ content: text, msg_type: 0, ...reply }).pipe(
+        Effect.mapError((e) => failedWith(t("server.connector.qq.send", { why: e.message }))),
+      );
       const request = HttpClientRequest.bodyText(
         HttpClientRequest.setHeaders(HttpClientRequest.post(this.api + "/v2/users/" + encodeURIComponent(openId) + "/messages"), this.headers(app, token)),
-        JSON.stringify(payload),
+        payload,
         "application/json",
       );
       const res = yield* this.http.execute(request).pipe(
@@ -221,7 +233,8 @@ export class QQClient implements QQApi {
       );
       const decoded = Effect.flatMap(res.json, Schema.decodeUnknownEffect(SendResponse));
       if (res.status < 200 || res.status > 299) {
-        const read = Option.getOrUndefined(yield* Effect.option(decoded));
+        const decoded2 = yield* Effect.option(decoded);
+        const read = Option.getOrUndefined(decoded2);
         return yield* sendFailure(res.status, t("server.connector.qq.send", { why: `${read?.code ?? res.status} ${read?.message ?? ""}`.trim() }));
       }
       const read = yield* Effect.mapError(decoded, (e) => failedWith(t("server.connector.qq.unread", { why: e.message })));

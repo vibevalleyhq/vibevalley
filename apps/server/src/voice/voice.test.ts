@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
-import { Clock, Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { Clock, Context, Effect, Exit, Fiber, Layer, Schema, Scope } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
@@ -18,10 +16,11 @@ import { inboxStart } from "#/services.ts";
 import { NotAnswered } from "#/session/host.ts";
 import { Setting } from "#/setting/setting.ts";
 import { defaultVoice } from "#/setting/voice.ts";
-import { testConfig, until } from "#/testing/layers.ts";
+import { aTurn, testConfig, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
 import { onCallLine } from "./prompts.ts";
+import recorded from "./testdata/voice-requests.json" with { type: "json" };
 import {
   Voice,
   agentFor,
@@ -50,16 +49,15 @@ const pendingDictation = () => {
     const signal = init?.signal ?? undefined;
     seen = signal;
     entered();
-    return new Promise<Response>((_, reject) => {
-      if (signal?.aborted === true) reject(signal.reason);
-      else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
-    });
+    return Effect.runPromise(Effect.never, { signal });
   };
   return { fetch, started, signal: () => seen };
 };
 
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
+
+const decodeRequest = Schema.decodeEffect(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 
 /** Agora's REST calls, kept; each answered as given (an agent by default). */
 class Capture {
@@ -75,7 +73,7 @@ class Capture {
     const call = (init?.method ?? "GET") + " " + url;
     this.urls.push(call);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
-    this.requests.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+    this.requests.push(typeof init?.body === "string" ? await Effect.runPromise(decodeRequest(init.body)) : {});
     await this.before?.(call);
     return new Response(this.body, {
       status: this.status,
@@ -94,7 +92,7 @@ interface Case {
   readonly requestUrl: string;
 }
 
-const cases = JSON.parse(readFileSync(resolve(import.meta.dirname, "testdata/voice-requests.json"), "utf8")) as Case[];
+const cases = recorded as Case[];
 
 describe("a call's agent", () => {
   for (const c of cases)
@@ -200,47 +198,55 @@ const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
 
 /** A helper at work on an issue, and the issue, as the core has them. */
 const helperOn = (id: string, issue: string) =>
-  ({
-    id,
-    name: "阿狐" + id,
-    agent: "lab",
-    runtime: "pi",
-    brief: "写打卡",
-    hiredAt: Date.now(),
-    runs: 1,
-    issue,
-    phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
-    refining: false,
-  }) as unknown as Session;
-const issueOf = (id: string, number: number, session: string) =>
-  ({
-    id: issueId(id),
-    number,
-    title: "写打卡",
-    priority: "medium",
-    deliver: "change",
-    mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
-    createdAt: Date.now(),
-    assignments: [
-      {
-        id: `a-${id}`,
-        issue: issueId(id),
+  Effect.map(
+    Clock.currentTimeMillis,
+    (now) =>
+      ({
+        id,
+        name: "阿狐" + id,
         agent: "lab",
-        assignedAt: Date.now(),
-        executions: [{ kind: "worker", session: sessionId(session), startedAt: Date.now() }],
-      },
-    ],
-    status: "in_progress",
-    moves: [],
-    findings: [],
-    questions: [],
-    description: "",
-    blockedBy: [],
-    criteria: [],
-    checks: [],
-    stage: { state: "working", acts: [] },
-  }) satisfies Issue;
+        runtime: "pi",
+        brief: "写打卡",
+        hiredAt: now,
+        runs: 1,
+        issue,
+        phase: { _tag: "working", since: now, doing: { action: "none", label: "" } },
+        play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
+        refining: false,
+      }) as unknown as Session,
+  );
+const issueOf = (id: string, number: number, session: string) =>
+  Effect.map(
+    Clock.currentTimeMillis,
+    (now) =>
+      ({
+        id: issueId(id),
+        number,
+        title: "写打卡",
+        priority: "medium",
+        deliver: "change",
+        mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
+        createdAt: now,
+        assignments: [
+          {
+            id: `a-${id}`,
+            issue: issueId(id),
+            agent: "lab",
+            assignedAt: now,
+            executions: [{ kind: "worker", session: sessionId(session), startedAt: now }],
+          },
+        ],
+        status: "in_progress",
+        moves: [],
+        findings: [],
+        questions: [],
+        description: "",
+        blockedBy: [],
+        criteria: [],
+        checks: [],
+        stage: { state: "working", acts: [] },
+      }) satisfies Issue,
+  );
 
 const credentials = (voice?: Partial<VoiceSettings>) =>
   Effect.gen(function* () {
@@ -258,7 +264,8 @@ describe("voice", () => {
   it.live("signs a grant only with credentials, and renews it", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
-      expect(yield* Effect.flip(voice.session())).toMatchObject({
+      const sessionFailure = yield* Effect.flip(voice.session());
+      expect(sessionFailure).toMatchObject({
         _tag: "VoiceUnavailable",
         reason: expect.stringContaining("App ID"),
       });
@@ -276,13 +283,10 @@ describe("voice", () => {
   // Agora's retries, on the service's Clock (voice.ts retrying): moved through, not waited for.
   it.effect("retries 408, 429 and 5xx twice on the Clock, as Agora's SDK would, and nothing else", () =>
     Effect.gen(function* () {
-      const run = Effect.runPromiseWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const run = Effect.runPromiseWith(context2);
       // A retry's sleep is taken after the answer comes back: let it be taken, then move the clock.
-      const step = (ms: number) =>
-        Effect.andThen(
-          Effect.promise(() => new Promise((r) => setImmediate(r))),
-          TestClock.adjust(ms),
-        );
+      const step = (ms: number) => Effect.andThen(aTurn, TestClock.adjust(ms));
       const answering = (...answers: [number, Record<string, string>?][]) => {
         const seen: number[] = [];
         const fetcher = (async () => {
@@ -312,7 +316,8 @@ describe("voice", () => {
       expect((yield* Fiber.join(busyCall)).status).toBe(200);
 
       const refused = answering([400]);
-      expect((yield* Fiber.join(yield* refused.call)).status).toBe(400);
+      const call2 = yield* refused.call;
+      expect((yield* Fiber.join(call2)).status).toBe(400);
       expect(refused.seen).toEqual([400]);
 
       const down = answering([500], [500], [500]);
@@ -340,14 +345,16 @@ describe("voice", () => {
       const late = asking((n) => (n < 3 ? 502 : 401));
       const lateFiber = yield* late.answers;
       yield* TestClock.adjust(4_000);
-      expect(yield* Fiber.join(lateFiber)).toBe(true);
+      const lateFiber2 = yield* Fiber.join(lateFiber);
+      expect(lateFiber2).toBe(true);
       expect(late.asked).toEqual([0, 2_000, 4_000]);
 
       const start = yield* Clock.currentTimeMillis;
       const never = asking(() => 404);
       const neverFiber = yield* never.answers;
       yield* TestClock.adjust(60_000);
-      expect(yield* Fiber.join(neverFiber)).toBe(false);
+      const neverFiber2 = yield* Fiber.join(neverFiber);
+      expect(neverFiber2).toBe(false);
       expect(never.asked.map((at) => at - start)).toEqual(Array.from({ length: 30 }, (_, i) => i * 2_000));
     }),
   );
@@ -375,7 +382,8 @@ describe("voice", () => {
       // A failure that is not retried: the retries have their own test (retrying, below).
       capture.status = 403;
       capture.body = `{"detail":"boom"}`;
-      expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceCallFailed" });
+      const stoppedFailure = yield* Effect.flip(voice.stop("other"));
+      expect(stoppedFailure).toMatchObject({ _tag: "VoiceCallFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
@@ -388,10 +396,12 @@ describe("voice", () => {
       const agent = yield* voice.start(grant.channel, grant.uid);
       yield* voice.heard(agent.agentId, "语音消息", "", "voice-1");
       const sql = yield* SqlClient.SqlClient;
-      expect(
-        yield* sql<{ source: string; meta: string | null }>`select d.source, m.meta from mailbox_delivery d
-          join channel_message m on m.id = d.message_id where m.body = '语音消息'`,
-      ).toEqual([{ source: "voice", meta: `{"ingressSource":"voice","spoken":true}` }]);
+      const rows = yield* sql<{
+        source: string;
+        meta: string | null;
+      }>`select d.source, m.meta from mailbox_delivery d
+          join channel_message m on m.id = d.message_id where m.body = '语音消息'`;
+      expect(rows).toEqual([{ source: "voice", meta: `{"ingressSource":"voice","spoken":true}` }]);
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
@@ -417,7 +427,8 @@ describe("voice", () => {
       yield* Fiber.join(interrupting);
       yield* until(() => capture.urls.some((url) => url.includes("/agents/parity-agent/leave")), "the late agent stopped");
       expect(voice.lines()).toBe(0);
-      expect(yield* Effect.flip(voice.start(grant.channel, grant.uid))).toMatchObject({
+      const startedFailure = yield* Effect.flip(voice.start(grant.channel, grant.uid));
+      expect(startedFailure).toMatchObject({
         _tag: "VoiceUnavailable",
         reason: expect.stringContaining("失效"),
       });
@@ -462,11 +473,12 @@ describe("voice", () => {
       const voice = yield* Voice;
       const core = yield* Core;
       yield* credentials({ answer: { vendor: "orchestrator" } });
-      expect(yield* voice.speak("没人在听")).toBe(false);
+      const spoken2 = yield* voice.speak("没人在听");
+      expect(spoken2).toBe(false);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: yield* helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: yield* issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "sessionReported",
         questions: [],
@@ -513,8 +525,8 @@ describe("voice", () => {
         ["w1", "t1", 41],
         ["w2", "t2", 42],
       ] as const) {
-        yield* core.apply({ type: "sessionChanged", session: helperOn(w, t) });
-        yield* core.apply({ type: "issueChanged", issue: issueOf(t, n, w) });
+        yield* core.apply({ type: "sessionChanged", session: yield* helperOn(w, t) });
+        yield* core.apply({ type: "issueChanged", issue: yield* issueOf(t, n, w) });
       }
       yield* core.apply({
         type: "sessionReported",
@@ -549,7 +561,7 @@ describe("voice", () => {
     const brief = () =>
       Effect.suspend(() => {
         asks++;
-        return asks === 1 ? Effect.fail(new NotAnswered({ message: "brief failed", cause: undefined })) : Effect.succeed("第二件说完了");
+        return asks === 1 ? Effect.fail(NotAnswered.make({ message: "brief failed", cause: undefined })) : Effect.succeed("第二件说完了");
       });
     return Effect.gen(function* () {
       const voice = yield* Voice;
@@ -557,8 +569,8 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: yield* helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: yield* issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "sessionReported",
         questions: [],
@@ -569,8 +581,8 @@ describe("voice", () => {
         runs: 1,
       });
       yield* until(() => asks === 1, "the failed brief");
-      yield* core.apply({ type: "sessionChanged", session: helperOn("w2", "t2") });
-      yield* core.apply({ type: "issueChanged", issue: issueOf("t2", 42, "w2") });
+      yield* core.apply({ type: "sessionChanged", session: yield* helperOn("w2", "t2") });
+      yield* core.apply({ type: "issueChanged", issue: yield* issueOf("t2", 42, "w2") });
       yield* core.apply({
         type: "sessionReported",
         questions: [],
@@ -603,8 +615,8 @@ describe("voice", () => {
       yield* Effect.provide(credentials({ answer: { vendor: "orchestrator" } }), context);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: yield* helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: yield* issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "sessionReported",
         questions: [],
@@ -639,8 +651,8 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: yield* helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: yield* issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "sessionReported",
         questions: [],
@@ -689,10 +701,12 @@ describe("voice", () => {
       capture.status = 403;
       capture.body = `{"detail":"stop failed"}`;
       yield* Effect.flip(voice.stop(call.agentId));
-      expect(yield* Effect.flip(voice.heard(call.agentId, "late", "", ""))).toMatchObject({
+      const heardFailure = yield* Effect.flip(voice.heard(call.agentId, "late", "", ""));
+      expect(heardFailure).toMatchObject({
         _tag: "VoiceCallFailed",
       });
-      expect(yield* Effect.flip(voice.said(call.agentId, "late"))).toMatchObject({
+      const saidFailure = yield* Effect.flip(voice.said(call.agentId, "late"));
+      expect(saidFailure).toMatchObject({
         _tag: "VoiceCallFailed",
       });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
@@ -701,7 +715,8 @@ describe("voice", () => {
   it.live("relays the owner's words without a call id only with one call on", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
-      expect(yield* Effect.flip(voice.heardCurrent("none", "", ""))).toMatchObject({
+      const heardCurrentFailure = yield* Effect.flip(voice.heardCurrent("none", "", ""));
+      expect(heardCurrentFailure).toMatchObject({
         _tag: "VoiceCallFailed",
       });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
@@ -725,28 +740,28 @@ describe("voice", () => {
           res.end(answer.body);
         });
       });
-      yield* Effect.promise(() => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve())));
+      yield* Effect.callback<void>((resume) => void server.listen(0, "127.0.0.1", () => resume(Effect.void)));
       yield* Effect.addFinalizer(() =>
-        Effect.promise(
-          () =>
-            new Promise<void>((resolve) => {
-              server.closeAllConnections();
-              server.close(() => resolve());
-            }),
-        ),
+        Effect.callback<void>((resume) => {
+          server.closeAllConnections();
+          server.close(() => resume(Effect.void));
+        }),
       );
       const address = server.address();
       const port = typeof address === "object" && address !== null ? address.port : 0;
       yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: `http://127.0.0.1:${port}/v1`, model: "m" } }));
       const voice = yield* Voice;
       for (let i = 0; i < 2; i++) {
-        expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+        const dictateFailure2 = yield* Effect.flip(voice.dictate("AAAA", "wav"));
+        expect(dictateFailure2).toMatchObject({
           _tag: "VoiceUnavailable",
           reason: expect.stringContaining("转写格式"),
         });
       }
-      expect(yield* voice.dictate("AAAA", "wav")).toEqual({ text: "好" });
-      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+      const dictate2 = yield* voice.dictate("AAAA", "wav");
+      expect(dictate2).toEqual({ text: "好" });
+      const dictateFailure = yield* Effect.flip(voice.dictate("AAAA", "wav"));
+      expect(dictateFailure).toMatchObject({
         _tag: "VoiceUnavailable",
         reason: expect.stringContaining("500：bad"),
       });
@@ -786,13 +801,15 @@ describe("voice", () => {
     Effect.gen(function* () {
       const voice = yield* Voice;
       expect((yield* Setting).status().dictationReady).toBe(false);
-      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+      const dictateFailure = yield* Effect.flip(voice.dictate("AAAA", "wav"));
+      expect(dictateFailure).toMatchObject({
         _tag: "VoiceUnavailable",
         reason: expect.stringContaining("默认听写连接"),
         settings: "dictation",
       });
       yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: "", model: "" } }));
-      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+      const dictateFailure2 = yield* Effect.flip(voice.dictate("AAAA", "wav"));
+      expect(dictateFailure2).toMatchObject({
         _tag: "VoiceUnavailable",
         reason: expect.stringContaining("听写还没配"),
       });
@@ -810,7 +827,7 @@ describe("voice", () => {
         format: form.get("response_format"),
         file: (form.get("file") as File | null)?.name,
       });
-      return new Response(JSON.stringify({ text: " 你好 " }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(`{"text":" 你好 "}`, { status: 200, headers: { "content-type": "application/json" } });
     };
     return Effect.gen(function* () {
       const setting = yield* Setting;
@@ -831,7 +848,8 @@ describe("voice", () => {
       expect(setting.status().dictation.via).toBe("moss");
       expect(setting.status().dictationReady).toBe(true);
       const voice = yield* Voice;
-      expect(yield* voice.dictate("AAAA", "wav")).toEqual({ text: "你好" });
+      const dictate2 = yield* voice.dictate("AAAA", "wav");
+      expect(dictate2).toEqual({ text: "你好" });
       expect(sent).toEqual([
         {
           url: "https://api.mosi.cn/v1/audio/transcriptions",
@@ -875,7 +893,8 @@ describe("voice", () => {
       const voice = yield* Voice;
       const sql = yield* SqlClient.SqlClient;
       yield* Effect.orDie(setting.save({ voice: { answer: { vendor: "moss" } } }));
-      expect(yield* Effect.flip(voice.session())).toMatchObject({
+      const sessionFailure = yield* Effect.flip(voice.session());
+      expect(sessionFailure).toMatchObject({
         _tag: "VoiceUnavailable",
         settings: "moss",
       });
@@ -903,7 +922,8 @@ describe("voice", () => {
 
       yield* voice.heard(call.agentId, "帮我看一下工单", "", "moss-voice-1");
       yield* voice.said(call.agentId, "好，我这就去查。");
-      expect(yield* voice.speak("41 号工单做完了。")).toBe(true);
+      const spoken = yield* voice.speak("41 号工单做完了。");
+      expect(spoken).toBe(true);
 
       const rows = yield* sql<{ body: string }>`select body from channel_message order by rowid`;
       expect(rows.map((r) => r.body)).toContain("帮我看一下工单");
@@ -911,7 +931,8 @@ describe("voice", () => {
       expect(rows.map((r) => r.body)).not.toContain("41 号工单做完了。");
 
       yield* voice.stop(call.agentId);
-      expect(yield* voice.speak("挂断后不再播报")).toBe(false);
+      const spoken2 = yield* voice.speak("挂断后不再播报");
+      expect(spoken2).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 });

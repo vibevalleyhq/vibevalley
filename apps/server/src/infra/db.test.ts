@@ -20,14 +20,16 @@ describe("the database", () => {
       expect((yield* lanOpen()).open).toBe(true);
       yield* addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123 });
       yield* seenLanDevice({ last_seen: 1_700_000_000_456, id: "d1" });
-      expect(yield* lanDevices()).toEqual([{ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 }]);
+      const lanDevices2 = yield* lanDevices();
+      expect(lanDevices2).toEqual([{ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 }]);
     }).pipe(Effect.provide(testDatabase())),
   );
 
   it.effect("one is the row, or undefined when there is none; a query that fails is still a defect", () =>
     Effect.gen(function* () {
       const db = yield* Db;
-      expect(yield* db.one(lanOpen())).toBeUndefined();
+      const lanOpen2 = yield* db.one(lanOpen());
+      expect(lanOpen2).toBeUndefined();
       yield* db.run(setLanOpen({ open: true }));
       expect((yield* db.one(lanOpen()))?.open).toBe(true);
       const sql = yield* SqlClient.SqlClient;
@@ -65,7 +67,8 @@ describe("the database", () => {
           }),
         ),
       );
-      expect(yield* db.run(lanDevices())).toEqual([]);
+      const lanDevices2 = yield* db.run(lanDevices());
+      expect(lanDevices2).toEqual([]);
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
@@ -75,7 +78,8 @@ describe("the database", () => {
       const sql = yield* SqlClient.SqlClient;
       const failed = yield* Effect.flip(db.attemptTx(Effect.andThen(setLanOpen({ open: true }), sql.unsafe("select * from nowhere"))));
       expect(failed._tag).toBe("SqlError");
-      expect(yield* db.one(lanOpen())).toBeUndefined();
+      const lanOpen2 = yield* db.one(lanOpen());
+      expect(lanOpen2).toBeUndefined();
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
@@ -88,7 +92,10 @@ describe("the database", () => {
       return [before[0]!.count, seq[0]!.seq];
     });
     return Effect.gen(function* () {
-      for (let n = 0; n < 3; n++) expect(yield* farm.pipe(Effect.provide(testDatabase()))).toEqual([0, 1]);
+      for (let n = 0; n < 3; n++) {
+        const counts = yield* farm.pipe(Effect.provide(testDatabase()));
+        expect(counts).toEqual([0, 1]);
+      }
     });
   });
 
@@ -99,7 +106,8 @@ describe("the database", () => {
       yield* open(addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1 }));
       expect(readFileSync(where + ".schema", "utf8").trim()).not.toBe("");
       expect(readdirSync(where)).toContain(dbFile);
-      expect(yield* open(lanDevices())).toMatchObject([{ id: "d1", name: "手机" }]);
+      const opened = yield* open(lanDevices());
+      expect(opened).toMatchObject([{ id: "d1", name: "手机" }]);
     });
   });
 

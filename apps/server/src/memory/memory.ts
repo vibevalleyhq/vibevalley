@@ -76,7 +76,7 @@ export class Memory extends Context.Service<
     readonly archive: (agent: string, query: string) => Effect.Effect<T.ArchiveListing>;
     readonly archiveFile: (agent: string, name: string) => Effect.Effect<string | undefined>;
   }
->()("vibevalley/Memory") {
+>()("@vibevalley/server/memory/memory") {
   static readonly layer = Layer.effect(
     Memory,
     Effect.suspend(() => make()),
@@ -177,7 +177,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         return yield* preview(agent, repo, text);
       }),
       recall: Effect.fn("Memory.recall")(function* (cue) {
-        const told = mergeRecalled(yield* sources.prefetch(cue));
+        const prefetch2 = yield* sources.prefetch(cue);
+        const told = mergeRecalled(prefetch2);
         const ids = told.map((l) => l.id).filter((id) => id !== "");
         yield* local.markRecalled(ids.filter((id) => !id.includes(":")));
         return { ids, lines: told.map((l) => l.line) };
@@ -360,7 +361,8 @@ const makeMemoryStore = Effect.gen(function* () {
                   }),
                 );
               }
-              yield* Effect.forEach(nextForgotten(yield* list(run.agent), 0), (id) => db.attempt(q.forget({ agent: run.agent, id })), { discard: true });
+              const found = yield* list(run.agent);
+              yield* Effect.forEach(nextForgotten(found, 0), (id) => db.attempt(q.forget({ agent: run.agent, id })), { discard: true });
             }),
           )
           .pipe(bestEffort(`what ${run.session} learned was not kept`));
@@ -376,14 +378,14 @@ const makeMemoryStore = Effect.gen(function* () {
 
   const write = Effect.fnUntraced(function* (n: Note) {
     const body = clip(n.text, noteMaxChars);
-    if (body === "") return yield* new MemoryRefused({ message: t("server.memory.empty") });
+    if (body === "") return yield* MemoryRefused.make({ message: t("server.memory.empty") });
     const repo = n.repo.trim() || undefined;
     const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
     const { id, at } = yield* insertNote(n.agent, body, repo, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
         Effect.andThen(
           Effect.logWarning(`a note for ${n.agent}: ${String(e)}`),
-          Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed"), cause: e })),
+          Effect.fail(MemoryRefused.make({ message: t("server.memory.dbFailed"), cause: e })),
         ),
       ),
     );

@@ -1,7 +1,8 @@
-import { Predicate } from "effect";
+import { Option, Predicate } from "effect";
 
 import { type DeepSeekChunk, decodeDeepSeekChunk, SseData } from "@vibevalley/provider/deepseek/response";
 
+import { parsedJson } from "./json.ts";
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -292,7 +293,10 @@ export function responseOf(model: Model, sse: string, timestamp = 0): AssistantM
   const data = new SseData();
   for (const line of sse.split("\n")) {
     const d = data.line(line);
-    if (d !== undefined) fold.chunk(decodeDeepSeekChunk(JSON.parse(d)));
+    if (d === undefined) continue;
+    const parsed = parsedJson(d);
+    if (Option.isNone(parsed)) throw new Error(`Not JSON in the stream: ${d.slice(0, 200)}`);
+    fold.chunk(decodeDeepSeekChunk(parsed.value));
   }
   const last = fold.end().at(-1);
   if (!last) return fold.message();

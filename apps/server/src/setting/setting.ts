@@ -6,7 +6,6 @@ import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOf } from "#/base/json.ts";
 import { pkmDir, reposDir, ServerConfig, worktreesDir } from "#/infra/config.ts";
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 
@@ -95,7 +94,7 @@ export class Setting extends Context.Service<
     readonly memorySources: () => readonly MemorySourceConfig[];
     readonly voiceConfig: () => VoiceConfig;
   }
->()("vibevalley/Setting") {
+>()("@vibevalley/server/setting/setting") {
   static readonly layer = Layer.effect(
     Setting,
     Effect.suspend(() => make),
@@ -106,6 +105,9 @@ const secret = (value: string | undefined, source: KeySource): KeyStatus => (val
 
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
+
+/** As it is written: keys in the order they were set. */
+const encodeStored = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
 
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
@@ -120,7 +122,7 @@ const make = Effect.gen(function* () {
     if (!config.voice.id) return base;
     return { ...base, tts: { vendor: "minimax", model: base.tts.vendor === "minimax" ? base.tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
   };
-  let stored: Stored = (yield* readOrSetAside(file, jsonOf(Stored), "the settings start empty")) ?? {};
+  let stored: Stored = (yield* readOrSetAside(file, Schema.decodeEffect(Schema.fromJsonString(Stored)), "the settings start empty")) ?? {};
   setLocale(stored.locale ?? "zh");
 
   const pick = (saved: string | undefined, given: string): [string, KeySource] | undefined =>
@@ -164,16 +166,17 @@ const make = Effect.gen(function* () {
 
   // Once the rename starts, cancellation must not leave memory at the previous revision.
   const persist = Effect.fn("Setting.persist")(function* (next: Stored) {
-    yield* disk
-      .save(JSON.stringify(next, null, 2) + "\n")
-      .pipe(Effect.mapError((e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: e.message }), cause: e })));
+    yield* encodeStored(next).pipe(
+      Effect.flatMap((text) => disk.save(text + "\n")),
+      Effect.mapError((e) => SettingRefused.make({ message: t("server.setting.notSaved", { file, why: e.message }), cause: e })),
+    );
     stored = next;
     setLocale(next.locale ?? "zh");
   }, Effect.uninterruptible);
 
   const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
     const problem = settingsProblem(u);
-    if (problem) return yield* new SettingRefused({ message: problem });
+    if (problem) return yield* SettingRefused.make({ message: problem });
     const next: Record<string, unknown> = { ...stored };
     for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
       const given = u[key];
@@ -192,7 +195,7 @@ const make = Effect.gen(function* () {
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
     if (Predicate.isObject(next.voice) && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
-    const kept = yield* Schema.decodeEffect(Stored)(compact(next)).pipe(Effect.mapError((e) => new SettingRefused({ message: e.message, cause: e })));
+    const kept = yield* Schema.decodeEffect(Stored)(compact(next)).pipe(Effect.mapError((e) => SettingRefused.make({ message: e.message, cause: e })));
     yield* persist(kept);
     return status();
   }, saving.withPermits(1));

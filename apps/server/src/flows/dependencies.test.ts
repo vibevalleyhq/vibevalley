@@ -108,7 +108,8 @@ it.live("regression: automatic child merge preserves uncommitted parent work", (
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue = yield* Issue;
+    const issues = testIssues(issue);
     yield* (yield* Agent).save(lab());
     const parent = yield* issues.add({ title: "父工单", agent: "lab", repo: "dirty-parent" });
     const place = yield* (yield* Repo).workplace("dirty-parent", parent.number, true, "");

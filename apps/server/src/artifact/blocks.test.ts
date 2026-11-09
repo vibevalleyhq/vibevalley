@@ -174,10 +174,12 @@ describe("a blocks artifact", () => {
         const sql = yield* SqlClient.SqlClient;
         const snap = yield* s.importMarkdown("导入", sample, "lab");
         expect([snap.artifact.seq, snap.blocks.length, snap.blocks[0]!.updatedBy]).toEqual([1, 17, "lab"]);
-        expect(yield* s.markdown(snap.artifact.id)).toBe(sample);
+        const markdown2 = yield* s.markdown(snap.artifact.id);
+        expect(markdown2).toBe(sample);
         const [b, r] = yield* s.append(snap.artifact.id, "lab", "paragraph", {}, "帮工写的 **一段**");
         expect([r!.status, b!.rev, b!.text.length]).toEqual(["applied", 1, 2]);
-        expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/u);
+        const markdown3 = yield* s.markdown(snap.artifact.id);
+        expect(markdown3).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/u);
         expect((yield* Effect.flip(s.get(artifactId("nope"))))._tag).toBe("Missing");
         expect((yield* sql<{ n: number }>`select count(*) as n from artifact_change`)[0]!.n).toBe(2);
       }),
@@ -194,7 +196,8 @@ describe("a blocks artifact", () => {
         yield* submit(s, id, "mine", { op: "insert_block", block: para("first", "V", "主人先写的") });
         const all = helpers(["off", false], ["backend", true], ["tester", true], ["frontend", true], ["docs", true]);
         yield* s.demo(id, all);
-        expect(yield* Effect.flip(s.demo(id, all))).toMatchObject({ reason: expect.stringContaining("演示正在写") });
+        const demoFailure = yield* Effect.flip(s.demo(id, all));
+        expect(demoFailure).toMatchObject({ reason: expect.stringContaining("演示正在写") });
         yield* finished(s);
         const snap = yield* s.get(id);
         expect(snap.blocks[0]!.id).toBe("first");

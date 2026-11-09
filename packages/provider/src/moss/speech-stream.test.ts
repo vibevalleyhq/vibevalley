@@ -1,10 +1,12 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Stream } from "effect";
+import { Deferred, Effect, Fiber, Formatter, Option, Schema, Stream } from "effect";
 import { Base64 } from "effect/encoding";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { type MossSpeechEvent, streamMossSpeech } from "./speech-stream.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = { model: "moss-tts-1.5-flash", text: "Synthetic sample", voice: "voice-one", format: "pcm" };
 const task = { type: "task.created", task_id: "task-one", object: "audio.speech", status: "PROCESSING", model: input.model };
@@ -16,7 +18,7 @@ const done = {
   usage: { input_characters: 11, prompt_tokens: 7, completion_tokens: 54, total_tokens: 61 },
   meta_info: { performance: { audio_duration_s: 2.16 } },
 };
-const frame = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
+const frame = (value: unknown) => `data: ${Formatter.formatJson(value)}\n\n`;
 const encoder = new TextEncoder();
 const answer = (text: string, contentType = "text/event-stream") =>
   HttpClient.make((request) => Effect.succeed(HttpClientResponse.fromWeb(request, new Response(text, { headers: { "content-type": contentType } }))));
@@ -34,9 +36,10 @@ it.effect.each([1, 7, 65536])("observed Flash SSE survives %i-byte chunks and pr
       expect(request.url).toBe("https://api.mosi.cn/v1/audio/speech");
       expect(request.headers.authorization).toBe("Bearer test-key");
       expect(request.headers.accept).toBe("text/event-stream");
-      expect(yield* Effect.serviceOption(FetchHttpClient.RequestInit)).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
+      const serviceOption2 = yield* Effect.serviceOption(FetchHttpClient.RequestInit);
+      expect(serviceOption2).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model: input.model,
         input: input.text,
         voice_id: input.voice,
@@ -83,7 +86,8 @@ it.effect("PCM samples may span delta boundaries, but the completed stream must 
   Effect.gen(function* () {
     const events = yield* collect([created, { type: delta.type, audio: "AQ==" }, { type: delta.type, audio: "AA==" }, done].map(frame).join(""));
     expect(events.map((event) => event.type)).toEqual(["speech.created", "speech.audio.delta", "speech.audio.delta", "speech.audio.done"]);
-    expect(yield* collect([created, { type: delta.type, audio: "AQ==" }, done].map(frame).join("")).pipe(Effect.flip)).toMatchObject({
+    const collectedFailure = yield* collect([created, { type: delta.type, audio: "AQ==" }, done].map(frame).join("")).pipe(Effect.flip);
+    expect(collectedFailure).toMatchObject({
       reason: "InvalidResponse",
       outcome: "Unknown",
     });
@@ -95,7 +99,7 @@ it.effect.each([
   { text: frame(task) },
   { text: frame(created) },
   { text: frame(created) + frame(delta) },
-  { text: frame(created) + frame(delta) + `data: ${JSON.stringify(done)}` },
+  { text: frame(created) + frame(delta) + `data: ${Formatter.formatJson(done)}` },
   { text: frame(created) + frame(delta) + "data: [DONE]\n\n" },
   { text: frame(delta) + frame(done) },
   { text: frame(done) },
@@ -114,7 +118,8 @@ it.effect.each([
   { text: "retry: 1000\n\n" },
 ])("invalid or incomplete SSE %# never claims completion", ({ text }) =>
   Effect.gen(function* () {
-    expect(yield* collect(text).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const collectedFailure = yield* collect(text).pipe(Effect.flip);
+    expect(collectedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }),
 );
 
@@ -132,7 +137,7 @@ it.effect("a vendor stream error preserves already emitted audio but never leaks
     );
     expect(events.map((event) => event.type)).toEqual(["speech.created", "speech.audio.delta"]);
     expect(error).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/private-key|signed-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/private-key|signed-url/u);
   }),
 );
 
@@ -145,7 +150,8 @@ it.effect.each([
   { webhook_url: "https://example.com" },
 ])("unsupported streaming request %# is rejected before submission", (patch) =>
   Effect.gen(function* () {
-    expect(yield* streamMossSpeech("test-key", { ...input, ...patch }).pipe(Stream.runDrain, Effect.flip)).toMatchObject({
+    const streamMossSpeechFailure = yield* streamMossSpeech("test-key", { ...input, ...patch }).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossSpeechFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });
@@ -159,7 +165,8 @@ it.effect.each([
 
 it.effect.each(["", "private\nheader"])("invalid streaming credential %# is not submitted", (key) =>
   Effect.gen(function* () {
-    expect(yield* streamMossSpeech(key, input).pipe(Stream.runDrain, Effect.flip)).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const streamMossSpeechFailure = yield* streamMossSpeech(key, input).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossSpeechFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -182,14 +189,15 @@ it.effect.each([302, 400, 503])("HTTP %i does not retry or follow redirects", (s
   return Effect.gen(function* () {
     const error = yield* streamMossSpeech("test-key", input).pipe(Stream.runDrain, Effect.flip);
     expect(error).toMatchObject({ reason: "HttpStatus", status, outcome: status === 400 ? "Rejected" : "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/private|secret/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/private|secret/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect("a successful JSON or raw PCM response cannot masquerade as an SSE stream", () =>
   Effect.gen(function* () {
-    expect(yield* streamMossSpeech("test-key", input).pipe(Stream.runDrain, Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const streamMossSpeechFailure = yield* streamMossSpeech("test-key", input).pipe(Stream.runDrain, Effect.flip);
+    expect(streamMossSpeechFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer(frame(created), "audio/pcm"))),
 );
 
@@ -198,7 +206,8 @@ it.effect.each([
   { text: frame(created) + frame({ ...delta, audio: Base64.encode(new Uint8Array((512 << 10) + 1)) }) },
 ])("oversized pending event or decoded audio frame %# is bounded", ({ text }) =>
   Effect.gen(function* () {
-    expect(yield* collect(text).pipe(Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const collectedFailure = yield* collect(text).pipe(Effect.flip);
+    expect(collectedFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }),
 );
 
@@ -230,7 +239,8 @@ it.effect.each(["done", "cancel", "timeout"])("%s closes the response body witho
     if (action === "cancel") yield* Fiber.interrupt(fiber);
     else if (action === "timeout") {
       yield* TestClock.adjust("300 seconds");
-      expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     } else {
       const events = yield* Fiber.join(fiber).pipe(Effect.flip);
       expect(events.at(-1)?.type).toBe("speech.audio.done");
@@ -256,7 +266,8 @@ it.effect("the absolute deadline includes waiting for response headers", () =>
     );
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(calls).toBe(1);
   }),
 );
@@ -266,7 +277,7 @@ it.effect("Flash snapshot requests preserve explicit optional controls and zero 
   const http = HttpClient.make((request) =>
     Effect.gen(function* () {
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toMatchObject({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toMatchObject({
         model: snapshot,
         language: "English",
         expected_duration_sec: 2,

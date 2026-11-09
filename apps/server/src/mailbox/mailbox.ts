@@ -105,7 +105,7 @@ export class Mailbox extends Context.Service<
     readonly returnInput: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
     readonly deliverDirect: (session: string, text: string, replyChannel: string | undefined, byOwner: boolean) => Effect.Effect<void>;
   }
->()("vibevalley/Mailbox") {
+>()("@vibevalley/server/mailbox/mailbox") {
   static readonly layer = Layer.effect(
     Mailbox,
     Effect.gen(function* () {
@@ -183,7 +183,7 @@ export class Mailbox extends Context.Service<
           key,
           Effect.delay(
             Effect.sync(() => {
-              if (!closed) void forkHere(pumpLocked(Effect.suspend(() => (closed ? Effect.void : effect()))).pipe(bestEffort(`mailbox: ${key}`)));
+              if (!closed) void Effect.suspend(() => (closed ? Effect.void : effect())).pipe(pumpLocked, bestEffort(`mailbox: ${key}`), forkHere);
             }),
             ms,
           ),
@@ -230,15 +230,14 @@ export class Mailbox extends Context.Service<
         const result = yield* work.receive(trigger, audience);
         if (!(yield* work.registered(trigger.id))) {
           const at = yield* Clock.currentTimeMillis;
-          received(
-            yield* db.run(
-              qr.markRouted({
-                envelope_id: trigger.id,
-                scope: deliveryScope(trigger.replyChannel ?? (yield* defaultChannelOf)),
-                routed_at: at,
-              }),
-            ),
+          const markRouted2 = yield* db.run(
+            qr.markRouted({
+              envelope_id: trigger.id,
+              scope: deliveryScope(trigger.replyChannel ?? (yield* defaultChannelOf)),
+              routed_at: at,
+            }),
           );
+          received(markRouted2);
         }
         return result ?? { heldNotice: "" };
       });
@@ -408,20 +407,17 @@ export class Mailbox extends Context.Service<
         retryWakeMs: config.chat.retryWakeMs,
       });
 
+      const launches2 = yield* sessions.launches;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* sessions.launches, (activity) =>
-          pumpLocked(pump.activity(activity)).pipe(bestEffort(`mailbox: ${activity.id} ${activity.kind}`)),
-        ),
+        Stream.runForEach(launches2, (activity) => pumpLocked(pump.activity(activity)).pipe(bestEffort(`mailbox: ${activity.id} ${activity.kind}`))),
       );
+      const inputsConsumed2 = yield* sessions.inputsConsumed;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* sessions.inputsConsumed, (input) =>
-          pumpLocked(pump.consumed(input)).pipe(bestEffort(`mailbox: input consumed by ${input.session}`)),
-        ),
+        Stream.runForEach(inputsConsumed2, (input) => pumpLocked(pump.consumed(input)).pipe(bestEffort(`mailbox: input consumed by ${input.session}`))),
       );
+      const inputsReturned2 = yield* sessions.inputsReturned;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* sessions.inputsReturned, (input) =>
-          pumpLocked(pump.returned(input)).pipe(bestEffort(`mailbox: input returned by ${input.session}`)),
-        ),
+        Stream.runForEach(inputsReturned2, (input) => pumpLocked(pump.returned(input)).pipe(bestEffort(`mailbox: input returned by ${input.session}`))),
       );
 
       const bindIssue = (issue: T.Issue) =>

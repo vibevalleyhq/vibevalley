@@ -87,7 +87,7 @@ export class GitError extends Schema.TaggedError<GitError, { readonly brand: uni
   message: Schema.String,
 }) {
   static of(code: number, stderr: string) {
-    return new GitError({ code, stderr, message: stderr.trim() || `git exited ${code}` });
+    return GitError.make({ code, stderr, message: stderr.trim() || `git exited ${code}` });
   }
 }
 

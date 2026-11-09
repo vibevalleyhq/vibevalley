@@ -43,18 +43,18 @@ export const providerStatus = (settings: ProviderSettings): T.ProviderStatus => 
 });
 
 export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (current: ProviderSettings, update: T.ProviderUpdate) {
-  if (update.revision !== current.revision) return yield* new SettingRefused({ message: t("server.provider.changed") });
-  if (update.connections.length > 32) return yield* new SettingRefused({ message: t("server.provider.limit") });
+  if (update.revision !== current.revision) return yield* SettingRefused.make({ message: t("server.provider.changed") });
+  if (update.connections.length > 32) return yield* SettingRefused.make({ message: t("server.provider.limit") });
   const seen = new Set<string>();
   const connections: ProviderSettings["connections"][number][] = [];
   for (const input of update.connections) {
-    if (!/^[a-zA-Z0-9_-]{1,80}$/u.test(input.id) || seen.has(input.id)) return yield* new SettingRefused({ message: t("server.provider.id") });
+    if (!/^[a-zA-Z0-9_-]{1,80}$/u.test(input.id) || seen.has(input.id)) return yield* SettingRefused.make({ message: t("server.provider.id") });
     seen.add(input.id);
     const name = input.name.trim();
-    if (!name || name.length > 80) return yield* new SettingRefused({ message: t("server.provider.name") });
+    if (!name || name.length > 80) return yield* SettingRefused.make({ message: t("server.provider.name") });
     const key = input.key === undefined ? (current.connections.find((c) => c.id === input.id)?.key ?? "") : input.key === null ? "" : input.key.trim();
     if ((input.key !== undefined && input.key !== null && key === "") || /\s/u.test(key) || key.length > 4096)
-      return yield* new SettingRefused({ message: t("server.provider.key") });
+      return yield* SettingRefused.make({ message: t("server.provider.key") });
     connections.push({ id: input.id, name, adapter: input.adapter, enabled: input.enabled, key });
   }
   const next: ProviderSettings = {
@@ -81,15 +81,15 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
     (next.transcription && !boundConnection(next, next.transcription.connection)) ||
     (next.vision && !boundConnection(next, next.vision.connection))
   )
-    return yield* new SettingRefused({ message: t("server.provider.bound") });
+    return yield* SettingRefused.make({ message: t("server.provider.bound") });
   if (next.dictation && !mossTranscription.models.some((model) => model === next.dictation?.model))
-    return yield* new SettingRefused({ message: t("server.provider.model") });
+    return yield* SettingRefused.make({ message: t("server.provider.model") });
   if (next.image && !mossImageModels.some((model) => model === next.image?.model))
-    return yield* new SettingRefused({ message: t("server.provider.imageModel") });
+    return yield* SettingRefused.make({ message: t("server.provider.imageModel") });
   if (next.understanding && !mossUnderstandingModels.some((model) => model === next.understanding?.model))
-    return yield* new SettingRefused({ message: t("server.provider.understandingModel") });
+    return yield* SettingRefused.make({ message: t("server.provider.understandingModel") });
   if (next.speech && !mossSpeechModels.some((model) => model === next.speech?.model))
-    return yield* new SettingRefused({ message: t("server.provider.speechModel") });
+    return yield* SettingRefused.make({ message: t("server.provider.speechModel") });
   for (const [use, models] of [
     ["live", mossLiveModels],
     ["speakers", mossSpeakersModels],
@@ -99,7 +99,7 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
   ] as const) {
     const binding = next[use];
     if (binding && !models.some((model) => model === binding.model))
-      return yield* new SettingRefused({ message: t("server.provider.capabilityModel", { capability: t(`server.provider.use.${use}`) }) });
+      return yield* SettingRefused.make({ message: t("server.provider.capabilityModel", { capability: t(`server.provider.use.${use}`) }) });
   }
   return next;
 });

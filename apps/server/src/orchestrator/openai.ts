@@ -51,21 +51,29 @@ const json = (status: number, body: unknown) => HttpServerResponse.jsonUnsafe(bo
 
 const refuse = (status: number, kind: string, code: string, message: string) => json(status, { error: { message, type: kind, code } });
 
+const ChatChunk = Schema.Struct({
+  id: Schema.String,
+  object: Schema.Literal("chat.completion.chunk"),
+  created: Schema.Finite,
+  model: Schema.String,
+  choices: Schema.Array(
+    Schema.Struct({
+      index: Schema.Finite,
+      delta: Schema.Struct({ role: Schema.optionalKey(Schema.Literal("assistant")), content: Schema.optionalKey(Schema.String) }),
+      finish_reason: Schema.NullOr(Schema.Literal("stop")),
+    }),
+  ),
+});
+const encodeChunk = Schema.encodeEffect(Schema.fromJsonString(ChatChunk));
+
 /** finish_reason is null until the last chunk, which has an empty delta. */
-export function chatChunk(id: string, created: number, model: string, content: string, stop: boolean, first: boolean): string {
-  const delta = stop ? {} : { ...(first ? { role: "assistant" } : {}), content };
-  return (
-    "data: " +
-    JSON.stringify({
-      id,
-      object: "chat.completion.chunk",
-      created,
-      model,
-      choices: [{ index: 0, delta, finish_reason: stop ? "stop" : null }],
-    }) +
-    "\n\n"
+export const chatChunk = (id: string, created: number, model: string, content: string, stop: boolean, first: boolean) => {
+  const delta = stop ? {} : { ...(first ? { role: "assistant" as const } : {}), content };
+  return Effect.map(
+    encodeChunk({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: stop ? "stop" : null }] }),
+    (text) => "data: " + text + "\n\n",
   );
-}
+};
 
 /** The route's handler: the request read as OpenAI's, the answer whole or as server-sent chunks. */
 export const chatCompletions = <E>(c: ChatCompletions<E>) =>
@@ -110,8 +118,8 @@ export const chatCompletions = <E>(c: ChatCompletions<E>) =>
     }
     const chunks = words.pipe(
       Stream.zipWithIndex,
-      Stream.map(([w, i]) => chatChunk(id, created, model, w, false, i === 0)),
-      Stream.concat(Stream.make(chatChunk(id, created, model, "", true, false), "data: [DONE]\n\n")),
+      Stream.mapEffect(([w, i]) => chatChunk(id, created, model, w, false, i === 0)),
+      Stream.concat(Stream.concat(Stream.fromEffect(chatChunk(id, created, model, "", true, false)), Stream.make("data: [DONE]\n\n"))),
       // An answer that fails midway ends the stream there, with no [DONE]: the asker sees it cut off.
       Stream.catchCauseIf(
         (cause) => !Cause.hasInterruptsOnly(cause),

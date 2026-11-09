@@ -1,22 +1,29 @@
-import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Effect, Schema } from "effect";
+import { Config, Effect, type FileSystem, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
 
 import { messageOf } from "#/base/errors.ts";
-import { jsonOf } from "#/base/json.ts";
 import { numberIn } from "#/base/order.ts";
 
 /** Past this a read of pi's balance counts as unknown. */
 const readTimeoutMs = 10_000;
 
+/** An environment variable; "" when it is not set. */
+const envVar = (name: string) =>
+  Config.String(name).pipe(
+    Config.withDefault(""),
+    Effect.orElseSucceed(() => ""),
+  );
+
 /** pi's agent folder, as oar's pi runtime finds it. */
-const piAgentDir = () => process.env.OAR_PI_AGENT_DIR || process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+const piAgentDir = Effect.gen(function* () {
+  return (yield* envVar("OAR_PI_AGENT_DIR")) || (yield* envVar("PI_CODING_AGENT_DIR")) || join(homedir(), ".pi", "agent");
+});
 
 const SettingsFile = Schema.Struct({
   defaultProvider: Schema.optionalKey(Schema.String),
@@ -43,19 +50,18 @@ const BalanceResponse = Schema.Struct({
 });
 
 /** One of pi's own files; none when it is not there or does not read. */
-async function readJson<T>(name: string, schema: Schema.Codec<T>): Promise<T | undefined> {
-  try {
-    return jsonOf(schema)(await readFile(join(piAgentDir(), name), "utf8"));
-  } catch {
-    return undefined;
-  }
-}
+const readJson = <T>(fs: FileSystem.FileSystem, name: string, schema: Schema.Codec<T>): Effect.Effect<T | undefined> =>
+  Effect.gen(function* () {
+    const dir = yield* piAgentDir;
+    const text = yield* fs.readFileString(join(dir, name));
+    return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(text);
+  }).pipe(Effect.orElseSucceed(() => undefined));
 
 /** pi's default provider and model, from its settings.json; "" when it has none. */
-export async function piSettings(): Promise<PiDefault> {
-  const s = await readJson("settings.json", SettingsFile);
-  return { provider: s?.defaultProvider ?? "", model: s?.defaultModel ?? "" };
-}
+export const piSettings = Effect.fnUntraced(function* (fs: FileSystem.FileSystem) {
+  const s = yield* readJson(fs, "settings.json", SettingsFile);
+  return { provider: s?.defaultProvider ?? "", model: s?.defaultModel ?? "" } satisfies PiDefault;
+});
 
 /** pi's default provider and model, as its settings.json names them. */
 export interface PiDefault {
@@ -63,40 +69,40 @@ export interface PiDefault {
   readonly model: string;
 }
 
-async function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): Promise<string> {
+const piProvider = Effect.fnUntraced(function* (fs: FileSystem.FileSystem, settings: Pick<RuntimeSettings, "defaultModel">) {
   const slash = settings.defaultModel.indexOf("/");
   const provider = slash >= 0 ? settings.defaultModel.slice(0, slash).trim() : "";
-  return provider || (await piSettings()).provider;
-}
+  return provider || (yield* piSettings(fs)).provider;
+});
 
 const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
 
 /** A value from pi's config as pi reads it. pi's `!command` values are not run. */
-function piValue(value: string): string {
+const piValue = Effect.fnUntraced(function* (value: string) {
   const m = envName.exec(value);
-  return (m?.[1] && process.env[m[1]]) || value;
-}
+  return (m?.[1] && (yield* envVar(m[1]))) || value;
+});
 
 /** The DeepSeek key pi uses and where it sends DeepSeek's requests. the base URL in models.json, else DeepSeek's own, without a trailing /v1. */
-async function piDeepseek(): Promise<{ key: string; base: string }> {
-  const authKey = (await readJson("auth.json", AuthFile))?.deepseek?.key;
-  let key = authKey ? piValue(authKey) : (process.env.DEEPSEEK_API_KEY ?? "");
+const piDeepseek = Effect.fnUntraced(function* (fs: FileSystem.FileSystem) {
+  const authKey = (yield* readJson(fs, "auth.json", AuthFile))?.deepseek?.key;
+  let key = authKey ? yield* piValue(authKey) : yield* envVar("DEEPSEEK_API_KEY");
   let base = "https://api.deepseek.com";
-  const p = (await readJson("models.json", ModelsFile))?.providers?.deepseek;
-  if (!key && p?.apiKey) key = piValue(p.apiKey);
+  const p = (yield* readJson(fs, "models.json", ModelsFile))?.providers?.deepseek;
+  if (!key && p?.apiKey) key = yield* piValue(p.apiKey);
   if (p?.baseUrl) base = p.baseUrl;
   base = base.replace(/\/$/u, "").replace(/\/v1$/u, "").replace(/\/$/u, "");
   return { key, base };
-}
+});
 
 const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", reason });
 
 /** pi's balance at DeepSeek, when its default model is DeepSeek's. no other provider reports one. */
-export const piBalance = (settings: Pick<RuntimeSettings, "defaultModel">): Effect.Effect<AccountUsage> =>
+export const piBalance = (fs: FileSystem.FileSystem, settings: Pick<RuntimeSettings, "defaultModel">): Effect.Effect<AccountUsage> =>
   Effect.gen(function* () {
-    const provider = yield* Effect.promise(() => piProvider(settings));
+    const provider = yield* piProvider(fs, settings);
     if (provider !== "deepseek") return unavailable(provider ? t("server.runtime.piNoBalance", { provider }) : t("server.runtime.piNoModel"));
-    const { key, base } = yield* Effect.promise(piDeepseek);
+    const { key, base } = yield* piDeepseek(fs);
     if (!key) return { status: "login_required" } as const;
     const http = yield* HttpClient.HttpClient;
     const res = yield* http.execute(HttpClientRequest.get(base + "/user/balance").pipe(HttpClientRequest.bearerToken(key))).pipe(

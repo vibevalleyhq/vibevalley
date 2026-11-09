@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
@@ -7,7 +5,7 @@ import { checkCases, goldenCasesAt } from "@vibevalley/testkit/golden";
 
 import { cli, farm } from "./testing.ts";
 
-const cases = goldenCasesAt(resolve(import.meta.dirname, "testdata", "cli.jsonl.gz"));
+const cases = goldenCasesAt(`${import.meta.dirname}/testdata/cli.jsonl.gz`);
 
 describe("the command line's answers", () => {
   it.live("are what they were", () =>

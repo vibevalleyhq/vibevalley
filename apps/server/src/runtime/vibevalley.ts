@@ -1,9 +1,8 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
-import { Clock, Effect, Exit, Fiber, Schema, Scope, Stream } from "effect";
+import { Clock, Effect, Exit, Fiber, Formatter, Schema, Scope, Stream } from "effect";
 
 import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
@@ -14,6 +13,7 @@ import { finished, type Todo } from "@vibevalley/agent/todo";
 import type { TodoStore } from "@vibevalley/agent/todoStore";
 import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { models } from "@vibevalley/ai/models";
+import { homeOf } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
@@ -49,8 +49,6 @@ export interface RuntimeOptions {
   };
 }
 
-const defaultHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
-
 const toMcp = (s: OarMcpServer): McpServer =>
   "url" in s
     ? { name: s.name, url: s.url, ...(s.headers ? { headers: { ...s.headers } } : {}) }
@@ -62,7 +60,7 @@ const toMcp = (s: OarMcpServer): McpServer =>
       };
 
 export function vibevalleyRuntimeOf(options: RuntimeOptions) {
-  const home = options.home ?? defaultHome;
+  const home = options.home ?? (() => homeOf());
   const llmOf = options.llm;
 
   const start = async (_installation: unknown, o: SessionOptions) => {
@@ -149,7 +147,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
             break;
           }
           case "tool_execution_start": {
-            const input = JSON.stringify(e.args ?? {});
+            const input = Formatter.formatJson(e.args ?? {});
             frame("vibevalley/tool_start", { callId: e.toolCallId, name: e.toolName, input }, [
               { kind: "tool_call_started", callId: e.toolCallId, tool: e.toolName, input },
             ]);
@@ -300,6 +298,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
 }
 
 const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
+const encodeAfter = Schema.encodeEffect(Schema.fromJsonString(Schema.Array(Schema.String)));
 const fromRow = (r: q.OpenTodosResult): Todo => ({
   id: r.id,
   title: r.title,
@@ -330,20 +329,22 @@ export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, D
             g.entries(),
             ([position, todo]) =>
               db.run(
-                q.addTodo({
-                  graph,
-                  keeper,
-                  id: todo.id,
-                  position,
-                  title: todo.title,
-                  brief: todo.brief,
-                  after: JSON.stringify(todo.after),
-                  executor: todo.by,
-                  state: todo.state,
-                  result: todo.result ?? "",
-                  tries: todo.tries ?? 0,
-                  updated_at: at,
-                }),
+                Effect.flatMap(encodeAfter(todo.after), (after) =>
+                  q.addTodo({
+                    graph,
+                    keeper,
+                    id: todo.id,
+                    position,
+                    title: todo.title,
+                    brief: todo.brief,
+                    after,
+                    executor: todo.by,
+                    state: todo.state,
+                    result: todo.result ?? "",
+                    tries: todo.tries ?? 0,
+                    updated_at: at,
+                  }),
+                ),
               ),
             { discard: true },
           );

@@ -1,3 +1,4 @@
+import { Equal, Formatter } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
@@ -88,8 +89,8 @@ test("the words are gse's, as recorded", () => {
     const cue = (c.in as { cue: { text: string } }).cue;
     const got = [...termsOf(cue.text)].toSorted();
     const want = (c.out as { terms: string[] }).terms;
-    if (JSON.stringify(got) !== JSON.stringify(want) && failed.length < 10)
-      failed.push(`line ${c.line} ${JSON.stringify(cue.text)}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+    if (!Equal.equals(got, want) && failed.length < 10)
+      failed.push(`line ${c.line} ${Formatter.format(cue.text)}: got ${Formatter.format(got)}, want ${Formatter.format(want)}`);
   }
   expect(failed).toEqual([]);
 });

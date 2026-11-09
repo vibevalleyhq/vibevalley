@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Schema } from "effect";
+import { Formatter, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -43,7 +43,7 @@ export interface TriggerInput {
 
 export const triggerOf = (input: TriggerInput): T.Trigger => {
   const id = createHash("sha256")
-    .update(JSON.stringify([input.source, input.key]))
+    .update(Formatter.formatJson([input.source, input.key]))
     .digest("hex");
   const { issue, ...restMeta } = input.meta ?? {};
   return {

@@ -47,7 +47,7 @@ export class CallStepFailed extends Schema.TaggedError<CallStepFailed, { readonl
   cause: Schema.Defect(),
 }) {}
 
-export const callStepFailed = (cause: unknown) => new CallStepFailed({ message: errorMessage(cause), cause });
+export const callStepFailed = (cause: unknown) => CallStepFailed.make({ message: errorMessage(cause), cause });
 
 export const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
 

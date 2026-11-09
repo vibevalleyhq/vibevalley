@@ -105,7 +105,8 @@ it.effect("unknown outcomes reach the model without usage guesses, while autonom
     if (create === undefined) throw new Error("media_image_create is missing");
     expect((yield* Effect.flip(create.execute({ ...input, id: "autonomous" }, { id: "blocked" }))).message).toBeTruthy();
     expect(tools.session(() => ({ ...caller(), session: "worker", actor: session("worker") })).filter((tool) => tool.name.startsWith("media_"))).toEqual([]);
-    expect(yield* media.list()).toHaveLength(1);
+    const medias = yield* media.list();
+    expect(medias).toHaveLength(1);
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });
 
@@ -136,7 +137,8 @@ it.effect("the orchestrator retries only a download and cancels a separate pendi
     yield* until(() => requests.length >= 6, "second submission acknowledged");
     yield* ingress.say("Cancel waiting for that image", {}, undefined, "");
     yield* waitFor(media.get("cancel"), (job) => job.phase === "canceled", "tool canceled waiting");
-    expect(yield* media.list()).toHaveLength(2);
+    const medias = yield* media.list();
+    expect(medias).toHaveLength(2);
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });
 
@@ -194,7 +196,8 @@ it.effect("the orchestrator executes a frozen owner approval through its trusted
     const caller = () => ({ agent: defaultOrchestrator, session: "", repo: "", here: channel, picked: "", envelope: "", actor: orchestrator(false) });
     const start = tools.orchestrator(caller).find((tool) => tool.name === "media_understanding_start");
     if (!start) return yield* Effect.die("Missing authorized understanding tool");
-    expect(yield* start.execute({ id }, { id: "autonomous" }).pipe(Effect.flip)).toMatchObject({ _tag: "ToolFailed" });
+    const outcomeFailure = yield* start.execute({ id }, { id: "autonomous" }).pipe(Effect.flip);
+    expect(outcomeFailure).toMatchObject({ _tag: "ToolFailed" });
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });
 

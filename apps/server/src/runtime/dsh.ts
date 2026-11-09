@@ -10,7 +10,7 @@ import {
   type SessionOptions,
   type StartSession,
 } from "@botiverse/oar";
-import { Predicate, Schema } from "effect";
+import { Exit, Option, Predicate, Schema } from "effect";
 
 import { jsonOrNone } from "#/base/json.ts";
 import { afterRealTime } from "#/infra/time.ts";
@@ -40,7 +40,14 @@ const { listingCwd } = await internal<{ listingCwd: (options: { cwd?: string }) 
 /** What dsh-acp has no channel for: its automation surface omits session prompts, tool denylists, names, tiers, extra
  * directories and output schemas. */
 /** A model option value as dsh writes it: ["provider", "model"]. */
-const modelPair = jsonOrNone(Schema.Tuple([Schema.String, Schema.String]));
+const ModelPair = Schema.Tuple([Schema.String, Schema.String]);
+const modelPair = jsonOrNone(ModelPair);
+const encodeModelPair = Schema.encodeOption(Schema.fromJsonString(ModelPair));
+const encodeRpcRequest = Schema.encodeExit(
+  Schema.fromJsonString(
+    Schema.Struct({ jsonrpc: Schema.Literal("2.0"), id: Schema.Finite, method: Schema.String, params: Schema.Record(Schema.String, Schema.Unknown) }),
+  ),
+);
 
 /** A JSON-RPC answer on dsh's stdout. */
 const rpcAnswer = jsonOrNone(
@@ -74,7 +81,8 @@ export function optionValue(given: string): string {
   const provider = slash < 0 ? deepseek : model.slice(0, slash);
   let id = slash < 0 ? model : model.slice(slash + 1);
   if (isDeepseek(provider) && id === "deepseek-v4-flash") id = "deepseek-flash";
-  return JSON.stringify([provider, id]);
+  // A pair of strings always writes; were it not to, the model is passed as given.
+  return Option.getOrElse(encodeModelPair([provider, id]), () => model);
 }
 
 /** How a model is written outside dsh, provider/model, from its option value; a value that is no pair is itself. */
@@ -198,12 +206,14 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
   const request = (method: string, params: Record<string, unknown>) =>
     new Promise<Record<string, unknown>>((resolve, reject) => {
       const id = ++next;
+      const line = encodeRpcRequest({ jsonrpc: "2.0", id, method, params });
+      if (Exit.isFailure(line)) return reject(new Error(`${method} could not be written`));
       const cancel = afterRealTime(timeoutMs, () => reject(new Error(`${method} timed out`)));
       waiting.set(id, {
         resolve: (v) => (cancel(), resolve(v)),
         reject: (e) => (cancel(), reject(e)),
       });
-      child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+      child.stdin.write(line.value + "\n");
     });
   try {
     await new Promise<void>((resolve, reject) => {

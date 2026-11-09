@@ -56,7 +56,7 @@ export function publicHttps(url: URL): boolean {
   );
 }
 
-export class PublicHttp extends Context.Service<PublicHttp, HttpClient.HttpClient>()("vibevalley/PublicHttp") {
+export class PublicHttp extends Context.Service<PublicHttp, HttpClient.HttpClient>()("@vibevalley/server/infra/publicHttp") {
   static readonly layer = Layer.effect(PublicHttp, NodeHttpClient.makeNodeHttp).pipe(
     Layer.provide(NodeHttpClient.layerAgentOptions({ lookup: publicLookup((host, done) => lookup(host, { all: true, family: 4 }, done)), keepAlive: false })),
   );

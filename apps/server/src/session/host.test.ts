@@ -27,7 +27,8 @@ describe("Caller", () => {
       caller.push("late");
       caller.end();
       caller.push("after the end");
-      expect(yield* Fiber.join(reading)).toBe("early late");
+      const reading2 = yield* Fiber.join(reading);
+      expect(reading2).toBe("early late");
     }),
   );
 
@@ -46,8 +47,10 @@ describe("Caller", () => {
       caller.push("kept");
       caller.end();
       caller.fail(new Error("too late"));
-      expect(yield* Stream.mkString(caller.words)).toBe("kept");
-      expect(yield* Stream.mkString(caller.words)).toBe("");
+      const mkString2 = yield* Stream.mkString(caller.words);
+      expect(mkString2).toBe("kept");
+      const mkString3 = yield* Stream.mkString(caller.words);
+      expect(mkString3).toBe("");
     }),
   );
 
@@ -62,7 +65,8 @@ describe("Caller", () => {
       caller.push("partly");
       caller.fail(new Error("no model"));
       caller.end();
-      expect(yield* Effect.flip(Fiber.join(reading))).toMatchObject({ _tag: "NotAnswered", message: "no model" });
+      const readingFailure = yield* Effect.flip(Fiber.join(reading));
+      expect(readingFailure).toMatchObject({ _tag: "NotAnswered", message: "no model" });
       expect(heard).toEqual(["partly"]);
     }),
   );
@@ -82,13 +86,16 @@ describe("AgentHost", () => {
       const finished: RunFinished[] = [];
       const consumed: InputConsumed[] = [];
       const answeringRuns: (string | undefined)[] = [];
-      yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (run) => Effect.sync(() => void finished.push(run))));
-      yield* Effect.forkScoped(Stream.runForEach(yield* sessions.inputsConsumed, (input) => Effect.sync(() => void consumed.push(input))));
+      const finishedRuns2 = yield* sessions.finishedRuns;
+      yield* Effect.forkScoped(Stream.runForEach(finishedRuns2, (run) => Effect.sync(() => void finished.push(run))));
+      const inputsConsumed2 = yield* sessions.inputsConsumed;
+      yield* Effect.forkScoped(Stream.runForEach(inputsConsumed2, (input) => Effect.sync(() => void consumed.push(input))));
       const said: string[] = [];
       const states: string[] = [];
       const core = yield* Core;
+      const subscribe2 = yield* core.subscribe;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* core.subscribe, () =>
+        Stream.runForEach(subscribe2, () =>
           Effect.sync(() => {
             const session = core.session("orchestrator");
             if (!session) return;
@@ -189,7 +196,8 @@ describe("AgentHost", () => {
       // Every later close waits for the one close, which is over.
       yield* host.close;
       expect(host.current().route).toBe("first");
-      expect(yield* Stream.mkString(caller.words)).toBe("");
+      const mkString2 = yield* Stream.mkString(caller.words);
+      expect(mkString2).toBe("");
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
   it.live("regression: a later close still waits for the cleanup when the first closing caller is interrupted", () => {

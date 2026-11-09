@@ -143,7 +143,8 @@ describe("an agent's loop", () => {
       yield* r.agent.steer(user("乙"));
       yield* Deferred.succeed(wake, undefined);
       yield* r.agent.idle;
-      expect(yield* r.said).toEqual([
+      const said2 = yield* r.said;
+      expect(said2).toEqual([
         "user:开始",
         "assistant:",
         "toolResult:醒了",
@@ -175,7 +176,8 @@ describe("an agent's loop", () => {
         "tool_execution_end:fast",
         "tool_execution_end:slow",
       ]);
-      expect(yield* r.said).toEqual(["user:一起", "assistant:两个", "toolResult:慢的", "toolResult:fast", "assistant:都好了"]);
+      const said2 = yield* r.said;
+      expect(said2).toEqual(["user:一起", "assistant:两个", "toolResult:慢的", "toolResult:fast", "assistant:都好了"]);
     }),
   );
 
@@ -238,7 +240,8 @@ describe("an agent's loop", () => {
       yield* r.agent.prompt([user("数")]);
       yield* r.agent.idle;
       expect(ran).toBe(0);
-      expect(yield* r.said).toEqual(["user:数", "assistant:", "toolResult:Operation aborted"]);
+      const said2 = yield* r.said;
+      expect(said2).toEqual(["user:数", "assistant:", "toolResult:Operation aborted"]);
     }),
   );
 
@@ -252,7 +255,8 @@ describe("an agent's loop", () => {
       yield* Deferred.await(started);
       yield* r.agent.abort;
       yield* r.agent.idle;
-      expect(yield* r.said).toEqual(["user:睡", "assistant:", "toolResult:已停下"]);
+      const said2 = yield* r.said;
+      expect(said2).toEqual(["user:睡", "assistant:", "toolResult:已停下"]);
       expect(r.requests.length).toBe(1);
     }),
   );
@@ -293,7 +297,8 @@ describe("an agent's loop", () => {
       yield* Deferred.await(preparing);
       yield* r.agent.abort;
       yield* r.agent.idle;
-      expect(yield* Deferred.isDone(interrupted)).toBe(true);
+      const isDone2 = yield* Deferred.isDone(interrupted);
+      expect(isDone2).toBe(true);
       const last = (yield* Ref.get(r.agent.messages)).at(-1)!;
       expect(last.role === "assistant" && [last.stopReason, words(last)]).toEqual(["aborted", "assistant:"]);
     }),
@@ -305,7 +310,8 @@ describe("an agent's loop", () => {
       const r = yield* rig([answer([toolCall("wait", {})]), answer("好")], [held("wait", started, release)]);
       yield* r.agent.prompt([user("一")]);
       yield* Deferred.await(started);
-      expect(yield* Effect.flip(r.agent.prompt([user("二")]))).toBeInstanceOf(AgentBusy);
+      const promptFailure = yield* Effect.flip(r.agent.prompt([user("二")]));
+      expect(promptFailure).toBeInstanceOf(AgentBusy);
       yield* Deferred.succeed(release, undefined);
       yield* r.agent.idle;
     }),

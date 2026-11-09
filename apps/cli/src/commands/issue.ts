@@ -1,4 +1,4 @@
-import { Effect, Schema, Stream } from "effect";
+import { DateTime, Effect, Schema, Stream } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
 import { t } from "@vibevalley/i18n";
@@ -11,7 +11,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
 import { FormatFlag } from "#/format.ts";
 import { observeIssue } from "#/issue-watch.ts";
-import { err, exit, Failure, stdinText } from "#/output.ts";
+import { err, exit, Failure, jsonText, stdinText } from "#/output.ts";
 
 const issueArg = nameArg("issue", "cli.arg.issue");
 const priorityFlag = Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority")));
@@ -105,7 +105,7 @@ const createCommand = Command.make(
   },
   (o) =>
     Effect.gen(function* () {
-      const description = yield* descriptionOf(given(o.description));
+      const description = yield* o.description.pipe(given, descriptionOf);
       const fields = { repo: given(o.repo), agent: given(o.agent), priority: given(o.priority), requestKey: given(o.key) };
       const request: T.IssueRequest = {
         title: o.title.join(" "),
@@ -136,7 +136,7 @@ const editCommand = Command.make(
   },
   (o) =>
     Effect.gen(function* () {
-      const description = yield* descriptionOf(given(o.description));
+      const description = yield* o.description.pipe(given, descriptionOf);
       const fields = { title: given(o.title), repo: given(o.repo), agent: given(o.agent), priority: given(o.priority) };
       const update: T.IssueUpdate = {
         ...(fields.title ? { title: fields.title } : {}),
@@ -201,7 +201,7 @@ const reviewCommand = Command.make(
     comment: optionalText("comment", "cli.flag.reviewComment"),
   },
   (o) => {
-    if (o.pass === o.fail) return Effect.fail(new Failure({ code: exit.usage, tag: "InvalidValue", text: t("cli.issue.passOrFail") }));
+    if (o.pass === o.fail) return Effect.fail(Failure.make({ code: exit.usage, tag: "InvalidValue", text: t("cli.issue.passOrFail") }));
     const text = given(o.comment);
     return change({
       name: "issue review",
@@ -241,7 +241,9 @@ const timelineCommand = Command.make("timeline", { issue: issueArg }, (o) =>
     (tl) =>
       show(tl, (x) =>
         [
-          ...x.milestones.map((m) => `${new Date(m.at).toISOString().slice(0, 16).replace("T", " ")}  ${m.kind}${m.who ? `  ${m.who}` : ""}  ${m.text}`),
+          ...x.milestones.map(
+            (m) => `${DateTime.formatIso(DateTime.makeUnsafe(m.at)).slice(0, 16).replace("T", " ")}  ${m.kind}${m.who ? `  ${m.who}` : ""}  ${m.text}`,
+          ),
           ...(x.spent ? [t("cli.issue.spent", { tokens: x.spent.tokens, cny: x.spent.cny?.toFixed(2) ?? "-" })] : []),
         ].join("\n"),
       ),
@@ -280,14 +282,14 @@ const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: n
   const base = yield* ServerFlag;
   const follow = frames(base, statePath).pipe(
     Stream.mapEffect((data) =>
-      Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
+      Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "Server", text: e.message }))),
     ),
     Stream.mapEffect((frame) => {
       const now = frame.state.issues.find((i) => i.id === issue.id);
-      return now ? Effect.succeed(now) : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
+      return now ? Effect.succeed(now) : Effect.fail(Failure.make({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
     }),
     Stream.changesWith((a, b) => a.status === b.status && a.stage.state === b.stage.state),
-    Stream.tap((now) => err(JSON.stringify({ issue: issue.number, status: now.status, stage: now.stage.state }))),
+    Stream.tap((now) => Effect.flatMap(jsonText({ issue: issue.number, status: now.status, stage: now.stage.state }), err)),
     Stream.takeUntil((now) => settled.has(now.status) || stageWantsOwner(now.stage.state)),
     Stream.runDrain,
   );
@@ -296,7 +298,7 @@ const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: n
     : follow.pipe(
         Effect.timeoutOrElse({
           duration: `${timeout} seconds`,
-          orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
+          orElse: () => Failure.make({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
         }),
       );
 });
@@ -314,7 +316,8 @@ const showCommand = Command.make(
       const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
       if (!o.watch) return yield* show(issue, issueText);
       yield* followed(issue, given(o.timeout));
-      yield* show(yield* ask((api) => api.issue.get({ id: issue.id })), issueText);
+      const answer = yield* ask((api) => api.issue.get({ id: issue.id }));
+      yield* show(answer, issueText);
     }),
 ).pipe(
   Command.withDescription(t("cli.command.issue.show")),
@@ -333,9 +336,10 @@ const watchCommand = Command.make(
   },
   (o) =>
     Effect.gen(function* () {
-      if ((yield* FormatFlag) === "json") return yield* new Failure({ code: exit.usage, tag: "WatchFormat", text: t("cli.issue.watchFormat") });
+      if ((yield* FormatFlag) === "json") return yield* Failure.make({ code: exit.usage, tag: "WatchFormat", text: t("cli.issue.watchFormat") });
       const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
-      yield* observeIssue(yield* ServerFlag, issue.id, o.follow, o.jsonl);
+      const serverFlag = yield* ServerFlag;
+      yield* observeIssue(serverFlag, issue.id, o.follow, o.jsonl);
     }),
 ).pipe(
   Command.withDescription(t("cli.command.issue.watch")),

@@ -22,6 +22,8 @@ const Layout = Schema.Struct({
   bbox_coord_space: Schema.Literal("abs_centralized"),
 });
 
+const encodeLayout = Schema.encodeEffect(Schema.fromJsonString(Layout));
+
 const MossImageInput = Schema.Struct({
   model: Schema.Literals(mossImageModels),
   prompt: Schema.Union([Text, Layout]),
@@ -69,24 +71,27 @@ class MossImageError extends Schema.TaggedError<MossImageError, { readonly brand
 
 export const prepareMossImage = Effect.fn("Provider.prepareMossImage")(function* (input: unknown) {
   const request = yield* Schema.decodeUnknownEffect(MossImageInput)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MossImageError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   const size = request.size ?? { width: 1024, height: 1024 };
   if (typeof request.prompt !== "string") {
     for (const item of request.prompt.items) {
       const [top, left, bottom, right] = item.bbox;
       if (top >= bottom || left >= right || top < -size.height / 2 || bottom > size.height / 2 || left < -size.width / 2 || right > size.width / 2)
-        return yield* new MossImageError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+        return yield* MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" });
     }
   }
-  const prompt = typeof request.prompt === "string" ? request.prompt : JSON.stringify(request.prompt);
-  if ([...prompt].length > 4000) return yield* new MossImageError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+  const prompt =
+    typeof request.prompt === "string"
+      ? request.prompt
+      : yield* encodeLayout(request.prompt).pipe(Effect.mapError(() => MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
+  if ([...prompt].length > 4000) return yield* MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" });
   return { ...request, prompt, size };
 });
 
 export const generateMossImage = Effect.fn("Provider.generateMossImage")(
   function* (key: string, input: unknown) {
-    if (!key.trim() || /\s/u.test(key)) return yield* new MossImageError({ reason: "Credentials", outcome: "NotSubmitted" });
+    if (!key.trim() || /\s/u.test(key)) return yield* MossImageError.make({ reason: "Credentials", outcome: "NotSubmitted" });
     const request = yield* prepareMossImage(input);
     const { prompt, size } = request;
     const body = yield* HttpBody.json({
@@ -101,18 +106,18 @@ export const generateMossImage = Effect.fn("Provider.generateMossImage")(
       ...(request.steps !== undefined ? { num_inference_steps: request.steps } : {}),
       ...(request.guidance !== undefined ? { guidance_scale: request.guidance } : {}),
       ...(request.negativePrompt !== undefined ? { negative_prompt: request.negativePrompt } : {}),
-    }).pipe(Effect.mapError(() => new MossImageError({ reason: "InvalidInput", outcome: "NotSubmitted" })));
+    }).pipe(Effect.mapError(() => MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
     const http = yield* HttpClient.HttpClient;
     const response = yield* http.post("https://api.mosi.cn/v1/images/generations", {
       headers: { authorization: `Bearer ${key}`, accept: "application/json" },
       body,
     });
     const raw = yield* readMossResponse(response).pipe(
-      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(new MossImageError({ reason: "TooLarge", outcome: "Unknown" }))),
+      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(MossImageError.make({ reason: "TooLarge", outcome: "Unknown" }))),
     );
     if (response.status < 200 || response.status >= 300) {
       const decoded = Schema.decodeOption(ErrorResponse)(raw);
-      return yield* new MossImageError({
+      return yield* MossImageError.make({
         reason: "HttpStatus",
         status: response.status,
         outcome: [400, 401, 403, 413, 422, 429].includes(response.status) ? "Rejected" : "Unknown",
@@ -120,10 +125,10 @@ export const generateMossImage = Effect.fn("Provider.generateMossImage")(
       });
     }
     const result = yield* Schema.decodeEffect(ImageResponse)(raw).pipe(
-      Effect.mapError(() => new MossImageError({ reason: "InvalidResponse", outcome: "Unknown" })),
+      Effect.mapError(() => MossImageError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
     );
     if (result.usage.output_width !== size.width || result.usage.output_height !== size.height)
-      return yield* new MossImageError({ reason: "InvalidResponse", outcome: "Unknown" });
+      return yield* MossImageError.make({ reason: "InvalidResponse", outcome: "Unknown" });
     // Persist this URL before downloading; a failed download must not trigger another generation.
     return { url: result.data[0].url.href, created: result.created, usage: result.usage };
   },
@@ -131,7 +136,7 @@ export const generateMossImage = Effect.fn("Provider.generateMossImage")(
   Effect.timeout("900 seconds"),
   // No request, prompt, signed URL or upstream error body may escape through failures.
   Effect.catchTags({
-    HttpClientError: () => Effect.fail(new MossImageError({ reason: "Network", outcome: "Unknown" })),
-    TimeoutError: () => Effect.fail(new MossImageError({ reason: "Timeout", outcome: "Unknown" })),
+    HttpClientError: () => Effect.fail(MossImageError.make({ reason: "Network", outcome: "Unknown" })),
+    TimeoutError: () => Effect.fail(MossImageError.make({ reason: "Timeout", outcome: "Unknown" })),
   }),
 );

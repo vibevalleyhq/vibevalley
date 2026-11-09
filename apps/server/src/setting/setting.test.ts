@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Formatter, Layer } from "effect";
 
 import { ServerConfig } from "#/infra/config.ts";
 import { testConfig } from "#/testing/layers.ts";
@@ -30,7 +30,7 @@ describe("settings", () => {
         expect(after.deepseekApiKey).toEqual({ source: "settings", hint: "…1234" });
         expect(after.agoraAppId).toEqual({ source: "settings", value: appId });
         expect(after.agoraAppCertificate).toEqual({ source: "settings", hint: "…2222" });
-        expect(JSON.stringify(after)).not.toContain("sk-saved");
+        expect(Formatter.formatJson(after)).not.toContain("sk-saved");
         expect(s.deepseekApiKey()).toBe("sk-saved-in-settings-1234");
         expect(s.agora()).toEqual({ appId, appCertificate: cert });
         expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);
@@ -117,7 +117,7 @@ describe("settings", () => {
         const after = yield* s.save({ voice: { tts }, ttsKey: " azure-speech-key-9f3a " });
         expect(after.voice.tts).toEqual(tts);
         expect(after.ttsKey).toEqual({ source: "settings", hint: "…9f3a" });
-        expect(JSON.stringify(after)).not.toContain("azure-speech-key");
+        expect(Formatter.formatJson(after)).not.toContain("azure-speech-key");
         expect(s.voiceConfig().keys).toEqual({ asrKey: "", llmKey: "", ttsKey: "azure-speech-key-9f3a" });
         expect(file(config).voice).toEqual({ tts });
       }),
@@ -147,7 +147,7 @@ describe("settings", () => {
           }),
         );
         expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
-        expect(JSON.stringify(setting.status())).not.toContain("test-private-key");
+        expect(Formatter.formatJson(setting.status())).not.toContain("test-private-key");
         expect(file(config)).not.toHaveProperty("mossKey");
         expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);
       }),
@@ -194,7 +194,7 @@ describe("settings", () => {
 
   it.effect("an unreadable or invalid settings file is kept aside untouched, and the settings start empty", () =>
     Effect.gen(function* () {
-      const cases = ["{not json", JSON.stringify({ deepseekApiKey: 7, agoraAppId: appId })];
+      const cases = ["{not json", Formatter.formatJson({ deepseekApiKey: 7, agoraAppId: appId })];
       for (const raw of cases) {
         const config = testConfig();
         const path = join(config.home, "settings.json");

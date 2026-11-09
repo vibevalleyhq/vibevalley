@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Clock, Deferred, Effect, Fiber, Layer, Stream } from "effect";
+import { Clock, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -12,6 +12,12 @@ import * as q from "#db/media_remote_file.sql.ts";
 import { makeInputs } from "./inputs.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
 import { png } from "./testdata/png.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const notIn = (value: unknown, secret: string) =>
+  Effect.map(json(value), (text) => {
+    expect(text).not.toContain(secret);
+  });
 
 const layer = () =>
   Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())));
@@ -38,7 +44,8 @@ it.effect("a real disk-backed input is uploaded once, recorded without its key, 
         if (!(file instanceof File)) return yield* Effect.die("Expected disk-backed file");
         expect(file.name).toMatch(/^vv-[0-9a-f-]+\.png$/u);
         expect(file.name).not.toContain("private-owner");
-        expect(Buffer.from(yield* Effect.promise(() => file.arrayBuffer()))).toEqual(bytes);
+        const arrayBuffer2 = yield* Effect.promise(() => file.arrayBuffer());
+        expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
         return HttpClientResponse.fromWeb(request, Response.json({ ...uploaded, filename: file.name }));
       }
       return HttpClientResponse.fromWeb(request, Response.json({ id: "file-one", object: "file", deleted: true }));
@@ -46,19 +53,19 @@ it.effect("a real disk-backed input is uploaded once, recorded without its key, 
   );
   return Effect.gen(function* () {
     const { remote, input } = yield* fixture;
-    expect(yield* Effect.all([remote.upload("task-a", input.id, account), remote.upload("task-a", input.id, account)], { concurrency: 2 })).toEqual([
-      "file-one",
-      "file-one",
-    ]);
-    expect(yield* remote.upload("task-a", input.id, account)).toBe("file-one");
+    const effects = yield* Effect.all([remote.upload("task-a", input.id, account), remote.upload("task-a", input.id, account)], { concurrency: 2 });
+    expect(effects).toEqual(["file-one", "file-one"]);
+    const uploaded2 = yield* remote.upload("task-a", input.id, account);
+    expect(uploaded2).toBe("file-one");
     const rows = yield* remote.list("task-a");
     expect(rows).toHaveLength(1);
-    expect(JSON.stringify(rows)).not.toContain(account.key);
+    yield* notIn(rows, account.key);
     expect(rows[0]).toMatchObject({ phase: "ready", remote_id: "file-one", revision: 1 });
     yield* remote.remove("task-a", input.id, { ...account, revision: 2 });
     yield* remote.remove("task-a", input.id, account);
     expect(calls).toEqual(["POST", "DELETE"]);
-    expect(yield* Effect.flip(remote.upload("task-a", input.id, account))).toMatchObject({ _tag: "Refused" });
+    const uploadedFailure = yield* Effect.flip(remote.upload("task-a", input.id, account));
+    expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
     expect((yield* remote.list("task-a"))[0]?.phase).toBe("deleted");
   }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
 });
@@ -72,13 +79,17 @@ it.effect.each([400, 503])("an upload returning %s is never resubmitted, includi
   return Effect.gen(function* () {
     const { remote, inputs, input } = yield* fixture;
     const error = yield* Effect.flip(remote.upload("task-a", input.id, account));
-    expect(JSON.stringify(error)).not.toContain("private response");
+    yield* notIn(error, "private response");
     const restarted = yield* makeRemoteFiles(inputs);
     yield* restarted.restore();
-    expect(yield* Effect.flip(restarted.upload("task-a", input.id, account))).toMatchObject({ _tag: "Refused" });
+    const uploadedFailure = yield* Effect.flip(restarted.upload("task-a", input.id, account));
+    expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
     expect((yield* restarted.list("task-a"))[0]?.phase).toBe(status === 400 ? "rejected" : "unknown");
     if (status === 400) yield* restarted.remove("task-a", input.id, account);
-    else expect(yield* Effect.flip(restarted.remove("task-a", input.id, account))).toMatchObject({ _tag: "Refused" });
+    else {
+      const removeFailure = yield* Effect.flip(restarted.remove("task-a", input.id, account));
+      expect(removeFailure).toMatchObject({ _tag: "Refused" });
+    }
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
 });
@@ -97,10 +108,12 @@ it.effect.each(["cancel", "timeout"])("regression: %s during remote upload recor
     if (action === "cancel") yield* Fiber.interrupt(fiber);
     else {
       yield* TestClock.adjust("300 seconds");
-      expect(yield* Fiber.join(fiber)).toMatchObject({ _tag: "Refused" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ _tag: "Refused" });
     }
     expect((yield* remote.list("task-a"))[0]?.phase).toBe("unknown");
-    expect(yield* Effect.flip(remote.upload("task-a", input.id, account))).toMatchObject({ _tag: "Refused" });
+    const uploadedFailure = yield* Effect.flip(remote.upload("task-a", input.id, account));
+    expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(1);
   }).pipe(Effect.provide(layer())),
 );
@@ -109,8 +122,10 @@ it.effect("a task without a retained input cannot upload another task's local fi
   const http = HttpClient.make(() => Effect.die("Unretained input must not reach the network"));
   return Effect.gen(function* () {
     const { remote, input } = yield* fixture;
-    expect(yield* Effect.flip(remote.upload("other-task", input.id, account))).toMatchObject({ _tag: "Refused" });
-    expect(yield* remote.list("other-task")).toEqual([]);
+    const uploadedFailure = yield* Effect.flip(remote.upload("other-task", input.id, account));
+    expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
+    const remotes = yield* remote.list("other-task");
+    expect(remotes).toEqual([]);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
 });
 
@@ -130,7 +145,8 @@ it.effect("changed credentials or connection cannot access or delete a recorded 
       yield* Effect.flip(remote.upload("task-a", input.id, replacement));
       yield* Effect.flip(remote.remove("task-a", input.id, replacement));
     }
-    expect(yield* remote.upload("task-a", input.id, { ...account, revision: 42 })).toBe("file-one");
+    const uploaded2 = yield* remote.upload("task-a", input.id, { ...account, revision: 42 });
+    expect(uploaded2).toBe("file-one");
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
 });

@@ -34,9 +34,12 @@ describe("an artifact", () => {
       const next = yield* artifacts.version(owner, { id: made.id, content: page("整页"), note: "加了整页" });
       expect([next.version, next.versions.map((v) => v.version)]).toEqual([2, [1, 2]]);
       expect((yield* chat.history(general)).at(-1)!.artifact).toMatchObject({ id: made.id, version: 2, note: "加了整页" });
-      expect(yield* artifacts.content(made.id)).toMatchObject({ version: 2, content: page("整页"), body: "html" });
-      expect(yield* artifacts.content(made.id, 1)).toMatchObject({ version: 1, content: page("抽屉") });
-      expect(yield* Effect.flip(artifacts.content(made.id, 3))).toMatchObject({ _tag: "Missing" });
+      const content2 = yield* artifacts.content(made.id);
+      expect(content2).toMatchObject({ version: 2, content: page("整页"), body: "html" });
+      const content3 = yield* artifacts.content(made.id, 1);
+      expect(content3).toMatchObject({ version: 1, content: page("抽屉") });
+      const contentFailure = yield* Effect.flip(artifacts.content(made.id, 3));
+      expect(contentFailure).toMatchObject({ _tag: "Missing" });
 
       yield* TestClock.adjust(1);
       const forIssue = yield* artifacts.create(owner, { title: "调研", kind: "markdown", content: "# 结论\n\n用抽屉。", issue: "issue-1" });
@@ -61,8 +64,10 @@ describe("an artifact", () => {
           ["paragraph", "lab"],
         ],
       ]);
-      expect(yield* artifacts.content(made.id)).toEqual({ version: 1, content: "# 结论\n\n用**抽屉**。\n", body: "blocks" });
-      expect(yield* Effect.flip(artifacts.version(owner, { id: made.id, content: "x" }))).toMatchObject({ _tag: "Refused" });
+      const content2 = yield* artifacts.content(made.id);
+      expect(content2).toEqual({ version: 1, content: "# 结论\n\n用**抽屉**。\n", body: "blocks" });
+      const versionFailure = yield* Effect.flip(artifacts.version(owner, { id: made.id, content: "x" }));
+      expect(versionFailure).toMatchObject({ _tag: "Refused" });
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -76,9 +81,11 @@ describe("an artifact", () => {
       expect(blank.channel).toBeUndefined();
       expect([(yield* artifacts.blocks(blank.id)).blocks, (yield* chat.history(chat.defaultChannel())).length]).toEqual([[], before]);
       const html = yield* artifacts.create(owner, { title: "页", kind: "html", content: page("页") });
-      expect(yield* Effect.flip(artifacts.blocks(html.id))).toMatchObject({ _tag: "Refused" });
+      const blocksFailure = yield* Effect.flip(artifacts.blocks(html.id));
+      expect(blocksFailure).toMatchObject({ _tag: "Refused" });
       expect((yield* artifacts.rename(blank.id, "  第 43 周  ")).title).toBe("第 43 周");
-      expect(yield* Effect.flip(artifacts.rename(blank.id, " "))).toMatchObject({ _tag: "Refused" });
+      const renamedFailure = yield* Effect.flip(artifacts.rename(blank.id, " "));
+      expect(renamedFailure).toMatchObject({ _tag: "Refused" });
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -94,8 +101,10 @@ describe("an artifact", () => {
       expect((yield* artifacts.content(made.id)).content).toBe(source.replace("on Friday", "on Monday"));
       expect((yield* artifacts.content(made.id, 1)).content).toBe(source);
       expect((yield* chat.history(chat.defaultChannel())).at(-1)!.artifact).toMatchObject({ version: 2, note: expect.stringContaining("Monday") });
-      expect(yield* Effect.flip(artifacts.htmlEdit(owner, { id: made.id, version: 1, anchor, text: "Sunday" }))).toMatchObject({ _tag: "Refused" });
-      expect(yield* Effect.flip(artifacts.htmlEdit(owner, { id: made.id, version: 2, anchor, text: "Sunday" }))).toMatchObject({ _tag: "Refused" });
+      const htmlEditFailure = yield* Effect.flip(artifacts.htmlEdit(owner, { id: made.id, version: 1, anchor, text: "Sunday" }));
+      expect(htmlEditFailure).toMatchObject({ _tag: "Refused" });
+      const htmlEditFailure2 = yield* Effect.flip(artifacts.htmlEdit(owner, { id: made.id, version: 2, anchor, text: "Sunday" }));
+      expect(htmlEditFailure2).toMatchObject({ _tag: "Refused" });
       expect((yield* artifacts.get(made.id)).version).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -104,15 +113,22 @@ describe("an artifact", () => {
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const refusedFor = (title: string, kind: string, content: string) => Effect.flip(artifacts.create(owner, { title, kind: kind as "html", content }));
-      expect(yield* refusedFor("", "html", page("a"))).toMatchObject({ _tag: "Refused" });
-      expect(yield* refusedFor("a", "pdf", page("a"))).toMatchObject({ _tag: "Refused" });
-      expect(yield* refusedFor("a", "html", "")).toMatchObject({ _tag: "Refused" });
-      expect(yield* refusedFor("a", "html", "x".repeat(artifactMax + 1))).toMatchObject({ _tag: "Refused" });
-      expect(yield* Effect.flip(artifacts.version(owner, { id: artifactId("nope"), content: "x" }))).toMatchObject({ _tag: "Missing" });
-      expect(yield* Effect.flip(artifacts.create(owner, { title: "a", kind: "html", content: "x", channel: "#nowhere" }))).toMatchObject({
+      const refusedFor2 = yield* refusedFor("", "html", page("a"));
+      expect(refusedFor2).toMatchObject({ _tag: "Refused" });
+      const refusedFor3 = yield* refusedFor("a", "pdf", page("a"));
+      expect(refusedFor3).toMatchObject({ _tag: "Refused" });
+      const refusedFor4 = yield* refusedFor("a", "html", "");
+      expect(refusedFor4).toMatchObject({ _tag: "Refused" });
+      const refusedFor5 = yield* refusedFor("a", "html", "x".repeat(artifactMax + 1));
+      expect(refusedFor5).toMatchObject({ _tag: "Refused" });
+      const versionFailure = yield* Effect.flip(artifacts.version(owner, { id: artifactId("nope"), content: "x" }));
+      expect(versionFailure).toMatchObject({ _tag: "Missing" });
+      const createdFailure = yield* Effect.flip(artifacts.create(owner, { title: "a", kind: "html", content: "x", channel: "#nowhere" }));
+      expect(createdFailure).toMatchObject({
         _tag: "Missing",
       });
-      expect(yield* artifacts.list({})).toEqual([]);
+      const artifacts2 = yield* artifacts.list({});
+      expect(artifacts2).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -128,7 +144,8 @@ describe("an artifact", () => {
       expect(readdirSync(dir).length).toBe(2);
       expect((yield* artifacts.previewRemove(one.id)).does.length).toBeGreaterThan(0);
       yield* artifacts.remove(one.id);
-      expect(yield* Effect.flip(artifacts.get(one.id))).toMatchObject({ _tag: "Missing" });
+      const artifactFailure = yield* Effect.flip(artifacts.get(one.id));
+      expect(artifactFailure).toMatchObject({ _tag: "Missing" });
       // the same page is still two's.
       expect(readdirSync(dir).length).toBe(1);
       yield* artifacts.remove(two.id);

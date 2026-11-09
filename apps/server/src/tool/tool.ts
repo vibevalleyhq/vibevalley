@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Predicate } from "effect";
+import { Clock, Context, Effect, Formatter, Layer, Predicate } from "effect";
 
 import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { maybe, t } from "@vibevalley/i18n";
@@ -30,7 +30,7 @@ export class Tool extends Context.Service<
     readonly start: (name: string, args: unknown) => ToolStart;
     readonly sessionLine: (session: T.Session) => string;
   }
->()("vibevalley/Tool") {
+>()("@vibevalley/server/tool/tool") {
   static readonly layer = Layer.effect(
     Tool,
     Effect.suspend(() => make),
@@ -54,7 +54,7 @@ export function toolStart(name: string, args: unknown): ToolStart {
     text: about ? t("server.tool.about", { label, about }) : label,
     action: "other",
     tool: name,
-    input: args === undefined || args === null ? "{}" : JSON.stringify(args),
+    input: args === undefined || args === null ? "{}" : Formatter.formatJson(args),
   };
 }
 

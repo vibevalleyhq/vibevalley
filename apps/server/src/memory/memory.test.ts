@@ -1,9 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, FileSystem, Layer, Path } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
@@ -20,6 +17,13 @@ import * as q from "#db/memory.sql.ts";
 
 import { Memory, make } from "./memory.ts";
 import { memoryIsNewNote, issueMemoryText, recallChars } from "./recall.ts";
+
+const onDisk = <E>(lay: (fs: FileSystem.FileSystem, path: Path.Path) => Effect.Effect<void, E>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    yield* lay(fs, path);
+  }).pipe(Effect.provide(NodeServices.layer));
 
 const world = (config = testConfig()) =>
   Layer.effect(Memory, make()).pipe(
@@ -90,12 +94,15 @@ describe("memory", () => {
       for (const x of yield* m.list("lab")) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
       const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", repo: " clock ", by: owner });
       expect([note.text, note.repo, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
-      expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", repo: "", by: owner }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
+      const writtenFailure = yield* Effect.flip(m.write({ agent: "lab", text: "  ", repo: "", by: owner }));
+      expect(writtenFailure).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
       yield* m.forget("lab", note.id);
       // One that is not there is missing, not silently passed over.
       expect((yield* Effect.flip(m.forget("lab", "not-a-number")))._tag).toBe("Missing");
-      expect(yield* m.list("lab")).toHaveLength(3);
-      expect(yield* m.list("other")).toHaveLength(0);
+      const ms = yield* m.list("lab");
+      expect(ms).toHaveLength(3);
+      const ms2 = yield* m.list("other");
+      expect(ms2).toHaveLength(0);
     }).pipe(Effect.provide(world())),
   );
 
@@ -112,7 +119,10 @@ describe("memory", () => {
       const notes = (yield* m.memoriesOf(defaultOrchestrator)).memories;
       expect(notes.map((note) => note.text)).toEqual(["replacement note", "owner note"]);
       expect(notes.find((note) => note.author === "owner")?.id).toBe(written.id);
-      expect(existsSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"))).toBe(false);
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const legacy = yield* fs.exists(path.join(agentHome(config, defaultOrchestrator), "MEMORY.md"));
+      expect(legacy).toBe(false);
       expect((yield* m.recallOf(defaultOrchestrator, "demo", "replacement")).lines.join("\n")).toContain("replacement note");
       yield* m.forget(defaultOrchestrator, written.id);
       expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.text)).toEqual(["replacement note"]);
@@ -121,18 +131,27 @@ describe("memory", () => {
 
   it.effect("the orchestrator's archive", () => {
     const config = testConfig();
-    const folder = agentHome(config, defaultOrchestrator);
-    mkdirSync(join(folder, "archive"), { recursive: true });
-    writeFileSync(join(folder, "archive", "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
-    return Effect.gen(function* () {
-      const m = yield* Memory;
-      const listing = yield* m.archive(defaultOrchestrator, "CLOCK-IN");
-      expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
-      expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
-      expect((yield* m.archive(defaultOrchestrator, "")).hits).toEqual([]);
-      expect(yield* m.archiveFile(defaultOrchestrator, "orchestrator-2026-10-12.md")).toContain("派给老周");
-      expect(yield* m.archiveFile(defaultOrchestrator, "../MEMORY.md")).toBeUndefined();
-    }).pipe(Effect.provide(world(config)));
+    const archived = onDisk((fs, path) =>
+      Effect.gen(function* () {
+        const folder = path.join(agentHome(config, defaultOrchestrator), "archive");
+        yield* fs.makeDirectory(folder, { recursive: true });
+        yield* fs.writeFileString(path.join(folder, "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
+      }),
+    );
+    return Effect.andThen(
+      archived,
+      Effect.gen(function* () {
+        const m = yield* Memory;
+        const listing = yield* m.archive(defaultOrchestrator, "CLOCK-IN");
+        expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
+        expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
+        expect((yield* m.archive(defaultOrchestrator, "")).hits).toEqual([]);
+        const archiveFile2 = yield* m.archiveFile(defaultOrchestrator, "orchestrator-2026-10-12.md");
+        expect(archiveFile2).toContain("派给老周");
+        const archiveFile3 = yield* m.archiveFile(defaultOrchestrator, "../MEMORY.md");
+        expect(archiveFile3).toBeUndefined();
+      }).pipe(Effect.provide(world(config))),
+    );
   });
 
   it.effect("a preview picks without counting, and the longest unused fade", () =>
@@ -190,7 +209,8 @@ describe("memory", () => {
     Effect.gen(function* () {
       const m = yield* Memory;
       yield* m.keep({ agent: "lab", session: "chat", repo: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
-      expect(yield* m.list("lab")).toEqual([]);
+      const ms = yield* m.list("lab");
+      expect(ms).toEqual([]);
       yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "", by: session("chat") });
       expect((yield* m.list("lab")).map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
         { kind: "note", text: "这个仓库用 pnpm test 跑测试", session: "chat" },
@@ -208,10 +228,12 @@ describe("memory", () => {
         `create trigger fail_write before insert on memory for each row when (new.kind = 'issue') begin select raise(abort, 'write failed'); end`,
       );
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
-      expect(yield* m.list("lab")).toEqual([]);
+      const ms = yield* m.list("lab");
+      expect(ms).toEqual([]);
       yield* sql.unsafe(`drop trigger fail_write`);
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
-      expect(yield* m.list("lab")).toHaveLength(1);
+      const ms2 = yield* m.list("lab");
+      expect(ms2).toHaveLength(1);
     }).pipe(Effect.provide(world())),
   );
 
@@ -220,7 +242,8 @@ describe("memory", () => {
       const m = yield* Memory;
       yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: session("s1") });
       yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: session("s1") });
-      expect(yield* m.list("lab")).toHaveLength(2);
+      const ms = yield* m.list("lab");
+      expect(ms).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
 
@@ -251,13 +274,16 @@ describe("memory", () => {
 
   it.effect("regression: a legacy memory path cannot interfere with database memory", () => {
     const config = testConfig();
-    mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
-    return Effect.gen(function* () {
-      const m = yield* Memory;
-      const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", repo: "", by: owner });
-      expect((yield* m.memoriesOf(defaultOrchestrator)).memories[0]?.id).toBe(note.id);
-      expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Missing");
-      expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Missing");
-    }).pipe(Effect.provide(world(config)));
+    const legacy = onDisk((fs, path) => fs.makeDirectory(path.join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true }));
+    return Effect.andThen(
+      legacy,
+      Effect.gen(function* () {
+        const m = yield* Memory;
+        const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", repo: "", by: owner });
+        expect((yield* m.memoriesOf(defaultOrchestrator)).memories[0]?.id).toBe(note.id);
+        expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Missing");
+        expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Missing");
+      }).pipe(Effect.provide(world(config))),
+    );
   });
 });

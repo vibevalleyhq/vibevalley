@@ -76,6 +76,7 @@
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
+| `jsonText` | `json.ts` | value as JSON text, as JSON.stringify writes it; one JSON cannot hold (a cycle, a bigint) fails instead of throwing. |
 | `jsonOrNone` | `json.ts` | Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. |
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
 | `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. |
@@ -121,9 +122,10 @@
 | `fileBlob` | `files.ts` |  |
 | `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` |  |
-| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read. |
+| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read; one read fails on is set aside. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
+| `HomeUnavailable` | `lease.ts` | The lock file could not be read or written for another reason (permissions, a missing home). |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
 | `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
 | `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being done), and the caller carries on. |
@@ -135,7 +137,8 @@
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
 | `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
-| `localeMinute` | `time.ts` | To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart. |
+| `localeMinute` | `time.ts` | To the minute, in this machine's zone: what an input says the time is, so that it does not change between two requests a |
+| `localParts` | `time.ts` | An instant's calendar and clock in this machine's zone; month counts from 1. |
 
 ## `apps/server/src/testing`
 

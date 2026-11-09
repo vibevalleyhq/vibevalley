@@ -2,6 +2,7 @@ import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
+import { jsonText } from "#/base/json.ts";
 import { Media } from "#/media/media.ts";
 
 import { callerOf, refuse, tool, type Who } from "./schemas.ts";
@@ -14,9 +15,13 @@ export const mediaTools = Effect.gen(function* () {
       Effect.fn("Tool.mediaImageCreate")(function* (input) {
         const caller = yield* callerOf(who);
         if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
-        return JSON.stringify(
-          yield* media.createImage(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
-        );
+        const imageCreated = yield* media.createImage(input, {
+          kind: "orchestrator",
+          agent: caller.agent,
+          channel: caller.here,
+          forOwner: caller.actor.forOwner,
+        });
+        return yield* jsonText(imageCreated);
       }),
     ),
     tool(
@@ -24,9 +29,13 @@ export const mediaTools = Effect.gen(function* () {
       Effect.fn("Tool.mediaUnderstandingStart")(function* ({ id }) {
         const caller = yield* callerOf(who);
         if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
-        return JSON.stringify(
-          yield* media.startUnderstanding(id, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
-        );
+        const understandingStarted = yield* media.startUnderstanding(id, {
+          kind: "orchestrator",
+          agent: caller.agent,
+          channel: caller.here,
+          forOwner: caller.actor.forOwner,
+        });
+        return yield* jsonText(understandingStarted);
       }),
     ),
     tool(
@@ -34,9 +43,13 @@ export const mediaTools = Effect.gen(function* () {
       Effect.fn("Tool.mediaSpeechCreate")(function* (input) {
         const caller = yield* callerOf(who);
         if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
-        return JSON.stringify(
-          yield* media.createSpeech(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
-        );
+        const speechCreated = yield* media.createSpeech(input, {
+          kind: "orchestrator",
+          agent: caller.agent,
+          channel: caller.here,
+          forOwner: caller.actor.forOwner,
+        });
+        return yield* jsonText(speechCreated);
       }),
     ),
     tool(
@@ -44,9 +57,13 @@ export const mediaTools = Effect.gen(function* () {
       Effect.fn("Tool.mediaSpeakersCreate")(function* (input) {
         const caller = yield* callerOf(who);
         if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
-        return JSON.stringify(
-          yield* media.createSpeakers(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
-        );
+        const speakersCreated = yield* media.createSpeakers(input, {
+          kind: "orchestrator",
+          agent: caller.agent,
+          channel: caller.here,
+          forOwner: caller.actor.forOwner,
+        });
+        return yield* jsonText(speakersCreated);
       }),
     ),
     tool(
@@ -54,9 +71,13 @@ export const mediaTools = Effect.gen(function* () {
       Effect.fn("Tool.mediaVoiceDesignCreate")(function* (input) {
         const caller = yield* callerOf(who);
         if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
-        return JSON.stringify(
-          yield* media.createVoiceDesign(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
-        );
+        const voiceDesignCreated = yield* media.createVoiceDesign(input, {
+          kind: "orchestrator",
+          agent: caller.agent,
+          channel: caller.here,
+          forOwner: caller.actor.forOwner,
+        });
+        return yield* jsonText(voiceDesignCreated);
       }),
     ),
     tool("media.job.get", ({ id }) => media.get(id).pipe(Effect.map(JSON.stringify))),

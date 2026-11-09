@@ -4,7 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { Option, Predicate, Schema } from "effect";
+import { Effect, Exit, Option, Predicate, Result, Schema } from "effect";
 
 import type { JsonSchema } from "@vibevalley/ai/tools";
 
@@ -13,7 +13,7 @@ import type { Tool } from "./core/loop.ts";
 import { textTool } from "./core/tool.ts";
 import { asTransport } from "./mcpTransport.ts";
 import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
-import { afterRealTime } from "./realTime.ts";
+import { failAfterRealTime } from "./realTime.ts";
 
 /** Also for connecting. */
 const callTimeoutMs = 120_000;
@@ -61,82 +61,79 @@ interface McpConnection {
   close(): Promise<void>;
 }
 
-const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
-  new Promise<A>((resolve, reject) => {
-    if (signal?.aborted === true) {
-      reject(new Error("canceled"));
-      return;
-    }
-    let settled = false;
-    const finish = (f: () => void) => {
-      if (settled) return;
-      settled = true;
-      cancelTimer();
-      signal?.removeEventListener("abort", abort);
-      f();
-    };
-    const cancelTimer = afterRealTime(ms, () => finish(() => reject(new Error("timed out"))));
-    const abort = () => finish(() => reject(new Error("canceled")));
-    signal?.addEventListener("abort", abort, { once: true });
-    p.then(
-      (value) => finish(() => resolve(value)),
-      (e: unknown) => finish(() => reject(e)),
-    );
-  });
+/** A server that could not be reached in time: its message is what mcpStatus says of it. */
+class McpUnreachable extends Schema.TaggedError<McpUnreachable, { readonly brand: unique symbol }>()("McpUnreachable", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
-async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpConnection> {
-  if (signal?.aborted === true) throw new Error("canceled");
-  let stderr = "";
-  let transport: Transport;
+/** What start gives, or a failure after callTimeoutMs of real time; the request it started is not cancelled. */
+const withinCallTimeout = <A>(start: () => Promise<A>) =>
+  Effect.raceFirst(
+    Effect.tryPromise({ try: start, catch: (cause) => McpUnreachable.make({ message: messageOf(cause), cause }) }),
+    failAfterRealTime(callTimeoutMs, () => McpUnreachable.make({ message: "timed out" })),
+  );
+
+interface Opened {
+  readonly transport: Transport;
+  /** The last line the server wrote to stderr, to say why it went. */
+  readonly lastStderr: () => string;
+}
+
+function openTransport(server: McpServer): Opened {
   if (server.url) {
-    transport = asTransport(
+    const transport = asTransport(
       new StreamableHTTPClientTransport(new URL(server.url), {
         requestInit: { headers: server.headers ?? {} },
       }),
     );
-  } else {
-    const stdio = new StdioClientTransport({
-      command: server.command ?? "",
-      args: server.args ?? [],
-      env: {
-        ...getDefaultEnvironment(),
-        ...Object.fromEntries(Object.entries(process.env).flatMap(([k, v]) => (v === undefined ? [] : [[k, v]]))),
-        ...server.env,
-      },
-      ...(server.cwd ? { cwd: server.cwd } : {}),
-      stderr: "pipe",
-    });
-    // Keeps the end of a server's stderr, to say why it went.
-    stdio.stderr?.on("data", (b: Buffer) => {
-      stderr = (stderr + b.toString("utf8")).slice(-2000);
-    });
-    transport = stdio;
+    return { transport, lastStderr: () => "" };
   }
-  const fail = (e: unknown) => {
-    const last = stderr.trim().split("\n").at(-1) ?? "";
-    return new Error(mcpWords.connectFailed(server.name, messageOf(e), last));
-  };
+  let stderr = "";
+  const stdio = new StdioClientTransport({
+    command: server.command ?? "",
+    args: server.args ?? [],
+    env: {
+      ...getDefaultEnvironment(),
+      ...Object.fromEntries(Object.entries(process.env).flatMap(([k, v]) => (v === undefined ? [] : [[k, v]]))),
+      ...server.env,
+    },
+    ...(server.cwd ? { cwd: server.cwd } : {}),
+    stderr: "pipe",
+  });
+  stdio.stderr?.on("data", (b: Buffer) => {
+    stderr = (stderr + b.toString("utf8")).slice(-2000);
+  });
+  return { transport: stdio, lastStderr: () => stderr.trim().split("\n").at(-1) ?? "" };
+}
+
+/** Interrupted or failed, what it opened is closed first. */
+const connectMcp = Effect.fnUntraced(function* (server: McpServer) {
+  const { transport, lastStderr } = openTransport(server);
   const client = new Client({ name: "vibevalley-agent", version: "0.1.0" });
   const close = async () => {
     await Promise.allSettled([client.close()]);
     await Promise.allSettled([transport.close()]);
   };
-  try {
-    await timeout(client.connect(transport), callTimeoutMs, signal);
+  return yield* Effect.gen(function* () {
+    yield* withinCallTimeout(() => client.connect(transport));
     const tools: Tool[] = [];
     let cursor: string | undefined;
     do {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- each page's cursor comes with the page before
-      const page = await timeout(client.listTools(cursor ? { cursor } : {}), callTimeoutMs, signal);
+      const asked = cursor ? { cursor } : {};
+      const page = yield* withinCallTimeout(() => client.listTools(asked));
       for (const t of page.tools) tools.push(mcpTool(client, server.name, t));
       cursor = page.nextCursor;
     } while (cursor);
-    return { tools, close };
-  } catch (e) {
-    await close();
-    throw fail(e);
-  }
-}
+    const connection: McpConnection = { tools, close };
+    return connection;
+  }).pipe(
+    Effect.onExit((exit) => (Exit.isFailure(exit) ? Effect.promise(close) : Effect.void)),
+    Effect.mapError((e) => McpUnreachable.make({ message: mcpWords.connectFailed(server.name, e.message, lastStderr()), cause: e })),
+  );
+});
+
+const encodeJson = Schema.encodeOption(Schema.fromJsonString(Schema.Unknown));
 
 function mcpTool(client: Client, server: string, t: { name: string; description?: string | undefined; inputSchema?: object | undefined }): Tool {
   const parameters: JsonSchema = t.inputSchema ? Object.fromEntries(Object.entries(t.inputSchema)) : { type: "object", properties: {} };
@@ -155,7 +152,9 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
         throw new Error(mcpWords.callFailed(server, t.name, messageOf(e)), { cause: e });
       }
       let text = mcpContentText(Option.getOrElse(contentOf(r.content), () => []));
-      if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : mcpWords.noContent;
+      // structuredContent came over JSON-RPC, so it always encodes back.
+      if (text === "")
+        text = r.structuredContent !== undefined ? Option.getOrElse(encodeJson(r.structuredContent), () => mcpWords.noContent) : mcpWords.noContent;
       if (r.isError === true) throw new Error(text);
       return text;
     },
@@ -168,20 +167,16 @@ interface McpConnections {
   close(): Promise<void>;
 }
 
-export async function connectAll(servers: readonly McpServer[], signal?: AbortSignal): Promise<McpConnections> {
-  const outcomes = await Promise.allSettled(servers.map((s) => connectMcp(s, signal)));
-  const connections: McpConnection[] = [];
-  const failed: string[] = [];
-  for (const o of outcomes) {
-    if (o.status === "fulfilled") connections.push(o.value);
-    else failed.push(o.reason instanceof Error ? o.reason.message : String(o.reason));
-  }
-  return {
+/** Each server at once; one that cannot be reached is in failed, in the order given. */
+export const connectAll = Effect.fnUntraced(function* (servers: readonly McpServer[]) {
+  const [connections, unreachable] = yield* Effect.partition(servers, (s) => connectMcp(s), { concurrency: "unbounded" });
+  const all: McpConnections = {
     tools: connections.flatMap((c) => c.tools),
-    failed,
+    failed: unreachable.map((e) => e.message),
     close: async () => void (await Promise.all(connections.map((c) => c.close()))),
   };
-}
+  return all;
+});
 
 /** MCP servers in the shape Claude Code and Cursor use: { "mcpServers": { name: { command, args, env } | { url } } }. */
 export interface McpServer {
@@ -213,13 +208,9 @@ export async function readMcpConfig(path: string): Promise<McpServer[]> {
     throw e;
   });
   if (data.trim() === "") throw new Error(mcpConfig.notJson(path));
-  let config: { mcpServers?: Record<string, McpEntry> };
-  try {
-    config = Schema.decodeSync(McpConfigSchema)(data);
-  } catch (e) {
-    throw new Error(mcpConfig.badShape(path, String(e)), { cause: e });
-  }
-  const entries = config.mcpServers ?? {};
+  const config: Result.Result<{ mcpServers?: Record<string, McpEntry> }, Schema.SchemaError> = Schema.decodeResult(McpConfigSchema)(data);
+  if (Result.isFailure(config)) throw new Error(mcpConfig.badShape(path, String(config.failure)), { cause: config.failure });
+  const entries = config.success.mcpServers ?? {};
   const out: McpServer[] = [];
   for (const name of Object.keys(entries).toSorted()) {
     const e = entries[name];

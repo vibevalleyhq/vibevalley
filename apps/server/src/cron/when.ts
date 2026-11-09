@@ -29,7 +29,7 @@ export function givenZone(tz: string): DateTime.TimeZone | undefined {
 /** The first run of the cron strictly after from. */
 function nextOf(cron: EffectCron.Cron, from: number): number | undefined {
   try {
-    return EffectCron.next(cron, new Date(from)).getTime();
+    return EffectCron.next(cron, from).getTime();
   } catch {
     return undefined;
   }

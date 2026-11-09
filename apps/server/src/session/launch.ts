@@ -84,11 +84,12 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
         if (access?.authenticated !== true) {
           return { refused: t("server.session.life.workerAuthenticationFailed"), retained: false };
         }
+        const houseRules = owner.issue ? yield* repos.houseRules() : "";
         const text = [
           workerInstructions(access.command),
           instructions(agent, store.skills()),
           owner.issue
-            ? workplaceRules(place, yield* repos.houseRules(), owner.id, repos.usesPullRequests(place.repo))
+            ? workplaceRules(place, houseRules, owner.id, repos.usesPullRequests(place.repo))
             : channelRules(place.cwd, owner.channel ?? "", owner.id),
         ]
           .filter((s) => s !== "")
@@ -210,53 +211,49 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     const deliver = Effect.fn("Session.deliver")(function* (id: string, text: string, input: DeliveryInput): Effect.fn.Return<Delivered> {
       const h = hands.get(id);
       if (!h) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
-      return yield* h.access.withPermits(1)(
-        admission.withPermits(1)(
-          Effect.gen(function* (): Effect.fn.Return<Delivered> {
-            const session = core.session(id);
-            if (hands.get(id) !== h || !session) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
-            const execution = executor.find(id);
-            if (execution?.closing === true) return { kind: "refused", reason: t("server.session.life.stillClosing", { name: session.name }) };
-            const starts = !isBusy(session);
-            let recall = "";
-            if (starts) {
-              const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byOwnerComment);
-              if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
-              recall = yield* remind(session.agent, id, h.place.repo, text, h.recalled);
-            }
-            if (execution?.attached !== true || !h.launch) {
-              expect(h, input);
-              const d = yield* wake(h, session, text, recall);
-              if (d.kind === "refused") unexpect(h);
-              return d;
-            }
-            const launch = h.launch;
-            const inputId = newId();
-            h.inputs.set(inputId, input.envelopeIds);
-            if (starts) expect(h, input);
-            const sent = yield* executor.deliver(id, withRecall(recall, text), inputId);
-            if (sent.kind === "accepted" && sent.landed === "prompted") {
-              h.inputs.delete(inputId);
-              return { kind: "run", launch };
-            }
-            if (starts) unexpect(h);
-            if (sent.kind !== "accepted") {
-              h.inputs.delete(inputId);
-              return { kind: "refused", reason: t("server.session.life.notReceived", { name: session.name, why: sent.reason }) };
-            }
-            if (sent.landed === "queued") {
-              if (sent.inputId === undefined) h.inputs.delete(inputId);
-              expect(h, input, sent.inputId);
-              return { kind: "queued", launch };
-            }
-            if (sent.inputId === undefined) {
-              h.inputs.delete(inputId);
-              consume(h, input.envelopeIds);
-            }
-            return { kind: "steered", launch };
-          }),
-        ),
-      );
+      return yield* Effect.gen(function* (): Effect.fn.Return<Delivered> {
+        const session = core.session(id);
+        if (hands.get(id) !== h || !session) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
+        const execution = executor.find(id);
+        if (execution?.closing === true) return { kind: "refused", reason: t("server.session.life.stillClosing", { name: session.name }) };
+        const starts = !isBusy(session);
+        let recall = "";
+        if (starts) {
+          const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byOwnerComment);
+          if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
+          recall = yield* remind(session.agent, id, h.place.repo, text, h.recalled);
+        }
+        if (execution?.attached !== true || !h.launch) {
+          expect(h, input);
+          const d = yield* wake(h, session, text, recall);
+          if (d.kind === "refused") unexpect(h);
+          return d;
+        }
+        const launch = h.launch;
+        const inputId = newId();
+        h.inputs.set(inputId, input.envelopeIds);
+        if (starts) expect(h, input);
+        const sent = yield* executor.deliver(id, withRecall(recall, text), inputId);
+        if (sent.kind === "accepted" && sent.landed === "prompted") {
+          h.inputs.delete(inputId);
+          return { kind: "run", launch };
+        }
+        if (starts) unexpect(h);
+        if (sent.kind !== "accepted") {
+          h.inputs.delete(inputId);
+          return { kind: "refused", reason: t("server.session.life.notReceived", { name: session.name, why: sent.reason }) };
+        }
+        if (sent.landed === "queued") {
+          if (sent.inputId === undefined) h.inputs.delete(inputId);
+          expect(h, input, sent.inputId);
+          return { kind: "queued", launch };
+        }
+        if (sent.inputId === undefined) {
+          h.inputs.delete(inputId);
+          consume(h, input.envelopeIds);
+        }
+        return { kind: "steered", launch };
+      }).pipe(admission.withPermits(1), h.access.withPermits(1));
     });
 
     const handOver = Effect.fn("Session.handOver")(function* (
@@ -280,7 +277,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
             Effect.mapError((e) => {
               const f = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reasonText(e));
               const words = notTakenIn(f, current.name, settle);
-              return new NotTakenIn({ failure: f, ...words, message: words.owner });
+              return NotTakenIn.make({ failure: f, ...words, message: words.owner });
             }),
           );
           if (merged.pullRequest) return merged;

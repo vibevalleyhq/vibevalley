@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer } from "effect";
+import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import type { ProviderUpdate } from "@vibevalley/protocol";
@@ -12,6 +12,12 @@ import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { Provider } from "./provider.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const notIn = (value: unknown, secret: string) =>
+  Effect.map(json(value), (text) => {
+    expect(text).not.toContain(secret);
+  });
 
 const layer = (http: HttpClient.HttpClient) =>
   Provider.layer.pipe(
@@ -38,20 +44,22 @@ it.effect.each(["moss-transcribe-1.0-2026-07-22", "moss-transcribe-diarize-pro-2
     Effect.gen(function* () {
       const provider = yield* Provider;
       yield* provider.update({ ...configured(), dictation: { connection: "moss", model } });
-      expect(yield* provider.dictation()).toEqual({ url: "https://api.mosi.cn/v1", model, key: "test-first-key" });
+      const dictation2 = yield* provider.dictation();
+      expect(dictation2).toEqual({ url: "https://api.mosi.cn/v1", model, key: "test-first-key" });
     }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Selecting a snapshot must not invoke the vendor"))))),
 );
 
 it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding %s is independent, private and frozen per call", (model) =>
   Effect.gen(function* () {
     const provider = yield* Provider;
-    expect(yield* Effect.flip(provider.understanding())).toMatchObject({ _tag: "Refused" });
+    const understandingFailure = yield* Effect.flip(provider.understanding());
+    expect(understandingFailure).toMatchObject({ _tag: "Refused" });
     const vision = { id: "vision", name: "Vision", adapter: "moss", enabled: true, key: "vision-private-key" } as const;
     const config: ProviderUpdate = { ...configured(), connections: [...configured().connections, vision], understanding: { connection: "vision", model } };
     const saved = yield* provider.update(config);
     expect(saved.understanding).toEqual({ connection: "vision", model });
     expect(saved.understandingModels).toEqual(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"]);
-    expect(JSON.stringify(saved)).not.toContain("vision-private-key");
+    yield* notIn(saved, "vision-private-key");
     const frozen = yield* provider.understanding();
     expect(frozen).toEqual({ connection: "vision", revision: 1, model, key: "vision-private-key" });
     expect((yield* provider.live()).key).toBe("test-first-key");
@@ -63,14 +71,16 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
       [...configured().connections, { ...vision, enabled: false }],
       [...configured().connections, { ...vision, key: null }],
     ]) {
-      expect(yield* Effect.flip(provider.update({ ...config, revision: 1, connections }))).toMatchObject({ _tag: "Refused" });
+      const updatedFailure = yield* Effect.flip(provider.update({ ...config, revision: 1, connections }));
+      expect(updatedFailure).toMatchObject({ _tag: "Refused" });
       expect(provider.status().revision).toBe(1);
     }
     yield* provider.update({ ...config, revision: 1, connections: [...configured().connections, { ...vision, key: "rotated-vision-key" }] });
     expect((yield* provider.understanding()).key).toBe("rotated-vision-key");
     expect(frozen.key).toBe("vision-private-key");
     yield* provider.update({ ...config, revision: 2, understanding: null });
-    expect(yield* Effect.flip(provider.understanding())).toMatchObject({ _tag: "Refused" });
+    const understandingFailure2 = yield* Effect.flip(provider.understanding());
+    expect(understandingFailure2).toMatchObject({ _tag: "Refused" });
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
 );
 
@@ -93,8 +103,10 @@ it.effect("cleanup resolves the original connection rather than the current defa
       revision: 1,
       connections: config.connections.map((connection) => (connection.id === "moss" ? { ...connection, enabled: false } : connection)),
     });
-    expect(yield* Effect.flip(provider.connection("moss"))).toMatchObject({ _tag: "Refused" });
-    expect(yield* Effect.flip(provider.connection("missing"))).toMatchObject({ _tag: "Refused" });
+    const connectionFailure = yield* Effect.flip(provider.connection("moss"));
+    expect(connectionFailure).toMatchObject({ _tag: "Refused" });
+    const connectionFailure2 = yield* Effect.flip(provider.connection("missing"));
+    expect(connectionFailure2).toMatchObject({ _tag: "Refused" });
     expect(original.key).toBe("test-first-key");
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Resolving a connection must not invoke a provider"))))),
 );
@@ -112,15 +124,18 @@ it.effect("connections and uses share credentials; replacing and clearing observ
     const provider = yield* Provider;
     const setting = yield* Setting;
     const api = yield* providerHandlers;
-    expect(yield* api["provider.model.list"]({ connection: "moss", revision: 0 }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const modelListFailure = yield* api["provider.model.list"]({ connection: "moss", revision: 0 }).pipe(Effect.flip);
+    expect(modelListFailure).toMatchObject({ _tag: "Refused" });
     expect(keys).toEqual([]);
     const saved = yield* api["provider.update"](configured());
     expect(saved.connections[0]?.key).toEqual({ source: "settings", hint: "…-key" });
-    expect(JSON.stringify(saved)).not.toContain("test-first-key");
+    yield* notIn(saved, "test-first-key");
     expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
     expect((yield* provider.live()).key).toBe("test-first-key");
-    expect(yield* provider.dictation()).toEqual({ url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0", key: "test-first-key" });
-    expect(yield* api["provider.model.list"]({ connection: "moss", revision: 1 })).toEqual({
+    const dictation2 = yield* provider.dictation();
+    expect(dictation2).toEqual({ url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0", key: "test-first-key" });
+    const modelList = yield* api["provider.model.list"]({ connection: "moss", revision: 1 });
+    expect(modelList).toEqual({
       connection: "moss",
       revision: 1,
       models: [{ id: "unknown-model", owner: "MOSS" }],
@@ -142,9 +157,11 @@ it.effect("connections and uses share credentials; replacing and clearing observ
       live: null,
     });
     expect(cleared.connections[0]?.key).toEqual({ source: null });
-    expect(yield* provider.live().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const liveFailure = yield* provider.live().pipe(Effect.flip);
+    expect(liveFailure).toMatchObject({ _tag: "Refused" });
     expect(setting.status()).toMatchObject({ mossReady: false, dictationReady: false });
-    expect(yield* provider.models({ connection: "moss", revision: 3 }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const modelsFailure = yield* provider.models({ connection: "moss", revision: 3 }).pipe(Effect.flip);
+    expect(modelsFailure).toMatchObject({ _tag: "Refused" });
     expect(keys).toHaveLength(2);
     for (const endpoint of endpoints.filter((row) => row.op.startsWith("provider."))) expect(endpoint.can).toEqual(["owner"]);
   }).pipe(Effect.provide(layer(capture)));
@@ -156,12 +173,14 @@ it.effect("deletion, disabling and clearing require explicit unbinding and unsup
     yield* provider.update(configured());
     const kept = { id: "moss", name: "renamed", adapter: "moss", enabled: true } as const;
     for (const connections of [[], [{ ...kept, enabled: false }], [{ ...kept, key: null }]]) {
-      expect(yield* provider.update({ ...configured(), revision: 1, connections }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const updatedFailure2 = yield* provider.update({ ...configured(), revision: 1, connections }).pipe(Effect.flip);
+      expect(updatedFailure2).toMatchObject({ _tag: "Refused" });
       expect(provider.status().revision).toBe(1);
     }
-    expect(yield* provider.update({ ...configured(), revision: 1, dictation: { connection: "moss", model: "unknown-model" } }).pipe(Effect.flip)).toMatchObject(
-      { _tag: "Refused" },
-    );
+    const updatedFailure = yield* provider
+      .update({ ...configured(), revision: 1, dictation: { connection: "moss", model: "unknown-model" } })
+      .pipe(Effect.flip);
+    expect(updatedFailure).toMatchObject({ _tag: "Refused" });
     yield* provider.update({ ...configured(), revision: 1, connections: [kept] });
     expect((yield* provider.live()).key).toBe("test-first-key");
     expect(provider.status().connections[0]?.name).toBe("renamed");
@@ -180,10 +199,9 @@ it.effect("stale updates cannot overwrite another writer and general settings sa
   Effect.gen(function* () {
     const provider = yield* Provider;
     const setting = yield* Setting;
-    const results = yield* Effect.all(
-      [configured("first-key"), configured("second-key")].map((input) =>
-        provider.update(input).pipe(Effect.match({ onSuccess: () => "saved", onFailure: () => "refused" })),
-      ),
+    const results = yield* Effect.forEach(
+      [configured("first-key"), configured("second-key")],
+      (input) => provider.update(input).pipe(Effect.match({ onSuccess: () => "saved", onFailure: () => "refused" })),
       { concurrency: 2 },
     );
     expect(results.toSorted()).toEqual(["refused", "saved"]);
@@ -209,13 +227,15 @@ it.effect("discovery rejects an old revision both before and after an in-flight 
     yield* Effect.gen(function* () {
       const provider = yield* Provider;
       yield* provider.update(configured());
-      expect(yield* provider.models({ connection: "moss", revision: 0 }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const modelsFailure = yield* provider.models({ connection: "moss", revision: 0 }).pipe(Effect.flip);
+      expect(modelsFailure).toMatchObject({ _tag: "Refused" });
       expect(calls).toBe(0);
       const pending = yield* provider.models({ connection: "moss", revision: 1 }).pipe(Effect.flip, Effect.forkChild);
       yield* Deferred.await(started);
       yield* provider.update({ ...configured("replacement"), revision: 1 });
       yield* Deferred.succeed(release, undefined);
-      expect(yield* Fiber.join(pending)).toMatchObject({ _tag: "Refused" });
+      const pending2 = yield* Fiber.join(pending);
+      expect(pending2).toMatchObject({ _tag: "Refused" });
       expect(calls).toBe(1);
     }).pipe(Effect.provide(layer(delayed)));
   }),
@@ -242,12 +262,14 @@ it.effect.each(["moss-image-base-1.0", "moss-image-sft-1.0", "moss-image-base-1.
   (model) =>
     Effect.gen(function* () {
       const provider = yield* Provider;
-      expect(yield* provider.image().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const imageFailure = yield* provider.image().pipe(Effect.flip);
+      expect(imageFailure).toMatchObject({ _tag: "Refused" });
       const saved = yield* provider.update({ ...configured(), image: { connection: "moss", model } });
       expect(saved.image).toEqual({ connection: "moss", model });
       expect(saved.imageModels).toContain(model);
-      expect(JSON.stringify(saved)).not.toContain("test-first-key");
-      expect(yield* provider.image()).toEqual({ connection: "moss", revision: 1, model, key: "test-first-key" });
+      yield* notIn(saved, "test-first-key");
+      const image2 = yield* provider.image();
+      expect(image2).toEqual({ connection: "moss", revision: 1, model, key: "test-first-key" });
       if (saved.image) saved.image.model = "changed-by-caller";
       saved.imageModels.length = 0;
       expect(provider.status().image?.model).toBe(model);
@@ -268,14 +290,17 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     expect((yield* provider.live()).key).toBe("test-first-key");
     expect((yield* provider.dictation()).key).toBe("test-first-key");
     for (const connections of [[first], [first, { ...image, enabled: false }], [first, { ...image, key: null }]]) {
-      expect(yield* provider.update({ ...config, revision: 1, connections }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const updatedFailure = yield* provider.update({ ...config, revision: 1, connections }).pipe(Effect.flip);
+      expect(updatedFailure).toMatchObject({ _tag: "Refused" });
       expect(provider.status().revision).toBe(1);
     }
     yield* provider.update({ ...configured("rotated-key"), revision: 1, image: { connection: "moss", model: "moss-image-sft-1.0-2026-10-09" } });
-    expect(yield* provider.image()).toEqual({ connection: "moss", revision: 2, model: "moss-image-sft-1.0-2026-10-09", key: "rotated-key" });
+    const image2 = yield* provider.image();
+    expect(image2).toEqual({ connection: "moss", revision: 2, model: "moss-image-sft-1.0-2026-10-09", key: "rotated-key" });
     expect(frozen).toEqual({ connection: "image", revision: 1, model: "moss-image-sft-1.0", key: "test-image-key" });
     yield* provider.update({ ...configured("rotated-key"), revision: 2 });
-    expect(yield* provider.image().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const imageFailure = yield* provider.image().pipe(Effect.flip);
+    expect(imageFailure).toMatchObject({ _tag: "Refused" });
     expect((yield* provider.live()).key).toBe("rotated-key");
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Unexpected network request"))))),
 );
@@ -291,7 +316,7 @@ it.effect("model discovery distinguishes account errors without returning upstre
       status = code;
       const error = yield* provider.models({ connection: "moss", revision: 1 }).pipe(Effect.flip);
       expect(error._tag).toBe("Refused");
-      expect(JSON.stringify(error)).not.toContain("test-private-key");
+      yield* notIn(error, "test-private-key");
       reasons.push(error.reason);
     }
     expect(new Set(reasons).size).toBe(4);
@@ -307,7 +332,8 @@ it.effect.each([
 ] as const)("$use protects and freezes its own account independently of other bindings", ({ use, model }) =>
   Effect.gen(function* () {
     const provider = yield* Provider;
-    expect(yield* provider[use]().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const resultFailure = yield* provider[use]().pipe(Effect.flip);
+    expect(resultFailure).toMatchObject({ _tag: "Refused" });
     const connection = { id: "separate", name: "Separate", adapter: "moss", enabled: true, key: "separate-private-key" } as const;
     const input = { ...configured(), connections: [...configured().connections, connection], [use]: { connection: connection.id, model } };
     const saved = yield* provider.update(input);
@@ -322,12 +348,14 @@ it.effect.each([
       { connections: [...configured().connections, { ...connection, key: null }] },
       { [use]: { connection: connection.id, model: "unsupported-model" } },
     ]) {
-      expect(yield* provider.update({ ...input, revision: 1, ...patch }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const updatedFailure = yield* provider.update({ ...input, revision: 1, ...patch }).pipe(Effect.flip);
+      expect(updatedFailure).toMatchObject({ _tag: "Refused" });
     }
     yield* provider.update({ ...input, revision: 1, connections: [...configured().connections, { ...connection, key: "rotated-private-key" }] });
     expect((yield* provider[use]()).key).toBe("rotated-private-key");
     expect(frozen.key).toBe("separate-private-key");
     yield* provider.update({ ...input, revision: 2, [use]: null, connections: configured().connections });
-    expect(yield* provider[use]().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const resultFailure2 = yield* provider[use]().pipe(Effect.flip);
+    expect(resultFailure2).toMatchObject({ _tag: "Refused" });
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
 );

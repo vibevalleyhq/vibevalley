@@ -4,7 +4,7 @@ import { connect, type Socket } from "node:net";
 import { hostname, networkInterfaces } from "node:os";
 
 import { NodeSink, NodeStream } from "@effect/platform-node";
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Schema, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -47,7 +47,7 @@ class ForwardFailed extends Schema.TaggedError<ForwardFailed, { readonly brand: 
   cause: Schema.Defect(),
 }) {}
 
-const forwardFailed = (cause: unknown) => new ForwardFailed({ message: messageOf(cause), cause });
+const forwardFailed = (cause: unknown) => ForwardFailed.make({ message: messageOf(cause), cause });
 
 interface Device extends LanDevice {
   readonly keyHash: string;
@@ -90,7 +90,7 @@ export class Lan extends Context.Service<
     /** Where the loopback server listens, once it does. */
     readonly setUpstream: (address: string) => void;
   }
->()("vibevalley/Lan") {
+>()("@vibevalley/server/lan/lan") {
   static readonly layer = (options?: LanOptions) => Layer.effect(Lan, make(options));
 }
 
@@ -176,8 +176,9 @@ const make = (options: LanOptions = {}) =>
         ...(row.last_seen !== null ? { lastSeen: row.last_seen } : {}),
       });
     }
+    const lanOpen2 = yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen()));
     // No row yet is shut.
-    const initialOpen = Option.match(yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen())), {
+    const initialOpen = Option.match(lanOpen2, {
       onNone: () => false,
       onSome: (r) => r.open,
     });
@@ -238,7 +239,7 @@ const make = (options: LanOptions = {}) =>
 
     const refuseHttp = (res: ServerResponse, status: number, reason: string) => {
       res.writeHead(status, { "content-type": "application/json" });
-      res.end(JSON.stringify({ _tag: "LanRefused", reason }));
+      res.end(Formatter.formatJson({ _tag: "LanRefused", reason }));
     };
 
     /** Handed to the loopback server as it came, the device said; the answer streams back. */

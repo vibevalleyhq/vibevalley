@@ -16,7 +16,8 @@ describe("an agent's own todos, kept", () => {
 
   it.effect("a store keeps the graph and puts a finished one away", () =>
     Effect.gen(function* () {
-      for (const [name, open] of Object.entries(yield* stores)) {
+      const todoStores = yield* stores;
+      for (const [name, open] of Object.entries(todoStores)) {
         const s = open("s1");
         const g = yield* s.change(
           (g) =>
@@ -25,19 +26,23 @@ describe("an agent's own todos, kept", () => {
               { id: "c", brief: "d", after: ["a"], by: "subagent" },
             ])[0],
         );
-        expect(yield* s.load, name).toEqual(g);
+        const load2 = yield* s.load;
+        expect(load2, name).toEqual(g);
         const refused = yield* Effect.flip(
           s.change(() => {
-            throw new TodoError({ message: "不改了" });
+            throw TodoError.make({ message: "不改了" });
           }),
         );
         expect(refused, name).toMatchObject({ _tag: "ToolFailed", message: "不改了" });
         expect(refused.cause, name).toBeInstanceOf(TodoError);
-        expect(yield* s.change(() => undefined), name).toBeUndefined();
-        expect(yield* s.load, name).toEqual(g);
+        const change2 = yield* s.change(() => undefined);
+        expect(change2, name).toBeUndefined();
+        const load3 = yield* s.load;
+        expect(load3, name).toEqual(g);
         const ended = yield* s.change((g) => update(update(g, "a", { state: "done" }), "c", { state: "skipped" }));
         expect(finished(ended), name).toBe(true);
-        expect(yield* s.load, name).toEqual([]);
+        const load4 = yield* s.load;
+        expect(load4, name).toEqual([]);
       }
     }).pipe(Effect.scoped, Effect.provide(database)),
   );
@@ -76,7 +81,8 @@ describe("an agent's own todos, kept", () => {
     Effect.gen(function* () {
       const open = yield* dbTodoStores;
       yield* open("s1").change((g) => add(g, [{ id: "a", brief: "b" }])[0]);
-      expect(yield* open("s2").load).toEqual([]);
+      const loaded = yield* open("s2").load;
+      expect(loaded).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(database)),
   );
 });

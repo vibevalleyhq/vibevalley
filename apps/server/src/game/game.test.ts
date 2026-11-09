@@ -145,7 +145,8 @@ describe("the game", () => {
       yield* until(stationOf("w3"), (s) => s >= 0, "w3 hired");
       yield* core.apply({ type: "sessionChanged", session: helper("w4", starting) });
       yield* until(stationOf("w4"), (s) => s >= 0, "w4 hired");
-      expect(yield* stationOf("w1")).toBe(4);
+      const stationOf2 = yield* stationOf("w1");
+      expect(stationOf2).toBe(4);
       // A taken station is not given again, and the wish is used once.
       expect([yield* stationOf("w3"), yield* stationOf("w4")]).toEqual([1, 2]);
     }).pipe(Effect.scoped, Effect.provide(farm())),

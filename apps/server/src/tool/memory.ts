@@ -44,7 +44,8 @@ export const memoryTools = Effect.gen(function* () {
           Effect.fn("Tool.memorySearch")(function* (p: Orchestrator<"memory.search">) {
             const agent = p.agent?.trim() ? yield* profile(p.agent) : "";
             const q = query({ text: p.text ?? "", repo: (p.repo ?? "").trim(), ...(agent ? { agent } : {}) });
-            return foundText(yield* memory.search(q), q);
+            const memorys = yield* memory.search(q);
+            return foundText(memorys, q);
           }, answered),
         )
       : sessionSchemaTool(
@@ -53,7 +54,8 @@ export const memoryTools = Effect.gen(function* () {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
             const q = query({ agent: c.agent, repo: sessionScope(c, p.repo), text: p.text ?? "" });
-            return foundText(yield* memory.search(q), q);
+            const memorys = yield* memory.search(q);
+            return foundText(memorys, q);
           }),
         );
 

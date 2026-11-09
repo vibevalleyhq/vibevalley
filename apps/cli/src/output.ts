@@ -49,9 +49,19 @@ export const err = (text: string) => line("stderr", text);
 /** What stdin holds, to its end. */
 export const stdinText = Effect.flatMap(Stdio.Stdio, (io) => io.stdin.pipe(Stream.decodeText, Stream.mkString));
 
+const oneLine = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const laidOut = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+
+/** A value as JSON text, one line (as JSON.stringify writes it) or, laid out, indented by two. */
+export const jsonText = (value: unknown, layout: "line" | "laidOut" = "line") =>
+  (layout === "laidOut" ? laidOut : oneLine)(value).pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "InvalidJson", text: e.message })));
+
 /** A document as stdout takes it: laid out for a person on a terminal, one line otherwise. */
 const printDocument = (value: unknown) =>
-  Effect.flatMap(Stdio.Stdio, (io) => io.stdoutIsTerminal).pipe(Effect.flatMap((tty) => out(tty ? JSON.stringify(value, null, 2) : JSON.stringify(value))));
+  Effect.flatMap(Stdio.Stdio, (io) => io.stdoutIsTerminal).pipe(
+    Effect.flatMap((tty) => jsonText(value, tty ? "laidOut" : "line")),
+    Effect.flatMap(out),
+  );
 
 const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
@@ -60,8 +70,6 @@ export const printBody = (text: string) => (text.trim() === "" ? Effect.void : O
 
 /** The failure on stderr, always one line, so a script can read the last line as JSON. */
 export const printFailure = (f: Failure) =>
-  err(
-    JSON.stringify({
-      error: { tag: f.tag, message: f.text, ...(f.status !== undefined ? { status: f.status } : {}), ...(f.next && f.next.length > 0 ? { next: f.next } : {}) },
-    }),
-  );
+  jsonText({
+    error: { tag: f.tag, message: f.text, ...(f.status !== undefined ? { status: f.status } : {}), ...(f.next && f.next.length > 0 ? { next: f.next } : {}) },
+  }).pipe(Effect.flatMap(err));

@@ -3,6 +3,7 @@ import { Effect, Layer, Stream } from "effect";
 import { HttpClient, HttpClientError } from "effect/http";
 
 import { complete, deepseek, MissingKey } from "./client.ts";
+import { jsonText } from "./json.ts";
 import { type LlmError, Llm, make } from "./llm.ts";
 import type { Context } from "./messages.ts";
 import { models } from "./models.ts";
@@ -90,7 +91,7 @@ describe("Llm", () => {
     const body =
       chunk({ reasoning_text: "想", content: "好", tool_calls: [{ index: 0, function: { arguments: '{"x":' } }] }) +
       chunk({ tool_calls: [{ index: 0, id: "call", function: { name: "lookup", arguments: "1}" } }] }) +
-      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls", usage: { prompt_tokens: 100, completion_tokens: 5, prompt_cache_hit_tokens: 20 } }] })}\n\n` +
+      `data: ${jsonText({ choices: [{ delta: {}, finish_reason: "tool_calls", usage: { prompt_tokens: 100, completion_tokens: 5, prompt_cache_hit_tokens: 20 } }] })}\n\n` +
       "data: [DONE]\n\n";
     const fragmented = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -145,7 +146,7 @@ describe("Llm", () => {
       expect([failed.reason, failed.status, failed.message]).toEqual(["status", 401, said]);
       const kept = yield* llm.complete(flash, context, { apiKey: "bad" });
       expect([kept.stopReason, kept.errorMessage, kept.content]).toEqual(["error", said, []]);
-    }).pipe(Effect.provide(llmOn(http([], JSON.stringify({ error: { message: "Authentication Fails", type: "authentication_error" } }), 401)))),
+    }).pipe(Effect.provide(llmOn(http([], jsonText({ error: { message: "Authentication Fails", type: "authentication_error" } }), 401)))),
   );
 
   it.effect("a stream that breaks fails with what had come", () =>

@@ -27,6 +27,8 @@ import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitTe
 const stalePauseMs = 60 * 60_000;
 
 const SecretsSchema = Schema.Record(Schema.String, Schema.String);
+const encodeSecrets = Schema.encodeEffect(Schema.fromJsonString(SecretsSchema));
+const encodeInbound = Schema.encodeEffect(Schema.fromJsonString(Inbound));
 
 interface Account {
   secrets: Record<string, string>;
@@ -50,7 +52,7 @@ export class BridgeError extends Schema.TaggedError<BridgeError, { readonly bran
 
 /** A bridge's step that the database or the farm failed, in the words its status says. */
 export const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError | ApiError) =>
-  new BridgeError({ message: causeMessage(e), cause: e });
+  BridgeError.make({ message: causeMessage(e), cause: e });
 
 export type SqlFailure = SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError;
 
@@ -354,7 +356,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     if (m.text) {
       // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
       const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
-      yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e), cause: e }));
+      yield* Effect.mapError(say(m.text, channel, sendKey), (e) => BridgeError.make({ message: reasonOf(e), cause: e }));
     }
     // The owner's action withdraws stale handoffs before its fresh reply opens the platform's delivery window.
     yield* drain(true);
@@ -373,7 +375,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
               yield* inboundQ.acceptInbound({
                 connector: id,
                 ext_id: withId.id,
-                payload: JSON.stringify(withId),
+                payload: yield* encodeInbound(withId),
                 created_at: yield* Clock.currentTimeMillis,
               });
             }),
@@ -489,7 +491,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
             Effect.gen(function* () {
               yield* accountQ.connectAccount({
                 connector: id,
-                secrets: JSON.stringify(linked.secrets),
+                secrets: yield* encodeSecrets(linked.secrets),
                 owner_id: linked.owner || null,
                 pair_code: pair,
                 connected_at: at,

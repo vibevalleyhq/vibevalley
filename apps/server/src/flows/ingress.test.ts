@@ -48,7 +48,8 @@ it.live("regression: the mandate grants its worker access to the original trigge
     expect((yield* resource.read(started.session!, { uri: source.card.readUri })).text).toContain("original requirement");
     const other = yield* issues.add({ title: "unrelated work", repo: "unrelated", agent: "lab" }, explicitMandate());
     const second = yield* testIssues(issues).start(other.id, "");
-    expect(yield* Effect.flip(resource.read(second.session!, { uri: source.card.readUri }))).toMatchObject({ _tag: "ResourceError" });
+    const resourceFailure = yield* Effect.flip(resource.read(second.session!, { uri: source.card.readUri }));
+    expect(resourceFailure).toMatchObject({ _tag: "ResourceError" });
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
 
@@ -74,10 +75,12 @@ it.live("regression: chat triggers keep their original payload through edits and
     yield* chat.edit(current.message.id, "edited voice input");
     yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
     yield* (yield* Mailbox).replay;
-    expect(yield* mailbox.registered(current.message.id)).toBe(false);
+    const registered2 = yield* mailbox.registered(current.message.id);
+    expect(registered2).toBe(false);
     yield* chat.start;
     yield* mailbox.start;
-    expect(yield* mailbox.registered(current.message.id)).toBe(true);
+    const registered3 = yield* mailbox.registered(current.message.id);
+    expect(registered3).toBe(true);
     const source = yield* ingress.read(current.message.id);
     expect(source?.trigger.source).toBe("voice");
     expect(source?.payload.text).toBe("original voice input");
@@ -101,7 +104,8 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const sessions = yield* Session;
     const mailbox = yield* Mailbox;
     const chat = yield* Channel;
@@ -183,7 +187,8 @@ it.live("regression: issue input waits without a session and an owner followup r
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const sessions = yield* Session;
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;

@@ -1,5 +1,6 @@
 import { decodeMossFrame, mossOutRate, mossTaggedFrameBytes, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
 
+import { jsonText } from "../json.ts";
 import { heard, levelOf, type MossEvent, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos, noisyMossActions } from "./moss-session.ts";
 import { type Piece, Playback, type PlaybackAction, type Queued } from "./playback.ts";
 
@@ -459,7 +460,7 @@ export class MossEngine {
   }
 
   private send(action: MossOutboundAction): void {
-    const text = JSON.stringify(action);
+    const text = jsonText(action);
     this.callbacks.sendText(text);
     this.window.up += text.length;
     if (!noisyMossActions.has(action.action)) this.log(true, action.action);
@@ -468,6 +469,6 @@ export class MossEngine {
 
   private log(up: boolean, action: string): void {
     if (!/^[a-z][a-z_.]{0,63}$/u.test(action)) return;
-    this.events = [...this.events.slice(-199), { up, text: JSON.stringify({ action }) }];
+    this.events = [...this.events.slice(-199), { up, text: jsonText({ action }) }];
   }
 }

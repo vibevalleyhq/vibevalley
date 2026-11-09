@@ -40,7 +40,7 @@ export class Ingress extends Context.Service<
     readonly record: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, ApiError>;
     readonly read: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
   }
->()("vibevalley/Ingress") {
+>()("@vibevalley/server/ingress/ingress") {
   static readonly layer = Layer.effect(
     Ingress,
     Effect.suspend(() => make),

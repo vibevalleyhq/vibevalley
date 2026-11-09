@@ -7,6 +7,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
 import { Db, causeMessage } from "#/infra/db.ts";
 import { channelType, senderKind, type ChannelRouteResult } from "#/mailbox/envelope.ts";
 import { NotRecorded, Session } from "#/session/session.ts";
@@ -61,20 +62,22 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     const { writtenLocked, received, stored, defaultChannel, open, reach, breaker, dispatch, issueOf, orchestratorOf } = options;
 
     const writeDelivery = (input: InsertDelivery) =>
-      qd.insertDelivery({
-        session_id: input.session,
-        envelope_id: input.row.envelope_id,
-        scope: input.row.scope,
-        channel_id: input.row.channel_id || null,
-        message_id: input.row.message_id,
-        source: input.row.source,
-        urgency: input.row.urgency,
-        reason: input.row.reason,
-        wakes: input.row.wakes,
-        held_by: input.row.held_by,
-        payload_json: JSON.stringify(input.row.payload),
-        created_at: input.row.created_at,
-      });
+      Effect.flatMap(jsonText(input.row.payload), (payloadJson) =>
+        qd.insertDelivery({
+          session_id: input.session,
+          envelope_id: input.row.envelope_id,
+          scope: input.row.scope,
+          channel_id: input.row.channel_id || null,
+          message_id: input.row.message_id,
+          source: input.row.source,
+          urgency: input.row.urgency,
+          reason: input.row.reason,
+          wakes: input.row.wakes,
+          held_by: input.row.held_by,
+          payload_json: payloadJson,
+          created_at: input.row.created_at,
+        }),
+      );
     const markRoute = (input: InsertDelivery) =>
       qr
         .markRouted({
@@ -215,7 +218,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             }),
           ),
         )
-        .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+        .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
       for (const entry of committed) received(entry.receipt);
       for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
     }, writtenLocked);
@@ -229,9 +232,9 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       const prepared = yield* Effect.forEach(rows, (talk) =>
         Effect.gen(function* () {
           const recorded = yield* db.one(qr.triggerById({ id: talk.row.envelope_id }));
-          if (!recorded) return yield* Effect.die(new Inconsistent({ message: `talk ${talk.row.envelope_id} has no recorded trigger` }));
+          if (!recorded) return yield* Effect.die(Inconsistent.make({ message: `talk ${talk.row.envelope_id} has no recorded trigger` }));
           const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(recorded.trigger_json).pipe(
-            Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
+            Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })),
           );
           const urgency = urgencyOf({ source: trigger.source, actor: "owner", recipient: "worker", event: "conversation", canSteer: true });
           const row: DeliveryDraft = {
@@ -267,7 +270,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             }),
           ),
         )
-        .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+        .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
       for (const entry of committed) {
         received(entry.receipt);
         for (const added of entry.added) stored(session, { ...entry.row, position: added.position });

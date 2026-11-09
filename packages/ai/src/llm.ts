@@ -37,7 +37,7 @@ export class Llm extends Context.Service<
     /** The whole answer; a failure is its error message (stopReason error), as a stream's error event carries one. */
     readonly complete: (model: Model, context: LlmContext, options: StreamOptions) => Effect.Effect<AssistantMessage>;
   }
->()("vibevalley/Llm") {
+>()("@vibevalley/ai/llm") {
   static readonly layer = Layer.effect(
     Llm,
     Effect.suspend(() => make),
@@ -65,23 +65,23 @@ export const make = Effect.gen(function* () {
   const stream = (model: Model, context: LlmContext, options: StreamOptions): Stream.Stream<AssistantMessageEvent, LlmError> =>
     Stream.unwrap(
       Effect.gen(function* () {
-        const fold = new Fold(model, yield* Clock.currentTimeMillis);
+        const now = yield* Clock.currentTimeMillis;
+        const fold = new Fold(model, now);
         const language = yield* deepseekModel({ model: model.id, baseUrl: model.baseUrl, key: options.apiKey }).pipe(
           Effect.provideService(HttpClient.HttpClient, http),
         );
         const source = yield* language.stream(requestInput(model, context, options)).pipe(
-          Effect.mapError(
-            (e) =>
-              new LlmError({
-                reason: e.reason,
-                message: e.message,
-                ...(e.status !== undefined ? { status: e.status } : {}),
-                ...(e.cause !== undefined ? { cause: e.cause } : {}),
-              }),
+          Effect.mapError((e) =>
+            LlmError.make({
+              reason: e.reason,
+              message: e.message,
+              ...(e.status !== undefined ? { status: e.status } : {}),
+              ...(e.cause !== undefined ? { cause: e.cause } : {}),
+            }),
           ),
         );
         const events = source.pipe(
-          Stream.mapError((e) => new LlmError({ reason: e.reason, message: e.message, partial: fold.message() })),
+          Stream.mapError((e) => LlmError.make({ reason: e.reason, message: e.message, partial: fold.message() })),
           Stream.map((chunk) => fold.chunk(chunk)),
           Stream.flattenIterable,
         );
@@ -97,13 +97,13 @@ export const make = Effect.gen(function* () {
         Effect.map((e) => (e._tag === "Some" ? e.value : undefined)),
         Effect.catchTag("LlmError", (e) => Effect.succeed(failedMessage(model, asked, e))),
       );
-      if (last === undefined) return failedMessage(model, asked, new LlmError({ reason: "stream", message: "The stream said nothing" }));
+      if (last === undefined) return failedMessage(model, asked, LlmError.make({ reason: "stream", message: "The stream said nothing" }));
       if ("role" in last) return last;
       return last.type === "done"
         ? last.message
         : last.type === "error"
           ? last.error
-          : failedMessage(model, asked, new LlmError({ reason: "stream", message: "The stream ended early" }));
+          : failedMessage(model, asked, LlmError.make({ reason: "stream", message: "The stream ended early" }));
     });
 
   return Llm.of({ stream, complete });

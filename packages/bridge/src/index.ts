@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Result, Schema } from "effect";
 
 /** Any Schema a contract may hold: its type and its encoded form, needing no services. */
 export type AnyCodec = Schema.Codec<unknown, unknown>;
@@ -71,20 +71,26 @@ const entryOf = (contract: Contract, name: string) => (Object.hasOwn(contract, n
 /** Nothing is answered after close. */
 export function serve<C extends Contract>(contract: C, link: Link, handlers: Handlers<C>) {
   let closed = false;
-  const answer = async (id: number, name: string, input: unknown) => {
+  const replyTo = async (id: number, name: string, input: unknown): Promise<BridgeMessage> => {
+    const refuse = (e: unknown): BridgeMessage => ({ id, ok: false, error: reasonOf(e) });
     const entry = entryOf(contract, name);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- each handler is given what its own call's Schema decoded, below
     const byName = handlers as unknown as Readonly<Record<string, ((input: unknown) => unknown) | undefined>>;
     const handler = Object.hasOwn(byName, name) ? byName[name] : undefined;
-    let reply: BridgeMessage;
+    if (entry?.kind !== "call" || handler === undefined) return refuse(new BridgeError(`no call ${name}`));
+    const read = Schema.decodeUnknownResult(entry.input)(input);
+    if (Result.isFailure(read)) return refuse(read.failure);
+    let output: unknown;
     try {
-      if (entry?.kind !== "call" || handler === undefined) throw new BridgeError(`no call ${name}`);
-      const read = Schema.decodeUnknownSync(entry.input)(input);
-      const output: unknown = await handler(read);
-      reply = { id, ok: true, output: Schema.encodeUnknownSync(entry.output)(output) };
+      output = await handler(read.success);
     } catch (e) {
-      reply = { id, ok: false, error: reasonOf(e) };
+      return refuse(e);
     }
+    const encoded = Schema.encodeUnknownResult(entry.output)(output);
+    return Result.isFailure(encoded) ? refuse(encoded.failure) : { id, ok: true, output: encoded.success };
+  };
+  const answer = async (id: number, name: string, input: unknown) => {
+    const reply = await replyTo(id, name, input);
     if (!closed) link.send(reply);
   };
   const stop = link.receive((raw) => {
@@ -96,7 +102,8 @@ export function serve<C extends Contract>(contract: C, link: Link, handlers: Han
     push: <K extends PushName<C>>(name: K, payload: PayloadOf<C, K>) => {
       const entry = entryOf(contract, name);
       if (closed || entry?.kind !== "push") return;
-      link.send({ push: name, payload: Schema.encodeUnknownSync(entry.payload)(payload) });
+      // A payload its own Schema cannot encode is the caller's mistake: it throws to the one pushing it.
+      link.send({ push: name, payload: Result.getOrThrow(Schema.encodeUnknownResult(entry.payload)(payload)) });
     },
     close: () => {
       closed = true;
@@ -140,17 +147,16 @@ export function connect<C extends Contract>(contract: C, link: Link) {
     waiting.delete(m.id);
     clearTimeout(w.timer);
     if (!m.ok) return w.reject(new BridgeError(m.error));
-    try {
-      w.resolve(Schema.decodeUnknownSync(w.output)(m.output));
-    } catch (e) {
-      w.reject(new BridgeError(reasonOf(e)));
-    }
+    const output = Schema.decodeUnknownResult(w.output)(m.output);
+    if (Result.isFailure(output)) w.reject(new BridgeError(reasonOf(output.failure)));
+    else w.resolve(output.success);
   });
 
   const ask = (name: string, entry: Call<AnyCodec, AnyCodec>, input: unknown) =>
     new Promise<unknown>((resolve, reject) => {
       if (closed) return reject(new BridgeError("the bridge is closed"));
-      const encoded = Schema.encodeUnknownSync(entry.input)(input);
+      const encoded = Schema.encodeUnknownResult(entry.input)(input);
+      if (Result.isFailure(encoded)) return reject(encoded.failure);
       const id = next++;
       const timeoutMs = entry.timeoutMs ?? callTimeoutMs;
       const timer =
@@ -161,7 +167,7 @@ export function connect<C extends Contract>(contract: C, link: Link) {
               reject(new BridgeError(`${name} was not answered in ${timeoutMs} ms`));
             }, timeoutMs);
       waiting.set(id, { output: entry.output, resolve, reject, ...(timer ? { timer } : {}) });
-      link.send({ id, call: name, input: encoded });
+      link.send({ id, call: name, input: encoded.success });
     });
 
   const methods = Object.fromEntries(

@@ -41,7 +41,8 @@ describe("a refined issue", () => {
   it.live("regression: repository-free drafts preserve discussion without dispatching work", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const chat = yield* Channel;
       const sessions = yield* Session;
       yield* (yield* Agent).save({ ...lab(), workdir: "" });
@@ -80,11 +81,13 @@ describe("a refined issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      const before = mustHire(yield* issues.hire(lab(), "看看仓库", "board"));
+      const hired = yield* issues.hire(lab(), "看看仓库", "board");
+      const before = mustHire(hired);
       yield* w.nextReport;
       yield* sessions.dismiss(before.id);
       let issue = yield* issues.add({ title: "新工单", repo: "board" });
@@ -138,7 +141,8 @@ describe("a refined issue", () => {
   it.live("leaves nothing behind", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
       let issue = yield* issues.add({ title: "新工单", repo: "board", agent: "lab" });
@@ -169,7 +173,8 @@ describe("a refined issue", () => {
   it.live("that cannot be read changes nothing", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
       yield* (yield* Agent).save(lab());

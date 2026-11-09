@@ -323,10 +323,11 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             );
             asked = [...asked, ...pending];
             pending = [];
-            const prepared = options.prepareRequest
-              ? yield* Effect.raceFirst(options.prepareRequest(asked, yield* Deferred.isDone(stop)), Effect.as(Deferred.await(stop), undefined))
-              : undefined;
-            if (prepared) asked = prepared;
+            if (options.prepareRequest) {
+              const stopped = yield* Deferred.isDone(stop);
+              const prepared = yield* Effect.raceFirst(options.prepareRequest(asked, stopped), Effect.as(Deferred.await(stop), undefined));
+              if (prepared) asked = prepared;
+            }
             const message = yield* answer(asked, stop);
             asked = [...asked, message];
             fresh.push(message);
@@ -375,7 +376,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       Effect.gen(function* () {
         const run: Run = { stop: yield* Deferred.make<void>(), done: yield* Deferred.make<void>() };
         const taken = yield* Ref.modify(active, (a) => (Option.isSome(a) ? ([false, a] as const) : ([true, Option.some(run)] as const)));
-        if (!taken) return yield* new AgentBusy({ message: "the agent is already running" });
+        if (!taken) return yield* AgentBusy.make({ message: "the agent is already running" });
         const body = Effect.gen(function* () {
           const context = [...(yield* Ref.get(messages))];
           const fresh: AgentMessage<A>[] = [...prompts];
@@ -425,13 +426,13 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       continue: Effect.gen(function* () {
         const all = yield* Ref.get(messages);
         const last: unknown = all.at(-1);
-        if (last === undefined) return yield* new CannotContinue({ message: "No messages to continue from" });
+        if (last === undefined) return yield* CannotContinue.make({ message: "No messages to continue from" });
         if (Predicate.hasProperty(last, "role") && last.role === "assistant") {
           const steered = yield* takeAll(steering);
           if (steered.length > 0) return yield* start(steered, true);
           const later = yield* takeOne(followUps);
           if (later.length > 0) return yield* start(later);
-          return yield* new CannotContinue({ message: "Cannot continue from message role: assistant" });
+          return yield* CannotContinue.make({ message: "Cannot continue from message role: assistant" });
         }
         return yield* start([]);
       }),

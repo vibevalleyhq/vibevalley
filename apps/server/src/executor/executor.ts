@@ -82,7 +82,7 @@ const isAttached = (phase: AllocationPhase): boolean => phase._tag === "observin
 
 const failureOf = (phase: AllocationPhase): string | undefined => (phase._tag === "closing" ? phase.failure : undefined);
 
-const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause), cause });
+const notClosed = (cause: unknown) => NotClosed.make({ message: messageOf(cause), cause });
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 const closeWaitMs = 15_000;
 
@@ -150,7 +150,7 @@ export class Executor extends Context.Service<
     readonly find: (id: string) => Execution | undefined;
     readonly all: () => readonly Execution[];
   }
->()("vibevalley/Executor") {
+>()("@vibevalley/server/executor/executor") {
   static readonly layer = Layer.effect(
     Executor,
     Effect.suspend(() => make),

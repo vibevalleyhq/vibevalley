@@ -189,7 +189,8 @@ export const issueTools = Effect.gen(function* () {
       Schema.decodeUnknownEffect(IssuePrSubmitInput),
       Effect.fn("Tool.issuePrSubmit")(function* ({ summary }) {
         const caller = yield* callerOf(who);
-        return issuePrSubmitted(yield* issue.submitPullRequest(caller.session, summary));
+        const pullRequestSubmitted = yield* issue.submitPullRequest(caller.session, summary);
+        return issuePrSubmitted(pullRequestSubmitted);
       }),
     );
 
@@ -198,13 +199,9 @@ export const issueTools = Effect.gen(function* () {
     Effect.fn("Tool.issueGet")(function* (item: T.Issue) {
       const w = workerOf(item);
       const timeline = yield* Effect.orElseSucceed(issue.timeline(item.id), () => undefined);
-      const lines = [issueDetail(item, whoOf(item), timeline, yield* Clock.currentTimeMillis)];
-      if (w)
-        lines.push(
-          sessionLine(w, yield* Clock.currentTimeMillis, item.number),
-          answers.check.workdir(run.cwdOf(w.id) ?? ""),
-          answers.check.lastReport(run.lastTextOf(w.id)),
-        );
+      const now = yield* Clock.currentTimeMillis;
+      const lines = [issueDetail(item, whoOf(item), timeline, now)];
+      if (w) lines.push(sessionLine(w, now, item.number), answers.check.workdir(run.cwdOf(w.id) ?? ""), answers.check.lastReport(run.lastTextOf(w.id)));
       return lines.join("\n");
     }),
   );
@@ -215,7 +212,8 @@ export const issueTools = Effect.gen(function* () {
       Effect.fn("Tool.issueDiff")(
         function* (item: T.Issue) {
           const c = yield* callerOf(who);
-          return changesText(yield* issue.changes(item.id, c.actor));
+          const changes2 = yield* issue.changes(item.id, c.actor);
+          return changesText(changes2);
         },
         Effect.catch((e) => Effect.succeed(answers.changes.failed(said(e)))),
       ),
@@ -298,7 +296,11 @@ export const issueTools = Effect.gen(function* () {
             if (!byName) return answers.issueCreate.noChannel(p.channel);
             channel = byName;
           } else channel = yield* chat.topOf(c.here);
-          const parent = p.parent ? yield* issue.get(yield* issue.idOf(p.parent)) : undefined;
+          let parent: T.Issue | undefined;
+          if (p.parent) {
+            const parentId = yield* issue.idOf(p.parent);
+            parent = yield* issue.get(parentId);
+          }
           const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
           const repo = (p.repo ?? parent?.repo ?? "").trim() || channel.repo;
           if (p.start === true && !repo) return answers.issueCreate.noDefaultRepo(channel.name);
@@ -407,7 +409,8 @@ export const issueTools = Effect.gen(function* () {
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);
-              return answers.issueStatus.moved(issueLine(done, whoOf(done), yield* Clock.currentTimeMillis).slice(2));
+              const now = yield* Clock.currentTimeMillis;
+              return answers.issueStatus.moved(issueLine(done, whoOf(done), now).slice(2));
             },
             Effect.catch((e) => Effect.succeed(answers.issueStatus.notMoved(typeof e === "string" ? e : said(e)))),
           ),

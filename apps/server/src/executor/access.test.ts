@@ -87,7 +87,8 @@ it.live("regression: early tool connection failures reach the journal and core w
     expect(id).toBeDefined();
     if (!id) return;
     expect(core.session(id)).toMatchObject({ toolConnections: [{ server: "vibevalley", status: "failed", reason: "connection refused" }] });
-    expect(yield* sessions.events(id)).toEqual(
+    const events2 = yield* sessions.events(id);
+    expect(events2).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "run/error", connection: { server: "vibevalley", status: "failed", reason: "connection refused" } }),
       ]),

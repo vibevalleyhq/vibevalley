@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 import { FetchHttpClient } from "effect/http";
 
 import { transcriptionModel } from "./transcription.ts";
@@ -12,7 +12,7 @@ it.effect("compatible transcription keeps filenames, MIME types, model and json 
       authorization: new Headers(init?.headers).get("authorization"),
       form: init?.body instanceof FormData ? init.body : undefined,
     });
-    return Promise.resolve(new Response(JSON.stringify({ text: " ok ", usage: { seconds: 2 } }), { headers: { "x-request-id": "local-1" } }));
+    return Promise.resolve(new Response(Formatter.formatJson({ text: " ok ", usage: { seconds: 2 } }), { headers: { "x-request-id": "local-1" } }));
   };
   return Effect.gen(function* () {
     for (const [format, mime] of [
@@ -44,7 +44,7 @@ it.effect("compatible transcription keeps filenames, MIME types, model and json 
 });
 
 it.effect("regression: unrecognized transcription usage does not invalidate an existing text response", () => {
-  const body = JSON.stringify({ text: "ok", usage: "unknown vendor format" });
+  const body = Formatter.formatJson({ text: "ok", usage: "unknown vendor format" });
   const fetcher: typeof fetch = () => Promise.resolve(new Response(body));
   return Effect.gen(function* () {
     const model = yield* transcriptionModel({ url: "http://transcription.invalid/v1", key: "", model: "explicit-model" }, "wav");

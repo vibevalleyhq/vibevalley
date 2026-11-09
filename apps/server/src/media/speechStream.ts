@@ -123,7 +123,7 @@ export const receiveSpeechStream = Effect.fn("Media.receiveSpeechStream")(functi
       }),
     ),
     Effect.timeout("5 minutes"),
-    Effect.catch((error) => save.pipe(Effect.andThen(Effect.fail(error)))),
+    Effect.tapError(() => save),
     Effect.onInterrupt(() => save.pipe(bestEffort("Partial speech stream could not be saved"))),
   );
   yield* save;

@@ -70,7 +70,7 @@ export class Issue extends Context.Service<
     readonly refreshQueue: Effect.Effect<void>;
     readonly submitPullRequest: (session: string, summary?: string) => Effect.Effect<string, ApiError>;
   }
->()("vibevalley/Issue") {
+>()("@vibevalley/server/issue/issue") {
   static readonly layer = Layer.effect(
     Issue,
     Effect.suspend(() => make),
@@ -207,7 +207,10 @@ const make = Effect.gen(function* () {
         yield* handedBack(e);
         if (issue) {
           const conflict = (yield* get(issue)).conflict;
-          if (conflict) yield* setConflict(issue, yield* sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base)));
+          if (conflict) {
+            const rechecked = yield* sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base));
+            yield* setConflict(issue, rechecked);
+          }
         }
         yield* joinChildren();
         return;
@@ -229,7 +232,8 @@ const make = Effect.gen(function* () {
   const news = yield* sessions.news;
   const ownerWords = yield* chat.ownerInThread;
   const finished = yield* sessions.finishedRuns;
-  yield* Effect.forkScoped(Stream.runForEach(yield* sessions.startedIssues, (id) => unqueue(id).pipe(bestEffort(`issue: run started on ${id}`))));
+  const startedIssues2 = yield* sessions.startedIssues;
+  yield* Effect.forkScoped(Stream.runForEach(startedIssues2, (id) => unqueue(id).pipe(bestEffort(`issue: run started on ${id}`))));
   // One at a time: a report and the owner's word on it do not cross.
   yield* Effect.forkScoped(
     Stream.runForEach(
@@ -268,8 +272,9 @@ const make = Effect.gen(function* () {
     return milestonesOf(issue, runs, names);
   });
 
+  const subscribe2 = yield* core.subscribe;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* core.subscribe, (fact) =>
+    Stream.runForEach(subscribe2, (fact) =>
       Effect.gen(function* () {
         if (fact.type !== "issueChanged" && fact.type !== "sessionLeft" && !(fact.type === "sessionChanged" && fact.session.issue !== undefined)) return;
         yield* refreshQueue();
@@ -287,7 +292,8 @@ const make = Effect.gen(function* () {
     }),
     query: Effect.fn("Issue.query")(function* (f) {
       const all = yield* everyIssue;
-      return pickIssues(all, f, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      return pickIssues(all, f, now);
     }),
     get,
     timeline,
@@ -342,7 +348,8 @@ const make = Effect.gen(function* () {
     }),
     idOf,
     stop: Effect.fn("Issue.stop")(function* (id) {
-      yield* sessions.stop(yield* liveSession(id));
+      const liveSession2 = yield* liveSession(id);
+      yield* sessions.stop(liveSession2);
     }),
     setStatus: Effect.fn("Issue.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
       if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
@@ -354,8 +361,9 @@ const make = Effect.gen(function* () {
         case "start":
           if (taker) yield* shape.edit(id, { agent: taker.id }, by);
           yield* start(id, channel);
+          const issueThread2 = yield* chat.issueThread(id, item.title, channel || undefined);
           yield* chat.notice(
-            yield* chat.issueThread(id, item.title, channel || undefined),
+            issueThread2,
             t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
             "issue_confirmed",
           );
@@ -424,8 +432,11 @@ const make = Effect.gen(function* () {
       return yield* get(id);
     }),
     previewStatus: Effect.fn("Issue.previewStatus")(function* (id, to, text, opt = {}, edit) {
-      const item = yield* withEdit(yield* get(id), edit);
-      return { does: yield* movesWords(yield* settledMove(item, to, text, opt)) };
+      const found = yield* get(id);
+      const item = yield* withEdit(found, edit);
+      const move = yield* settledMove(item, to, text, opt);
+      const does = yield* movesWords(move);
+      return { does };
     }),
     previewRemove: Effect.fn("Issue.previewRemove")(function* (id) {
       const item = yield* unsent(id);
@@ -456,9 +467,10 @@ const make = Effect.gen(function* () {
           : "";
       if (why) return yield* Effect.fail(refused(why, nextSteps(item)));
       if (req.pass) {
+        const now = yield* Clock.currentTimeMillis;
         yield* judged(
           id,
-          yield* Clock.currentTimeMillis,
+          now,
           item.findings.map((f) => ({ ...f, resolved: true })),
         );
         return yield* get(id);
@@ -490,7 +502,8 @@ const make = Effect.gen(function* () {
     templates: Effect.fn("Issue.templates")(function* (name) {
       const stack = yield* repos.stack(name);
       if (!stack) return yield* Effect.fail(missing(t("server.issue.repoRef", { name }), [lookIn.repo]));
-      return { repo: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
+      const all = yield* everyIssue;
+      return { repo: name, stack, recent: sentTitles(all, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     }),
     hire,
     refreshPullRequests: refreshPullRequests(),

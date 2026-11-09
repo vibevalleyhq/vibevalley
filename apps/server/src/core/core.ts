@@ -25,7 +25,7 @@ export class Projection extends Context.Service<
     /** seq: the core's count of folds the state includes (StateFrame.seq). */
     readonly frame: (state: T.SpaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
   }
->()("vibevalley/Projection") {}
+>()("@vibevalley/server/core/core/Projection") {}
 
 /** The most changes one frame gathers: past it, the frame goes at once. */
 const burstMost = 1_000;
@@ -73,7 +73,7 @@ export class Core extends Context.Service<
     /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
     readonly states: Stream.Stream<T.StateFrame>;
   }
->()("vibevalley/Core") {
+>()("@vibevalley/server/core/core") {
   static readonly layer = Layer.effect(
     Core,
     Effect.suspend(() => make),

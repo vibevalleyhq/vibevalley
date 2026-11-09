@@ -1,4 +1,4 @@
-import { Option, Schema } from "effect";
+import { Formatter, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId, VoiceModeValues } from "@vibevalley/protocol";
@@ -62,7 +62,7 @@ export const metaOf = (raw: unknown): Meta =>
 export const metaText = (m: Meta | undefined) =>
   m === undefined
     ? null
-    : JSON.stringify(
+    : Formatter.formatJson(
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 

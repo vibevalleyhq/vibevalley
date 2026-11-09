@@ -20,14 +20,14 @@ test("a server says where it listens in its home while it runs, and a stopped on
   withdraw();
   expect(announced(home)).toBeUndefined();
   // Left behind by a server that died: its pid is not running.
-  writeFileSync(join(home, "server.json"), JSON.stringify({ url: "http://127.0.0.1:1", pid: 2 ** 22 + 7 }));
+  writeFileSync(join(home, "server.json"), `{"url":"http://127.0.0.1:1","pid":${2 ** 22 + 7}}`);
   expect(announced(home)).toBeUndefined();
 });
 
 test("the saved language is settings.json's, Chinese when there is none or it is not one we speak", () => {
   const home = tempDir("vv-locale-");
   expect(savedLocale(home)).toBe("zh");
-  writeFileSync(join(home, "settings.json"), JSON.stringify({ locale: "en" }));
+  writeFileSync(join(home, "settings.json"), '{"locale":"en"}');
   expect(savedLocale(home)).toBe("en");
   writeFileSync(join(home, "settings.json"), "{");
   expect(savedLocale(home)).toBe("zh");

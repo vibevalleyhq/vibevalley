@@ -75,7 +75,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
           ? get(opt.issue)
           : attemptAdd({ title: brief, repo: where, agent: agent.id }, explicitMandate()).pipe(
               // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
-              Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
+              Effect.catchTags({ SqlError: (e) => Effect.fail(e.pipe(causeMessage, refused)), SchemaError: Effect.die }),
             )
         ).pipe(
           Effect.mapError((e) => t("server.issue.notRecorded", { name: agent.name, why: reasonOf(e) })),
@@ -209,7 +209,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       const where = channel;
       const trigger = by;
       const full = sessions.noRoom(agent.runtime, repo);
-      const blocked = issue.blockedBy.length > 0 ? blockedIssues(issue, yield* everyIssue) : [];
+      const blocked = issue.blockedBy.length > 0 ? yield* everyIssue.pipe(Effect.map((all) => blockedIssues(issue, all))) : [];
       if (blocked.length > 0) {
         yield* setQueued(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.dependencies.waiting", { issues: list(blocked) }) };

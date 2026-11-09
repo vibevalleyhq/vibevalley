@@ -28,14 +28,14 @@ interface ResourcePage {
 }
 
 export class ResourceError extends Schema.TaggedError<ResourceError, { readonly brand: unique symbol }>()("ResourceError", { message: Schema.String }) {}
-const refuse = (message: string) => Effect.fail(new ResourceError({ message }));
+const refuse = (message: string) => Effect.fail(ResourceError.make({ message }));
 
 export class Resource extends Context.Service<
   Resource,
   {
     readonly read: (session: string, input: ReadResource) => Effect.Effect<ResourcePage, ResourceError | ApiError | RepoError>;
   }
->()("vibevalley/Resource") {
+>()("@vibevalley/server/resource/resource") {
   static readonly layer = Layer.effect(
     Resource,
     Effect.suspend(() => make),
@@ -145,7 +145,8 @@ function resourceRef(uri: string): ResourceRef | undefined {
   }
 }
 
-const textOf = (value: unknown) => JSON.stringify(value, null, 2);
+const encodePretty = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+const textOf = (value: unknown) => encodePretty(value).pipe(Effect.mapError((e) => ResourceError.make({ message: e.message })));
 
 const make = Effect.gen(function* () {
   const channels = yield* Channel;
@@ -181,13 +182,16 @@ const make = Effect.gen(function* () {
   const load = Effect.fnUntraced(function* (ref: ResourceRef, session: T.Session | undefined, orchestrator: boolean, uri: string) {
     switch (ref.kind) {
       case "trigger": {
-        const resource = yield* ingress.read(ref.id).pipe(Effect.mapError((error) => new ResourceError({ message: error.message })));
+        const resource = yield* ingress.read(ref.id).pipe(Effect.mapError((error) => ResourceError.make({ message: error.message })));
         if (!resource) return yield* refuse(resourceWords.missing(uri));
         let permitted = orchestrator;
         if (session?.issue && !permitted) permitted = (yield* issues.get(session.issue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
           const owner = yield* mailbox.ownerOf(ref.id);
-          if (owner) permitted = yield* mayReadIssue(session, yield* issues.get(owner));
+          if (owner) {
+            const ownerIssue = yield* issues.get(owner);
+            permitted = yield* mayReadIssue(session, ownerIssue);
+          }
         }
         if (session && !permitted) {
           for (const thread of resource.trigger.threads) {
@@ -208,42 +212,42 @@ const make = Effect.gen(function* () {
           resource.trigger.source === "channel" || resource.trigger.source === "voice" || resource.trigger.source === "connector"
             ? yield* channels.envelopeResource(S.messageId(ref.id))
             : undefined;
-        return textOf({ ...resource, ...(context ? { around: context.around, ...(context.parent ? { parent: context.parent } : {}) } : {}) });
+        return yield* textOf({ ...resource, ...(context ? { around: context.around, ...(context.parent ? { parent: context.parent } : {}) } : {}) });
       }
       case "envelope": {
         const resource = yield* channels.envelopeResource(S.messageId(ref.id));
         if (resource === undefined) return yield* refuse(resourceWords.missing(uri));
         if (!orchestrator && (session === undefined || !(yield* mayReadChannel(session, resource.message.channel))))
           return yield* refuse(resourceWords.forbidden(uri));
-        return textOf(resource);
+        return yield* textOf(resource);
       }
       case "issue": {
         const issue = yield* issues.get(ref.id);
         if (!orchestrator && (session === undefined || !(yield* mayReadIssue(session, issue)))) return yield* refuse(resourceWords.forbidden(uri));
-        return textOf({ issue, runs: yield* sessions.issueRuns(issue.id), messages: yield* channels.issueMessages(issue.id) });
+        return yield* textOf({ issue, runs: yield* sessions.issueRuns(issue.id), messages: yield* channels.issueMessages(issue.id) });
       }
       case "channel": {
         if (!orchestrator && (session === undefined || !(yield* mayReadChannel(session, ref.id)))) return yield* refuse(resourceWords.forbidden(uri));
         const messages = yield* channels.history(ref.id, undefined, 200);
-        return textOf({ messages, latestPage: messages.length === 200 });
+        return yield* textOf({ messages, latestPage: messages.length === 200 });
       }
       case "session": {
         if (!orchestrator && session?.id !== ref.id) return yield* refuse(resourceWords.forbidden(uri));
         const events = yield* sessions.events(ref.id);
         if (events === undefined) return yield* refuse(resourceWords.missing(uri));
-        return textOf({ events });
+        return yield* textOf({ events });
       }
       case "github": {
         const issue = (yield* issues.list()).find((item) => item.repo === ref.repo && item.pullRequest?.number === ref.pull);
         if (!issue) return yield* refuse(resourceWords.missing(uri));
         if (!orchestrator && (session === undefined || !(yield* mayReadIssue(session, issue)))) return yield* refuse(resourceWords.forbidden(uri));
         const snapshot = yield* ingress.githubSnapshot(ref.repo, ref.pull);
-        if (ref.resource === "checks") return textOf({ head: snapshot.head, checks: snapshot.checks });
+        if (ref.resource === "checks") return yield* textOf({ head: snapshot.head, checks: snapshot.checks });
         const review = snapshot.reviews.find((item) => item.id === ref.id);
         const comment = snapshot.comments.find((item) => item.id === ref.id || item.databaseId === ref.id || item.threadId === ref.id);
         if (!review && !comment) return yield* refuse(resourceWords.missing(uri));
-        if (review) return textOf({ review, comments: snapshot.comments.filter((item) => item.reviewId === review.id) });
-        return textOf(
+        if (review) return yield* textOf({ review, comments: snapshot.comments.filter((item) => item.reviewId === review.id) });
+        return yield* textOf(
           comment?.threadId
             ? { threadId: comment.threadId, resolved: comment.resolved, comments: snapshot.comments.filter((item) => item.threadId === comment.threadId) }
             : comment,

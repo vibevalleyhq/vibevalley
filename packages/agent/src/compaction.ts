@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 
 import { complete, type ModelClient } from "@vibevalley/ai/client";
 import type { ToolDeclaration, Usage } from "@vibevalley/ai/messages";
@@ -9,7 +9,7 @@ import { compaction as compactionWords } from "./prompts.ts";
 import { applySummary } from "./session.ts";
 
 /** Characters over three: close enough for mixed Chinese and code. */
-export const estimateTokens = (messages: readonly BrainMessage[]) => Math.ceil(JSON.stringify(messages).length / 3);
+export const estimateTokens = (messages: readonly BrainMessage[]) => Math.ceil(Formatter.formatJson(messages).length / 3);
 
 export const summaryInstructions = compactionWords.summaryInstructions;
 
@@ -92,7 +92,7 @@ const summaryOf = (plan: CompactionPlan, said: string, where: string, options: C
 
 /** Where the folded part is kept word for word; "" when it could not be: the fold goes on without it. */
 const archived = (options: CompactionOptions, text: string): Effect.Effect<string> =>
-  Effect.promise(() => archive(options.home, options.session, text, new Date(options.now())).catch(() => ""));
+  Effect.promise(() => archive(options.home, options.session, text, options.now()).catch(() => ""));
 
 export interface Summarized {
   readonly summary?: CompactionSummaryMessage;

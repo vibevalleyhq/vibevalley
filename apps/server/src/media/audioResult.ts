@@ -104,6 +104,8 @@ export const saveAudioResult = Effect.fn("Media.saveAudioResult")(
     );
     return yield* saveAudioStream(id, format, source, inputs);
   },
-  Effect.timeout("300 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(failed())),
+  Effect.timeoutOrElse({
+    duration: "300 seconds",
+    orElse: () => Effect.fail(failed()),
+  }),
 );

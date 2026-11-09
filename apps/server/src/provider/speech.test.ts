@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer } from "effect";
+import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import type { ProviderUpdate } from "@vibevalley/protocol";
@@ -13,6 +13,12 @@ import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { Provider } from "./provider.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const notIn = (value: unknown, secret: string) =>
+  Effect.map(json(value), (text) => {
+    expect(text).not.toContain(secret);
+  });
 
 const config: ProviderUpdate = {
   revision: 0,
@@ -47,7 +53,8 @@ const page = {
 it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable and protected while in use", (model) =>
   Effect.gen(function* () {
     const provider = yield* Provider;
-    expect(yield* provider.speech().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const speechFailure = yield* provider.speech().pipe(Effect.flip);
+    expect(speechFailure).toMatchObject({ _tag: "Refused" });
     const input = { ...config, speech: { connection: "second", model } };
     const saved = yield* provider.update(input);
     expect(saved.speechModels).toEqual(mossSpeechModels);
@@ -55,7 +62,7 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
     expect(frozen).toEqual({ connection: "second", revision: 1, model, key: "test-second-private" });
     expect((yield* provider.dictation()).key).toBe("test-first-private");
     expect((yield* provider.live()).key).toBe("test-first-private");
-    expect(JSON.stringify(saved)).not.toContain("test-second-private");
+    yield* notIn(saved, "test-second-private");
     if (saved.speech) saved.speech.model = "caller-mutated";
     expect(provider.status().speech?.model).toBe(model);
     for (const connections of [
@@ -63,7 +70,8 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
       config.connections.map((c) => (c.id === "second" ? { ...c, key: null } : c)),
       config.connections.map((c) => (c.id === "second" ? { ...c, enabled: false } : c)),
     ]) {
-      expect(yield* provider.update({ ...input, revision: 1, connections }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const updatedFailure = yield* provider.update({ ...input, revision: 1, connections }).pipe(Effect.flip);
+      expect(updatedFailure).toMatchObject({ _tag: "Refused" });
       expect(provider.status().revision).toBe(1);
     }
     yield* provider.update({
@@ -74,7 +82,8 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
     expect((yield* provider.speech()).key).toBe("test-rotated-private");
     expect(frozen.key).toBe("test-second-private");
     yield* provider.update({ ...input, revision: 2, speech: null });
-    expect(yield* provider.speech().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const speechFailure2 = yield* provider.speech().pipe(Effect.flip);
+    expect(speechFailure2).toMatchObject({ _tag: "Refused" });
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
 );
 
@@ -102,13 +111,15 @@ it.effect("voice listing uses only the selected account and forwards one page, n
     const second = yield* api["provider.voice.list"]({ connection: "second", revision: 1, after: "next-page", limit: 1 });
     expect(second.connection).toBe("second");
     expect(keys).toEqual(["Bearer test-first-private", "Bearer test-second-private"]);
-    expect(JSON.stringify([first, second])).not.toContain("private");
+    yield* notIn([first, second], "private");
     for (const request of [
       { connection: "first", revision: 0 },
       { connection: "missing", revision: 1 },
       { connection: "first", revision: 1, after: "next-page", offset: 0 },
-    ])
-      expect(yield* api["provider.voice.list"](request).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    ]) {
+      const listFailure = yield* api["provider.voice.list"](request).pipe(Effect.flip);
+      expect(listFailure).toMatchObject({ _tag: "Refused" });
+    }
     expect(keys).toHaveLength(2);
   }).pipe(Effect.provide(layer(http)));
 });
@@ -133,8 +144,10 @@ it.effect("regression: an in-flight voice listing cannot outlive the configurati
       yield* Deferred.await(started);
       yield* provider.update({ ...config, revision: 1, speech: null, connections: config.connections.slice(0, 1) });
       yield* Deferred.succeed(finish, undefined);
-      expect(yield* Fiber.join(fiber)).toMatchObject({ _tag: "Refused" });
-      expect(yield* provider.voices({ connection: "second", revision: 2 }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ _tag: "Refused" });
+      const voicesFailure = yield* provider.voices({ connection: "second", revision: 2 }).pipe(Effect.flip);
+      expect(voicesFailure).toMatchObject({ _tag: "Refused" });
       expect(calls).toBe(1);
     }).pipe(Effect.provide(layer(http)));
   }),
@@ -146,7 +159,7 @@ it.effect("voice listing errors never expose the account secret or vendor respon
     yield* provider.update(config);
     const error = yield* provider.voices({ connection: "second", revision: 1 }).pipe(Effect.flip);
     expect(error._tag).toBe("Refused");
-    expect(JSON.stringify(error)).not.toContain("private");
+    yield* notIn(error, "private");
   }).pipe(
     Effect.provide(
       layer(

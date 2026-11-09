@@ -30,7 +30,8 @@ describe("an issue's thread", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const chat = yield* Channel;
       const mailbox = yield* Mailbox;
       yield* (yield* Agent).save(lab());
@@ -69,7 +70,8 @@ describe("an issue's thread", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const channels = yield* Channel;
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
@@ -105,7 +107,8 @@ describe("an issue's thread", () => {
       runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const channels = yield* Channel;
       const sessions = yield* Session;
       const core = yield* Core;
@@ -139,12 +142,15 @@ describe("an issue's thread", () => {
         n: number;
       }>`select count(*) as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`.pipe(Effect.orDie);
       expect(woken[0]!.n).toBe(0);
-      expect(yield* sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`).toHaveLength(1);
+      const rows = yield* sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`;
+      expect(rows).toHaveLength(1);
 
-      const second = latestSessionIdOf(yield* issues.setStatus(issue.id, "todo", "接着做", "", owner));
+      const setStatus2 = yield* issues.setStatus(issue.id, "todo", "接着做", "", owner);
+      const second = latestSessionIdOf(setStatus2);
       if (second === undefined) throw new Error("the issue has no reopened session");
       yield* until(() => reportsBy(second) === 1, "the second session's report in the same thread");
-      expect(yield* channels.threadOfSession(second)).toBe(thread!.id);
+      const threadOfSession2 = yield* channels.threadOfSession(second);
+      expect(threadOfSession2).toBe(thread!.id);
       const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
       expect(handed?.text).toContain("@" + second);
       expect(handed?.text).toContain("第 2 次");
@@ -171,7 +177,8 @@ describe("an issue's thread", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const channels = yield* Channel;
       const sessions = yield* Session;
       const inbox = yield* Inbox;

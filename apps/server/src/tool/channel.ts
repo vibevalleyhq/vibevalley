@@ -37,14 +37,13 @@ export const channelTools = Effect.gen(function* () {
       "channel.message.send",
       Effect.fn("Tool.messageSend")(function* (p: SessionInput<"channel.message.send">) {
         const c = yield* callerOf(who);
-        return spokenText(
-          yield* chat.speak(participant(c), p.text, {
-            ...(p.id ? { target: p.id } : {}),
-            ...(p.anyway === true ? { anyway: true } : {}),
-            ...(p.confirm === true ? { confirm: true } : {}),
-            ...(p.replyTo !== undefined ? { reply: p.replyTo } : {}),
-          }),
-        );
+        const spoken = yield* chat.speak(participant(c), p.text, {
+          ...(p.id ? { target: p.id } : {}),
+          ...(p.anyway === true ? { anyway: true } : {}),
+          ...(p.confirm === true ? { confirm: true } : {}),
+          ...(p.replyTo !== undefined ? { reply: p.replyTo } : {}),
+        });
+        return spokenText(spoken);
       }),
     );
 

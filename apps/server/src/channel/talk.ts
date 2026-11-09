@@ -56,7 +56,7 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
               }),
           );
           model.joined(joined);
-        }).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause }))),
+        }).pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause }))),
       );
 
     const startTalk = Effect.fnUntraced(function* (channel: string, agentId: string) {

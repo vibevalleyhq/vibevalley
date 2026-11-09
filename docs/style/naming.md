@@ -77,7 +77,7 @@
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
 | 服务 | 概念的单数词，和模块的文件夹、表同一个词（照 Effect 自己的 `Database`）；照 Effect 的默认写法是类，接口写在类型参数里、不另起名，`layer` 是静态成员；它的类型是 `Issue["Service"]`（lint 的 `vibevalley/singular-service` 查） | `Issue`、`Channel`、`Session`；`Core`、`Orchestrator` |
-| 服务的标签和 `Effect.fn` 的名字 | `vibevalley/<概念>`；`<服务>.<方法>` | `"vibevalley/Issue"`；`"Issue.edit"` |
+| 服务的标签和 `Effect.fn` 的名字 | 包名加文件的路径（`deterministicKeys` 查）；`<服务>.<方法>` | `"@vibevalley/server/issue/issue"`；`"Issue.edit"` |
 | 服务端代码里和服务同名的线上形状 | 经命名空间读：`import type * as T from "@vibevalley/protocol"`，写 `T.Issue`；这样的文件里协议的类型都写成 `T.X`（lint 的 `vibevalley/protocol-namespace` 查） | `issue: T.Issue`、`(s: T.Session) => …` |
 | 带牌子的 id | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |

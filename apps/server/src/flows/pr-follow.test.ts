@@ -77,7 +77,8 @@ for (const submittedReport of [false, true]) {
       yield* (yield* Repo).refreshGitHub();
       const issue = yield* issues.add({ title: "work", repo: "follow", agent: "lab" }, explicitMandate("", true));
       yield* issues.start(issue.id, "");
-      const id = latestSessionIdOf(yield* issues.get(issue.id))!;
+      const issue2 = yield* issues.get(issue.id);
+      const id = latestSessionIdOf(issue2)!;
       yield* until(() => inputs.length === 1, "the implementation committed");
       yield* issues.submitPullRequest(id);
       if (submittedReport) yield* sessions.report(id, { summary: "PR submitted", questions: [], checks: [], remember: [], prSubmit: true });

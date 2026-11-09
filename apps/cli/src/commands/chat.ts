@@ -27,12 +27,12 @@ const program = Config.String("VIBEVALLEY_CHAT").pipe(
 const converse = (args: readonly string[]) =>
   Effect.gen(function* () {
     const chat = yield* program;
-    if (!chat) return yield* new Failure({ code: exit.other, tag: "NoChat", text: t("cli.failure.noChat") });
+    if (!chat) return yield* Failure.make({ code: exit.other, tag: "NoChat", text: t("cli.failure.noChat") });
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const code = yield* spawner
       .exitCode(ChildProcess.make(process.execPath, [...process.execArgv, chat, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" }))
-      .pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Chat", text: e.message })));
-    if (code !== 0) return yield* new Ended({ code });
+      .pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "Chat", text: e.message })));
+    if (code !== 0) return yield* Ended.make({ code });
   }).pipe(Effect.uninterruptible);
 
 /** The flags given, as the server's conversation reads them (apps/server src/chat/main.ts): --name value, in order. */
@@ -60,7 +60,7 @@ export const chatCommand = Command.make(
     const given = stray.filter((f) => Option.isSome(flags[f]));
     if (given.length > 0)
       return Effect.fail(
-        new Failure({ code: exit.usage, tag: "InvalidValue", text: t("cli.failure.chatFlag", { flags: given.map((f) => `--${f}`).join(" "), runtime: id }) }),
+        Failure.make({ code: exit.usage, tag: "InvalidValue", text: t("cli.failure.chatFlag", { flags: given.map((f) => `--${f}`).join(" "), runtime: id }) }),
       );
     return converse(
       own

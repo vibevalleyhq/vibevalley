@@ -72,13 +72,13 @@ export const contextPlace = Effect.fn("Session.contextPlace")(function* (
     yield* fs.makeDirectory(root, { recursive: true });
     const work = yield* fs.realPath(workRoot);
     const parent = yield* fs.realPath(root);
-    if (dirname(parent) !== work) return yield* new RepoError({ message: t("server.repo.outside") });
+    if (dirname(parent) !== work) return yield* RepoError.make({ message: t("server.repo.outside") });
     const directory = yield* fs.makeTempDirectory({ directory: parent, prefix: id + "-" });
     const cwd = yield* fs.realPath(directory);
-    if (dirname(cwd) !== parent) return yield* new RepoError({ message: t("server.repo.outside") });
+    if (dirname(cwd) !== parent) return yield* RepoError.make({ message: t("server.repo.outside") });
     return { repo: "", cwd };
   });
-  return yield* make.pipe(Effect.mapError((cause) => new RepoError({ message: messageOf(cause), cause })));
+  return yield* make.pipe(Effect.mapError((cause) => RepoError.make({ message: messageOf(cause), cause })));
 });
 
 /** A failed opening can discard only an empty context directory. */
@@ -91,5 +91,5 @@ export const releaseContextPlace = Effect.fn("Session.releaseContextPlace")(func
     if ((yield* fs.readDirectory(place.cwd)).length > 0) return kept(t("server.session.life.contextHasFiles"));
     yield* fs.remove(place.cwd, { recursive: true });
     return { kept: false as const };
-  }).pipe(Effect.catch((cause) => Effect.succeed(kept(messageOf(cause)))));
+  }).pipe(Effect.catch((cause) => Effect.succeed(cause.pipe(messageOf, kept))));
 });

@@ -39,13 +39,16 @@ it.effect("regression: the source cursor and Mailbox trigger share commit and ro
     });
     const rolledBack = yield* Effect.exit(db.inTx(Effect.andThen(write, Effect.fail("rollback"))));
     expect(Exit.isFailure(rolledBack)).toBe(true);
-    expect(yield* mailbox.readTrigger(id)).toBeUndefined();
+    const trigger2 = yield* mailbox.readTrigger(id);
+    expect(trigger2).toBeUndefined();
     expect((yield* db.run(cursor.gitHubCursor(scope))).check_revision).toBe(0);
     const trigger = yield* db.inTx(write);
     expect((yield* db.run(cursor.gitHubCursor(scope))).check_revision).toBe(1);
     expect((yield* mailbox.readTrigger(id))?.trigger).toEqual(trigger);
-    expect(yield* mailbox.registered(id)).toBe(false);
-    expect(yield* db.run(allOpenDeliveries())).toEqual([]);
+    const registered2 = yield* mailbox.registered(id);
+    expect(registered2).toBe(false);
+    const allOpenDeliveries2 = yield* db.run(allOpenDeliveries());
+    expect(allOpenDeliveries2).toEqual([]);
     expect(mailbox.pending(defaultOrchestrator)).toEqual([]);
     expect(core.state()).toBe(state);
   }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
@@ -55,12 +58,16 @@ it.effect("regression: duplicate source and channel records keep the first trigg
   Effect.gen(function* () {
     const mailbox = yield* Mailbox;
     const first = yield* mailbox.recordTrigger(event);
-    expect(yield* mailbox.recordTrigger({ ...event, text: "changed", data: null, at: 20 })).toEqual(first);
+    const triggerRecorded = yield* mailbox.recordTrigger({ ...event, text: "changed", data: null, at: 20 });
+    expect(triggerRecorded).toEqual(first);
     expect((yield* mailbox.readTrigger(first.id))?.payload).toEqual({ text: event.text, data: event.data });
-    expect(yield* mailbox.knownGitHubEvents("repo", 7)).toEqual([{ key: event.key, routed: false, botRound: 1, botRoundKey: "round-1" }]);
+    const knownGitHubEvents2 = yield* mailbox.knownGitHubEvents("repo", 7);
+    expect(knownGitHubEvents2).toEqual([{ key: event.key, routed: false, botRound: 1, botRoundKey: "round-1" }]);
     const channel = triggerOf({ ...event, source: "channel", key: "message" });
-    expect(yield* mailbox.recordChannelTrigger(channel, "first", "room")).toEqual(channel);
-    expect(yield* mailbox.recordChannelTrigger({ ...channel, at: 20 }, "changed", "other")).toEqual(channel);
+    const channelTriggerRecorded = yield* mailbox.recordChannelTrigger(channel, "first", "room");
+    expect(channelTriggerRecorded).toEqual(channel);
+    const channelTriggerRecorded2 = yield* mailbox.recordChannelTrigger({ ...channel, at: 20 }, "changed", "other");
+    expect(channelTriggerRecorded2).toEqual(channel);
     expect((yield* mailbox.readTrigger(channel.id))?.payload).toEqual({
       text: "first",
       data: { kind: "channel_message", message: channel.id, channel: "room" },
@@ -79,7 +86,9 @@ it.effect("regression: cron replay supplies decoded source payloads without rout
       { id: first.id, data: { occurrence: 1 } },
       { id: second.id, data: { occurrence: 2 } },
     ]);
-    expect(yield* mailbox.registered(first.id)).toBe(false);
-    expect(yield* mailbox.registered(second.id)).toBe(false);
+    const registered2 = yield* mailbox.registered(first.id);
+    expect(registered2).toBe(false);
+    const registered3 = yield* mailbox.registered(second.id);
+    expect(registered3).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
 );

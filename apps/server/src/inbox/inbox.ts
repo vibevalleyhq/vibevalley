@@ -33,7 +33,7 @@ export class Inbox extends Context.Service<
     /** Pending external deliveries changed: a later connector rereads them. */
     readonly externalChanges: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>;
   }
->()("vibevalley/Inbox") {
+>()("@vibevalley/server/inbox/inbox") {
   static readonly layer = Layer.effect(
     Inbox,
     Effect.suspend(() => make),
@@ -86,7 +86,8 @@ const make = Effect.gen(function* () {
       ),
     ),
   );
-  yield* Effect.forkScoped(Stream.runForEach(yield* chat.ownerReads, () => PubSub.publish(externalHub, undefined)));
+  const ownerReads2 = yield* chat.ownerReads;
+  yield* Effect.forkScoped(Stream.runForEach(ownerReads2, () => PubSub.publish(externalHub, undefined)));
 
   let memory: PatrolMemory = emptyPatrol();
   const patrol = Effect.gen(function* () {

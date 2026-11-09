@@ -62,12 +62,11 @@ export const channelHub = Effect.gen(function* () {
       Effect.sync(() => model.followed(channel, participant)),
     );
   const reload = Effect.gen(function* () {
-    model.load(
-      yield* db.run(qc.allChannels()),
-      yield* db.run(qp.participants()),
-      yield* db.run(qr.readCursorsOf({ participant_id: ownerId })),
-      yield* db.run(qf.allFollows()),
-    );
+    const channels = yield* db.run(qc.allChannels());
+    const participants2 = yield* db.run(qp.participants());
+    const cursorsOf = yield* db.run(qr.readCursorsOf({ participant_id: ownerId }));
+    const follows = yield* db.run(qf.allFollows());
+    model.load(channels, participants2, cursorsOf, follows);
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */

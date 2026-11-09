@@ -67,7 +67,7 @@ export class Artifact extends Context.Service<
     /** Starts the demo and returns at once (blocks.ts). */
     readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   }
->()("vibevalley/Artifact") {
+>()("@vibevalley/server/artifact/artifact") {
   static readonly layer = Layer.effect(
     Artifact,
     Effect.suspend(() => make()),
@@ -149,7 +149,8 @@ const make = () =>
       const now = yield* Clock.currentTimeMillis;
       const name = maker.by === ownerId ? t("server.channel.name.owner") : maker.by;
       yield* db.run(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
-      return yield* assemble(yield* found(id));
+      const found2 = yield* found(id);
+      return yield* assemble(found2);
     });
 
     const create = Effect.fn("Artifact.create")(function* (maker: Maker, req: T.ArtifactRequest) {
@@ -192,7 +193,8 @@ const make = () =>
         );
         yield* db.run(qv.artifactVersionAnnounced({ artifact_id: id, version: 1, message_id: said.id }));
       } else yield* blocks.fill(id, req.content, maker.by);
-      return yield* assemble(yield* found(id));
+      const found2 = yield* found(id);
+      return yield* assemble(found2);
     });
 
     const version = Effect.fn("Artifact.version")(function* (maker: Maker, req: T.ArtifactVersionRequest) {
@@ -227,7 +229,8 @@ const make = () =>
       );
       yield* db.run(qv.artifactVersionAnnounced({ artifact_id: row.id, version: next, message_id: said.id }));
       yield* db.run(qa.artifactVersioned({ id: row.id, version: next, updated_at: now }));
-      return yield* assemble(yield* found(S.artifactId(row.id)));
+      const found2 = yield* found(S.artifactId(row.id));
+      return yield* assemble(found2);
     });
 
     const versionOf = Effect.fnUntraced(function* (id: T.ArtifactId, version: number | undefined) {
@@ -251,14 +254,18 @@ const make = () =>
           rows,
           (r) =>
             Effect.gen(function* () {
-              if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
+              if (!q.channel || r.channel_id === q.channel) {
+                const artifact = yield* assemble(r);
+                out.push(artifact);
+              }
             }),
           { discard: true },
         );
         return out;
       }),
       get: Effect.fn("Artifact.get")(function* (id) {
-        return yield* assemble(yield* found(id));
+        const found2 = yield* found(id);
+        return yield* assemble(found2);
       }),
       content: Effect.fn("Artifact.content")(function* (id, version) {
         const row = yield* found(id);
@@ -300,7 +307,8 @@ const make = () =>
         const problem = artifactProblem({ title });
         if (problem) return yield* Effect.fail(refused(problem));
         yield* db.run(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
-        return yield* assemble(yield* found(id));
+        const found2 = yield* found(id);
+        return yield* assemble(found2);
       }, lock.withPermits(1)),
       previewRemove: Effect.fn("Artifact.previewRemove")(function* (id) {
         const row = yield* found(id);
@@ -326,7 +334,9 @@ const make = () =>
       }, lock.withPermits(1)),
       blocks: Effect.fn("Artifact.blocks")(function* (id) {
         const list = yield* blocks.blocks(id);
-        return { artifact: yield* assemble(yield* found(id)), blocks: list };
+        const row = yield* found(id);
+        const artifact = yield* assemble(row);
+        return { artifact, blocks: list };
       }),
       markdown: blocks.markdown,
       submit: blocks.submit,

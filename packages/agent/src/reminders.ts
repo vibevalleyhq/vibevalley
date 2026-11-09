@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Clock, Cron, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
+import { Clock, Cron, DateTime, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
 
 import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
@@ -121,7 +121,7 @@ export const makeReminders = (home: string, wake: (due: string[]) => Effect.Effe
       if (next === undefined) return void start(Effect.void);
       start(
         Effect.sleep(Math.max(0, next - now())).pipe(
-          Effect.andThen(Effect.suspend(() => claimDue(new Date(now())))),
+          Effect.andThen(Effect.suspend(() => claimDue(DateTime.toDateUtc(DateTime.makeUnsafe(now()))))),
           Effect.flatMap(wake),
           Effect.andThen(Effect.sync(arm)),
           Effect.catch((e) =>
@@ -154,7 +154,7 @@ export const makeReminders = (home: string, wake: (due: string[]) => Effect.Effe
           const parsed = parseCron(p.cron);
           if (Result.isFailure(parsed)) throw new Error(parsed.failure);
         }
-        const made = new Date(now());
+        const made = DateTime.toDateUtc(DateTime.makeUnsafe(now()));
         const reminder: Reminder = {
           id: "reminder-" + randomUUID(),
           name: p.name,

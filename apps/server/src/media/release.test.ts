@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Clock, Effect, FileSystem, Layer, Stream } from "effect";
+import { Clock, Effect, FileSystem, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
@@ -20,6 +20,8 @@ import * as speech from "#db/media_speech.sql.ts";
 import { makeInputs } from "./inputs.ts";
 import { Media } from "./media.ts";
 import { wav } from "./testdata/audio.ts";
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const configured = Effect.gen(function* () {
   const provider = yield* Provider;
@@ -109,26 +111,35 @@ it.effect("regression: releasing one transcript preserves another job's pins, th
     const before = yield* media.get(first.id);
     const row = yield* db.one(audio.audio({ id: first.id }));
     expect((yield* media.previewRelease(first.id)).does).toHaveLength(3);
-    expect(yield* media.get(first.id)).toEqual(before);
+    const media2 = yield* media.get(first.id);
+    expect(media2).toEqual(before);
     const sql = yield* SqlClient.SqlClient;
     yield* sql.unsafe("CREATE TRIGGER media_input_pin_test_release BEFORE DELETE ON media_input_pin BEGIN SELECT RAISE(ABORT, 'release blocked'); END");
-    expect(yield* media.release(first.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.get(first.id)).toEqual(before);
+    const releasedFailure = yield* media.release(first.id).pipe(Effect.flip);
+    expect(releasedFailure).toMatchObject({ _tag: "Refused" });
+    const media3 = yield* media.get(first.id);
+    expect(media3).toEqual(before);
     expect((yield* media.inputs.get(local.id)).canDelete).toBe(false);
     yield* sql.unsafe("DROP TRIGGER media_input_pin_test_release");
     const released = yield* media.release(first.id);
     expect(released).toMatchObject({ input: null, resultInput: null, previewInput: null, canRelease: false, result: { text: "Retain this transcript." } });
-    expect(yield* media.get(second.id)).toMatchObject({ input: { id: local.id }, canRelease: true });
+    const media4 = yield* media.get(second.id);
+    expect(media4).toMatchObject({ input: { id: local.id }, canRelease: true });
     expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
-    expect(yield* db.run(input.inputCapacity())).toEqual({ bytes: bytes.length, count: 1 });
+    const inputCapacity2 = yield* db.run(input.inputCapacity());
+    expect(inputCapacity2).toEqual({ bytes: bytes.length, count: 1 });
     const after = yield* db.one(audio.audio({ id: first.id }));
     expect(after).toMatchObject({ request: row?.request, remote_task_id: row?.remote_task_id, result: row?.result });
     yield* media.release(second.id);
-    expect(yield* db.run(input.inputCapacity())).toEqual({ bytes: 0, count: 0 });
-    expect(yield* media.inputs.get(local.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const inputCapacity3 = yield* db.run(input.inputCapacity());
+    expect(inputCapacity3).toEqual({ bytes: 0, count: 0 });
+    const inputFailure = yield* media.inputs.get(local.id).pipe(Effect.flip);
+    expect(inputFailure).toMatchObject({ _tag: "Refused" });
     yield* media.restore();
-    expect(yield* media.createTranscription(first)).toMatchObject({ id: first.id, input: null, result: { text: "Retain this transcript." } });
-    expect(yield* media.createTranscription(second)).toMatchObject({ id: second.id, input: null });
+    const transcriptionCreated = yield* media.createTranscription(first);
+    expect(transcriptionCreated).toMatchObject({ id: first.id, input: null, result: { text: "Retain this transcript." } });
+    const transcriptionCreated2 = yield* media.createTranscription(second);
+    expect(transcriptionCreated2).toMatchObject({ id: second.id, input: null });
     expect([uploads, submissions, deletes]).toEqual([2, 2, 2]);
   }).pipe(Effect.provide(layer(http)));
 });
@@ -180,16 +191,21 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     expect((yield* media.inputs.get(design.previewInput)).canDelete).toBe(false);
     const file = yield* (yield* Channel).attachment(design.attachment.id);
     if (!file) return yield* Effect.die("Release deleted an independently owned channel attachment");
-    expect(Buffer.from(yield* (yield* FileSystem.FileSystem).readFile(file.path))).toEqual(wav());
-    expect(yield* channel.say("Published preview", undefined, "release-preview-published", { attachments: [design.attachment.id] })).toMatchObject({
+    const file2 = yield* (yield* FileSystem.FileSystem).readFile(file.path);
+    expect(Buffer.from(file2)).toEqual(wav());
+    const said = yield* channel.say("Published preview", undefined, "release-preview-published", { attachments: [design.attachment.id] });
+    expect(said).toMatchObject({
       again: true,
       message: published.message,
     });
     const releasedVoice = yield* media.release(clone.id);
     expect(releasedVoice).toMatchObject({ input: null, result: { kind: "clone", voice: { id: "saved-voice" } } });
-    expect(yield* media.inputs.get(design.previewInput).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.createVoiceDesign(request, { kind: "owner" })).toMatchObject({ previewInput: null });
-    expect(yield* media.createClone(clone)).toEqual(releasedVoice);
+    const inputFailure = yield* media.inputs.get(design.previewInput).pipe(Effect.flip);
+    expect(inputFailure).toMatchObject({ _tag: "Refused" });
+    const voiceDesignCreated = yield* media.createVoiceDesign(request, { kind: "owner" });
+    expect(voiceDesignCreated).toMatchObject({ previewInput: null });
+    const cloneCreated = yield* media.createClone(clone);
+    expect(cloneCreated).toEqual(releasedVoice);
     expect([generations, clones]).toEqual([1, 1]);
   }).pipe(Effect.provide(layer(http)));
 });
@@ -204,8 +220,8 @@ it.effect.each(["queued", "generating", "downloading"] as const)("regression: %s
       audio.insertAudio({
         id: request.id,
         kind: "voiceDesign",
-        request: JSON.stringify({ ...request, kind: "voiceDesign" }),
-        source: JSON.stringify({ kind: "owner" }),
+        request: yield* json({ ...request, kind: "voiceDesign" }),
+        source: yield* json({ kind: "owner" }),
         input: null,
         connection: "moss",
         revision: 1,
@@ -217,9 +233,12 @@ it.effect.each(["queued", "generating", "downloading"] as const)("regression: %s
     const row = yield* db.one(audio.audio({ id: request.id }));
     if (!row) return yield* Effect.die("Missing seeded job");
     yield* db.run(audio.changeAudio({ ...row, phase, now }));
-    expect(yield* media.previewRelease(request.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.release(request.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(yield* media.get(request.id)).toMatchObject({ phase, canRelease: false });
+    const previewReleaseFailure = yield* media.previewRelease(request.id).pipe(Effect.flip);
+    expect(previewReleaseFailure).toMatchObject({ _tag: "Refused" });
+    const releasedFailure = yield* media.release(request.id).pipe(Effect.flip);
+    expect(releasedFailure).toMatchObject({ _tag: "Refused" });
+    const media2 = yield* media.get(request.id);
+    expect(media2).toMatchObject({ phase, canRelease: false });
     for (const op of ["media.job.previewRelease", "media.job.release"]) expect(endpoints.find((endpoint) => endpoint.op === op)?.can).toEqual(["owner"]);
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Release cannot contact a provider"))))),
 );
@@ -255,7 +274,7 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
           now,
           remote_task_id: "paid-task",
           result_url: phase === "download_failed" ? "https://audio.example.com/result.pcm" : null,
-          result_input: JSON.stringify(asset),
+          result_input: yield* json(asset),
           result_format: "pcm" as const,
           content_type: "audio/pcm",
         };
@@ -264,8 +283,8 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
             audio.insertAudio({
               id: request.id,
               kind: "voiceDesign",
-              request: JSON.stringify({ ...request, kind: "voiceDesign" }),
-              source: JSON.stringify({ kind: "owner" }),
+              request: yield* json({ ...request, kind: "voiceDesign" }),
+              source: yield* json({ kind: "owner" }),
               input: null,
               connection: "moss",
               revision: 1,
@@ -281,8 +300,8 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
           yield* db.run(
             speech.insertSpeech({
               id: request.id,
-              request: JSON.stringify(request),
-              source: JSON.stringify({ kind: "owner" }),
+              request: yield* json(request),
+              source: yield* json({ kind: "owner" }),
               connection: "moss",
               revision: 1,
               model: "moss-tts-1.5-flash",
@@ -294,25 +313,38 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
           if (!row) return yield* Effect.die("Missing speech job");
           yield* db.run(speech.changeSpeech({ ...row, ...patch, remote_task: "paid-task" }));
         }
-        expect(yield* media.get(request.id)).toMatchObject({
+        const media2 = yield* media.get(request.id);
+        expect(media2).toMatchObject({
           canRelease: true,
           canResume: phase !== "download_failed",
           canRetryDownload: phase === "download_failed",
         });
         expect((yield* media.previewRelease(request.id)).does).toHaveLength(3);
         expect((yield* inputs.get(asset.id)).canDelete).toBe(false);
-        expect(yield* media.release(request.id)).toMatchObject({ phase, resultInput: null, canRelease: false, canResume: false, canRetryDownload: false });
-        expect(yield* media.retryDownload(request.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+        const released = yield* media.release(request.id);
+        expect(released).toMatchObject({ phase, resultInput: null, canRelease: false, canResume: false, canRetryDownload: false });
+        const downloadRetriedFailure = yield* media.retryDownload(request.id).pipe(Effect.flip);
+        expect(downloadRetriedFailure).toMatchObject({ _tag: "Refused" });
       }
-      expect(yield* media.audioResume(design.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-      expect(yield* media.speechResume(spoken.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-      expect(yield* db.one(audio.audio({ id: design.id }))).toMatchObject({ remote_task_id: "paid-task", assets_released: 1 });
-      expect(yield* db.one(speech.speech({ id: spoken.id }))).toMatchObject({ remote_task: "paid-task", assets_released: 1 });
-      for (const id of assets) expect(yield* inputs.get(id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      const audioResumeFailure = yield* media.audioResume(design.id).pipe(Effect.flip);
+      expect(audioResumeFailure).toMatchObject({ _tag: "Refused" });
+      const speechResumeFailure = yield* media.speechResume(spoken.id).pipe(Effect.flip);
+      expect(speechResumeFailure).toMatchObject({ _tag: "Refused" });
+      const audio2 = yield* db.one(audio.audio({ id: design.id }));
+      expect(audio2).toMatchObject({ remote_task_id: "paid-task", assets_released: 1 });
+      const speech2 = yield* db.one(speech.speech({ id: spoken.id }));
+      expect(speech2).toMatchObject({ remote_task: "paid-task", assets_released: 1 });
+      for (const id of assets) {
+        const inputFailure = yield* inputs.get(id).pipe(Effect.flip);
+        expect(inputFailure).toMatchObject({ _tag: "Refused" });
+      }
       yield* media.restore();
-      expect(yield* media.createVoiceDesign(design, { kind: "owner" })).toMatchObject({ phase, resultInput: null, canRelease: false });
-      expect(yield* media.createSpeech(spoken, { kind: "owner" })).toMatchObject({ phase, resultInput: null, canRelease: false });
-      expect(yield* db.run(input.inputCapacity())).toEqual({ bytes: 0, count: 0 });
+      const voiceDesignCreated = yield* media.createVoiceDesign(design, { kind: "owner" });
+      expect(voiceDesignCreated).toMatchObject({ phase, resultInput: null, canRelease: false });
+      const speechCreated = yield* media.createSpeech(spoken, { kind: "owner" });
+      expect(speechCreated).toMatchObject({ phase, resultInput: null, canRelease: false });
+      const inputCapacity2 = yield* db.run(input.inputCapacity());
+      expect(inputCapacity2).toEqual({ bytes: 0, count: 0 });
     }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Abandoned jobs cannot contact a provider"))))),
 );
 
@@ -365,12 +397,16 @@ it.effect("regression: local release leaves failed remote deletion receipts retr
     const pending = yield* waitFor(media.get(request.id), (job) => job.problem !== "", "remote cleanup recorded");
     expect(pending.phase, pending.problem).toBe("ready");
     expect(pending).toMatchObject({ canCleanup: true });
-    expect(yield* media.release(request.id)).toMatchObject({ input: null, canCleanup: true, result: { text: "Keep the transcript." } });
-    expect(yield* media.inputs.get(local.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const released = yield* media.release(request.id);
+    expect(released).toMatchObject({ input: null, canCleanup: true, result: { text: "Keep the transcript." } });
+    const inputFailure = yield* media.inputs.get(local.id).pipe(Effect.flip);
+    expect(inputFailure).toMatchObject({ _tag: "Refused" });
     expect(deletes).toBe(1);
     yield* media.restore();
-    expect(yield* media.get(request.id)).toMatchObject({ input: null, canCleanup: false, problem: "", result: { text: "Keep the transcript." } });
-    expect(yield* media.createTranscription(request)).toMatchObject({ input: null, canRelease: false });
+    const media2 = yield* media.get(request.id);
+    expect(media2).toMatchObject({ input: null, canCleanup: false, problem: "", result: { text: "Keep the transcript." } });
+    const transcriptionCreated = yield* media.createTranscription(request);
+    expect(transcriptionCreated).toMatchObject({ input: null, canRelease: false });
     expect([submissions, deletes]).toEqual([1, 2]);
   }).pipe(Effect.provide(layer(http)));
 });

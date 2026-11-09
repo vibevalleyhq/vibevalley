@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
+import { NodeServices } from "@effect/platform-node";
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Stream } from "effect";
+import { Clock, ConfigProvider, Context, Deferred, Effect, FileSystem, Layer, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -18,6 +18,7 @@ import { Agent } from "#/agent/agent.ts";
 import { sampleAgent } from "#/agent/seed.ts";
 import { Core } from "#/core/core.ts";
 import { type ServerConfig } from "#/infra/config.ts";
+import { localParts } from "#/infra/time.ts";
 import { platform } from "#/services.ts";
 import { offlineNetwork, testConfig, nextTurn, whenTrue } from "#/testing/layers.ts";
 import { allow, heard, refuse } from "#/testing/refuse.ts";
@@ -46,7 +47,7 @@ const notFound = async (id: string): Promise<T.RuntimeInfo> => ({
   mcpServers: null,
   tools: null,
   settings: { enabled: true, binPath: "", defaultModel: "", defaultEffort: "", env: {} },
-  checkedAt: Date.now(),
+  checkedAt: await Effect.runPromise(Clock.currentTimeMillis),
 });
 
 const world = (config: ServerConfig["Service"] = testConfig()) =>
@@ -67,10 +68,13 @@ const until = (ok: () => boolean) => whenTrue(ok, "it");
 
 const servers: Server[] = [];
 const dirs: string[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const s of servers.splice(0)) s.close();
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  await Effect.runPromise(Effect.forEach(dirs.splice(0), (d) => fs.remove(d, { recursive: true, force: true }), { discard: true }));
 });
+
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const fs = Effect.runSync(Effect.service(FileSystem.FileSystem).pipe(Effect.provide(NodeServices.layer)));
 
 const env = (name: string, value: string | undefined) => {
   if (value === undefined) delete process.env[name];
@@ -94,8 +98,9 @@ describe("runtime", () => {
       yield* r.refresh("pi");
       const chinese = yield* reason;
       setLocale("en");
+      const reason2 = yield* reason;
       // The list shows what it held until the probe in English lands.
-      expect(yield* reason).toBe(chinese);
+      expect(reason2).toBe(chinese);
       yield* waitFor(reason, (r) => r === "oar does not know this runtime", "the reason in English");
       expect((yield* r.info("pi"))!.installation).toMatchObject({ reason: "oar does not know this runtime" });
     }).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))), Effect.scoped, Effect.provide(world()));
@@ -116,7 +121,8 @@ describe("runtime", () => {
       }),
     ]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const runPromise = Effect.runPromiseWith(context2);
       let used = "";
       let observeUsage = false;
       const options: RuntimeOptions = {
@@ -148,7 +154,8 @@ describe("runtime", () => {
       const { promise: fullGate, resolve: releaseFull } = Promise.withResolvers<void>();
       const { promise: usageGate, resolve: releaseUsage } = Promise.withResolvers<void>();
       return Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context());
+        const context2 = yield* Effect.context();
+        const runPromise = Effect.runPromiseWith(context2);
         let full = 0;
         let usageCalls = 0;
         const changed: T.AccountUsage = { status: "ok", subscription: "pro", windows: [] };
@@ -206,7 +213,13 @@ describe("runtime", () => {
 
   // The spend push waits spendPushAfterMs on the service's Clock: moved through, not waited for.
   it.effect("a usage read keeps its answer when a spend rebuilds what is shown meanwhile, and a late older one does not undo a newer", () => {
-    const out: ((u: T.AccountUsage) => void)[] = [];
+    const out: Deferred.Deferred<T.AccountUsage>[] = [];
+    const heldUsage = () => {
+      const answer = Deferred.makeUnsafe<T.AccountUsage>();
+      out.push(answer);
+      return Effect.runPromise(Deferred.await(answer));
+    };
+    const answer = (n: number, usage: T.AccountUsage) => Deferred.doneUnsafe(out[n]!, Effect.succeed(usage));
     const used = (usedPercent: number) =>
       ({
         status: "ok",
@@ -215,8 +228,9 @@ describe("runtime", () => {
       }) as T.AccountUsage;
     return Effect.gen(function* () {
       const pushed: T.RuntimeInfo[] = [];
+      const subscribe2 = yield* (yield* Core).subscribe;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* (yield* Core).subscribe, (event) =>
+        Stream.runForEach(subscribe2, (event) =>
           Effect.sync(() => {
             if (event.type === "runtime") pushed.push(event.info);
           }),
@@ -226,7 +240,7 @@ describe("runtime", () => {
       const r = yield* makeRuntime({
         registry: new RuntimeRegistry([fake("pi", { installation: async () => ({ kind: "available", via: "executable", command: "pi" }) })]),
         background: true,
-        usageOf: async () => (++calls === 1 ? null : new Promise<T.AccountUsage>((answer) => out.push(answer))),
+        usageOf: async () => (++calls === 1 ? null : heldUsage()),
       });
       yield* Effect.promise(() => whenTrue(() => new Set(pushed.map((info) => info.id)).size === runtimeIds().length, "the initial probes"));
       r.usageSoon("pi");
@@ -235,7 +249,7 @@ describe("runtime", () => {
       r.spend("pi", 1);
       yield* TestClock.adjust(3_000);
       yield* Effect.promise(() => whenTrue(() => pushed.some((info) => info.id === "pi" && info.spentToday === 1), "spend push"));
-      out[0]!(used(40));
+      answer(0, used(40));
       yield* waitFor(r.info("pi"), (info) => info?.usage?.status === "ok" && info.usage.windows[0]?.usedPercent === 40, "the usage kept after spend");
       expect((yield* r.info("pi"))!.spentToday).toBe(1);
       yield* TestClock.adjust(300_000);
@@ -243,9 +257,9 @@ describe("runtime", () => {
       r.usageSoon("pi");
       yield* TestClock.adjust(20_000);
       yield* Effect.promise(() => whenTrue(() => out.length === 3, "overlapping delayed usage"));
-      out[2]!(used(100));
+      answer(2, used(100));
       yield* waitFor(r.info("pi"), (info) => info?.usage?.status === "ok" && info.usage.windows[0]?.usedPercent === 100, "the newer usage");
-      out[1]!(used(70));
+      answer(1, used(70));
       yield* Effect.promise(nextTurn);
       expect((yield* r.info("pi"))!.usage).toEqual(used(100));
     }).pipe(Effect.scoped, Effect.provide(world()));
@@ -270,7 +284,8 @@ describe("runtime", () => {
       // Asked again, the list tries again, and says checking until the second read answers.
       yield* waitFor(pi, (p) => p.installation.status === "checking" && probes === 2, "a second probe");
       expect((yield* pi).installation.status).toBe("checking");
-      second.resolve(yield* Effect.promise(() => notFound("pi")));
+      const notFound2 = yield* Effect.promise(() => notFound("pi"));
+      second.resolve(notFound2);
       yield* waitFor(pi, (p) => p.installation.status === "not_found", "the second probe landed");
       expect(probes).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world()));
@@ -281,7 +296,8 @@ describe("runtime", () => {
     const latest = Promise.withResolvers<T.RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const runPromise = Effect.runPromiseWith(context2);
       const r = yield* runtimes({
         probe: (id) => {
           if (id !== "pi") return notFound(id);
@@ -297,9 +313,11 @@ describe("runtime", () => {
       const latestResult = runPromise(r.refresh("pi"));
       yield* Effect.promise(() => until(() => probes === 2));
       old.reject(new Error("old probe failed"));
-      expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
+      const oldResult2 = yield* Effect.promise(() => oldResult);
+      expect(oldResult2).toMatchObject({ status: "rejected" });
       expect((yield* r.list()).find((info) => info.id === "pi")!.installation.status).toBe("checking");
-      latest.resolve(yield* Effect.promise(() => notFound("pi")));
+      const notFound2 = yield* Effect.promise(() => notFound("pi"));
+      latest.resolve(notFound2);
       expect((yield* Effect.promise(() => latestResult))!.installation.status).toBe("not_found");
       // The old read's failure started no read of its own.
       expect(probes).toBe(2);
@@ -323,8 +341,10 @@ describe("runtime", () => {
       const assessed = yield* r.assess(a);
       expect(assessed.info!.support.refused.env).toBe("test adapter refuses env");
       expect(usable(assessed)).toBe(false);
-      expect(usable(yield* r.assess(agent({})))).toBe(true);
-      expect(usable(yield* r.assess(agent({ enabled: false })))).toBe(false);
+      const assess2 = yield* r.assess(agent({}));
+      expect(usable(assess2)).toBe(true);
+      const assess3 = yield* r.assess(agent({ enabled: false }));
+      expect(usable(assess3)).toBe(false);
       const opencode = (yield* r.info("opencode"))!.support.refused;
       expect(opencode).toEqual({
         env: "test env",
@@ -352,7 +372,8 @@ describe("runtime", () => {
       const assessed = yield* r.assess(a);
       expect(assessed.blocking.map((i) => i.field)).toEqual(["effort", "env"]);
       expect(usable(assessed)).toBe(false);
-      expect(yield* r.problemsOf(a)).toEqual(assessed.problems);
+      const problemsOf2 = yield* r.problemsOf(a);
+      expect(problemsOf2).toEqual(assessed.problems);
       expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -376,7 +397,8 @@ describe("runtime", () => {
       });
       expect((yield* r.assess(agent({}))).blocking.map((i) => i.field)).toEqual(["effort"]);
       const override = agent({ effort: "low", env: { OVERRIDE: "profile" } });
-      expect(usable(yield* r.assess(override))).toBe(true);
+      const assess2 = yield* r.assess(override);
+      expect(usable(assess2)).toBe(true);
       const sent = yield* r.resolve(override);
       expect([sent.model, sent.effort, sent.env]).toEqual(["known", "low", { BASE: "kept", OVERRIDE: "profile" }]);
     }).pipe(Effect.scoped, Effect.provide(world())),
@@ -422,7 +444,8 @@ describe("runtime", () => {
     let waiting = false;
     const { promise: held, resolve: release } = Promise.withResolvers<void>();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const runPromise = Effect.runPromiseWith(context2);
       let probes = 0;
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("pi")]),
@@ -462,7 +485,8 @@ describe("runtime", () => {
           }),
         });
         const a = agent({});
-        expect(yield* r.problemsOf(a)).toEqual([]);
+        const problemsOf2 = yield* r.problemsOf(a);
+        expect(problemsOf2).toEqual([]);
         const store = yield* Agent;
         yield* r.update("pi", {
           ...store.settings("pi"),
@@ -491,7 +515,8 @@ describe("runtime", () => {
       yield* r.update("pi", { ...store.settings("pi"), enabled: false, dailyBudget: 1 });
       r.spend("pi", 1);
       const a = agent({ enabled: false });
-      expect(usable(yield* r.assess(a))).toBe(false);
+      const assess2 = yield* r.assess(a);
+      expect(usable(assess2)).toBe(false);
       expect((yield* r.resolve(a)).runtime.id).toBe("pi");
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -521,8 +546,9 @@ describe("runtime", () => {
       expect(byId.claude!.installation.status).toBe("unsupported");
       expect(byId.claude!.preset.label).toBe("Claude Code");
       expect(byId.claude!.support.capabilities).toEqual(supportOf("claude").capabilities);
-      expect(JSON.stringify(byId.claude)).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/u);
-      expect(JSON.stringify(byId.claude)).toMatch(/"support":\{"steer":true,"refused":\{\}/u);
+      const claude = yield* json(byId.claude);
+      expect(claude).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/u);
+      expect(claude).toMatch(/"support":\{"steer":true,"refused":\{\}/u);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -583,21 +609,28 @@ describe("runtime", () => {
 
   it.live("regression: legacy spend files are ignored and invalid amounts cannot enter the database counter", () => {
     const config = testConfig();
-    const d = new Date();
-    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    writeFileSync(join(config.home, "spend.json"), `{"day":${JSON.stringify(day)},"byRuntime":{"pi":1e999}}`);
-    return Effect.gen(function* () {
-      const r = yield* runtimes({ probe: notFound });
-      yield* r.refresh("pi");
-      expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
-      r.spend("pi", Number.POSITIVE_INFINITY);
-      r.spend("pi", Number.NaN);
-      expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
-      const sql = yield* SqlClient.SqlClient;
-      expect((yield* Effect.exit(sql`insert into runtime_spend (day, runtime, cny) values ('1970-01-01', 'pi', 9e999)`))._tag).toBe("Failure");
-      r.spend("pi", 2);
-      expect((yield* r.info("pi"))!.spentToday).toBe(2);
-    }).pipe(Effect.scoped, Effect.provide(world(config)));
+    const legacy = Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
+      const d = localParts(now);
+      const day = `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+      const fs = yield* FileSystem.FileSystem;
+      yield* fs.writeFileString(join(config.home, "spend.json"), `{"day":"${day}","byRuntime":{"pi":1e999}}`);
+    }).pipe(Effect.provide(NodeServices.layer));
+    return Effect.andThen(
+      legacy,
+      Effect.gen(function* () {
+        const r = yield* runtimes({ probe: notFound });
+        yield* r.refresh("pi");
+        expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
+        r.spend("pi", Number.POSITIVE_INFINITY);
+        r.spend("pi", Number.NaN);
+        expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
+        const sql = yield* SqlClient.SqlClient;
+        expect((yield* Effect.exit(sql`insert into runtime_spend (day, runtime, cny) values ('1970-01-01', 'pi', 9e999)`))._tag).toBe("Failure");
+        r.spend("pi", 2);
+        expect((yield* r.info("pi"))!.spentToday).toBe(2);
+      }).pipe(Effect.scoped, Effect.provide(world(config))),
+    );
   });
 
   it.effect("regression: flushed spending survives restart without being added twice and each day remains separate", () => {
@@ -612,7 +645,8 @@ describe("runtime", () => {
           yield* waitFor(sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`, (rows) => rows[0]?.cny === 4, "the spend committed");
         }),
       );
-      expect(existsSync(join(config.home, "spend.json"))).toBe(false);
+      const legacy = yield* fs.exists(join(config.home, "spend.json"));
+      expect(legacy).toBe(false);
       yield* Effect.scoped(
         Effect.gen(function* () {
           const runtime = yield* runtimes();
@@ -628,7 +662,10 @@ describe("runtime", () => {
           runtime.spend("pi", 5);
         }),
       );
-      expect(yield* sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi' order by day`).toEqual([{ cny: 6 }, { cny: 5 }]);
+      const rows2 = yield* sql<{
+        cny: number;
+      }>`select cny from runtime_spend where runtime = 'pi' order by day`;
+      expect(rows2).toEqual([{ cny: 6 }, { cny: 5 }]);
     }).pipe(Effect.scoped, Effect.provide(world(config)));
   });
 
@@ -648,14 +685,18 @@ describe("runtime", () => {
             (n) => n > 0,
             "the rejected write",
           );
-          expect(yield* sql`select * from runtime_spend`).toEqual([]);
+          const rows3 = yield* sql`select * from runtime_spend`;
+          expect(rows3).toEqual([]);
           expect((yield* runtime.info("pi"))?.spentToday).toBe(4);
           yield* allow(sql, "refuse_spend");
           yield* TestClock.adjust(2000);
           yield* waitFor(sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`, (rows) => rows[0]?.cny === 4, "the retry committed");
         }),
       );
-      expect(yield* sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`).toEqual([{ cny: 4 }]);
+      const rows2 = yield* sql<{
+        cny: number;
+      }>`select cny from runtime_spend where runtime = 'pi'`;
+      expect(rows2).toEqual([{ cny: 4 }]);
     }).pipe(Effect.scoped, Effect.provide(Layer.merge(world(config), log.layer)));
   });
 
@@ -670,8 +711,8 @@ describe("runtime", () => {
         },
       });
       const file = join(config.home, "config.json");
-      rmSync(file);
-      mkdirSync(file);
+      yield* fs.remove(file);
+      yield* fs.makeDirectory(file);
       expect(
         (yield* Effect.flip(
           r.update("pi", {
@@ -711,8 +752,9 @@ describe("runtime", () => {
       expect([got.runtime.id, got.model, got.effort, got.env]).toEqual(["pi", "known", "default-effort", { base: "kept", override: "profile" }]);
       const core = yield* Core;
       const notices: T.ServerEvent[] = [];
+      const subscribe2 = yield* core.subscribe;
       // Subscribed before it returns: no wait for the reader to start.
-      yield* Effect.forkScoped(Stream.runForEach(yield* core.subscribe, (e) => Effect.sync(() => notices.push(e))));
+      yield* Effect.forkScoped(Stream.runForEach(subscribe2, (e) => Effect.sync(() => notices.push(e))));
       const fallback = yield* r.resolve({ ...a, model: "unknown", effort: "profile-effort" });
       expect([fallback.model, fallback.effort]).toEqual(["", "profile-effort"]);
       yield* Effect.promise(() => until(() => notices.some((e) => e.type === "notice")));
@@ -739,11 +781,10 @@ describe("runtime", () => {
   });
 
   it("pi's balance, as pi configures DeepSeek", async () => {
-    const saved = {
-      dir: process.env.OAR_PI_AGENT_DIR,
-      key: process.env.DEEPSEEK_API_KEY,
-      mine: process.env.MY_DEEPSEEK,
-    };
+    // pi's environment, as its Config reads it: this machine's own is never asked.
+    const env: Record<string, string> = {};
+    const balanceOf = (settings: { defaultModel: string }) =>
+      Effect.runPromise(piBalance(fs, settings).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env })))));
     const balance = async (
       key: string,
       answer: unknown = {
@@ -751,21 +792,26 @@ describe("runtime", () => {
         balance_infos: [{ currency: "CNY", total_balance: "12.50" }],
       },
     ) => {
+      const body = await Effect.runPromise(json(answer));
       const s = createServer((req, res) => {
         if (req.url !== "/user/balance" || req.headers.authorization !== "Bearer " + key) return void res.writeHead(401).end();
-        res.end(JSON.stringify(answer));
+        res.end(body);
       });
       servers.push(s);
-      await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
+      await Effect.runPromise(Effect.callback<void>((resume) => void s.listen(0, "127.0.0.1", () => resume(Effect.void))));
       return `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
     };
     const piHome = (models: string, auth: string, settings = `{"defaultProvider":"deepseek","defaultModel":"deepseek-chat"}`) => {
       const dir = tempDir("pi-");
       dirs.push(dir);
-      process.env.OAR_PI_AGENT_DIR = dir;
-      writeFileSync(join(dir, "settings.json"), settings);
-      if (models) writeFileSync(join(dir, "models.json"), models);
-      if (auth) writeFileSync(join(dir, "auth.json"), auth);
+      env.OAR_PI_AGENT_DIR = dir;
+      return Effect.runPromise(
+        Effect.all([
+          fs.writeFileString(join(dir, "settings.json"), settings),
+          models ? fs.writeFileString(join(dir, "models.json"), models) : Effect.void,
+          auth ? fs.writeFileString(join(dir, "auth.json"), auth) : Effect.void,
+        ]),
+      );
     };
     const want = {
       status: "balance",
@@ -773,42 +819,35 @@ describe("runtime", () => {
       available: true,
       balances: [{ currency: "CNY", amount: 12.5 }],
     };
-    try {
-      let url = await balance("sk-from-env");
-      delete process.env.DEEPSEEK_API_KEY;
-      process.env.MY_DEEPSEEK = "sk-from-env";
-      piHome(`{"providers":{"deepseek":{"apiKey":"$MY_DEEPSEEK","baseUrl":"${url}/v1/"}}}`, "");
-      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
-      url = await balance("sk-auth");
-      process.env.DEEPSEEK_API_KEY = "sk-env";
-      piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, `{"deepseek":{"type":"api_key","key":"sk-auth"}}`);
-      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
-      url = await balance("sk-env");
-      piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, "");
-      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
-      delete process.env.DEEPSEEK_API_KEY;
-      piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({ status: "login_required" });
-      expect(await Effect.runPromise(piBalance({ defaultModel: "anthropic/claude" }))).toEqual({
-        status: "unavailable",
-        reason: "anthropic 不报余额",
-      });
-      url = await balance("sk-bad", { is_available: true, balance_infos: {} });
-      process.env.DEEPSEEK_API_KEY = "sk-bad";
-      piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({
-        status: "unavailable",
-        reason: "没读到 DeepSeek 余额",
-      });
-      piHome("", "", `{"defaultProvider":{}}`);
-      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({
-        status: "unavailable",
-        reason: "pi 没有设默认模型",
-      });
-    } finally {
-      env("OAR_PI_AGENT_DIR", saved.dir);
-      env("DEEPSEEK_API_KEY", saved.key);
-      env("MY_DEEPSEEK", saved.mine);
-    }
+    let url = await balance("sk-from-env");
+    env.MY_DEEPSEEK = "sk-from-env";
+    await piHome(`{"providers":{"deepseek":{"apiKey":"$MY_DEEPSEEK","baseUrl":"${url}/v1/"}}}`, "");
+    expect(await balanceOf({ defaultModel: "" })).toEqual(want);
+    url = await balance("sk-auth");
+    env.DEEPSEEK_API_KEY = "sk-env";
+    await piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, `{"deepseek":{"type":"api_key","key":"sk-auth"}}`);
+    expect(await balanceOf({ defaultModel: "" })).toEqual(want);
+    url = await balance("sk-env");
+    await piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, "");
+    expect(await balanceOf({ defaultModel: "" })).toEqual(want);
+    delete env.DEEPSEEK_API_KEY;
+    await piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
+    expect(await balanceOf({ defaultModel: "" })).toEqual({ status: "login_required" });
+    expect(await balanceOf({ defaultModel: "anthropic/claude" })).toEqual({
+      status: "unavailable",
+      reason: "anthropic 不报余额",
+    });
+    url = await balance("sk-bad", { is_available: true, balance_infos: {} });
+    env.DEEPSEEK_API_KEY = "sk-bad";
+    await piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
+    expect(await balanceOf({ defaultModel: "" })).toEqual({
+      status: "unavailable",
+      reason: "没读到 DeepSeek 余额",
+    });
+    await piHome("", "", `{"defaultProvider":{}}`);
+    expect(await balanceOf({ defaultModel: "" })).toEqual({
+      status: "unavailable",
+      reason: "pi 没有设默认模型",
+    });
   });
 });

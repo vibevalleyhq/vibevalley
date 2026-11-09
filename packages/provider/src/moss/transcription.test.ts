@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import { mossTranscriptionModels } from "./transcription-models.ts";
 import { createMossTranscriptionTask, prepareMossTranscription } from "./transcription.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = { model: "moss-transcribe-1.0", fileId: "file-one" };
 
@@ -16,7 +18,7 @@ it.effect.each(mossTranscriptionModels)("%s submits a stored file once without i
       expect(request.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
       expect(request.headers.authorization).toBe("Bearer transcription-account");
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model,
         file_id: "file-one",
         response_format: "json",
@@ -27,7 +29,8 @@ it.effect.each(mossTranscriptionModels)("%s submits a stored file once without i
     }),
   );
   return Effect.gen(function* () {
-    expect(yield* createMossTranscriptionTask("transcription-account", { ...input, model })).toEqual({ taskId: "transcription-one", retryAfterSeconds: 0 });
+    const mossTranscriptionTaskCreated = yield* createMossTranscriptionTask("transcription-account", { ...input, model });
+    expect(mossTranscriptionTaskCreated).toEqual({ taskId: "transcription-one", retryAfterSeconds: 0 });
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -35,7 +38,8 @@ it.effect.each(mossTranscriptionModels)("%s submits a stored file once without i
 it.effect.each(["moss-transcribe-diarize-pro", "moss-transcribe-diarize-pro-2026-07-03"])("%s preserves diarization and Unicode keyterms", (model) =>
   Effect.gen(function* () {
     const keyterms = ["MOSS", "𝄞".repeat(30)];
-    expect(yield* prepareMossTranscription({ ...input, model, diarize: true, keyterms })).toEqual({
+    const mossTranscriptionPrepared = yield* prepareMossTranscription({ ...input, model, diarize: true, keyterms });
+    expect(mossTranscriptionPrepared).toEqual({
       model,
       file_id: "file-one",
       response_format: "json",
@@ -49,7 +53,8 @@ it.effect.each(["moss-transcribe-diarize-pro", "moss-transcribe-diarize-pro-2026
 
 it.effect("standard transcription preserves explicit false and an empty keyterm list", () =>
   Effect.gen(function* () {
-    expect(yield* prepareMossTranscription({ ...input, diarize: false, keyterms: [] })).toMatchObject({ diarize: false, keyterms: [] });
+    const mossTranscriptionPrepared = yield* prepareMossTranscription({ ...input, diarize: false, keyterms: [] });
+    expect(mossTranscriptionPrepared).toMatchObject({ diarize: false, keyterms: [] });
   }),
 );
 
@@ -71,7 +76,8 @@ it.effect.each([
   { response_format: "verbose_json" },
 ])("invalid transcription options %# cannot reach the vendor", (patch) =>
   Effect.gen(function* () {
-    expect(yield* createMossTranscriptionTask("transcription-account", { ...input, ...patch }).pipe(Effect.flip)).toMatchObject({
+    const mossTranscriptionTaskCreatedFailure = yield* createMossTranscriptionTask("transcription-account", { ...input, ...patch }).pipe(Effect.flip);
+    expect(mossTranscriptionTaskCreatedFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });

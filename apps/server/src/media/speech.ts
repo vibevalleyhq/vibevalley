@@ -32,6 +32,16 @@ interface Ports {
   otherExists: (id: string) => Effect.Effect<boolean>;
 }
 const fingerprint = (key: string) => createHash("sha256").update(key).digest("hex");
+const encodeJson = <A, I>(schema: Schema.Codec<A, I>) => {
+  const encode = Schema.encodeEffect(Schema.fromJsonString(schema));
+  return (value: A) => encode(value).pipe(Effect.mapError(() => refused(t("server.media.corrupt"))));
+};
+const attachmentJson = encodeJson(S.Attachment);
+const referenceJson = encodeJson(S.MediaInputReference);
+const metadataJson = encodeJson(S.MediaAudioMetadata);
+const usageJson = encodeJson(S.MediaAudioUsage);
+const requestJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSpeechRequest));
+const sourceJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSource));
 
 export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
@@ -110,7 +120,8 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
     };
   });
   const get = Effect.fn("Media.speechGet")(function* (id: string) {
-    return yield* view(yield* found(id));
+    const found2 = yield* found(id);
+    return yield* view(found2);
   });
   const change = Effect.fnUntraced(
     function* (
@@ -146,13 +157,15 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
             Effect.provideService(FileSystem.FileSystem, fs),
           ),
         );
-        const committed = yield* change(id, ["downloading"], {
-          phase: "ready",
-          attachment: saved.attachment === undefined ? null : JSON.stringify(saved.attachment),
-          result_input: saved.resultInput === null ? null : JSON.stringify(saved.resultInput),
-          result_url: null,
-          problem: "",
-          metadata: saved.metadata === undefined ? null : JSON.stringify(saved.metadata),
+        const committed = yield* Effect.gen(function* () {
+          return yield* change(id, ["downloading"], {
+            phase: "ready",
+            attachment: saved.attachment === undefined ? null : yield* attachmentJson(saved.attachment),
+            result_input: saved.resultInput === null ? null : yield* referenceJson(saved.resultInput),
+            result_url: null,
+            problem: "",
+            metadata: saved.metadata === undefined ? null : yield* metadataJson(saved.metadata),
+          });
         }).pipe(Effect.onError(() => releaseAudioResult(id, saved, ports.inputs)));
         if (!committed) yield* releaseAudioResult(id, saved, ports.inputs);
       }),
@@ -209,7 +222,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           result_url: result.url,
           result_format: result.format,
           content_type: result.contentType,
-          usage: result.usage === undefined ? null : JSON.stringify(result.usage),
+          usage: result.usage === undefined ? null : yield* usageJson(result.usage),
         })
       )
         yield* download(id);
@@ -237,12 +250,12 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
       emit: (event) => Queue.offer(session.queue, event).pipe(Effect.asVoid),
       save: Effect.fnUntraced(function* (saved: SpeechStreamSaved) {
         const patch = {
-          attachment: saved.attachment === undefined ? null : JSON.stringify(saved.attachment),
+          attachment: saved.attachment === undefined ? null : yield* attachmentJson(saved.attachment),
           result_format: "wav",
           content_type: "audio/wav",
-          result_input: saved.resultInput === null ? null : JSON.stringify(saved.resultInput),
-          metadata: JSON.stringify(saved.metadata),
-          usage: saved.usage === undefined ? null : JSON.stringify(saved.usage),
+          result_input: saved.resultInput === null ? null : yield* referenceJson(saved.resultInput),
+          metadata: yield* metadataJson(saved.metadata),
+          usage: saved.usage === undefined ? null : yield* usageJson(saved.usage),
         } satisfies Partial<q.SpeechResult>;
         if (
           !(yield* change(id, ["generating"], {
@@ -309,7 +322,8 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
     has: (id: string) => db.one(q.speech({ id })).pipe(Effect.map((row) => row !== undefined)),
     pending: () => db.run(q.pendingSpeech()).pipe(Effect.map((rows) => rows.length)),
     list: Effect.fn("Media.speechList")(function* () {
-      return yield* Effect.forEach(yield* db.run(q.recentSpeech()), view);
+      const recentSpeech2 = yield* db.run(q.recentSpeech());
+      return yield* Effect.forEach(recentSpeech2, view);
     }),
     create: Effect.fn("Media.createSpeech")(function* (given: T.MediaSpeechRequest, caller: MediaCaller) {
       if (caller.kind === "orchestrator" && !caller.forOwner) return yield* Effect.fail(refused(t("server.media.ownerRequired")));
@@ -321,8 +335,8 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
         Effect.gen(function* () {
           const existing = yield* db.one(q.speech({ id: input.id }));
           if (existing) {
-            if (!same(yield* decodeRequest(existing.request), input) || !same((yield* view(existing)).source, source))
-              return yield* Effect.fail(refused(t("server.media.reusedId")));
+            const storedRequest = yield* decodeRequest(existing.request);
+            if (!same(storedRequest, input) || !same((yield* view(existing)).source, source)) return yield* Effect.fail(refused(t("server.media.reusedId")));
             return yield* view(existing);
           }
           if (yield* ports.otherExists(input.id)) return yield* Effect.fail(refused(t("server.media.reusedId")));
@@ -337,8 +351,8 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           yield* db.run(
             q.insertSpeech({
               id: input.id,
-              request: JSON.stringify(input),
-              source: JSON.stringify(source),
+              request: yield* requestJson(input).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
+              source: yield* sourceJson(source).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
               connection: account.connection,
               revision: account.revision,
               model: account.model,
@@ -380,7 +394,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
                       result_url: result.url,
                       result_format: result.format,
                       content_type: result.contentType,
-                      usage: result.usage === undefined ? null : JSON.stringify(result.usage),
+                      usage: result.usage === undefined ? null : yield* usageJson(result.usage),
                     })
                   )
                     yield* download(input.id);
@@ -452,7 +466,8 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
     restore: Effect.fn("Media.speechRestore")(function* () {
       yield* db.run(q.interruptSpeech({ problem: t("server.media.restarted"), now: yield* Clock.currentTimeMillis }));
       yield* ports.publish();
-      yield* Effect.forEach(yield* db.run(q.pendingSpeech()), (row) => run(row.id, row.phase === "generating" ? poll(row.id) : download(row.id)), {
+      const pendingSpeech2 = yield* db.run(q.pendingSpeech());
+      yield* Effect.forEach(pendingSpeech2, (row) => run(row.id, row.phase === "generating" ? poll(row.id) : download(row.id)), {
         discard: true,
       });
     }),

@@ -59,7 +59,8 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       if (thread) return yield* handedOn(h, thread);
       const channel = channelOfSession(h);
       const latest = (yield* db.run(qm.latestNumber({ channel_id: channel }))).n ?? 0;
-      yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      yield* setRead(h.id, channel, latest, now);
       const what = h.refining ? t("server.channel.dispatch.draft") : head(h.brief.replace(/\s+/gu, " "), 80);
       // The dispatch note is the farm's, under the name of the orchestrator that looks after the channel.
       const by = orchestratorOfRow(model.channel(channel));
@@ -82,7 +83,8 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       if (model.channel(thread)?.type === "direct") return yield* follow(thread, h.id, "owner", model.channel(thread)?.last_number ?? 0);
       const channel = channelOfSession(h);
       const latest = (yield* db.run(qm.latestNumber({ channel_id: channel }))).n ?? 0;
-      yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      yield* setRead(h.id, channel, latest, now);
       // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
       const nth = ((yield* db.run(qm.dispatchesIn({ channel_id: thread }))).n ?? 0) + 2;
       const text = h.refining

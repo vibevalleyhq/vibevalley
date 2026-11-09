@@ -27,7 +27,7 @@ export const api = new VibeValleyApi("", async (url, init) => {
   try {
     return await fetch(url, init);
   } catch (error) {
-    if (error instanceof TypeError) throw new ApiConnectionError({ cause: error });
+    if (error instanceof TypeError) throw ApiConnectionError.make({ cause: error });
     throw error;
   }
 });
