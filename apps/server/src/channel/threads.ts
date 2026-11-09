@@ -102,7 +102,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
         if (p.kind !== "session" || p.left_at !== null || on.has(p.id)) continue;
         yield* db.run(qp.participantLeft({ left_at: now, id: p.id }));
         model.left(p.id, now);
-        yield* mailbox.dropSession(p.id, "left");
+        yield* mailbox.withdraw({ _tag: "Session", session: p.id, why: "left" });
         yield* db.run(qf.unfollowAllOf({ at: now, participant_id: p.id }));
       }
     });

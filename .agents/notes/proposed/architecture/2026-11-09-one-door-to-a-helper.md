@@ -45,7 +45,7 @@ flowchart LR
 一句话：**工单和频道要找帮工，只经 Mailbox。** Mailbox 对它们只交出几个动词，帮工投递相关的成员只给 Mailbox 用。不新建模块，不改名，不改表。
 
 1. **Mailbox 是唯一的门。** 它对工单和频道只交出 `receive`、`withdraw`、`pending`、`changes` 四个动词（见下面的「名词和路径」）。腾位置、开会话、`kick`、直投、消费回执、刹车提示，都变成 Mailbox 里面的事。
-2. **帮工只交出它自己的事。** 跑一轮所需的（`send`、`register`、`makeRoom`、`noRoom`、`deliver`、`launches`、消费和退回的回执、`runOf`、`reportOf`、`onIssue`、消息流）只给 Mailbox 用。工作区和交接（`withWorkplace`、`withIdleWorkplace`、`handOver`、`clearWorkplace`、`discardWork`、`dismiss`）是工单生命周期要的，留给工单用。外圈在用的 14 个不变。
+2. **帮工只交出它自己的事。** 投递和唤醒（`deliver`、`launches`、消费和退回的回执）只给 Mailbox 用。读帮工的事实和它的生命周期（`sessionOf`、`present`、`runOf`、`reportOf`、`onIssue`、`news`、`startedIssues`、`finishedRuns`）不是投递：频道靠它们开关串、标出一条话出自哪一轮，工单靠它们跟进度，这些留在帮工的接口上，挪到 Mailbox 后面只会多一跳转发。工作区和交接（`withWorkplace`、`withIdleWorkplace`、`handOver`、`clearWorkplace`、`discardWork`、`dismiss`）是工单生命周期要的，留给工单用。开一个帮工（`makeRoom`、`noRoom`、`send`、`register`）见「名词和路径」里未决的一件。
 3. **一次挪一条边，频道先。** 频道到帮工、到 Mailbox 的 20 处最集中，也最好验证：先把它们换成 Mailbox 的几个动词，跑完频道和派活的测试、数一遍调用关系；再挪工单；最后收 Mailbox 用帮工的那 8 处。每一步单独一个 PR。
 4. **测试对着门写。** 门窄了以后，工单和频道的测试可以只给一个假的 Mailbox，不用搭整座农场；`world()` 留给真正跨模块的流程（`src/flows`）。不另做「测试入口」：那是给宽接口包一层，不解决耦合。
 
@@ -76,10 +76,18 @@ flowchart LR
 |---|---|---|
 | `receive` | 把一个触发交给它的受众 | `registerTalk`、`registerInitialInputs`、`deliverDirect`、`kick`，和工单、频道直接用帮工的 `makeRoom`、`send`、`register` |
 | `withdraw` | 撤回一个帮工、一封信或一张工单的待投递 | `dropSession`、`dropEnvelope`、`retireDispatches`、`returnOne`、`returnInput` |
-| `pending` | 一个工单、帮工或一封信现在等着什么 | `queuedInputs`、`issueInputs`、`waitingOn` |
-| `changes` | 投递的变化：消费、退回、刹车 | `consumed`、`breakerNotices`，和工单、频道直接订阅帮工的 `news`、`startedIssues`、`finishedRuns` |
+| `pending` | 一个工单、帮工或一封信现在等着什么 | `queuedInputs`、`issueInputs`、`waitingOn`，和现有的同步 `pending(session)` |
+| `changes` | 投递的变化：消费、刹车 | `consumed`、`breakerNotices` |
 
-未决的一件：工单派一个新帮工（`send` 返回 `Hired`）时，选哪个档案是工单的决定。这个决定留在工单，开帮工这一步是 `receive` 带着这个决定，还是工单直接用帮工，第一步挪频道时不碰，挪工单前定。
+未决的两件，挪下去之前定：
+
+- **开一个帮工**：工单派活、私聊里主人第一次对一个档案说话（`channel/talk.ts`）都要开一个帮工（`makeRoom`、`send`，开的同时用 `registerTalk`、`registerInitialInputs` 登记最初的几封信，再 `kick`）。选哪个档案是工单或频道的决定；开帮工和登记最初的信是经 `receive` 带着这个决定，还是留在调用方。
+- **直说**（`deliverDirect`）：频道的 `tellSession` 在帮工没有串时把话直接交给它，不记触发、不过刹车。并进 `receive` 就要先记下触发、过刹车，是行为上的变化。
+
+## 进度
+
+- 第一步（频道）的前半：`withdraw` 取代 `dropSession`、`dropEnvelope`，`changes` 取代 `consumed`、`breakerNotices`；行为不变，频道、Mailbox、流程、会话、工单和 MCP 的测试通过。Mailbox 对外的成员实际是 34 个（服务和泵各有一组），比上表多数的那张少算了 7 个。
+- 频道剩下的旁路是开帮工（`talk.ts`）和直说（`deliverDirect`），等上一节两件定了再挪。
 
 ## Alternatives considered
 
@@ -91,11 +99,11 @@ flowchart LR
 
 ## Acceptance criteria
 
-- 用同样的数法重数一遍：「只有这几个模块互相用」的成员从 38 个降到 15 个以内，只剩工单用帮工的工作区和交接（6 个）、工单在自己的串里说话（`say`、`issueThread`、`notice`、`ownerInThread`）和 Inbox 读主人的阅读位置（`ownerReads`）；这些是真实的依赖，不归投递。
+- 用同样的数法重数一遍：投递相关、只在这几个模块之间用的成员清零；剩下的只有读帮工的事实和生命周期、工单用帮工的工作区和交接、工单在自己的串里说话（`say`、`issueThread`、`notice`、`ownerInThread`）和 Inbox 读主人的阅读位置（`ownerReads`），这些是真实的依赖，不归投递。
 - 工单和频道不再用帮工跑一轮相关的成员，也不再用 Mailbox 的内部步骤；Mailbox 对它们只交出 `receive`、`withdraw`、`pending`、`changes`。
 - 频道和工单各至少有一组测试只用假的 Mailbox，不用 `world()`。
 - `vp run server:check` 通过；派活、带话、刹车和私聊的流程测试（`src/flows`）不改断言。
-- 投递这件事上只用「名词和路径」一节留下的名字：表里收掉的标识符（`queuedInputs`、`issueInputs`、`registerInitialInputs`、`returnInput`、`registerTalk`、`TalkRow`、`ChannelMail`、`retireDispatches`、`deliverDirect`、`dropSession`、`dropEnvelope`、`returnOne`、`waitingOn`、`breakerNotices`）在 `apps/server/src` 里都不再出现。
+- 投递这件事上只用「名词和路径」一节留下的名字：表里收掉的标识符（`queuedInputs`、`issueInputs`、`registerInitialInputs`、`returnInput`、`registerTalk`、`TalkRow`、`ChannelMail`、`retireDispatches`、`deliverDirect`、`dropSession`、`dropEnvelope`、`returnOne`、`waitingOn`、`breakerNotices`）不再出现在 Mailbox 的接口和 Mailbox 以外的代码里（Mailbox 内部的步骤怎么叫不限）。
 - 投递行为不变：`mailbox_delivery` 的状态、刹车计数和唤醒顺序和改之前一样。
 
 ## Risks

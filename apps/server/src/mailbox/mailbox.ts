@@ -67,6 +67,16 @@ export interface TalkRow {
   readonly context: InputContext;
 }
 
+/** What can be taken back before it is handed: everything for a session that left, or one deleted message. */
+export type Withdrawal =
+  | { readonly _tag: "Session"; readonly session: string; readonly why: string }
+  | { readonly _tag: "Envelope"; readonly envelope: string };
+
+/** What happened to deliveries: a message taken into a model (its 👀), or a session that failed every wake. */
+export type DeliveryChange =
+  | { readonly _tag: "Consumed"; readonly session: string; readonly message: string }
+  | { readonly _tag: "Braked"; readonly session: string; readonly failed: number };
+
 export class Mailbox extends Context.Service<
   Mailbox,
   {
@@ -93,14 +103,10 @@ export class Mailbox extends Context.Service<
     readonly insert: (input: InsertDelivery) => Effect.Effect<void, SqlError.SqlError | Schema.SchemaError>;
     /** A direct conversation's first request: its recent messages, already written, are handed with it. */
     readonly registerTalk: (session: string, launch: string, at: number, rows: readonly TalkRow[]) => Effect.Effect<void, NotRecorded>;
-    /** What a message's 👀 reaction is for, as the pump sees each input consumed. */
-    readonly consumed: Effect.Effect<Stream.Stream<{ readonly session: string; readonly message: string }>, never, Scope.Scope>;
-    /** A session that failed every wake: Channel writes the notice where it talks. */
-    readonly breakerNotices: Effect.Effect<Stream.Stream<{ readonly session: string; readonly failed: number }>, never, Scope.Scope>;
+    readonly changes: Effect.Effect<Stream.Stream<DeliveryChange>, never, Scope.Scope>;
     readonly kick: (session: string) => Effect.Effect<void>;
     readonly returnOne: (session: string, envelope: string) => Effect.Effect<void>;
-    readonly dropSession: (session: string, why: string) => Effect.Effect<void>;
-    readonly dropEnvelope: (envelope: string) => Effect.Effect<readonly string[]>;
+    readonly withdraw: (what: Withdrawal) => Effect.Effect<void>;
     readonly waitingOn: (envelope: string) => Effect.Effect<number>;
     readonly returnInput: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
     readonly deliverDirect: (session: string, text: string, replyChannel: string | undefined, byOwner: boolean) => Effect.Effect<void>;
@@ -160,14 +166,7 @@ export class Mailbox extends Context.Service<
       };
       const breaker = new WakeBreaker();
       const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
-      const consumedHub = yield* PubSub.unbounded<{
-        readonly session: string;
-        readonly message: string;
-      }>();
-      const breakerHub = yield* PubSub.unbounded<{
-        readonly session: string;
-        readonly failed: number;
-      }>();
+      const changesHub = yield* PubSub.unbounded<DeliveryChange>();
       const routeLock = yield* Semaphore.make(1);
       const routeLocked = <A, E>(effect: Effect.Effect<A, E>) => routeLock.withPermits(1)(effect);
       const pumpLock = yield* Semaphore.make(1);
@@ -242,6 +241,13 @@ export class Mailbox extends Context.Service<
         return result ?? { heldNotice: "" };
       });
 
+      const dropSession = (session: string, why: string) =>
+        Effect.gen(function* () {
+          yield* db.run(qd.dropOpen({ session_id: session, dropped_why: why }));
+          open.dropped(session);
+          reach.left(session);
+          breaker.reset(session);
+        });
       const api = Mailbox.of({
         ...journal,
         unreadSummary,
@@ -291,8 +297,7 @@ export class Mailbox extends Context.Service<
         }),
         insert: work.insert,
         registerTalk: work.registerTalk,
-        consumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
-        breakerNotices: Effect.map(PubSub.subscribe(breakerHub), Stream.fromSubscription),
+        changes: Effect.map(PubSub.subscribe(changesHub), Stream.fromSubscription),
         kick: Effect.fn("Mailbox.kick")(function* (session) {
           yield* Effect.sync(() => later(`kick:${session}`, 0, () => pump.kick(session)));
         }),
@@ -307,16 +312,16 @@ export class Mailbox extends Context.Service<
           yield* db.run(qd.rollbackOne({ session_id: session, envelope_id: envelope }));
           open.handedBackOne(session, envelope);
         }, writtenLocked),
-        dropSession: Effect.fn("Mailbox.dropSession")(function* (session, why) {
-          yield* db.run(qd.dropOpen({ session_id: session, dropped_why: why }));
-          open.dropped(session);
-          reach.left(session);
-          breaker.reset(session);
-        }, writtenLocked),
-        dropEnvelope: Effect.fn("Mailbox.dropEnvelope")(function* (envelope) {
-          const rows = yield* db.run(qd.dropOpenOf({ message_id: envelope }));
-          for (const row of rows) open.remove(row.session_id, envelope);
-          return rows.map((row) => row.session_id);
+        withdraw: Effect.fn("Mailbox.withdraw")(function* (what) {
+          switch (what._tag) {
+            case "Session":
+              return yield* dropSession(what.session, what.why);
+            case "Envelope": {
+              const rows = yield* db.run(qd.dropOpenOf({ message_id: what.envelope }));
+              for (const row of rows) open.remove(row.session_id, what.envelope);
+              return;
+            }
+          }
         }, writtenLocked),
         waitingOn: Effect.fn("Mailbox.waitingOn")(function* (envelope) {
           return (yield* db.run(qd.waitingOn({ message_id: envelope }))).length;
@@ -346,7 +351,7 @@ export class Mailbox extends Context.Service<
         });
       const pump = makePump<InboxMessage>(sessions, {
         pending: api.pending,
-        dropSession: api.dropSession,
+        dropSession: (session, why) => writtenLocked(dropSession(session, why)),
         returnOne: api.returnOne,
         hand: work.hand,
         consume: Effect.fn("Mailbox.consume")(function* (session, envelope, at) {
@@ -399,9 +404,9 @@ export class Mailbox extends Context.Service<
         publishOrchestrator,
         consumedMessages: (recipient, messages) =>
           Effect.sync(() => {
-            for (const message of messages) PubSub.publishUnsafe(consumedHub, { session: recipient, message });
+            for (const message of messages) PubSub.publishUnsafe(changesHub, { _tag: "Consumed", session: recipient, message });
           }),
-        breakerNotice: (recipient, failed) => Effect.sync(() => PubSub.publishUnsafe(breakerHub, { session: recipient, failed })),
+        breakerNotice: (recipient, failed) => Effect.sync(() => PubSub.publishUnsafe(changesHub, { _tag: "Braked", session: recipient, failed })),
         later,
         noticeBatchMs: config.chat.noticeBatchMs,
         retryWakeMs: config.chat.retryWakeMs,

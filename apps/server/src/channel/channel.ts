@@ -231,7 +231,7 @@ const make = Effect.gen(function* () {
       const row = yield* messageOf(id);
       if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
       yield* change(row, (revision, now) => db.run(qm.deleteMessage({ at: now, revision, id })));
-      yield* mailbox.dropEnvelope(id);
+      yield* mailbox.withdraw({ _tag: "Envelope", envelope: id });
     }, locked),
     previewRemove: Effect.fn("Channel.previewRemove")(function* (id) {
       const row = yield* messageOf(id);
@@ -500,21 +500,20 @@ const make = Effect.gen(function* () {
   yield* Effect.forkScoped(Stream.runForEach(news2, onSessionNews));
   const subscribe2 = yield* PubSub.subscribe(said);
   yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(subscribe2), onDirectMessage));
-  const consumed2 = yield* mailbox.consumed;
+  const changes = yield* mailbox.changes;
   yield* Effect.forkScoped(
-    Stream.runForEach(consumed2, ({ session, message }) =>
-      reacting(message, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${message}`)),
-    ),
-  );
-  const breakerNotices2 = yield* mailbox.breakerNotices;
-  yield* Effect.forkScoped(
-    Stream.runForEach(breakerNotices2, ({ session, failed }) =>
-      Effect.gen(function* () {
-        const where = (yield* shape.threadOfSession(session)) ?? model.defaultId();
-        const name = sessions.sessionOf(session)?.name ?? session;
-        yield* shape.notice(where, t("server.channel.breaker", { name, failed }), "wake_breaker");
-      }).pipe(bestEffort(`chat: wake breaker for ${session}`)),
-    ),
+    Stream.runForEach(changes, (change) => {
+      switch (change._tag) {
+        case "Consumed":
+          return reacting(change.message, change.session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${change.message}`));
+        case "Braked":
+          return Effect.gen(function* () {
+            const where = (yield* shape.threadOfSession(change.session)) ?? model.defaultId();
+            const name = sessions.sessionOf(change.session)?.name ?? change.session;
+            yield* shape.notice(where, t("server.channel.breaker", { name, failed: change.failed }), "wake_breaker");
+          }).pipe(bestEffort(`chat: wake breaker for ${change.session}`));
+      }
+    }),
   );
   return shape;
 });
