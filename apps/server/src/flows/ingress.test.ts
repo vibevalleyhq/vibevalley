@@ -61,9 +61,9 @@ it.live("regression: chat triggers keep their original payload through edits and
     const ingress = yield* Ingress;
     const mailbox = yield* Mailbox;
     const sql = yield* SqlClient.SqlClient;
-    const before = yield* chat.say("previous message", undefined, "before");
+    const before = yield* chat.post({ _tag: "Owner", text: "previous message", sendKey: "before" });
     const current = yield* ingress.owner({ source: "voice", text: "original voice input", envelope: "voice-source" });
-    yield* chat.say("next message", undefined, "after");
+    yield* chat.post({ _tag: "Owner", text: "next message", sendKey: "after" });
     yield* chat.edit(current.message.id, "edited voice input");
     yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
     yield* (yield* Mailbox).replay;

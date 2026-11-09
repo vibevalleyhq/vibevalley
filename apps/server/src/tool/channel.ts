@@ -37,7 +37,10 @@ export const channelTools = Effect.gen(function* () {
       "channel.message.send",
       Effect.fn("Tool.messageSend")(function* (p: SessionInput<"channel.message.send">) {
         const c = yield* callerOf(who);
-        const spoken = yield* chat.speak(participant(c), p.text, {
+        const spoken = yield* chat.post({
+          _tag: "Agent",
+          from: participant(c),
+          text: p.text,
           ...(p.id ? { target: p.id } : {}),
           ...(p.anyway === true ? { anyway: true } : {}),
           ...(p.confirm === true ? { confirm: true } : {}),

@@ -541,6 +541,7 @@ tester.run("service-method-names", rule("service-method-names"), {
     "GitError.of(code, stderr)",
     "const call = (x) => x;\nGame.of({ want: (s) => call(s) })",
     'const blocks = { submit: Effect.fn("Artifact.submit")(function* (b) { return b; }) };\nArtifact.of({ submit: blocks.submit })',
+    'const a = Effect.fn("Channel.post")(function* (p) { return p; });\nconst b = Effect.fn("Channel.post", { attributes: { post: "B" } })(function* (p) { return p; });\nfunction post(p) { switch (p._tag) { case "A": return a(p); case "B": return b(p); } }\nChannel.of({ post })',
   ],
   invalid: [
     { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
@@ -567,6 +568,10 @@ tester.run("service-method-names", rule("service-method-names"), {
     {
       code: "const blocks = { submit: (b) => Effect.succeed(b) };\nArtifact.of({ submit: blocks.submit })",
       errors: [{ messageId: "unnamed" }],
+    },
+    {
+      code: 'const a = Effect.fn("Channel.say")(function* (p) { return p; });\nconst b = Effect.fn("Channel.post")(function* (p) { return p; });\nfunction post(p) { if (p.a) return a(p); return b(p); }\nChannel.of({ post })',
+      errors: [{ messageId: "unnamed", data: { service: "Channel", method: "post" } }],
     },
   ],
 });

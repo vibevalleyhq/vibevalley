@@ -41,7 +41,7 @@ export function merging(d: MergeDeps) {
     let [owner, line] = [n.owner, n.notice];
     if (n.fix) {
       const untold = yield* chat
-        .tellSession(ownerId, id, n.fix, "")
+        .post({ _tag: "Tell", from: ownerId, session: id, text: n.fix, sendKey: "" })
         .pipe(Effect.match({ onSuccess: () => "", onFailure: (e) => t("server.issue.merge.tellFailed", { why: reasonOf(e) }) }));
       [owner, line] = [owner + untold, line + untold];
     }
@@ -73,7 +73,13 @@ export function merging(d: MergeDeps) {
       .submitPullRequest(place, issue, pullRequestConclusion(said))
       .pipe(Effect.mapError((e) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(e.message))));
     const thread = yield* chat.issueThread(issue.id, issue.title).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
-    yield* chat.notice(thread, t("server.issue.prDelivered", { url: pr.url }), "issue_pr_delivery", `issue-pr:${issue.id}:${pr.url}`);
+    yield* chat.post({
+      _tag: "Notice",
+      channel: thread,
+      text: t("server.issue.prDelivered", { url: pr.url }),
+      code: "issue_pr_delivery",
+      sendKey: `issue-pr:${issue.id}:${pr.url}`,
+    });
     yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
     return { pullRequest: pr, text: t("shared.join.labeled", { label: "PR", text: pr.url }), commits: 0 };
   });

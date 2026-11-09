@@ -182,7 +182,12 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     expect(design.phase, design.problem).toBe("ready");
     if (design.kind !== "voiceDesign" || !design.previewInput || !design.attachment) return yield* Effect.die("Missing saved voice preview");
     const channel = yield* Channel;
-    const published = yield* channel.say("Published preview", undefined, "release-preview-published", { attachments: [design.attachment.id] });
+    const published = yield* channel.post({
+      _tag: "Owner",
+      text: "Published preview",
+      sendKey: "release-preview-published",
+      attachments: [design.attachment.id],
+    });
     const clone: T.MediaCloneRequest = { id: "clone", input: design.previewInput, connection: "moss", revision: 1, consent: true };
     yield* media.createClone(clone);
     const voice = yield* terminal(media, clone.id);
@@ -194,7 +199,7 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     if (!file) return yield* Effect.die("Release deleted an independently owned channel attachment");
     const file2 = yield* (yield* FileSystem.FileSystem).readFile(file.path);
     expect(Buffer.from(file2)).toEqual(wav());
-    const said = yield* channel.say("Published preview", undefined, "release-preview-published", { attachments: [design.attachment.id] });
+    const said = yield* channel.post({ _tag: "Owner", text: "Published preview", sendKey: "release-preview-published", attachments: [design.attachment.id] });
     expect(said).toMatchObject({
       again: true,
       message: published.message,

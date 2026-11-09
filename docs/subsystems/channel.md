@@ -42,6 +42,7 @@
 - **主动阅读与被动消费分开记账**：
   - 调读取接口推进 `channel_read_cursor.read_number`。
   - 模型实际消费投递推进 `mailbox_delivery.consumed_at` 并加 👀 反应，未读查询同时排除两者已覆盖的消息。
+- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话的人分的联合，`Owner`（主人）、`Tell`（对一个帮工说）、`Agent`（帮工、管家经说话工具）、`Announce`（带上做出来的稿子或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种都开同一个 `Channel.post` span，种类记在 span 的 `post` 属性上，最后都落进 `writing.ts` 的 `write`。
 - **发送幂等键 `sendKey`**：主人发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞
@@ -86,7 +87,7 @@
 ## 和谁打交道
 
 - **信箱**：Channel 算出候选受众并落库后，交 [Mailbox](docs/subsystems/mailbox.md) 执行刹车、蓄水与唤醒。
-- **帮工与管家（`session`、`orchestrator`）**：订阅 `Session` 事件维护串；管家经 `Channel.runSays` 写回复（在服务端里跑的 agent 一轮说的话，一整条）。
+- **帮工与管家（`session`、`orchestrator`）**：订阅 `Session` 事件维护串；管家经 `Channel.post` 的 `Run` 写回复（在服务端里跑的 agent 一轮说的话，一整条）。
 - **工单与通知（`issue`、`inbox`）**：向工单广播 `ownerInThread`；向 Inbox 提供 `ownerMentions` 并消费 `Inbox.toOwner`。
 
 ## 为什么这样

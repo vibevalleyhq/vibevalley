@@ -55,7 +55,7 @@
 
 ## 和谁打交道
 
-- **信箱与频道（`mailbox`、`channel`）**：从 `Mailbox` 收投递与摘要，经 `Channel.runSays` 写回回复。
+- **信箱与频道（`mailbox`、`channel`）**：从 `Mailbox` 收投递与摘要，经 `Channel.post` 的 `Run` 写回回复。
 - **工单与定时任务（`issue`、`cron`）**：通过 `tool` 调用服务方法；指派给管家的工单跑完后进 `in_review` 等主人点头。
 - **帮工与大脑（`session`、`packages/agent`）**：经 `Session.host` 运行 `Brain`，经 `MemoryPort` 读写 `memory` 表。
 - **语音（`voice`）**：经 `response.ts` 的 `Caller` 端口向电话流式推送回答文本。

@@ -158,9 +158,13 @@ const echoing = Layer.effectDiscard(
     yield* Effect.forkScoped(
       Stream.runForEach(news2, (news) =>
         news._tag === "Handed"
-          ? Effect.forEach(news.messages, (message) => chat.runSays(news.channel, "收到：**" + message.text + "**", "", defaultOrchestrator), {
-              discard: true,
-            })
+          ? Effect.forEach(
+              news.messages,
+              (message) => chat.post({ _tag: "Run", from: defaultOrchestrator, channel: news.channel, text: "收到：**" + message.text + "**", run: "" }),
+              {
+                discard: true,
+              },
+            )
           : Effect.void,
       ),
     );
@@ -275,7 +279,7 @@ describe("the chat apps", () => {
       const chat = yield* Channel;
       yield* weixinConnected(script);
       const channel = chat.defaultChannel();
-      yield* chat.runSays(channel, "已经接下来了", "", defaultOrchestrator);
+      yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: channel, text: "已经接下来了", run: "" });
       const statusOf2 = yield* statusOf("weixin");
       yield* waitFor(Effect.promise(statusOf2), (status) => status.pending === 1, "the handoff waiting outside");
       const [message] = yield* chat.history(channel);
@@ -327,7 +331,7 @@ describe("the chat apps", () => {
       expect(setChannelFailure).toMatchObject({
         reason: expect.stringContaining("没有叫"),
       });
-      yield* chat.runSays(chat.defaultChannel(), "默认频道里的话", "", defaultOrchestrator);
+      yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: chat.defaultChannel(), text: "默认频道里的话", run: "" });
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       const nth2 = yield* nth(script, "weixin", 0, "the answer in WeChat");
       expect(nth2).toEqual({
@@ -610,16 +614,13 @@ describe("the chat apps", () => {
       yield* Effect.gen(function* () {
         const chat = yield* Channel;
         yield* weixinConnected(first);
-        const parent = (yield* chat.say("这个话题", undefined, "")).message;
-        const written = yield* chat.speak(defaultOrchestrator, "旧的答复", {
-          target: `#general:${parent.number}`,
-          anyway: true,
-        });
+        const parent = (yield* chat.post({ _tag: "Owner", text: "这个话题", sendKey: "" })).message;
+        const written = yield* chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#general:${parent.number}`, anyway: true });
         thread = written.message!.channel;
         yield* nth(first, "weixin", 0, "the original answer sent");
         const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
         yield* status((s) => s.pending === 0, "the external identity saved");
-        for (let i = 0; i < 301; i++) yield* chat.notice(chat.defaultChannel(), `动静 ${i}`, "history");
+        for (let i = 0; i < 301; i++) yield* chat.post({ _tag: "Notice", channel: chat.defaultChannel(), text: `动静 ${i}`, code: "history" });
         yield* reply(first, "继续这个话题", 1);
       }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
       const second = new Script();
@@ -638,22 +639,18 @@ describe("the chat apps", () => {
         yield* weixinConnected(first);
         const linked = yield* chat.openChannel("linked", "", "");
         yield* c.setChannel("weixin", "linked");
-        const parent = (yield* chat.say("旧话题", linked.id, "")).message;
-        thread = (yield* chat.speak(defaultOrchestrator, "旧的答复", {
-          target: `#linked:${parent.number}`,
-          anyway: true,
-        })).message!.channel;
+        const parent = (yield* chat.post({ _tag: "Owner", text: "旧话题", channel: linked.id, sendKey: "" })).message;
+        thread = (yield* chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#linked:${parent.number}`, anyway: true })).message!
+          .channel;
         yield* nth(first, "weixin", 0, "the old answer sent");
         const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
         yield* status((s) => s.pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
-          const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-          const fresh = (yield* chat.speak(defaultOrchestrator, "其他答复", {
-            target: `#general:${other.number}`,
-            anyway: true,
-          })).message!.channel;
-          yield* chat.notice(fresh, "第一条动静", "history");
-          yield* chat.notice(fresh, "第二条动静", "history");
+          const other = (yield* chat.post({ _tag: "Owner", text: `其他话题 ${i}`, sendKey: "" })).message;
+          const fresh = (yield* chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "其他答复", target: `#general:${other.number}`, anyway: true }))
+            .message!.channel;
+          yield* chat.post({ _tag: "Notice", channel: fresh, text: "第一条动静", code: "history" });
+          yield* chat.post({ _tag: "Notice", channel: fresh, text: "第二条动静", code: "history" });
         }
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
       }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
@@ -662,7 +659,7 @@ describe("the chat apps", () => {
         const chat = yield* Channel;
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
-        yield* chat.runSays(thread, "在旧串里继续答复", "", defaultOrchestrator);
+        yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: thread, text: "在旧串里继续答复", run: "" });
         expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
         expect(second.by("weixin")).toHaveLength(1);
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);
@@ -736,7 +733,7 @@ describe("the chat apps", () => {
       yield* Effect.orDie(
         sql.unsafe(`create trigger fail_outbox before update on connector_outbox for each row begin select raise(abort, 'disk failure'); end`),
       );
-      const { message } = yield* chat.say("pending", undefined, "");
+      const { message } = yield* chat.post({ _tag: "Owner", text: "pending", sendKey: "" });
       yield* Effect.orDie(
         sql.unsafe(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', ?, 'pending', 1)`, [message.id]),
       );

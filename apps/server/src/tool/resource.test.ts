@@ -36,7 +36,7 @@ describe("resource_read", () => {
       const read = tools.orchestrator(caller).find((item) => item.name === "resource_read");
       if (read === undefined) throw new Error("resource_read is missing");
       const original = "甲".repeat(500);
-      const message = (yield* channels.say(original, undefined, "")).message;
+      const message = (yield* channels.post({ _tag: "Owner", text: original, sendKey: "" })).message;
       const uri = `vv://envelope/${message.id}`;
       const firstText = yield* textResult(read, { uri, offset: 0, limit: 120 });
       let page = yield* decodePage(firstText);
@@ -64,7 +64,7 @@ describe("resource_read", () => {
       const issues = testIssues(issue2);
       const tools = yield* Tool;
       const secret = yield* channels.openChannel("secret", "", "");
-      const message = (yield* channels.say("owner only", secret.id, "")).message;
+      const message = (yield* channels.post({ _tag: "Owner", text: "owner only", channel: secret.id, sendKey: "" })).message;
       const agent = sampleAgent({ id: "lab" });
       yield* agents.save(agent);
       const issue = yield* issues.add({ title: "work", repo: "demo", agent: agent.id });

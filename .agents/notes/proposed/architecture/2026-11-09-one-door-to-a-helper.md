@@ -110,7 +110,7 @@ flowchart LR
 
 数的时候发现、写在这里免得再数错的：Mailbox 对外的成员实际是 34 个（服务和泵各有一组），Problem 的表少算了 7 个。
 
-工单还直接用帮工的 `noRoom`（只问有没有位置，排队用）是读，不归投递，留在帮工。管家的会话不经 `hire` 开，由帮工在档案存下时自己登记（[一件事一条路](.agents/notes/proposed/architecture/2026-11-09-converge-paths.md)）。
+工单还直接用帮工的 `noRoom`（只问有没有位置，排队用）是读，不归投递，留在帮工。管家的会话不经 `hire` 开，由帮工在档案存下时自己登记（[一件事一条路](docs/subsystems/foundation.md#模块和服务)）。
 
 ## Alternatives considered
 

@@ -147,7 +147,7 @@ describe("mcp", () => {
         "resource_read",
         "session_list",
       ]);
-      const extra = (yield* chat.say("顺手做另一件事", thread, "extra")).message;
+      const extra = (yield* chat.post({ _tag: "Owner", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
       const mailbox = yield* Mailbox;
       yield* waitFor(
         Effect.succeed(mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id),
@@ -311,7 +311,7 @@ describe("mcp", () => {
         },
       );
       const direct = yield* chat.direct("lab");
-      yield* chat.say("在这里做一份", direct, "");
+      yield* chat.post({ _tag: "Owner", text: "在这里做一份", channel: direct, sendKey: "" });
       yield* until(() => tokens.length > 0, "the channel context's token");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);

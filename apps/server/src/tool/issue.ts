@@ -244,7 +244,10 @@ export const issueTools = Effect.gen(function* () {
           return yield* withIssue(p.id, (item) => {
             const w = workerOf(item);
             if (!w) return Effect.succeed(nobodyOn(item));
-            return Effect.as(chat.tellSession(participant(c), w.id, p.text, ""), answers.tell.told(item.number, w.name));
+            return Effect.as(
+              chat.post({ _tag: "Tell", from: participant(c), session: w.id, text: p.text, sendKey: "" }),
+              answers.tell.told(item.number, w.name),
+            );
           });
         },
         Effect.catch((e) => Effect.succeed(answers.tell.failed(said(e)))),

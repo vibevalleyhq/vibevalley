@@ -6,7 +6,7 @@ import { parseSync } from "vite";
 
 /** Which server module uses which member of another module's service, read from syntax: `const x = yield* Service`
  * binds x in that file, `x.member` is a use. Kept in scripts/service-paths.json; a new edge is a new path to that
- * member, and it has to be written down on purpose (.agents/notes/proposed/architecture/2026-11-09-converge-paths.md).
+ * member, and it has to be written down on purpose (docs/subsystems/foundation.md).
  *
  * Not seen: a service destructured from its yield, or handed on as a port or a parameter. Those are missed, never
  * reported wrongly. */
@@ -91,7 +91,7 @@ export function pathProblems(kept: Edges, now: Edges): string[] {
         problems.push(
           `${m} now uses ${key}, a path the table does not have. Fix: reach it through the door this module already uses ` +
             `(the modules that use ${key} today: ${[...was].join(", ") || "none"}); if this module really is a new caller, \`vp run paths:write\` ` +
-            `and say why in the PR. See .agents/notes/proposed/architecture/2026-11-09-converge-paths.md`,
+            `and say why in the PR. See docs/subsystems/foundation.md`,
         );
     for (const m of was)
       if (!is.has(m)) problems.push(`${m} no longer uses ${key}. Fix: \`vp run paths:write\` takes the path off the table, so it cannot come back unnoticed.`);

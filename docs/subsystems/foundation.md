@@ -51,12 +51,13 @@
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
-- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `orchestrator`（带 `forOwner`），`/mcp` 为对应 `session`，定时与巡查为 `system`。落库枚举统一用 `actor_kind`。
+- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `agent` 带 `role: "orchestrator"` 与 `forOwner`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
+- **模块之间的路径记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员，存在 `scripts/service-paths.json`；`vp run paths:check` 在提交前的钩子里跑，多一条路就失败：要么走已有的门，要么 `vp run paths:write` 写下来并在 PR 里说明；少了的路由 `paths:write` 去掉，不能悄悄回来。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### Effect 与错误处理
 
-- **服务方法具名追踪**：写成 `Effect.fn("<服务>.<方法>")`（`vibevalley/service-method-names` 检查）；高频热点用 `Effect.fnUntraced`。
+- **服务方法具名追踪**：写成 `Effect.fn("<服务>.<方法>")`（`vibevalley/service-method-names` 检查）；高频热点用 `Effect.fnUntraced`。一个联合进、按种类分给处理函数的门（`Channel.post`），每个分支返回的处理函数都以这个方法的名字开 span，种类记在 span 的属性上。
 - **Promise 止步于外部库边界**：外部异步调用必须用 `Effect.tryPromise({ try, catch })` 包装并绑定 `AbortSignal`（`vibevalley/promise-boundary` 检查）。出站请求统一走 Effect `HttpClient`。
 - **时间与定时归属作用域**：
   - 禁止在 `apps/server/src` 直接调 `Date.now()` 或 `setTimeout`（`vibevalley/no-wall-clock` 检查）。

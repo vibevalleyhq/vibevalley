@@ -82,7 +82,11 @@ const make = Effect.gen(function* () {
   return Ingress.of({
     owner: Effect.fn("Ingress.owner")(function* (input) {
       yield* core.open();
-      return yield* chat.say(input.text, input.channel, input.envelope, {
+      return yield* chat.post({
+        _tag: "Owner",
+        text: input.text,
+        channel: input.channel,
+        sendKey: input.envelope,
         source: input.source,
         ...(input.picked ? { picked: input.picked } : {}),
         ...(input.responsePort ? { responsePort: input.responsePort } : {}),
@@ -94,7 +98,11 @@ const make = Effect.gen(function* () {
       const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
       const blocks = yield* quote(more?.blockRefs);
       yield* core.open();
-      yield* chat.say(text, channel, sendKey, {
+      yield* chat.post({
+        _tag: "Owner",
+        text: text,
+        channel: channel,
+        sendKey: sendKey,
         ...more,
         ...(blocks.length > 0 ? { blocks } : {}),
         ...(picked.agent || picked.repo ? { picked } : {}),

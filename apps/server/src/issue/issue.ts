@@ -162,7 +162,7 @@ const make = Effect.gen(function* () {
     const latest = latestSessionIdOf(issue);
     const session = latest === undefined ? undefined : sessions.sessionOf(latest);
     const thread = yield* chat.issueThread(issue.id, issue.title, session?.channel);
-    yield* chat.say(text, thread, sendKey);
+    yield* chat.post({ _tag: "Owner", text: text, channel: thread, sendKey: sendKey });
   });
 
   /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
@@ -359,11 +359,12 @@ const make = Effect.gen(function* () {
           if (taker) yield* shape.edit(id, { agent: taker.id }, by);
           yield* start(id, channel);
           const issueThread2 = yield* chat.issueThread(id, item.title, channel || undefined);
-          yield* chat.notice(
-            issueThread2,
-            t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
-            "issue_confirmed",
-          );
+          yield* chat.post({
+            _tag: "Notice",
+            channel: issueThread2,
+            text: t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
+            code: "issue_confirmed",
+          });
           break;
         case "unqueue":
           yield* setQueued(id, false, chat.defaultChannel());

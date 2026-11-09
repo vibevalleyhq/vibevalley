@@ -67,11 +67,11 @@ describe("the subscriptions", () => {
     Effect.gen(function* () {
       const { address, chat } = yield* farm;
       const general = chat.defaultChannel();
-      for (const text of ["早", "在吗"]) yield* chat.say(text, undefined, "");
+      for (const text of ["早", "在吗"]) yield* chat.post({ _tag: "Owner", text: text, sendKey: "" });
       const rpc = yield* client(address);
       const first = (yield* chat.history(general)).find((m) => m.text === "早")!;
       const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(rpc["channel.follow"]({ id: general, after: first.revision }), 2)));
-      yield* chat.say("看看进度", undefined, "");
+      yield* chat.post({ _tag: "Owner", text: "看看进度", sendKey: "" });
       const got = yield* Fiber.join(following);
       expect(got.map((e) => (e._tag === "Message" ? e.message.text : e._tag))).toEqual(["在吗", "看看进度"]);
       const drainOutcomeFailure = yield* Effect.flip(Stream.runDrain(rpc["channel.follow"]({ id: "no-such-channel", after: 0 })));

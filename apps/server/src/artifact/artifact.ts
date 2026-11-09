@@ -172,7 +172,13 @@ const make = () =>
       const version = body === "html" ? 1 : 0;
       const card: T.ArtifactCard = { id, title, body, version, note: note ?? "" };
       // Said first: the name it goes by is the one the channel knows its maker by.
-      const said = yield* chat.announce(maker.from, channel, words(t("server.artifact.made", { title }), note), { card });
+      const said = yield* chat.post({
+        _tag: "Announce",
+        from: maker.from,
+        channel: channel,
+        text: words(t("server.artifact.made", { title }), note),
+        made: { card },
+      });
       const now = yield* Clock.currentTimeMillis;
       yield* db.run(
         qa.addArtifact({ id, title, body, channel_id: said.channel, issue: req.issue ?? null, by_id: maker.by, by_name: said.name, version, created_at: now }),
@@ -208,8 +214,14 @@ const make = () =>
       const note = req.note?.trim() || undefined;
       const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "" };
       // Announced where the first one was: its comments stay in one place.
-      const said = yield* chat.announce(maker.from, row.channel_id ?? "", words(t("server.artifact.versioned", { title: row.title, version: next }), note), {
-        card,
+      const said = yield* chat.post({
+        _tag: "Announce",
+        from: maker.from,
+        channel: row.channel_id ?? "",
+        text: words(t("server.artifact.versioned", { title: row.title, version: next }), note),
+        made: {
+          card,
+        },
       });
       const now = yield* Clock.currentTimeMillis;
       yield* db.run(

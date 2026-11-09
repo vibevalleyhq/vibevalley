@@ -14,14 +14,19 @@ import { NotRecorded } from "#/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 
-import { type MsgRow, type ChannelService } from "./contracts.ts";
+import type { MsgRow } from "./contracts.ts";
 import type { ChannelHub } from "./hub.ts";
 import type { SessionThreads } from "./threads.ts";
 import type { ChannelWriting } from "./writing.ts";
 
 const talkContext = 12;
 
-export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThreads, "sessionsLeft">, notice: ChannelService["notice"]) =>
+export const directTalk = (
+  r: ChannelHub,
+  w: ChannelWriting,
+  th: Pick<SessionThreads, "sessionsLeft">,
+  notice: (channel: string, text: string, code: string) => Effect.Effect<void>,
+) =>
   Effect.gen(function* () {
     const agents = yield* Agent;
     const db = yield* Db;

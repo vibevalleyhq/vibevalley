@@ -163,7 +163,14 @@ const make = Effect.gen(function* () {
     const attachment = yield* Schema.decodeEffect(Schema.fromJsonString(S.Attachment))(row.attachment);
     const request = yield* decodeRequest(row.request);
     const words = t("server.media.imageMade", { prompt: head(request.prompt, 80) });
-    yield* channel.announce(source.agent, source.channel, words, { attachments: [attachment.id] }, `media:${id}`);
+    yield* channel.post({
+      _tag: "Announce",
+      from: source.agent,
+      channel: source.channel,
+      text: words,
+      made: { attachments: [attachment.id] },
+      sendKey: `media:${id}`,
+    });
   });
 
   const download = Effect.fnUntraced(function* (id: string) {

@@ -167,6 +167,36 @@ export interface Write {
   readonly readBy?: string;
 }
 
+/** Words written into a place, by who writes them; each kind keeps its own checks and its own answer. */
+export type Post =
+  /** The owner's words; again: sendKey was sent before, and the message is that one. channel undefined: the default one. */
+  | ({ readonly _tag: "Owner"; readonly text: string; readonly channel?: string | undefined; readonly sendKey: string } & SayMore)
+  /** Words to a session in its thread; with no thread the session hears them straight. */
+  | { readonly _tag: "Tell"; readonly from: string; readonly session: string; readonly text: string; readonly sendKey: string }
+  /** A session's or the orchestrator's words, through channel_message_send: a retry is that message, unseen words are shown first. */
+  | ({ readonly _tag: "Agent"; readonly from: string; readonly text: string } & SpeakOptions)
+  /** Words that announce what was made, with it: an artifact's card (artifact/) or a made file's attachments (media/), said as from
+   * (the owner, a session or an orchestrator) in a channel placeOf names. A sendKey said before is that message again. */
+  | { readonly _tag: "Announce"; readonly from: string; readonly channel: string; readonly text: string; readonly made: Made; readonly sendKey?: string }
+  /** Words said on a call, kept in the default channel as they were said; they wake no one. */
+  | { readonly _tag: "Call"; readonly from: string; readonly text: string; readonly sendKey: string }
+  /** The words a run of an agent hosted here said (from: its profile id), one whole message each: it shows once said in full. */
+  | { readonly _tag: "Run"; readonly from: string; readonly channel: string; readonly text: string; readonly run: string }
+  /** The farm's own notice; code names the kind, for dropping repeats. */
+  | { readonly _tag: "Notice"; readonly channel: string; readonly text: string; readonly code: string; readonly sendKey?: string };
+
+export type PostOf<Tag extends Post["_tag"]> = Extract<Post, { readonly _tag: Tag }>;
+
+/** Each kind of post with its answer; Run and Notice are best effort and never fail. */
+export interface PostDoor {
+  (p: PostOf<"Owner">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+  (p: PostOf<"Tell">): Effect.Effect<T.ChatMessage | undefined, ApiError>;
+  (p: PostOf<"Agent">): Effect.Effect<Spoken, ApiError>;
+  (p: PostOf<"Announce">): Effect.Effect<T.ChatMessage, ApiError>;
+  (p: PostOf<"Call">): Effect.Effect<boolean, ApiError>;
+  (p: PostOf<"Run"> | PostOf<"Notice">): Effect.Effect<void>;
+}
+
 export interface Written {
   absent: string[];
   heldNotice: string;
@@ -182,13 +212,8 @@ export interface ChannelService {
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
-  /** The owner's words; again: sendKey was sent before, and the message is that one. */
-  readonly say: (
-    text: string,
-    channel: string | undefined,
-    sendKey: string,
-    more?: SayMore,
-  ) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+  /** Words written into a place: one door, and what is checked and answered depends on who writes them (Post). */
+  readonly post: PostDoor;
   /** The owner's own chat words, changed. Changes tell and wake nobody. */
   readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Effect.Effect<T.ChatMessage, ApiError>;
   /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
@@ -207,22 +232,9 @@ export interface ChannelService {
   readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
   readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
   readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
-  /** Words to a session in its thread; with no thread the session hears them straight. */
-  readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<T.ChatMessage | undefined, ApiError>;
-  /** A session's or the orchestrator's words, through channel_message_send. */
-  readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
   /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
    * session's own thread, else the default channel. */
   readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** Words that announce what was made, with it: an artifact's card (artifact/) or a made file's attachments (media/), said as from
-   * (the owner, a session or an orchestrator) in a channel placeOf names. A sendKey said before is that message again. */
-  readonly announce: (from: string, channel: string, text: string, made: Made, sendKey?: string) => Effect.Effect<T.ChatMessage, ApiError>;
-  /** Words said on a call, kept in the default channel as they were said; they wake no one. */
-  readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** The words a run of an agent hosted here said (from: its profile id), one whole message each: it shows once said in full. */
-  readonly runSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
-  /** code names the kind, for dropping repeats. */
-  readonly notice: (channel: string, text: string, code: string, sendKey?: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
   /** The places who has not read all of, the newest first, by their addresses. */
   readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;

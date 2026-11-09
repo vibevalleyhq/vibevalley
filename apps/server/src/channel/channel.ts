@@ -18,7 +18,7 @@ import { Session } from "#/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
-import { type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, envelopeMore, type ChannelService } from "./contracts.ts";
+import { type Post, type PostOf, type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, envelopeMore, type ChannelService } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
 import { channelHub, lastMax, lineOf } from "./hub.ts";
 import { mentionOf, parseChatTarget } from "./mentions.ts";
@@ -39,7 +39,7 @@ const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
 const afterAll = "\uffff";
 
-export type { Info, Spoken, SayMore, Delivered } from "./contracts.ts";
+export type { Info, Post, PostOf, Spoken, SayMore, Delivered } from "./contracts.ts";
 
 export class Channel extends Context.Service<Channel, ChannelService>()("@vibevalley/server/channel/channel") {
   static readonly layer = Layer.effect(
@@ -55,7 +55,7 @@ const make = Effect.gen(function* () {
   const dir = yield* channelDirectory(r);
   const w = yield* channelWriting(r);
   const th = yield* sessionThreads(r, w);
-  const talk = yield* directTalk(r, w, th, (channel, text, code) => shape.notice(channel, text, code));
+  const talk = yield* directTalk(r, w, th, (channel, text, code) => post({ _tag: "Notice", channel, text, code }));
   const {
     model,
     tx,
@@ -184,7 +184,192 @@ const make = Effect.gen(function* () {
     const target = targetOfChannel(row);
     return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => envelopeOf(m, target));
   });
+  const postOwner = Effect.fn("Channel.post", { attributes: { post: "Owner" } })(
+    (p: PostOf<"Owner">) => ownerSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode),
+    locked,
+  );
+
+  const postTell = Effect.fn("Channel.post", { attributes: { post: "Tell" } })(function* ({ from, session, text, sendKey }: PostOf<"Tell">) {
+    const thread = yield* threadOfSession(session);
+    if (!thread) {
+      // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
+      if (!sessions.isReachable(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
+      const channel = sessionOf(session)?.channel;
+      const at = yield* Clock.currentTimeMillis;
+      const speaker = sessionOf(from);
+      const trigger = yield* mailbox.recordTrigger({
+        source: "channel",
+        key: sendKey || newId(at),
+        actor:
+          from === ownerId
+            ? { kind: "owner", id: ownerId }
+            : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
+        text: text.trim(),
+        threads: [],
+        addressed: "direct",
+        ...(channel ? { replyChannel: channel } : {}),
+        at,
+      });
+      yield* mailbox.receive({ _tag: "Trigger", trigger, to: { session } });
+      return undefined;
+    }
+    const run = sessions.runOf(from);
+    const written = yield* write({
+      channel: thread,
+      from,
+      kind: "chat",
+      text: text.trim(),
+      meta: run ? { run } : {},
+      sendKey,
+      ...(from === ownerId ? { readBy: ownerId } : {}),
+    });
+    return toMessage(written.row);
+  }, locked);
+
+  const postAgent = Effect.fn("Channel.post", { attributes: { post: "Agent" } })(function* ({
+    from,
+    text,
+    ...opt
+  }: PostOf<"Agent">): Effect.fn.Return<Spoken, ApiError> {
+    const words = text.trim();
+    if (!words) return yield* Effect.fail(refused(t("server.channel.empty")));
+    const channel = yield* resolveTarget(from, opt.target ?? "");
+    const row = model.channel(channel);
+    if (!row) return yield* Effect.fail(refused(t("server.channel.channelGone")));
+    const target = targetOfChannel(row);
+    // A retry of the same words is the same message.
+    const again = yield* db.one(
+      qm.recentDuplicate({ sender_id: from, channel_id: channel, body: words, since: (yield* Clock.currentTimeMillis) - retryWindowMs }),
+    );
+    if (again) {
+      const m = yield* db.one(qm.messageByID({ id: again.id }));
+      if (m) return { kind: "sent", message: toMessage(m), target, absent: [] };
+    }
+    // Posting on a channel right after reading a thread: confirm once.
+    const last = model.lastRead.get(from) ?? "";
+    if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
+    // Newer messages it has not seen: show them instead of sending.
+    const unseen = (yield* db.run(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
+    if (unseen.length > 0 && opt.anyway !== true) {
+      const now = yield* Clock.currentTimeMillis;
+      const shown: Envelope[] = [];
+      for (const id of unseen.slice(0, heldShown)) {
+        const m = yield* db.one(qm.messageByID({ id }));
+        if (!m) continue;
+        shown.push(envelopeOf(m, target));
+      }
+      const newest = shown.at(-1);
+      if (newest) yield* setRead(from, channel, newest.number, now);
+      return { kind: "held", target, shown, more: unseen.length - shown.length };
+    }
+    // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
+    const caller = !agents.isOrchestrator(from) ? (yield* db.one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
+    const answers = caller === undefined ? undefined : sessionId(caller);
+    const run = sessions.runOf(from);
+    if (agents.isOrchestrator(from)) yield* seat(from);
+    yield* answered(channel, opt.reply);
+    const written = yield* write({
+      channel,
+      from,
+      kind: "chat",
+      text: words,
+      ...(answers ? { answers } : {}),
+      ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
+      meta: run ? { run } : {},
+    });
+    const now2 = yield* Clock.currentTimeMillis;
+    yield* setRead(from, channel, written.row.number, now2);
+    return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
+  }, locked);
+
+  const postAnnounce = Effect.fn("Channel.post", { attributes: { post: "Announce" } })(function* ({
+    from,
+    channel,
+    text,
+    made,
+    sendKey = "",
+  }: PostOf<"Announce">) {
+    const where = model.channel(channel) ? channel : yield* resolveTarget(from, channel);
+    if (!model.channel(where)) return yield* Effect.fail(refused(t("server.channel.channelGone")));
+    const run = sessions.runOf(from);
+    if (agents.isOrchestrator(from)) yield* seat(from);
+    const shown = "card" in made ? { artifact: made.card } : { attachments: yield* attachmentsOf(made.attachments) };
+    const written = yield* write({
+      channel: where,
+      from,
+      kind: "chat",
+      text: text.trim(),
+      meta: { ...(run ? { run } : {}), ...shown },
+      sendKey,
+      ...(from === ownerId ? { readBy: ownerId } : {}),
+    });
+    if (from !== ownerId) {
+      const now = yield* Clock.currentTimeMillis;
+      yield* setRead(from, where, written.row.number, now);
+    }
+    return toMessage(written.row);
+  }, locked);
+
+  const postCall = Effect.fn("Channel.post", { attributes: { post: "Call" } })(
+    function* ({ from, text, sendKey }: PostOf<"Call">) {
+      if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
+      if (!text.trim()) return false;
+      const written = yield* write({
+        channel: model.defaultId(),
+        from,
+        kind: "chat",
+        text: text.trim(),
+        meta: { spoken: true },
+        sendKey,
+        ...(from === ownerId ? { readBy: ownerId } : {}),
+      });
+      return written.again;
+    },
+    Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false)),
+    locked,
+  );
+
+  const postRun = Effect.fn("Channel.post", { attributes: { post: "Run" } })(function* ({ channel, text, run, from }: PostOf<"Run">) {
+    if (!text.trim()) return;
+    yield* locked(Effect.andThen(seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })));
+  }, bestEffort("chat: a run's words"));
+
+  const postNotice = Effect.fn("Channel.post", { attributes: { post: "Notice" } })(
+    function* ({ channel, text, code, sendKey = "" }: PostOf<"Notice">) {
+      return yield* write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });
+    },
+    locked,
+    bestEffort("chat: notice"),
+  );
+
+  // One door; each kind keeps its own checks and answer, and the overloads tie the answer to the kind.
+  function post(p: PostOf<"Owner">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+  function post(p: PostOf<"Tell">): Effect.Effect<T.ChatMessage | undefined, ApiError>;
+  function post(p: PostOf<"Agent">): Effect.Effect<Spoken, ApiError>;
+  function post(p: PostOf<"Announce">): Effect.Effect<T.ChatMessage, ApiError>;
+  function post(p: PostOf<"Call">): Effect.Effect<boolean, ApiError>;
+  function post(p: PostOf<"Run"> | PostOf<"Notice">): Effect.Effect<void>;
+  function post(p: Post): Effect.Effect<{ message: T.ChatMessage; again: boolean } | T.ChatMessage | Spoken | boolean | undefined | void, ApiError> {
+    switch (p._tag) {
+      case "Owner":
+        return postOwner(p);
+      case "Tell":
+        return postTell(p);
+      case "Agent":
+        return postAgent(p);
+      case "Announce":
+        return postAnnounce(p);
+      case "Call":
+        return postCall(p);
+      case "Run":
+        return postRun(p);
+      case "Notice":
+        return postNotice(p);
+    }
+  }
+
   const shape = Channel.of({
+    post,
     ownerReads: Effect.map(PubSub.subscribe(ownerReadHub), Stream.fromSubscription),
     now: () => core.state().chat,
     ...channelStreams(db, model, said),
@@ -209,10 +394,6 @@ const make = Effect.gen(function* () {
         around: [...before, ...after].map(toMessage),
       };
     }),
-    say: Effect.fn("Channel.say")(
-      (text, channel, sendKey, more = {}) => ownerSays(text, channel, sendKey, more, more.source, more.responsePort, more.voiceMode),
-      locked,
-    ),
     edit: Effect.fn("Channel.edit")(function* (id, text, keep) {
       const row = yield* messageOf(id);
       if (row.sender_id !== ownerId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.notYours")));
@@ -321,147 +502,10 @@ const make = Effect.gen(function* () {
     }),
     attach,
     attachment,
-    tellSession: Effect.fn("Channel.tellSession")(function* (from, session, text, sendKey) {
-      const thread = yield* threadOfSession(session);
-      if (!thread) {
-        // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
-        if (!sessions.isReachable(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
-        const channel = sessionOf(session)?.channel;
-        const at = yield* Clock.currentTimeMillis;
-        const speaker = sessionOf(from);
-        const trigger = yield* mailbox.recordTrigger({
-          source: "channel",
-          key: sendKey || newId(at),
-          actor:
-            from === ownerId
-              ? { kind: "owner", id: ownerId }
-              : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
-          text: text.trim(),
-          threads: [],
-          addressed: "direct",
-          ...(channel ? { replyChannel: channel } : {}),
-          at,
-        });
-        yield* mailbox.receive({ _tag: "Trigger", trigger, to: { session } });
-        return undefined;
-      }
-      const run = sessions.runOf(from);
-      const written = yield* write({
-        channel: thread,
-        from,
-        kind: "chat",
-        text: text.trim(),
-        meta: run ? { run } : {},
-        sendKey,
-        ...(from === ownerId ? { readBy: ownerId } : {}),
-      });
-      return toMessage(written.row);
-    }, locked),
-    speak: Effect.fn("Channel.speak")(function* (from, text, opt = {}): Effect.fn.Return<Spoken, ApiError> {
-      const words = text.trim();
-      if (!words) return yield* Effect.fail(refused(t("server.channel.empty")));
-      const channel = yield* resolveTarget(from, opt.target ?? "");
-      const row = model.channel(channel);
-      if (!row) return yield* Effect.fail(refused(t("server.channel.channelGone")));
-      const target = targetOfChannel(row);
-      // A retry of the same words is the same message.
-      const again = yield* db.one(
-        qm.recentDuplicate({ sender_id: from, channel_id: channel, body: words, since: (yield* Clock.currentTimeMillis) - retryWindowMs }),
-      );
-      if (again) {
-        const m = yield* db.one(qm.messageByID({ id: again.id }));
-        if (m) return { kind: "sent", message: toMessage(m), target, absent: [] };
-      }
-      // Posting on a channel right after reading a thread: confirm once.
-      const last = model.lastRead.get(from) ?? "";
-      if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
-      // Newer messages it has not seen: show them instead of sending.
-      const unseen = (yield* db.run(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
-      if (unseen.length > 0 && opt.anyway !== true) {
-        const now = yield* Clock.currentTimeMillis;
-        const shown: Envelope[] = [];
-        for (const id of unseen.slice(0, heldShown)) {
-          const m = yield* db.one(qm.messageByID({ id }));
-          if (!m) continue;
-          shown.push(envelopeOf(m, target));
-        }
-        const newest = shown.at(-1);
-        if (newest) yield* setRead(from, channel, newest.number, now);
-        return { kind: "held", target, shown, more: unseen.length - shown.length };
-      }
-      // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
-      const caller = !agents.isOrchestrator(from) ? (yield* db.one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
-      const answers = caller === undefined ? undefined : sessionId(caller);
-      const run = sessions.runOf(from);
-      if (agents.isOrchestrator(from)) yield* seat(from);
-      yield* answered(channel, opt.reply);
-      const written = yield* write({
-        channel,
-        from,
-        kind: "chat",
-        text: words,
-        ...(answers ? { answers } : {}),
-        ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
-        meta: run ? { run } : {},
-      });
-      const now2 = yield* Clock.currentTimeMillis;
-      yield* setRead(from, channel, written.row.number, now2);
-      return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
-    }, locked),
     placeOf: Effect.fn("Channel.placeOf")(function* (from, channel) {
       if (model.channel(channel)) return channel;
       return yield* resolveTarget(from, channel);
     }),
-    announce: Effect.fn("Channel.announce")(function* (from, channel, text, made, sendKey = "") {
-      const where = model.channel(channel) ? channel : yield* resolveTarget(from, channel);
-      if (!model.channel(where)) return yield* Effect.fail(refused(t("server.channel.channelGone")));
-      const run = sessions.runOf(from);
-      if (agents.isOrchestrator(from)) yield* seat(from);
-      const shown = "card" in made ? { artifact: made.card } : { attachments: yield* attachmentsOf(made.attachments) };
-      const written = yield* write({
-        channel: where,
-        from,
-        kind: "chat",
-        text: text.trim(),
-        meta: { ...(run ? { run } : {}), ...shown },
-        sendKey,
-        ...(from === ownerId ? { readBy: ownerId } : {}),
-      });
-      if (from !== ownerId) {
-        const now = yield* Clock.currentTimeMillis;
-        yield* setRead(from, where, written.row.number, now);
-      }
-      return toMessage(written.row);
-    }, locked),
-    spoken: Effect.fn("Channel.spoken")(
-      function* (from, text, sendKey) {
-        if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
-        if (!text.trim()) return false;
-        const written = yield* write({
-          channel: model.defaultId(),
-          from,
-          kind: "chat",
-          text: text.trim(),
-          meta: { spoken: true },
-          sendKey,
-          ...(from === ownerId ? { readBy: ownerId } : {}),
-        });
-        return written.again;
-      },
-      Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false)),
-      locked,
-    ),
-    runSays: Effect.fn("Channel.runSays")(function* (channel, text, run, from) {
-      if (!text.trim()) return;
-      yield* locked(Effect.andThen(seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })));
-    }, bestEffort("chat: a run's words")),
-    notice: Effect.fn("Channel.notice")(
-      function* (channel, text, code, sendKey = "") {
-        return yield* write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });
-      },
-      locked,
-      bestEffort("chat: notice"),
-    ),
     read: Effect.fn("Channel.read")(function* (who, opt = {}) {
       const channel = yield* resolveTarget(who, opt.target ?? "");
       const row = model.channel(channel);
@@ -532,7 +576,7 @@ const make = Effect.gen(function* () {
           return Effect.gen(function* () {
             const where = (yield* shape.threadOfSession(change.session)) ?? model.defaultId();
             const name = sessions.sessionOf(change.session)?.name ?? change.session;
-            yield* shape.notice(where, t("server.channel.breaker", { name, failed: change.failed }), "wake_breaker");
+            yield* post({ _tag: "Notice", channel: where, text: t("server.channel.breaker", { name, failed: change.failed }), code: "wake_breaker" });
           }).pipe(bestEffort(`chat: wake breaker for ${change.session}`));
       }
     }),

@@ -567,7 +567,7 @@ const make = (options: VoiceOptions = {}) =>
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
         if (call.quick && text.trim() !== call.greeting)
-          yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""), {
+          yield* Effect.ignore(chat.post({ _tag: "Call", from: defaultOrchestrator, text: text, sendKey: "" }), {
             log: "Warn",
             message: "vibevalley: voice: the orchestrator's spoken words were not kept",
           });

@@ -87,7 +87,7 @@ export function refinement(d: RefinementDeps) {
       const thread = yield* chat.issueThread(item.id, item.title, channel || undefined);
       const history = yield* chat.history(thread, undefined, 40);
       const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
-      if (said) yield* chat.say(said, thread, "");
+      if (said) yield* chat.post({ _tag: "Owner", text: said, channel: thread, sendKey: "" });
       yield* beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
       const kept = where ? yield* sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
@@ -106,7 +106,7 @@ export function refinement(d: RefinementDeps) {
     const id = h.issue;
     const said = sessions.lastTextOf(f.id);
     const thread = yield* chat.threadOfSession(f.id);
-    const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
+    const tell = (text: string) => (thread ? chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" }) : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
       if (!d) yield* tell(t("server.issue.refinement.unread", { name: h.name, problem }));
