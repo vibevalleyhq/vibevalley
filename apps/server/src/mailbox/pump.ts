@@ -19,10 +19,10 @@ interface PumpPorts<Message> {
   readonly breakerOpen: (session: string) => boolean;
   readonly readyInputs: (recipient: string, rows: readonly DeliveryRow[]) => readonly DeliveryRow[];
   readonly closed: () => boolean;
-  readonly isOrchestrator: (id: string) => boolean;
+  readonly isHosted: (id: string) => boolean;
   readonly message: (row: DeliveryRow) => Message;
   readonly wakeInput: (recipient: string, rows: readonly DeliveryRow[], messages: readonly Message[]) => Effect.Effect<string>;
-  readonly publishOrchestrator: (recipient: string, messages: readonly Message[], primary: DeliveryRow) => Effect.Effect<void>;
+  readonly handToHost: (recipient: string, messages: readonly Message[], primary: DeliveryRow) => Effect.Effect<void>;
   readonly consumedMessages: (recipient: string, envelopes: readonly string[]) => Effect.Effect<void>;
   readonly breakerNotice: (recipient: string, failed: number) => Effect.Effect<void>;
   readonly later: (key: string, ms: number, effect: () => Effect.Effect<void>) => void;
@@ -68,7 +68,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     const rows = ports.readyInputs(recipient, ports.pending(recipient));
     if (held(recipient)) return;
     const waking = rows.filter((row) => row.wakes && row.held_by === null && row.state === "pending");
-    if (ports.isOrchestrator(recipient)) {
+    if (ports.isHosted(recipient)) {
       const now = yield* Clock.currentTimeMillis;
       yield* Effect.forEach(
         Map.groupBy(waking, (row) => row.scope),
@@ -79,7 +79,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
             if (!primary) return;
             const messages = grouped.map(ports.message);
             yield* Effect.forEach(grouped, (row) => ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now), { discard: true });
-            yield* ports.publishOrchestrator(recipient, messages, primary);
+            yield* ports.handToHost(recipient, messages, primary);
           }),
         { discard: true },
       );

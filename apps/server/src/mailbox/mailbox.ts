@@ -23,6 +23,7 @@ import {
   type UnreadRow,
   orchestratorIn,
 } from "#/mailbox/envelope.ts";
+import { isHosted } from "#/session/roster.ts";
 import { type NotRecorded, Session } from "#/session/session.ts";
 import { defaultID, topPlace, unreadOf } from "#db/channel.sql.ts";
 import { membersOf } from "#db/channel_member.sql.ts";
@@ -382,7 +383,7 @@ export class Mailbox extends Context.Service<
         }),
       });
 
-      const publishOrchestrator = (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) =>
+      const handToHost = (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) =>
         Effect.gen(function* () {
           const meta = primary.payload.trigger.meta;
           const source = orchestratorSource(primary.payload.trigger.source);
@@ -441,7 +442,10 @@ export class Mailbox extends Context.Service<
           });
         },
         closed: () => closed,
-        isOrchestrator: agents.isOrchestrator,
+        isHosted: (id) => {
+          const agent = agents.agent(id);
+          return agent !== undefined && isHosted(agent);
+        },
         message: (row) => inputOf(row),
         wakeInput: (recipient, _rows, messages) =>
           Effect.map(deliveryUnread(recipient), (all) =>
@@ -450,7 +454,7 @@ export class Mailbox extends Context.Service<
               all.filter((other) => !messages.some((message) => message.target === other.target)),
             ),
           ),
-        publishOrchestrator,
+        handToHost,
         consumedMessages: (recipient, messages) =>
           Effect.sync(() => {
             for (const message of messages) PubSub.publishUnsafe(newsHub, { _tag: "Consumed", session: recipient, envelope: message });

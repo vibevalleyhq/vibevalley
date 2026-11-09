@@ -7,6 +7,9 @@ import type * as T from "@vibevalley/protocol";
 export const isOnDuty = (who: { readonly role: T.AgentRole }): boolean => who.role === "orchestrator";
 /** Hired for a piece of work, and gone once it is done: a helper's session. */
 export const isHired = (who: { readonly role: T.AgentRole }): boolean => who.role === "worker";
+/** Hosted: works in this server process (Session.host), handed its inputs there; the others are launched on a
+ * runtime, an input at a time. Today the role decides it, here alone: an orchestrator is hosted. */
+export const isHosted = (who: { readonly role: T.AgentRole }): boolean => who.role === "orchestrator";
 export const sessionOf = (state: T.SpaceState, id: string) => state.sessions.find((h) => h.id === id);
 
 /** The session working the issue now: the latest hired of those on it. */
