@@ -18,8 +18,8 @@ export type Sqlite_artifact_body = typeof Sqlite_artifact_body.Type
 export const Sqlite_artifact_suggestion_status = Schema.Literals(["open","accepted","rejected"])
 export type Sqlite_artifact_suggestion_status = typeof Sqlite_artifact_suggestion_status.Type
 
-export const Sqlite_channel_follow_reason = Schema.Literals(["owner","replied","mentioned","manual"])
-export type Sqlite_channel_follow_reason = typeof Sqlite_channel_follow_reason.Type
+export const Sqlite_channel_member_reason = Schema.Literals(["owner","replied","mentioned","manual"])
+export type Sqlite_channel_member_reason = typeof Sqlite_channel_member_reason.Type
 
 export const Sqlite_channel_mention_resolved = Schema.Literals(["delivered","absent","unknown"])
 export type Sqlite_channel_mention_resolved = typeof Sqlite_channel_mention_resolved.Type

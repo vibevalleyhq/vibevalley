@@ -1,4 +1,6 @@
-import { composerOn, expect, tab, test, choose } from "./fixtures";
+import { defaultOrchestrator } from "@vibevalley/protocol";
+
+import { composerOn, expect, tab, test } from "./fixtures";
 
 // A server of its own: a second orchestrator is the whole farm's, and the other files count one.
 test.use({ farm: "orchestrators" });
@@ -32,10 +34,13 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
   await page.goto(`/chat/${general.id}`);
   await page.getByTestId("channel-settings-open").click();
   const dialog = page.getByTestId("channel-settings-dialog");
-  await choose(dialog.getByTestId("channel-orchestrator"), id);
+  // The new one goes into the channel and the default one comes out: the channel's orchestrator is the new one.
+  await dialog.locator(`[data-testid="channel-member"][data-key="${id}"]`).click();
+  await dialog.locator(`[data-testid="channel-member"][data-key="${defaultOrchestrator}"]`).click();
   await dialog.getByTestId("submit").click();
   await expect(page.getByTestId("channel-orchestrator-line")).toHaveAttribute("data-key", id);
-  expect((await api.channel.list()).find((c) => c.id === general.id)!.orchestrator).toBe(id);
+  const kept = (await api.channel.list()).filter((c) => c.id === general.id);
+  expect(kept.map((c) => [c.members, c.orchestrator])).toEqual([[[id], id]]);
 
   await page.goto("/agents");
   await page.locator(`[data-testid="agent-card"][data-key="${id}"]`).getByRole("link").click();

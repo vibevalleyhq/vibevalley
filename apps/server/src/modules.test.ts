@@ -54,7 +54,7 @@ const sources = () =>
     .map((file) => inspect(file, readFileSync(file, "utf8"))));
 
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
-  mailbox: { "channel.sql.ts": ["defaultID", "orchestratorForChannel", "unreadOf"], "issue.sql.ts": ["issueExists"] },
+  mailbox: { "channel.sql.ts": ["defaultID", "topPlace", "unreadOf"], "channel_member.sql.ts": ["membersOf"], "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "ownerReadReports"] },
 };
 const folders = readdirSync(src).filter((name) => statSync(join(src, name)).isDirectory());
@@ -119,9 +119,9 @@ describe("the modules", () => {
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
     const file = join(src, "mailbox/mailbox.ts");
     const queries = (text: string) => foreignQueries(file, inspect(file, text).edges);
-    expect(queries('import { orchestratorForChannel as route } from "#db/channel.sql.ts";')).toEqual([]);
+    expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual([]);
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
-    expect(queries('import { setOrchestrator } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
+    expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
     expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
     const ingress = join(src, "ingress/ingress.ts");
     expect(foreignQueries(ingress, inspect(ingress, 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";').edges)).toEqual([

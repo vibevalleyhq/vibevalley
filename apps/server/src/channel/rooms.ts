@@ -7,30 +7,36 @@ type ParticipantRow = qp.ParticipantsResult;
 
 const subjectKey = (kind: string, id: string) => kind + ":" + id;
 
-/** Who follows each thread, told each follow as the chat writes it and reloaded with the model. */
-export class Follows {
-  private follows = new Map<string, Set<string>>();
+/** Who follows each thread and who is in each channel, told each change as the chat writes it and reloaded with the model. */
+export class Members {
+  private members = new Map<string, Set<string>>();
 
   load(follows: readonly { channel_id: string; participant_id: string }[]) {
-    this.follows.clear();
-    for (const f of follows) this.followed(f.channel_id, f.participant_id);
+    this.members.clear();
+    for (const f of follows) this.memberAdded(f.channel_id, f.participant_id);
   }
 
   /** Follow: following again is following. */
-  followed(channel: string, participant: string) {
-    const held = this.follows.get(channel);
+  memberAdded(channel: string, participant: string) {
+    const held = this.members.get(channel);
     if (held) held.add(participant);
-    else this.follows.set(channel, new Set([participant]));
+    else this.members.set(channel, new Set([participant]));
+  }
+
+  /** One taken out of a place. */
+  memberRemoved(channel: string, participant: string) {
+    const held = this.members.get(channel);
+    if (held?.delete(participant) === true && held.size === 0) this.members.delete(channel);
   }
 
   /** A Session that left follows nothing. */
   left(participant: string) {
-    for (const [channel, held] of this.follows) if (held.delete(participant) && held.size === 0) this.follows.delete(channel);
+    for (const [channel, held] of this.members) if (held.delete(participant) && held.size === 0) this.members.delete(channel);
   }
 
   /** By id. */
-  followers(channel: string): string[] {
-    return [...(this.follows.get(channel) ?? [])].toSorted();
+  membersOf(channel: string): string[] {
+    return [...(this.members.get(channel) ?? [])].toSorted();
   }
 }
 
@@ -40,7 +46,7 @@ export class ChatModel {
   private threadBySubject = new Map<string, string>();
   private people = new Map<string, ParticipantRow>();
   private ownerRead = new Map<string, number>();
-  private follows = new Follows();
+  private members = new Members();
   readonly lastRead = new Map<string, string>();
   private publishedLast = new Map<string, number>();
 
@@ -58,7 +64,7 @@ export class ChatModel {
     for (const c of channels) this.created(c);
     for (const p of participants) this.people.set(p.id, { ...p });
     for (const r of ownerRead) this.ownerRead.set(r.channel_id, r.read_number);
-    if (follows) this.follows.load(follows);
+    if (follows) this.members.load(follows);
   }
 
   channel(id: string): ChannelRow | undefined {
@@ -126,7 +132,7 @@ export class ChatModel {
   }
 
   /** RenameChannel, SetCategory, PlaceChannel, SetArchived, SetNotify. */
-  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify" | "orchestrator">>) {
+  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify">>) {
     const c = this.byId.get(id);
     if (c) this.byId.set(id, { ...c, ...change });
   }
@@ -184,20 +190,24 @@ export class ChatModel {
 
   /** ParticipantLeft: their participant state, follows and read place go with them. */
   left(id: string, at: number) {
-    this.follows.left(id);
+    this.members.left(id);
     this.lastRead.delete(id);
     const p = this.people.get(id);
     if (p && p.left_at === null) this.people.set(id, { ...p, left_at: at });
   }
 
   /** Follow: following again is following. */
-  followed(channel: string, participant: string) {
-    this.follows.followed(channel, participant);
+  memberAdded(channel: string, participant: string) {
+    this.members.memberAdded(channel, participant);
   }
 
-  /** Who follows a thread, by id. */
-  followers(channel: string): string[] {
-    return this.follows.followers(channel);
+  memberRemoved(channel: string, participant: string) {
+    this.members.memberRemoved(channel, participant);
+  }
+
+  /** Who follows a thread or is in a channel, by id. */
+  membersOf(channel: string): string[] {
+    return this.members.membersOf(channel);
   }
 
   /** The newest number the chat published for a channel. */

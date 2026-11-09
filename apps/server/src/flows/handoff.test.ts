@@ -12,7 +12,7 @@ it.effect("regression: owner read cursors and later replies suppress external no
     const chat = yield* Channel;
     const inbox = yield* Inbox;
     const channel = chat.defaultChannel();
-    const agent = chat.orchestratorOf(channel);
+    const agent = chat.orchestratorIn(channel);
     yield* chat.orchestratorSays(channel, "需要你确认", "read-receipt", agent);
     const message = (yield* chat.history(channel)).at(-1)!;
     const handoffState2 = yield* inbox.handoffState(message.id);

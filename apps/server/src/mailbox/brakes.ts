@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "direct" | "addressed";
+export type DeliveryReason = "mention" | "everyone" | "own_thread" | "member" | "channel" | "direct" | "addressed";
 type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
 
 export interface Recipient {

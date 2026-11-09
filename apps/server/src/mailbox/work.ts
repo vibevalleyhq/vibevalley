@@ -49,7 +49,8 @@ interface WorkOptions {
   readonly breaker: WakeBreaker;
   readonly dispatch: (session: string) => void;
   readonly issueOf: (id: string) => T.Issue | undefined;
-  readonly orchestratorOf: (channel: string) => Effect.Effect<string>;
+  /** The orchestrator in a channel (envelope.ts orchestratorIn): who what names no one there goes to. */
+  readonly orchestratorIn: (channel: string) => Effect.Effect<string>;
 }
 
 const readTrigger = Schema.decodeUnknownSync(Schema.fromJsonString(S.Trigger));
@@ -59,7 +60,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     const db = yield* Db;
     const sessions = yield* Session;
     const agents = yield* Agent;
-    const { writtenLocked, received, stored, defaultChannel, open, reach, breaker, dispatch, issueOf, orchestratorOf } = options;
+    const { writtenLocked, received, stored, defaultChannel, open, reach, breaker, dispatch, issueOf, orchestratorIn } = options;
 
     const writeDelivery = (input: InsertDelivery) =>
       Effect.flatMap(jsonText(input.row.payload), (payloadJson) =>
@@ -284,7 +285,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     ) {
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
+        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorIn(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward([
         {
           trigger,
@@ -433,7 +434,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       }
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
+        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorIn(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward([{ trigger, session: recipient, commit: Effect.void }]);
       dispatch(recipient);
       return undefined;

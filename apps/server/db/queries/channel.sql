@@ -51,7 +51,7 @@ with unread as (
   left join channel ch on ch.id = c.parent_id
   join channel_message m on m.channel_id = c.id
   left join channel_read_cursor rc on rc.participant_id = sqlc.arg(participant) and rc.channel_id = c.id
-  left join channel_follow f on f.channel_id = c.id and f.participant_id = sqlc.arg(participant) and f.unfollowed_at is null
+  left join channel_member f on f.channel_id = c.id and f.participant_id = sqlc.arg(participant) and f.left_at is null
   where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
     and (c.id = sqlc.arg(channel) or f.participant_id is not null)
     and m.number > max(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
@@ -84,18 +84,15 @@ update channel set archived_at = sqlc.narg(archived_at) where id = sqlc.arg(id) 
 -- name: SetNotify :exec
 update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 
--- name: SetOrchestrator :exec
-update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id) and type = 'channel';
-
--- name: OrchestratorForChannel :one
+-- name: TopPlace :one
+-- A place's channel or direct channel: itself, or the one a thread hangs in.
 with recursive places as (
-  select id, type, peer_id, parent_id, orchestrator from channel where id = sqlc.arg(id)
+  select id, type, peer_id, parent_id from channel where id = sqlc.arg(id)
   union
-  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator
+  select c.id, c.type, c.peer_id, c.parent_id
   from channel c join places p on c.id = p.parent_id where p.type = 'thread'
 )
-select (case when type = 'direct' then peer_id else orchestrator end)::text? as agent
-from places where type <> 'thread' limit 1;
+select id, type, peer_id from places where type <> 'thread' limit 1;
 
 
 -- name: ChannelInUse :one

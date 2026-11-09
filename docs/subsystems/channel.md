@@ -23,7 +23,7 @@
 | `apps/server/src/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
 | `packages/protocol/src/rpc.ts`、`apps/server/src/http/rpc.ts` | `/api/v1/rpc` 频道与稿子实时订阅契约与服务端挂载 |
 | `apps/server/src/connector/` | `connector.ts` 桥接协调器、`digest.ts`、`weixin.ts`、`feishu.ts`、`qq.ts` |
-| 表 `channel`、`channel_participant`、`channel_message`、`channel_attachment`、`channel_mention`、`channel_follow`、`channel_read_cursor` | 频道与消息存储表 |
+| 表 `channel`、`channel_participant`、`channel_message`、`channel_attachment`、`channel_mention`、`channel_member`、`channel_read_cursor` | 频道与消息存储表 |
 | 表 `connector_account`、`connector_inbound`、`connector_outbox` | 外部聊天软件账号、入站去重与出站队列 |
 | `apps/web/src/features/channel/`、`apps/web/src/farm/chat/` | 工作台聊天页、输入框 `composing.ts`、订阅 `follow.ts` 与农场田头窗 |
 
@@ -46,13 +46,17 @@
 
 ### 受众计算与说话防撞
 
+频道和串都有成员，记在同一张 `channel_member`：串的成员是开串的人、回过话的、被 `@` 的和手动加的；频道的成员是主人放进来的管家（只有管家能放），新频道和默认频道一开始就有默认管家。私聊的成员就是对面。没人点名的话发给成员，被 `@` 的另外加上；一个成员都没有的频道，要 `@` 才有人接。
+
+「这里的管家」（`Channel.orchestratorIn`，`T.Channel.orchestrator`）由 `mailbox/envelope.ts` 的 `orchestratorIn` 一处算：私聊是对面（他是管家时），否则是频道成员里的默认管家或第一个管家，都没有就是默认管家；泛称的「@管家」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
+
 | 发言者与位置 | 唤醒目标 | 被动通知（仅知晓） |
 |---|---|---|
-| 主人在公共频道 | 被 `@` 的对象；未 `@` 他人时为该频道的管家 | 该频道内的在场帮工 |
+| 主人在公共频道 | 被 `@` 的对象；未 `@` 他人时为频道里的成员（主人放进来的管家） | 该频道内的在场帮工 |
 | 主人在私聊 | 私聊对象（对应管家或帮工档案 `Session`） | — |
 | 主人在工单串 | 被 `@` 的对象、该工单当前帮工、关注该串的对象 | — |
 | 管家或帮工发言 | 被 `@` 的对象；在工单串内发言唤醒该工单当前帮工 | — |
-| 帮工回合结束汇报 | 失败时唤醒频道管家 | 完成时作为摘要捎带给管家 |
+| 帮工回合结束汇报 | 失败时唤醒所在频道的成员 | 完成时作为摘要捎带给成员 |
 
 - **帮工说话前新鲜度拦截**：帮工刚读串却要发往顶层频道时先要求 `confirm`；目标通道有未读新消息时先拦截并返回最旧 3 条未读，帮工可改后再发或带 `anyway: true` 照发。
 - **附件与公网链接预览**：附件按 SHA-256 去重并经 `GET /api/v1/attachment/<id>` 带沙箱返回（上限 25MB）；消息中的公网 `http(s)` 链接在后台抓取标题与摘要（拦截内网与云元数据地址，限 3 次跳转、3 秒、512KB）。

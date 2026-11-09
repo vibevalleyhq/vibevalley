@@ -18,7 +18,7 @@
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
 | 技能 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skill/…` |
 | 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是管家的档案时是那个管家的） |
-| 管家 | 管家 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"` 的会话）、`Channel.orchestrator`（照看那处的管家） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
+| 管家 | 管家 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"` 的会话）、`Channel.orchestrator`（这里的管家：私聊的对面或频道成员里的管家）、`Channel.members`（频道里的成员） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.assignments`（责任与执行历史） | `/api/v1/issue/…` |
 | 父子工单 | 图纸桌打开工单 | 工作台 `features/issue/FamilyDetail.tsx` | `Issue.parent`、`blockedBy`，父单与子单都是普通工单 | `/api/v1/issue/…` |
 | 稿子 | — | `/artifacts`（`features/artifact`） | `Artifact`、`ArtifactBlock` | `/api/v1/artifact/…` |
@@ -61,7 +61,7 @@
 | 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/reaction.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 轨迹 | `Session`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
 | 改动、完成 | `Issue`（挪到 `done`、合并、提 PR；`repo/repo.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在仓库目录干活的没有这两项 | |
-| 默认频道、频道、工单串 | `Channel`（`channel/channel.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`mailbox_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow` 表 | 送到 Agent Session 的话是 `Wake`、`Steer`、`Announce` |
+| 默认频道、频道、工单串 | `Channel`（`channel/channel.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`mailbox_delivery`、`channel_read_cursor`、`channel_mention`、`channel_member` 表 | 送到 Agent Session 的话是 `Wake`、`Steer`、`Announce` |
 | 定时任务 | `Cron` | `cron` 表 | |
 | 巡查 | `Inbox`（`inbox/inbox.ts`；规则在 `inbox/patrol.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Inbox`（`inbox/inbox.ts`、`inbox/items.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |

@@ -167,7 +167,6 @@ export const AllChannelsResult = Schema.Struct({
   ["position"]: Schema.NullOr(Schema.Int),
   ["archived_at"]: Schema.NullOr(Schema.Number),
   ["notify"]: Sqlite_channel_notify,
-  ["orchestrator"]: Schema.NullOr(Schema.String),
 })
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
@@ -210,7 +209,6 @@ export const RecentChannelsResult = Schema.Struct({
   ["position"]: Schema.NullOr(Schema.Int),
   ["archived_at"]: Schema.NullOr(Schema.Number),
   ["notify"]: Sqlite_channel_notify,
-  ["orchestrator"]: Schema.NullOr(Schema.String),
 })
 export type RecentChannelsResult = typeof RecentChannelsResult.Type
 
@@ -266,7 +264,7 @@ export const UnreadOfResult = Schema.Struct({
 export type UnreadOfResult = typeof UnreadOfResult.Type
 
 
-export const UnreadOfSql = "-- name: UnreadOf :many\n-- A participant's unread: the channel it is in and the threads it follows, newest first.\nwith unread as (\n  select c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, cast(coalesce(ch.name, c.name, '') as text) as channel_name,\n         cast(count(m.id) as integer) as unread,\n         max(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = ?1)) as mentions_you,\n         cast(coalesce(max(m.number), 0) as integer) as latest\n  from channel c\n  left join channel ch on ch.id = c.parent_id\n  join channel_message m on m.channel_id = c.id\n  left join channel_read_cursor rc on rc.participant_id = ?1 and rc.channel_id = c.id\n  left join channel_follow f on f.channel_id = c.id and f.participant_id = ?1 and f.unfollowed_at is null\n  where m.sender_id <> ?1 and m.kind <> 'notice'\n    and (c.id = ?2 or f.participant_id is not null)\n    and m.number > max(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))\n    and not exists (select 1 from mailbox_delivery d where d.session_id = ?1 and d.message_id = m.id and d.consumed_at is not null)\n  group by c.id, ch.name\n)\nselect u.*,\n       cast((select p.name from channel_message lm join channel_participant p on p.id = lm.sender_id\n        where lm.channel_id = u.id and lm.number = u.latest) as text) as latest_sender_name\nfrom unread u\norder by u.latest desc\nlimit 20;"
+export const UnreadOfSql = "-- name: UnreadOf :many\n-- A participant's unread: the channel it is in and the threads it follows, newest first.\nwith unread as (\n  select c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, cast(coalesce(ch.name, c.name, '') as text) as channel_name,\n         cast(count(m.id) as integer) as unread,\n         max(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = ?1)) as mentions_you,\n         cast(coalesce(max(m.number), 0) as integer) as latest\n  from channel c\n  left join channel ch on ch.id = c.parent_id\n  join channel_message m on m.channel_id = c.id\n  left join channel_read_cursor rc on rc.participant_id = ?1 and rc.channel_id = c.id\n  left join channel_member f on f.channel_id = c.id and f.participant_id = ?1 and f.left_at is null\n  where m.sender_id <> ?1 and m.kind <> 'notice'\n    and (c.id = ?2 or f.participant_id is not null)\n    and m.number > max(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))\n    and not exists (select 1 from mailbox_delivery d where d.session_id = ?1 and d.message_id = m.id and d.consumed_at is not null)\n  group by c.id, ch.name\n)\nselect u.*,\n       cast((select p.name from channel_message lm join channel_participant p on p.id = lm.sender_id\n        where lm.channel_id = u.id and lm.number = u.latest) as text) as latest_sender_name\nfrom unread u\norder by u.latest desc\nlimit 20;"
 
 export const unreadOf = Effect.fn("UnreadOf")(function* (params: UnreadOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -385,43 +383,28 @@ export const setNotify = Effect.fn("SetNotify")(function* (params: SetNotifyPara
   })(params)
 })
 
-export const SetOrchestratorParams = Schema.Struct({
-  ["orchestrator"]: Schema.NullOr(Schema.String),
+export const TopPlaceParams = Schema.Struct({
   ["id"]: Schema.String,
 })
-export type SetOrchestratorParams = typeof SetOrchestratorParams.Type
+export type TopPlaceParams = typeof TopPlaceParams.Type
 
 
-export const SetOrchestratorSql = "-- name: SetOrchestrator :exec\nupdate channel set orchestrator = ?1 where id = ?2 and type = 'channel';"
-
-export const setOrchestrator = Effect.fn("SetOrchestrator")(function* (params: SetOrchestratorParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: SetOrchestratorParams,
-    execute: (p) => sql.unsafe(SetOrchestratorSql, [p["orchestrator"], p["id"]]),
-  })(params)
-})
-
-export const OrchestratorForChannelParams = Schema.Struct({
+export const TopPlaceResult = Schema.Struct({
   ["id"]: Schema.String,
+  ["type"]: Sqlite_channel_type,
+  ["peer_id"]: Schema.NullOr(Schema.String),
 })
-export type OrchestratorForChannelParams = typeof OrchestratorForChannelParams.Type
+export type TopPlaceResult = typeof TopPlaceResult.Type
 
 
-export const OrchestratorForChannelResult = Schema.Struct({
-  ["agent"]: Schema.NullOr(Schema.String),
-})
-export type OrchestratorForChannelResult = typeof OrchestratorForChannelResult.Type
+export const TopPlaceSql = "-- name: TopPlace :one\n-- A place's channel or direct channel: itself, or the one a thread hangs in.\nwith recursive places as (\n  select id, type, peer_id, parent_id from channel where id = ?1\n  union\n  select c.id, c.type, c.peer_id, c.parent_id\n  from channel c join places p on c.id = p.parent_id where p.type = 'thread'\n)\nselect id, type, peer_id from places where type <> 'thread' limit 1;"
 
-
-export const OrchestratorForChannelSql = "-- name: OrchestratorForChannel :one\nwith recursive places as (\n  select id, type, peer_id, parent_id, orchestrator from channel where id = ?1\n  union\n  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator\n  from channel c join places p on c.id = p.parent_id where p.type = 'thread'\n)\nselect cast((case when type = 'direct' then peer_id else orchestrator end) as text) as agent\nfrom places where type <> 'thread' limit 1;"
-
-export const orchestratorForChannel = Effect.fn("OrchestratorForChannel")(function* (params: OrchestratorForChannelParams) {
+export const topPlace = Effect.fn("TopPlace")(function* (params: TopPlaceParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
-    Request: OrchestratorForChannelParams,
-    Result: OrchestratorForChannelResult,
-    execute: (p) => sql.unsafe(OrchestratorForChannelSql, [p["id"]]),
+    Request: TopPlaceParams,
+    Result: TopPlaceResult,
+    execute: (p) => sql.unsafe(TopPlaceSql, [p["id"]]),
   })(params)
 })
 

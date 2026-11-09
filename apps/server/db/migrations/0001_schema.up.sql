@@ -43,16 +43,13 @@ CREATE TABLE channel (
   archived_at   real,
   -- What of it counts for the owner: everything, only what @s the owner, or nothing.
   notify        text not null default 'all' check (notify in ('all', 'mentions', 'none')),
-  -- The orchestrator's profile id that looks after a channel: the owner's words there go to it; none is the default one.
-  orchestrator  text,
   check ((type = 'thread') = (root_id is not null)),
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
   check ((subject_kind is null) or type = 'thread'),
   check (not is_default or type = 'channel'),
-  check (not is_default or archived_at is null),
-  check (orchestrator is null or type = 'channel')
+  check (not is_default or archived_at is null)
 );
 CREATE TABLE channel_message (
   id              text primary key,
@@ -222,12 +219,12 @@ CREATE TABLE channel_mention (
   resolved    text not null check (resolved in ('delivered', 'absent', 'unknown')),
   primary key (message_id, target_id)
 );
-CREATE TABLE channel_follow (
+CREATE TABLE channel_member (
   channel_id  text not null references channel (id),
   participant_id   text not null references channel_participant (id),
   reason           text not null check (reason in ('owner', 'replied', 'mentioned', 'manual')),
   from_number      integer not null,
-  unfollowed_at    real,
+  left_at    real,
   primary key (channel_id, participant_id)
 );
 CREATE TABLE channel_read_cursor (
@@ -642,7 +639,7 @@ CREATE INDEX artifact_suggestion_open on artifact_suggestion (artifact_id, statu
 CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
 
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
-CREATE INDEX channel_follow_by_participant on channel_follow (participant_id);
+CREATE INDEX channel_member_by_participant on channel_member (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
 CREATE INDEX mailbox_delivery_by_message on mailbox_delivery (message_id);
 CREATE INDEX mailbox_issue_by_session on mailbox_issue (session_id) where session_id is not null;

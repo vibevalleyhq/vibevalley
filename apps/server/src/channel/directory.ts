@@ -1,7 +1,6 @@
-import { Clock, Effect } from "effect";
+import { Array as Arr, Clock, Effect, Option, String as Str } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
-import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
 import { head } from "#/base/clip.ts";
@@ -10,7 +9,7 @@ import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import * as qc from "#db/channel.sql.ts";
-import * as qf from "#db/channel_follow.sql.ts";
+import * as qmb from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
@@ -28,7 +27,7 @@ type DirectoryMethods = Pick<
   | "previewRemoveChannel"
   | "removeChannel"
   | "setNotify"
-  | "orchestratorOf"
+  | "orchestratorIn"
   | "direct"
   | "notifyOf"
   | "markUnread"
@@ -43,7 +42,21 @@ export const channelDirectory = (r: ChannelHub) =>
     const core = yield* Core;
     const agents = yield* Agent;
     const db = yield* Db;
-    const { model, reload, tx, locked, seat, orchestratorOfRow, channelOfSession, hired, targetOfChannel, publishChannel, publishOwnerMentions } = r;
+    const {
+      model,
+      reload,
+      tx,
+      locked,
+      seat,
+      addMember,
+      joinDefault,
+      orchestratorInRow,
+      channelOfSession,
+      hired,
+      targetOfChannel,
+      publishChannel,
+      publishOwnerMentions,
+    } = r;
 
     /** A channel nothing points at any more; refused with what still does. */
     const removable = Effect.fnUntraced(function* (id: string) {
@@ -126,8 +139,8 @@ export const channelDirectory = (r: ChannelHub) =>
           position: null,
           archived_at: null,
           notify: "all",
-          orchestrator: null,
         });
+        yield* joinDefault(id);
         yield* publishChannel(id);
         return infoOf({ id, name: clean, description: desc, repo: proj, is_default: false });
       }, locked),
@@ -135,7 +148,7 @@ export const channelDirectory = (r: ChannelHub) =>
         const row = model.channel(id);
         if (!row || row.type === "direct") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
         const onlyName =
-          upd.description === undefined && upd.repo === undefined && upd.category === undefined && upd.before === undefined && upd.orchestrator === undefined;
+          upd.description === undefined && upd.repo === undefined && upd.category === undefined && upd.before === undefined && upd.members === undefined;
         if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(t("server.channel.threadOnlyTitle")));
         let name = row.name;
         if (upd.name !== undefined) {
@@ -153,10 +166,13 @@ export const channelDirectory = (r: ChannelHub) =>
         const desc = (upd.description !== undefined ? optional(upd.description) : null) ?? row.description;
         const proj = upd.repo !== undefined ? optional(upd.repo) : row.repo;
         const category = upd.category !== undefined ? optional(upd.category) : row.category;
-        // The default orchestrator is kept as none, so a channel follows whichever is the default.
-        const wanted = upd.orchestrator?.trim();
-        if (wanted && !agents.isOrchestrator(wanted)) return yield* Effect.fail(refused(t("server.channel.notOrchestrator", { id: wanted })));
-        const orchestrator = wanted === undefined ? row.orchestrator : wanted && wanted !== defaultOrchestrator ? wanted : null;
+        // Only an orchestrator is put in a channel: a helper is hired into a place, not seated in one.
+        const wanted = upd.members === undefined ? undefined : Arr.dedupe(Arr.filter(Arr.map(upd.members, Str.trim), Str.isNonEmpty));
+        const notOne = wanted === undefined ? Option.none() : Arr.findFirst(wanted, (m) => !agents.isOrchestrator(m));
+        if (Option.isSome(notOne)) return yield* Effect.fail(refused(t("server.channel.notOrchestrator", { id: notOne.value })));
+        const had = model.membersOf(id);
+        const joining = wanted === undefined ? [] : Arr.difference(wanted, had);
+        const leaving = wanted === undefined ? [] : Arr.filter(had, (m) => agents.isOrchestrator(m) && !Arr.contains(wanted, m));
         // Placed before another channel: every channel but the default gets its place again, in order.
         const order =
           upd.before === undefined
@@ -175,16 +191,26 @@ export const channelDirectory = (r: ChannelHub) =>
             if (row.type === "channel") yield* db.run(qc.updateChannel({ description: desc, repo: proj, id }));
             if (name !== row.name) yield* db.run(qc.renameChannel({ name, id }));
             if (category !== row.category) yield* db.run(qc.setCategory({ category, id }));
-            if (orchestrator !== row.orchestrator) yield* db.run(qc.setOrchestrator({ orchestrator, id }));
+            yield* Effect.forEach(joining, (m) => Effect.andThen(seat(m), addMember(id, m, "manual", 0)), { discard: true });
+            const at = yield* Clock.currentTimeMillis;
+            yield* Effect.forEach(
+              leaving,
+              (m) =>
+                Effect.andThen(
+                  db.run(qmb.removeMember({ channel_id: id, participant_id: m, at })),
+                  Effect.sync(() => model.memberRemoved(id, m)),
+                ),
+              { discard: true },
+            );
             yield* Effect.forEach((order ?? []).entries(), ([position, each]) => db.run(qc.placeChannel({ position, id: each })), { discard: true });
           }),
         );
         if (row.type === "channel") model.channelUpdated(id, desc, proj);
-        model.patched(id, { name, category, orchestrator });
+        model.patched(id, { name, category });
         for (const [position, each] of (order ?? []).entries()) model.patched(each, { position });
         yield* Effect.forEach(order ?? [id], (each) => publishChannel(each), { discard: true });
-        // Its threads are looked after by the same orchestrator: they show the new one too.
-        if (orchestrator !== row.orchestrator) yield* Effect.forEach(model.threadsOf(id), (item) => publishChannel(item.id), { discard: true });
+        // Its threads are in the same channel: they show who is in it now too.
+        if (joining.length > 0 || leaving.length > 0) yield* Effect.forEach(model.threadsOf(id), (item) => publishChannel(item.id), { discard: true });
       }, locked),
       archive: Effect.fn("Channel.archive")(function* (id, on) {
         const row = model.channel(id);
@@ -206,7 +232,7 @@ export const channelDirectory = (r: ChannelHub) =>
         yield* tx(
           Effect.gen(function* () {
             yield* db.run(qm.deleteThreadMessagesIn({ id }));
-            yield* db.run(qf.deleteFollowsIn({ id }));
+            yield* db.run(qmb.deleteMembersIn({ id }));
             yield* db.run(qr.deleteCursorsIn({ id }));
             yield* db.run(qc.deleteThreadsOf({ id }));
             yield* db.run(qm.deleteMessagesIn({ id }));
@@ -224,7 +250,7 @@ export const channelDirectory = (r: ChannelHub) =>
         yield* publishChannel(id);
         yield* publishOwnerMentions;
       }, locked),
-      orchestratorOf: (channel) => orchestratorOfRow(model.channel(channel)),
+      orchestratorIn: (channel) => orchestratorInRow(model.channel(channel)),
       direct: Effect.fn("Channel.direct")(function* (ref) {
         const name = ref.trim();
         const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);

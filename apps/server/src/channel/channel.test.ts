@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Formatter, Layer, Metric, PubSub, type Scope, Stream } from "effect";
+import { Array as Arr, Effect, Fiber, Formatter, Layer, Metric, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
@@ -17,7 +17,7 @@ import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { dbQueries, Database, Db } from "#/infra/db.ts";
 import { wakeBreaker } from "#/mailbox/brakes.ts";
-import type { Handed } from "#/mailbox/envelope.ts";
+import { type Handed, orchestratorIn } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { layer as projection } from "#/projection/frame.ts";
 import { restoredSession, sessionState } from "#/session/history.ts";
@@ -28,7 +28,8 @@ import type { Consumed, LaunchActivity } from "#/session/signals.ts";
 import { testConfig, offline, testDatabase, until, waitFor } from "#/testing/layers.ts";
 import { allow, heard, refuse } from "#/testing/refuse.ts";
 import { Said, said } from "#/testing/world.ts";
-import { orchestratorForChannel, setOrchestrator } from "#db/channel.sql.ts";
+import { topPlace } from "#db/channel.sql.ts";
+import { addMember, membersOf, removeMember } from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
 
@@ -1165,12 +1166,12 @@ describe("the chat", () => {
     ),
   );
 
-  it.live("a dispatch whose thread cannot be followed leaves no dispatch, and a second try writes one", () => {
+  it.live("a dispatch whose thread cannot take its member leaves no dispatch, and a second try writes one", () => {
     const log = heard();
     return run(
       (f) =>
         Effect.gen(function* () {
-          yield* trigger(f.sql, "fail_owner", "before insert on channel_follow", "new.reason = 'owner'");
+          yield* trigger(f.sql, "fail_owner", "before insert on channel_member", "new.reason = 'owner'");
           const first: T.Session = {
             id: sessionId("w1"),
             role: "worker",
@@ -1195,7 +1196,7 @@ describe("the chat", () => {
           );
           const history2 = yield* f.chat.history(f.chat.defaultChannel());
           expect(history2).toEqual([]);
-          yield* drop(f.sql, "fail_owner", "channel_follow");
+          yield* drop(f.sql, "fail_owner", "channel_member");
           // Another hire opens every present session's thread again.
           const second: T.Session = {
             id: sessionId("w2"),
@@ -1217,7 +1218,7 @@ describe("the chat", () => {
           yield* until(() => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
           const thread = (yield* f.chat.threadOfSession("w1"))!;
           expect(
-            (yield* f.sql`select participant_id from channel_follow where channel_id = ${thread}`.pipe(Effect.orDie)).map((r) => r.participant_id),
+            (yield* f.sql`select participant_id from channel_member where channel_id = ${thread}`.pipe(Effect.orDie)).map((r) => r.participant_id),
           ).toEqual(["w1"]);
         }),
       undefined,
@@ -1229,15 +1230,25 @@ describe("the chat", () => {
 it.effect("regression: mailbox routing reads the current channel manager through threads and direct conversations", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`insert into channel_participant (id, kind, name, joined_at) values ('manager', 'orchestrator', 'manager', 0)`;
-    yield* sql`insert into channel (id, type, name, orchestrator, created_at) values ('room', 'channel', 'room', 'first', 0)`;
+    yield* sql`insert into channel_participant (id, kind, name, joined_at) values ('manager', 'orchestrator', 'manager', 0), ('first', 'orchestrator', 'first', 0), ('second', 'orchestrator', 'second', 0)`;
+    yield* sql`insert into channel (id, type, name, created_at) values ('room', 'channel', 'room', 0)`;
+    yield* addMember({ channel_id: "room", participant_id: "first", reason: "manual", from_number: 0 });
     yield* sql`insert into channel_message (id, channel_id, number, sender_id, kind, body, created_at, revision)
       values ('root', 'room', 1, 'manager', 'chat', '', 0, 1)`;
     yield* sql`insert into channel (id, type, root_id, parent_id, created_at) values ('thread', 'thread', 'root', 'room', 0)`;
     yield* sql`insert into channel (id, type, peer_id, created_at) values ('direct', 'direct', 'manager', 0)`;
-    expect((yield* orchestratorForChannel({ id: "thread" })).agent).toBe("first");
-    yield* setOrchestrator({ id: "room", orchestrator: "second" });
-    expect((yield* orchestratorForChannel({ id: "thread" })).agent).toBe("second");
-    expect((yield* orchestratorForChannel({ id: "direct" })).agent).toBe("manager");
+    // Every agent named here is taken for an orchestrator: what is under test is which place's members are read.
+    const orchestratorHere = Effect.fn(function* (id: string) {
+      const top = yield* topPlace({ id });
+      const rows = yield* membersOf({ channel_id: top.id });
+      return orchestratorIn({ top, members: Arr.map(rows, (m) => m.participant_id), isOrchestrator: () => true });
+    });
+    const before = yield* orchestratorHere("thread");
+    expect(before).toBe("first");
+    yield* removeMember({ channel_id: "room", participant_id: "first", at: 1 });
+    yield* addMember({ channel_id: "room", participant_id: "second", reason: "manual", from_number: 0 });
+    const after = yield* orchestratorHere("thread");
+    const direct = yield* orchestratorHere("direct");
+    expect([after, direct]).toEqual(["second", "manager"]);
   }).pipe(Effect.provide(testDatabase())),
 );

@@ -1,7 +1,6 @@
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
+import { Array as Arr, Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import { defaultOrchestrator } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -22,9 +21,11 @@ import {
   targetOf,
   summaryChannels,
   type UnreadRow,
+  orchestratorIn,
 } from "#/mailbox/envelope.ts";
 import { type NotRecorded, Session } from "#/session/session.ts";
-import { defaultID, orchestratorForChannel, unreadOf } from "#db/channel.sql.ts";
+import { defaultID, topPlace, unreadOf } from "#db/channel.sql.ts";
+import { membersOf } from "#db/channel_member.sql.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
 import * as qr from "#db/mailbox_trigger.sql.ts";
 
@@ -142,11 +143,11 @@ export class Mailbox extends Context.Service<
       const defaultChannelOf = Effect.gen(function* () {
         return (yield* db.one(defaultID()))?.id ?? "";
       });
-      const orchestratorOf = (channel: string): Effect.Effect<string> =>
-        Effect.gen(function* () {
-          const own = (yield* db.one(orchestratorForChannel({ id: channel })))?.agent;
-          return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
-        });
+      const orchestratorInChannel = Effect.fn("Mailbox.orchestratorIn")(function* (channel: string) {
+        const top = yield* db.one(topPlace({ id: channel }));
+        const rows = top === undefined || top.type === "direct" ? [] : yield* db.run(membersOf({ channel_id: top.id }));
+        return orchestratorIn({ top, members: Arr.map(rows, (m) => m.participant_id), isOrchestrator: agents.isOrchestrator });
+      });
       const unreadSummary = Effect.fn("Mailbox.unreadSummary")((participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
         Effect.map(db.run(unreadOf({ participant, channel })), (rows) =>
           rows.slice(0, summaryChannels).map((row) => ({
@@ -214,7 +215,7 @@ export class Mailbox extends Context.Service<
         breaker,
         dispatch: (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
         issueOf,
-        orchestratorOf,
+        orchestratorIn: orchestratorInChannel,
       });
       const flushIssue = (issue: string, human?: boolean) => routeLocked(work.flush(issue, human));
       const restore = writtenLocked(

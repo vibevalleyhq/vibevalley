@@ -61,6 +61,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   default: Schema.Boolean,
   peer: Schema.optionalKey(Schema.String),
   orchestrator: Schema.optionalKey(Schema.String),
+  members: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   parent: Schema.optionalKey(Schema.String),
   category: Schema.String,
   position: Schema.optionalKey(Schema.Finite),
@@ -113,7 +114,7 @@ export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   before: Schema.optionalKey(Schema.String),
-  orchestrator: Schema.optionalKey(Schema.String),
+  members: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
 export const ChannelRequest: Codec<T.ChannelRequest> = Schema.Struct({

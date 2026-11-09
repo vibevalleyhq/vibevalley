@@ -1,6 +1,6 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Fiber, FileSystem, Layer, Path, Schema, Stream } from "effect";
+import { Array as Arr, Clock, Effect, Fiber, FileSystem, Layer, Option, Path, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -251,17 +251,22 @@ describe("the orchestrator", () => {
       expect(log).toContain("私下问你");
 
       const notes = (yield* chat.openChannel("notes-room", "", "")).id;
-      yield* chat.updateChannel(notes, { orchestrator: lead.id });
-      expect(chat.orchestratorOf(notes)).toBe(lead.id);
+      // A new channel has the default orchestrator in it; the owner puts 阿青 there instead.
+      const core = yield* Core;
+      const membersOfNotes = () => Arr.findFirst(core.state().chat?.channels ?? [], (c) => c.id === notes).pipe(Option.map((c) => c.members));
+      expect(membersOfNotes()).toEqual(Option.some([defaultOrchestrator]));
+      yield* chat.updateChannel(notes, { members: [lead.id] });
+      expect(membersOfNotes()).toEqual(Option.some([lead.id]));
+      expect(chat.orchestratorIn(notes)).toBe(lead.id);
       yield* ingress.say("这边怎么样", {}, notes, "");
-      yield* until(() => from(notes, lead.id)[0], "the answer from the one that looks after the channel");
+      yield* until(() => from(notes, lead.id)[0], "the answer from the one in the channel");
       yield* ingress.say(`@${lead.id} 你也看看`, {}, undefined, "");
       yield* until(() => from(chat.defaultChannel(), lead.id)[0], "the answer from the one named");
       yield* ingress.say("默认频道里随便说", {}, undefined, "");
       yield* until(() => from(chat.defaultChannel(), defaultOrchestrator)[0], "the default one's answer");
       expect(asked("默认频道里随便说")[0]!.system).not.toContain("你是管家");
       expect(from(chat.defaultChannel(), lead.id)).toHaveLength(1);
-      expect((yield* Effect.flip(chat.updateChannel(notes, { orchestrator: "lab" })))._tag).toBe("Refused");
+      expect((yield* Effect.flip(chat.updateChannel(notes, { members: ["lab"] })))._tag).toBe("Refused");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

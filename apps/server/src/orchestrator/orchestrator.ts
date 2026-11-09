@@ -155,7 +155,7 @@ const make = (options: OrchestratorOptions = {}) =>
             const by = clock.currentTimeMillisUnsafe() + withinMs;
             return cron.list().some((s) => {
               const next = nextRun(s);
-              return next !== undefined && (s.agent || chat.orchestratorOf(s.channel)) === id && next <= by;
+              return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
             });
           };
           const profile = store.agent(id);

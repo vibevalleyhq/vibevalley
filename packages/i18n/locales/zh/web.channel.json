@@ -129,7 +129,7 @@
     "title": "成员",
     "owner": "主人",
     "none": "这里还没有帮工",
-    "looksAfter": "照看这里的管家"
+    "inChannel": "频道里的管家"
   },
   "composer": {
     "notSent": "没发出去：{why}",
@@ -150,8 +150,8 @@
     "name": "名称",
     "category": "分组（可不填）",
     "categoryHint": "侧栏里按分组列频道",
-    "orchestrator": "照看的管家",
-    "orchestratorHint": "你在这个频道里说话、没 @ 别人时，是它回答",
+    "members": "频道里的管家",
+    "membersHint": "在频道里的管家能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
     "notify": "提醒",
     "notifyAll": "全部",
     "notifyMentions": "只在 @主人 时",

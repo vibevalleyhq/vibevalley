@@ -32,7 +32,7 @@
   "Channel.notice": ["issue"],
   "Channel.notifyOf": ["inbox"],
   "Channel.openChannel": ["tool"],
-  "Channel.orchestratorOf": ["issue", "orchestrator"],
+  "Channel.orchestratorIn": ["issue", "orchestrator"],
   "Channel.orchestratorSays": ["orchestrator"],
   "Channel.ownerInThread": ["issue"],
   "Channel.ownerReads": ["inbox"],

@@ -1,7 +1,7 @@
-import { Formatter, Option, Schema } from "effect";
+import { Array as Arr, Formatter, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { ownerId, VoiceModeValues } from "@vibevalley/protocol";
+import { defaultOrchestrator, ownerId, VoiceModeValues } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -152,18 +152,36 @@ export interface ChannelEnvelopeRow {
 }
 
 /** Collaboration facts from which Mailbox computes audience, brakes, urgency and the durable deliveries. */
+/** The orchestrator in a place, for what names no orchestrator in particular there (a machine's event, a generic @ of
+ * one, work left to one): a direct channel's other one when it is an orchestrator; else, of the members of the channel
+ * the place is in, the default orchestrator when it is one of them, else the first orchestrator; else the default one. */
+export const orchestratorIn = (place: {
+  readonly top: { readonly type: string; readonly peer_id: string | null } | undefined;
+  readonly members: readonly string[];
+  readonly isOrchestrator: (agent: string) => boolean;
+}): string => {
+  const { top, members, isOrchestrator } = place;
+  if (top?.type === "direct") return top.peer_id !== null && isOrchestrator(top.peer_id) ? top.peer_id : defaultOrchestrator;
+  if (Arr.contains(members, defaultOrchestrator)) return defaultOrchestrator;
+  return Option.getOrElse(Arr.findFirst(members, isOrchestrator), () => defaultOrchestrator);
+};
+
 export interface ChannelAudience {
   readonly from: string;
   readonly fromKind: T.ActorKind;
   readonly kind: T.MessageKind;
   readonly mentions: readonly string[];
   readonly channel: Pick<T.Channel, "type" | "peer">;
+  /** The orchestrator in the place (orchestratorIn): who a generic @ of one names. */
   readonly orchestrator: string;
+  /** Who is in the channel the place is in: what is said there to no one in particular, and reports, go to them. */
+  readonly channelMembers: readonly string[];
   readonly orchestrators: readonly string[];
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
   readonly present?: readonly string[] | null;
-  readonly followers: readonly string[];
+  /** A thread's members: what the owner says there goes to them. Empty outside a thread. */
+  readonly members: readonly string[];
   readonly outcome?: T.Outcome;
   readonly spoken?: boolean;
 }

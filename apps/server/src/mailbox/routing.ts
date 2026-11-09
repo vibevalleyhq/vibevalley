@@ -31,7 +31,7 @@ export function whoHears(input: ChannelAudience): Recipient[] {
     return deliveries;
   }
   if (input.kind === "report") {
-    add(input.orchestrator, "addressed", input.outcome === "failed");
+    for (const member of input.channelMembers) add(member, "addressed", input.outcome === "failed");
     return deliveries;
   }
   for (const mention of input.mentions) {
@@ -43,9 +43,9 @@ export function whoHears(input: ChannelAudience): Recipient[] {
   const threadOwner = thread ? (input.threadOwner ?? "") : "";
   if (input.fromKind === "owner") {
     if (threadOwner) add(threadOwner, "own_thread", true);
-    if (thread) for (const follower of input.followers) add(follower, "follower", true);
+    if (thread) for (const member of input.members) add(member, "member", true);
     else {
-      if (!input.mentions.some((mention) => mention !== ownerId)) add(input.orchestrator, "addressed", true);
+      if (!input.mentions.some((mention) => mention !== ownerId)) for (const member of input.channelMembers) add(member, "addressed", true);
       for (const session of input.sessions) add(session, "channel", false);
     }
   } else if (threadOwner) add(threadOwner, "own_thread", true);

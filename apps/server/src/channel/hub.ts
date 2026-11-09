@@ -12,11 +12,11 @@ import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
-import { type Envelope } from "#/mailbox/envelope.ts";
+import { type Envelope, orchestratorIn } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
-import * as qf from "#db/channel_follow.sql.ts";
+import * as qmb from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
@@ -55,16 +55,16 @@ export const channelHub = Effect.gen(function* () {
   const mailbox = yield* Mailbox;
   const sessions = yield* Session;
   const model = new ChatModel();
-  const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
+  const addMember = (channel: string, participant: string, reason: qmb.AddMemberParams["reason"], from: number) =>
     Effect.andThen(
-      db.run(qf.follow({ channel_id: channel, participant_id: participant, reason, from_number: from })),
-      Effect.sync(() => model.followed(channel, participant)),
+      db.run(qmb.addMember({ channel_id: channel, participant_id: participant, reason, from_number: from })),
+      Effect.sync(() => model.memberAdded(channel, participant)),
     );
   const reload = Effect.gen(function* () {
     const channels = yield* db.run(qc.allChannels());
     const participants2 = yield* db.run(qp.participants());
     const cursorsOf = yield* db.run(qr.readCursorsOf({ participant_id: ownerId }));
-    const follows = yield* db.run(qf.allFollows());
+    const follows = yield* db.run(qmb.allMembers());
     model.load(channels, participants2, cursorsOf, follows);
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
@@ -96,17 +96,14 @@ export const channelHub = Effect.gen(function* () {
   });
   const orchestratorIds = () => agents.orchestrators().map((a) => a.id);
   yield* Effect.forEach(orchestratorIds(), (id) => seat(id), { discard: true });
-  if (!(yield* db.one(qc.defaultID())))
+  if (!(yield* db.one(qc.defaultID()))) {
+    const id = newId();
     yield* db.run(
-      qc.createChannel({
-        id: newId(),
-        is_default: true,
-        name: firstChannelName,
-        description: null,
-        repo: null,
-        created_at: yield* Clock.currentTimeMillis,
-      }),
+      qc.createChannel({ id, is_default: true, name: firstChannelName, description: null, repo: null, created_at: yield* Clock.currentTimeMillis }),
     );
+    // The farm's first channel has the default orchestrator in it, as every new channel does (joinDefault).
+    yield* db.run(qmb.addMember({ channel_id: id, participant_id: defaultOrchestrator, reason: "manual", from_number: 0 }));
+  }
   yield* Effect.forEach(
     orchestratorIds(),
     (id) => Effect.flatMap(Clock.currentTimeMillis, (now) => db.run(qc.createDirect({ id: newId(), peer_id: id, created_at: now }))),
@@ -116,13 +113,18 @@ export const channelHub = Effect.gen(function* () {
   );
   yield* reload;
 
-  const orchestratorOfRow = (row: ChannelRow | undefined): string => {
-    if (!row) return defaultOrchestrator;
-    if (row.type === "thread") return orchestratorOfRow(row.parent_id !== null ? model.channel(row.parent_id) : undefined);
-    const own = row.type === "direct" ? row.peer_id : row.orchestrator;
-    // One no longer an orchestrator (its profile gone or made a helper) looks after nothing: the default one does.
-    return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
+  /** A place's channel or direct channel: itself, or the one a thread hangs in. */
+  const topOfRow = (row: ChannelRow | undefined): ChannelRow | undefined =>
+    row?.type === "thread" ? topOfRow(row.parent_id !== null ? model.channel(row.parent_id) : undefined) : row;
+  /** Who is in the channel a place is in; a direct channel has its other one instead. */
+  const membersOfRow = (row: ChannelRow | undefined): string[] => {
+    const top = topOfRow(row);
+    return top === undefined || top.type === "direct" ? [] : model.membersOf(top.id);
   };
+  const orchestratorInRow = (row: ChannelRow | undefined): string =>
+    orchestratorIn({ top: topOfRow(row), members: membersOfRow(row), isOrchestrator: agents.isOrchestrator });
+  /** In a channel from its start: the default orchestrator, so what is said there reaches someone until the owner changes who is in it. */
+  const joinDefault = (channel: string) => addMember(channel, defaultOrchestrator, "manual", 0);
 
   /** A channel's name; none for a thread or what is not there. */
   const channelName = (id: string) => {
@@ -170,7 +172,8 @@ export const channelHub = Effect.gen(function* () {
       type: channelType(row.type),
       default: row.is_default,
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
-      orchestrator: orchestratorOfRow(row),
+      orchestrator: orchestratorInRow(row),
+      ...(row.type === "direct" ? {} : { members: model.membersOf(row.id) }),
       category: row.category ?? "",
       ...(row.position !== null ? { position: row.position } : {}),
       ...(row.archived_at !== null ? { archived: row.archived_at } : {}),
@@ -265,7 +268,7 @@ export const channelHub = Effect.gen(function* () {
     return "";
   };
 
-  /** Inside the root message's transaction: a thread and its first follower appear together. */
+  /** Inside the root message's transaction: a thread and its first member appear together. */
   const threadFor = Effect.fn("Channel.threadFor")(function* (root: { id: string; number: number; channel: string }, subject: ThreadSubject) {
     const existing = model.threadOfRoot(root.id);
     if (existing) return existing;
@@ -296,9 +299,8 @@ export const channelHub = Effect.gen(function* () {
       position: null,
       archived_at: null,
       notify: "all",
-      orchestrator: null,
     });
-    if (subject.owner) yield* follow(id, subject.owner, "owner", root.number);
+    if (subject.owner) yield* addMember(id, subject.owner, "owner", root.number);
     return id;
   });
 
@@ -411,7 +413,7 @@ export const channelHub = Effect.gen(function* () {
   });
   return {
     model,
-    follow,
+    addMember,
     reload,
     tx,
     locked,
@@ -419,7 +421,9 @@ export const channelHub = Effect.gen(function* () {
     ownerReadHub,
     seat,
     orchestratorIds,
-    orchestratorOfRow,
+    orchestratorInRow,
+    membersOfRow,
+    joinDefault,
     channelTags,
     directOfSession,
     talkSession,

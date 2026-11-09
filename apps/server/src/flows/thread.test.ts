@@ -50,7 +50,7 @@ describe("an issue's thread", () => {
       );
       yield* (yield* Issue).setStatus(issue.id, "canceled", "", "", owner);
       const returned = yield* await_(
-        () => Effect.succeed(mailbox.deliveriesOf(chat.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
+        () => Effect.succeed(mailbox.deliveriesOf(chat.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
         (rows) => rows.length === 1,
         "the unread followup returned",
       );
@@ -95,7 +95,7 @@ describe("an issue's thread", () => {
       );
       yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
       yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
-      const returned = mailbox.deliveriesOf(channels.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
+      const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
       expect(returned).toHaveLength(1);
       expect(returned[0]!.payload.trigger.id).toBe(followup.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

@@ -153,7 +153,7 @@ export interface Write {
   readonly answers?: T.SessionId;
   readonly thread?: ThreadSubject;
   /** A participant who follows the channel from this message on, in the same transaction. */
-  readonly follow?: string;
+  readonly member?: string;
   /** The client's key for one send: the same key from the same sender again is that message, not a new one. */
   readonly sendKey?: string;
   /** The number of the message in the same channel it answers. */
@@ -250,8 +250,8 @@ export interface ChannelService {
   /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
   readonly notifyOf: (id: string) => T.Notify;
   readonly direct: (agent: string) => Effect.Effect<string, ApiError>;
-  /** The orchestrator a place is looked after by. */
-  readonly orchestratorOf: (channel: string) => string;
+  /** The orchestrator in a place (mailbox/envelope.ts orchestratorIn): who work left to an orchestrator there goes to. */
+  readonly orchestratorIn: (channel: string) => string;
   readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
   /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */
   readonly topOf: (channel: string) => Effect.Effect<Info>;

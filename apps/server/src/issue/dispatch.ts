@@ -144,7 +144,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       channel: string,
       input?: { readonly text: string; readonly by: T.RunTrigger },
     ) {
-      const agent = assignedAgentOf(issue) || chat.orchestratorOf((yield* chat.topOf(channel)).id);
+      const agent = assignedAgentOf(issue) || chat.orchestratorIn((yield* chat.topOf(channel)).id);
       if (!sessions.sessionOf(agent)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
       yield* recordOrchestratorStart(issue, agent, channel, input);
     });
@@ -287,7 +287,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       const issue =
         found ??
         (yield* add(
-          { title: s.name, description: s.text, ...(repo ? { repo } : {}), agent: s.agent ?? chat.orchestratorOf(channel.id) },
+          { title: s.name, description: s.text, ...(repo ? { repo } : {}), agent: s.agent ?? chat.orchestratorIn(channel.id) },
           inferredMandate(input.id),
           s.id,
         ));

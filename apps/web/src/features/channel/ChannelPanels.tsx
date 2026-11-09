@@ -1,8 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
+import { Array as Arr } from "effect";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, ownerId } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus, useNow } from "#/base/dom.tsx";
@@ -538,7 +539,14 @@ export function Members(props: { channel: Channel }) {
   const act = createAct();
   const now = useNow();
   const orchestrators = useOrchestrators();
-  const here = () => props.channel.orchestrator ?? defaultOrchestrator;
+  const isOrchestrator = (id: string) => Arr.some(orchestrators(), (a) => a.id === id);
+  // The orchestrators in the place: a direct channel's other one, or those the owner put in the channel.
+  const inside = () =>
+    props.channel.type === "direct"
+      ? props.channel.peer !== undefined && isOrchestrator(props.channel.peer)
+        ? [props.channel.peer]
+        : []
+      : Arr.filter(props.channel.members ?? [], isOrchestrator);
   const nameOf = (id: string) => orchestrators().find((a) => a.id === id)?.name || t("web.channel.orchestrator");
   const helpers = () => {
     if (props.channel.type === "direct") return [];
@@ -552,14 +560,18 @@ export function Members(props: { channel: Channel }) {
         <span {...stylex.attrs(viewStyles.membersSpan)}>{t("web.channel.members.owner").slice(0, 1)}</span>
         {t("web.channel.members.owner")}
       </div>
-      <div data-testid="member-orchestrator" data-key={here()} {...stylex.attrs(viewStyles.membersDiv)}>
-        <OrchestratorFace size={28} agent={here()} />
-        <span {...stylex.attrs(viewStyles.membersSpan2)}>
-          <span {...stylex.attrs(viewStyles.membersSpan3)}>{nameOf(here())}</span>
-          <span {...stylex.attrs(viewStyles.membersSpan4)}>{t("web.channel.members.looksAfter")}</span>
-        </span>
-        <span {...stylex.attrs(viewStyles.membersSpan5)}>{orchestratorMoodLabels[orchestratorMood(core(), here())]}</span>
-      </div>
+      <For each={inside()} keyed={(id) => id}>
+        {(id) => (
+          <div data-testid="member-orchestrator" data-key={id()} {...stylex.attrs(viewStyles.membersDiv)}>
+            <OrchestratorFace size={28} agent={id()} />
+            <span {...stylex.attrs(viewStyles.membersSpan2)}>
+              <span {...stylex.attrs(viewStyles.membersSpan3)}>{nameOf(id())}</span>
+              <span {...stylex.attrs(viewStyles.membersSpan4)}>{t("web.channel.members.inChannel")}</span>
+            </span>
+            <span {...stylex.attrs(viewStyles.membersSpan5)}>{orchestratorMoodLabels[orchestratorMood(core(), id())]}</span>
+          </div>
+        )}
+      </For>
       <For each={helpers()} keyed={(h) => h.id}>
         {(h) => (
           <div {...stylex.attrs(viewStyles.membersDiv)}>

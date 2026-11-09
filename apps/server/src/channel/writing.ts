@@ -29,11 +29,12 @@ export const channelWriting = (r: ChannelHub) =>
     const mailbox = yield* Mailbox;
     const {
       model,
-      follow,
+      addMember,
       tx,
       locked,
       orchestratorIds,
-      orchestratorOfRow,
+      orchestratorInRow,
+      membersOfRow,
       channelOfSession,
       hired,
       publishChannel,
@@ -55,7 +56,7 @@ export const channelWriting = (r: ChannelHub) =>
       if (!ch) return yield* Effect.die(Inconsistent.make({ message: `no channel ${row.channel_id}` }));
       const meta = metaOf(row.meta);
       const orchestrators = orchestratorIds();
-      const here = orchestratorOfRow(ch);
+      const here = orchestratorInRow(ch);
       // No one else is in a direct channel to be named.
       const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
       const sessionsNow = hired();
@@ -77,19 +78,19 @@ export const channelWriting = (r: ChannelHub) =>
         row = { ...row, meta: metaText({ ...meta, mentions }) };
         yield* db.run(qm.updateMessageMeta({ meta: row.meta, id: row.id }));
       }
-      let followers: string[] = [];
+      let members: string[] = [];
       if (ch.type === "thread") {
-        // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
-        if (row.sender_id !== "system" && row.kind !== "dispatch") yield* follow(ch.id, row.sender_id, "replied", row.number);
+        // A dispatch handing the issue to its next session makes no one a member: the orchestrator would be woken by every word in it.
+        if (row.sender_id !== "system" && row.kind !== "dispatch") yield* addMember(ch.id, row.sender_id, "replied", row.number);
         yield* Effect.forEach(
           named,
           (m) =>
             Effect.gen(function* () {
-              if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) yield* follow(ch.id, m.id, "mentioned", row.number - 1);
+              if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) yield* addMember(ch.id, m.id, "mentioned", row.number - 1);
             }),
           { discard: true },
         );
-        followers = model.followers(ch.id);
+        members = model.membersOf(ch.id);
       }
       const audience = sessionsNow.filter((h) => ch.type === "thread" || channelOfSession(h) === ch.id).map((h) => h.id);
       const heard = {
@@ -99,11 +100,12 @@ export const channelWriting = (r: ChannelHub) =>
         mentions,
         channel: { type: channelType(ch.type), ...(ch.peer_id !== null ? { peer: ch.peer_id } : {}) },
         orchestrator: here,
+        channelMembers: membersOfRow(ch),
         orchestrators,
         threadOwner: ownerOf(ch),
         sessions: audience,
         present,
-        followers,
+        members,
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
         spoken: meta.spoken === true && meta.ingressSource !== "voice",
       };
@@ -181,7 +183,7 @@ export const channelWriting = (r: ChannelHub) =>
           };
           const out: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
           if (w.readBy) yield* readUpTo(w.readBy, w.channel, number);
-          if (w.follow) yield* follow(w.channel, w.follow, "owner", number);
+          if (w.member) yield* addMember(w.channel, w.member, "owner", number);
           if (w.thread) out.thread = yield* threadFor({ id, number, channel: w.channel }, w.thread);
           return out;
         }),

@@ -86,8 +86,12 @@ export interface Channel {
   default: boolean;
   /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
-  /** The orchestrator that looks after the place, by its profile id, as the server resolves it. The owner's words there go to it. */
+  /** The orchestrator in the place, by its profile id, as the server resolves it: a direct channel's other one, else one
+   * of the members of the channel it is in, else the default one. What names no orchestrator in particular there (a
+   * generic @ of it, work left to one) goes to it. */
   orchestrator?: string;
+  /** Who is in a channel or follows a thread, by participant id: what is said there to no one in particular goes to them. */
+  members?: string[];
   /** A thread's channel. */
   parent?: string;
   /** A channel's group in the sidebar. */
@@ -185,8 +189,8 @@ export interface ChannelUpdate {
   category?: string;
   /** Placed before this channel in the sidebar; empty is last. */
   before?: string;
-  /** The orchestrator that looks after the channel, by its profile id; empty is the default one. */
-  orchestrator?: string;
+  /** The agents in the channel, by profile id: what is said there to no one in particular goes to them. Only orchestrators can be. */
+  members?: string[];
 }
 
 export interface ChannelRequest {

@@ -2361,7 +2361,7 @@ export const catalogs = {
         editHint: "回车存下 · Esc 不改了",
       },
       pins: { open: "置顶的消息", title: "置顶", none: "这里还没有置顶的消息", failed: "置顶没读到：{why}" },
-      members: { open: "成员", title: "成员", owner: "主人", none: "这里还没有帮工", looksAfter: "照看这里的管家" },
+      members: { open: "成员", title: "成员", owner: "主人", none: "这里还没有帮工", inChannel: "频道里的管家" },
       composer: {
         notSent: "没发出去：{why}",
         who: "叫谁",
@@ -2381,8 +2381,8 @@ export const catalogs = {
         name: "名称",
         category: "分组（可不填）",
         categoryHint: "侧栏里按分组列频道",
-        orchestrator: "照看的管家",
-        orchestratorHint: "你在这个频道里说话、没 @ 别人时，是它回答",
+        members: "频道里的管家",
+        membersHint: "在频道里的管家能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
         notify: "提醒",
         notifyAll: "全部",
         notifyMentions: "只在 @主人 时",
@@ -6928,7 +6928,7 @@ export const catalogs = {
         editHint: "Enter saves · Esc cancels",
       },
       pins: { open: "Pinned messages", title: "Pinned", none: "Nothing is pinned here yet", failed: "Could not read the pins: {why}" },
-      members: { open: "Members", title: "Members", owner: "Owner", none: "No helpers here yet", looksAfter: "The manager looking after this" },
+      members: { open: "Members", title: "Members", owner: "Owner", none: "No helpers here yet", inChannel: "A manager in the channel" },
       composer: {
         notSent: "Not sent: {why}",
         who: "Who",
@@ -6948,8 +6948,8 @@ export const catalogs = {
         name: "Name",
         category: "Group (optional)",
         categoryHint: "The sidebar lists channels by group",
-        orchestrator: "Looked after by",
-        orchestratorHint: "When you speak here without @ anyone, this manager answers",
+        members: "Managers in the channel",
+        membersHint: "The managers in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
         notify: "Notify",
         notifyAll: "All",
         notifyMentions: "Only @owner",
@@ -11428,6 +11428,8 @@ export interface Messages {
   "web.channel.manage.category": undefined;
   "web.channel.manage.categoryHint": undefined;
   "web.channel.manage.drag": undefined;
+  "web.channel.manage.members": undefined;
+  "web.channel.manage.membersHint": undefined;
   "web.channel.manage.mentionsOnly": undefined;
   "web.channel.manage.muted": undefined;
   "web.channel.manage.name": undefined;
@@ -11436,8 +11438,6 @@ export interface Messages {
   "web.channel.manage.notifyHint": undefined;
   "web.channel.manage.notifyMentions": undefined;
   "web.channel.manage.notifyNone": undefined;
-  "web.channel.manage.orchestrator": undefined;
-  "web.channel.manage.orchestratorHint": undefined;
   "web.channel.manage.remove": undefined;
   "web.channel.manage.removeSure": undefined;
   "web.channel.manage.removeWill": undefined;
@@ -11448,7 +11448,7 @@ export interface Messages {
   "web.channel.media.preview": undefined;
   "web.channel.media.takeOff": { readonly name: string | number };
   "web.channel.media.uploadingFile": { readonly name: string | number; readonly percent: string | number };
-  "web.channel.members.looksAfter": undefined;
+  "web.channel.members.inChannel": undefined;
   "web.channel.members.none": undefined;
   "web.channel.members.open": undefined;
   "web.channel.members.owner": undefined;

@@ -12,7 +12,7 @@ import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { channelNameProblem, mentionsIn, parseChatTarget } from "./mentions.ts";
 import { parseSearch } from "./messages.ts";
-import { Follows } from "./rooms.ts";
+import { Members } from "./rooms.ts";
 
 const chatAudience = (input: ChannelAudience & BrakeInput) => brakes(whoHears(input), input);
 
@@ -77,9 +77,10 @@ test("with several orchestrators: the place's hears the owner, 管家 is the pla
     mentions: [],
     channel: { type: "channel" },
     orchestrator: "lead",
+    channelMembers: ["lead"],
     orchestrators: ["orchestrator", "lead"],
     sessions: ["w1"],
-    followers: [],
+    members: [],
     hops: 0,
     cooling: [],
     broken: [],
@@ -88,6 +89,8 @@ test("with several orchestrators: the place's hears the owner, 管家 is the pla
     ["lead", "addressed", true],
     ["w1", "channel", false],
   ]);
+  // No one in the channel: what the owner says there to no one in particular wakes no one.
+  expect(chatAudience({ ...base, channelMembers: [] })).toEqual([{ recipient: "w1", reason: "channel", wakes: false }]);
   expect(chatAudience({ ...base, mentions: ["orchestrator"] }).map((d) => [d.recipient, d.reason])).toEqual([
     ["orchestrator", "mention"],
     ["w1", "channel"],
@@ -101,23 +104,23 @@ test("with several orchestrators: the place's hears the owner, 管家 is the pla
 
 describe("channel follows", () => {
   it("loads and updates who follows each thread", () => {
-    const follows = new Follows();
+    const follows = new Members();
     follows.load([{ channel_id: "t", participant_id: "w3" }]);
-    follows.followed("t", "w1");
-    follows.followed("t", "w3");
-    expect(follows.followers("t")).toEqual(["w1", "w3"]);
-    expect(follows.followers("other")).toEqual([]);
+    follows.memberAdded("t", "w1");
+    follows.memberAdded("t", "w3");
+    expect(follows.membersOf("t")).toEqual(["w1", "w3"]);
+    expect(follows.membersOf("other")).toEqual([]);
   });
 
   it("forgets a session that left", () => {
-    const follows = new Follows();
+    const follows = new Members();
     follows.load([
       { channel_id: "t", participant_id: "w3" },
       { channel_id: "u", participant_id: "w3" },
       { channel_id: "u", participant_id: "w1" },
     ]);
     follows.left("w3");
-    expect([follows.followers("t"), follows.followers("u")]).toEqual([[], ["w1"]]);
+    expect([follows.membersOf("t"), follows.membersOf("u")]).toEqual([[], ["w1"]]);
   });
 });
 

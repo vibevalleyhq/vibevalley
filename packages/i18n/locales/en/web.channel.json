@@ -129,7 +129,7 @@
     "title": "Members",
     "owner": "Owner",
     "none": "No helpers here yet",
-    "looksAfter": "The manager looking after this"
+    "inChannel": "A manager in the channel"
   },
   "composer": {
     "notSent": "Not sent: {why}",
@@ -150,8 +150,8 @@
     "name": "Name",
     "category": "Group (optional)",
     "categoryHint": "The sidebar lists channels by group",
-    "orchestrator": "Looked after by",
-    "orchestratorHint": "When you speak here without @ anyone, this manager answers",
+    "members": "Managers in the channel",
+    "membersHint": "The managers in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
     "notify": "Notify",
     "notifyAll": "All",
     "notifyMentions": "Only @owner",
