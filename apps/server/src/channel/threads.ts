@@ -32,7 +32,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       directOfSession,
       channelOfSession,
       sessionOf,
-      workers,
+      hired,
       threadOf,
       threadOfSession,
       setRead,
@@ -96,7 +96,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
     });
 
     const sessionsLeft = Effect.gen(function* () {
-      const on = new Set<string>(workers().map((h) => h.id));
+      const on = new Set<string>(hired().map((h) => h.id));
       const now = yield* Clock.currentTimeMillis;
       for (const p of model.participants()) {
         if (p.kind !== "session" || p.left_at !== null || on.has(p.id)) continue;
@@ -133,7 +133,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
           if (closed) return Effect.void;
           switch (n._tag) {
             case "Hired":
-              return Effect.forEach(workers(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), {
+              return Effect.forEach(hired(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), {
                 discard: true,
               });
             case "Left":
@@ -150,7 +150,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       if (written.heldNotice) yield* write({ channel: row.channel_id, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
     }, locked);
     const start = Effect.gen(function* () {
-      yield* locked(Effect.forEach(workers(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
+      yield* locked(Effect.forEach(hired(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
       // Each row once, in order: one that cannot be routed stays unrouted, and is not fetched again.
       let after = { after_channel: "", after_number: 0 };
       while (true) {

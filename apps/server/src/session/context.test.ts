@@ -112,11 +112,11 @@ describe("an agent's channel context", () => {
       const room = yield* sessions.makeRoom("pi", "");
       expect(room).toHaveProperty("evicted");
       expect(executor.all()).toHaveLength(maxRunning - 1);
-      expect(sessions.workers().map((s) => s.id)).toEqual(ids);
+      expect(sessions.hired().map((s) => s.id)).toEqual(ids);
       for (const id of ids) yield* sessions.suspend(id);
       const room2 = yield* sessions.makeRoom("pi", "");
       expect(room2).toEqual({});
-      expect(sessions.workers()).toHaveLength(maxRunning);
+      expect(sessions.hired()).toHaveLength(maxRunning);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime] })));
   });
 
@@ -130,7 +130,7 @@ describe("an agent's channel context", () => {
       expect(hired.session).toBeUndefined();
       expect(hired.retainedWork).toBeUndefined();
       expect(readdirSync(join(config.workRoot, "contexts"))).toEqual([]);
-      expect(sessions.workers()).toEqual([]);
+      expect(sessions.hired()).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
 

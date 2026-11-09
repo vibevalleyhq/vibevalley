@@ -227,7 +227,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const situation = (channel: string) =>
       Effect.gen(function* () {
         const sessions = yield* agentLines;
-        const roster = run.workers();
+        const roster = run.hired();
         const here = yield* chat.addressOf(channel);
         const byChannel = (yield* chat.channels()).map((c) => {
           const theirs = roster.filter((session) => (session.channel ?? chat.defaultChannel()) === c.id).map((session) => tool.sessionLine(session));

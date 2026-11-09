@@ -1,6 +1,12 @@
 import type * as T from "@vibevalley/protocol";
 
 // Finding and changing a session in the core state. Nothing here changes what it is given.
+
+/** On duty: the agent's one standing session, its id the profile's and there from startup. The others are hired for a
+ * piece of work and leave. Today the role decides it, here alone: an orchestrator is on duty. */
+export const isOnDuty = (who: { readonly role: T.AgentRole }): boolean => who.role === "orchestrator";
+/** Hired for a piece of work, and gone once it is done: a helper's session. */
+export const isHired = (who: { readonly role: T.AgentRole }): boolean => who.role === "worker";
 export const sessionOf = (state: T.SpaceState, id: string) => state.sessions.find((h) => h.id === id);
 
 /** The session working the issue now: the latest hired of those on it. */

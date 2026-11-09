@@ -30,8 +30,8 @@ Status: proposed
 |---|---|---|
 | 农场里的一个人 | agent（档案 `T.Agent`） | — |
 | 他的职务 | role：`orchestrator`（管家）、`worker`（帮工） | — |
-| 一直当值的人的那个会话 | 当值 on duty：`Session.keepOnDuty(profile)`（内部），`isOnDuty(session)` | `registerOrchestrator`；按 `role === "orchestrator"` 判会话怎么来的地方 |
-| 按活雇来的会话 | hired：`Session.hire`、`Hired`（已有） | — |
+| 一直当值的人的那个会话 | 当值 on duty：`keepOnDuty(profile)`（帮工模块内部），`isOnDuty(who)` | `registerOrchestrator`；按 `role === "orchestrator"` 判会话怎么来的地方 |
+| 按活雇来的会话 | hired：`Session.hire`、`Hired`（已有），`isHired(who)`，`Session.hired()` | `role === "worker"` 问会话怎么来的地方；`Session.workers` |
 | 在服务端进程里干活 | hosted：`Session.host`、`AgentHost`（已有），问法 `isHosted(id)` | 泵里的 `isOrchestrator` |
 | 在农机上干活 | launched：`launch`（已有） | — |
 | 频道的负责人：没点名的话他接 | keeper：`keeperOf`，列 `channel.keeper` | `orchestratorOf`、`orchestratorOfRow`、`OrchestratorForChannel`、列 `channel.orchestrator`、`setOrchestrator` |
@@ -50,6 +50,16 @@ Status: proposed
 5. **话是谁说的。** `ActorKind` 收成 `owner | agent | system`，agent 带 `role`。改 protocol 形状和页面，单独一步，放最后。
 
 改名用 tsgo 的 LSP 重命名，SQL、列和字面量用 ast-grep 限定文件改；每步跑 `vp check`、`server:check`、`effect:check`、`practice:check`、`paths:check`、`docs:verify`，碰页面的跑 `web:check`。
+
+## 进度
+
+| 步 | 状态 | 提交 | 做了什么 |
+|---|---|---|---|
+| 1 当值 | 完成 | 本提交 | `isOnDuty`、`isHired` 在 `session/roster.ts` 各定义一次（两个都正着写：黄金数据里有没带 `role` 的会话，取反会把它们算成雇来的）；`keepOnDuty`；`Session.workers` 改叫 `hired` |
+| 2 频道负责人 | 未做 | — | |
+| 3 在哪干 | 未做 | — | |
+| 4 名字只说职务的 | 未做 | — | |
+| 5 话是谁说的 | 未做 | — | |
 
 ## Alternatives considered
 

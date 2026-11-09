@@ -9,6 +9,7 @@ import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { Repo } from "#/repo/repo.ts";
+import { isHired } from "#/session/roster.ts";
 import * as q from "#db/game_ledger.sql.ts";
 
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
@@ -119,7 +120,7 @@ const make = Effect.gen(function* () {
       Effect.gen(function* () {
         if (fact.type === "progressChanged" && fact.commits === undefined && fact.station === undefined) return;
         if (fact.type === "sessionReported") yield* soon;
-        if (fact.type === "sessionChanged" && fact.session.role === "worker") {
+        if (fact.type === "sessionChanged" && isHired(fact.session)) {
           const wish = wanted;
           wanted = undefined;
           if (wish && wish.until > fact.at) yield* core.apply({ type: "progressChanged", station: { id: fact.session.id, station: wish.station } });

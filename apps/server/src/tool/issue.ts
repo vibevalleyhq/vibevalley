@@ -68,7 +68,7 @@ export const issueTools = Effect.gen(function* () {
 
   // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
-    const all = run.workers();
+    const all = run.hired();
     return all.find((session) => session.id === key) ?? all.find((session) => session.name === key) ?? all.find((session) => key.includes(session.name));
   };
 
@@ -120,7 +120,7 @@ export const issueTools = Effect.gen(function* () {
 
   const roster = tool("session.list", () =>
     Effect.sync(() => {
-      const all = run.workers();
+      const all = run.hired();
       return all.length === 0
         ? answers.roster.empty
         : all.map((session) => sessionLine(session, clock.currentTimeMillisUnsafe(), numberOf(session))).join("\n");
@@ -131,7 +131,7 @@ export const issueTools = Effect.gen(function* () {
     Effect.sync(() => {
       // Listed without @: an @ wakes someone, and models copy what they read.
       const lines = [answers.sessionList.intro];
-      for (const h of run.workers())
+      for (const h of run.hired())
         lines.push(
           answers.sessionList.row(
             h.id,

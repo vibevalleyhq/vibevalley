@@ -23,7 +23,7 @@ import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { sourceBrief } from "./prompts.ts";
 import { handsToOwner, summaryOf } from "./report.ts";
-import { sessionOnIssue } from "./roster.ts";
+import { isHired, isOnDuty, sessionOnIssue } from "./roster.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
 import type { Delivered, DeliveryInput, RunFinished, SessionNews } from "./signals.ts";
 
@@ -95,7 +95,7 @@ export class Session extends Context.Service<
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
     readonly sessionOf: (id: string) => T.Session | undefined;
     /** The helpers on the farm as the core state has them, whether or not this process holds them now. */
-    readonly workers: () => readonly T.Session[];
+    readonly hired: () => readonly T.Session[];
     /** This process holds it now (between launches too): it can be handed a message. */
     readonly isReachable: (id: string) => boolean;
     /** Its complete last answer, kept out of the core frame. */
@@ -147,11 +147,11 @@ export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefin
   switch (fact.type) {
     case "sessionChanged": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
-      return session?.role === "worker" ? { _tag: "Hired", session } : undefined;
+      return session !== undefined && isHired(session) ? { _tag: "Hired", session } : undefined;
     }
     case "sessionReported": {
       const session = after.sessions.find((h) => h.id === fact.id);
-      return session?.role === "worker" ? { _tag: "Reported", report: fact, session } : undefined;
+      return session !== undefined && isHired(session) ? { _tag: "Reported", report: fact, session } : undefined;
     }
     case "sessionLeft":
       return { _tag: "Left", left: fact };
@@ -203,7 +203,7 @@ const make = Effect.gen(function* () {
   yield* Effect.forkScoped(
     Stream.runForEach(moves, ({ fact, after }) => {
       const news = newsOf(fact, after);
-      if (news?._tag === "Reported" && news.session?.role === "worker" && news.session.issue === undefined) {
+      if (news?._tag === "Reported" && news.session !== undefined && isHired(news.session) && news.session.issue === undefined) {
         const id = news.session.id;
         const deadline = fact.at + 10 * 60_000;
         void later(
@@ -250,7 +250,7 @@ const make = Effect.gen(function* () {
         .filter((n) => Number.isFinite(n)),
     );
     for (const row of kept) {
-      if (row.role === "orchestrator") continue;
+      if (isOnDuty(row)) continue;
       const session = core.session(row.id) ?? restoredSession(row);
       const place = row.place ? placeOf(row.place) : undefined;
       if (!place || !(yield* Effect.orElseSucceed(fs.exists(place.cwd), () => false))) {
@@ -614,7 +614,7 @@ const make = Effect.gen(function* () {
     }),
     events: (id, r) => trajectories.events(id, r),
     sessionOf: (id) => core.session(id),
-    workers: () => core.state().sessions.filter((s) => s.role === "worker"),
+    hired: () => core.state().sessions.filter(isHired),
     isReachable: (id) => hands.has(id),
     lastTextOf: (id) => hands.get(id)?.lastText ?? "",
     cwdOf: (id) => hands.get(id)?.place.cwd,

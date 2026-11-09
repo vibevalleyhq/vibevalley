@@ -142,7 +142,7 @@ const channelLayer = (x: FakeSessions) =>
       const sessions = {
         isReachable: (id: string) => x.core.session(id) !== undefined,
         sessionOf: (id: string) => x.core.session(id),
-        workers: () => x.core.state().sessions.filter((s) => s.role === "worker"),
+        hired: () => x.core.state().sessions.filter((s) => s.role === "worker"),
         deliver: (id: string, text: string, input: Parameters<Session["Service"]["deliver"]>[2]) =>
           Effect.sync(() => x.deliver(id, text, () => x.consumed({ session: id, envelopeIds: [...input.envelopeIds] }))),
         runOf: () => undefined,

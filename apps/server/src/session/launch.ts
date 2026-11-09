@@ -19,6 +19,7 @@ import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/rep
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
 import { workerInstructions, channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
+import { isHired } from "./roster.ts";
 import type { Delivered, DeliveryInput } from "./signals.ts";
 import type { SessionWatch } from "./watch.ts";
 import { WorkerAccess } from "./worker.ts";
@@ -157,7 +158,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     });
 
     const capacity = (): Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "phase">[] => {
-      const visible = core.state().sessions.filter((s) => s.role === "worker");
+      const visible = core.state().sessions.filter(isHired);
       return [
         ...visible.map((s) => {
           const h = hands.get(s.id);

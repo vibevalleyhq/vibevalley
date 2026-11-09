@@ -4,7 +4,7 @@ import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { withChannel, withMessage, withOwnerMentions } from "#/channel/messages.ts";
 import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "#/game/view.ts";
 import { withIssue, withIssueStatuses } from "#/issue/status.ts";
-import { sessionOf, withSession } from "#/session/roster.ts";
+import { isOnDuty, sessionOf, withSession } from "#/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
@@ -75,7 +75,7 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
     case "sessionChanged": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
-      if (f.session.role === "orchestrator") return [{ ...state, sessions: [...others, f.session] }, true];
+      if (isOnDuty(f.session)) return [{ ...state, sessions: [...others, f.session] }, true];
       const plays = state.plays ?? {};
       const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
       return [{ ...state, sessions: [...others, f.session], plays: { ...plays, [f.session.id]: play } }, true];

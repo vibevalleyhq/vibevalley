@@ -537,7 +537,7 @@ describe("issues", () => {
       const issues2 = yield* issues.list();
       expect(issues2).toEqual([]);
       expect(core.state().issues).toEqual([]);
-      expect(sessions.workers()).toEqual([]);
+      expect(sessions.hired()).toEqual([]);
       noWorktree(f.config.workRoot);
 
       const existing = yield* issues.add({ title: "already queued", repo: "demo", agent: agent.id });
@@ -567,7 +567,7 @@ describe("issues", () => {
       const got = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo");
       expect(got.refused).toContain("test write failure");
       expect(got.session).toBeUndefined();
-      expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.workers().length]).toEqual([0, 0]);
+      expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.hired().length]).toEqual([0, 0]);
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

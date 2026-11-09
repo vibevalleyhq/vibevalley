@@ -521,7 +521,7 @@ export class Mailbox extends Context.Service<
             }).pipe(bestEffort(`mailbox: restore issue ${issue.id}`)),
           { discard: true },
         );
-        yield* Effect.forEach(sessions.workers(), (session) => pumpLocked(pump.kick(session.id)), { discard: true });
+        yield* Effect.forEach(sessions.hired(), (session) => pumpLocked(pump.kick(session.id)), { discard: true });
       });
       yield* Effect.forkScoped(api.replay.pipe(Effect.repeat(Schedule.spaced(config.chat.retryWakeMs)), Effect.delay(config.chat.retryWakeMs)));
       yield* Effect.addFinalizer(() =>

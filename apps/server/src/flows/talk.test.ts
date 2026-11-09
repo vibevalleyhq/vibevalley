@@ -71,18 +71,18 @@ describe("a talk with a helper profile", () => {
       const answers = () => saidIn(dm).filter((m) => m.kind === "report").length;
       yield* channels.say("你好，记得这段对话", dm, "");
       yield* until(() => answers() === 1, "the first answer");
-      const first = sessions.workers().find((s) => s.channel === dm);
+      const first = sessions.hired().find((s) => s.channel === dm);
       expect(first).toMatchObject({ agent: "lab", channel: dm });
       expect(first?.issue).toBeUndefined();
       expect(first?.repo).toBeUndefined();
       yield* TestClock.adjust(10 * 60_000);
       yield* until(() => disposed === 1, "the idle execution suspended");
-      expect(sessions.workers().find((s) => s.channel === dm)?.id).toBe(first?.id);
+      expect(sessions.hired().find((s) => s.channel === dm)?.id).toBe(first?.id);
       yield* channels.say("接着聊", dm, "");
       yield* until(() => answers() === 2, "the resumed answer");
       expect(
         sessions
-          .workers()
+          .hired()
           .filter((s) => s.channel === dm)
           .map((s) => s.id),
       ).toEqual([first?.id]);
@@ -136,7 +136,7 @@ describe("a talk with a helper profile", () => {
       yield* Effect.promise(() => opening.promise);
       yield* channels.say("启动中的第二句", dm, "");
       opened.resolve();
-      yield* until(() => sessions.workers().some((s) => s.channel === dm), "the context registered");
+      yield* until(() => sessions.hired().some((s) => s.channel === dm), "the context registered");
       releaseFirst.resolve();
       yield* until(() => said(dm).filter((m) => m.kind === "report").length === 2, "both inputs answered");
       expect(starts).toBe(1);
@@ -194,7 +194,7 @@ describe("a talk with a helper profile", () => {
           (rows) => rows.length === 1 && rows[0]?.state === "consumed",
           "the input receipt persisted before restart",
         );
-        const context = sessions.workers().find((s) => s.channel === dm);
+        const context = sessions.hired().find((s) => s.channel === dm);
         if (!context) throw new Error("the conversation has no session");
         yield* (yield* Core).apply({ type: "progressChanged", station: { id: context.id, station: 3 } });
         return { dm, session: context.id };
@@ -207,7 +207,7 @@ describe("a talk with a helper profile", () => {
         yield* channels.start;
         const direct2 = yield* channels.direct("lab");
         expect(direct2).toBe(first.dm);
-        expect(sessions.workers().find((s) => s.channel === first.dm)?.id).toBe(first.session);
+        expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);
         expect((yield* Core).state().plays?.[first.session]?.station).toBe(0);
         yield* channels.say("重启之后", first.dm, "");
         yield* until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");

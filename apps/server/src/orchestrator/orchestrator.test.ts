@@ -179,10 +179,10 @@ describe("the orchestrator", () => {
       expect(tool).toMatchObject({ tool: "issue_create", text: "记一张工单：demo" });
       expect(tool!.input).toContain(`"repo":"demo"`);
       expect(answer!.text).toBe("好，记下了");
-      expect(sessions.workers().map((session) => session.repo)).toEqual(["demo"]);
-      const worker = sessions.workers()[0]!;
+      expect(sessions.hired().map((session) => session.repo)).toEqual(["demo"]);
+      const worker = sessions.hired()[0]!;
       expect((yield* (yield* Resource).read(worker.id, { uri: `vv://trigger/${origin.id}` })).text).toContain(origin.text);
-      yield* until(() => sessions.workers()[0]?.lastRun, "its report");
+      yield* until(() => sessions.hired()[0]?.lastRun, "its report");
 
       const before = f.requests.length;
       yield* ingress.owner({ source: "voice", voiceMode: "dictated", text: "随便说一句", envelope: "" });
@@ -546,7 +546,7 @@ describe("the orchestrator", () => {
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
       helper = hired.session!.id;
       number = (yield* issues.get(hired.session!.issue!)).number;
-      yield* until(() => sessions.workers().some((session) => session.id === helper && session.phase._tag === "done"), "the work handed back");
+      yield* until(() => sessions.hired().some((session) => session.id === helper && session.phase._tag === "done"), "the work handed back");
       yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
       const thread = (yield* chat.threadOfSession(helper))!;
       const refused = yield* until(() => saidIn(thread).find((m) => m.from === defaultOrchestrator && m.text.startsWith("合并：")), "the completion refused");
@@ -657,7 +657,7 @@ describe("the orchestrator", () => {
       yield* enableLab;
       yield* ingress.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(
-        () => sessions.workers().some((session) => session.brief.split("\n")[0] === "加个 CHANGELOG" && session.phase._tag === "done"),
+        () => sessions.hired().some((session) => session.brief.split("\n")[0] === "加个 CHANGELOG" && session.phase._tag === "done"),
         "the work handed back",
       );
       yield* inbox.patrol;

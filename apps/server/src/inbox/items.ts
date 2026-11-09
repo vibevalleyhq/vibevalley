@@ -4,6 +4,7 @@ import { everyone, ownerId, type Notify } from "@vibevalley/protocol";
 import { cut, defaultOf, latestSessionIdOf, needOf, omitUndefined, oneLine, slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "#/base/clip.ts";
+import { isOnDuty } from "#/session/roster.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
 
@@ -49,7 +50,7 @@ function gathered(state: T.SpaceState): Unworded[] {
   // The channel is the session's or the default one; a farm without channels has neither.
   const push = (e: Omit<Unworded, "channel"> & { readonly channel: string | undefined }) => out.push(omitUndefined(e));
   for (const h of state.sessions) {
-    if (h.role === "orchestrator") continue;
+    if (isOnDuty(h)) continue;
     const want = wantOf(h, state);
     if (!want) continue;
     const channel = h.channel ?? general;

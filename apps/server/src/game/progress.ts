@@ -5,7 +5,7 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { type AchievementDef, achievements } from "#/agent/seed.ts";
 import { localParts } from "#/infra/time.ts";
-import { sessionOf, sessionOnIssue } from "#/session/roster.ts";
+import { isHired, isOnDuty, sessionOf, sessionOnIssue } from "#/session/roster.ts";
 
 import { achievementInWords, levelForCommits } from "./view.ts";
 
@@ -166,7 +166,7 @@ export const progressFold = (entries: readonly T.LedgerEntry[], from: Folded = e
 
 const fullHouse = 6;
 
-const working = (state: T.SpaceState) => state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
+const working = (state: T.SpaceState) => state.sessions.filter((h) => isHired(h) && h.phase._tag === "working").length;
 
 function familyEntry(id: T.IssueId, children: readonly T.Issue[]): Entry {
   const merged = new Set<string>(children.filter((issue) => issue.delivered === "merged_into_parent").map((issue) => issue.id));
@@ -183,7 +183,7 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
   switch (fact.type) {
     case "sessionReported": {
       const h = sessionOf(after, fact.id) ?? sessionOf(before, fact.id);
-      if (h?.role === "orchestrator") break;
+      if (h !== undefined && isOnDuty(h)) break;
       if (fact.outcome === "failed") out.push({ kind: "failed", session: fact.id, ...(h?.agent ? { agent: h.agent } : {}) });
       break;
     }
@@ -191,7 +191,7 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
       if (fact.state === "live") out.push({ kind: "opened" });
       break;
     case "sessionChanged":
-      if (fact.session.role === "worker") out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
+      if (isHired(fact.session)) out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
       break;
     case "issueChanged": {
       const issue = fact.issue;

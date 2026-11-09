@@ -9,6 +9,8 @@ import { type Workplace } from "#/repo/workplace.ts";
 import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
 
+import { isOnDuty } from "./roster.ts";
+
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
 export const pendingReportOf = jsonOrNone(S.IssueReport);
@@ -106,7 +108,7 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
     hiredAt: row.hired_at,
     refining: row.refining,
     runs: row.runs,
-    phase: row.role === "orchestrator" ? { _tag: "resting" } : phase,
+    phase: isOnDuty(row) ? { _tag: "resting" } : phase,
     ...(row.repo === null ? {} : { repo: row.repo }),
     ...(row.issue === null ? {} : { issue: issueId(row.issue) }),
     ...(row.channel === null ? {} : { channel: row.channel }),

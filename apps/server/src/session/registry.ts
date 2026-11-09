@@ -24,6 +24,7 @@ import { restoredSession, sessionState } from "./history.ts";
 import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
 import { type Tracking } from "./reaction.ts";
+import { isOnDuty } from "./roster.ts";
 import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
 /** A burst of changes is one write. */
@@ -191,17 +192,17 @@ export const sessionRegistry = Effect.gen(function* () {
       });
   });
 
-  /** An orchestrator profile's session, kept before anything can record a Run or address its mailbox: written when
-   * there is none or its name changed, at startup and whenever a profile is kept. A profile that is not an
-   * orchestrator is left alone. */
-  const registerOrchestrator = Effect.fn("Session.registerOrchestrator")(function* (profile: T.Agent) {
-    if (profile.role !== "orchestrator") return;
+  /** An on-duty agent's session, kept before anything can record a Run or address its mailbox: written when there is
+   * none or its name changed, at startup and whenever a profile is kept. A profile hired per piece of work is left
+   * alone. */
+  const keepOnDuty = Effect.fn("Session.keepOnDuty")(function* (profile: T.Agent) {
+    if (!isOnDuty(profile)) return;
     const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
     if (core.session(profile.id)?.name === name) return;
     yield* register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
   });
-  yield* Effect.forEach(store.orchestrators(), registerOrchestrator, { discard: true });
-  store.whenKept((profile) => registerOrchestrator(profile).pipe(Effect.mapError((error) => refused(error.message))));
+  yield* Effect.forEach(store.all(), keepOnDuty, { discard: true });
+  store.whenKept((profile) => keepOnDuty(profile).pipe(Effect.mapError((error) => refused(error.message))));
 
   const keep = (s: T.Session) =>
     keepRow({

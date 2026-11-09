@@ -139,7 +139,7 @@ export const channelHub = Effect.gen(function* () {
     const ch = h.channel ? model.channel(h.channel) : undefined;
     return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
   };
-  const talkSession = (channel: string) => workers().find((h) => directOfSession(h) === channel);
+  const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
   const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : model.defaultId());
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
   /** Where the owner talks with peer alone, from either side. */
@@ -148,7 +148,7 @@ export const channelHub = Effect.gen(function* () {
     return model.channels("direct").find((c) => c.peer_id === peer);
   };
   const sessionOf = (id: string) => sessions.sessionOf(id);
-  const workers = () => sessions.workers();
+  const hired = () => sessions.hired();
 
   const targetOfRow = (type: string, rootNumber: number | null, name: string | null, channelId: string | null, channelNameOf: string | null) => {
     const shown = name ?? channelNameOf;
@@ -427,7 +427,7 @@ export const channelHub = Effect.gen(function* () {
     channelIdOf,
     directWith,
     sessionOf,
-    workers,
+    hired,
     targetOfRow,
     targetOfChannel,
     toChannel,
