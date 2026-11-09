@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream, String as Str } from "effect";
+import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -125,9 +125,6 @@ export class Session extends Context.Service<
     readonly events: (id: string, run?: string) => Effect.Effect<T.SessionEvent[] | undefined>;
     /** Everything Session tells, subscribed before it returns: nothing told after is missed. */
     readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
-    /** An orchestrator profile's session, kept before anything can record a Run or address its mailbox: written when
-     * there is none or its name changed. A profile that is not an orchestrator is left alone. */
-    readonly registerOrchestrator: (profile: T.Agent) => Effect.Effect<void, NotRecorded>;
     /** Whose token it is; "" when nobody's. */
     readonly who: (token: string) => string;
     /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
@@ -646,12 +643,6 @@ const make = Effect.gen(function* () {
     }),
     onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    registerOrchestrator: Effect.fn("Session.registerOrchestrator")(function* (profile: T.Agent) {
-      if (profile.role !== "orchestrator") return;
-      const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
-      if (core.session(profile.id)?.name === name) return;
-      yield* register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
-    }),
     who,
     setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
     host: Effect.fn("Session.host")(function* <R>(o: HostOptions<R>) {

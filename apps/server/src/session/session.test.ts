@@ -3,12 +3,13 @@ import { join } from "node:path";
 
 import type { Session as RuntimeSession } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, it, layer } from "@effect/vitest";
 import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Formatter, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
+import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
@@ -649,5 +650,18 @@ it.live("regression: reopening a session rotates its credential before deliverin
         }),
       }),
     ),
+  );
+});
+
+layer(world({ runtimes: [], repos: [] }), { timeout: "30 seconds" })("orchestrator profiles", (it) => {
+  it.effect("regression: an orchestrator profile has its session as soon as it is kept, and its new name as soon as it is renamed", () =>
+    Effect.gen(function* () {
+      const agents = yield* Agent;
+      const sessions = yield* Session;
+      const lead = yield* agents.create({ ...starter(defaultOrchestrator), id: "", name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime });
+      expect(sessions.sessionOf(lead.id)?.name).toBe("前端组长");
+      yield* agents.save({ ...lead, name: "前端总管" });
+      expect(sessions.sessionOf(lead.id)?.name).toBe("前端总管");
+    }),
   );
 });

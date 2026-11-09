@@ -38,7 +38,7 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 
 `tellSession` 改名说它做的事（`toSession`：对一个帮工说，有串写在串里，没串直接交给它），留着，因为它的落点不只是频道。`writing.ts` 的 `post(w, heard)` 并进 `write`。旧名字写进 `scripts/stale-names.ts`。
 
-**三、管家的会话只在一处登记。** Agent 加一条 `news` 流（`Saved`、`Removed`）。Session 订它：管家档案存下或改名时登记会话，开机时把现有的管家登记一遍；`registerOrchestrator` 从接口上拿掉。频道的 `seat` 也订同一条流，开口前不再补。
+**三、管家的会话只在一处登记。** Session 开机时登记现有的管家，并经 `Agent.whenKept` 挂上同一个登记：档案存下（新建、改、装模板、按模板更新）时，在写档案的那次调用返回之前登记好，登记失败那次写就失败；`registerOrchestrator` 从接口上拿掉，频道、工单、Mailbox 不再补。用流（Agent 发 `Saved`、Session 订）试过：流是异步的，改完名立刻读还是旧名字，所以用同步的挂钩。频道的 `seat` 只管它自己的参与者表，照旧。
 
 **四、「在」分成两个名字。** `present(id)` 改名 `attached(id)`（有 hand、能交信）；`presentSessions()` 改名 `workers()`（核心状态里的 worker）；`sessionOf` 不变。改完把 `naming.md` 的双关表补一行 present。
 
@@ -61,5 +61,5 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 ## Risks
 
 - **`post` 的联合太大，变成一个大 switch。** 每个 `_tag` 的检查留在各自的小函数里，`post` 只分派，落点是同一个 `write`。
-- **Agent 的流晚到。** 流是异步的：档案存下到 Session 处理那条消息之间有一拍，「存完立刻派给这个管家」会在那一拍里找不到会话。先写这个测试看它会不会失败；会的话，改成 Session 在自己用到管家会话的地方（交信、`host`）读不到就当场登记，仍然只有 Session 一处，调用方不管。
+- **Agent 的流晚到。** 试过，会：改名后立刻读到旧名字。改用 `whenKept` 同步挂钩，见 Proposal 三。顺带发现改名只写了库、没进核心状态，原来要重启才显示新名字，已修（`regression: an orchestrator profile has its session as soon as it is kept, and its new name as soon as it is renamed`）。
 - **调用表误报。** 绑定没写成 `const x = yield* S` 的（解构、经参数传进来的端口）看不到，表会少算；它只拦新边，少算不会误拦，但会漏。漏的写在脚本的说明里。

@@ -92,8 +92,6 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       const drafts = yield* Effect.forEach(inputs, (input) =>
         Effect.gen(function* () {
           const { trigger } = input;
-          const profile = agents.agent(input.session);
-          if (profile !== undefined) yield* sessions.registerOrchestrator(profile).pipe(Effect.mapError((error) => refused(error.message)));
           const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? (yield* defaultChannel);
           const scope = deliveryScope(destination, input.issue);
           const urgency =
@@ -101,7 +99,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             urgencyOf({
               source: trigger.source,
               actor: trigger.actor.kind,
-              recipient: input.role ?? profile?.role ?? "worker",
+              recipient: input.role ?? agents.agent(input.session)?.role ?? "worker",
               event: input.event ?? triggerEvent(trigger),
               canSteer: true,
             });

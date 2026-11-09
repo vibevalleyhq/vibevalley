@@ -95,6 +95,9 @@ export class Agent extends Context.Service<
     /** What removeSkill would do, refused as it would be; nothing changes. */
     readonly previewRemoveSkill: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly saveSettings: (runtime: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeSettings, ApiError>;
+    /** What has to hold for every profile kept from now on (an orchestrator's session), run before the write that
+     * kept it returns: a failure fails that write. */
+    readonly whenKept: (keep: (agent: T.Agent) => Effect.Effect<void, ApiError>) => void;
     /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
     readonly templates: () => Effect.Effect<T.AgentTemplate[]>;
     readonly installTemplate: (id: string) => Effect.Effect<T.Agent, ApiError>;
@@ -170,6 +173,13 @@ const make = Effect.gen(function* () {
   s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
   yield* Effect.orDie(Effect.flatMap(jsonText(s), disk.save));
 
+  const keeps: ((agent: T.Agent) => Effect.Effect<void, ApiError>)[] = [];
+  const saved = (agent: T.Agent) =>
+    Effect.as(
+      Effect.forEach(keeps, (keep) => keep(agent), { discard: true }),
+      agent,
+    );
+
   /** A change is kept only once it is on disk: one that cannot be written is refused and leaves the profiles as they were. */
   const change = (f: (s: Stored) => Stored) =>
     Effect.gen(function* () {
@@ -232,7 +242,7 @@ const make = Effect.gen(function* () {
       if (why) return yield* Effect.fail(refused(why));
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
-      return cast;
+      return yield* saved(cast);
     }),
     create: Effect.fn("Agent.create")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(t("server.agent.newAgentId")));
@@ -242,7 +252,7 @@ const make = Effect.gen(function* () {
       while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
       const created = withCast({ ...draft, id: `agent-${n}` });
       yield* change((x) => ({ ...x, agents: [...x.agents, created] }));
-      return created;
+      return yield* saved(created);
     }),
     remove: Effect.fn("Agent.remove")(function* (id) {
       yield* deletableAgent(id);
@@ -291,13 +301,14 @@ const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } }));
       return settings;
     }),
+    whenKept: (keep) => void keeps.push(keep),
     templates,
     installTemplate: Effect.fn("Agent.installTemplate")(function* (id) {
       const item = yield* templateOf(id);
       if (!item) return yield* Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
       const made = withCast(installed(item, s.agents));
       yield* change((x) => ({ ...x, agents: [...x.agents, made] }));
-      return made;
+      return yield* saved(made);
     }),
     updateFromTemplate: Effect.fn("Agent.updateFromTemplate")(function* (agent) {
       const a = s.agents.find((x) => x.id === agent);
@@ -307,7 +318,7 @@ const make = Effect.gen(function* () {
       if (!item) return yield* Effect.fail(refused(t("server.agent.template.gone", { name: a.name, template: a.from.template })));
       const next = withCast(updatedFrom(item, a));
       yield* change((x) => ({ ...x, agents: upsert(x.agents, next) }));
-      return next;
+      return yield* saved(next);
     }),
     addTemplate: Effect.fn("Agent.addTemplate")(function* (path) {
       const item = yield* withFs(readTemplate(path, "added")).pipe(Effect.mapError((e) => refused(e.message)));

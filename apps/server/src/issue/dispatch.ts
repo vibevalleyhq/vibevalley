@@ -145,11 +145,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       input?: { readonly text: string; readonly by: T.RunTrigger },
     ) {
       const agent = assignedAgentOf(issue) || chat.orchestratorOf((yield* chat.topOf(channel)).id);
-      if (!sessions.sessionOf(agent)) {
-        const profile = store.agent(agent);
-        if (!profile) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
-        yield* sessions.registerOrchestrator(profile).pipe(Effect.mapError((error) => refused(error.message)));
-      }
+      if (!sessions.sessionOf(agent)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
       yield* recordOrchestratorStart(issue, agent, channel, input);
     });
     const toOrchestrator = Effect.fn("Issue.toOrchestrator")(function* (issue: T.Issue, channel: string, by: T.RunTrigger, said?: string) {

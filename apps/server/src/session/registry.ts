@@ -1,12 +1,14 @@
 import { randomBytes } from "node:crypto";
 
 import { type SubagentReport } from "@botiverse/oar/agents";
-import { Clock, Deferred, Effect, FiberMap, FiberSet, Queue, PubSub, Semaphore, Stream } from "effect";
+import { Clock, Deferred, Effect, FiberMap, FiberSet, Queue, PubSub, Semaphore, Stream, String as Str } from "effect";
 
+import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
@@ -177,25 +179,29 @@ export const sessionRegistry = Effect.gen(function* () {
       channel: null,
       hired_at: hiredAt,
     });
-    if (!core.session(session.id))
+    const kept = core.session(session.id);
+    // An orchestrator renamed is the same session under its new name.
+    if (kept === undefined || kept.name !== session.name)
       yield* core.apply({
         type: "sessionChanged",
-        session: {
-          ...session,
-          id: sessionId(session.id),
-          hiredAt,
-          runs: 0,
-          refining: false,
-          phase: { _tag: "resting" },
-        },
+        session:
+          kept === undefined
+            ? { ...session, id: sessionId(session.id), hiredAt, runs: 0, refining: false, phase: { _tag: "resting" } }
+            : { ...kept, name: session.name },
       });
   });
 
-  yield* Effect.forEach(
-    store.orchestrators(),
-    (agent) => register({ id: agent.id, role: "orchestrator", agent: agent.id, name: agent.name, runtime: agent.runtime, brief: agent.duty }),
-    { discard: true },
-  );
+  /** An orchestrator profile's session, kept before anything can record a Run or address its mailbox: written when
+   * there is none or its name changed, at startup and whenever a profile is kept. A profile that is not an
+   * orchestrator is left alone. */
+  const registerOrchestrator = Effect.fn("Session.registerOrchestrator")(function* (profile: T.Agent) {
+    if (profile.role !== "orchestrator") return;
+    const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
+    if (core.session(profile.id)?.name === name) return;
+    yield* register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
+  });
+  yield* Effect.forEach(store.orchestrators(), registerOrchestrator, { discard: true });
+  store.whenKept((profile) => registerOrchestrator(profile).pipe(Effect.mapError((error) => refused(error.message))));
 
   const keep = (s: T.Session) =>
     keepRow({

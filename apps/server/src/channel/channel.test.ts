@@ -148,21 +148,6 @@ const channelLayer = (x: FakeSessions) =>
         runOf: () => undefined,
         reportOf: (id: string) => summaryOf(x.last.get(id) ?? ""),
         onIssue: (issue: string) => sessionOnIssue(x.core.state(), issue)?.id,
-        registerOrchestrator: (profile: T.Agent) =>
-          db.run(
-            qsession.keepSession({
-              id: profile.id,
-              agent: profile.id,
-              role: profile.role,
-              name: profile.name,
-              runtime: profile.runtime,
-              brief: profile.duty,
-              repo: null,
-              issue: null,
-              channel: null,
-              hired_at: 0,
-            }),
-          ),
         news: Effect.map(PubSub.subscribe(x.news), Stream.fromSubscription),
       };
       return Channel.layer.pipe(Layer.provideMerge(Mailbox.layer), Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])));

@@ -30,8 +30,6 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
   return Effect.gen(function* () {
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
-    const profile = (yield* Agent).agent(defaultOrchestrator)!;
-    yield* (yield* Session).registerOrchestrator(profile);
     const channel = (yield* Channel).defaultChannel();
     const inputs = (yield* Effect.forEach(
       Array.from({ length: 12 }, (_, n) => n),
@@ -39,7 +37,7 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
     )).filter((input) => input !== undefined);
     const writes = inputs.map((trigger) =>
       committedDelivery({
-        session: profile.id,
+        session: defaultOrchestrator,
         row: {
           envelope_id: trigger.id,
           scope: `channel:${channel}`,
@@ -60,7 +58,7 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
     yield* Effect.all([...writes, mailbox.restore, mailbox.restore], { concurrency: "unbounded", discard: true });
     expect(
       mailbox
-        .deliveriesOf(profile.id)
+        .deliveriesOf(defaultOrchestrator)
         .map((row) => row.envelope_id)
         .toSorted(),
     ).toEqual(inputs.map((input) => input.id).toSorted());

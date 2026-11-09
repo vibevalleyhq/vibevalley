@@ -128,7 +128,8 @@ export const channelWriting = (r: ChannelHub) =>
       return written;
     });
 
-    const post = Effect.fnUntraced(function* (w: Write, heard: (row: MsgRow) => Effect.Effect<Written>): Effect.fn.Return<Written> {
+    /** Routing follows the committed message, so startup can replay an interrupted handoff. */
+    const write = Effect.fnUntraced(function* (w: Write): Effect.fn.Return<Written> {
       const written = yield* tx(
         Effect.gen(function* () {
           if (w.sendKey) {
@@ -186,14 +187,11 @@ export const channelWriting = (r: ChannelHub) =>
         }),
       );
       if (written.again) return written;
-      const routed = yield* heard(written.row);
+      const routed = yield* settle(written.row);
       const complete = { ...routed, thread: written.thread };
       yield* after(w.channel, complete, w.answers);
       return complete;
     });
-
-    /** Routing follows the committed message, so startup can replay an interrupted handoff. */
-    const write = (w: Write) => post(w, settle);
 
     /** The previews of a message's links, read after it is out (the server's own requests take seconds) and then put on
      * it as a change. */

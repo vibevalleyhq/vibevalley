@@ -107,7 +107,14 @@ if (import.meta.main) {
     .split("\n")
     .filter((p) => p.endsWith(".ts"));
   const now = edgesOf(paths.map((path) => ({ path, text: readFileSync(path, "utf8") })));
-  if (values.write === true) writeFileSync(tablePath, JSON.stringify(now, null, 2) + "\n");
+  // One line a member, as the formatter keeps it.
+  if (values.write === true)
+    writeFileSync(
+      tablePath,
+      `{\n${Object.entries(now)
+        .map(([key, modules]) => `  ${JSON.stringify(key)}: ${JSON.stringify(modules).replaceAll(",", ", ")}`)
+        .join(",\n")}\n}\n`,
+    );
   if (values.check === true || values.write === true) {
     const kept: Edges = JSON.parse(readFileSync(tablePath, "utf8"));
     const problems = pathProblems(kept, now);
