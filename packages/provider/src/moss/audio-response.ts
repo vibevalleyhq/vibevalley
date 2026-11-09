@@ -24,6 +24,33 @@ export class MossAudioError extends Schema.TaggedError<MossAudioError, { readonl
   code: Schema.optionalKey(ErrorCode),
 }) {}
 
+const UsageCount = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }));
+export const AudioUsage = Schema.Struct({
+  input_characters: Schema.optionalKey(UsageCount),
+  prompt_tokens: Schema.optionalKey(UsageCount),
+  completion_tokens: Schema.optionalKey(UsageCount),
+  total_tokens: Schema.optionalKey(UsageCount),
+  input_audio_seconds: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+});
+
+export interface MossAudioUsage {
+  readonly inputCharacters?: number;
+  readonly promptTokens?: number;
+  readonly completionTokens?: number;
+  readonly totalTokens?: number;
+  readonly inputAudioSeconds?: number;
+}
+
+export function audioUsage(usage: typeof AudioUsage.Type): MossAudioUsage {
+  return {
+    ...(usage.input_characters !== undefined ? { inputCharacters: usage.input_characters } : {}),
+    ...(usage.prompt_tokens !== undefined ? { promptTokens: usage.prompt_tokens } : {}),
+    ...(usage.completion_tokens !== undefined ? { completionTokens: usage.completion_tokens } : {}),
+    ...(usage.total_tokens !== undefined ? { totalTokens: usage.total_tokens } : {}),
+    ...(usage.input_audio_seconds !== undefined ? { inputAudioSeconds: usage.input_audio_seconds } : {}),
+  };
+}
+
 const mimeTypes: Record<(typeof mossSpeechFormats)[number], readonly string[]> = {
   mp3: ["audio/mpeg", "audio/mp3"],
   wav: ["audio/wav", "audio/x-wav", "audio/wave"],

@@ -5,6 +5,7 @@ import { TestClock } from "effect/testing";
 
 import { getMossAudioTask } from "./audio-tasks.ts";
 import { createMossSpeechTask } from "./speech.ts";
+import { createMossTranscriptionTask } from "./transcription.ts";
 
 const base = { id: "task-one", object: "audio.speech", created_at: 1, updated_at: 2 };
 const success = { ...base, status: "SUCCESS", url: "https://audio.example.com/out.wav", response_format: "wav", content_type: "audio/wav" };
@@ -29,9 +30,9 @@ it.effect.each(["audio.speech", "audio.voice_generation"])("%s preserves the act
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...success, object }))),
 );
 
-it.effect.each([undefined, [], [{ speaker: "speaker-1", text: "Hello", start: 0, end: 1.5 }]])(
+it.effect.each([{ segments: undefined }, { segments: [] }, { segments: [{ speaker: "speaker-1", text: "Hello", start: 0, end: 1.5 }] }])(
   "transcription preserves absent, empty or populated segments %#",
-  (segments) =>
+  ({ segments }) =>
     Effect.gen(function* () {
       const task = yield* getMossAudioTask("test-key", base.id);
       expect(task).toMatchObject({ status: "SUCCESS", object: "audio.transcription", text: "Hello" });
@@ -114,4 +115,90 @@ it.effect("task lookup has a bounded deadline and never resubmits generation", (
     expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout" });
     expect(calls).toBe(1);
   }),
+);
+
+it.effect("long transcription submits once and preserves overlapping speakers and precise timeline offsets", () => {
+  const segments = [
+    { speaker: "S02", text: "Later start", start: 35.125, end: 36.875 },
+    { speaker: "S01", text: "Overlapping response", start: 35.5, end: 37 },
+    { speaker: "S02", text: "Final line", start: 3598, end: 3600 },
+  ];
+  const calls: string[] = [];
+  const http = HttpClient.make((request) => {
+    calls.push(`${request.method} ${request.url}`);
+    expect(request.headers.authorization).toBe("Bearer frozen-account");
+    return Effect.succeed(
+      HttpClientResponse.fromWeb(
+        request,
+        Response.json(
+          request.method === "POST"
+            ? { task_id: base.id, retry_after: 4 }
+            : { ...base, object: "audio.transcription", status: "SUCCESS", text: "Full transcript", segments },
+        ),
+      ),
+    );
+  });
+  return Effect.gen(function* () {
+    const submitted = yield* createMossTranscriptionTask("frozen-account", { model: "moss-transcribe-diarize-pro", fileId: "file-one", diarize: true });
+    expect(calls).toHaveLength(1);
+    const task = yield* getMossAudioTask("frozen-account", submitted.taskId);
+    expect(task).toEqual({
+      id: base.id,
+      object: "audio.transcription",
+      status: "SUCCESS",
+      text: "Full transcript",
+      segments,
+      createdAtSeconds: 1,
+      updatedAtSeconds: 2,
+    });
+    expect(task).not.toHaveProperty("duration");
+    expect(task).not.toHaveProperty("usage");
+    expect(calls).toEqual(["POST https://api.mosi.cn/v1/audio/transcriptions", `GET https://api.mosi.cn/v1/audio/tasks/${base.id}`]);
+  }).pipe(Effect.provideService(HttpClient.HttpClient, http));
+});
+
+it.effect.each([
+  { segments: [{ speaker: "", text: "x", start: 0, end: 1 }] },
+  { segments: [{ speaker: "S01", text: "x", start: -1, end: 1 }] },
+  { segments: [{ speaker: "S01", text: "x", start: 2, end: 1 }] },
+  { segments: Array.from({ length: 10001 }, () => ({ speaker: "S01", text: "x", start: 0, end: 1 })) },
+])("invalid or excessive transcription segments %# cannot become a usable timeline", ({ segments }) =>
+  Effect.gen(function* () {
+    expect(yield* getMossAudioTask("test-key", base.id).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+  }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...base, object: "audio.transcription", status: "SUCCESS", text: "x", segments }))),
+);
+
+it.effect.each(["audio.speech", "audio.voice_generation", "audio.transcription"])(
+  "%s preserves observed optional usage without deriving missing counts",
+  (object) =>
+    Effect.gen(function* () {
+      const task = yield* getMossAudioTask("test-key", base.id);
+      expect(task).toHaveProperty("usage", { inputCharacters: 9, promptTokens: 149, completionTokens: 63, totalTokens: 212 });
+    }).pipe(
+      Effect.provideService(
+        HttpClient.HttpClient,
+        answer({
+          ...success,
+          object,
+          text: "Transcript",
+          usage: { input_characters: 9, prompt_tokens: 149, completion_tokens: 63, total_tokens: 212 },
+        }),
+      ),
+    ),
+);
+
+it.effect("partial zero-valued audio task usage remains partial and zero", () =>
+  Effect.gen(function* () {
+    expect(yield* getMossAudioTask("test-key", base.id)).toHaveProperty("usage", { completionTokens: 0 });
+  }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...success, usage: { completion_tokens: 0 } }))),
+);
+
+it.effect.each([{ total_tokens: -1 }, { input_characters: 0.5 }, { prompt_tokens: "private" }])(
+  "malformed task usage %# fails without exposing its content",
+  (usage) =>
+    Effect.gen(function* () {
+      const error = yield* getMossAudioTask("test-key", base.id).pipe(Effect.flip);
+      expect(error).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+      expect(JSON.stringify(error)).not.toContain("private");
+    }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...success, usage }))),
 );

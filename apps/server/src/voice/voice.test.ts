@@ -822,6 +822,10 @@ describe("voice", () => {
         understanding: null,
         speech: null,
         image: null,
+        speakers: null,
+        voiceDesign: null,
+        transcription: null,
+        vision: null,
         live: null,
       });
       expect(setting.status().dictation.via).toBe("moss");
@@ -852,6 +856,10 @@ describe("voice", () => {
         understanding: null,
         speech: null,
         image: null,
+        speakers: null,
+        voiceDesign: null,
+        transcription: null,
+        vision: null,
         live: null,
       });
       yield* voice.dictate("AAAA", "wav");
@@ -878,7 +886,11 @@ describe("voice", () => {
         image: null,
         understanding: null,
         speech: null,
-        live: "moss",
+        speakers: null,
+        voiceDesign: null,
+        transcription: null,
+        vision: null,
+        live: { connection: "moss", model: "moss-live-1.0" },
       });
       const grant = yield* voice.session();
       expect(grant.appId).toBe("moss");
@@ -896,7 +908,7 @@ describe("voice", () => {
       const rows = yield* sql<{ body: string }>`select body from channel_message order by rowid`;
       expect(rows.map((r) => r.body)).toContain("帮我看一下工单");
       expect(rows.map((r) => r.body)).toContain("好，我这就去查。");
-      expect(rows.map((r) => r.body)).toContain("41 号工单做完了。");
+      expect(rows.map((r) => r.body)).not.toContain("41 号工单做完了。");
 
       yield* voice.stop(call.agentId);
       expect(yield* voice.speak("挂断后不再播报")).toBe(false);

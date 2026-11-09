@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { HttpBody, HttpClientRequest } from "effect/http";
 
-import { AudioId, AudioResult, audioRequest, MossAudioError } from "./audio-response.ts";
+import { AudioId, AudioResult, AudioUsage, audioRequest, audioUsage, MossAudioError } from "./audio-response.ts";
 import { mossSpeechFormats, mossSpeechLanguages, mossSpeechModels } from "./speech-models.ts";
 
 const Text = Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u));
@@ -32,6 +32,7 @@ const SpeechResponse = Schema.fromJsonString(
     status: Schema.Literal("SUCCESS"),
     created_at: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     ...AudioResult.fields,
+    usage: Schema.optionalKey(AudioUsage),
   }).check(Schema.makeFilter((result) => Schema.is(AudioResult)(result))),
 );
 const Submission = Schema.fromJsonString(Schema.Struct({ task_id: AudioId }));
@@ -66,18 +67,23 @@ const post = Effect.fnUntraced(function* (key: string, input: unknown, asynchron
   const body = yield* HttpBody.json({ ...request, async: asynchronous }).pipe(
     Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
-  const raw = yield* audioRequest(key, HttpClientRequest.post("https://api.mosi.cn/v1/audio/speech", { body }));
-  return { raw, format: request.response_format };
+  return yield* audioRequest(key, HttpClientRequest.post("https://api.mosi.cn/v1/audio/speech", { body }));
 });
 
 export const generateMossSpeech = Effect.fn("Provider.generateMossSpeech")(
   function* (key: string, input: unknown) {
-    const { raw, format } = yield* post(key, input, false);
+    const raw = yield* post(key, input, false);
     const result = yield* Schema.decodeEffect(SpeechResponse)(raw).pipe(
       Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })),
     );
-    if (result.response_format !== format) return yield* new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
-    return { id: result.id, url: result.url.href, format: result.response_format, contentType: result.content_type, createdAt: result.created_at };
+    return {
+      id: result.id,
+      url: result.url.href,
+      format: result.response_format,
+      contentType: result.content_type,
+      createdAt: result.created_at,
+      ...(result.usage !== undefined ? { usage: audioUsage(result.usage) } : {}),
+    };
   },
   Effect.timeout("300 seconds"),
   Effect.catchTag("TimeoutError", () => Effect.fail(new MossAudioError({ reason: "Timeout", outcome: "Unknown" }))),
@@ -85,7 +91,7 @@ export const generateMossSpeech = Effect.fn("Provider.generateMossSpeech")(
 
 export const createMossSpeechTask = Effect.fn("Provider.createMossSpeechTask")(
   function* (key: string, input: unknown) {
-    const { raw } = yield* post(key, input, true);
+    const raw = yield* post(key, input, true);
     const result = yield* Schema.decodeEffect(Submission)(raw).pipe(
       Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })),
     );

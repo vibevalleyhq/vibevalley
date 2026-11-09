@@ -46,7 +46,16 @@ it.live("raw input upload is owner-only, immutable, and separate from JSON attac
     const ready = yield* client.put(url, { body: HttpBody.uint8Array(bytes) }).pipe(Effect.flatMap(HttpClientResponse.schemaBodyJson(MediaInput)));
     expect(ready).toMatchObject({ phase: "ready", canDelete: true, hash: createHash("sha256").update(bytes).digest("hex") });
     expect(ready).not.toHaveProperty("path");
-    expect((yield* client.get(url)).status).toBe(404);
+    const downloaded = yield* client.get(url);
+    expect(downloaded.status).toBe(200);
+    expect(Buffer.from(yield* downloaded.arrayBuffer)).toEqual(bytes);
+    expect((yield* client.get(url, { headers: { origin: "https://untrusted.example" } })).status).toBe(403);
+    const part = yield* client.get(url, { headers: { range: "bytes=4-15" } });
+    expect(part.status).toBe(206);
+    expect(part.headers["content-range"]).toBe(`bytes 4-15/${bytes.length}`);
+    expect(Buffer.from(yield* part.arrayBuffer)).toEqual(bytes.subarray(4, 16));
+    expect((yield* client.get(url, { headers: { range: `bytes=${bytes.length}-` } })).status).toBe(416);
+    expect((yield* client.get(url, { headers: { range: "bytes=0-1,4-5" } })).status).toBe(416);
     expect((yield* post("media.input.delete", { id: input.id })).status).toBe(204);
     expect((yield* post("media.input.get", { id: input.id })).status).toBe(409);
     expect((yield* post("media.input.create", { ...metadata, size: 30_000_001 })).status).toBe(400);

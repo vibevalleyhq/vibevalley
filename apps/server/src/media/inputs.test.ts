@@ -13,6 +13,7 @@ import { testConfig } from "#/testing/layers.ts";
 import * as q from "#db/media_input.sql.ts";
 
 import { makeInputs } from "./inputs.ts";
+import { wav } from "./testdata/audio.ts";
 import { png } from "./testdata/png.ts";
 
 const layer = () =>
@@ -319,5 +320,165 @@ it.effect.each(["changed", "truncated", "grown", "missing"])("regression: %s inp
     expect((yield* inputs.upload(input.id, Stream.make(bytes))).phase).toBe("ready");
     const repaired = yield* inputs.blob(input.id, "task-a");
     expect(Buffer.from(yield* Effect.promise(() => repaired.arrayBuffer()))).toEqual(bytes);
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: retained audio content remains playable after expiry while unretained and corrupt inputs cannot be read", () =>
+  Effect.gen(function* () {
+    const inputs = yield* makeInputs;
+    const bytes = wav();
+    const metadata = { kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length } as const;
+    const first = yield* inputs.create(metadata);
+    const second = yield* inputs.create(metadata);
+    yield* inputs.upload(first.id, Stream.make(bytes.subarray(0, 5), bytes.subarray(5)));
+    yield* inputs.upload(second.id, Stream.make(bytes));
+    yield* inputs.pin([first.id], "transcript", Effect.void);
+    yield* TestClock.adjust("25 hours");
+    expect(yield* inputs.content(second.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const content = yield* inputs.content(first.id);
+    expect(content).toMatchObject({ mime: "audio/wav", size: bytes.length, name: "sample.wav" });
+    yield* (yield* FileSystem.FileSystem).writeFile(content.path, Buffer.alloc(bytes.length));
+    const error = yield* inputs.content(first.id).pipe(Effect.flip);
+    expect(error).toMatchObject({ _tag: "Refused" });
+    expect(JSON.stringify(error)).not.toContain(content.path);
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: generated raw PCM uses the hash store without inventing metadata or weakening public uploads", () =>
+  Effect.gen(function* () {
+    const inputs = yield* makeInputs;
+    const source = Uint8Array.of(1, 2, 3, 4);
+    expect(yield* inputs.create({ kind: "audio", name: "raw.pcm", mime: "audio/pcm", size: source.length }).pipe(Effect.flip)).toMatchObject({
+      _tag: "Refused",
+    });
+    const first = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const staged = yield* inputs.stageResult("raw.pcm", "pcm", Stream.make(source));
+        expect(staged.metadata).toBeUndefined();
+        return yield* inputs.storeResult(staged, "first");
+      }),
+    );
+    const second = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const staged = yield* inputs.stageResult("raw.pcm", "pcm", Stream.make(source));
+        return yield* inputs.storeResult(staged, "second");
+      }),
+    );
+    expect(first.hash).toBe(second.hash);
+    const fs = yield* FileSystem.FileSystem;
+    const root = join((yield* ServerConfig).home, "media-inputs");
+    expect(yield* fs.readDirectory(join(root, "content"))).toEqual([first.hash]);
+    expect(yield* fs.readDirectory(join(root, "staging"))).toEqual([]);
+    expect((yield* inputs.content(first.id)).mime).toBe("audio/pcm");
+    yield* inputs.release("unrelated");
+    expect((yield* inputs.get(first.id)).canDelete).toBe(false);
+    yield* inputs.release("first");
+    yield* inputs.delete(first.id);
+    expect((yield* inputs.content(second.id)).size).toBe(source.length);
+    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(source.length);
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: generated staging observes reserved quota and releases failed temporary bytes", () =>
+  Effect.gen(function* () {
+    const inputs = yield* makeInputs;
+    for (let index = 0; index < 4; index++) yield* inputs.create({ kind: "audio", name: `reserved-${index}.wav`, mime: "audio/wav", size: 512_000_000 });
+    yield* inputs.create({ kind: "audio", name: "remainder.wav", mime: "audio/wav", size: 2 * 1024 * 1024 * 1024 - 4 * 512_000_000 - 4 });
+    expect(yield* inputs.stageResult("too-large.pcm", "pcm", Stream.make(new Uint8Array(5))).pipe(Effect.scoped, Effect.flip)).toMatchObject({
+      _tag: "Refused",
+    });
+    const fs = yield* FileSystem.FileSystem;
+    expect(yield* fs.readDirectory(join((yield* ServerConfig).home, "media-inputs/staging"))).toEqual([]);
+    const result = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const staged = yield* inputs.stageResult("fits.pcm", "pcm", Stream.make(new Uint8Array(4)));
+        return yield* inputs.storeResult(staged, "fits");
+      }),
+    );
+    expect((yield* inputs.content(result.id)).size).toBe(4);
+    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(2 * 1024 * 1024 * 1024);
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: failed generated-result promotion rolls back rows, pins, and temporary files", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const failing = FileSystem.FileSystem.of({
+      ...fs,
+      rename: () => Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "rename" })),
+    });
+    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const staged = yield* inputs.stageResult("sample.wav", "wav", Stream.make(wav()));
+        expect(yield* inputs.storeResult(staged, "failed").pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+      }),
+    );
+    expect(yield* inputs.list()).toEqual([]);
+    const root = join((yield* ServerConfig).home, "media-inputs");
+    expect(yield* fs.readDirectory(join(root, "staging"))).toEqual([]);
+    expect(yield* fs.readDirectory(join(root, "content"))).toEqual([]);
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: explicit asset release preserves shared pins and content until the final holder releases quota", () =>
+  Effect.gen(function* () {
+    const inputs = yield* makeInputs;
+    const first = yield* saved(inputs);
+    const sharedContent = yield* saved(inputs);
+    yield* inputs.pin([first.id], "job-a", Effect.void);
+    yield* inputs.pin([first.id], "job-b", Effect.void);
+    yield* inputs.pin([sharedContent.id], "job-c", Effect.void);
+    yield* TestClock.adjust("25 hours");
+    yield* inputs.sweep();
+    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(bytes.length * 2);
+    yield* inputs.releaseAssets([first.id], ["job-a"], Effect.void);
+    expect((yield* inputs.get(first.id)).canDelete).toBe(false);
+    expect((yield* inputs.blob(first.id, "job-b")).size).toBe(bytes.length);
+    expect(yield* inputs.blob(first.id, "job-a").pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    yield* inputs.releaseAssets([first.id], ["job-b"], Effect.void);
+    expect(yield* inputs.get(first.id).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect((yield* inputs.content(sharedContent.id)).size).toBe(bytes.length);
+    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(bytes.length);
+    yield* inputs.releaseAssets([sharedContent.id], ["job-c"], Effect.void);
+    expect(yield* (yield* Db).run(q.inputCapacity())).toEqual({ bytes: 0, count: 0 });
+    expect((yield* inputs.create(metadata)).phase).toBe("reserved");
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: failed reference clearing rolls back asset pins and leaves bytes readable", () =>
+  Effect.gen(function* () {
+    const inputs = yield* makeInputs;
+    const input = yield* saved(inputs);
+    yield* inputs.pin([input.id], "job", Effect.void);
+    expect(yield* inputs.releaseAssets([input.id], ["job"], Effect.fail(refused("clear failed"))).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect((yield* inputs.get(input.id)).canDelete).toBe(false);
+    expect((yield* inputs.blob(input.id, "job")).size).toBe(bytes.length);
+  }).pipe(Effect.provide(layer())),
+);
+
+it.effect("regression: failed explicit unlink keeps a quota-accounted tombstone for restart cleanup", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    let blocked = "";
+    const failing = FileSystem.FileSystem.of({
+      ...fs,
+      remove: (path, options) =>
+        path === blocked
+          ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
+          : fs.remove(path, options),
+    });
+    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
+    const input = yield* saved(inputs);
+    yield* inputs.pin([input.id], "job", Effect.void);
+    blocked = (yield* inputs.content(input.id)).path;
+    expect(yield* inputs.releaseAssets([input.id], ["job"], Effect.void).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect(yield* inputs.get(input.id)).toMatchObject({ phase: "deleting", canDelete: true });
+    expect(yield* (yield* Db).run(q.inputCapacity())).toEqual({ bytes: bytes.length, count: 1 });
+    blocked = "";
+    const restarted = yield* makeInputs;
+    yield* restarted.restore();
+    yield* restarted.sweep();
+    expect(yield* (yield* Db).run(q.inputCapacity())).toEqual({ bytes: 0, count: 0 });
   }).pipe(Effect.provide(layer())),
 );

@@ -1,10 +1,12 @@
 {
   "labels": {
     "media_image_create": "Submit image generation",
+    "media_understanding_start": "Execute authorized understanding",
+    "media_speech_create": "Generate single-speaker speech",
     "media_job_get": "Read a generation task",
     "media_job_list": "List recent generation tasks",
     "media_job_cancel": "Cancel generation waiting",
-    "media_job_download": "Retry image download",
+    "media_job_download": "Retry media download",
     "repo_list": "Repos",
     "channel_list": "Channels",
     "channel_create": "Open a channel",

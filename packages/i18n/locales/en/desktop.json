@@ -35,6 +35,10 @@
     "front": "Bring All to Front",
     "close": "Close Window"
   },
+  "media": {
+    "camera": "Use the camera only when you start realtime visual understanding. Frames are sent to your selected AI provider.",
+    "microphone": "Use the microphone only when you start dictation or a call. Audio is sent to your selected AI provider."
+  },
   "commandLine": {
     "taken": "{link} is another program's file and was not replaced: move it away, then install again"
   }

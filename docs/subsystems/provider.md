@@ -1,6 +1,6 @@
 # AI 服务
 
-主人在「设置 → AI 服务」保存供应商连接，为听写、MOSS Live、生图、媒体理解和单人语音分别选择连接；用途可以共用一份凭据，也可以使用不同账号。生图支持默认模型和快照，提交、预览与保存由[生图任务](docs/subsystems/media.md)提供。
+主人在「设置 → AI 服务」保存供应商连接，为听写、生图、媒体理解、单人语音、多人对白、音色设计、长音频转写、MOSS Live 与独立 Vision 分别选择连接和模型；用途可以共用凭据，也可以使用不同账号。提交、预览、播放与保存由[媒体任务](docs/subsystems/media.md)提供，实时设备与会话见[语音](docs/subsystems/voice.md)。
 
 ## 管什么，不管什么
 
@@ -10,7 +10,7 @@
 | MOSS 账号模型目录查询、用途模型校验和解析 | 录音设备、通话、中继与字幕（[语音](docs/subsystems/voice.md)） |
 | 脱敏的公共状态、配置版本冲突与迟到查询结果 | 外部编码农机的登录、模型和凭据（[档案和农机](docs/subsystems/agent.md)） |
 
-当前适配器为 MOSS。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。生图与理解任务由 Media 管。单人语音目前只有独立绑定、Flash／Pro 模型目录和 owner-only 音色分页接口；设置页明确提示生成与播放尚未开放。音色创建、管理和听写文本后处理尚未接入。
+当前适配器为 MOSS。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
 
 ## 在哪
 
@@ -28,14 +28,15 @@
 
 ## 模型和不变量
 
-- **配置只有一份**：`settings.json.providers` 保存 `revision`、`connections`、`dictation`、`image`、`understanding`、`speech` 和 `live`。连接有稳定 ID、名称、`adapter`、开关和私有 Key；最多 32 条。没有单独的 MOSS Key 文件、连接数据库或自动旧格式迁移。
+- **配置只有一份**：`settings.json.providers` 保存 `revision`、`connections` 及九个独立用途：`dictation`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`live`、`vision`。连接有稳定 ID、名称、`adapter`、开关和私有 Key；最多 32 条。没有单独的 MOSS Key 文件、连接数据库或自动旧格式迁移。
 - **修改整组配置时检查版本**：请求携带读取时的 `revision`，不一致就拒绝。Setting 的同一把锁覆盖普通设置与连接设置的读取、校验、写盘和内存替换；写盘失败不改变内存与版本。
 - **凭据更新有三个动作**：省略 `key` 保留，非空字符串替换，`null` 清除。公共状态只显示来源与末四位提示；模型查询和语音消费者只在服务端取得明文。
 - **用途引用有效连接**：默认用途必须引用存在、已启用且有凭据的连接。删除、禁用或清除凭据时，主人应在同次修改中明确解除或改绑用途；服务端不自动换账号。
-- **听写模型与实时线路分开**：听写绑定是连接 ID 加模型 ID；可选模型由服务端返回。MOSS Live 只绑定连接，沿用已有实时协议。更换听写模型不改变通话协议。
+- **听写与实时线路分开**：每个用途绑定连接 ID 与完整模型 ID，包括 Live、Vision 的稳定版本或快照。更换听写模型不改变通话协议；长转写不借用输入框听写绑定。
 - **生图用途固定模型版本**：`image` 保存连接 ID 与完整模型 ID；只接受已适配的稳定名称与官方快照。`Provider.image()` 在服务端返回连接 ID、配置 revision、模型与 Key 的一次性快照，不回退到听写或 Live 账号；改绑与换 Key 不改变已经取得的快照。该内部方法不发网络请求，也不经 HTTP 暴露。
 - **媒体理解独立绑定**：`understanding` 保存连接与模型，只接受 `moss-vl-1.0` 和官方 `2026-07-08` 快照；配置与协议共用 `moss/understanding-models.ts`。`Provider.understanding()` 返回一次性私有快照，不借用其他用途的账号，不发请求。图片／视频理解的上传许可、任务与结果由 [Media](docs/subsystems/media.md) 管理，配置本身不会上传。
 - **单人语音独立绑定**：`speech` 保存连接和模型；`moss/speech-models.ts` 是 Flash／Pro 稳定 ID 与官方快照的唯一列表。`Provider.speech()` 返回冻结的连接、revision、模型与 Key，不调用模型、不借用听写或 Live 账号。删除、停用或清 Key 必须先解绑；不把多人 TTS 放进单人模型选项。
+- **多人对白、设计、长转写与 Vision 独立绑定**：各用途使用对应 `moss/*-models.ts` 的闭集，稳定 ID 与快照走相同协议，不靠字符串前缀猜能力。所有 11 个已适配稳定模型及其 11 个快照按用途路由；目录中的其他模型不自动成为可调用选项。克隆不另设模型用途，按请求明确指定连接与 revision，许可和输入限制见[媒体任务](docs/subsystems/media.md)。
 - **音色查询限定账号与版本**：owner-only `provider.voice.list` 接受 connection、revision 和一组分页参数；请求前后都检查配置版本，换账号或换 Key 后不交付旧结果。只读一页，最多 150 条，offset 与 after 互斥；返回 ID、名称、创建秒数和下一页游标，不持久化，也不从列表猜音色就绪或模型兼容性。30 秒覆盖响应体，最多 1 MiB，不重试、不跟重定向，原始厂商错误不出服务端。
 - **保存不推理、不探测**：配置完整只表示本机所需字段齐全，不代表账号有模型权限或真实调用已通过。模型查询由主人单独触发，不自动验证密钥或调用付费模型。
 - **目录不是能力证明**：MOSS `GET /v1/models` 返回模型 ID 与归属方，没有能力字段。未知模型保留在列表，不依据名称推断用途。听写选项来自已适配的协议模型，而非目录前缀过滤。
@@ -45,7 +46,7 @@
 ## 怎么走
 
 1. 主人添加 MOSS 连接，填名称和 Key；页面只保留当前未保存输入，成功后清空输入框。
-2. 主人选听写连接和模型、MOSS Live 连接，或选择生图、媒体理解、单人语音连接和模型；选择「不使用」解除相应用途绑定。
+2. 主人为所需用途选择连接与模型；选择「不使用」解除相应用途绑定。
 3. Provider 校验整个候选配置，Setting 在锁内检查并原子保存，返回脱敏状态；发生版本冲突时页面保留草稿，主人可重新加载。
 4. 主人查询模型时，Provider 取该版本的连接 Key，调用官方 `https://api.mosi.cn/v1/models`；没有可用凭据时在本机拒绝。
 5. Voice 发起听写时向 Provider 要解析后的地址、模型、Key，经现有 Provider 转写实现与 AI Core 调用，返回文本给原输入框。普通听写继续使用同步 multipart 和 `response_format=json`，不因选多说话人模型就自动启用分段、热词或流式。
@@ -67,9 +68,6 @@
 - `apps/server/src/provider/provider.test.ts`：凭据更新、用途引用、账号隔离、版本冲突、并发保存、迟到目录结果。
 - `apps/server/src/setting/setting.test.ts`：权限 `0600`、私有配置重启后保留、公共设置只暴露就绪状态。
 - `apps/server/src/voice/voice.test.ts`、`http/moss.test.ts`：听写使用选择的模型与连接、MOSS Live 使用绑定密钥、自建转写与实时中继回归。
-- `apps/web/test/providers.spec.ts`：真实隔离服务端上的表单保存、刷新、密钥脱敏、冲突草稿、五种用途的解绑清除与空选项显示。
+- `apps/web/test/providers.spec.ts`：真实隔离服务端上的表单保存、刷新、密钥脱敏、冲突草稿、用途解绑清除与空选项显示。
 - `apps/web/test/a11y.spec.ts`：已绑定生图与理解模型的浅深主题无障碍检查、390px 窄屏与截图；模型与语音网络适配由不联网协议测试覆盖，不当作真实厂商效果验收。
 
-## 还没做的
-
-理解的管家授权入口、TTS 和实时视觉见 [MOSS 多模态计划](.agents/notes/proposed/feature/2026-11-08-moss-multimodal.md)。

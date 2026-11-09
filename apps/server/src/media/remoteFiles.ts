@@ -30,6 +30,12 @@ const extensions = new Map([
   ["video/x-msvideo", "avi"],
   ["video/webm", "webm"],
   ["video/x-matroska", "mkv"],
+  ["audio/wav", "wav"],
+  ["audio/mpeg", "mp3"],
+  ["audio/mp4", "m4a"],
+  ["audio/flac", "flac"],
+  ["audio/ogg", "ogg"],
+  ["audio/webm", "webm"],
 ]);
 
 export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInputs>) {

@@ -24,7 +24,7 @@ const withDoors = (f: ReturnType<typeof farm>) =>
   Layer.mergeAll(
     Layer.mock(Orchestrator)({ answerer: unused }),
     Layer.mock(Lan)({ status: unused, stopPairing: unused, previewStopPairing: unused, setUpstream: unused }),
-    Layer.mock(Voice)({ mossProblem: unused, lines: unused }),
+    Layer.mock(Voice)({ lines: unused }),
     Layer.mock(Connector)({}),
   ).pipe(Layer.provideMerge(f.layer));
 

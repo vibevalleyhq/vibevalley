@@ -1,4 +1,13 @@
 {
+  "capabilityUnbound": "请先在 AI 服务中为{capability}选择连接与模型。",
+  "capabilityModel": "请为{capability}选择支持的模型或快照。",
+  "use": {
+    "speakers": "多人语音",
+    "voiceDesign": "音色设计",
+    "transcription": "音频转写",
+    "vision": "实时视觉",
+    "live": "MOSS Live"
+  },
   "speechModel": "请选择支持的 Flash、Pro 语音模型或快照。",
   "speechUnbound": "请先在 AI 服务中选择语音生成连接与模型。",
   "voiceQuery": "音色分页参数无效，请在允许范围内选择偏移量或游标，不要同时使用。",

@@ -5,7 +5,7 @@ import { attachmentPath, type MediaImageRequest, type MediaImageJob } from "@vib
 
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { Link } from "#/infra/router.ts";
+import { Link, useSearchParams } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
@@ -13,12 +13,18 @@ import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 
+import { AudioPanel } from "./AudioPanel.tsx";
 import { publicationKey } from "./publication.ts";
+import { SpeechPanel } from "./SpeechPanel.tsx";
 import { UnderstandingPanel } from "./UnderstandingPanel.tsx";
 
 export function MediaPage() {
   const state = useCore();
-  const [mode, setMode] = createSignal<"image" | "understanding">("image");
+  const [search, setSearch] = useSearchParams();
+  const mode = () => {
+    const selected = search().get("mode");
+    return selected === "speech" || selected === "understanding" || selected === "audio" ? selected : "image";
+  };
   const images = () => state()?.media?.filter((job) => job.kind === "image") ?? [];
   const [prompt, setPrompt] = createSignal("");
   const [format, setFormat] = createSignal<"text" | "layout">("text");
@@ -63,7 +69,7 @@ export function MediaPage() {
           data-testid="media-mode-image"
           aria-pressed={mode() === "image" ? "true" : "false"}
           tone={mode() === "image" ? "primary" : "plain"}
-          onClick={() => setMode("image")}
+          onClick={() => setSearch({ mode: "image" })}
         >
           {t("web.media.image")}
         </Button>
@@ -71,12 +77,34 @@ export function MediaPage() {
           data-testid="media-mode-understanding"
           aria-pressed={mode() === "understanding" ? "true" : "false"}
           tone={mode() === "understanding" ? "primary" : "plain"}
-          onClick={() => setMode("understanding")}
+          onClick={() => setSearch({ mode: "understanding" })}
         >
           {t("web.media.understanding.title")}
         </Button>
+        <Button
+          data-testid="media-mode-speech"
+          aria-pressed={mode() === "speech" ? "true" : "false"}
+          tone={mode() === "speech" ? "primary" : "plain"}
+          onClick={() => setSearch({ mode: "speech" })}
+        >
+          {t("web.media.speech.title")}
+        </Button>
+        <Button
+          data-testid="media-mode-audio"
+          aria-pressed={mode() === "audio" ? "true" : "false"}
+          tone={mode() === "audio" ? "primary" : "plain"}
+          onClick={() => setSearch({ mode: "audio" })}
+        >
+          {t("web.audio.title")}
+        </Button>
       </div>
       <div class="flex max-w-3xl min-w-0 flex-col gap-4">
+        <Show when={mode() === "audio"}>
+          <AudioPanel />
+        </Show>
+        <Show when={mode() === "speech"}>
+          <SpeechPanel />
+        </Show>
         <Show when={mode() === "understanding"}>
           <UnderstandingPanel />
         </Show>

@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { HttpClientRequest } from "effect/http";
+import { HttpBody, HttpClientRequest } from "effect/http";
 
 import { AudioId, audioRequest, MossAudioError } from "./audio-response.ts";
 
@@ -16,6 +16,45 @@ const Voice = Schema.Struct({
   name: Schema.String.check(Schema.isMaxLength(1000)),
   created_at: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
 });
+
+export interface MossVoice {
+  readonly id: string;
+  readonly name: string;
+  readonly createdAtSeconds: number;
+}
+
+const Clone = Schema.Struct({
+  audio: Schema.instanceOf(Blob).check(
+    Schema.makeFilter(
+      (audio) =>
+        audio.size > 0 &&
+        audio.size <= 10_000_000 &&
+        ["audio/wav", "audio/x-wav", "audio/wave", "audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/flac", "audio/x-flac"].includes(audio.type),
+    ),
+  ),
+  filename: Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/^[^\p{Cc}/\\]+\.(?:wav|mp3|m4a|flac)$/iu)),
+  name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(1000))),
+  // Duration must come from the caller's media inspection, not a browser or model assertion.
+  durationSeconds: Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(30)),
+});
+
+export const createMossVoice = Effect.fn("Provider.createMossVoice")(
+  function* (key: string, input: unknown) {
+    const request = yield* Schema.decodeUnknownEffect(Clone)(input, { onExcessProperty: "error" }).pipe(
+      Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    );
+    const form = new FormData();
+    form.append("audio_sample", request.audio, request.filename);
+    if (request.name !== undefined) form.append("name", request.name);
+    const raw = yield* audioRequest(key, HttpClientRequest.post("https://api.mosi.cn/v1/audio/voices", { body: HttpBody.formData(form) }));
+    const voice = yield* Schema.decodeEffect(Schema.fromJsonString(Voice))(raw).pipe(
+      Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })),
+    );
+    return { id: voice.id, name: voice.name, createdAtSeconds: voice.created_at } satisfies MossVoice;
+  },
+  Effect.timeout("300 seconds"),
+  Effect.catchTag("TimeoutError", () => Effect.fail(new MossAudioError({ reason: "Timeout", outcome: "Unknown" }))),
+);
 const Listing = Schema.fromJsonString(
   Schema.Struct({
     object: Schema.Literal("list"),

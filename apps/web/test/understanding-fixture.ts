@@ -19,6 +19,10 @@ export async function bindUnderstanding(api: VibeValleyApi) {
     image: null,
     understanding: { connection: "understanding", model: "moss-vl-1.0" },
     speech: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
   });
 }
 

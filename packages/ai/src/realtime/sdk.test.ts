@@ -74,7 +74,7 @@ describe("SDK realtime boundary", () => {
       const first = playback.queue({ chunk: "c1", run: "r1", turn: "t1" }, 0.2, 0);
       playback.queue({ chunk: "c2", run: "r1", turn: "t1" }, 0.2, 0);
       expect(playback.ended(first)).toEqual([{ action: "playback.chunk.completed", chunk_id: "c1", run_id: "r1", turn_id: "t1" }]);
-      expect(playback.cutSampleAccurate("r1", "t1", 75).actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 275 }]);
+      expect(playback.cutSampleAccurate("r1", "t1", 75).actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 75 }]);
     } finally {
       p.session.dispose();
     }

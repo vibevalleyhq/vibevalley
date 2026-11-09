@@ -15,6 +15,24 @@ test("the opening preserves the owner's theme underneath, and stays until the fi
   await expect(cover).toHaveCount(0, { timeout: 3000 });
 });
 
+for (const interrupted of ["pause", "cancel"] as const) {
+  test(`regression: a ${interrupted}d cover animation cannot strand the opening`, async ({ page }) => {
+    await page.addInitScript((action) => {
+      // oxlint-disable-next-line typescript/unbound-method -- Called with the intercepted element via apply below.
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (...args) {
+        const animation = animate.apply(this, args);
+        if (this.id === "opening") animation[action]();
+        return animation;
+      };
+    }, interrupted);
+    await page.goto("/issues");
+    await expect(page.locator("#opening")).toHaveCount(0);
+    await expect(page.getByTestId("desk")).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath(`opening-${interrupted}-released.png`) });
+  });
+}
+
 test("the delivered opening covers a deep-linked page until it is ready, without replaying its dialog animation", async ({ page, api }) => {
   const html = await (await page.request.get("/issues")).text();
   expect(html).toContain('id="opening"');

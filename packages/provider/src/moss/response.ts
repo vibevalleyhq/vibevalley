@@ -6,6 +6,7 @@ class MossResponseTooLarge extends Schema.TaggedError<MossResponseTooLarge, { re
 export const readMossResponse = Effect.fn("Provider.readMossResponse")(function* (response: HttpClientResponse.HttpClientResponse) {
   let bytes = 0;
   const chunks = yield* response.stream.pipe(
+    Stream.catchReason("HttpClientError", "EmptyBodyError", () => Stream.empty),
     Stream.mapEffect((chunk) => {
       bytes += chunk.byteLength;
       return bytes > 1 << 20 ? Effect.fail(new MossResponseTooLarge()) : Effect.succeed(chunk);

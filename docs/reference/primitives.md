@@ -155,6 +155,8 @@
 | `isInput` | `evals.ts` |  |
 | `committed` | `evals.ts` |  |
 | `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. |
+| `replayWorld` | `evals.ts` |  |
+| `replaySetup` | `evals.ts` |  |
 | `farm` | `farm.ts` | The whole farm on a free port: its address. |
 | `workingFarm` | `farm.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as |
 | `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
@@ -172,6 +174,7 @@
 | `offlineNetwork` | `layers.ts` |  |
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
 | `network` | `network.ts` |  |
+| `realtimeFixture` | `realtime.ts` |  |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds. |
 | `allow` | `refuse.ts` |  |
 | `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { type MossEvents, type MossTransport, verifyMoss } from "./moss/server.ts";
 
@@ -23,7 +23,8 @@ describe("checking a MOSS Live key", () => {
     Effect.gen(function* () {
       const { transport, log } = fake((on, sent) => {
         on.open();
-        if (sent.includes(JSON.stringify({ action: "attach_session" }))) on.text(JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }));
+        const attached = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ action: Schema.String })))(sent[0]);
+        if (attached.action === "attach_session") on.text(JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }));
       });
       expect(yield* verifyMoss("sk-good", transport)).toEqual({ kind: "ok" });
       expect([log.closed, log.asked]).toEqual([1, 0]);
@@ -55,6 +56,27 @@ describe("checking a MOSS Live key", () => {
         );
       });
       expect(yield* verifyMoss("sk-x", erring.transport)).toEqual({ kind: "failed", why: "invalid or unsupported request" });
+    }),
+  );
+  it.effect("regression: verifies the selected Live snapshot without leaking its credential in errors", () =>
+    Effect.gen(function* () {
+      const models: (string | undefined)[] = [];
+      const transport: MossTransport = {
+        connect: (_key, on, model) => {
+          models.push(model);
+          queueMicrotask(() => {
+            on.open();
+            on.text(JSON.stringify({ action: "error", data: { error: "rejected private-fixture-key" } }));
+          });
+          return { send: () => {}, close: () => {} };
+        },
+        status: () => Effect.die("No HTTP fallback after explicit protocol error"),
+      };
+      expect(yield* verifyMoss("private-fixture-key", transport, "moss-live-1.0-2026-11-02")).toEqual({
+        kind: "failed",
+        why: "rejected [redacted]",
+      });
+      expect(models).toEqual(["moss-live-1.0-2026-11-02"]);
     }),
   );
 });

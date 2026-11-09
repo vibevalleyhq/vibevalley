@@ -5,9 +5,14 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import type { Refused } from "@vibevalley/protocol/api";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
+import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
 import { type MossModelError, mossModels } from "@vibevalley/provider/moss/models";
+import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
 import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
+import { mossTranscriptionModels } from "@vibevalley/provider/moss/transcription-models";
 import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding-models";
+import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
+import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-models";
 import { listMossVoices } from "@vibevalley/provider/moss/voices";
 import { mossTranscription } from "@vibevalley/provider/transcription";
 
@@ -47,6 +52,20 @@ const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMoss
   return { _tag: "Refused", reason: reason() };
 };
 
+export interface UnderstandingAccount {
+  readonly connection: string;
+  readonly revision: number;
+  readonly model: (typeof mossUnderstandingModels)[number];
+  readonly key: string;
+}
+
+export interface ProviderAccount {
+  readonly connection: string;
+  readonly revision: number;
+  readonly model: string;
+  readonly key: string;
+}
+
 export class Provider extends Context.Service<
   Provider,
   {
@@ -59,7 +78,7 @@ export class Provider extends Context.Service<
       Refused
     >;
     readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, Refused>;
-    readonly transcription: () => Effect.Effect<{ readonly url: string; readonly model: string; readonly key: string }, Refused>;
+    readonly dictation: () => Effect.Effect<{ readonly url: string; readonly model: string; readonly key: string }, Refused>;
     readonly image: () => Effect.Effect<
       {
         readonly connection: string;
@@ -69,16 +88,12 @@ export class Provider extends Context.Service<
       },
       Refused
     >;
-    readonly understanding: () => Effect.Effect<
-      {
-        readonly connection: string;
-        readonly revision: number;
-        readonly model: (typeof mossUnderstandingModels)[number];
-        readonly key: string;
-      },
-      Refused
-    >;
-    readonly liveKey: () => string;
+    readonly understanding: () => Effect.Effect<UnderstandingAccount, Refused>;
+    readonly speakers: () => Effect.Effect<ProviderAccount, Refused>;
+    readonly voiceDesign: () => Effect.Effect<ProviderAccount, Refused>;
+    readonly transcription: () => Effect.Effect<ProviderAccount, Refused>;
+    readonly vision: () => Effect.Effect<ProviderAccount, Refused>;
+    readonly live: () => Effect.Effect<ProviderAccount, Refused>;
   }
 >()("vibevalley/Provider") {
   static readonly layer = Layer.effect(
@@ -90,8 +105,35 @@ export class Provider extends Context.Service<
 const make = Effect.gen(function* () {
   const settings = yield* Setting;
   const http = yield* HttpClient.HttpClient;
+  const account = Effect.fnUntraced(function* (
+    use: "speakers" | "voiceDesign" | "transcription" | "vision" | "live",
+    models: readonly string[],
+  ): Effect.fn.Return<ProviderAccount, Refused> {
+    const config = settings.providers();
+    const binding = config[use];
+    const connection = boundConnection(config, binding?.connection ?? null);
+    const capability = t(`server.provider.use.${use}`);
+    if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.capabilityUnbound", { capability }) });
+    if (!models.includes(binding.model)) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.capabilityModel", { capability }) });
+    return { connection: connection.id, revision: config.revision, model: binding.model, key: connection.key };
+  });
   return Provider.of({
     status: () => providerStatus(settings.providers()),
+    speakers: Effect.fn("Provider.speakers")(function* () {
+      return yield* account("speakers", mossSpeakersModels);
+    }),
+    voiceDesign: Effect.fn("Provider.voiceDesign")(function* () {
+      return yield* account("voiceDesign", mossVoiceDesignModels);
+    }),
+    transcription: Effect.fn("Provider.transcription")(function* () {
+      return yield* account("transcription", mossTranscriptionModels);
+    }),
+    vision: Effect.fn("Provider.vision")(function* () {
+      return yield* account("vision", mossVisionModels);
+    }),
+    live: Effect.fn("Provider.live")(function* () {
+      return yield* account("live", mossLiveModels);
+    }),
     connection: Effect.fn("Provider.connection")(function* (id) {
       const config = settings.providers();
       const connection = boundConnection(config, id);
@@ -131,7 +173,7 @@ const make = Effect.gen(function* () {
       if (!model) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.speechModel") });
       return { connection: connection.id, revision: config.revision, model, key: connection.key };
     }),
-    transcription: Effect.fn("Provider.transcription")(function* () {
+    dictation: Effect.fn("Provider.dictation")(function* () {
       const own = settings.dictation();
       if (own?.via === "own") return { url: own.url, model: own.model, key: own.key };
       if (!own) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.voice.dictation.unset") });
@@ -159,9 +201,5 @@ const make = Effect.gen(function* () {
       if (!model) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.understandingModel") });
       return { connection: connection.id, revision: config.revision, model, key: connection.key };
     }),
-    liveKey: () => {
-      const config = settings.providers();
-      return boundConnection(config, config.live)?.key ?? "";
-    },
   });
 });

@@ -6,6 +6,7 @@ export type VoiceFix = (typeof VoiceFixValues)[number];
 
 /** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. */
 export const mossLinePath = "/api/v1/voice/moss/line";
+export const visionLinePath = "/api/v1/voice/vision/line";
 
 export const voiceSilenceMsMin = 200;
 

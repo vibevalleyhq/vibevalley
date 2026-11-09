@@ -2,7 +2,11 @@ import { Schema } from "effect";
 
 import { Attachment } from "../channel/schema";
 import type { Codec } from "../codec";
+import { MediaAudioJob } from "./audio-schema";
+import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 import * as T from "./shapes";
+
+export { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 
 const InputName = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/^[^\p{Cc}/\\]+$/u), Schema.isPattern(/\S/u));
 export const MediaInputRequest = Schema.Union([
@@ -18,10 +22,16 @@ export const MediaInputRequest = Schema.Union([
     mime: Schema.Literals(["video/mp4", "video/x-m4v", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"]),
     size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 200_000_000 })),
   }),
+  Schema.Struct({
+    kind: Schema.Literal("audio"),
+    name: InputName,
+    mime: Schema.Literals(["audio/wav", "audio/mpeg", "audio/mp4", "audio/flac", "audio/ogg", "audio/webm"]),
+    size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 512_000_000 })),
+  }),
 ]) satisfies Codec<T.MediaInputRequest>;
 export const MediaInput: Codec<T.MediaInput> = Schema.Struct({
   id: Schema.String,
-  kind: Schema.Literals(["image", "video"]),
+  kind: Schema.Literals(["image", "video", "audio"]),
   name: Schema.String,
   mime: Schema.String,
   size: Schema.Int,
@@ -45,11 +55,6 @@ export const MediaImageRequest = Schema.Struct({
   enhance: Schema.Boolean,
   watermark: Schema.Boolean,
 }) satisfies Codec<T.MediaImageRequest>;
-export const MediaPhase: Codec<T.MediaPhase> = Schema.Literals(T.MediaPhaseValues);
-export const MediaSource: Codec<T.MediaSource> = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("owner") }),
-  Schema.Struct({ kind: Schema.Literal("orchestrator"), agent: Schema.NonEmptyString, channel: Schema.String }),
-]);
 export const MediaImageUsage: Codec<T.MediaImageUsage> = Schema.Struct({
   images: Schema.Literal(1),
   width: Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 2048 })),
@@ -88,13 +93,13 @@ export const MediaUnderstandingRequest = Schema.Struct({
   allowUpload: Schema.Literal(true),
   maxOutputTokens: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 8192 })),
 }) satisfies Codec<T.MediaUnderstandingRequest>;
-export const MediaInputReference: Codec<T.MediaInputReference> = Schema.Struct({
-  id: Schema.NonEmptyString,
-  kind: Schema.Literals(["image", "video"]),
-  name: Schema.String,
-  mime: Schema.String,
-  size: Schema.Int,
-  hash: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
+export const MediaUnderstandingAuthorizationRequest = Schema.Struct({
+  ...MediaUnderstandingRequest.fields,
+  channel: Schema.NonEmptyString,
+}) satisfies Codec<T.MediaUnderstandingAuthorizationRequest>;
+export const MediaUnderstandingAuthorization: Codec<T.MediaUnderstandingAuthorization> = Schema.Struct({
+  channel: Schema.NonEmptyString,
+  expiresAt: Schema.Finite,
 });
 const Tokens = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 export const MediaUnderstandingResult: Codec<T.MediaUnderstandingResult> = Schema.Struct({
@@ -113,6 +118,7 @@ export const MediaUnderstandingJob: Codec<T.MediaUnderstandingJob> = Schema.Stru
   connection: Schema.String,
   revision: Schema.Int,
   source: MediaSource,
+  authorization: Schema.NullOr(MediaUnderstandingAuthorization),
   phase: Schema.Literals(T.MediaUnderstandingPhaseValues),
   phaseText: Schema.String,
   problem: Schema.String,
@@ -125,7 +131,57 @@ export const MediaUnderstandingJob: Codec<T.MediaUnderstandingJob> = Schema.Stru
   createdAt: Schema.Finite,
   updatedAt: Schema.Finite,
 });
-export const MediaJob: Codec<T.MediaJob> = Schema.Union([MediaImageJob, MediaUnderstandingJob]);
+export const MediaSpeechEvent: Codec<T.MediaSpeechEvent> = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("format"),
+    sampleRate: Schema.Int.check(Schema.isBetween({ minimum: 8000, maximum: 192000 })),
+    channels: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 8 })),
+    bitDepth: Schema.Literal(16),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("audio"),
+    sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    audio: Schema.String.check(Schema.isMaxLength(2_000_000)),
+  }),
+  Schema.Struct({ type: Schema.Literal("done") }),
+  Schema.Struct({ type: Schema.Literal("failed") }),
+]);
+export const MediaSpeechRequest = Schema.Struct({
+  id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u)),
+  text: Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u)),
+  voice: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u)),
+  format: Schema.Literals(T.MediaAudioFormatValues),
+  asynchronous: Schema.optionalKey(Schema.Boolean),
+  streaming: Schema.optionalKey(Schema.Boolean),
+  connection: Schema.NonEmptyString,
+  revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}) satisfies Codec<T.MediaSpeechRequest>;
+export const MediaSpeechJob: Codec<T.MediaSpeechJob> = Schema.Struct({
+  kind: Schema.Literal("speech"),
+  id: Schema.String,
+  prompt: Schema.String,
+  model: Schema.String,
+  connection: Schema.String,
+  revision: Schema.Int,
+  source: MediaSource,
+  voice: Schema.String,
+  format: Schema.Literals(T.MediaAudioFormatValues),
+  contentType: Schema.optionalKey(Schema.String),
+  metadata: Schema.optionalKey(MediaAudioMetadata),
+  usage: Schema.optionalKey(MediaAudioUsage),
+  canResume: Schema.optionalKey(Schema.Boolean),
+  canRelease: Schema.Boolean,
+  phase: MediaPhase,
+  phaseText: Schema.String,
+  problem: Schema.String,
+  attachment: Schema.optionalKey(Attachment),
+  resultInput: Schema.NullOr(MediaInputReference),
+  canCancel: Schema.Boolean,
+  canRetryDownload: Schema.Boolean,
+  createdAt: Schema.Finite,
+  updatedAt: Schema.Finite,
+});
+export const MediaJob: Codec<T.MediaJob> = Schema.Union([MediaImageJob, MediaUnderstandingJob, MediaSpeechJob, MediaAudioJob]);
 export const MediaJobRequest = Schema.Struct({ id: Schema.String }) satisfies Codec<T.MediaJobRequest>;
 export const FactMediaChanged: Codec<T.FactMediaChanged> = Schema.Struct({
   type: Schema.Literal("mediaChanged"),

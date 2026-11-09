@@ -19,6 +19,46 @@ export const mediaTools = Effect.gen(function* () {
         );
       }),
     ),
+    tool(
+      "media.understanding.start",
+      Effect.fn("Tool.mediaUnderstandingStart")(function* ({ id }) {
+        const caller = yield* callerOf(who);
+        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        return JSON.stringify(
+          yield* media.startUnderstanding(id, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
+        );
+      }),
+    ),
+    tool(
+      "media.speech.create",
+      Effect.fn("Tool.mediaSpeechCreate")(function* (input) {
+        const caller = yield* callerOf(who);
+        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        return JSON.stringify(
+          yield* media.createSpeech(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
+        );
+      }),
+    ),
+    tool(
+      "media.dialogue.create",
+      Effect.fn("Tool.mediaSpeakersCreate")(function* (input) {
+        const caller = yield* callerOf(who);
+        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        return JSON.stringify(
+          yield* media.createSpeakers(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
+        );
+      }),
+    ),
+    tool(
+      "media.voiceDesign.create",
+      Effect.fn("Tool.mediaVoiceDesignCreate")(function* (input) {
+        const caller = yield* callerOf(who);
+        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        return JSON.stringify(
+          yield* media.createVoiceDesign(input, { kind: "orchestrator", agent: caller.agent, channel: caller.here, forOwner: caller.actor.forOwner }),
+        );
+      }),
+    ),
     tool("media.job.get", ({ id }) => media.get(id).pipe(Effect.map(JSON.stringify))),
     tool("media.job.cancel", ({ id }) => media.cancel(id).pipe(Effect.map(JSON.stringify))),
     tool("media.job.download", ({ id }) => media.retryDownload(id).pipe(Effect.map(JSON.stringify))),

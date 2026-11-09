@@ -276,6 +276,8 @@ export const catalogs = {
         session: { event: { list: "读一个帮工的轨迹，从早到晚" }, get: "看一个帮工", list: "列出帮工，可以只看一份档案的", stop: "停下帮工这一轮，帮工还在" },
         media: {
           understanding: {
+            authorize: "登记不可变理解请求，只授权指定频道的管家执行一次",
+            start: "管家按已授权任务编号执行理解，不接受新的输入或授权声明",
             create: "确认账号和上传许可后理解选中的本机输入",
             cleanup: "清理已知远端文件，不重复理解请求",
             previewCleanup: "预览远端清理和本机保留释放，不改变任何文件",
@@ -288,7 +290,24 @@ export const catalogs = {
             previewDelete: "预览删除本机媒体输入，不实际改动",
           },
           image: { create: "创建生图任务，同一编号不重复生成" },
-          job: { get: "读取生成任务", list: "列出最近生成任务", cancel: "取消本机等待，不保证停止厂商计费", download: "只重试结果下载，不重新生成" },
+          speech: { create: "创建单人语音任务，生成后下载到本机，不重复提交同一编号", resume: "继续查询已知语音任务，不重新提交" },
+          dialogue: { create: "使用指定账号的音色生成多人对话" },
+          voiceDesign: { create: "设计合成音色试听，不保存可复用音色" },
+          clone: { create: "克隆已明确授权的本机声音样本" },
+          transcription: { create: "转写已授权上传的音频，可区分说话人" },
+          audio: {
+            resume: "继续查询同一个已知音频任务，不重复生成",
+            previewCleanup: "预览清理已知远端音频文件，不实际改动",
+            cleanup: "清理已知远端音频文件，不重复转写或合成",
+          },
+          job: {
+            get: "读取生成任务",
+            list: "列出最近生成任务",
+            cancel: "取消本机等待，不保证停止厂商计费",
+            download: "只重试结果下载，不重新生成",
+            previewRelease: "预览释放本机音频资产并放弃后续恢复",
+            release: "释放这个任务的本机音频资产，不删除共享资产，也不停止厂商计费",
+          },
         },
         provider: {
           voice: { list: "查询指定 MOSS 账号的一页音色，不生成音频" },
@@ -514,6 +533,10 @@ export const catalogs = {
         zoom: "缩放",
         front: "前置全部窗口",
         close: "关闭窗口",
+      },
+      media: {
+        camera: "仅在你开始实时视觉理解时使用摄像头，画面会发送到你选择的 AI 服务。",
+        microphone: "仅在你开始听写或通话时使用麦克风，音频会发送到你选择的 AI 服务。",
       },
       commandLine: { taken: "{link} 已经有别的文件，没有换掉：先挪开它再装" },
     },
@@ -1092,6 +1115,11 @@ export const catalogs = {
       ambiguous: "这条输入同时对应多张工单，需要明确归属",
     },
     "server.media": {
+      speechInvalid: "语音合成参数无效，请检查文字、音色与音频格式；Pro 不支持停顿标签。",
+      speechChanged: "语音合成连接已变化，请核对连接后重新提交。",
+      speechDownloadFailed: "音频下载或保存失败。可以只重试下载，不会重新合成。",
+      speechUnknown: "没有收到完整的语音合成结果，供应商可能仍在处理或计费，没有重复提交。",
+      speechRejected: "MOSS 拒绝了语音合成请求，请检查账号权限与输入后再创建新任务。",
       inputDeletePreview: "删除「{name}」的本机输入预留及未完成的上传。",
       inputDeleteBytes: "没有其他输入保留这份本机文件时，删除文件。",
       remoteAccountChanged: "这份远端文件属于另一条连接或凭据，没有用替换后的账号发送请求。",
@@ -1101,10 +1129,13 @@ export const catalogs = {
       cleanupPreview: "经原连接 {connection} 删除 {count} 份已知远端文件，不删除账号里不明来历的文件。",
       cleanupReleasePreview: "解除本任务对本机输入的保留。未知上传可能仍有文件；这不会停止供应商处理，也不会重复推理。",
       consentChanged: "图片与视频理解的连接已变化，请核对连接后重新确认上传。",
+      authorizationRequired: "这次理解任务未授权当前频道或调用者执行。",
+      authorizationExpired: "上传授权已过期或连接已变化，没有上传文件；请重新确认并创建新请求。",
       understandingUnknown: "理解结果尚未确认，供应商可能仍在处理或计费，没有重复提交。",
       understandingRejected: "MOSS 拒绝了理解请求，没有重复提交。",
       remoteUnresolved: "部分上传没有取得文件 ID。已知文件已清理，请在供应商后台核对这些文件名：{files}",
       understandingPhase: {
+        authorized: "等待管家执行",
         queued: "排队中",
         uploading: "上传到 MOSS",
         generating: "理解中",
@@ -1141,6 +1172,20 @@ export const catalogs = {
       canceled: "已停止本机等待；不代表厂商停止计算或停止计费。",
       restarted: "服务端已重启，未重新提交生成请求。",
       noDownload: "这次任务没有可重试的下载结果。",
+      speechPollPaused: "已暂停查询，未重新提交已知的厂商任务。恢复只会查询原任务，仍可能产生费用。",
+      speechNoResume: "没有可恢复查询的已知异步任务。",
+      speechPartial: "流式连接未确认完成就已结束，仅保存收到的部分音频，未重新生成。",
+      speechStreamUnavailable: "此实时流不可用或已有监听者。如有已保存结果，请使用该结果；不会自动重新提交流式生成。",
+      audioInvalid: "音频请求无效，请检查说话人映射、格式、样本时长、账号与授权。",
+      audioUnknown: "音频请求结果未知，未重新提交；厂商可能仍会计费。",
+      audioRejected: "厂商拒绝了这次音频请求，或任务执行失败。",
+      audioPollingPaused: "已暂停查询。恢复只查询已知的厂商任务，不会重新提交。",
+      audioAccountChanged: "原音频账号不可用或密钥已变更，未使用其他凭据。",
+      audioCleanupPending: "结果已保留，但远端文件尚未清理；释放本机音频后仍需单独重试远端清理。",
+      releaseUnavailable: "请先停止本机处理，再释放此任务的音频文件。",
+      releasePreview: "移除此任务的本机播放、音色预览和输入引用，并删除没有其他任务保留的本机文件。",
+      releasePreserves: "共享文件、已发布的频道附件、转写文字、已保存的音色 ID 和任务记录保持不变；不会重新生成音频或删除远端文件。",
+      releaseAbandons: "永久放弃此任务的本机恢复和下载重试。远端处理和计费可能继续，此操作不会取消厂商任务。",
       phase: {
         queued: "排队中",
         generating: "生成中",
@@ -1201,6 +1246,9 @@ export const catalogs = {
       changedSince: "「{page}」在读出以后又被改过，没有写：重新读一次再改",
     },
     "server.provider": {
+      capabilityUnbound: "请先在 AI 服务中为{capability}选择连接与模型。",
+      capabilityModel: "请为{capability}选择支持的模型或快照。",
+      use: { speakers: "多人语音", voiceDesign: "音色设计", transcription: "音频转写", vision: "实时视觉", live: "MOSS Live" },
       speechModel: "请选择支持的 Flash、Pro 语音模型或快照。",
       speechUnbound: "请先在 AI 服务中选择语音生成连接与模型。",
       voiceQuery: "音色分页参数无效，请在允许范围内选择偏移量或游标，不要同时使用。",
@@ -1478,10 +1526,12 @@ export const catalogs = {
     "server.tool": {
       labels: {
         media_image_create: "提交生图",
+        media_understanding_start: "执行已授权理解",
+        media_speech_create: "生成单人语音",
         media_job_get: "查看生成任务",
         media_job_list: "查看最近生成任务",
         media_job_cancel: "取消生成等待",
-        media_job_download: "重试图片下载",
+        media_job_download: "重试媒体下载",
         repo_list: "仓库",
         channel_list: "频道",
         channel_create: "开频道",
@@ -1555,6 +1605,7 @@ export const catalogs = {
         shape: "听写的地址回的不是 OpenAI 的转写格式",
       },
       moss: {
+        toolFailed: "后台请求未能完成。",
         noKey: "请先在 AI 服务中为 MOSS Live 绑定已启用的连接",
         refused: "MOSS Live 不认这个 Key：{why}",
         unreachable: "连不上 MOSS Live：{why}",
@@ -1903,6 +1954,112 @@ export const catalogs = {
         save: "存成新的一稿",
         saved: "存成了第 {version} 稿",
       },
+    },
+    "web.audio": {
+      title: "音频工作台",
+      notice:
+        "请求可能产生费用。取消只停止本机等待，不代表厂商停止计费。结果未知时不会自动重新提交。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅主人可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
+      configure: "请先在 AI 服务中配置这项用途。",
+      refresh: "刷新账号与配置",
+      account: "音色账号",
+      chooseAccount: "选择账号",
+      voices: "账号音色",
+      voice: "音色",
+      chooseVoice: "选择音色",
+      first: "首页 / 刷新",
+      next: "下一页",
+      emptyVoices: "此账号没有返回音色。",
+      queryVoice: "在本页查找音色",
+      queryHint: "按名称或 ID 筛选此账号的当前页，更多音色请翻页。厂商不支持单个音色查询与删除。",
+      speakerTitle: "多人语音",
+      speakerHint:
+        "最多为五位说话人选择配置账号的音色，再按顺序添加对话（合计不超过 10,000 字符）。说话人 ID 不能重复，只能包含英文字母、数字、下划线或连字符。",
+      speaker: "说话人 ID",
+      addSpeaker: "添加说话人",
+      remove: "移除",
+      dialogue: "对话",
+      addTurn: "添加对话段",
+      text: "文字",
+      generate: "生成对话音频",
+      designTitle: "设计音色",
+      instructions: "音色描述",
+      previewText: "试听文字",
+      preview: "生成试听",
+      designHint:
+        "生成试听不会保存可复用音色。试听后，需明确选择保存到原账号。只有不超过 30 秒、10 MB 的 WAV、MP3 或 FLAC 试听可保存为音色；更长的试听只能下载。",
+      voiceName: "可复用音色名称",
+      saveVoice: "保存可复用音色",
+      savedVoice: "已保存音色：{voice}",
+      cloneTitle: "克隆声音样本",
+      cloneHint: "只能使用你本人或已获得克隆许可的声音：WAV、MP3、M4A 或 FLAC，不超过 30 秒、10 MB。授权绑定当前文件和账号版本；换文件或账号后需要重新授权。",
+      consent: "我有权使用这份声音，并授权将此文件上传到所选账号用于本次请求。",
+      clone: "创建可复用音色",
+      transcriptionTitle: "长音频转写",
+      transcriptionHint:
+        "将最长一小时的音频上传到独立配置的转写账号。异步模式等待远端任务；流式模式即时保存收到的文字和说话人分段。离开页面不会取消已保存的任务。只有完整结束才是最终结果；中断的流保留部分内容，不会自动重连或重新提交。",
+      execution: "执行方式",
+      executionHint: "仅说话人分离模型及其支持的快照版本可使用流式模式。",
+      executionAsync: "异步任务",
+      executionStreaming: "流式文字与说话人",
+      partialTitle: "部分转写",
+      partialTranscript: "部分转写——并非完整结果。",
+      savePartialTranscript: "将部分转写保存为稿子",
+      downloadPartialTranscript: "下载部分转写",
+      usageAudioSeconds: "输入音频：{value} 秒",
+      input: "音频文件",
+      transcribe: "开始转写",
+      localPlayback: "本机输入回放",
+      timeline: "说话人时间轴",
+      seek: "定位到 {time}",
+      noTimestamps: "厂商没有返回带时间戳的分段。",
+      saveTranscript: "将转写保存为稿子",
+      openTranscript: "打开已保存的转写稿子",
+      downloadTranscript: "下载转写",
+      downloadAudio: "下载音频",
+      history: "音频任务",
+      empty: "还没有音频任务。",
+      pending: "请求已固定。再次查询沿用同一 ID 和账号，不会新建请求。",
+      check: "查询原请求",
+      new: "新建请求",
+      newAsk: "要发起另一笔请求吗？原请求仍可能完成并产生费用。",
+      uploading: "正在将所选音频上传到本机服务端…",
+      stopUpload: "停止上传",
+      format: "音频格式",
+      transcript: "转写结果",
+      diarize: "识别说话人",
+      resume: "继续查询原远端任务",
+      cleanupPreview: "预览远端文件清理",
+      cleanup: "重试清理远端文件",
+      cleanupAsk: "要删除预览中列出的远端输入文件吗？此操作不会重新生成音频或改变已保存结果。",
+      flashTitle: "Flash 实时播放",
+      flashNotice:
+        "明确开始后，边生成边播放收到的 PCM 音频。仅支持 Flash，完整结果保存为 WAV，最多缓冲五秒播放。停止、离开页面或切换设备都会关闭流，不能重连，厂商仍可能计费。",
+      flashStart: "开始生成并播放",
+      flashStop: "停止播放和本机任务",
+      flashIdle: "尚未开始流式播放。",
+      flashConnecting: "正在打开原请求的音频流…",
+      flashPlaying: "正在播放收到的音频…",
+      flashDraining: "音频流已完整接收，正在播完缓冲内容…",
+      flashDone: "音频流和播放均已完成，保存结果见下方。",
+      flashStopped: "已停止。听到的音频可能不完整，此音频流不会重连。",
+      flashIncomplete: "音频流在结果完整前结束。听到的内容只是部分音频，不能据此判断请求未计费。",
+      flashInvalid: "音频流包含无效或乱序数据，已停止。",
+      flashUnavailable: "无法打开原请求的音频流，不会重连或自动重新生成。",
+      flashUnsupported: "此浏览器无法实时播放音频，请改用非流式格式。",
+      flashDeviceChanged: "音频设备或播放环境发生变化，已停止原音频流。",
+      flashProgress: "已接收 {received} 秒 · 已播放 {played} 秒",
+      playbackUnsupported: "此浏览器无法播放这个格式，请下载后使用兼容的播放器收听。",
+      metadataFile: "从已保存音频测得",
+      metadataProvider: "厂商报告",
+      metadataRate: "{value} Hz",
+      metadataDuration: "{value} 秒",
+      metadataChannels: "{value} 声道",
+      metadataBits: "{value} 位",
+      usageCharacters: "输入字符：{value}",
+      usagePrompt: "提示词 token：{value}",
+      usageCompletion: "生成 token：{value}",
+      usageTotal: "总 token：{value}",
+      unknownSpeaker: "未标注说话人",
     },
     "web.base": {
       route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
@@ -3257,6 +3414,35 @@ export const catalogs = {
     "web.media": {
       title: "媒体",
       image: "生成图片",
+      speech: {
+        title: "单人语音生成",
+        notice:
+          "将文字发送到下方的 MOSS 账号，生成单人语音，可能产生费用。不会自动播放；Flash 流式播放也需手动开始。取消只停止本机等待，不代表供应商停止处理或计费。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅主人可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
+        configure: "请先在 AI 服务中选择语音生成连接和 Flash 或 Pro 模型。",
+        binding: "{account} · {connection} · {model} · 配置版本 {revision}",
+        refresh: "刷新连接配置",
+        voice: "音色",
+        voiceHint: "音色属于下方显示的账号。音色可见不代表生成权限或效果已经验证。",
+        chooseVoice: "选择账号音色",
+        firstVoices: "重新加载音色首页",
+        nextVoices: "下一页音色",
+        emptyVoices: "此账号在这一页没有返回音色。",
+        format: "音频格式",
+        execution: "执行方式",
+        synchronous: "等待生成结果",
+        asynchronous: "可恢复的异步任务",
+        downloadOnly: "此格式在当前设备上仅提供下载；原始 PCM 不包含可直接播放的参数。",
+        resume: "恢复查询原任务",
+        text: "要朗读的文字（最多 10,000 字符）",
+        submit: "生成语音",
+        pending:
+          "请求 ID、原账号、配置版本、音色、文字与格式已固定。重试同一提交只会取回同一任务，不会重新生成结果未知的请求；要修改输入或再次生成，请明确开始新请求。",
+        new: "新的语音请求",
+        history: "最近的语音任务",
+        empty: "还没有语音任务。先配置语音连接，选择音色并输入文字。",
+        save: "保存音频",
+        publish: "发布音频",
+      },
       understanding: {
         title: "理解图片与视频",
         notice:
@@ -3265,6 +3451,14 @@ export const catalogs = {
         files: "本机图片或视频",
         prompt: "想让模型说明什么？",
         tokens: "最多输出多少 token",
+        executor: "执行方式／授权频道",
+        direct: "现在由我提交",
+        authorize: "登记管家授权",
+        authorizationNotice: "仅登记这份问题、输入和输出上限，不立即上传到 MOSS。所选频道的管家可在 15 分钟内替你执行一次；取消、过期或服务端重启后失效。",
+        authorization: "已授权频道 {channel}。发送给管家后才开始执行；授权在登记后 15 分钟失效。",
+        delegate: "发送给管家",
+        delegated: "已发送给管家",
+        delegation: "请执行我已授权的媒体理解任务 {id}，完成后告诉我结果。",
         consent: "我同意将这些文件和问题发送到上方的 MOSS 连接。",
         stored: "已存到本机",
         selected: "已选择，还未上传",
@@ -3287,7 +3481,7 @@ export const catalogs = {
       sourceAgent: "来源：管家 {agent} · 频道 {channel}",
       usage: "厂商报告：{images} 张 · {width} × {height}",
       usageUnknown: "尚无厂商用量结果；不代表未计费。",
-      hint: "用 AI 服务中绑定的连接生成图片或理解选中的图片、视频，结果保存在本机。",
+      hint: "用 AI 服务中绑定的连接生成图片、单人语音或理解选中的图片、视频，结果保存在本机。",
       configure: "配置 AI 连接",
       prompt: "提示词 / 布局 JSON",
       format: "输入方式",
@@ -3313,6 +3507,9 @@ export const catalogs = {
       cancel: "取消等待",
       cancelAsk: "停止本机等待？厂商可能仍在生成或计费。",
       retry: "只重试下载",
+      releasePreview: "查看本机音频释放范围",
+      release: "释放本机音频",
+      releaseAsk: "释放未共享的本机音频，并永久放弃此任务的恢复和下载重试？转写、音色、已发布附件和记录仍保留；远端处理和计费可能继续，不会重新生成音频。",
       save: "保存图片",
       channel: "发布到频道",
       chooseChannel: "选择频道",
@@ -3462,13 +3659,21 @@ export const catalogs = {
       tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.provider": {
+      speakersSettings: "多人语音生成",
+      voiceDesignSettings: "音色设计",
+      transcriptionSettings: "音频转写",
+      visionSettings: "实时视觉",
+      capabilityConnection: "连接",
+      capabilityModel: "模型 / 版本",
+      capabilityNotice: "选择独立的连接和模型。保存设置不会提交请求，也不会访问麦克风、摄像头或文件。",
       speechSettings: "单人语音生成",
       speechConnection: "语音生成连接",
       speechModel: "语音生成模型",
-      speechNotice: "可独立选择 Flash 或 Pro。工作台尚未开放语音生成和流式播放，保存此设置不会生成音频。",
+      speechNotice: "可独立选择 Flash 或 Pro，再到媒体页生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
+      openSpeech: "打开语音生成",
       title: "AI 服务",
-      intro: "保存供应商连接，再为听写、MOSS Live 和生图选择连接。当前接入 MOSS；朗读尚未开放。",
-      words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 AI",
+      intro: "保存 MOSS 连接，再为听写、生图、媒体理解、语音生成、音色设计、转写和实时音视频分别选择模型。",
+      words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 理解 语音 音频 AI",
       understandingSettings: "媒体理解配置",
       understandingConnection: "媒体理解连接",
       understandingModel: "理解模型 / 版本",
@@ -3496,7 +3701,7 @@ export const catalogs = {
       model: "听写模型",
       modelHint: "这里只列出产品已适配的普通转写模型；账号权限与实际效果仍需真实调用验证。",
       unbound: "不使用",
-      liveHint: "现有 MOSS Live 实时线路使用这条连接的密钥，不会因更改听写模型而切换实时协议。",
+      liveHint: "MOSS Live 使用独立的连接和模型；更改听写模型不会切换实时协议。",
       bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
       manage: "管理 AI 服务连接",
     },
@@ -4131,7 +4336,38 @@ export const catalogs = {
         dismiss: "知道了",
       },
       call: { renew: "令牌续期失败：{why}", noMic: "没有麦克风权限", cannotHear: "声网：听不到对面：{why}", agora: "声网：{code} {msg}" },
+      vision: {
+        silence: "本轮没有回答，会话仍然连接。",
+        interrupted: "回答已被打断",
+        title: "实时视觉理解",
+        liveTitle: "向 Live 通话分享画面",
+        notice:
+          "开始后会请求摄像头或屏幕权限。选中的画面经本机服务端上传至配置的 MOSS 账号，每秒至多一张 JPEG，每张不超过 256 KiB。展示隐私内容前请停止分享。内容不存入田头。",
+        hostNotice: "需要安全的本机浏览器环境和可用的采集能力。桌面摄像头需要系统授权；桌面屏幕采集和手机壳视觉输入尚不可用。离开此页或切到后台会停止采集。",
+        source: "画面来源",
+        camera: "摄像头",
+        screen: "屏幕或窗口",
+        unavailable: "当前宿主或浏览器环境不支持画面采集。",
+        denied: "摄像头或屏幕权限被拒绝。",
+        deviceLost: "采集设备或屏幕分享已停止。",
+        captureFailed: "无法采集所选画面。",
+        closed: "视觉会话已断开。请检查 AI 服务中独立的视觉模型用途，再重新开始。",
+        start: "开始分享",
+        stop: "停止分享",
+        idle: "尚未连接",
+        connecting: "正在请求权限并连接…",
+        ready: "已连接",
+        ended: "会话已结束",
+        error: "会话失败",
+        prompt: "询问分享的画面",
+        final: "回答此问题后结束会话",
+        send: "发送问题",
+        transcript: "视觉回答",
+      },
       moss: {
+        busy: "已有 Live 会话正在连接或通话，请先结束它，再开始新的会话。",
+        localOnly: "浏览器实时会话仅在本机（localhost）可用，配对的远程浏览器无法打开这些线路。",
+        requestFailed: "MOSS Live 未能完成此请求。请检查通话配置后再试。",
         intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
         persona: "人设（不填用 MOSS 默认的）",
         personaHint: "比如：你是我的管家，说话简短。",
@@ -4497,16 +4733,33 @@ export const catalogs = {
             previewDelete: "Preview deleting a local media input without changing it",
           },
           understanding: {
+            authorize: "Freeze an understanding request for one execution by the selected channel's orchestrator",
+            start: "Execute an authorized understanding task by ID without accepting new input or self-declared consent",
             create: "Understand selected local inputs with explicit account and upload approval",
             cleanup: "Clean known remote files without repeating understanding",
             previewCleanup: "Preview remote cleanup and local retention release without changing either",
           },
           image: { create: "Create an image task without resubmitting the same request ID" },
+          speech: {
+            create: "Create single-speaker speech and download it locally without repeating the same request ID",
+            resume: "Resume polling the same known speech task without resubmitting it",
+          },
+          dialogue: { create: "Create a dialogue using the selected account's voices" },
+          voiceDesign: { create: "Design a synthetic voice preview without saving a reusable voice" },
+          clone: { create: "Clone an explicitly authorized local voice sample" },
+          transcription: { create: "Transcribe an approved audio input with optional speaker labels" },
+          audio: {
+            resume: "Resume the same known audio task without submitting another generation",
+            previewCleanup: "Preview cleanup of known remote audio files without changing them",
+            cleanup: "Clean known remote audio files without repeating transcription or synthesis",
+          },
           job: {
             get: "Read a generation task",
             list: "List recent generation tasks",
             cancel: "Stop local waiting without guaranteeing provider cancellation",
             download: "Retry result download without generating again",
+            previewRelease: "Preview releasing local audio assets and abandoning further recovery",
+            release: "Release this task's local audio assets without deleting shared assets or canceling provider billing",
           },
         },
         provider: {
@@ -4759,6 +5012,10 @@ export const catalogs = {
         zoom: "Zoom",
         front: "Bring All to Front",
         close: "Close Window",
+      },
+      media: {
+        camera: "Use the camera only when you start realtime visual understanding. Frames are sent to your selected AI provider.",
+        microphone: "Use the microphone only when you start dictation or a call. Audio is sent to your selected AI provider.",
       },
       commandLine: { taken: "{link} is another program's file and was not replaced: move it away, then install again" },
     },
@@ -5356,6 +5613,11 @@ export const catalogs = {
       ambiguous: "This input matches multiple issues and needs an explicit owner",
     },
     "server.media": {
+      speechInvalid: "Invalid speech parameters. Check the text, voice and audio format; Pro does not support pause tags.",
+      speechChanged: "The selected speech connection changed. Review the connection and submit again.",
+      speechDownloadFailed: "Audio download or saving failed. Retry only the download without synthesizing again.",
+      speechUnknown: "No complete speech result was received. The provider may still be processing or charging. Speech was not submitted again.",
+      speechRejected: "MOSS rejected the speech request. Check account access and input before creating a new task.",
       inputDeletePreview: "Delete the local input reservation for {name} and any unfinished upload.",
       inputDeleteBytes: "Delete the local file if no other input retains it.",
       remoteAccountChanged: "This remote file belongs to a different connection or credential. No request was sent with a replacement account.",
@@ -5366,10 +5628,13 @@ export const catalogs = {
       cleanupPreview: "Delete {count} known remote files using their original connection {connection}; never delete unknown account files.",
       cleanupReleasePreview: "Release this task's local input retention. Unknown uploads may remain; this does not stop vendor processing or repeat inference.",
       consentChanged: "The selected understanding connection changed. Review the connection and explicitly approve uploading again.",
+      authorizationRequired: "This understanding task is not authorized for the current channel or caller.",
+      authorizationExpired: "Upload approval expired or the connection changed. No files were uploaded; review and create a new request.",
       understandingUnknown: "The understanding result is unknown. The provider may still be processing or charging. The request was not repeated.",
       understandingRejected: "MOSS rejected the understanding request. It was not repeated.",
       remoteUnresolved: "Some uploads have no confirmed file ID. Known files were cleaned, but inspect these names in the provider console: {files}",
       understandingPhase: {
+        authorized: "Awaiting orchestrator",
         queued: "Queued",
         uploading: "Uploading to MOSS",
         generating: "Understanding",
@@ -5406,6 +5671,23 @@ export const catalogs = {
       canceled: "Local waiting stopped. This does not guarantee the provider stopped computing or charging.",
       restarted: "The server restarted. Generation was not resubmitted.",
       noDownload: "This task has no result available for a download retry.",
+      speechPollPaused: "Polling paused. The known provider task was not resubmitted; resume to query that same task. Charges may still apply.",
+      speechNoResume: "There is no known asynchronous task to resume.",
+      speechPartial: "The stream ended without confirmed completion. Only the received partial audio was saved; generation was not repeated.",
+      speechStreamUnavailable:
+        "This live stream is unavailable or already has a listener. Use a saved result if available; streaming is never resubmitted automatically.",
+      audioInvalid: "Invalid audio request. Check speaker mappings, format, sample length, account and consent.",
+      audioUnknown: "The audio request outcome is unknown. It was not resubmitted; the provider may still charge for it.",
+      audioRejected: "The provider rejected or failed this audio task.",
+      audioPollingPaused: "Polling paused. Resume queries only the known provider task, without submitting it again.",
+      audioAccountChanged: "The original audio account is unavailable or its key changed. No different credentials were used.",
+      audioCleanupPending: "The result is retained, but remote file cleanup is pending. Retry remote cleanup separately from releasing local audio.",
+      releaseUnavailable: "Stop local processing before releasing this media request's audio assets.",
+      releasePreview: "Remove this request's local playback, voice-preview and source references, and delete local files that no other request retains.",
+      releasePreserves:
+        "Keep shared files, published channel attachments, transcripts, saved voice IDs and request history. This does not regenerate audio or delete remote files.",
+      releaseAbandons:
+        "Permanently abandon local resume and download retries for this request. Remote processing and charges may continue; this does not cancel the provider's task.",
       phase: {
         queued: "Queued",
         generating: "Generating",
@@ -5468,6 +5750,15 @@ export const catalogs = {
       changedSince: '"{page}" was changed after it was read and was not written: read it again, then edit',
     },
     "server.provider": {
+      capabilityUnbound: "Choose a connection and model for {capability} in AI services first.",
+      capabilityModel: "Choose a supported model or snapshot for {capability}.",
+      use: {
+        speakers: "multi-speaker speech",
+        voiceDesign: "voice design",
+        transcription: "audio transcription",
+        vision: "realtime vision",
+        live: "MOSS Live",
+      },
       speechModel: "Choose a supported Flash or Pro speech model or snapshot.",
       speechUnbound: "Select a speech connection and model in AI services first.",
       voiceQuery: "Voice pagination is invalid; use either an offset or a cursor within the supported bounds.",
@@ -5756,10 +6047,12 @@ export const catalogs = {
     "server.tool": {
       labels: {
         media_image_create: "Submit image generation",
+        media_understanding_start: "Execute authorized understanding",
+        media_speech_create: "Generate single-speaker speech",
         media_job_get: "Read a generation task",
         media_job_list: "List recent generation tasks",
         media_job_cancel: "Cancel generation waiting",
-        media_job_download: "Retry image download",
+        media_job_download: "Retry media download",
         repo_list: "Repos",
         channel_list: "Channels",
         channel_create: "Open a channel",
@@ -5833,6 +6126,7 @@ export const catalogs = {
         shape: "The dictation address did not answer in OpenAI's transcription format",
       },
       moss: {
+        toolFailed: "The background request could not be completed.",
         noKey: "Bind an enabled connection to MOSS Live in AI services first",
         refused: "MOSS Live refused the key: {why}",
         unreachable: "Cannot reach MOSS Live: {why}",
@@ -6200,6 +6494,113 @@ export const catalogs = {
         save: "Save as a new version",
         saved: "Saved as version {version}",
       },
+    },
+    "web.audio": {
+      title: "Audio studio",
+      notice:
+        "Requests may incur charges. Canceling stops local waiting, not remote billing. Unknown outcomes are never automatically submitted again. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in owner-only Media storage, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
+      configure: "Configure this capability in AI services first.",
+      refresh: "Refresh accounts and configuration",
+      account: "Voice account",
+      chooseAccount: "Choose an account",
+      voices: "Account voices",
+      voice: "Voice",
+      chooseVoice: "Choose a voice",
+      first: "First page / refresh",
+      next: "Next page",
+      emptyVoices: "No voices returned for this account.",
+      queryVoice: "Find a voice on this page",
+      queryHint: "Search this account's current page by name or ID. Use Next page for more voices; individual remote lookup and deletion are not supported.",
+      speakerTitle: "Multiple speakers",
+      speakerHint:
+        "Map up to five speakers to voices from the configured account, then add dialogue turns in order (10,000 characters total). Speaker IDs must be unique and use letters, digits, underscores or hyphens.",
+      speaker: "Speaker ID",
+      addSpeaker: "Add speaker",
+      remove: "Remove",
+      dialogue: "Dialogue",
+      addTurn: "Add turn",
+      text: "Text",
+      generate: "Generate dialogue",
+      designTitle: "Design a voice",
+      instructions: "Voice instructions",
+      previewText: "Preview text",
+      preview: "Generate preview",
+      designHint:
+        "Preview generation does not save a reusable voice. Listen first, then explicitly save on the original account. Saving is available for WAV, MP3 or FLAC previews up to 30 seconds and 10 MB; longer previews can only be downloaded.",
+      voiceName: "Reusable voice name",
+      saveVoice: "Save reusable voice",
+      savedVoice: "Saved voice: {voice}",
+      cloneTitle: "Clone a voice sample",
+      cloneHint:
+        "Use only a voice you own or have permission to clone: WAV, MP3, M4A or FLAC, up to 30 seconds and 10 MB. Consent applies to this exact file and account revision; changing either requires consent again.",
+      consent: "I have permission to use this sample and authorize uploading this file to the selected account for this request.",
+      clone: "Create reusable voice",
+      transcriptionTitle: "Long audio transcription",
+      transcriptionHint:
+        "Uploads audio up to one hour to the independently configured transcription account. Async waits for a remote task; streaming saves incoming text and speaker segments immediately. Leaving this page does not cancel the saved task. Only a completed result is final; interrupted streams stay partial and never reconnect or resubmit automatically.",
+      execution: "Execution",
+      executionHint: "Streaming is available only for the diarization model and its supported snapshot.",
+      executionAsync: "Asynchronous task",
+      executionStreaming: "Streaming text and speakers",
+      partialTitle: "Partial transcript",
+      partialTranscript: "Partial transcript — not a completed result.",
+      savePartialTranscript: "Save partial transcript as artifact",
+      downloadPartialTranscript: "Download partial transcript",
+      usageAudioSeconds: "Input audio: {value} s",
+      input: "Audio file",
+      transcribe: "Start transcription",
+      localPlayback: "Local input playback",
+      timeline: "Speaker timeline",
+      seek: "Seek to {time}",
+      noTimestamps: "The provider returned no timestamped segments.",
+      saveTranscript: "Save transcript as artifact",
+      openTranscript: "Open saved transcript",
+      downloadTranscript: "Download transcript",
+      downloadAudio: "Download audio",
+      history: "Audio tasks",
+      empty: "No audio tasks yet.",
+      pending: "This request is frozen. Checking it again reuses the same ID and account; it does not create another request.",
+      check: "Check original request",
+      new: "New request",
+      newAsk: "Start a separate request? The original may still complete and incur charges.",
+      uploading: "Uploading the selected audio to this server…",
+      stopUpload: "Stop upload",
+      format: "Audio format",
+      transcript: "Transcript",
+      diarize: "Identify speakers",
+      resume: "Resume polling the original task",
+      cleanupPreview: "Preview remote file cleanup",
+      cleanup: "Retry remote file cleanup",
+      cleanupAsk: "Delete the remote input files shown in this preview? This does not regenerate audio or change the saved result.",
+      flashTitle: "Flash live playback",
+      flashNotice:
+        "Start explicitly to generate and play PCM as it arrives. Flash only; the completed stream is saved as WAV. Playback buffers at most five seconds. Stopping, leaving this page or changing devices closes the stream; it cannot reconnect, and charges may still apply.",
+      flashStart: "Start generation and playback",
+      flashStop: "Stop playback and local task",
+      flashIdle: "No stream started.",
+      flashConnecting: "Opening the original stream…",
+      flashPlaying: "Playing incoming audio…",
+      flashDraining: "Stream complete; playing the remaining buffered audio…",
+      flashDone: "Stream and playback complete. The saved result is below.",
+      flashStopped: "Stopped. Any audio heard may be incomplete; this stream will not reconnect.",
+      flashIncomplete: "The stream ended without a complete result. Any audio heard is partial; do not assume the request was unbilled.",
+      flashInvalid: "The audio stream contained invalid or out-of-order data and was stopped.",
+      flashUnavailable: "The original audio stream could not be opened. It will not be reconnected or automatically regenerated.",
+      flashUnsupported: "This browser cannot play live audio. Use a non-streaming format instead.",
+      flashDeviceChanged: "Audio devices or the playback context changed. The original stream was stopped.",
+      flashProgress: "Received {received} s · played {played} s",
+      playbackUnsupported: "This browser cannot play this format. Download the audio to listen in a compatible player.",
+      metadataFile: "Measured from saved audio",
+      metadataProvider: "Reported by the provider",
+      metadataRate: "{value} Hz",
+      metadataDuration: "{value} s",
+      metadataChannels: "{value} channels",
+      metadataBits: "{value}-bit",
+      usageCharacters: "Input characters: {value}",
+      usagePrompt: "Prompt tokens: {value}",
+      usageCompletion: "Completion tokens: {value}",
+      usageTotal: "Total tokens: {value}",
+      unknownSpeaker: "Unlabeled speaker",
     },
     "web.base": {
       route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
@@ -7653,6 +8054,35 @@ export const catalogs = {
     "web.media": {
       title: "Media",
       image: "Image generation",
+      speech: {
+        title: "Single-speaker speech",
+        notice:
+          "Send text to the displayed MOSS account to generate one speaker. Charges may apply. Playback never starts automatically; Flash streaming plays only when requested. Canceling stops local waiting, not necessarily provider work or charges. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in owner-only Media storage, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
+        configure: "Select a speech connection and Flash or Pro model in AI services first.",
+        binding: "{account} · {connection} · {model} · configuration revision {revision}",
+        refresh: "Refresh connection settings",
+        voice: "Voice",
+        voiceHint: "Voices belong to the displayed account. Listing a voice does not verify generation permission or quality.",
+        chooseVoice: "Choose an account voice",
+        firstVoices: "Reload first voice page",
+        nextVoices: "Next voice page",
+        emptyVoices: "This account returned no voices on this page.",
+        format: "Audio format",
+        execution: "Execution",
+        synchronous: "Wait for generation",
+        asynchronous: "Persistent asynchronous task",
+        downloadOnly: "This format is download-only on this device. Raw PCM has no self-describing playback parameters.",
+        resume: "Resume querying the same task",
+        text: "Text to speak (up to 10,000 characters)",
+        submit: "Generate speech",
+        pending:
+          "The request ID and original account, configuration, voice, text and format are frozen. Retrying the same submission retrieves the same task; it never regenerates an uncertain result. Choose a new request to change inputs or generate again.",
+        new: "New speech request",
+        history: "Recent speech tasks",
+        empty: "No speech tasks yet. Configure a speech connection, choose a voice and enter text.",
+        save: "Save audio",
+        publish: "Publish audio",
+      },
       understanding: {
         title: "Understand images and video",
         notice:
@@ -7661,6 +8091,15 @@ export const catalogs = {
         files: "Local images or video",
         prompt: "What should the model explain?",
         tokens: "Maximum output tokens",
+        executor: "Execution / authorized channel",
+        direct: "Submit now myself",
+        authorize: "Authorize the orchestrator",
+        authorizationNotice:
+          "Freeze this prompt, input and output limit without uploading to MOSS yet. An orchestrator acting for you in the selected channel may execute it once within 15 minutes. Cancellation, expiry or a server restart invalidates approval.",
+        authorization: "Authorized channel: {channel}. Send to the orchestrator to begin. Approval expires 15 minutes after registration.",
+        delegate: "Send to orchestrator",
+        delegated: "Sent to orchestrator",
+        delegation: "Execute my authorized media understanding task {id}, then report the result.",
         consent: "I approve sending these files and this prompt to the displayed MOSS connection.",
         stored: "Stored locally",
         selected: "Selected; not uploaded yet",
@@ -7686,7 +8125,7 @@ export const catalogs = {
       sourceAgent: "Source: orchestrator {agent} · channel {channel}",
       usage: "Provider reported: {images} image(s) · {width} × {height}",
       usageUnknown: "No provider usage result yet. This does not mean there was no charge.",
-      hint: "Generate images or understand selected images and video with the connections bound in AI services. Keep results locally.",
+      hint: "Generate images or single-speaker speech, or understand selected images and video with the connections bound in AI services. Keep results locally.",
       configure: "Configure AI connections",
       prompt: "Prompt / layout JSON",
       format: "Input format",
@@ -7714,6 +8153,10 @@ export const catalogs = {
       cancel: "Cancel waiting",
       cancelAsk: "Stop waiting locally? The provider may still be generating or charging.",
       retry: "Retry download only",
+      releasePreview: "Review local audio release",
+      release: "Release local audio",
+      releaseAsk:
+        "Release unshared local audio and permanently abandon this request's resume/download retries? Transcripts, voices, published attachments and history remain. Remote processing and charges may continue; audio will not be regenerated.",
       save: "Save image",
       channel: "Publish to channel",
       chooseChannel: "Choose a channel",
@@ -7896,14 +8339,24 @@ export const catalogs = {
       tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
     "web.provider": {
+      speakersSettings: "Multi-speaker speech",
+      voiceDesignSettings: "Voice design",
+      transcriptionSettings: "Audio transcription",
+      visionSettings: "Realtime vision",
+      capabilityConnection: "Connection",
+      capabilityModel: "Model / version",
+      capabilityNotice:
+        "Choose an independent connection and model. Saving these settings does not submit a request or access your microphone, camera or files.",
       speechSettings: "Single-speaker speech",
       speechConnection: "Speech connection",
       speechModel: "Speech model",
       speechNotice:
-        "Choose a separate Flash or Pro binding. Speech generation and streaming playback are not yet available in the workspace; saving this setting does not generate audio.",
+        "Choose a separate Flash or Pro binding, then generate one speaker on the Media page. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
+      openSpeech: "Open speech generation",
       title: "AI services",
-      intro: "Save provider connections, then select one for dictation, MOSS Live and images. MOSS is supported; reading aloud is not available yet.",
-      words: "provider MOSS connection model key dictation image generation snapshot AI",
+      intro:
+        "Save MOSS connections, then choose independent models for dictation, images, media understanding, speech, voice design, transcription and realtime audio or vision.",
+      words: "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
       understandingSettings: "Media understanding settings",
       understandingConnection: "Media understanding connection",
       understandingModel: "Understanding model / version",
@@ -7933,7 +8386,7 @@ export const catalogs = {
       model: "Dictation model",
       modelHint: "Only integrated transcription models are offered. Account permission and quality still require a real request to verify.",
       unbound: "Not in use",
-      liveHint: "The existing MOSS Live route uses this connection's key. Changing the dictation model does not change the realtime protocol.",
+      liveHint: "MOSS Live uses its own connection and model. Changing the dictation model does not change the realtime protocol.",
       bindingHint:
         "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
       manage: "Manage AI service connections",
@@ -8595,7 +9048,39 @@ export const catalogs = {
         cannotHear: "Agora: cannot hear the other side: {why}",
         agora: "Agora: {code} {msg}",
       },
+      vision: {
+        silence: "No response for this turn; the session remains connected.",
+        interrupted: "Response interrupted",
+        title: "Realtime visual understanding",
+        liveTitle: "Share a picture with the Live call",
+        notice:
+          "Starting requests camera or screen permission. Selected images are uploaded through this server to the configured MOSS account, at most once a second (JPEG, up to 256 KiB). Stop sharing before showing private content. Nothing is saved to chat.",
+        hostNotice:
+          "Requires a secure local browser and available capture support. Desktop camera requires system permission; desktop screen capture and mobile-shell visual input are unavailable. Leaving this page or moving it to the background stops capture.",
+        source: "Picture source",
+        camera: "Camera",
+        screen: "Screen or window",
+        unavailable: "Capture is unavailable in this host or browser context.",
+        denied: "Camera or screen permission was denied.",
+        deviceLost: "The capture device or screen share stopped.",
+        captureFailed: "Could not capture the selected source.",
+        closed: "The visual session disconnected. Check the independent visual model binding in AI services before starting again.",
+        start: "Start sharing",
+        stop: "Stop sharing",
+        idle: "Not connected",
+        connecting: "Requesting permission and connecting…",
+        ready: "Connected",
+        ended: "Session ended",
+        error: "Session failed",
+        prompt: "Ask about the shared picture",
+        final: "Finish the session after this question",
+        send: "Send question",
+        transcript: "Visual responses",
+      },
       moss: {
+        busy: "Another Live session is already open or connecting. End it before starting this one.",
+        localOnly: "Realtime browser sessions are available only on this computer (localhost). Paired remote browsers cannot open these relays.",
+        requestFailed: "MOSS Live could not complete this request. Check the call setup before trying again.",
         intro:
           "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
         persona: "Persona (MOSS's own when empty)",
@@ -9005,6 +9490,11 @@ export interface Messages {
   "cli.op.lan.pairing.start": undefined;
   "cli.op.lan.pairing.stop": undefined;
   "cli.op.lan.update": undefined;
+  "cli.op.media.audio.cleanup": undefined;
+  "cli.op.media.audio.previewCleanup": undefined;
+  "cli.op.media.audio.resume": undefined;
+  "cli.op.media.clone.create": undefined;
+  "cli.op.media.dialogue.create": undefined;
   "cli.op.media.image.create": undefined;
   "cli.op.media.input.create": undefined;
   "cli.op.media.input.delete": undefined;
@@ -9015,9 +9505,17 @@ export interface Messages {
   "cli.op.media.job.download": undefined;
   "cli.op.media.job.get": undefined;
   "cli.op.media.job.list": undefined;
+  "cli.op.media.job.previewRelease": undefined;
+  "cli.op.media.job.release": undefined;
+  "cli.op.media.speech.create": undefined;
+  "cli.op.media.speech.resume": undefined;
+  "cli.op.media.transcription.create": undefined;
+  "cli.op.media.understanding.authorize": undefined;
   "cli.op.media.understanding.cleanup": undefined;
   "cli.op.media.understanding.create": undefined;
   "cli.op.media.understanding.previewCleanup": undefined;
+  "cli.op.media.understanding.start": undefined;
+  "cli.op.media.voiceDesign.create": undefined;
   "cli.op.memory.create": undefined;
   "cli.op.memory.delete": undefined;
   "cli.op.memory.list": undefined;
@@ -9111,6 +9609,8 @@ export interface Messages {
   "desktop.exited": { readonly code: string | number };
   "desktop.failed": { readonly why: string | number };
   "desktop.idle": undefined;
+  "desktop.media.camera": undefined;
+  "desktop.media.microphone": undefined;
   "desktop.menu.about": { readonly app: string | number };
   "desktop.menu.close": undefined;
   "desktop.menu.copy": undefined;
@@ -9696,6 +10196,14 @@ export interface Messages {
   "server.mailbox.ambiguous": undefined;
   "server.mailbox.notOwned": undefined;
   "server.mailbox.subscriptionTaken": { readonly thread: string | number };
+  "server.media.audioAccountChanged": undefined;
+  "server.media.audioCleanupPending": undefined;
+  "server.media.audioInvalid": undefined;
+  "server.media.audioPollingPaused": undefined;
+  "server.media.audioRejected": undefined;
+  "server.media.audioUnknown": undefined;
+  "server.media.authorizationExpired": undefined;
+  "server.media.authorizationRequired": undefined;
   "server.media.busy": undefined;
   "server.media.canceled": undefined;
   "server.media.cleanup.blocked": undefined;
@@ -9731,6 +10239,10 @@ export interface Messages {
   "server.media.phase.ready": undefined;
   "server.media.phase.unknown": undefined;
   "server.media.rejected": undefined;
+  "server.media.releaseAbandons": undefined;
+  "server.media.releasePreserves": undefined;
+  "server.media.releasePreview": undefined;
+  "server.media.releaseUnavailable": undefined;
   "server.media.remoteAccountChanged": undefined;
   "server.media.remoteCleanupFailed": undefined;
   "server.media.remoteUnresolved": { readonly files: string | number };
@@ -9738,6 +10250,16 @@ export interface Messages {
   "server.media.remoteUploadUnknown": undefined;
   "server.media.restarted": undefined;
   "server.media.reusedId": undefined;
+  "server.media.speechChanged": undefined;
+  "server.media.speechDownloadFailed": undefined;
+  "server.media.speechInvalid": undefined;
+  "server.media.speechNoResume": undefined;
+  "server.media.speechPartial": undefined;
+  "server.media.speechPollPaused": undefined;
+  "server.media.speechRejected": undefined;
+  "server.media.speechStreamUnavailable": undefined;
+  "server.media.speechUnknown": undefined;
+  "server.media.understandingPhase.authorized": undefined;
   "server.media.understandingPhase.canceled": undefined;
   "server.media.understandingPhase.failed": undefined;
   "server.media.understandingPhase.generating": undefined;
@@ -9793,6 +10315,8 @@ export interface Messages {
   "server.pkm.summary": { readonly tldr: string | number };
   "server.provider.authentication": undefined;
   "server.provider.bound": undefined;
+  "server.provider.capabilityModel": { readonly capability: string | number };
+  "server.provider.capabilityUnbound": { readonly capability: string | number };
   "server.provider.changed": undefined;
   "server.provider.forbidden": undefined;
   "server.provider.httpStatus": { readonly status: string | number };
@@ -9814,6 +10338,11 @@ export interface Messages {
   "server.provider.unbound": undefined;
   "server.provider.understandingModel": undefined;
   "server.provider.understandingUnbound": undefined;
+  "server.provider.use.live": undefined;
+  "server.provider.use.speakers": undefined;
+  "server.provider.use.transcription": undefined;
+  "server.provider.use.vision": undefined;
+  "server.provider.use.voiceDesign": undefined;
   "server.provider.voiceQuery": undefined;
   "server.repo.badGithub": undefined;
   "server.repo.badName": undefined;
@@ -10076,6 +10605,8 @@ export interface Messages {
   "server.tool.labels.media_job_download": undefined;
   "server.tool.labels.media_job_get": undefined;
   "server.tool.labels.media_job_list": undefined;
+  "server.tool.labels.media_speech_create": undefined;
+  "server.tool.labels.media_understanding_start": undefined;
   "server.tool.labels.memory_create": undefined;
   "server.tool.labels.memory_search": undefined;
   "server.tool.labels.remember": undefined;
@@ -10107,6 +10638,7 @@ export interface Messages {
   "server.voice.moss.noKey": undefined;
   "server.voice.moss.refused": { readonly why: string | number };
   "server.voice.moss.silent": undefined;
+  "server.voice.moss.toolFailed": undefined;
   "server.voice.moss.unreachable": { readonly why: string | number };
   "server.voice.noAgora": undefined;
   "server.voice.noAsrKey": undefined;
@@ -10463,6 +10995,105 @@ export interface Messages {
   "web.artifact.talk.send": undefined;
   "web.artifact.talk.sent": undefined;
   "web.artifact.talk.sentVersion": { readonly version: string | number };
+  "web.audio.account": undefined;
+  "web.audio.addSpeaker": undefined;
+  "web.audio.addTurn": undefined;
+  "web.audio.check": undefined;
+  "web.audio.chooseAccount": undefined;
+  "web.audio.chooseVoice": undefined;
+  "web.audio.cleanup": undefined;
+  "web.audio.cleanupAsk": undefined;
+  "web.audio.cleanupPreview": undefined;
+  "web.audio.clone": undefined;
+  "web.audio.cloneHint": undefined;
+  "web.audio.cloneTitle": undefined;
+  "web.audio.configure": undefined;
+  "web.audio.consent": undefined;
+  "web.audio.designHint": undefined;
+  "web.audio.designTitle": undefined;
+  "web.audio.dialogue": undefined;
+  "web.audio.diarize": undefined;
+  "web.audio.downloadAudio": undefined;
+  "web.audio.downloadPartialTranscript": undefined;
+  "web.audio.downloadTranscript": undefined;
+  "web.audio.empty": undefined;
+  "web.audio.emptyVoices": undefined;
+  "web.audio.execution": undefined;
+  "web.audio.executionAsync": undefined;
+  "web.audio.executionHint": undefined;
+  "web.audio.executionStreaming": undefined;
+  "web.audio.first": undefined;
+  "web.audio.flashConnecting": undefined;
+  "web.audio.flashDeviceChanged": undefined;
+  "web.audio.flashDone": undefined;
+  "web.audio.flashDraining": undefined;
+  "web.audio.flashIdle": undefined;
+  "web.audio.flashIncomplete": undefined;
+  "web.audio.flashInvalid": undefined;
+  "web.audio.flashNotice": undefined;
+  "web.audio.flashPlaying": undefined;
+  "web.audio.flashProgress": { readonly played: string | number; readonly received: string | number };
+  "web.audio.flashStart": undefined;
+  "web.audio.flashStop": undefined;
+  "web.audio.flashStopped": undefined;
+  "web.audio.flashTitle": undefined;
+  "web.audio.flashUnavailable": undefined;
+  "web.audio.flashUnsupported": undefined;
+  "web.audio.format": undefined;
+  "web.audio.generate": undefined;
+  "web.audio.history": undefined;
+  "web.audio.input": undefined;
+  "web.audio.instructions": undefined;
+  "web.audio.localPlayback": undefined;
+  "web.audio.metadataBits": { readonly value: string | number };
+  "web.audio.metadataChannels": { readonly value: string | number };
+  "web.audio.metadataDuration": { readonly value: string | number };
+  "web.audio.metadataFile": undefined;
+  "web.audio.metadataProvider": undefined;
+  "web.audio.metadataRate": { readonly value: string | number };
+  "web.audio.new": undefined;
+  "web.audio.newAsk": undefined;
+  "web.audio.next": undefined;
+  "web.audio.noTimestamps": undefined;
+  "web.audio.notice": undefined;
+  "web.audio.openTranscript": undefined;
+  "web.audio.partialTitle": undefined;
+  "web.audio.partialTranscript": undefined;
+  "web.audio.pending": undefined;
+  "web.audio.playbackUnsupported": undefined;
+  "web.audio.preview": undefined;
+  "web.audio.previewText": undefined;
+  "web.audio.queryHint": undefined;
+  "web.audio.queryVoice": undefined;
+  "web.audio.refresh": undefined;
+  "web.audio.remove": undefined;
+  "web.audio.resume": undefined;
+  "web.audio.savePartialTranscript": undefined;
+  "web.audio.saveTranscript": undefined;
+  "web.audio.saveVoice": undefined;
+  "web.audio.savedVoice": { readonly voice: string | number };
+  "web.audio.seek": { readonly time: string | number };
+  "web.audio.speaker": undefined;
+  "web.audio.speakerHint": undefined;
+  "web.audio.speakerTitle": undefined;
+  "web.audio.stopUpload": undefined;
+  "web.audio.text": undefined;
+  "web.audio.timeline": undefined;
+  "web.audio.title": undefined;
+  "web.audio.transcribe": undefined;
+  "web.audio.transcript": undefined;
+  "web.audio.transcriptionHint": undefined;
+  "web.audio.transcriptionTitle": undefined;
+  "web.audio.unknownSpeaker": undefined;
+  "web.audio.uploading": undefined;
+  "web.audio.usageAudioSeconds": { readonly value: string | number };
+  "web.audio.usageCharacters": { readonly value: string | number };
+  "web.audio.usageCompletion": { readonly value: string | number };
+  "web.audio.usagePrompt": { readonly value: string | number };
+  "web.audio.usageTotal": { readonly value: string | number };
+  "web.audio.voice": undefined;
+  "web.audio.voiceName": undefined;
+  "web.audio.voices": undefined;
   "web.base.big": { readonly n: string | number };
   "web.base.cast.outfit.farmer": undefined;
   "web.base.cast.outfit.gardener": undefined;
@@ -11921,19 +12552,60 @@ export interface Messages {
   "web.media.prompt": undefined;
   "web.media.publish": undefined;
   "web.media.published": undefined;
+  "web.media.release": undefined;
+  "web.media.releaseAsk": undefined;
+  "web.media.releasePreview": undefined;
   "web.media.resubmit": undefined;
   "web.media.retry": undefined;
   "web.media.save": undefined;
   "web.media.seed": undefined;
   "web.media.sourceAgent": { readonly agent: string | number; readonly channel: string | number };
   "web.media.sourceOwner": undefined;
+  "web.media.speech.asynchronous": undefined;
+  "web.media.speech.binding": {
+    readonly account: string | number;
+    readonly connection: string | number;
+    readonly model: string | number;
+    readonly revision: string | number;
+  };
+  "web.media.speech.chooseVoice": undefined;
+  "web.media.speech.configure": undefined;
+  "web.media.speech.downloadOnly": undefined;
+  "web.media.speech.empty": undefined;
+  "web.media.speech.emptyVoices": undefined;
+  "web.media.speech.execution": undefined;
+  "web.media.speech.firstVoices": undefined;
+  "web.media.speech.format": undefined;
+  "web.media.speech.history": undefined;
+  "web.media.speech.new": undefined;
+  "web.media.speech.nextVoices": undefined;
+  "web.media.speech.notice": undefined;
+  "web.media.speech.pending": undefined;
+  "web.media.speech.publish": undefined;
+  "web.media.speech.refresh": undefined;
+  "web.media.speech.resume": undefined;
+  "web.media.speech.save": undefined;
+  "web.media.speech.submit": undefined;
+  "web.media.speech.synchronous": undefined;
+  "web.media.speech.text": undefined;
+  "web.media.speech.title": undefined;
+  "web.media.speech.voice": undefined;
+  "web.media.speech.voiceHint": undefined;
   "web.media.steps": undefined;
   "web.media.text": undefined;
   "web.media.title": undefined;
+  "web.media.understanding.authorization": { readonly channel: string | number };
+  "web.media.understanding.authorizationNotice": undefined;
+  "web.media.understanding.authorize": undefined;
   "web.media.understanding.cleanup": undefined;
   "web.media.understanding.cleanupAsk": undefined;
   "web.media.understanding.configure": undefined;
   "web.media.understanding.consent": undefined;
+  "web.media.understanding.delegate": undefined;
+  "web.media.understanding.delegated": undefined;
+  "web.media.understanding.delegation": { readonly id: string | number };
+  "web.media.understanding.direct": undefined;
+  "web.media.understanding.executor": undefined;
   "web.media.understanding.files": undefined;
   "web.media.understanding.history": undefined;
   "web.media.understanding.new": undefined;
@@ -12155,6 +12827,9 @@ export interface Messages {
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
   "web.provider.bindings": undefined;
+  "web.provider.capabilityConnection": undefined;
+  "web.provider.capabilityModel": undefined;
+  "web.provider.capabilityNotice": undefined;
   "web.provider.console": undefined;
   "web.provider.dictation": undefined;
   "web.provider.discover": undefined;
@@ -12173,21 +12848,26 @@ export interface Messages {
   "web.provider.modelHint": undefined;
   "web.provider.name": undefined;
   "web.provider.noModels": undefined;
+  "web.provider.openSpeech": undefined;
   "web.provider.reload": undefined;
   "web.provider.reloadAsk": undefined;
   "web.provider.remove": undefined;
   "web.provider.removeAsk": undefined;
   "web.provider.saveFirst": undefined;
+  "web.provider.speakersSettings": undefined;
   "web.provider.speechConnection": undefined;
   "web.provider.speechModel": undefined;
   "web.provider.speechNotice": undefined;
   "web.provider.speechSettings": undefined;
   "web.provider.title": undefined;
+  "web.provider.transcriptionSettings": undefined;
   "web.provider.unbound": undefined;
   "web.provider.understandingConnection": undefined;
   "web.provider.understandingModel": undefined;
   "web.provider.understandingNotice": undefined;
   "web.provider.understandingSettings": undefined;
+  "web.provider.visionSettings": undefined;
+  "web.provider.voiceDesignSettings": undefined;
   "web.provider.words": undefined;
   "web.repo.add": undefined;
   "web.repo.all": undefined;
@@ -12742,6 +13422,7 @@ export interface Messages {
   "web.voice.dictation.stop": undefined;
   "web.voice.dictation.transcribing": undefined;
   "web.voice.dictation.unset": undefined;
+  "web.voice.moss.busy": undefined;
   "web.voice.moss.closed": undefined;
   "web.voice.moss.connecting": undefined;
   "web.voice.moss.defaultInstructions": undefined;
@@ -12751,6 +13432,7 @@ export interface Messages {
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.instructions": undefined;
   "web.voice.moss.intro": undefined;
+  "web.voice.moss.localOnly": undefined;
   "web.voice.moss.mute": undefined;
   "web.voice.moss.notInChat": undefined;
   "web.voice.moss.nothingSaid": undefined;
@@ -12775,12 +13457,38 @@ export interface Messages {
   "web.voice.moss.qos.title": undefined;
   "web.voice.moss.qos.up": undefined;
   "web.voice.moss.qos.upTip": undefined;
+  "web.voice.moss.requestFailed": undefined;
   "web.voice.moss.said": undefined;
   "web.voice.moss.talk": undefined;
   "web.voice.moss.tryIt": undefined;
   "web.voice.moss.unmute": undefined;
   "web.voice.moss.up": undefined;
   "web.voice.moss.you": undefined;
+  "web.voice.vision.camera": undefined;
+  "web.voice.vision.captureFailed": undefined;
+  "web.voice.vision.closed": undefined;
+  "web.voice.vision.connecting": undefined;
+  "web.voice.vision.denied": undefined;
+  "web.voice.vision.deviceLost": undefined;
+  "web.voice.vision.ended": undefined;
+  "web.voice.vision.error": undefined;
+  "web.voice.vision.final": undefined;
+  "web.voice.vision.hostNotice": undefined;
+  "web.voice.vision.idle": undefined;
+  "web.voice.vision.interrupted": undefined;
+  "web.voice.vision.liveTitle": undefined;
+  "web.voice.vision.notice": undefined;
+  "web.voice.vision.prompt": undefined;
+  "web.voice.vision.ready": undefined;
+  "web.voice.vision.screen": undefined;
+  "web.voice.vision.send": undefined;
+  "web.voice.vision.silence": undefined;
+  "web.voice.vision.source": undefined;
+  "web.voice.vision.start": undefined;
+  "web.voice.vision.stop": undefined;
+  "web.voice.vision.title": undefined;
+  "web.voice.vision.transcript": undefined;
+  "web.voice.vision.unavailable": undefined;
   "web.voice.voice.address": undefined;
   "web.voice.voice.answer.agora": undefined;
   "web.voice.voice.answer.deepseek": { readonly from: string | number };

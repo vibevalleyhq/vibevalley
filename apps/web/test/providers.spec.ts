@@ -17,8 +17,8 @@ test("regression: the settings navigation leaves the provider form usable at 390
 
 test("regression: unbound provider choices keep a visible placeholder", async ({ page }) => {
   await page.goto("/settings/providers");
-  for (const id of ["provider-dictation", "provider-live", "provider-image", "provider-understanding", "provider-speech"]) {
-    const choice = page.getByTestId(id);
+  for (const use of ["dictation", "live", "image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "vision"]) {
+    const choice = page.getByTestId(`provider-${use}`);
     await expect(choice).toHaveAttribute("data-value", "");
     await expect(choice.locator("span").first()).not.toBeEmpty();
   }
@@ -62,6 +62,21 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   await page.getByTestId("provider-speech-model").click();
   await expect(page.getByRole("option")).toHaveCount(4);
   await page.locator('[role="option"][data-key="moss-tts-1.0-pro-2026-02-07"]').click();
+  const audioAndRealtime = [
+    ["live", "moss-live-1.0-2026-11-02"],
+    ["speakers", "moss-ttsd-1.0-2026-03-20"],
+    ["voiceDesign", "moss-voice-generator-1.0-2026-07-22"],
+    ["transcription", "moss-transcribe-diarize-pro-2026-07-03"],
+    ["vision", "moss-vl-realtime-1.0-2026-09-09"],
+  ] as const;
+  for (const [use, model] of audioAndRealtime) {
+    if (use !== "live") {
+      await page.getByTestId(`provider-${use}`).click();
+      await page.locator(`[role="option"][data-key="${id}"]`).click();
+    }
+    await page.getByTestId(`provider-${use}-model`).click();
+    await page.locator(`[role="option"][data-key="${model}"]`).click();
+  }
   await page.getByTestId("save").click();
   await expect(form).toHaveAttribute("data-revision", "2");
   expect((await api.provider.get()).dictation).toEqual({ connection: id, model: "moss-transcribe-diarize-pro" });
@@ -74,6 +89,11 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   await expect(page.getByTestId("provider-image-model")).toHaveAttribute("data-value", "moss-image-sft-1.0-2026-10-09");
   await expect(page.getByTestId("provider-understanding-model")).toHaveAttribute("data-value", "moss-vl-1.0-2026-07-08");
   await expect(page.getByTestId("provider-speech-model")).toHaveAttribute("data-value", "moss-tts-1.0-pro-2026-02-07");
+  const restored = await api.provider.get();
+  for (const [use, model] of audioAndRealtime) {
+    expect(restored[use]).toEqual({ connection: id, model });
+    await expect(page.getByTestId(`provider-${use}-model`)).toHaveAttribute("data-value", model);
+  }
   await connection.getByTestId("provider-name").fill("unsaved edit");
   const current = await api.provider.get();
   await api.provider.update({ ...current, connections: current.connections.map(({ key: _key, ...item }) => ({ ...item, name: "other window" })) });
@@ -113,6 +133,11 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   expect((await api.provider.get()).speech?.connection).toBe(id);
   await page.getByTestId("provider-speech").click();
   await page.locator('[role="option"][data-key=""]').click();
+  for (const [use] of audioAndRealtime) {
+    if (use === "live") continue;
+    await page.getByTestId(`provider-${use}`).click();
+    await page.locator('[role="option"][data-key=""]').click();
+  }
   await page.getByTestId("save").click();
   await expect(form).toHaveAttribute("data-revision", "4");
   expect(await api.setting.get()).toMatchObject({ mossReady: false, dictationReady: false });

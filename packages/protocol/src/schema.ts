@@ -21,3 +21,4 @@ export * from "./voice/schema";
 export * from "./setting/schema";
 export * from "./provider/schema";
 export * from "./media/schema";
+export * from "./media/audio-schema";

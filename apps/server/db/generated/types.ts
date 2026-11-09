@@ -75,6 +75,15 @@ export type Sqlite_mailbox_delivery_urgency = typeof Sqlite_mailbox_delivery_urg
 export const Sqlite_mailbox_issue_state = Schema.Literals(["held","forwarded","returned"])
 export type Sqlite_mailbox_issue_state = typeof Sqlite_mailbox_issue_state.Type
 
+export const Sqlite_media_audio_kind = Schema.Literals(["speakers","voiceDesign","clone","transcription"])
+export type Sqlite_media_audio_kind = typeof Sqlite_media_audio_kind.Type
+
+export const Sqlite_media_audio_phase = Schema.Literals(["queued","generating","downloading","ready","failed","unknown","canceled","download_failed"])
+export type Sqlite_media_audio_phase = typeof Sqlite_media_audio_phase.Type
+
+export const Sqlite_media_audio_result_format = Schema.Literals(["mp3","wav","pcm","flac","aac","opus"])
+export type Sqlite_media_audio_result_format = typeof Sqlite_media_audio_result_format.Type
+
 export const Sqlite_media_generation_phase = Schema.Literals(["queued","generating","downloading","ready","failed","unknown","canceled","download_failed"])
 export type Sqlite_media_generation_phase = typeof Sqlite_media_generation_phase.Type
 
@@ -84,13 +93,19 @@ export type Sqlite_media_input_phase = typeof Sqlite_media_input_phase.Type
 export const Sqlite_media_remote_file_phase = Schema.Literals(["uploading","ready","rejected","unknown","deleting","deleted"])
 export type Sqlite_media_remote_file_phase = typeof Sqlite_media_remote_file_phase.Type
 
-export const Sqlite_media_remote_file_purpose = Schema.Literals(["image","video"])
+export const Sqlite_media_remote_file_purpose = Schema.Literals(["image","video","audio"])
 export type Sqlite_media_remote_file_purpose = typeof Sqlite_media_remote_file_purpose.Type
+
+export const Sqlite_media_speech_phase = Schema.Literals(["queued","generating","downloading","ready","failed","unknown","canceled","download_failed"])
+export type Sqlite_media_speech_phase = typeof Sqlite_media_speech_phase.Type
+
+export const Sqlite_media_speech_result_format = Schema.Literals(["mp3","wav","pcm","flac","aac","opus"])
+export type Sqlite_media_speech_result_format = typeof Sqlite_media_speech_result_format.Type
 
 export const Sqlite_media_understanding_cleanup = Schema.Literals(["pending","running","done","blocked","unknown"])
 export type Sqlite_media_understanding_cleanup = typeof Sqlite_media_understanding_cleanup.Type
 
-export const Sqlite_media_understanding_phase = Schema.Literals(["queued","uploading","generating","ready","incomplete","failed","unknown","canceled"])
+export const Sqlite_media_understanding_phase = Schema.Literals(["authorized","queued","uploading","generating","ready","incomplete","failed","unknown","canceled"])
 export type Sqlite_media_understanding_phase = typeof Sqlite_media_understanding_phase.Type
 
 export const Sqlite_memory_author = Schema.Literals(["owner","orchestrator","session","system"])

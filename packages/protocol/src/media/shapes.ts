@@ -1,9 +1,10 @@
 import type { Attachment } from "../channel/shapes";
+import type { MediaAudioJob } from "./audio-shapes";
 
 export const mediaInputContentPath = (id: string) => `/api/v1/media/input/${encodeURIComponent(id)}/content`;
 
 export interface MediaInputRequest {
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
   name: string;
   mime: string;
   size: number;
@@ -75,12 +76,31 @@ export interface MediaUnderstandingRequest {
   maxOutputTokens: number;
 }
 
+export interface MediaUnderstandingAuthorizationRequest extends MediaUnderstandingRequest {
+  channel: string;
+}
+
+export interface MediaUnderstandingAuthorization {
+  channel: string;
+  expiresAt: number;
+}
+
 export interface MediaInputReference extends MediaInputRequest {
   id: string;
   hash: string;
 }
 
-export const MediaUnderstandingPhaseValues = ["queued", "uploading", "generating", "ready", "incomplete", "failed", "unknown", "canceled"] as const;
+export const MediaUnderstandingPhaseValues = [
+  "authorized",
+  "queued",
+  "uploading",
+  "generating",
+  "ready",
+  "incomplete",
+  "failed",
+  "unknown",
+  "canceled",
+] as const;
 export type MediaUnderstandingPhase = (typeof MediaUnderstandingPhaseValues)[number];
 export const MediaCleanupValues = ["pending", "running", "done", "blocked", "unknown"] as const;
 export type MediaCleanup = (typeof MediaCleanupValues)[number];
@@ -102,6 +122,7 @@ export interface MediaUnderstandingJob {
   connection: string;
   revision: number;
   source: MediaSource;
+  authorization: MediaUnderstandingAuthorization | null;
   phase: MediaUnderstandingPhase;
   phaseText: string;
   problem: string;
@@ -115,7 +136,69 @@ export interface MediaUnderstandingJob {
   updatedAt: number;
 }
 
-export type MediaJob = MediaImageJob | MediaUnderstandingJob;
+export const MediaAudioFormatValues = ["wav", "mp3", "flac", "aac", "opus", "pcm"] as const;
+export type MediaAudioFormat = (typeof MediaAudioFormatValues)[number];
+
+export interface MediaAudioMetadata {
+  source: "file" | "provider";
+  sampleRate?: number;
+  duration?: number;
+  channels?: number;
+  bitDepth?: number;
+}
+
+export interface MediaAudioUsage {
+  inputCharacters?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  inputAudioSeconds?: number;
+}
+export type MediaSpeechEvent =
+  | { type: "format"; sampleRate: number; channels: number; bitDepth: 16 }
+  | { type: "audio"; sequence: number; audio: string }
+  | { type: "done" }
+  | { type: "failed" };
+export const mediaSpeechStreamPath = (id: string) => `/api/v1/media/speech/${encodeURIComponent(id)}/stream`;
+
+export interface MediaSpeechRequest {
+  id: string;
+  text: string;
+  voice: string;
+  format: MediaAudioFormat;
+  asynchronous?: boolean;
+  streaming?: boolean;
+  connection: string;
+  revision: number;
+}
+
+export interface MediaSpeechJob {
+  kind: "speech";
+  id: string;
+  prompt: string;
+  model: string;
+  connection: string;
+  revision: number;
+  source: MediaSource;
+  voice: string;
+  format: MediaAudioFormat;
+  contentType?: string;
+  metadata?: MediaAudioMetadata;
+  usage?: MediaAudioUsage;
+  canResume?: boolean;
+  phase: MediaPhase;
+  phaseText: string;
+  problem: string;
+  attachment?: Attachment;
+  resultInput: MediaInputReference | null;
+  canCancel: boolean;
+  canRelease: boolean;
+  canRetryDownload: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type MediaJob = MediaImageJob | MediaUnderstandingJob | MediaSpeechJob | MediaAudioJob;
 
 export interface MediaJobRequest {
   id: string;

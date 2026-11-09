@@ -1,4 +1,13 @@
 {
+  "capabilityUnbound": "Choose a connection and model for {capability} in AI services first.",
+  "capabilityModel": "Choose a supported model or snapshot for {capability}.",
+  "use": {
+    "speakers": "multi-speaker speech",
+    "voiceDesign": "voice design",
+    "transcription": "audio transcription",
+    "vision": "realtime vision",
+    "live": "MOSS Live"
+  },
   "speechModel": "Choose a supported Flash or Pro speech model or snapshot.",
   "speechUnbound": "Select a speech connection and model in AI services first.",
   "voiceQuery": "Voice pagination is invalid; use either an offset or a cursor within the supported bounds.",

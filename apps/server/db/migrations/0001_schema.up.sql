@@ -80,7 +80,7 @@ CREATE TABLE channel_message (
 CREATE TABLE media_input (
   id TEXT PRIMARY KEY NOT NULL,
   metadata TEXT NOT NULL,
-  size INTEGER NOT NULL CHECK (size BETWEEN 16 AND 200000000),
+  size INTEGER NOT NULL CHECK (size BETWEEN 1 AND 512000000),
   phase TEXT NOT NULL CHECK (phase IN ('reserved','uploading','ready','failed','deleting')),
   hash TEXT CHECK (hash IS NULL OR (length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*')),
   created_at INTEGER NOT NULL,
@@ -105,7 +105,7 @@ CREATE TABLE media_remote_file (
   revision INTEGER NOT NULL,
   credential_hash TEXT NOT NULL,
   filename TEXT NOT NULL,
-  purpose TEXT NOT NULL CHECK (purpose IN ('image','video')),
+  purpose TEXT NOT NULL CHECK (purpose IN ('image','video','audio')),
   size INTEGER NOT NULL,
   content_hash TEXT NOT NULL,
   phase TEXT NOT NULL CHECK (phase IN ('uploading','ready','rejected','unknown','deleting','deleted')),
@@ -121,10 +121,12 @@ CREATE TABLE media_understanding (
   id TEXT PRIMARY KEY NOT NULL,
   request TEXT NOT NULL,
   inputs TEXT NOT NULL,
+  source TEXT NOT NULL,
+  authorization TEXT,
   connection TEXT NOT NULL,
   revision INTEGER NOT NULL,
   model TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','uploading','generating','ready','incomplete','failed','unknown','canceled')),
+  phase TEXT NOT NULL CHECK (phase IN ('authorized','queued','uploading','generating','ready','incomplete','failed','unknown','canceled')),
   result TEXT,
   cleanup TEXT NOT NULL CHECK (cleanup IN ('pending','running','done','blocked','unknown')),
   problem TEXT NOT NULL DEFAULT '',
@@ -151,6 +153,60 @@ CREATE TABLE media_generation (
 );
 CREATE INDEX media_generation_recent ON media_generation(created_at DESC, id);
 CREATE INDEX media_generation_phase ON media_generation(phase);
+
+CREATE TABLE media_speech (
+  id TEXT PRIMARY KEY NOT NULL,
+  request TEXT NOT NULL,
+  source TEXT NOT NULL,
+  connection TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  credential_hash TEXT NOT NULL,
+  remote_task TEXT,
+  result_format TEXT CHECK (result_format IN ('mp3','wav','pcm','flac','aac','opus')),
+  content_type TEXT,
+  metadata TEXT,
+  usage TEXT,
+  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
+  result_url TEXT,
+  attachment TEXT,
+  result_input TEXT,
+  assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
+  problem TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX media_speech_recent ON media_speech(created_at DESC, id);
+CREATE INDEX media_speech_phase ON media_speech(phase);
+
+CREATE TABLE media_audio (
+  id TEXT PRIMARY KEY NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('speakers','voiceDesign','clone','transcription')),
+  request TEXT NOT NULL,
+  source TEXT NOT NULL,
+  input TEXT,
+  connection TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
+  remote_task_id TEXT,
+  result_url TEXT,
+  result_format TEXT CHECK (result_format IN ('mp3','wav','pcm','flac','aac','opus')),
+  content_type TEXT,
+  metadata TEXT,
+  usage TEXT,
+  result TEXT,
+  attachment TEXT,
+  result_input TEXT,
+  preview_input TEXT,
+  assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
+  problem TEXT NOT NULL DEFAULT '',
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+CREATE INDEX media_audio_phase ON media_audio(phase);
+CREATE INDEX media_audio_created ON media_audio(created_at DESC, id);
 
 CREATE TABLE channel_attachment (
   -- The sha256 of its bytes, kept under the home directory's attachments/: the same file is kept once.

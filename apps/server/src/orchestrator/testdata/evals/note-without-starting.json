@@ -4,6 +4,7 @@
   "model": "deepseek-flash",
   "want": "主人只说记一下，管家却记下就开工了。应该查重后记进备选，不填 start，回编号和「在备选里」。",
   "memory": "",
+  "scenario": { "repos": ["demo"] },
   "tools": [
     "channel_create",
     "channel_list",
@@ -19,7 +20,7 @@
     "issue_update",
     "memory_create",
     "memory_search",
-    "project_list",
+    "repo_list",
     "cron_create",
     "cron_delete",
     "cron_list",
@@ -175,8 +176,22 @@
       "argLacks": "\"start\":true"
     },
     {
-      "kind": "saysNot",
-      "contains": "派"
+      "kind": "notCalled",
+      "tool": "issue_create",
+      "argContains": "\"start\":true"
+    },
+    {
+      "kind": "notCalled",
+      "tool": "issue_create",
+      "argContains": "\"draft\":true"
+    },
+    {
+      "kind": "notCalled",
+      "tool": "issue_status_update"
+    },
+    {
+      "kind": "called",
+      "tool": "issue_list"
     }
   ]
 }

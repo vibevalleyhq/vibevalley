@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect";
 import { HttpClient, type HttpClientRequest, HttpClientResponse } from "effect/http";
+import { TestClock } from "effect/testing";
 
 import type { MediaUnderstandingRequest } from "@vibevalley/protocol";
 
+import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { Provider } from "#/provider/provider.ts";
@@ -43,6 +45,10 @@ const fixture = Effect.gen(function* () {
     speech: null,
     dictation: null,
     live: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
   });
   const media = yield* Media;
   const input = yield* media.inputs.create({ kind: "image", mime: "image/png", name: "private-owner-image.png", size: bytes.length });
@@ -367,6 +373,9 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
                   id,
                   request: JSON.stringify({ ...request, id }),
                   inputs: JSON.stringify([reference]),
+                  source: JSON.stringify({ kind: "owner" }),
+                  authorization: null,
+                  phase: "queued",
                   connection: "moss",
                   revision: request.revision,
                   model: "moss-vl-1.0",
@@ -377,6 +386,7 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
                 q.changeUnderstanding({
                   id,
                   phase,
+                  source: JSON.stringify({ kind: "owner" }),
                   result: phase === "ready" ? JSON.stringify(saved) : null,
                   cleanup: phase === "ready" ? "running" : "pending",
                   problem: "",
@@ -398,3 +408,87 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
     expect((yield* Core).state().media).toHaveLength(4);
   }).pipe(Effect.provide(layer(http)));
 });
+
+it.effect("owner approval freezes inputs and authorizes only one trusted channel execution", () => {
+  const calls: string[] = [];
+  const http = HttpClient.make((request) => {
+    calls.push(`${request.method} ${request.url}`);
+    return Effect.succeed(reply(request));
+  });
+  return Effect.gen(function* () {
+    const { media, input, request } = yield* fixture;
+    const channel = (yield* Channel).defaultChannel();
+    const caller = { kind: "orchestrator", agent: "authorized-agent", channel, forOwner: true } as const;
+    const granted = yield* media.authorizeUnderstanding({ ...request, channel });
+    expect(granted.phase).toBe("authorized");
+    expect(granted.authorization?.channel).toBe(channel);
+    expect((yield* media.inputs.get(input.id)).canDelete).toBe(false);
+    expect(calls).toEqual([]);
+    for (const other of [{ kind: "owner" } as const, { ...caller, forOwner: false }, { ...caller, channel: "wrong-channel" }])
+      expect(yield* media.startUnderstanding(request.id, other).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect(yield* media.createUnderstanding(request).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect(yield* media.authorizeUnderstanding({ ...request, channel, prompt: "Different question" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect(calls).toEqual([]);
+    yield* Effect.all([media.startUnderstanding(request.id, caller), media.startUnderstanding(request.id, caller)], { concurrency: 2 });
+    const completed = yield* waitFor(media.get(request.id), (job) => job.kind === "understanding" && job.cleanup === "done", "authorized understanding");
+    expect(completed).toMatchObject({ phase: "ready", source: { kind: "orchestrator", agent: caller.agent, channel } });
+    expect(yield* media.startUnderstanding(request.id, caller)).toEqual(completed);
+    expect(yield* media.startUnderstanding(request.id, { ...caller, agent: "other-agent" }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    expect(calls).toEqual(["POST https://api.mosi.cn/v1/files", "POST https://api.mosi.cn/v1/responses", "DELETE https://api.mosi.cn/v1/files/file-one"]);
+    expect((yield* media.inputs.get(input.id)).canDelete).toBe(true);
+    expect(JSON.stringify((yield* Core).state().media)).not.toContain("fingerprint");
+  }).pipe(Effect.provide(layer(http)));
+});
+
+it.effect.each(["cancel", "restart", "expire", "account"] as const)("unused approval cannot upload after %s", (action) =>
+  Effect.gen(function* () {
+    const { media, input, request } = yield* fixture;
+    const channel = (yield* Channel).defaultChannel();
+    const caller = { kind: "orchestrator", agent: "authorized-agent", channel, forOwner: true } as const;
+    yield* media.authorizeUnderstanding({ ...request, channel });
+    switch (action) {
+      case "cancel":
+        yield* media.cancel(request.id);
+        break;
+      case "restart":
+        yield* media.restore();
+        break;
+      case "expire":
+        yield* TestClock.adjust("15 minutes");
+        expect(yield* media.startUnderstanding(request.id, caller).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+        yield* media.cancel(request.id);
+        break;
+      case "account": {
+        const provider = yield* Provider;
+        const state = provider.status();
+        yield* provider.update({ ...state, connections: state.connections.map((item) => ({ ...item, key: "changed-account-key" })) });
+        expect(yield* media.startUnderstanding(request.id, caller).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+        yield* media.cancel(request.id);
+        break;
+      }
+    }
+    expect((yield* media.startUnderstanding(request.id, caller)).phase).toBe("canceled");
+    expect((yield* media.inputs.get(input.id)).canDelete).toBe(true);
+  }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Invalidated approval must not contact the vendor"))))),
+);
+
+it.effect("regression: queued delegated understanding rechecks account before uploading", () =>
+  Effect.gen(function* () {
+    const { media, input, request } = yield* fixture;
+    yield* media.createImage({ id: "hold-slot", prompt: "Hold", format: "text", width: 256, height: 256, enhance: false, watermark: true }, { kind: "owner" });
+    yield* waitFor(media.get("hold-slot"), (job) => job.phase === "generating", "shared execution slot occupied");
+    const channel = (yield* Channel).defaultChannel();
+    yield* media.authorizeUnderstanding({ ...request, channel });
+    yield* media.startUnderstanding(request.id, { kind: "orchestrator", agent: "authorized-agent", channel, forOwner: true });
+    const provider = yield* Provider;
+    const status = provider.status();
+    yield* provider.update({ ...status, connections: status.connections.map((item) => ({ ...item, key: "changed-before-upload" })) });
+    yield* media.cancel("hold-slot");
+    yield* waitFor(media.get(request.id), (job) => job.phase === "canceled", "stale queued approval rejected");
+    yield* waitFor(media.inputs.get(input.id), (item) => item.canDelete, "input retention released");
+  }).pipe(
+    Effect.provide(
+      layer(HttpClient.make((request) => (request.url.endsWith("/images/generations") ? Effect.never : Effect.die("Stale queued approval uploaded")))),
+    ),
+  ),
+);

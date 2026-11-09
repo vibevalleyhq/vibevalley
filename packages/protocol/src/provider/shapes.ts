@@ -23,7 +23,16 @@ export interface ProviderStatus {
   connections: ProviderConnection[];
   dictation: ProviderBinding | null;
   image: ProviderBinding | null;
-  live: string | null;
+  live: ProviderBinding | null;
+  liveModels: string[];
+  speakers: ProviderBinding | null;
+  speakersModels: string[];
+  voiceDesign: ProviderBinding | null;
+  voiceDesignModels: string[];
+  transcription: ProviderBinding | null;
+  transcriptionModels: string[];
+  vision: ProviderBinding | null;
+  visionModels: string[];
   dictationModels: string[];
   imageModels: string[];
   understanding: ProviderBinding | null;
@@ -48,7 +57,11 @@ export interface ProviderUpdate {
   understanding: ProviderBinding | null;
   dictation: ProviderBinding | null;
   image: ProviderBinding | null;
-  live: string | null;
+  live: ProviderBinding | null;
+  speakers: ProviderBinding | null;
+  voiceDesign: ProviderBinding | null;
+  transcription: ProviderBinding | null;
+  vision: ProviderBinding | null;
 }
 
 export interface ProviderModelRequest {

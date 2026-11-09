@@ -422,16 +422,33 @@
         "previewDelete": "Preview deleting a local media input without changing it"
       },
       "understanding": {
+        "authorize": "Freeze an understanding request for one execution by the selected channel's orchestrator",
+        "start": "Execute an authorized understanding task by ID without accepting new input or self-declared consent",
         "create": "Understand selected local inputs with explicit account and upload approval",
         "cleanup": "Clean known remote files without repeating understanding",
         "previewCleanup": "Preview remote cleanup and local retention release without changing either"
       },
       "image": { "create": "Create an image task without resubmitting the same request ID" },
+      "speech": {
+        "create": "Create single-speaker speech and download it locally without repeating the same request ID",
+        "resume": "Resume polling the same known speech task without resubmitting it"
+      },
+      "dialogue": { "create": "Create a dialogue using the selected account's voices" },
+      "voiceDesign": { "create": "Design a synthetic voice preview without saving a reusable voice" },
+      "clone": { "create": "Clone an explicitly authorized local voice sample" },
+      "transcription": { "create": "Transcribe an approved audio input with optional speaker labels" },
+      "audio": {
+        "resume": "Resume the same known audio task without submitting another generation",
+        "previewCleanup": "Preview cleanup of known remote audio files without changing them",
+        "cleanup": "Clean known remote audio files without repeating transcription or synthesis"
+      },
       "job": {
         "get": "Read a generation task",
         "list": "List recent generation tasks",
         "cancel": "Stop local waiting without guaranteeing provider cancellation",
-        "download": "Retry result download without generating again"
+        "download": "Retry result download without generating again",
+        "previewRelease": "Preview releasing local audio assets and abandoning further recovery",
+        "release": "Release this task's local audio assets without deleting shared assets or canceling provider billing"
       }
     },
     "provider": {

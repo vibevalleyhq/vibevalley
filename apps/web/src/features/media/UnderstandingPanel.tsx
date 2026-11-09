@@ -1,7 +1,7 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactId, MediaInput, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
+import type { ArtifactId, MediaInput, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
 
 import { api, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
@@ -12,8 +12,10 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
-import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
+import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
+
+import { publicationKey } from "./publication.ts";
 
 interface Selected {
   file: File;
@@ -28,6 +30,7 @@ export function UnderstandingPanel() {
   const [selected, setSelected] = createSignal<Selected[]>([]);
   const [prompt, setPrompt] = createSignal("");
   const [tokens, setTokens] = createSignal(512);
+  const [channel, setChannel] = createSignal("");
   const [consent, setConsent] = createSignal<{ connection: string; revision: number }>();
   const approved = () => {
     const current = status();
@@ -36,7 +39,7 @@ export function UnderstandingPanel() {
       current !== undefined && approval !== undefined && current.revision === approval.revision && current.understanding?.connection === approval.connection
     );
   };
-  const [submitted, setSubmitted] = createSignal<MediaUnderstandingRequest>();
+  const [submitted, setSubmitted] = createSignal<MediaUnderstandingRequest | MediaUnderstandingAuthorizationRequest>();
   const [error, setError] = createSignal<string>();
   const act = createAct(setError);
   let transfer: AbortController | undefined;
@@ -49,13 +52,17 @@ export function UnderstandingPanel() {
     const files = selected();
     const text = prompt();
     const maxOutputTokens = tokens();
+    const target = channel();
     const previous = submitted();
     const controller = new AbortController();
     transfer = controller;
     setError(undefined);
     return act
       .run(async () => {
-        if (previous) return api.media.understanding.create(previous, { signal: controller.signal });
+        if (previous)
+          return "channel" in previous
+            ? api.media.understanding.authorize(previous, { signal: controller.signal })
+            : api.media.understanding.create(previous, { signal: controller.signal });
         if (!configuration || !binding || !approvedNow) return;
         const ids = await Promise.all(
           files.map(async (selected) => {
@@ -81,6 +88,11 @@ export function UnderstandingPanel() {
           allowUpload: true,
           maxOutputTokens,
         };
+        if (target) {
+          const authorization: MediaUnderstandingAuthorizationRequest = { ...request, channel: target };
+          setSubmitted(authorization);
+          return api.media.understanding.authorize(authorization, { signal: controller.signal });
+        }
         setSubmitted(request);
         return api.media.understanding.create(request, { signal: controller.signal });
       })
@@ -139,6 +151,22 @@ export function UnderstandingPanel() {
               onInput={(event) => setTokens(Number(event.currentTarget.value))}
             />
           </Field>
+          <Field label={t("web.media.understanding.executor")}>
+            <Select
+              label={t("web.media.understanding.executor")}
+              placeholder={t("web.media.understanding.direct")}
+              testid="understanding-channel"
+              value={channel()}
+              onChange={setChannel}
+              options={[
+                { value: "", label: t("web.media.understanding.direct") },
+                ...(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id })),
+              ]}
+            />
+          </Field>
+          <Show when={channel()}>
+            <p class="text-sm text-muted">{t("web.media.understanding.authorizationNotice")}</p>
+          </Show>
           <label class="flex items-start gap-2 text-sm">
             <Checkbox
               testid="understanding-consent"
@@ -170,7 +198,7 @@ export function UnderstandingPanel() {
             }
             onClick={() => void submit()}
           >
-            {submitted() ? t("web.media.resubmit") : t("web.media.understanding.submit")}
+            {submitted() ? t("web.media.resubmit") : channel() ? t("web.media.understanding.authorize") : t("web.media.understanding.submit")}
           </Button>
           <Show when={act.busy() && submitted() === undefined}>
             <Button data-testid="understanding-stop-upload" onClick={() => transfer?.abort()}>
@@ -213,6 +241,7 @@ export function UnderstandingPanel() {
 function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
   const [error, setError] = createSignal<string>();
   const [saved, setSaved] = createSignal<ArtifactId>();
+  const [sent, setSent] = createSignal(false);
   const act = createAct(setError);
   const save = () => {
     const job = props.job;
@@ -233,6 +262,38 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
           {props.job.model} · {props.job.connection} · {props.job.id}
         </p>
         <p class="text-sm break-words whitespace-pre-wrap">{props.job.prompt}</p>
+        <p class="text-xs break-words text-muted" data-testid="understanding-source">
+          {props.job.source.kind === "owner"
+            ? t("web.media.sourceOwner")
+            : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
+        </p>
+        <Show when={props.job.phase === "authorized" && props.job.authorization}>
+          {(approval) => (
+            <>
+              <p class="text-sm break-words text-muted" data-testid="understanding-authorization">
+                {t("web.media.understanding.authorization", { channel: approval().channel })}
+              </p>
+              <Button
+                data-testid="understanding-delegate"
+                disabled={act.busy() || sent()}
+                onClick={() => {
+                  const id = props.job.id;
+                  const channel = approval().channel;
+                  void act.run(async () => {
+                    await api.channel.message.send({
+                      id: channel,
+                      text: t("web.media.understanding.delegation", { id }),
+                      sendKey: await publicationKey(`understanding:${id}`, channel),
+                    });
+                    setSent(true);
+                  });
+                }}
+              >
+                {sent() ? t("web.media.understanding.delegated") : t("web.media.understanding.delegate")}
+              </Button>
+            </>
+          )}
+        </Show>
         <For each={props.job.inputs}>{(input) => <p class="text-xs break-all text-muted">{input.name}</p>}</For>
         <Show when={props.job.problem}>
           <p class="text-sm text-berry">{props.job.problem}</p>

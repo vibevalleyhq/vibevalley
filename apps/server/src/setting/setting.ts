@@ -150,7 +150,7 @@ const make = Effect.gen(function* () {
       dictationKey: secret(s.dictationKey, "settings"),
       dictationReady:
         s.dictation?.via === "own" ? !!s.dictation.url : !!boundConnection(s.providers ?? emptyProviders, s.providers?.dictation?.connection ?? null),
-      mossReady: !!boundConnection(s.providers ?? emptyProviders, s.providers?.live ?? null),
+      mossReady: !!boundConnection(s.providers ?? emptyProviders, s.providers?.live?.connection ?? null),
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
         everything: m.everything ?? false,

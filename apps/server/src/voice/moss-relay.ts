@@ -1,4 +1,4 @@
-import { Effect, Queue, type Scope } from "effect";
+import { Clock, Deferred, Effect, Queue, type Scope } from "effect";
 import { Socket } from "effect/socket";
 
 import { type MossLink, type MossTransport, nodeMossTransport } from "@vibevalley/provider/moss/server";
@@ -12,51 +12,78 @@ export interface MossRelayHooks {
   readonly onMossText?: (data: string, link: MossLink, sendToPage: (frame: string) => void) => void;
 }
 
-/** Where MOSS's frames go to the page, and where a closing goes: one queue, so they keep their order. */
 type Down = string | Uint8Array | Socket.CloseEvent;
 
-/** The page's frames wait in a queue until MOSS opens. */
 export const relay = (
   page: Socket.Socket,
   key: string,
   transport: MossTransport = nodeMossTransport,
   hooks?: MossRelayHooks,
+  model = "moss-live-1.0",
 ): Effect.Effect<void, never, Scope.Scope> =>
   Effect.gen(function* () {
-    const down = yield* Queue.unbounded<Down>();
+    const down = yield* Queue.bounded<Down>(64);
+    const overflow = yield* Deferred.make<void>();
     const writer = yield* page.writer;
-    const sendToPage = (frame: string) => {
-      Queue.offerUnsafe(down, frame);
-    };
+    let downBytes = 0;
+    let waitingBytes = 0;
+    let windowBytes = 0;
+    let windowAt = yield* Clock.currentTimeMillis;
     let open = false;
+    let closed = false;
     let closeHook: (() => void) | void;
     const waiting: (string | Uint8Array)[] = [];
+    const size = (frame: Down) => (typeof frame === "string" ? Buffer.byteLength(frame) : Socket.isCloseEvent(frame) ? 0 : frame.byteLength);
+    const fail = () => {
+      if (closed) return;
+      closed = true;
+      Deferred.doneUnsafe(overflow, Effect.void);
+    };
+    const enqueue = (frame: Down) => {
+      if (closed) return;
+      const bytes = size(frame);
+      if (bytes > 512 * 1024 || downBytes + bytes > 2 * 1024 * 1024 || !Queue.offerUnsafe(down, frame)) return fail();
+      downBytes += bytes;
+    };
+    const sendToPage = (frame: string) => enqueue(frame);
     const link: MossLink = yield* Effect.acquireRelease(
       Effect.sync(() =>
-        transport.connect(key, {
-          open: () => {
-            open = true;
-            closeHook = hooks?.onOpen?.(link, sendToPage);
-            for (const f of waiting.splice(0)) link.send(f);
+        transport.connect(
+          key,
+          {
+            open: () => {
+              if (closed) return;
+              open = true;
+              closeHook = hooks?.onOpen?.(link, sendToPage);
+              for (const frame of waiting.splice(0)) link.send(frame);
+              waitingBytes = 0;
+            },
+            text: (data) => {
+              if (closed) return;
+              if (Buffer.byteLength(data) > 256 * 1024) return fail();
+              const safe = key ? data.replaceAll(key, "[redacted]") : data;
+              hooks?.onMossText?.(safe, link, sendToPage);
+              enqueue(safe);
+            },
+            binary: enqueue,
+            // Vendor close reasons may contain credentials or private request content.
+            down: () => enqueue(new Socket.CloseEvent(1011, "Realtime connection closed")),
           },
-          text: (data) => {
-            hooks?.onMossText?.(data, link, sendToPage);
-            Queue.offerUnsafe(down, data);
-          },
-          binary: (data) => Queue.offerUnsafe(down, data),
-          // 1011: MOSS went away; its reason, when it gave one, goes to the page.
-          down: (why) => Queue.offerUnsafe(down, new Socket.CloseEvent(1011, why.slice(0, 120))),
-        }),
+          model,
+        ),
       ),
-      (l) =>
+      (connection) =>
         Effect.sync(() => {
+          closed = true;
+          waiting.length = 0;
           closeHook?.();
-          l.close();
+          connection.close();
         }),
     );
     const toPage = Effect.gen(function* () {
       for (;;) {
         const frame = yield* Queue.take(down);
+        downBytes -= size(frame);
         yield* writer.write(frame);
         if (Socket.isCloseEvent(frame)) return;
       }
@@ -65,11 +92,30 @@ export const relay = (
       const { pull } = yield* page.reader;
       for (;;)
         for (const frame of yield* pull) {
+          const bytes = size(frame);
+          const now = yield* Clock.currentTimeMillis;
+          if (now - windowAt >= 1000) {
+            windowAt = now;
+            windowBytes = 0;
+          }
+          windowBytes += bytes;
+          if (bytes > 256 * 1024 + 1 || windowBytes > 1024 * 1024 || (link.bufferedAmount?.() ?? 0) > 512 * 1024) {
+            fail();
+            return yield* Effect.never;
+          }
           const transformed = typeof frame === "string" && hooks?.onPageText ? hooks.onPageText(frame, link, sendToPage) : frame;
-          if (transformed === undefined) continue;
+          if (transformed === undefined || closed) continue;
           if (open) link.send(transformed);
-          else waiting.push(transformed);
+          else {
+            waitingBytes += size(transformed);
+            if (waiting.length >= 16 || waitingBytes > 512 * 1024) {
+              fail();
+              return yield* Effect.never;
+            }
+            waiting.push(transformed);
+          }
         }
     });
-    yield* Effect.raceFirst(toPage, fromPage).pipe(Effect.ignore({ log: "Debug" }));
+    const failed = Deferred.await(overflow).pipe(Effect.andThen(writer.write(new Socket.CloseEvent(1009, "Realtime buffer limit"))));
+    yield* Effect.raceFirst(Effect.raceFirst(toPage, fromPage), failed).pipe(Effect.ignore({ log: "Debug" }));
   });

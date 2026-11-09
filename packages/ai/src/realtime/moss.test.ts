@@ -94,14 +94,14 @@ describe("Playback", () => {
     p.ended(a);
     const { stop, actions } = p.cut("r1", "t1", 0.25);
     expect(stop).toEqual([b]);
-    expect(actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 250 }]);
+    expect(actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 50 }]);
     expect(p.ended(b)).toEqual([]);
     expect(p.aheadMs(0.25)).toBe(0);
 
     const p2 = new Playback();
     p2.ended(p2.queue(piece("c1"), 0.2, 0));
     p2.queue(piece("c2"), 0.2, 0.2);
-    expect(p2.cutSampleAccurate("r1", "t1", 75).actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 275 }]);
+    expect(p2.cutSampleAccurate("r1", "t1", 75).actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 75 }]);
   });
 
   it("says nothing when cutting a run it never heard of", () => {
@@ -130,6 +130,7 @@ describe("MossEngine end-to-end session state machine", () => {
       },
       onEnqueueAudio: () => {},
       onCutAudio: (run) => cutRuns.push(run),
+      onEnd: () => {},
       onChange: () => {},
     });
 
@@ -137,15 +138,15 @@ describe("MossEngine end-to-end session state machine", () => {
     expect(engine.phase).toBe("connecting");
 
     engine.socketOpened();
-    expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({ action: "attach_session" });
+    expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({ action: "attach_session", memory_scope: "session" });
 
-    engine.socketText(JSON.stringify({ action: "session_attached" }));
+    engine.socketText(JSON.stringify({ action: "session_attached", data: { session_id: "s1", memory_scope: "session", delegation: "none" } }));
     expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({
       action: "session.update",
       session: { persona: { prompt: "calm" }, instructions: "speak concisely" },
     });
 
-    engine.socketText(JSON.stringify({ action: "session.updated" }));
+    engine.socketText(JSON.stringify({ action: "session.updated", data: { error: "", tools: [] } }));
     expect(readyCount).toBe(1);
     expect(engine.phase).toBe("live");
     expect(sentText.slice(-2).map((s) => JSON.parse(s))).toEqual([
@@ -169,6 +170,8 @@ describe("MossEngine end-to-end session state machine", () => {
     engine.socketText(JSON.stringify({ action: "response.interrupted", data: { run_id: "r1", turn_id: "t1", text: "Hold on" } }));
     expect(cutRuns).toEqual(["r1"]);
     expect(engine.turns).toEqual([{ who: "moss", key: "t1", text: "Hold on", done: true }]);
+    expect(sentText.some((text) => text.includes("playback.stopped"))).toBe(false);
+    engine.audioStopped("r1", "t1", 50);
     expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({
       action: "playback.stopped",
       run_id: "r1",

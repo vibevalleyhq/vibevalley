@@ -67,6 +67,10 @@ test("regression: stale upload approval is refused before an understanding task 
     connections: [{ id: "understanding", name: "Changed account", adapter: "moss", enabled: true, key: "changed-test-key" }],
     dictation: null,
     live: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
     image: null,
     understanding: initial.understanding,
     speech: null,
@@ -134,4 +138,38 @@ test("unknown and canceled understanding retain honest states and explicit clean
   await api.media.understanding.cleanup({ id: canceled.id });
   await expect(unknownCard).toHaveAttribute("data-cleanup", "done");
   await expect(canceledCard).toHaveAttribute("data-cleanup", "done");
+});
+
+test("owner can authorize immutable input for a channel and revoke it before any vendor upload", async ({ page, api }) => {
+  await bindUnderstanding(api);
+  const channel = await api.channel.create({ name: "understanding-approval" });
+  await page.goto("/media");
+  await page.getByTestId("media-mode-understanding").click();
+  await page.getByTestId("understanding-files").setInputFiles(understandingFile("video").path);
+  await page.getByTestId("understanding-prompt").fill("Explain this synthetic video after my approval.");
+  await page.getByTestId("understanding-channel").click();
+  await page.locator(`[role="option"][data-key="${channel}"]`).click();
+  await page.getByTestId("understanding-consent").click();
+  const approved = page.waitForResponse((response) => response.url().endsWith("/api/v1/media/understanding/authorize") && response.status() === 200);
+  await page.getByTestId("understanding-submit").click();
+  const response = await approved;
+  const job = await response.json();
+  const card = page.locator(`[data-testid="understanding-job"][data-id="${job.id}"]`);
+  await expect(card).toHaveAttribute("data-phase", "authorized");
+  await expect(card.getByTestId("understanding-delegate")).toBeEnabled();
+  await expect(card.getByTestId("understanding-result")).toHaveCount(0);
+  const granted = await api.media.job.get({ id: job.id });
+  if (granted.kind !== "understanding") throw new Error("Expected understanding task");
+  expect(granted.authorization?.channel).toBe(channel);
+  expect(granted.inputs[0]?.kind).toBe("video");
+  await page.reload();
+  await page.getByTestId("media-mode-understanding").click();
+  await expect(card).toHaveAttribute("data-phase", "authorized");
+  await card.getByTestId("understanding-cancel").click();
+  await card.getByTestId("understanding-cancel-sure").click();
+  await expect(card).toHaveAttribute("data-phase", "canceled");
+  await expect(card.getByTestId("understanding-delegate")).toHaveCount(0);
+  const input = granted.inputs[0];
+  if (!input) throw new Error("Expected authorized input");
+  expect((await api.media.input.get({ id: input.id })).canDelete).toBe(true);
 });

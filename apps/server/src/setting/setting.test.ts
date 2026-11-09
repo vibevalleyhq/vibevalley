@@ -139,7 +139,11 @@ describe("settings", () => {
             image: { connection: "moss", model: "moss-image-sft-1.0-2026-10-09" },
             understanding: { connection: "moss", model: "moss-vl-1.0-2026-07-08" },
             speech: { connection: "moss", model: "moss-tts-1.0-pro-2026-02-07" },
-            live: "moss",
+            live: { connection: "moss", model: "moss-live-1.0" },
+            speakers: { connection: "moss", model: "moss-ttsd-1.0" },
+            voiceDesign: { connection: "moss", model: "moss-voice-generator-1.0" },
+            transcription: { connection: "moss", model: "moss-transcribe-diarize-pro" },
+            vision: { connection: "moss", model: "moss-vl-realtime-1.0" },
           }),
         );
         expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
@@ -157,6 +161,11 @@ describe("settings", () => {
             expect(setting.providers().revision).toBe(1);
             expect(setting.providers().image).toEqual({ connection: "moss", model: "moss-image-sft-1.0-2026-10-09" });
             expect(setting.providers().understanding).toEqual({ connection: "moss", model: "moss-vl-1.0-2026-07-08" });
+            expect(setting.providers().live).toEqual({ connection: "moss", model: "moss-live-1.0" });
+            expect(setting.providers().speakers).toEqual({ connection: "moss", model: "moss-ttsd-1.0" });
+            expect(setting.providers().voiceDesign).toEqual({ connection: "moss", model: "moss-voice-generator-1.0" });
+            expect(setting.providers().transcription).toEqual({ connection: "moss", model: "moss-transcribe-diarize-pro" });
+            expect(setting.providers().vision).toEqual({ connection: "moss", model: "moss-vl-realtime-1.0" });
           }),
         ),
       ),

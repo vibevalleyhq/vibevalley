@@ -19,7 +19,7 @@
     "issue_update",
     "memory_create",
     "memory_search",
-    "project_list",
+    "repo_list",
     "cron_create",
     "cron_delete",
     "cron_list",
@@ -128,6 +128,20 @@
       "tool": "issue_create",
       "argContains": "codex",
       "argLacks": "\"start\":true"
+    },
+    {
+      "kind": "notCalled",
+      "tool": "issue_create",
+      "argContains": "\"start\":true"
+    },
+    {
+      "kind": "notCalled",
+      "tool": "issue_create",
+      "argContains": "\"draft\":true"
+    },
+    {
+      "kind": "notCalled",
+      "tool": "issue_status_update"
     }
   ]
 }

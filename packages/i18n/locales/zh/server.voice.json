@@ -43,6 +43,7 @@
     "shape": "听写的地址回的不是 OpenAI 的转写格式"
   },
   "moss": {
+    "toolFailed": "后台请求未能完成。",
     "noKey": "请先在 AI 服务中为 MOSS Live 绑定已启用的连接",
     "refused": "MOSS Live 不认这个 Key：{why}",
     "unreachable": "连不上 MOSS Live：{why}",

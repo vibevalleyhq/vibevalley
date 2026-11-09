@@ -429,6 +429,16 @@
     "swallowed": 0,
     "resultBranch": 0
   },
+  "web: features/media": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 3,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "web: features/memory": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -450,6 +460,16 @@
     "resultBranch": 0
   },
   "web: features/pkm": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
+  "web: features/provider": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,

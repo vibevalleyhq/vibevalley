@@ -24,7 +24,11 @@ const config: ProviderUpdate = {
   image: null,
   understanding: null,
   speech: { connection: "second", model: "moss-tts-1.5-flash" },
-  live: "first",
+  live: { connection: "first", model: "moss-live-1.0" },
+  speakers: null,
+  voiceDesign: null,
+  transcription: null,
+  vision: null,
 };
 const layer = (http: HttpClient.HttpClient) =>
   Provider.layer.pipe(
@@ -49,8 +53,8 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
     expect(saved.speechModels).toEqual(mossSpeechModels);
     const frozen = yield* provider.speech();
     expect(frozen).toEqual({ connection: "second", revision: 1, model, key: "test-second-private" });
-    expect((yield* provider.transcription()).key).toBe("test-first-private");
-    expect(provider.liveKey()).toBe("test-first-private");
+    expect((yield* provider.dictation()).key).toBe("test-first-private");
+    expect((yield* provider.live()).key).toBe("test-first-private");
     expect(JSON.stringify(saved)).not.toContain("test-second-private");
     if (saved.speech) saved.speech.model = "caller-mutated";
     expect(provider.status().speech?.model).toBe(model);

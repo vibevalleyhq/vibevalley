@@ -37,6 +37,10 @@ const configured = Effect.gen(function* () {
     speech: null,
     dictation: null,
     live: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
   });
 });
 // world already builds Media; a fresh instance must capture these offline clients instead of reusing that service.

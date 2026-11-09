@@ -6,6 +6,7 @@ import { same } from "@vibevalley/protocol/rules";
 
 import { api, reasonOf } from "#/infra/api.ts";
 import { providerQuery, ready, settingsQuery, useQuery, useQueryClient } from "#/infra/query.ts";
+import { Link } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
@@ -24,6 +25,10 @@ const editable = (status: ProviderStatus): ProviderUpdate => ({
   understanding: status.understanding,
   speech: status.speech,
   live: status.live,
+  speakers: status.speakers,
+  voiceDesign: status.voiceDesign,
+  transcription: status.transcription,
+  vision: status.vision,
 });
 
 export function ProviderPage() {
@@ -232,11 +237,28 @@ function ProviderForm(props: { initial: ProviderStatus }) {
             testid="provider-live"
             placeholder={t("web.provider.unbound")}
             disabled={act.busy()}
-            value={draft().live ?? ""}
+            value={draft().live?.connection ?? ""}
             options={choices()}
-            onChange={(live) => setDraft((current) => ({ ...current, live: live || null }))}
+            onChange={(connection) =>
+              setDraft((current) => ({
+                ...current,
+                live: connection ? { connection, model: current.live?.model ?? base().liveModels[0] ?? "" } : null,
+              }))
+            }
           />
         </Field>
+        <Show when={draft().live}>
+          <Field label={t("web.provider.capabilityModel")}>
+            <Select
+              label={t("web.provider.capabilityModel")}
+              testid="provider-live-model"
+              disabled={act.busy()}
+              value={draft().live?.model ?? ""}
+              options={base().liveModels.map((model) => ({ value: model, label: model }))}
+              onChange={(model) => setDraft((current) => ({ ...current, live: current.live ? { ...current.live, model } : null }))}
+            />
+          </Field>
+        </Show>
         <p class="text-xs text-muted">{t("web.provider.bindingHint")}</p>
       </Card>
       <Card title={t("web.provider.imageSettings")}>
@@ -309,6 +331,9 @@ function ProviderForm(props: { initial: ProviderStatus }) {
         <p class="text-xs text-muted" data-testid="provider-speech-notice">
           {t("web.provider.speechNotice")}
         </p>
+        <Link href="/media?mode=speech" data-testid="provider-speech-open" class="text-sm text-water underline">
+          {t("web.provider.openSpeech")}
+        </Link>
         <Field label={t("web.provider.speechConnection")}>
           <Select
             label={t("web.provider.speechConnection")}
@@ -335,6 +360,46 @@ function ProviderForm(props: { initial: ProviderStatus }) {
           </Field>
         </Show>
       </Card>
+      <For each={["speakers", "voiceDesign", "transcription", "vision"] as const}>
+        {(use) => (
+          <Card title={t(`web.provider.${use}Settings`)}>
+            <p class="text-xs text-muted">{t("web.provider.capabilityNotice")}</p>
+            <Field label={t("web.provider.capabilityConnection")}>
+              <Select
+                label={t("web.provider.capabilityConnection")}
+                testid={`provider-${use}`}
+                placeholder={t("web.provider.unbound")}
+                disabled={act.busy()}
+                value={draft()[use]?.connection ?? ""}
+                options={choices()}
+                onChange={(connection) =>
+                  setDraft((current) => ({
+                    ...current,
+                    [use]: connection ? { connection, model: current[use]?.model ?? base()[`${use}Models`][0] ?? "" } : null,
+                  }))
+                }
+              />
+            </Field>
+            <Show when={draft()[use]}>
+              <Field label={t("web.provider.capabilityModel")}>
+                <Select
+                  label={t("web.provider.capabilityModel")}
+                  testid={`provider-${use}-model`}
+                  disabled={act.busy()}
+                  value={draft()[use]?.model ?? ""}
+                  options={base()[`${use}Models`].map((model) => ({ value: model, label: model }))}
+                  onChange={(model) =>
+                    setDraft((current) => {
+                      const binding = current[use];
+                      return { ...current, [use]: binding ? { ...binding, model } : null };
+                    })
+                  }
+                />
+              </Field>
+            </Show>
+          </Card>
+        )}
+      </For>
       <SaveBar
         dirty={dirty()}
         busy={act.busy()}

@@ -25,8 +25,23 @@ const configured = (key = "test-first-key"): ProviderUpdate => ({
   image: null,
   understanding: null,
   speech: null,
-  live: "moss",
+  speakers: null,
+  voiceDesign: null,
+  transcription: null,
+  vision: null,
+  live: { connection: "moss", model: "moss-live-1.0" },
 });
+
+it.effect.each(["moss-transcribe-1.0-2026-07-22", "moss-transcribe-diarize-pro-2026-07-03"])(
+  "regression: dictation accepts the explicit snapshot %s without substituting its stable alias",
+  (model) =>
+    Effect.gen(function* () {
+      const provider = yield* Provider;
+      yield* provider.update({ ...configured(), dictation: { connection: "moss", model } });
+      expect(yield* provider.dictation()).toEqual({ url: "https://api.mosi.cn/v1", model, key: "test-first-key" });
+    }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Selecting a snapshot must not invoke the vendor"))))),
+);
+
 it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding %s is independent, private and frozen per call", (model) =>
   Effect.gen(function* () {
     const provider = yield* Provider;
@@ -39,8 +54,8 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
     expect(JSON.stringify(saved)).not.toContain("vision-private-key");
     const frozen = yield* provider.understanding();
     expect(frozen).toEqual({ connection: "vision", revision: 1, model, key: "vision-private-key" });
-    expect(provider.liveKey()).toBe("test-first-key");
-    expect((yield* provider.transcription()).key).toBe("test-first-key");
+    expect((yield* provider.live()).key).toBe("test-first-key");
+    expect((yield* provider.dictation()).key).toBe("test-first-key");
     if (saved.understanding) saved.understanding.model = "changed-by-caller";
     expect(provider.status().understanding?.model).toBe(model);
     for (const connections of [
@@ -103,8 +118,8 @@ it.effect("connections and uses share credentials; replacing and clearing observ
     expect(saved.connections[0]?.key).toEqual({ source: "settings", hint: "…-key" });
     expect(JSON.stringify(saved)).not.toContain("test-first-key");
     expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
-    expect(provider.liveKey()).toBe("test-first-key");
-    expect(yield* provider.transcription()).toEqual({ url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0", key: "test-first-key" });
+    expect((yield* provider.live()).key).toBe("test-first-key");
+    expect(yield* provider.dictation()).toEqual({ url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0", key: "test-first-key" });
     expect(yield* api["provider.model.list"]({ connection: "moss", revision: 1 })).toEqual({
       connection: "moss",
       revision: 1,
@@ -120,10 +135,14 @@ it.effect("connections and uses share credentials; replacing and clearing observ
       image: null,
       understanding: null,
       speech: null,
+      speakers: null,
+      voiceDesign: null,
+      transcription: null,
+      vision: null,
       live: null,
     });
     expect(cleared.connections[0]?.key).toEqual({ source: null });
-    expect(provider.liveKey()).toBe("");
+    expect(yield* provider.live().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
     expect(setting.status()).toMatchObject({ mossReady: false, dictationReady: false });
     expect(yield* provider.models({ connection: "moss", revision: 3 }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
     expect(keys).toHaveLength(2);
@@ -144,9 +163,15 @@ it.effect("deletion, disabling and clearing require explicit unbinding and unsup
       { _tag: "Refused" },
     );
     yield* provider.update({ ...configured(), revision: 1, connections: [kept] });
-    expect(provider.liveKey()).toBe("test-first-key");
+    expect((yield* provider.live()).key).toBe("test-first-key");
     expect(provider.status().connections[0]?.name).toBe("renamed");
-    yield* provider.update({ revision: 2, connections: [], dictation: null, image: null, understanding: null, speech: null, live: null });
+    yield* provider.update({
+      ...configured(),
+      revision: 2,
+      connections: [],
+      dictation: null,
+      live: null,
+    });
     expect(provider.status().connections).toEqual([]);
   }).pipe(Effect.provide(layer(http))),
 );
@@ -164,7 +189,7 @@ it.effect("stale updates cannot overwrite another writer and general settings sa
     expect(results.toSorted()).toEqual(["refused", "saved"]);
     expect(provider.status().revision).toBe(1);
     yield* Effect.all([provider.update({ ...configured("third-key"), revision: 1 }), setting.save({ deepseekApiKey: "test-deepseek" })], { concurrency: 2 });
-    expect(provider.liveKey()).toBe("third-key");
+    expect((yield* provider.live()).key).toBe("third-key");
     expect(setting.deepseekApiKey()).toBe("test-deepseek");
   }).pipe(Effect.provide(layer(http))),
 );
@@ -205,10 +230,10 @@ it.effect("each use resolves its own account without key fallback", () =>
         { id: "moss", name: "dictation", adapter: "moss", enabled: true, key: "dictation-key" },
         { id: "live", name: "live", adapter: "moss", enabled: true, key: "live-key" },
       ],
-      live: "live",
+      live: { connection: "live", model: "moss-live-1.0" },
     });
-    expect(provider.liveKey()).toBe("live-key");
-    expect((yield* provider.transcription()).key).toBe("dictation-key");
+    expect((yield* provider.live()).key).toBe("live-key");
+    expect((yield* provider.dictation()).key).toBe("dictation-key");
   }).pipe(Effect.provide(layer(http))),
 );
 
@@ -240,8 +265,8 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     yield* provider.update(config);
     const frozen = yield* provider.image();
     expect(frozen.key).toBe("test-image-key");
-    expect(provider.liveKey()).toBe("test-first-key");
-    expect((yield* provider.transcription()).key).toBe("test-first-key");
+    expect((yield* provider.live()).key).toBe("test-first-key");
+    expect((yield* provider.dictation()).key).toBe("test-first-key");
     for (const connections of [[first], [first, { ...image, enabled: false }], [first, { ...image, key: null }]]) {
       expect(yield* provider.update({ ...config, revision: 1, connections }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
       expect(provider.status().revision).toBe(1);
@@ -251,7 +276,7 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     expect(frozen).toEqual({ connection: "image", revision: 1, model: "moss-image-sft-1.0", key: "test-image-key" });
     yield* provider.update({ ...configured("rotated-key"), revision: 2 });
     expect(yield* provider.image().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
-    expect(provider.liveKey()).toBe("rotated-key");
+    expect((yield* provider.live()).key).toBe("rotated-key");
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Unexpected network request"))))),
 );
 
@@ -272,3 +297,37 @@ it.effect("model discovery distinguishes account errors without returning upstre
     expect(new Set(reasons).size).toBe(4);
   }).pipe(Effect.provide(layer(failed)));
 });
+
+it.effect.each([
+  { use: "speakers", model: "moss-ttsd-1.0" },
+  { use: "voiceDesign", model: "moss-voice-generator-1.0" },
+  { use: "transcription", model: "moss-transcribe-diarize-pro" },
+  { use: "vision", model: "moss-vl-realtime-1.0" },
+  { use: "live", model: "moss-live-1.0" },
+] as const)("$use protects and freezes its own account independently of other bindings", ({ use, model }) =>
+  Effect.gen(function* () {
+    const provider = yield* Provider;
+    expect(yield* provider[use]().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const connection = { id: "separate", name: "Separate", adapter: "moss", enabled: true, key: "separate-private-key" } as const;
+    const input = { ...configured(), connections: [...configured().connections, connection], [use]: { connection: connection.id, model } };
+    const saved = yield* provider.update(input);
+    const frozen = yield* provider[use]();
+    expect(frozen).toEqual({ connection: connection.id, revision: 1, model, key: connection.key });
+    expect((yield* provider.dictation()).key).toBe("test-first-key");
+    if (saved[use]) saved[use].model = "caller-mutated";
+    expect((yield* provider[use]()).model).toBe(model);
+    for (const patch of [
+      { connections: configured().connections },
+      { connections: [...configured().connections, { ...connection, enabled: false }] },
+      { connections: [...configured().connections, { ...connection, key: null }] },
+      { [use]: { connection: connection.id, model: "unsupported-model" } },
+    ]) {
+      expect(yield* provider.update({ ...input, revision: 1, ...patch }).pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    }
+    yield* provider.update({ ...input, revision: 1, connections: [...configured().connections, { ...connection, key: "rotated-private-key" }] });
+    expect((yield* provider[use]()).key).toBe("rotated-private-key");
+    expect(frozen.key).toBe("separate-private-key");
+    yield* provider.update({ ...input, revision: 2, [use]: null, connections: configured().connections });
+    expect(yield* provider[use]().pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+  }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
+);

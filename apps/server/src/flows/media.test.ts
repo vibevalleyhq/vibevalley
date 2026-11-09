@@ -1,8 +1,9 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Stream } from "effect";
 
 import { messageText } from "@vibevalley/agent/messages";
 import { scriptedLLM } from "@vibevalley/agent/testing";
+import type { ModelClient } from "@vibevalley/ai/client";
 import { answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
@@ -10,6 +11,7 @@ import { orchestrator, session } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Media } from "#/media/media.ts";
+import { png } from "#/media/testdata/png.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 import { Provider } from "#/provider/provider.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
@@ -23,13 +25,17 @@ const configured = Effect.gen(function* () {
     connections: [{ id: "images", name: "Images", adapter: "moss", enabled: true, key: "test-only-key" }],
     dictation: null,
     live: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
     image: { connection: "images", model: "moss-image-base-1.0" },
     understanding: null,
     speech: null,
   });
 });
 
-const farm = (llm: ReturnType<typeof scriptedLLM>["llm"]) => {
+const farm = (llm: ModelClient) => {
   const media = Layer.fresh(Media.layer).pipe(
     Layer.provideMerge(network),
     Layer.provideMerge(world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }) })),
@@ -131,5 +137,105 @@ it.effect("the orchestrator retries only a download and cancels a separate pendi
     yield* ingress.say("Cancel waiting for that image", {}, undefined, "");
     yield* waitFor(media.get("cancel"), (job) => job.phase === "canceled", "tool canceled waiting");
     expect(yield* media.list()).toHaveLength(2);
+  }).pipe(Effect.scoped, Effect.provide(farm(llm)));
+});
+
+it.effect("the orchestrator executes a frozen owner approval through its trusted channel context", () => {
+  const id = "authorized-understanding";
+  const { llm, requests } = scriptedLLM([
+    answer([toolCall("media_understanding_start", { id })]),
+    answer("Started the authorized request"),
+    answer([toolCall("media_job_get", { id })]),
+    answer("The synthetic image was understood"),
+  ]);
+  return Effect.gen(function* () {
+    yield* configured;
+    const provider = yield* Provider;
+    const status = yield* provider.update({
+      ...provider.status(),
+      connections: [{ id: "images", name: "Images", adapter: "moss", enabled: true }],
+      understanding: { connection: "images", model: "moss-vl-1.0" },
+    });
+    const media = yield* Media;
+    const bytes = png();
+    const input = yield* media.inputs.create({ kind: "image", mime: "image/png", name: "synthetic.png", size: bytes.length });
+    yield* media.inputs.upload(input.id, Stream.make(bytes));
+    const channel = (yield* Channel).defaultChannel();
+    yield* media.authorizeUnderstanding({
+      id,
+      prompt: "Explain this synthetic image",
+      inputs: [input.id],
+      connection: "images",
+      revision: status.revision,
+      allowUpload: true,
+      maxOutputTokens: 64,
+      channel,
+    });
+    expect((yield* media.get(id)).phase).toBe("authorized");
+    const ingress = yield* Ingress;
+    yield* ingress.say("Execute the authorized understanding task", {}, channel, "");
+    const job = yield* waitFor(media.get(id), (job) => job.kind === "understanding" && job.cleanup === "done", "delegated task result");
+    expect(job).toMatchObject({
+      phase: "ready",
+      source: { kind: "orchestrator", agent: defaultOrchestrator, channel },
+      result: { text: "Offline understanding of image input." },
+    });
+    yield* until(() => requests.length >= 2, "delegated submission acknowledged");
+    yield* ingress.say("Read the understanding result", {}, channel, "");
+    yield* until(() => requests.length >= 4, "understanding result read by orchestrator");
+    const returned = requests
+      .at(-1)
+      ?.messages.filter((message) => message.role === "toolResult")
+      .map(messageText)
+      .join("\n");
+    expect(returned).toContain("Offline understanding of image input.");
+    expect(returned).not.toContain("fingerprint");
+    const tools = yield* Tool;
+    const caller = () => ({ agent: defaultOrchestrator, session: "", repo: "", here: channel, picked: "", envelope: "", actor: orchestrator(false) });
+    const start = tools.orchestrator(caller).find((tool) => tool.name === "media_understanding_start");
+    if (!start) return yield* Effect.die("Missing authorized understanding tool");
+    expect(yield* start.execute({ id }, { id: "autonomous" }).pipe(Effect.flip)).toMatchObject({ _tag: "ToolFailed" });
+  }).pipe(Effect.scoped, Effect.provide(farm(llm)));
+});
+
+it.effect("the orchestrator synthesizes speech with trusted provenance and reads the persisted audio", () => {
+  const id = "orchestrator-speech";
+  const { llm, requests } = scriptedLLM([
+    answer([
+      toolCall("media_speech_create", { id, text: "[speech:success] A quiet farm", voice: "voice-one", format: "wav", connection: "images", revision: 2 }),
+    ]),
+    answer("Submitted"),
+    answer([toolCall("media_job_get", { id })]),
+    answer("Audio saved"),
+  ]);
+  return Effect.gen(function* () {
+    yield* configured;
+    const provider = yield* Provider;
+    yield* provider.update({
+      ...provider.status(),
+      connections: [{ id: "images", name: "Images", adapter: "moss", enabled: true }],
+      speech: { connection: "images", model: "moss-tts-1.5-flash" },
+    });
+    const ingress = yield* Ingress;
+    yield* ingress.say("Generate the requested speech", {}, undefined, "");
+    const jobs = yield* waitFor((yield* Media).list(), (jobs) => jobs.some((job) => job.id === id && job.phase === "ready"), "speech tool saved audio");
+    const job = jobs.find((job) => job.id === id);
+    expect(job).toMatchObject({
+      kind: "speech",
+      source: { kind: "orchestrator", agent: defaultOrchestrator, channel: (yield* Channel).defaultChannel() },
+      attachment: { type: "audio/wav" },
+    });
+    if (job?.kind !== "speech" || !job.attachment) return yield* Effect.die("Expected saved speech");
+    yield* until(() => requests.length >= 2, "speech submission acknowledged");
+    yield* ingress.say("Read the saved speech", {}, undefined, "");
+    yield* until(() => requests.length >= 4, "speech result read by orchestrator");
+    const returned = requests
+      .at(-1)
+      ?.messages.filter((message) => message.role === "toolResult")
+      .map(messageText)
+      .join("\n");
+    expect(returned).toContain(job.attachment.id);
+    expect(returned).not.toContain("test-only-key");
+    expect(returned).not.toContain("https://media.example.com");
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });

@@ -50,6 +50,9 @@ Triggers, closes and tabs take `render`: another tag (`"span"`, `"a"`) or a comp
 (`render={(p) => <Button {...p} tone="quiet" />}`). A portal goes into the modal dialog its trigger is in, else the body.
 Positioners take `side`, `align`, `sideOffset` and `collisionPadding` ([@floating-ui/dom](https://floating-ui.com)).
 
+Initial popup focus is an opening-time snapshot computed after placement, under its reactive owner. Changes to a
+selected value do not move focus again; the effect phase only focuses the captured element.
+
 Styling-only pieces that shadcn also ships (Badge, Card, Alert, Skeleton, Kbd, Spinner, Table, Breadcrumb) have no
 behaviour to share and live in `apps/web/src/ui`. Parts never spread a computed object next to their props
 (`{...attrs()}`): Solid would re-read `children` with it and rebuild them, taking the focus; `test/source.test.ts` checks.

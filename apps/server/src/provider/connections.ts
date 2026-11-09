@@ -3,8 +3,13 @@ import { Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
+import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
+import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
 import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
+import { mossTranscriptionModels } from "@vibevalley/provider/moss/transcription-models";
 import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding-models";
+import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
+import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-models";
 import { mossTranscription } from "@vibevalley/provider/transcription";
 
 import { keyHint } from "#/setting/memorySources.ts";
@@ -19,7 +24,16 @@ export const providerStatus = (settings: ProviderSettings): T.ProviderStatus => 
   })),
   dictation: settings.dictation ? { ...settings.dictation } : null,
   image: settings.image ? { ...settings.image } : null,
-  live: settings.live,
+  live: settings.live ? { ...settings.live } : null,
+  liveModels: [...mossLiveModels],
+  speakers: settings.speakers ? { ...settings.speakers } : null,
+  speakersModels: [...mossSpeakersModels],
+  voiceDesign: settings.voiceDesign ? { ...settings.voiceDesign } : null,
+  voiceDesignModels: [...mossVoiceDesignModels],
+  transcription: settings.transcription ? { ...settings.transcription } : null,
+  transcriptionModels: [...mossTranscriptionModels],
+  vision: settings.vision ? { ...settings.vision } : null,
+  visionModels: [...mossVisionModels],
   dictationModels: [...mossTranscription.models],
   imageModels: [...mossImageModels],
   understanding: settings.understanding ? { ...settings.understanding } : null,
@@ -51,13 +65,21 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
     understanding: update.understanding,
     speech: update.speech,
     live: update.live,
+    speakers: update.speakers,
+    voiceDesign: update.voiceDesign,
+    transcription: update.transcription,
+    vision: update.vision,
   };
   if (
     (next.dictation && !boundConnection(next, next.dictation.connection)) ||
     (next.image && !boundConnection(next, next.image.connection)) ||
     (next.understanding && !boundConnection(next, next.understanding.connection)) ||
     (next.speech && !boundConnection(next, next.speech.connection)) ||
-    (next.live !== null && !boundConnection(next, next.live))
+    (next.live && !boundConnection(next, next.live.connection)) ||
+    (next.speakers && !boundConnection(next, next.speakers.connection)) ||
+    (next.voiceDesign && !boundConnection(next, next.voiceDesign.connection)) ||
+    (next.transcription && !boundConnection(next, next.transcription.connection)) ||
+    (next.vision && !boundConnection(next, next.vision.connection))
   )
     return yield* new SettingRefused({ message: t("server.provider.bound") });
   if (next.dictation && !mossTranscription.models.some((model) => model === next.dictation?.model))
@@ -68,5 +90,16 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
     return yield* new SettingRefused({ message: t("server.provider.understandingModel") });
   if (next.speech && !mossSpeechModels.some((model) => model === next.speech?.model))
     return yield* new SettingRefused({ message: t("server.provider.speechModel") });
+  for (const [use, models] of [
+    ["live", mossLiveModels],
+    ["speakers", mossSpeakersModels],
+    ["voiceDesign", mossVoiceDesignModels],
+    ["transcription", mossTranscriptionModels],
+    ["vision", mossVisionModels],
+  ] as const) {
+    const binding = next[use];
+    if (binding && !models.some((model) => model === binding.model))
+      return yield* new SettingRefused({ message: t("server.provider.capabilityModel", { capability: t(`server.provider.use.${use}`) }) });
+  }
   return next;
 });

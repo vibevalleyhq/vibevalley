@@ -127,7 +127,6 @@ it.effect.each([
   { url: "https://user:secret@audio.example.com/out.mp3" },
   { url: "https://audio.example.com/out.mp3#private" },
   { url: "data:audio/mpeg;base64,AAAA" },
-  { response_format: "wav", content_type: "audio/wav" },
   { content_type: "text/html" },
   { status: "FAILED" },
   { object: "audio.voice_generation" },

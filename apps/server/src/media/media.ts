@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Fiber, FiberHandle, FiberMap, Layer, Option, Schedule, Schema, Semaphore } from "effect";
+import { Clock, Context, Effect, Fiber, FiberHandle, FiberMap, Layer, Option, Schedule, Schema, Semaphore, type Stream } from "effect";
 import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -13,11 +13,15 @@ import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { Provider } from "#/provider/provider.ts";
+import * as audioQueries from "#db/media_audio.sql.ts";
 import * as q from "#db/media_generation.sql.ts";
+import * as speechQueries from "#db/media_speech.sql.ts";
 
+import { makeAudio } from "./audio.ts";
 import { downloadImage } from "./download.ts";
 import { makeInputs } from "./inputs.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
+import { makeSpeech } from "./speech.ts";
 import { makeUnderstanding } from "./understanding.ts";
 
 export type MediaCaller =
@@ -27,15 +31,29 @@ export type MediaCaller =
 export class Media extends Context.Service<
   Media,
   {
-    readonly inputs: Pick<Effect.Success<typeof makeInputs>, "create" | "upload" | "get" | "list" | "delete" | "previewDelete">;
+    readonly inputs: Pick<Effect.Success<typeof makeInputs>, "create" | "upload" | "get" | "list" | "delete" | "previewDelete" | "content">;
     readonly createImage: (input: T.MediaImageRequest, caller: MediaCaller) => Effect.Effect<T.MediaImageJob, ApiError>;
     readonly createUnderstanding: (input: T.MediaUnderstandingRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
+    readonly authorizeUnderstanding: (input: T.MediaUnderstandingAuthorizationRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
+    readonly startUnderstanding: (id: string, caller: MediaCaller) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
+    readonly createSpeech: (input: T.MediaSpeechRequest, caller: MediaCaller) => Effect.Effect<T.MediaSpeechJob, ApiError>;
+    readonly speechResume: (id: string) => Effect.Effect<T.MediaSpeechJob, ApiError>;
+    readonly speechEvents: (id: string) => Effect.Effect<Stream.Stream<T.MediaSpeechEvent>, ApiError>;
+    readonly createSpeakers: (input: T.MediaSpeakersRequest, caller: MediaCaller) => Effect.Effect<T.MediaAudioJob, ApiError>;
+    readonly createVoiceDesign: (input: T.MediaVoiceDesignRequest, caller: MediaCaller) => Effect.Effect<T.MediaAudioJob, ApiError>;
+    readonly createClone: (input: T.MediaCloneRequest) => Effect.Effect<T.MediaAudioJob, ApiError>;
+    readonly createTranscription: (input: T.MediaTranscriptionRequest) => Effect.Effect<T.MediaAudioJob, ApiError>;
+    readonly audioResume: (id: string) => Effect.Effect<T.MediaAudioJob, ApiError>;
+    readonly audioPreviewCleanup: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly audioCleanup: (id: string) => Effect.Effect<T.MediaAudioJob, ApiError>;
     readonly previewUnderstandingCleanup: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly cleanupUnderstanding: (id: string) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
     readonly get: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
     readonly list: () => Effect.Effect<T.MediaJob[], ApiError>;
     readonly cancel: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
     readonly retryDownload: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
+    readonly previewRelease: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly release: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
     readonly restore: () => Effect.Effect<void, ApiError>;
   }
 >()("vibevalley/Media") {
@@ -99,7 +117,9 @@ const make = Effect.gen(function* () {
   const list = Effect.fn("Media.list")(function* (): Effect.fn.Return<T.MediaJob[], ApiError> {
     const images = yield* Effect.forEach(yield* db.run(q.recentGenerations()), view);
     const understood = yield* understanding.list();
-    return [...images, ...understood]
+    const spoken = yield* speech.list();
+    const audioJobs = yield* audio.list();
+    return [...images, ...understood, ...spoken, ...audioJobs]
       .toSorted((a, b) => (a.createdAt === b.createdAt ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : b.createdAt - a.createdAt))
       .slice(0, 100);
   });
@@ -108,7 +128,9 @@ const make = Effect.gen(function* () {
   });
   const get = Effect.fn("Media.get")(function* (id: string): Effect.fn.Return<T.MediaJob, ApiError> {
     const image = yield* db.one(q.generation({ id }));
-    return image ? yield* view(image) : yield* understanding.get(id);
+    if (image) return yield* view(image);
+    if (yield* audio.has(id)) return yield* audio.get(id);
+    return (yield* speech.has(id)) ? yield* speech.get(id) : yield* understanding.get(id);
   });
   const change = Effect.fnUntraced(
     function* (
@@ -155,7 +177,8 @@ const make = Effect.gen(function* () {
     );
   });
   const capacity = Effect.fnUntraced(function* (): Effect.fn.Return<void, ApiError> {
-    if ((yield* db.run(q.pendingGenerations())).length + (yield* understanding.pending()) >= 8) return yield* Effect.fail(refused(t("server.media.busy")));
+    if ((yield* db.run(q.pendingGenerations())).length + (yield* understanding.pending()) + (yield* speech.pending()) + (yield* audio.pending()) >= 8)
+      return yield* Effect.fail(refused(t("server.media.busy")));
   });
 
   const understanding = yield* makeUnderstanding({
@@ -165,16 +188,80 @@ const make = Effect.gen(function* () {
     slots,
     publish,
     capacity,
-    imageExists: (id) => db.one(q.generation({ id })).pipe(Effect.map((row) => row !== undefined)),
+    otherExists: Effect.fnUntraced(function* (id: string): Effect.fn.Return<boolean> {
+      return (yield* db.one(q.generation({ id }))) !== undefined || (yield* speech.has(id)) || (yield* audio.has(id));
+    }),
+  });
+  const speech = yield* makeSpeech({
+    inputs,
+    lock,
+    slots,
+    publish,
+    capacity,
+    otherExists: Effect.fnUntraced(function* (id: string): Effect.fn.Return<boolean> {
+      return (yield* db.one(q.generation({ id }))) !== undefined || (yield* understanding.has(id)) || (yield* audio.has(id));
+    }),
+  });
+  const audio = yield* makeAudio({
+    inputs,
+    remote: remoteFiles,
+    lock,
+    slots,
+    publish,
+    capacity,
+    otherExists: Effect.fnUntraced(function* (id: string): Effect.fn.Return<boolean> {
+      return (yield* db.one(q.generation({ id }))) !== undefined || (yield* understanding.has(id)) || (yield* speech.has(id));
+    }),
+  });
+
+  const releasable = Effect.fnUntraced(function* (id: string) {
+    const job = yield* get(id);
+    if (job.kind === "image" || job.kind === "understanding" || active(job.phase)) return yield* Effect.fail(refused(t("server.media.releaseUnavailable")));
+    return job;
   });
 
   return Media.of({
     inputs,
     createUnderstanding: understanding.create,
+    authorizeUnderstanding: understanding.authorize,
+    startUnderstanding: understanding.start,
+    createSpeech: speech.create,
+    speechResume: speech.resume,
+    speechEvents: speech.events,
+    createSpeakers: audio.createSpeakers,
+    createVoiceDesign: audio.createVoiceDesign,
+    createClone: Effect.fn("Media.createClone")((input) => audio.createClone(input, { kind: "owner" })),
+    createTranscription: Effect.fn("Media.createTranscription")((input) => audio.createTranscription(input, { kind: "owner" })),
+    audioResume: audio.resume,
+    audioPreviewCleanup: audio.previewCleanup,
+    audioCleanup: audio.cleanup,
     cleanupUnderstanding: understanding.cleanup,
     previewUnderstandingCleanup: understanding.previewCleanup,
     get,
     list,
+    previewRelease: Effect.fn("Media.previewRelease")(function* (id) {
+      const job = yield* releasable(id);
+      return { does: job.canRelease ? [t("server.media.releasePreview"), t("server.media.releasePreserves"), t("server.media.releaseAbandons")] : [] };
+    }, lock.withPermits(1)),
+    release: Effect.fn("Media.release")(
+      function* (id) {
+        const job = yield* releasable(id);
+        if (!job.canRelease) return job;
+        const ids = job.kind === "speech" ? [job.resultInput?.id] : [job.input?.id, job.resultInput?.id, job.previewInput];
+        const now = yield* Clock.currentTimeMillis;
+        const clear = db.run(job.kind === "speech" ? speechQueries.releaseSpeechAssets({ id, now }) : audioQueries.releaseAudioAssets({ id, now }));
+        yield* inputs
+          .releaseAssets(
+            ids.filter((value): value is string => value != null),
+            [id],
+            clear,
+          )
+          .pipe(Effect.ensuring(publish().pipe(Effect.catch(() => Effect.logError("Media asset release could not be published")))));
+        return yield* get(id);
+      },
+      lock.withPermits(1),
+      Effect.uninterruptible,
+    ),
     createImage: Effect.fn("Media.createImage")(function* (given, caller) {
       if (caller.kind === "orchestrator" && !caller.forOwner) return yield* Effect.fail(refused(t("server.media.ownerRequired")));
       const source: T.MediaSource = yield* Schema.decodeEffect(S.MediaSource)(caller).pipe(Effect.mapError(() => refused(t("server.media.invalid"))));
@@ -188,7 +275,8 @@ const make = Effect.gen(function* () {
               return yield* Effect.fail(refused(t("server.media.reusedId")));
             return yield* view(existing);
           }
-          if (yield* understanding.has(input.id)) return yield* Effect.fail(refused(t("server.media.reusedId")));
+          if ((yield* understanding.has(input.id)) || (yield* speech.has(input.id)) || (yield* audio.has(input.id)))
+            return yield* Effect.fail(refused(t("server.media.reusedId")));
           yield* capacity();
           const connection = yield* provider.image();
           const prompt =
@@ -249,6 +337,8 @@ const make = Effect.gen(function* () {
       );
     }),
     cancel: Effect.fn("Media.cancel")(function* (id) {
+      if (yield* audio.has(id)) return yield* audio.cancel(id);
+      if (yield* speech.has(id)) return yield* speech.cancel(id);
       if (yield* understanding.has(id)) return yield* understanding.cancel(id);
       const fiber = yield* lock.withPermits(1)(
         Effect.gen(function* () {
@@ -263,6 +353,8 @@ const make = Effect.gen(function* () {
       return yield* get(id);
     }),
     retryDownload: Effect.fn("Media.retryDownload")(function* (id) {
+      if (yield* audio.has(id)) return yield* audio.retryDownload(id);
+      if (yield* speech.has(id)) return yield* speech.retryDownload(id);
       return yield* lock.withPermits(1)(
         Effect.gen(function* () {
           const row = yield* found(id);
@@ -282,15 +374,18 @@ const make = Effect.gen(function* () {
       yield* understanding.restore();
       yield* inputs.restore();
       yield* inputs.sweep();
+      yield* understanding.sweep();
       yield* FiberHandle.run(
         cleanup,
-        inputs.sweep().pipe(
+        Effect.andThen(understanding.sweep(), inputs.sweep()).pipe(
           Effect.catch(() => Effect.logError("Media input cleanup failed")),
           Effect.repeat(Schedule.spaced("1 minute")),
           Effect.asVoid,
         ),
       );
       yield* db.run(q.interruptGenerations({ problem: t("server.media.restarted"), now: yield* Clock.currentTimeMillis }));
+      yield* speech.restore();
+      yield* audio.restore();
       yield* publish();
       yield* Effect.forEach(yield* db.run(q.pendingGenerations()), (row) => (row.phase === "downloading" ? run(row.id, download(row.id)) : Effect.void), {
         discard: true,

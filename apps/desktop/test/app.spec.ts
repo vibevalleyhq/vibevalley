@@ -116,6 +116,61 @@ test("the desktop app shows the live board and sends a notice", async () => {
   await expect(fetch(server + pathOf("server.health.get"), { method: "POST" })).rejects.toThrow();
 });
 
+test("regression: desktop media permissions allow virtual devices and release a refused visual session without offering screen capture", async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-media-")));
+  const app = await electron.launch({
+    args: [`--user-data-dir=${join(dir, "electron")}`, "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", join(import.meta.dirname, "..")],
+    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work") },
+  });
+  let server = "";
+  try {
+    const page = await app.firstWindow();
+    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/u, { timeout: 45_000 });
+    server = new URL(page.url()).origin;
+    expect(await page.evaluate(() => window.vibevalleyHost?.name)).toBe("desktop");
+    await page.addInitScript(() => {
+      const acquire = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = async (constraints) => {
+        const stream = await acquire(constraints);
+        document.documentElement.dataset.captureOpened = String(Number(document.documentElement.dataset.captureOpened ?? 0) + 1);
+        for (const track of stream.getTracks()) {
+          const stop = track.stop.bind(track);
+          track.stop = () => {
+            if (track.readyState === "ended") return;
+            stop();
+            document.documentElement.dataset.captureState = track.readyState;
+            document.documentElement.dataset.captureStopped = String(Number(document.documentElement.dataset.captureStopped ?? 0) + 1);
+          };
+        }
+        return stream;
+      };
+    });
+    await page.goto(server + "/settings/moss");
+    await expect(page.getByTestId("vision-start")).toBeEnabled();
+    await page.getByTestId("vision-line").getByTestId("visual-source").click();
+    await expect(page.locator('[role="option"][data-key="screen"]')).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await page.getByTestId("vision-start").click();
+    await expect(page.locator("html")).toHaveAttribute("data-capture-opened", "1");
+    await expect(page.getByTestId("vision-line")).toHaveAttribute("data-state", "error");
+    await expect(page.locator("html")).toHaveAttribute("data-capture-stopped", "1");
+    await expect(page.locator("html")).toHaveAttribute("data-capture-state", "ended");
+    const microphone = await page.evaluate(async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const tracks = stream.getTracks();
+      const before = tracks.map((track) => ({ kind: track.kind, state: track.readyState }));
+      for (const track of tracks) track.stop();
+      return { before, after: tracks.map((track) => ({ kind: track.kind, state: track.readyState })) };
+    });
+    expect(microphone).toEqual({ before: [{ kind: "audio", state: "live" }], after: [{ kind: "audio", state: "ended" }] });
+    await expect(page.locator("html")).toHaveAttribute("data-capture-stopped", "2");
+    await page.screenshot({ path: test.info().outputPath("desktop-moss-media.png") });
+  } finally {
+    await app.close();
+  }
+  await expect(fetch(server + pathOf("server.health.get"), { method: "POST" })).rejects.toThrow();
+});
+
 test("the window opens on the bar at once, and says there why the server could not start", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   // A file where the farm's home should be: the server cannot start in it.

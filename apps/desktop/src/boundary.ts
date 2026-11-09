@@ -19,6 +19,20 @@ export function navigationOf(to: string, server: string | undefined): "stay" | "
   return target.protocol === "http:" || target.protocol === "https:" ? "browser" : "block";
 }
 
+export function pagePermission(
+  permission: string,
+  requestingUrl: string,
+  server: string | undefined,
+  isMainFrame: boolean,
+  mediaTypes: readonly string[] = [],
+): boolean {
+  if (!isMainFrame || server === undefined || !URL.canParse(requestingUrl)) return false;
+  const url = new URL(requestingUrl);
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || navigationOf(requestingUrl, server) !== "stay") return false;
+  if (permission === "clipboard-sanitized-write") return true;
+  return permission === "media" && mediaTypes.length > 0 && mediaTypes.every((type) => type === "audio" || type === "video");
+}
+
 const within = (path: string, root: string) => {
   const r = relative(root, path);
   return r === "" || (!r.startsWith("..") && !isAbsolute(r) && !r.split(sep).includes(".."));

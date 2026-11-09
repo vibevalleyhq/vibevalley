@@ -1,19 +1,24 @@
+import { createHash } from "node:crypto";
+
 import { Clock, Effect, Fiber, FiberMap, Option, Schema, Semaphore } from "effect";
 import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 import { prepareMossUnderstanding, understandMossMedia } from "@vibevalley/provider/moss/understanding";
 
 import { type ApiError, refused } from "#/base/errors.ts";
+import { Channel } from "#/channel/channel.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { Provider } from "#/provider/provider.ts";
+import { Provider, type UnderstandingAccount } from "#/provider/provider.ts";
 import * as q from "#db/media_understanding.sql.ts";
 
 import type { makeInputs } from "./inputs.ts";
+import type { MediaCaller } from "./media.ts";
 import type { makeRemoteFiles } from "./remoteFiles.ts";
 
 interface Ports {
@@ -23,20 +28,31 @@ interface Ports {
   slots: Semaphore.Semaphore;
   publish: () => Effect.Effect<void, ApiError>;
   capacity: () => Effect.Effect<void, ApiError>;
-  imageExists: (id: string) => Effect.Effect<boolean>;
+  otherExists: (id: string) => Effect.Effect<boolean>;
 }
+
+const Authorization = Schema.Struct({
+  channel: Schema.NonEmptyString,
+  expiresAt: Schema.Finite,
+  fingerprint: Schema.String,
+});
 
 export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
   const provider = yield* Provider;
+  const channels = yield* Channel;
   const http = yield* HttpClient.HttpClient;
   const fibers = yield* FiberMap.make<string, void, ApiError>();
   const cleanupSlot = yield* Semaphore.make(1);
-  const active = (phase: T.MediaUnderstandingPhase) => phase === "queued" || phase === "uploading" || phase === "generating";
+  const active = (phase: T.MediaUnderstandingPhase) => phase === "authorized" || phase === "queued" || phase === "uploading" || phase === "generating";
   const terminal: readonly T.MediaUnderstandingPhase[] = ["ready", "incomplete", "failed", "unknown", "canceled"];
   const invalid = () => refused(t("server.media.inputInvalid"));
   const request = (row: q.UnderstandingResult) =>
     Schema.decodeEffect(Schema.fromJsonString(S.MediaUnderstandingRequest))(row.request).pipe(Effect.mapError(invalid));
+  const authorization = (row: q.UnderstandingResult) =>
+    row.authorization === null
+      ? Effect.succeed(null)
+      : Schema.decodeEffect(Schema.fromJsonString(Authorization))(row.authorization).pipe(Effect.mapError(invalid));
   const found = Effect.fnUntraced(function* (id: string) {
     const row = yield* db.one(q.understanding({ id }));
     if (!row) return yield* Effect.fail(refused(t("server.media.missing")));
@@ -44,6 +60,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
   });
   const view = Effect.fnUntraced(function* (row: q.UnderstandingResult): Effect.fn.Return<T.MediaUnderstandingJob, ApiError> {
     const input = yield* request(row);
+    const approval = yield* authorization(row);
     return {
       kind: "understanding",
       id: row.id,
@@ -52,7 +69,8 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       model: row.model,
       connection: row.connection,
       revision: row.revision,
-      source: { kind: "owner" },
+      source: yield* Schema.decodeEffect(Schema.fromJsonString(S.MediaSource))(row.source).pipe(Effect.mapError(invalid)),
+      authorization: approval ? { channel: approval.channel, expiresAt: approval.expiresAt } : null,
       phase: row.phase,
       phaseText: t(`server.media.understandingPhase.${row.phase}`),
       problem: row.problem,
@@ -74,7 +92,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     function* (
       id: string,
       before: readonly T.MediaUnderstandingPhase[],
-      patch: Partial<Pick<q.UnderstandingResult, "phase" | "result" | "cleanup" | "problem">>,
+      patch: Partial<Pick<q.UnderstandingResult, "phase" | "source" | "result" | "cleanup" | "problem">>,
     ) {
       const row = yield* found(id);
       if (!before.includes(row.phase)) return false;
@@ -109,6 +127,136 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     );
   }, cleanupSlot.withPermits(1));
 
+  const approvedAccount = Effect.fnUntraced(function* (row: q.UnderstandingResult) {
+    const approval = yield* authorization(row);
+    const account = yield* provider.understanding();
+    if (
+      !approval ||
+      approval.expiresAt <= (yield* Clock.currentTimeMillis) ||
+      account.connection !== row.connection ||
+      account.revision !== row.revision ||
+      account.model !== row.model ||
+      createHash("sha256").update(account.key).digest("hex") !== approval.fingerprint
+    )
+      return yield* Effect.fail(refused(t("server.media.consentChanged")));
+    return account;
+  });
+  const expire = Effect.fnUntraced(function* (id: string) {
+    if (yield* change(id, ["authorized", "queued"], { phase: "canceled", cleanup: "done", problem: t("server.media.authorizationExpired") }))
+      yield* ports.inputs.release(id);
+  });
+  const enqueue = Effect.fnUntraced(function* (row: q.UnderstandingResult, account: UnderstandingAccount) {
+    const input = yield* request(row);
+    const references = (yield* view(row)).inputs;
+    const work = Effect.gen(function* () {
+      if (row.authorization !== null) {
+        const valid = yield* approvedAccount(row).pipe(
+          Effect.as(true),
+          Effect.catch(() => Effect.succeed(false)),
+        );
+        if (!valid) return yield* expire(input.id);
+      }
+      if (!(yield* change(input.id, ["queued"], { phase: "uploading" }))) return;
+      const media = yield* Effect.forEach(references, (item) =>
+        Effect.gen(function* () {
+          return { kind: item.kind, fileId: yield* ports.remote.upload(input.id, item.id, account) };
+        }),
+      );
+      if (!(yield* change(input.id, ["uploading"], { phase: "generating" }))) return;
+      const { id: _responseId, ...result } = yield* understandMossMedia(account.key, {
+        model: account.model,
+        text: input.prompt,
+        media,
+        maxOutputTokens: input.maxOutputTokens,
+      }).pipe(Effect.provideService(HttpClient.HttpClient, http));
+      if (
+        yield* change(input.id, ["generating"], {
+          phase: result.status === "completed" ? "ready" : "incomplete",
+          result: JSON.stringify(result),
+          cleanup: "running",
+          problem: "",
+        })
+      )
+        yield* clean(input.id);
+    }).pipe(
+      Effect.catchTag("MossUnderstandingError", (error) =>
+        change(input.id, ["generating"], {
+          phase: error.outcome === "Unknown" ? "unknown" : "failed",
+          problem: error.outcome === "Unknown" ? t("server.media.understandingUnknown") : t("server.media.understandingRejected"),
+        }),
+      ),
+      Effect.catch(() =>
+        Effect.gen(function* () {
+          const uncertain = (yield* ports.remote.list(input.id)).some((row) => row.phase === "unknown" || row.phase === "uploading");
+          yield* change(input.id, ["uploading"], {
+            phase: uncertain ? "unknown" : "failed",
+            problem: uncertain ? t("server.media.remoteUploadUnknown") : t("server.media.remoteUploadRejected"),
+          });
+        }),
+      ),
+      Effect.onError(() =>
+        change(input.id, ["uploading", "generating"], { phase: "unknown", problem: t("server.media.understandingUnknown") }).pipe(
+          bestEffort("Media understanding interruption could not be recorded"),
+        ),
+      ),
+      Effect.asVoid,
+    );
+    yield* FiberMap.run(fibers, input.id, ports.slots.withPermits(1)(work));
+  });
+  const create = Effect.fn("Media.createUnderstanding")(
+    function* (given: T.MediaUnderstandingRequest, channel: string | null) {
+      const input = yield* Schema.decodeEffect(S.MediaUnderstandingRequest)(given).pipe(Effect.mapError(invalid));
+      const existing = yield* db.one(q.understanding({ id: input.id }));
+      if (existing) {
+        if (!same(yield* request(existing), input) || (yield* authorization(existing))?.channel !== (channel ?? undefined))
+          return yield* Effect.fail(refused(t("server.media.reusedId")));
+        return yield* view(existing);
+      }
+      if (yield* ports.otherExists(input.id)) return yield* Effect.fail(refused(t("server.media.reusedId")));
+      yield* ports.capacity();
+      const account = yield* provider.understanding();
+      if (input.connection !== account.connection || input.revision !== account.revision) return yield* Effect.fail(refused(t("server.media.consentChanged")));
+      if (channel !== null && (yield* channels.placeOf(ownerId, channel)) !== channel) return yield* Effect.fail(invalid());
+      const references = yield* Effect.forEach(input.inputs, (id) =>
+        ports.inputs.get(id).pipe(Effect.flatMap(Schema.decodeUnknownEffect(S.MediaInputReference)), Effect.mapError(invalid)),
+      );
+      yield* prepareMossUnderstanding({
+        model: account.model,
+        text: input.prompt,
+        maxOutputTokens: input.maxOutputTokens,
+        media: references.map((item) => ({ kind: item.kind, fileId: item.id })),
+      }).pipe(Effect.mapError(invalid));
+      const now = yield* Clock.currentTimeMillis;
+      yield* ports.inputs.pin(
+        input.inputs,
+        input.id,
+        db.run(
+          q.insertUnderstanding({
+            id: input.id,
+            request: JSON.stringify(input),
+            inputs: JSON.stringify(references),
+            source: JSON.stringify({ kind: "owner" }),
+            authorization:
+              channel === null
+                ? null
+                : JSON.stringify({ channel, expiresAt: now + 15 * 60_000, fingerprint: createHash("sha256").update(account.key).digest("hex") }),
+            connection: account.connection,
+            revision: account.revision,
+            model: account.model,
+            phase: channel === null ? "queued" : "authorized",
+            now,
+          }),
+        ),
+      );
+      yield* ports.publish();
+      const row = yield* found(input.id);
+      if (channel === null) yield* enqueue(row, account);
+      return yield* view(row);
+    },
+    ports.lock.withPermits(1),
+    Effect.uninterruptible,
+  );
+
   return {
     get,
     has: (id: string) => db.one(q.understanding({ id })).pipe(Effect.map((row) => row !== undefined)),
@@ -116,104 +264,59 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     list: Effect.fn("Media.understandingList")(function* () {
       return yield* Effect.forEach(yield* db.run(q.recentUnderstanding()), view);
     }),
-    create: Effect.fn("Media.createUnderstanding")(function* (given: T.MediaUnderstandingRequest) {
-      const input = yield* Schema.decodeEffect(S.MediaUnderstandingRequest)(given).pipe(Effect.mapError(invalid));
-      return yield* ports.lock.withPermits(1)(
-        Effect.gen(function* () {
-          const existing = yield* db.one(q.understanding({ id: input.id }));
-          if (existing) {
-            if (!same(yield* request(existing), input)) return yield* Effect.fail(refused(t("server.media.reusedId")));
-            return yield* view(existing);
-          }
-          if (yield* ports.imageExists(input.id)) return yield* Effect.fail(refused(t("server.media.reusedId")));
-          yield* ports.capacity();
-          const account = yield* provider.understanding();
-          if (input.connection !== account.connection || input.revision !== account.revision)
-            return yield* Effect.fail(refused(t("server.media.consentChanged")));
-          const references = yield* Effect.forEach(input.inputs, (id) =>
-            ports.inputs.get(id).pipe(Effect.flatMap(Schema.decodeUnknownEffect(S.MediaInputReference)), Effect.mapError(invalid)),
-          );
-          yield* prepareMossUnderstanding({
-            model: account.model,
-            text: input.prompt,
-            maxOutputTokens: input.maxOutputTokens,
-            media: references.map((item) => ({ kind: item.kind, fileId: item.id })),
-          }).pipe(Effect.mapError(invalid));
-          yield* ports.inputs.pin(
-            input.inputs,
-            input.id,
-            Effect.gen(function* () {
-              yield* db.run(
-                q.insertUnderstanding({
-                  id: input.id,
-                  request: JSON.stringify(input),
-                  inputs: JSON.stringify(references),
-                  connection: account.connection,
-                  revision: account.revision,
-                  model: account.model,
-                  now: yield* Clock.currentTimeMillis,
-                }),
-              );
-            }),
-          );
-          yield* ports.publish();
-          const work = Effect.gen(function* () {
-            if (!(yield* change(input.id, ["queued"], { phase: "uploading" }))) return;
-            const media = yield* Effect.forEach(references, (item) =>
-              Effect.gen(function* () {
-                return { kind: item.kind, fileId: yield* ports.remote.upload(input.id, item.id, account) };
-              }),
-            );
-            if (!(yield* change(input.id, ["uploading"], { phase: "generating" }))) return;
-            const { id: _responseId, ...result } = yield* understandMossMedia(account.key, {
-              model: account.model,
-              text: input.prompt,
-              media,
-              maxOutputTokens: input.maxOutputTokens,
-            }).pipe(Effect.provideService(HttpClient.HttpClient, http));
-            if (
-              yield* change(input.id, ["generating"], {
-                phase: result.status === "completed" ? "ready" : "incomplete",
-                result: JSON.stringify(result),
-                cleanup: "running",
-                problem: "",
-              })
-            )
-              yield* clean(input.id);
-          }).pipe(
-            Effect.catchTag("MossUnderstandingError", (error) =>
-              change(input.id, ["generating"], {
-                phase: error.outcome === "Unknown" ? "unknown" : "failed",
-                problem: error.outcome === "Unknown" ? t("server.media.understandingUnknown") : t("server.media.understandingRejected"),
-              }),
-            ),
-            Effect.catch(() =>
-              Effect.gen(function* () {
-                const uncertain = (yield* ports.remote.list(input.id)).some((row) => row.phase === "unknown" || row.phase === "uploading");
-                yield* change(input.id, ["uploading"], {
-                  phase: uncertain ? "unknown" : "failed",
-                  problem: uncertain ? t("server.media.remoteUploadUnknown") : t("server.media.remoteUploadRejected"),
-                });
-              }),
-            ),
-            Effect.onError(() =>
-              change(input.id, ["uploading", "generating"], { phase: "unknown", problem: t("server.media.understandingUnknown") }).pipe(
-                bestEffort("Media understanding interruption could not be recorded"),
-              ),
-            ),
-            Effect.asVoid,
-          );
-          yield* FiberMap.run(fibers, input.id, ports.slots.withPermits(1)(work));
-          return yield* get(input.id);
-        }).pipe(Effect.uninterruptible),
-      );
+    create: (input: T.MediaUnderstandingRequest) => create(input, null),
+    authorize: Effect.fn("Media.authorizeUnderstanding")(function* (given: T.MediaUnderstandingAuthorizationRequest) {
+      const { channel, ...input } = yield* Schema.decodeEffect(S.MediaUnderstandingAuthorizationRequest)(given).pipe(Effect.mapError(invalid));
+      return yield* create(input, channel);
+    }),
+    start: Effect.fn("Media.startUnderstanding")(
+      function* (id: string, caller: MediaCaller) {
+        if (caller.kind !== "orchestrator" || !caller.forOwner) return yield* Effect.fail(refused(t("server.media.ownerRequired")));
+        const row = yield* found(id);
+        const approval = yield* authorization(row);
+        if (!approval || approval.channel !== caller.channel) return yield* Effect.fail(refused(t("server.media.authorizationRequired")));
+        const source: T.MediaSource = { kind: "orchestrator", agent: caller.agent, channel: caller.channel };
+        if (row.phase !== "authorized") {
+          const existing = yield* view(row);
+          if (existing.source.kind === "orchestrator" && !same(existing.source, source))
+            return yield* Effect.fail(refused(t("server.media.authorizationRequired")));
+          return existing;
+        }
+        const account = yield* approvedAccount(row);
+        yield* channels.placeOf(ownerId, approval.channel);
+        const next = { ...row, source: JSON.stringify(source), phase: "queued" as const };
+        yield* db.run(q.changeUnderstanding({ ...next, now: yield* Clock.currentTimeMillis }));
+        yield* ports.publish();
+        yield* enqueue(next, account);
+        return yield* view(next);
+      },
+      ports.lock.withPermits(1),
+      Effect.uninterruptible,
+    ),
+    sweep: Effect.fn("Media.understandingSweep")(function* () {
+      const now = yield* Clock.currentTimeMillis;
+      for (const row of yield* db.run(q.activeUnderstanding())) {
+        if (row.phase !== "authorized") continue;
+        const approval = yield* authorization(row);
+        if (approval && approval.expiresAt <= now) yield* expire(row.id);
+      }
     }),
     cancel: Effect.fn("Media.understandingCancel")(function* (id: string) {
       const fiber = yield* ports.lock.withPermits(1)(
         Effect.gen(function* () {
           const row = yield* found(id);
           if (!active(row.phase)) return Option.none();
-          yield* db.run(q.changeUnderstanding({ ...row, phase: "canceled", problem: t("server.media.canceled"), now: yield* Clock.currentTimeMillis }));
+          const unsubmitted = row.phase === "authorized" || row.phase === "queued";
+          yield* db.run(
+            q.changeUnderstanding({
+              ...row,
+              phase: "canceled",
+              cleanup: unsubmitted ? "done" : row.cleanup,
+              problem: t("server.media.canceled"),
+              now: yield* Clock.currentTimeMillis,
+            }),
+          );
+          if (unsubmitted) yield* ports.inputs.release(id);
           yield* ports.publish();
           return FiberMap.getUnsafe(fibers, id);
         }).pipe(Effect.uninterruptible),
@@ -264,7 +367,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       const before = yield* db.run(q.activeUnderstanding());
       yield* db.run(q.interruptUnderstanding({ now: yield* Clock.currentTimeMillis, problem: t("server.media.restarted") }));
       yield* Effect.forEach(
-        before.filter((row) => row.phase === "queued"),
+        before.filter((row) => row.phase === "authorized" || row.phase === "queued"),
         (row) => ports.inputs.release(row.id),
         { discard: true },
       );

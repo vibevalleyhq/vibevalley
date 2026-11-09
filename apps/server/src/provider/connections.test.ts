@@ -8,7 +8,7 @@ import { emptyProviders } from "#/setting/provider.ts";
 import { connectionsOver } from "./connections.ts";
 
 const connection: ProviderConnectionUpdate = { id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-key" };
-const update: ProviderUpdate = { revision: 0, connections: [connection], dictation: null, image: null, understanding: null, speech: null, live: null };
+const update: ProviderUpdate = { ...emptyProviders, connections: [connection] };
 
 it.effect.each([
   { ...update, connections: [connection, connection] },
@@ -19,7 +19,7 @@ it.effect.each([
   { ...update, connections: [{ ...connection, key: "a b" }] },
   { ...update, connections: [{ ...connection, key: "x".repeat(4097) }] },
   { ...update, connections: Array.from({ length: 33 }, (_, index) => ({ ...connection, id: `connection-${index}` })) },
-  { ...update, live: "missing" },
+  { ...update, live: { connection: "missing", model: "moss-live-1.0" } },
   { ...update, speech: { connection: "missing", model: "moss-tts-1.5-flash" } },
   { ...update, speech: { connection: "moss", model: "moss-ttsd-1.0" } },
   { ...update, speech: { connection: "moss", model: "moss-tts-1.5-flash-2099-01-01" } },
@@ -35,7 +35,6 @@ it.effect.each([
     const error = yield* connectionsOver(emptyProviders, input).pipe(Effect.flip);
     expect(error._tag).toBe("SettingRefused");
     expect(error.message).not.toContain("test-key");
-    expect(emptyProviders).toEqual({ revision: 0, connections: [], dictation: null, image: null, understanding: null, speech: null, live: null });
   }),
 );
 
@@ -50,6 +49,10 @@ it.effect("new unconfigured connections can be saved without implying any usable
       understanding: null,
       speech: null,
       live: null,
+      speakers: null,
+      voiceDesign: null,
+      transcription: null,
+      vision: null,
     });
   }),
 );

@@ -13,91 +13,112 @@ import { type VoiceDriver, type VoicePhase, type VoiceTurn } from "./contract.ts
 import { MossLine } from "./moss-line.ts";
 
 // A call's line on MOSS Live over local WebSocket (/api/v1/voice/moss/line): needs no Agora credentials or tunnel.
-const mossRtc: Rtc = async (_grant, on) => {
-  const moss = new MossLine({
-    closed: () => t("web.voice.moss.closed"),
-    noMic: () => t("web.voice.call.noMic"),
-    formatError: messageOf,
-  });
-  let connected = false;
-  let gone = false;
-  let lastMic = 0;
-  let lastMoss = 0;
-  let lastState = "";
-  let nextTurnId = 1;
-  const turnIds = new Map<number, number>();
-  const sentTurns = new Map<number, { text: string; done: boolean }>();
+const mossRtc =
+  (signal: AbortSignal): Rtc =>
+  async (_grant, on) => {
+    const moss = new MossLine({
+      closed: () => t("web.voice.moss.closed"),
+      noMic: () => t("web.voice.call.noMic"),
+      formatError: messageOf,
+    });
+    let connected = false;
+    let gone = false;
+    let lastMic = 0;
+    let lastMoss = 0;
+    let lastState = "";
+    let nextTurnId = 1;
+    const sentTurns = new Map<string, { id: number; text: string; done: boolean }>();
 
-  return new Promise<RtcLine>((resolve, reject) => {
-    const off = moss.subscribe(() => {
-      if (gone) return;
-      if (moss.micLevel !== lastMic || moss.mossLevel !== lastMoss) {
-        lastMic = moss.micLevel;
-        lastMoss = moss.mossLevel;
-        on.levels(lastMic, lastMoss);
-      }
-      const nextState = moss.mossLevel > 0 ? "speaking" : "listening";
-      if (connected && nextState !== lastState) {
-        lastState = nextState;
-        on.stream(JSON.stringify({ object: "message.state", state: nextState }));
-      }
-      moss.turns.forEach((turn, idx) => {
-        let turnId = turnIds.get(idx);
-        if (turnId === undefined) {
-          turnId = nextTurnId++;
-          turnIds.set(idx, turnId);
+    return new Promise<RtcLine>((resolve, reject) => {
+      const abort = () => moss.end();
+      const off = moss.subscribe(() => {
+        if (gone) return;
+        if (moss.micLevel !== lastMic || moss.mossLevel !== lastMoss) {
+          lastMic = moss.micLevel;
+          lastMoss = moss.mossLevel;
+          on.levels(lastMic, lastMoss);
         }
-        const prev = sentTurns.get(idx);
-        if (prev && prev.text === turn.text && prev.done === turn.done) return;
-        sentTurns.set(idx, { text: turn.text, done: turn.done });
-        if (turn.who === "owner") {
-          on.stream(
-            JSON.stringify({
-              object: "user.transcription",
-              turn_id: turnId,
-              text: turn.text,
-              final: turn.done,
-            }),
-          );
-        } else {
-          on.stream(
-            JSON.stringify({
-              object: "assistant.transcription",
-              turn_id: turnId,
-              text: turn.text,
-              turn_status: turn.done ? 1 : 0,
-            }),
-          );
+        const nextState = moss.mossLevel > 0 ? "speaking" : "listening";
+        if (connected && nextState !== lastState) {
+          lastState = nextState;
+          on.stream(JSON.stringify({ object: "message.state", state: nextState }));
+        }
+        moss.turns.forEach((turn) => {
+          const key = `${turn.who}:${turn.key}`;
+          let prev = sentTurns.get(key);
+          if (!prev && turn.key) {
+            const unnamedKey = `${turn.who}:`;
+            const unnamed = sentTurns.get(unnamedKey);
+            if (unnamed && !moss.turns.some((entry) => entry.who === turn.who && !entry.key)) {
+              prev = unnamed;
+              sentTurns.delete(unnamedKey);
+              sentTurns.set(key, unnamed);
+            }
+          }
+          if (prev && prev.text === turn.text && prev.done === turn.done) return;
+          const turnId = prev?.id ?? nextTurnId++;
+          sentTurns.set(key, { id: turnId, text: turn.text, done: turn.done });
+          if (turn.who === "owner") {
+            on.stream(
+              JSON.stringify({
+                object: "user.transcription",
+                turn_id: turnId,
+                text: turn.text,
+                final: turn.done,
+              }),
+            );
+          } else {
+            on.stream(
+              JSON.stringify({
+                object: "assistant.transcription",
+                turn_id: turnId,
+                text: turn.text,
+                turn_status: turn.done ? 1 : 0,
+              }),
+            );
+          }
+        });
+        while (sentTurns.size > moss.turns.length) {
+          const oldest = sentTurns.keys().next().value;
+          if (oldest === undefined) break;
+          sentTurns.delete(oldest);
+        }
+
+        if (!connected && moss.phase === "live") {
+          connected = true;
+          signal.removeEventListener("abort", abort);
+          on.joined();
+          resolve({
+            mute: async (muted) => {
+              moss.mute(muted);
+            },
+            renew: async () => {},
+            leave: async () => {
+              gone = true;
+              off();
+              moss.end();
+            },
+          });
+        } else if (moss.phase === "idle") {
+          signal.removeEventListener("abort", abort);
+          off();
+          if (!connected) {
+            reject(new Error(moss.problem || t("web.voice.moss.closed")));
+          } else if (!gone) {
+            if (moss.problem) on.problem(moss.problem);
+            on.left();
+          }
         }
       });
-
-      if (!connected && moss.phase === "live") {
-        connected = true;
-        on.joined();
-        resolve({
-          mute: async (muted) => {
-            moss.mute(muted);
-          },
-          renew: async () => {},
-          leave: async () => {
-            gone = true;
-            off();
-            moss.end();
-          },
-        });
-      } else if (moss.phase === "idle") {
+      if (signal.aborted) {
         off();
-        if (!connected) {
-          reject(new Error(moss.problem || t("web.voice.moss.closed")));
-        } else if (!gone) {
-          if (moss.problem) on.problem(moss.problem);
-          on.left();
-        }
+        reject(new Cancelled());
+        return;
       }
+      signal.addEventListener("abort", abort, { once: true });
+      void moss.start({ persona: "", instructions: "" });
     });
-    void moss.start({ persona: "", instructions: "" });
-  });
-};
+  };
 
 // A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop, a browser).
 const webRtc: Rtc = async (grant, on) => {
@@ -258,7 +279,14 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
 
   private async run(about?: string) {
     let cancelled = false;
-    const stop = new Promise<never>((_, reject) => (this.cancel = () => ((cancelled = true), reject(new Cancelled()))));
+    const controller = new AbortController();
+    const stop = new Promise<never>((_resolve, reject) => {
+      this.cancel = () => {
+        cancelled = true;
+        controller.abort();
+        reject(new Cancelled());
+      };
+    });
     stop.catch(() => undefined);
     const until = <T>(p: Promise<T>) => Promise.race([p, stop]);
     this.set("connecting", "");
@@ -266,11 +294,16 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
       const session = await until(api.voice.grant.create());
       let line: RtcLine | undefined;
       const mine = () => !cancelled && this.line === line;
-      const transport = session.appId === "moss" ? mossRtc : (currentHost().rtc ?? webRtc);
+      const transport = session.appId === "moss" ? mossRtc(controller.signal) : (currentHost().rtc ?? webRtc);
       line = await until(
         transport(session, {
           joined: () => mine() && ((this.agentHere = true), this.changed()),
-          left: () => mine() && ((this.agentHere = false), this.changed()),
+          left: () => {
+            if (!mine()) return;
+            this.agentHere = false;
+            if (session.appId === "moss") void this.end();
+            else this.changed();
+          },
           stream: (text) => mine() && this.captions.feed(text) && this.changed(),
           levels: (mic, orchestrator) => {
             if (!mine()) return;

@@ -41,7 +41,9 @@ const testRuntimes = Effect.gen(function* () {
 const main = Effect.gen(function* () {
   const loaded = yield* loadConfig(flags.config);
   const config = flags.web ? { ...loaded, web: flags.web } : loaded;
-  const runtime = testRuntimesAsked ? yield* testRuntimes : undefined;
+  const options = testRuntimesAsked
+    ? { runtime: yield* testRuntimes, voice: { moss: (yield* Effect.promise(() => import("./testing/realtime.ts"))).realtimeFixture } }
+    : {};
   const network = testRuntimesAsked
     ? (yield* Effect.promise(() => import("./testing/network.ts"))).network
     : Layer.merge(FetchHttpClient.layer, PublicHttp.layer);
@@ -75,7 +77,7 @@ const main = Effect.gen(function* () {
         withdraw = announce(config.home, `http://${address}`);
         if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid } satisfies ServerReady) + "\n");
       }),
-    runtime ? { runtime } : {},
+    options,
   );
   // With otlp.url the services' spans (Effect.fn), logs and metrics go to that collector; without it nothing is sent.
   const observed = config.otlp.url

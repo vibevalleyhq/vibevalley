@@ -83,6 +83,10 @@ for (const theme of ["light", "dark"] as const)
       image: { connection: "media-audit", model: "moss-image-sft-1.0" },
       understanding: null,
       speech: null,
+      speakers: null,
+      voiceDesign: null,
+      transcription: null,
+      vision: null,
     });
     const input = { format: "text", width: 256, height: 256, enhance: false, watermark: true } as const;
     const ready = await api.media.image.create({ ...input, id: `audit-ready-${theme}`, prompt: "A generated image fixture" });
@@ -119,10 +123,14 @@ for (const theme of ["light", "dark"] as const)
       revision: current.revision,
       connections: [{ id: "image-audit", name: "MOSS image account", adapter: "moss", enabled: true, key: "test-audit-key-1234" }],
       dictation: null,
-      live: null,
+      live: { connection: "image-audit", model: "moss-live-1.0" },
       image: { connection: "image-audit", model: "moss-image-sft-1.0-2026-10-09" },
       understanding: { connection: "image-audit", model: "moss-vl-1.0-2026-07-08" },
       speech: { connection: "image-audit", model: "moss-tts-1.0-pro-2026-02-07" },
+      speakers: { connection: "image-audit", model: "moss-ttsd-1.0" },
+      voiceDesign: { connection: "image-audit", model: "moss-voice-generator-1.0" },
+      transcription: { connection: "image-audit", model: "moss-transcribe-diarize-pro" },
+      vision: { connection: "image-audit", model: "moss-vl-realtime-1.0" },
     });
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
     await page.goto("/settings/providers");

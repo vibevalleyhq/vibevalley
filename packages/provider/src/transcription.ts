@@ -2,7 +2,9 @@ import type { TranscriptionModelV4 } from "@ai-sdk/provider";
 import { type Cause, Clock, Effect, FiberSet, Schema } from "effect";
 import { HttpBody, HttpClient, type HttpClientError } from "effect/http";
 
-export const mossTranscription = { url: "https://api.mosi.cn/v1", models: ["moss-transcribe-1.0", "moss-transcribe-diarize-pro"] } as const;
+import { mossTranscriptionModels } from "./moss/transcription-models.ts";
+
+export const mossTranscription = { url: "https://api.mosi.cn/v1", models: mossTranscriptionModels } as const;
 const transcriptionFormats = {
   wav: "audio/wav",
   m4a: "audio/mp4",

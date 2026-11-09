@@ -138,10 +138,11 @@ export const tabbable =
 /** Once the positioner is placed, gives the focus to what `target` picks in the popup. */
 export function focusWhenPlaced(c: FloatingParts, popup: Accessor<HTMLElement | undefined>, target: (popup: HTMLElement) => HTMLElement) {
   createEffect(
-    () => (c.placed() ? popup() : undefined),
-    (el) => {
+    () => {
+      const el = c.placed() ? popup() : undefined;
       // The target is an opening-time snapshot; value changes must not steal focus again.
-      if (el) untrack(() => target(el)).focus({ preventScroll: true });
+      return el ? untrack(() => target(el)) : undefined;
     },
+    (el) => el?.focus({ preventScroll: true }),
   );
 }

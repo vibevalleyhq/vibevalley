@@ -5,18 +5,14 @@ import { Effect, Schema, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { makeBrain } from "@vibevalley/agent/brain";
-import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, transcript } from "@vibevalley/agent/messages";
 import { deepseek } from "@vibevalley/ai/client";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { orchestrator } from "#/base/actor.ts";
 import { standaloneLlm } from "#/chat/chat.ts";
-import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "#/testing/evals.ts";
-import { world } from "#/testing/world.ts";
-import { Tool } from "#/tool/tool.ts";
+import { casesIn, check, committed, type EvalCase, isInput, replaySetup, replayWorld } from "#/testing/evals.ts";
 
 import { agentPrompt, systemPrompt } from "./prompts.ts";
 
@@ -25,33 +21,23 @@ const key = process.env.DEEPSEEK_API_KEY ?? "";
 
 class EvalFailure extends Schema.TaggedError<EvalFailure, { readonly brand: unique symbol }>()("EvalFailure", { message: Schema.String }) {}
 
-/** The orchestrator's tool definitions, from a farm that is let go at once: every call is answered by stubs. */
-const orchestratorTools = () =>
-  Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const t = yield* Tool;
-        return t.orchestrator(() => ({ agent: defaultOrchestrator, session: "", repo: "", here: "", picked: "", envelope: "", actor: orchestrator(true) }));
-      }).pipe(Effect.provide(world())),
-    ),
-  );
-
 /** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
-function replay(c: EvalCase, model: string, tools: readonly LoopTool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
+function replay(c: EvalCase, model: string): Promise<{ turn: BrainMessage[]; tokens: number }> {
   const home = tempDir("vibevalley-eval-");
   writeFileSync(memoryFile(home), c.memory);
   writeFileSync(join(home, defaultOrchestrator + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
   return Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
+        const setup = yield* replaySetup(c);
         const brain = yield* makeBrain({
           name: defaultOrchestrator,
           instructions: systemPrompt + agentPrompt,
           llm: deepseek(model, key, standaloneLlm()),
           home,
           cwd: home,
-          tools: stubbed(tools, c.did),
+          tools: setup.tools,
           noSkills: true,
           noSubagents: true,
           reminders: false,
@@ -60,7 +46,7 @@ function replay(c: EvalCase, model: string, tools: readonly LoopTool[]): Promise
         const turn: BrainMessage[] = [];
         let tokens = 0;
         yield* Effect.andThen(
-          brain.send(c.input),
+          brain.send(setup.input),
           events.pipe(
             Stream.takeUntil((event) => event.type === "agent_settled"),
             Stream.runForEach((event) =>
@@ -76,7 +62,7 @@ function replay(c: EvalCase, model: string, tools: readonly LoopTool[]): Promise
           ),
         ).pipe(Effect.timeoutOrElse({ duration: "5 minutes", orElse: () => new EvalFailure({ message: "the turn took too long" }) }));
         return { turn, tokens };
-      }),
+      }).pipe(Effect.provide(replayWorld(c))),
     ),
   );
 }
@@ -91,7 +77,6 @@ describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {
       ({ file }) => only.length === 0 || only.some((o) => basename(file).startsWith(o)),
     );
     expect(cases.length).toBeGreaterThan(0);
-    const tools = await orchestratorTools();
     const rows = ["| case | model | passed | tokens |", "|---|---|---|---|"];
     const short: string[] = [];
     for (const { file, case: c } of cases) {
@@ -105,7 +90,7 @@ describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {
       let tokens = 0;
       for (let i = 0; i < n; i++) {
         // oxlint-disable-next-line eslint/no-await-in-loop -- one request at a time to the live model, within its rate limit
-        const sample = await replay(c, model, tools);
+        const sample = await replay(c, model);
         tokens += sample.tokens;
         const missed = check(c.expect, sample.turn);
         if (missed.length === 0) passed++;

@@ -1,9 +1,16 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-import { Effect, FileSystem, Schema, Stream } from "effect";
+import { Effect, FileSystem, type PlatformError, Schema, type Scope, Stream } from "effect";
 
+import type * as T from "@vibevalley/protocol";
 import { MediaInputRequest } from "@vibevalley/protocol/schema";
+
+import type { ApiError } from "#/base/errors.ts";
+import { fileBlob } from "#/infra/files.ts";
+
+import { inspectAudio, inspectWave } from "./audioMetadata.ts";
+import { mp3Structure } from "./validateSpeechBytes.ts";
 
 class MediaInputRejected extends Schema.TaggedError<MediaInputRejected, { readonly brand: unique symbol }>()("MediaInputRejected", {
   reason: Schema.Literals(["Metadata", "Size", "Format", "Changed"]),
@@ -35,6 +42,18 @@ const matchesContainer = (mime: (typeof MediaInputRequest.Type)["mime"], prefix:
       return bytes.toString("latin1", 0, 4) === "RIFF" && bytes.toString("latin1", 8, 12) === "AVI ";
     case "video/webm":
     case "video/x-matroska":
+      return head.startsWith("1a45dfa3");
+    case "audio/wav":
+      return bytes.toString("latin1", 0, 4) === "RIFF" && bytes.toString("latin1", 8, 12) === "WAVE";
+    case "audio/mpeg":
+      return bytes.toString("latin1", 0, 3) === "ID3" || (bytes[0] === 255 && ((bytes[1] ?? 0) & 0xe0) === 0xe0);
+    case "audio/mp4":
+      return bytes.toString("latin1", 4, 8) === "ftyp";
+    case "audio/flac":
+      return bytes.toString("latin1", 0, 4) === "fLaC";
+    case "audio/ogg":
+      return bytes.toString("latin1", 0, 4) === "OggS";
+    case "audio/webm":
       return head.startsWith("1a45dfa3");
   }
 };
@@ -88,5 +107,108 @@ export const stageMediaInput = Effect.fn("Media.stageInput")(function* <E, R>(di
     Stream.run(fs.sink(path, { flag: "wx", mode: 0o600 })),
   );
   if (received !== input.size) return yield* new MediaInputRejected({ reason: "Size" });
+  if (input.kind === "audio") {
+    const audio = yield* inspectAudio(yield* fileBlob(path, input.mime)).pipe(Effect.mapError(() => new MediaInputRejected({ reason: "Format" })));
+    const mime = {
+      wav: "audio/wav",
+      mp3: "audio/mpeg",
+      m4a: "audio/mp4",
+      flac: "audio/flac",
+      aac: "audio/aac",
+      opus: "audio/ogg",
+      ogg: "audio/ogg",
+      webm: "audio/webm",
+    };
+    if (audio.duration > 3600 || mime[audio.format] !== input.mime) return yield* new MediaInputRejected({ reason: "Format" });
+  }
   return { ...input, path, hash: hash.digest("hex") };
+}, Effect.timeout("300 seconds"));
+
+export const audioResultMax = 512_000_000;
+const audioResultMime: Record<T.MediaAudioFormat, string> = {
+  wav: "audio/wav",
+  mp3: "audio/mpeg",
+  flac: "audio/flac",
+  pcm: "audio/pcm",
+  aac: "audio/aac",
+  opus: "audio/ogg",
+};
+
+export interface StagedAudioResult {
+  readonly path: string;
+  readonly hash: string;
+  readonly size: number;
+  readonly mime: string;
+  readonly name: string;
+  readonly metadata?: T.MediaAudioMetadata;
+}
+
+const audioBytes = (blob: Blob, start: number, end: number) =>
+  Effect.tryPromise({
+    try: () => blob.slice(start, end).arrayBuffer(),
+    catch: () => new MediaInputRejected({ reason: "Format" }),
+  }).pipe(Effect.map((bytes) => Buffer.from(bytes)));
+
+export const stageAudioResult = Effect.fn("Media.stageAudioResult")(function* (
+  directory: string,
+  name: string,
+  format: T.MediaAudioFormat,
+  source: Stream.Stream<Uint8Array, ApiError>,
+): Effect.fn.Return<StagedAudioResult, ApiError | MediaInputRejected | PlatformError.PlatformError, FileSystem.FileSystem | Scope.Scope> {
+  const fs = yield* FileSystem.FileSystem;
+  yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 });
+  const temporary = yield* fs.makeTempDirectoryScoped({ directory, prefix: ".result-" });
+  const path = join(temporary, "content");
+  const hash = createHash("sha256");
+  let size = 0;
+  yield* source.pipe(
+    Stream.mapEffect((chunk) => {
+      if (chunk.byteLength > audioResultMax - size) return Effect.fail(new MediaInputRejected({ reason: "Size" }));
+      size += chunk.byteLength;
+      hash.update(chunk);
+      return Effect.succeed(chunk);
+    }),
+    Stream.run(fs.sink(path, { flag: "wx", mode: 0o600 })),
+  );
+  if (size === 0) return yield* new MediaInputRejected({ reason: "Size" });
+  const mime = audioResultMime[format];
+  const blob = yield* fileBlob(path, mime);
+  if (format === "mp3") {
+    const ranges = mp3Structure(size);
+    let next = ranges.next();
+    let cached = Buffer.alloc(0);
+    let start = 0;
+    while (next.done !== true) {
+      const range = next.value;
+      if (range.offset < start || range.offset + range.length > start + cached.length) {
+        start = range.offset;
+        cached = yield* audioBytes(blob, start, Math.min(size, start + 64 * 1024));
+      }
+      next = ranges.next(cached.subarray(range.offset - start, range.offset - start + range.length));
+    }
+    if (!next.value) return yield* new MediaInputRejected({ reason: "Format" });
+  }
+  const audio =
+    format === "pcm"
+      ? undefined
+      : yield* (format === "wav" ? inspectWave(blob) : inspectAudio(blob)).pipe(Effect.mapError(() => new MediaInputRejected({ reason: "Format" })));
+  if (audio && audio.format !== format) return yield* new MediaInputRejected({ reason: "Format" });
+  return {
+    path,
+    hash: hash.digest("hex"),
+    size,
+    mime,
+    name,
+    ...(audio
+      ? {
+          metadata: {
+            source: "file" as const,
+            duration: audio.duration,
+            sampleRate: audio.sampleRate,
+            channels: audio.channels,
+            ...(audio.bitDepth === undefined ? {} : { bitDepth: audio.bitDepth }),
+          },
+        }
+      : {}),
+  };
 }, Effect.timeout("300 seconds"));

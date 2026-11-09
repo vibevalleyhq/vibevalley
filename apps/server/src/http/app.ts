@@ -12,7 +12,7 @@ import { Session } from "#/session/session.ts";
 import { api, artifactContent, attachments, mossLine } from "./api.ts";
 import { handlers } from "./handlers.ts";
 import { mcpRoute } from "./mcp.ts";
-import { mediaUploads } from "./media.ts";
+import { mediaInputContent, mediaSpeechStream, mediaUploads } from "./media.ts";
 import { page } from "./page.ts";
 import { subscriptions } from "./rpc.ts";
 import { issueWatchStream, streams } from "./streams.ts";
@@ -27,6 +27,8 @@ const routes = (config: ServerConfig["Service"]) =>
     subscriptions,
     mossLine,
     mediaUploads,
+    mediaInputContent,
+    mediaSpeechStream,
     mcpRoute,
     config.web ? page(config.web) : Layer.empty,
   );

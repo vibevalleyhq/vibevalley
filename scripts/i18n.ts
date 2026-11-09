@@ -87,7 +87,7 @@ const sources = () =>
     .split("\n")
     .filter(
       (f) =>
-        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) || f === "scripts/capabilities.ts") &&
+        (/^(apps|packages)\/[^/]+\/(src|scripts)\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) || f === "scripts/capabilities.ts") &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );

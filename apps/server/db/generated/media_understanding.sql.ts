@@ -16,6 +16,8 @@ export const UnderstandingResult = Schema.Struct({
   ["id"]: Schema.String,
   ["request"]: Schema.String,
   ["inputs"]: Schema.String,
+  ["source"]: Schema.String,
+  ["authorization"]: Schema.NullOr(Schema.String),
   ["connection"]: Schema.String,
   ["revision"]: Schema.Int,
   ["model"]: Schema.String,
@@ -50,6 +52,8 @@ export const RecentUnderstandingResult = Schema.Struct({
   ["id"]: Schema.String,
   ["request"]: Schema.String,
   ["inputs"]: Schema.String,
+  ["source"]: Schema.String,
+  ["authorization"]: Schema.NullOr(Schema.String),
   ["connection"]: Schema.String,
   ["revision"]: Schema.Int,
   ["model"]: Schema.String,
@@ -84,6 +88,8 @@ export const ActiveUnderstandingResult = Schema.Struct({
   ["id"]: Schema.String,
   ["request"]: Schema.String,
   ["inputs"]: Schema.String,
+  ["source"]: Schema.String,
+  ["authorization"]: Schema.NullOr(Schema.String),
   ["connection"]: Schema.String,
   ["revision"]: Schema.Int,
   ["model"]: Schema.String,
@@ -97,7 +103,7 @@ export const ActiveUnderstandingResult = Schema.Struct({
 export type ActiveUnderstandingResult = typeof ActiveUnderstandingResult.Type
 
 
-export const ActiveUnderstandingSql = "-- name: ActiveUnderstanding :many\n-- bound: admission shares the limit of eight active tasks with image generation.\nselect * from media_understanding where phase in ('queued','uploading','generating') or cleanup = 'running';"
+export const ActiveUnderstandingSql = "-- name: ActiveUnderstanding :many\n-- bound: admission shares the limit of eight active tasks with image generation.\nselect * from media_understanding where phase in ('authorized','queued','uploading','generating') or cleanup = 'running';"
 
 export const activeUnderstanding = Effect.fn("ActiveUnderstanding")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -112,26 +118,30 @@ export const InsertUnderstandingParams = Schema.Struct({
   ["id"]: Schema.String,
   ["request"]: Schema.String,
   ["inputs"]: Schema.String,
+  ["source"]: Schema.String,
+  ["authorization"]: Schema.NullOr(Schema.String),
   ["connection"]: Schema.String,
   ["revision"]: Schema.Int,
   ["model"]: Schema.String,
+  ["phase"]: Sqlite_media_understanding_phase,
   ["now"]: Schema.Int,
 })
 export type InsertUnderstandingParams = typeof InsertUnderstandingParams.Type
 
 
-export const InsertUnderstandingSql = "-- name: InsertUnderstanding :exec\ninsert into media_understanding (id, request, inputs, connection, revision, model, phase, cleanup, created_at, updated_at)\nvalues (?1, ?2, ?3, ?4, ?5, ?6, 'queued', 'pending', ?7, ?7);"
+export const InsertUnderstandingSql = "-- name: InsertUnderstanding :exec\ninsert into media_understanding (id, request, inputs, source, authorization, connection, revision, model, phase, cleanup, created_at, updated_at)\nvalues (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?10);"
 
 export const insertUnderstanding = Effect.fn("InsertUnderstanding")(function* (params: InsertUnderstandingParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: InsertUnderstandingParams,
-    execute: (p) => sql.unsafe(InsertUnderstandingSql, [p["id"], p["request"], p["inputs"], p["connection"], p["revision"], p["model"], p["now"]]),
+    execute: (p) => sql.unsafe(InsertUnderstandingSql, [p["id"], p["request"], p["inputs"], p["source"], p["authorization"], p["connection"], p["revision"], p["model"], p["phase"], p["now"]]),
   })(params)
 })
 
 export const ChangeUnderstandingParams = Schema.Struct({
   ["phase"]: Sqlite_media_understanding_phase,
+  ["source"]: Schema.String,
   ["result"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Sqlite_media_understanding_cleanup,
   ["problem"]: Schema.String,
@@ -141,13 +151,13 @@ export const ChangeUnderstandingParams = Schema.Struct({
 export type ChangeUnderstandingParams = typeof ChangeUnderstandingParams.Type
 
 
-export const ChangeUnderstandingSql = "-- name: ChangeUnderstanding :exec\nupdate media_understanding set phase = ?1, result = ?2, cleanup = ?3, problem = ?4, updated_at = ?5 where id = ?6;"
+export const ChangeUnderstandingSql = "-- name: ChangeUnderstanding :exec\nupdate media_understanding set phase = ?1, source = ?2, result = ?3, cleanup = ?4, problem = ?5, updated_at = ?6 where id = ?7;"
 
 export const changeUnderstanding = Effect.fn("ChangeUnderstanding")(function* (params: ChangeUnderstandingParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: ChangeUnderstandingParams,
-    execute: (p) => sql.unsafe(ChangeUnderstandingSql, [p["phase"], p["result"], p["cleanup"], p["problem"], p["now"], p["id"]]),
+    execute: (p) => sql.unsafe(ChangeUnderstandingSql, [p["phase"], p["source"], p["result"], p["cleanup"], p["problem"], p["now"], p["id"]]),
   })(params)
 })
 
@@ -158,7 +168,7 @@ export const InterruptUnderstandingParams = Schema.Struct({
 export type InterruptUnderstandingParams = typeof InterruptUnderstandingParams.Type
 
 
-export const InterruptUnderstandingSql = "-- name: InterruptUnderstanding :exec\nupdate media_understanding set\nphase = case when phase = 'queued' then 'canceled' when phase in ('uploading','generating') then 'unknown' else phase end,\ncleanup = case when phase = 'queued' then 'done' when cleanup = 'running' then 'blocked' else cleanup end,\nproblem = case when phase in ('queued','uploading','generating') then ?1 else problem end,\nupdated_at = ?2 where phase in ('queued','uploading','generating') or cleanup = 'running';"
+export const InterruptUnderstandingSql = "-- name: InterruptUnderstanding :exec\nupdate media_understanding set\nphase = case when phase in ('authorized','queued') then 'canceled' when phase in ('uploading','generating') then 'unknown' else phase end,\ncleanup = case when phase in ('authorized','queued') then 'done' when cleanup = 'running' then 'blocked' else cleanup end,\nproblem = case when phase in ('authorized','queued','uploading','generating') then ?1 else problem end,\nupdated_at = ?2 where phase in ('authorized','queued','uploading','generating') or cleanup = 'running';"
 
 export const interruptUnderstanding = Effect.fn("InterruptUnderstanding")(function* (params: InterruptUnderstandingParams) {
   const sql = yield* SqlClient.SqlClient
