@@ -316,7 +316,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       if (issue.status === "backlog") return;
       const assigned = assignedAgentOf(issue);
       const worker = latestSessionIdOf(issue);
-      const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.present(worker) ? worker : undefined;
+      const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.isReachable(worker) ? worker : undefined;
       const closing = issue.status === "done" || (issue.status === "canceled" && issue.canceled !== "lost");
       const inputs = yield* db.run(qi.pendingIssueInputs({ issue_id: id, recipient: recipient ?? null, closing }));
       if (closing) {

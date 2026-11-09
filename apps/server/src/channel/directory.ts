@@ -43,14 +43,14 @@ export const channelDirectory = (r: ChannelHub) =>
     const core = yield* Core;
     const agents = yield* Agent;
     const db = yield* Db;
-    const { model, reload, tx, locked, seat, orchestratorOfRow, channelOfSession, presentSessions, targetOfChannel, publishChannel, publishOwnerMentions } = r;
+    const { model, reload, tx, locked, seat, orchestratorOfRow, channelOfSession, workers, targetOfChannel, publishChannel, publishOwnerMentions } = r;
 
     /** A channel nothing points at any more; refused with what still does. */
     const removable = Effect.fnUntraced(function* (id: string) {
       const row = model.channel(id);
       if (!row || row.type !== "channel") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
       if (row.is_default) return yield* Effect.fail(refused(t("server.channel.defaultStays")));
-      if (presentSessions().some((h) => channelOfSession(h) === id))
+      if (workers().some((h) => channelOfSession(h) === id))
         return yield* Effect.fail(refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") })));
       const used = yield* db.run(qc.channelInUse({ id }));
       const why = [

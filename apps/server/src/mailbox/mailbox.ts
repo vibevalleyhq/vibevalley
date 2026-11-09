@@ -233,7 +233,7 @@ export class Mailbox extends Context.Service<
           open.load(snapshot.rows);
           reach.load(
             snapshot.scopes,
-            snapshot.sessions.filter((row) => sessions.present(row.session_id)),
+            snapshot.sessions.filter((row) => sessions.isReachable(row.session_id)),
             readOwnerRoutes(snapshot.owners),
           );
         }),
@@ -521,7 +521,7 @@ export class Mailbox extends Context.Service<
             }).pipe(bestEffort(`mailbox: restore issue ${issue.id}`)),
           { discard: true },
         );
-        yield* Effect.forEach(sessions.presentSessions(), (session) => pumpLocked(pump.kick(session.id)), { discard: true });
+        yield* Effect.forEach(sessions.workers(), (session) => pumpLocked(pump.kick(session.id)), { discard: true });
       });
       yield* Effect.forkScoped(api.replay.pipe(Effect.repeat(Schedule.spaced(config.chat.retryWakeMs)), Effect.delay(config.chat.retryWakeMs)));
       yield* Effect.addFinalizer(() =>

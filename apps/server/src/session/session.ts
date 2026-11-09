@@ -94,9 +94,10 @@ export class Session extends Context.Service<
     readonly clearWorkplace: (issue: string, repo: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
     readonly sessionOf: (id: string) => T.Session | undefined;
-    readonly presentSessions: () => readonly T.Session[];
-    /** On the farm now: it can be handed a message. */
-    readonly present: (id: string) => boolean;
+    /** The helpers on the farm as the core state has them, whether or not this process holds them now. */
+    readonly workers: () => readonly T.Session[];
+    /** This process holds it now (between launches too): it can be handed a message. */
+    readonly isReachable: (id: string) => boolean;
     /** Its complete last answer, kept out of the core frame. */
     readonly lastTextOf: (id: string) => string;
     /** Its host-local working directory, kept out of the protocol shape. */
@@ -613,8 +614,8 @@ const make = Effect.gen(function* () {
     }),
     events: (id, r) => trajectories.events(id, r),
     sessionOf: (id) => core.session(id),
-    presentSessions: () => core.state().sessions.filter((s) => s.role === "worker"),
-    present: (id) => hands.has(id),
+    workers: () => core.state().sessions.filter((s) => s.role === "worker"),
+    isReachable: (id) => hands.has(id),
     lastTextOf: (id) => hands.get(id)?.lastText ?? "",
     cwdOf: (id) => hands.get(id)?.place.cwd,
     runOf: (id) => {

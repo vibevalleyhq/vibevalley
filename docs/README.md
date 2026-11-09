@@ -70,7 +70,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 |---|---|---|---|---|
 | 管家 | manager | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认管家 | 工头（指管家时）、主 agent |
 | 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案工作的执行上下文；工单里的画成帮工，私聊的关联频道，跨多轮保留身份 | 工人、子 agent、worker、执行（指帮工时） |
-| 在场 | here | `presentSessions`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
+| 在场 | here | `Session.workers`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
 | 一轮 | a round of work | `Run`（`session_run` 表） | 一次触发到一次汇报：派出去、带话、计划、定时任务、农机自己 | 一次干活、turn（指一轮时） |
 | 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家（`orchestrator`）或帮工（`worker`） | 帮工档案、角色（指档案时） |
 | 农机 | machine | runtime（`RuntimeInfo`） | 机器上的一种编码 agent 程序（pi、claude、codex……）；左栏和设置里也叫农机 | harness、引擎、runtime（中文界面） |
@@ -144,7 +144,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 仓库 | warehouse | 合进主分支或 PR 合了的工单 | `delivered`：`merged`、`pull_request` |
 | 图纸桌 | issue board | 工单 | `Issue` |
 | 一季庄稼 | a crop | 一轮 | `Run` |
-| 地里 | in the field | 在场的帮工 | `presentSessions` |
+| 地里 | in the field | 在场的帮工 | `Session.workers` |
 | 来电 | call | Inbox 里的一件 | `InboxItem` |
 | 农具 | tools | 农机 | `RuntimeInfo` |
 | 技能书 | skill book | 技能 | `Skill` |

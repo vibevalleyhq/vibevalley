@@ -140,9 +140,9 @@ const channelLayer = (x: FakeSessions) =>
       );
       x.news = yield* PubSub.unbounded<SessionNews>();
       const sessions = {
-        present: (id: string) => x.core.session(id) !== undefined,
+        isReachable: (id: string) => x.core.session(id) !== undefined,
         sessionOf: (id: string) => x.core.session(id),
-        presentSessions: () => x.core.state().sessions.filter((s) => s.role === "worker"),
+        workers: () => x.core.state().sessions.filter((s) => s.role === "worker"),
         deliver: (id: string, text: string, input: Parameters<Session["Service"]["deliver"]>[2]) =>
           Effect.sync(() => x.deliver(id, text, () => x.consumed({ session: id, envelopeIds: [...input.envelopeIds] }))),
         runOf: () => undefined,

@@ -87,7 +87,7 @@ export function merging(d: MergeDeps) {
         if (m === "none") return yield* Effect.fail(refused(why));
       }
       const last = latestSessionIdOf(issue);
-      if (issue.repo && (!last || !sessions.present(last)) && (yield* list).some((child) => child.parent === issue.id)) {
+      if (issue.repo && (!last || !sessions.isReachable(last)) && (yield* list).some((child) => child.parent === issue.id)) {
         const place = yield* repos.workplace(issue.repo, issue.number, true, "").pipe(Effect.mapError((error) => refused(error.message)));
         if (issue.pullRequest?.state === "open" || repos.usesPullRequests(issue.repo))
           return (yield* pullRequestOf(place, issue, issue.description).pipe(Effect.mapError((error) => refused(error.message)))).text;
@@ -109,7 +109,7 @@ export function merging(d: MergeDeps) {
   const finishPullRequest = Effect.fnUntraced(function* (issue: T.Issue, state: T.PullRequestState) {
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = latestSessionIdOf(issue);
-    if (id && sessions.present(id))
+    if (id && sessions.isReachable(id))
       yield* sessions
         .handOver(id, closed, (place) => repos.finishPullRequest(place.repo, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));

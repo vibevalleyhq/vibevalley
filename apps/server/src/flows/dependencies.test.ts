@@ -40,7 +40,7 @@ it.live("regression: native child issues wait for prerequisites and start from t
     expect(child.stage.acts.map((act) => act.act)).toContain("start");
     expect((yield* issues.start(child.id, "")).queued).toBeDefined();
     yield* (yield* Issue).refreshQueue;
-    expect(sessions.presentSessions()).toEqual([]);
+    expect(sessions.workers()).toEqual([]);
     yield* service.setStatus(prerequisite.id, "canceled", "", "", owner);
     yield* (yield* Issue).refreshQueue;
     const started = yield* await_(

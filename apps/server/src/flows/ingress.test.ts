@@ -198,7 +198,7 @@ it.live("regression: issue input waits without a session and an owner followup r
       at: 1,
     };
     const queued = (yield* ingress.accept(ownerEvent))!;
-    expect(sessions.presentSessions()).toHaveLength(0);
+    expect(sessions.workers()).toHaveLength(0);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
     const started = yield* issues.start(issue.id, "");
     yield* until(() => inputs.some((input) => input.includes("queued-owner-detail")), "the queued input delivered");

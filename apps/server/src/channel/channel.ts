@@ -323,7 +323,7 @@ const make = Effect.gen(function* () {
       const thread = yield* threadOfSession(session);
       if (!thread) {
         // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
-        if (!sessions.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
+        if (!sessions.isReachable(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
         const channel = sessionOf(session)?.channel;
         const at = yield* Clock.currentTimeMillis;
         const speaker = sessionOf(from);
@@ -472,7 +472,7 @@ const make = Effect.gen(function* () {
       const newest = rows.at(-1);
       if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
       for (const participant of model.lastRead.keys())
-        if (participant !== ownerId && !agents.isOrchestrator(participant) && !sessions.present(participant)) model.lastRead.delete(participant);
+        if (participant !== ownerId && !agents.isOrchestrator(participant) && !sessions.isReachable(participant)) model.lastRead.delete(participant);
       model.lastRead.set(who, target);
       const oldest = rows[0];
       const older = oldest !== undefined && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: oldest.number, n: 1 }))).length > 0;

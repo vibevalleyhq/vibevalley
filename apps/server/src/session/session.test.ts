@@ -457,7 +457,7 @@ describe("sessions", () => {
       expect(Formatter.formatJson(errors)).toContain("did not stop");
       expect(closes).toBe(1);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
-      expect(sessions.presentSessions()).toEqual([]);
+      expect(sessions.workers()).toEqual([]);
       const next = yield* sessions.hire(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
       expect(next).toMatchObject({ retainedWork: true });
       expect(next.session).toBeUndefined();

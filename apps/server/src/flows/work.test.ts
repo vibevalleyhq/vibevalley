@@ -339,9 +339,9 @@ describe("a session's work", () => {
       for (const h of both) mustHire(h);
       yield* w.nextReport;
       yield* w.nextReport;
-      expect(sessions.presentSessions()).toHaveLength(2);
+      expect(sessions.workers()).toHaveLength(2);
       for (const h of core.state().sessions) yield* sessions.dismiss(h.id);
-      expect(sessions.presentSessions()).toHaveLength(0);
+      expect(sessions.workers()).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

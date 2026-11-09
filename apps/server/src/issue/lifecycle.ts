@@ -112,7 +112,7 @@ export const issueLifecycle = Effect.gen(function* () {
   const liveSession = (id: string) =>
     Effect.filterOrFail(
       latest(id),
-      (session) => sessions.present(session),
+      (session) => sessions.isReachable(session),
       (session) => missing(t("server.issue.helperRef", { id: session }), [lookIn.session]),
     );
 
@@ -273,7 +273,7 @@ export const issueLifecycle = Effect.gen(function* () {
 
   const changesOf = Effect.fn("Issue.changesOf")(function* (item: T.Issue) {
     const session = latestSessionIdOf(item);
-    if (session && sessions.present(session))
+    if (session && sessions.isReachable(session))
       return yield* sessions.withWorkplace(session, (place) => repos.changes(place).pipe(Effect.mapError((error) => refused(error.message))));
     return item.repo ? yield* repos.branchChanges(item.repo, issueBranch(item.number)).pipe(Effect.mapError((error) => refused(error.message))) : undefined;
   });

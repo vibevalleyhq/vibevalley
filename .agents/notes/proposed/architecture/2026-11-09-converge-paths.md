@@ -40,9 +40,20 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 
 **三、管家的会话只在一处登记。** Session 开机时登记现有的管家，并经 `Agent.whenKept` 挂上同一个登记：档案存下（新建、改、装模板、按模板更新）时，在写档案的那次调用返回之前登记好，登记失败那次写就失败；`registerOrchestrator` 从接口上拿掉，频道、工单、Mailbox 不再补。用流（Agent 发 `Saved`、Session 订）试过：流是异步的，改完名立刻读还是旧名字，所以用同步的挂钩。频道的 `seat` 只管它自己的参与者表，照旧。
 
-**四、「在」分成两个名字。** `present(id)` 改名 `attached(id)`（有 hand、能交信）；`presentSessions()` 改名 `workers()`（核心状态里的 worker）；`sessionOf` 不变。改完把 `naming.md` 的双关表补一行 present。
+**四、「在」分成两个名字。** `present(id)` 改名 `isReachable(id)`（这个进程拿着它的 hand、能交信；hand 在两次启动之间也在，所以不叫 attached；是非照命名表写 `isX`）；`presentSessions()` 改名 `workers()`（核心状态里的 worker）；`sessionOf` 不变。`naming.md` 的双关表补一行 present。
 
 改名都用 tsgo 的 LSP 重命名（`textDocument/rename`），判别字段和字面量用 ast-grep 限定在列出的文件里改，不用正则。
+
+## 进度
+
+| 步 | 状态 | 提交 | 做了什么 |
+|---|---|---|---|
+| 调用表做成检查 | 完成 | `2901cd8e1` | `scripts/service-paths.ts`、`vp run paths:check`（提交前的钩子），表在 `scripts/service-paths.json` |
+| 管家的会话 | 完成 | `902031e44` | `Agent.whenKept`；顺带修了改名要重启才显示 |
+| 「在」分成两个名字 | 完成 | 本提交 | `isReachable`、`workers` |
+| 频道写话 | 未做 | — | 见下 |
+
+频道写话还没动：七个入口的返回和错误不同（`{ message, again }`、`Spoken` 的 sent/held/confirm、`ChatMessage`、`boolean`；`notice`、`orchestratorSays` 不失败），收成一个 `post` 要么靠条件类型加断言，要么调用方拆走不到的分支。`writing.ts` 那层多余的参数已经并掉，落点本来就是一个 `write`。
 
 ## Alternatives considered
 

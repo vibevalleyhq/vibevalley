@@ -178,7 +178,7 @@ const make = Effect.gen(function* () {
       { discard: true },
     );
     const last = latestSessionIdOf(item);
-    if (last === undefined || !sessions.present(last)) return;
+    if (last === undefined || !sessions.isReachable(last)) return;
     if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing(t("server.issue.helperRef", { id: last }), [lookIn.session]));
   });
 
@@ -404,7 +404,7 @@ const make = Effect.gen(function* () {
             // Written down before its session goes home, so that leaving does not take it for canceled.
             yield* complete(id, acceptedDelivery);
             const last = latestSessionIdOf(item);
-            if (last !== undefined && sessions.present(last)) yield* sessions.dismiss(last, "keep", "completed");
+            if (last !== undefined && sessions.isReachable(last)) yield* sessions.dismiss(last, "keep", "completed");
             break;
           }
           // The session's leaving closes the issue too, but later: closed here, the answer already says so.
@@ -452,7 +452,7 @@ const make = Effect.gen(function* () {
       if (!changes) return yield* Effect.fail(refused(t("server.issue.notStarted")));
       yield* setConflict(id, conflictOf(changes));
       const session = latestSessionIdOf(item);
-      if (by.kind === "owner" && session && sessions.present(session)) yield* core.did({ kind: "reviewed", session });
+      if (by.kind === "owner" && session && sessions.isReachable(session)) yield* core.did({ kind: "reviewed", session });
       return changes;
     }),
     review: Effect.fn("Issue.review")(function* (id, req) {

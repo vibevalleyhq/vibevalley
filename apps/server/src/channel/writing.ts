@@ -35,7 +35,7 @@ export const channelWriting = (r: ChannelHub) =>
       orchestratorIds,
       orchestratorOfRow,
       channelOfSession,
-      presentSessions,
+      workers,
       publishChannel,
       publishOwnerMentions,
       publishMessage,
@@ -58,7 +58,7 @@ export const channelWriting = (r: ChannelHub) =>
       const here = orchestratorOfRow(ch);
       // No one else is in a direct channel to be named.
       const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
-      const sessionsNow = presentSessions();
+      const sessionsNow = workers();
       // Participants are sessions, agents and the owner alike: a mention is any of them.
       const present: readonly string[] = sessionsNow.map((h) => h.id);
       const known = new Set(model.participants().map((p) => p.id));

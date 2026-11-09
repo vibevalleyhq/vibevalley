@@ -80,13 +80,13 @@ describe("an issue's thread", () => {
       yield* issues.comment(issue.id, "先记下验收要求", "queued-comment");
       const thread = yield* channels.issueThread(issue.id, issue.title);
       expect((yield* channels.history(thread)).map((message) => message.text)).toEqual(["先记下验收要求"]);
-      expect(sessions.presentSessions()).toEqual([]);
+      expect(sessions.workers()).toEqual([]);
       expect((yield* issues.get(issue.id)).status).toBe("backlog");
       yield* issues.start(issue.id, "");
       yield* until(() => inputs.length > 0, "the queued input delivered with the first assignment");
       expect(inputs[0]).toContain("先记下验收要求");
       const followup = (yield* channels.say("另一个需求", thread, "handback-source")).message;
-      const session = sessions.presentSessions()[0]!;
+      const session = sessions.workers()[0]!;
       const mailbox = yield* Mailbox;
       yield* await_(
         () => Effect.succeed(mailbox.deliveriesOf(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),

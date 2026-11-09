@@ -81,7 +81,7 @@ it.live("regression: splitting preserves the parent's assignment and branch ance
       (item) => item.status === "in_review",
       "all native children merged",
     );
-    expect(sessions.present(helper.id)).toBe(true);
+    expect(sessions.isReachable(helper.id)).toBe(true);
     expect((yield* issues.get(issue.id)).closedAt).toBeUndefined();
     expect(gitIn(helper.worktree!, "status", "--porcelain")).toBe("");
   }).pipe(Effect.ensuring(Effect.sync(release)), Effect.scoped, Effect.provide(f.layer));

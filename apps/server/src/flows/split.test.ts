@@ -162,7 +162,7 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
     expect(result._tag).toBe("Refused");
     expect((yield* issues.list()).map((item) => [item.id, item.title])).toEqual([[parent.id, "parent"]]);
     expect((yield* Core).state().issues.map((item) => item.id)).toEqual([parent.id]);
-    expect((yield* Session).presentSessions()).toEqual([]);
+    expect((yield* Session).workers()).toEqual([]);
     const unsafe2 = yield* sql.unsafe("select * from mailbox_trigger where trigger_json->'meta'->'dispatch' = 'true'").pipe(Effect.orDie);
     expect(unsafe2).toHaveLength(0);
     const unsafe3 = yield* sql.unsafe("select * from mailbox_issue").pipe(Effect.orDie);
