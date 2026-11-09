@@ -20,7 +20,7 @@ export interface MossRelayBridge {
   readonly attachWorkletPorts: (capturePort: MessagePort, playbackPort: MessagePort) => void;
   readonly cutPlayback: (run: string, turn: string) => void;
   readonly bufferedAmount: () => number;
-  /** Asks the relay how full the socket is; bufferedAmount reads the answer once it comes. */
+  /** Has the relay say how full the socket is now; bufferedAmount reads that once it comes. */
   readonly measure: () => void;
   readonly setMic: (enabled: boolean) => void;
   readonly close: () => void;
