@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, FileSystem } from "effect";
+import { Deferred, Effect, Exit, Fiber, FileSystem } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -172,7 +172,8 @@ it.effect("regression: format, MIME, declared length and actual audio must match
 it.effect("a stalled speech body is canceled at the download deadline", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>();
-    let canceled = false;
+    // The body's cancel comes after the download has given up, on the stream's own turn.
+    const canceled = yield* Deferred.make<void>();
     const http = HttpClient.make((request) =>
       Deferred.succeed(started, undefined).pipe(
         Effect.as(
@@ -181,7 +182,7 @@ it.effect("a stalled speech body is canceled at the download deadline", () =>
             new Response(
               new ReadableStream<Uint8Array>({
                 cancel() {
-                  canceled = true;
+                  Deferred.doneUnsafe(canceled, Exit.void);
                 },
               }),
               { headers: { "content-type": "audio/wav" } },
@@ -198,6 +199,6 @@ it.effect("a stalled speech body is canceled at the download deadline", () =>
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
     expect((yield* Fiber.join(fiber))._tag).toBe("Refused");
-    expect(canceled).toBe(true);
+    yield* Deferred.await(canceled);
   }),
 );
