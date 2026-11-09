@@ -25,7 +25,7 @@ Status: proposed
 
 | 步 | 状态 | 提交 | 做了什么 |
 |---|---|---|---|
-| 一 准备状态 | 完成 | 本提交 | `SettingsStatus.readiness`（规则在 `apps/server/src/setting/readiness.ts`）；页面的 `fixOf`（`apps/web/src/infra/readiness.ts`，现在指向「模型」「AI 服务」「通话线路」「听写」，第二步改指「账号与钥匙」）；`/imagegen` 没准备好时打开设置 |
+| 一 准备状态 | 完成 | `c50f118d3` | `SettingsStatus.readiness`（规则在 `apps/server/src/setting/readiness.ts`）；页面的 `fixOf`（`apps/web/src/infra/readiness.ts`，现在指向「模型」「AI 服务」「通话线路」「听写」，第二步改指「账号与钥匙」）；`/imagegen` 没准备好时打开设置 |
 | 二 账号与钥匙 | 未做 | — | |
 | 三 功能页 | 未做 | — | |
 
