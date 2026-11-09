@@ -23,7 +23,6 @@ import {
   type UnreadRow,
   orchestratorIn,
 } from "#/mailbox/envelope.ts";
-import { isHosted } from "#/session/roster.ts";
 import { type NotRecorded, Session } from "#/session/session.ts";
 import { defaultID, topPlace, unreadOf } from "#db/channel.sql.ts";
 import { membersOf } from "#db/channel_member.sql.ts";
@@ -442,10 +441,7 @@ export class Mailbox extends Context.Service<
           });
         },
         closed: () => closed,
-        isHosted: (id) => {
-          const agent = agents.agent(id);
-          return agent !== undefined && isHosted(agent);
-        },
+        isHosted: agents.isHosted,
         message: (row) => inputOf(row),
         wakeInput: (recipient, _rows, messages) =>
           Effect.map(deliveryUnread(recipient), (all) =>

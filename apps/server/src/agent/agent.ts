@@ -79,6 +79,9 @@ export class Agent extends Context.Service<
     readonly orchestrators: () => T.Agent[];
     /** A profile with this id is an orchestrator. */
     readonly isOrchestrator: (id: string) => boolean;
+    /** A profile whose agent works in this server process (Session.host), handed its inputs there; the others are
+     * launched on a runtime. Today the role decides it, here alone (roleProblem keeps orchestrators on VibeValley's agent). */
+    readonly isHosted: (id: string) => boolean;
     readonly agent: (id: string) => T.Agent | undefined;
     /** A profile work is sent to, by its id or its name, as a person or a model says it. */
     readonly named: (key: string) => T.Agent | undefined;
@@ -190,6 +193,7 @@ const make = Effect.gen(function* () {
 
   const all = () => structuredClone([...s.agents]);
   const sendable = () => all().filter((a) => a.role === "worker");
+  const isOrchestrator = (id: string) => s.agents.some((a) => a.id === id && a.role === "orchestrator");
 
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it stays and is reached on a call. */
   const roleProblem = (a: T.Agent): string => {
@@ -236,7 +240,8 @@ const make = Effect.gen(function* () {
     skills: () => structuredClone([...s.skills]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
-    isOrchestrator: (id) => s.agents.some((a) => a.id === id && a.role === "orchestrator"),
+    isOrchestrator,
+    isHosted: isOrchestrator,
     save: Effect.fn("Agent.save")(function* (a) {
       const why = roleProblem(a);
       if (why) return yield* Effect.fail(refused(why));

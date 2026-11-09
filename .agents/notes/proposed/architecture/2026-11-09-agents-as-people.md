@@ -32,13 +32,13 @@ Status: proposed
 | 他的职务 | role：`orchestrator`（管家）、`worker`（帮工） | — |
 | 一直当值的人的那个会话 | 当值 on duty：`keepOnDuty(profile)`（帮工模块内部），`isOnDuty(who)` | `registerOrchestrator`；按 `role === "orchestrator"` 判会话怎么来的地方 |
 | 按活雇来的会话 | hired：`Session.hire`、`Hired`（已有），`isHired(who)`，`Session.hired()` | `role === "worker"` 问会话怎么来的地方；`Session.workers` |
-| 在服务端进程里干活 | hosted：`Session.host`、`AgentHost`（已有），问法 `isHosted(id)` | 泵里的 `isOrchestrator` |
+| 在服务端进程里干活 | hosted：`Session.host`、`AgentHost`（已有），问法 `Agent.isHosted(id)` | 泵里的 `isOrchestrator` |
 | 在农机上干活 | launched：`launch`（已有） | — |
 | 一个地方有谁 | 成员 members：频道和串都记在 `channel_member`；私聊是对面 | 频道的「负责人」（列 `channel.orchestrator`、`orchestratorOfRow`、`OrchestratorForChannel`、`setOrchestrator`） |
 | 这里的管家（泛称的 @管家、没指定人的活、没人收的事交给他） | `orchestratorIn`（`mailbox/envelope.ts` 一处），`T.Channel.orchestrator` 是它算出的结果 | Mailbox 的 `orchestratorOf`、频道的 `orchestratorOf` |
 | 话是谁说的 | `ActorKind = owner \| agent \| system`，agent 带 `role` | `orchestrator`、`session` 两种 actor |
 
-「当值」和「hosted」今天都由职务推出来，但只在一处推：`isOnDuty`、`isHosted` 各定义一次，别处都问它们，不再自己看 `role`。以后有不当值的管家或在进程里干活的帮工，只改这两处。
+「当值」和「hosted」今天都由职务推出来，但只在一处推：`isOnDuty`（`session/roster.ts`）、`isHosted`（`Agent`）各定义一次，别处都问它们，不再自己看 `role`。以后有不当值的管家或在进程里干活的帮工，只改这两处。
 
 ## Proposal
 
@@ -46,7 +46,7 @@ Status: proposed
 
 1. **当值。** `registerOrchestrator` 改名 `keepOnDuty`；`isOnDuty(session)` 定义在帮工模块一处，`newsOf`、恢复、`workers()`、`history`、`assignment` 里问会话怎么来的地方都问它。
 2. **频道有成员，没有负责人。** 私聊是有对面的频道；串有跟帖的人（`channel_member`）；普通频道也用 `channel_member` 记成员，只有管家能放进来，新频道和默认频道一开始就有默认管家。没点名的话和汇报发给成员；一个成员都没有，要 @ 才有人接。「这里的管家」由 `orchestratorIn` 一处算（私聊的对面，或成员里的默认管家、第一个管家，都没有就是默认管家），频道和 Mailbox 共用。
-3. **在哪干。** 泵的端口 `isOrchestrator` 改 `isHosted`，由帮工模块定义一次。
+3. **在哪干。** 泵的端口 `isOrchestrator` 改 `isHosted`，由 agent 模块定义一次。
 4. **名字只说职务的。** `orchestratorSays`、`isForOrchestrator`、`beginOrchestrator`、`toOrchestrator`、`recordOrchestratorStart` 按它们做的事改名（交给当值的人、当值的人一整条说完）。
 5. **话是谁说的。** `ActorKind` 收成 `owner | agent | system`，agent 带 `role`。改 protocol 形状和页面，单独一步，放最后。
 
@@ -58,7 +58,7 @@ Status: proposed
 |---|---|---|---|
 | 1 当值 | 完成 | `edf285f44` | `isOnDuty`、`isHired` 在 `session/roster.ts` 各定义一次（两个都正着写：黄金数据里有没带 `role` 的会话，取反会把它们算成雇来的）；`keepOnDuty`；`Session.workers` 改叫 `hired` |
 | 2 频道有成员 | 完成 | `6e3bdacff` | 删掉频道负责人；`channel_follow` 改名 `channel_member`，频道和串的成员都记在这里（投递原因 `follower` 改叫 `member`）；`orchestratorIn`；页面勾选成员 |
-| 3 在哪干 | 完成 | `2dea99530` | `isHosted` 在 `session/roster.ts` 定义一次；泵的端口 `isOrchestrator` 改 `isHosted`（Mailbox 按档案问它），`publishOrchestrator` 改 `handToHost` |
+| 3 在哪干 | 完成 | `2dea99530`、本步的修正提交 | `isHosted` 在 `Agent` 上定义一次（和 `roleProblem` 一处：管家只跑在服务端里；放在 `session/roster.ts` 会被 `modules.test.ts` 当成读别人的核心状态）；泵的端口 `isOrchestrator` 改 `isHosted`，`publishOrchestrator` 改 `handToHost` |
 | 4 名字只说职务的 | 完成 | 本步的提交 | `isForOrchestrator` 改 `assignedOnDuty`（服务端和页面），`beginOrchestrator`、`toOrchestrator` 改 `beginOnDuty`、`handOnDuty`，`recordOrchestratorStart`、`recordWorkerStart` 改 `recordOnDutyStart`、`recordHiredStart`；`stale-names` 拦旧名字。`orchestratorSays` 并进第 5 步的写入口 |
 | 5 话是谁说的 | 未做 | — | |
 

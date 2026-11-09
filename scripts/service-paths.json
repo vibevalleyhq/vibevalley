@@ -2,6 +2,7 @@
   "Agent.agent": ["channel", "ingress", "issue", "mailbox", "orchestrator", "session", "tool"],
   "Agent.agents": ["cron", "issue", "memory", "orchestrator", "runtime"],
   "Agent.all": ["session"],
+  "Agent.isHosted": ["mailbox"],
   "Agent.isOrchestrator": ["channel", "issue", "mailbox", "memory", "orchestrator", "tool"],
   "Agent.named": ["channel", "issue", "tool"],
   "Agent.orchestrators": ["channel", "mailbox", "orchestrator", "tool"],
