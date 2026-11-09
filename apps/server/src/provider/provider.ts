@@ -476,7 +476,7 @@ const make = Effect.gen(function* () {
     }),
     dictation: Effect.fn("Provider.dictation")(function* () {
       const own = settings.dictation();
-      if (own?.via === "own") return { model: own.model, transcriber: transcriber(own) };
+      if (own?.via === "own") return { model: own.model, transcriber: transcriber({ url: own.url, model: own.model, key: Redacted.value(own.key) }) };
       if (!own) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.voice.dictation.unset") });
       const bound = bindingOf("dictation")(settings.providers());
       if (!bound.ready) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.unbound") });

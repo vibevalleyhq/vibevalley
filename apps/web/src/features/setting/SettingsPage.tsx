@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { matches } from "#/base/search.ts";
 import { ConnectorsPage } from "#/features/connector/index.ts";
 import { LanPage } from "#/features/lan/index.ts";
-import { ProviderPage } from "#/features/provider/index.ts";
+import { MossAccounts, ProviderPage } from "#/features/provider/index.ts";
 import { SkillsPage } from "#/features/runtime/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
 import { Link as A, Navigate } from "#/infra/router.ts";
@@ -165,7 +165,7 @@ interface Section {
 const sections: readonly Section[] = [
   { id: "general", group: "options", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
   { id: "appearance", group: "options", icon: "appearance", label: t("web.setting.nav.appearance"), words: t("web.setting.words.appearance") },
-  { id: "models", group: "options", icon: "key", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
+  { id: "accounts", group: "options", icon: "key", label: t("web.setting.nav.accounts"), words: t("web.setting.words.accounts") },
   { id: "providers", group: "options", icon: "plug", label: t("web.provider.title"), words: t("web.provider.words") },
   { id: "memory", group: "helpers", icon: "memory", label: t("web.setting.nav.memory"), words: t("web.setting.words.memory") },
   { id: "skills", group: "helpers", icon: "skill", label: t("web.setting.nav.skills"), words: t("web.setting.words.skills") },
@@ -235,10 +235,12 @@ export function SettingsPage(props: { rest: string }) {
                 <Match when={section().id === "appearance"}>
                   <AppearancePage />
                 </Match>
-                <Match when={section().id === "models"}>
-                  <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")} action={<SettingsFile />}>
-                    <Readiness features={["orchestrator"]} />
+                <Match when={section().id === "accounts"}>
+                  <Page title={t("web.setting.nav.accounts")} hint={t("web.setting.accounts.intro")} action={<SettingsFile />}>
+                    <Readiness features={["orchestrator", "call"]} />
                     <SettingsForm part="deepseek" />
+                    <MossAccounts />
+                    <VoiceForm part="line" view="accounts" />
                   </Page>
                 </Match>
                 <Match when={section().id === "providers"}>

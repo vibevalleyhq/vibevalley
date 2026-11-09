@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect, Redacted, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -90,10 +90,11 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   const told = new Set<string>();
 
   /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
+  const key = c.key === undefined ? "" : Redacted.value(c.key);
   const post = (path: "add" | "flush" | "search", body: Body, closing = false) => {
     const request = HttpClientRequest.post(`${c.url.replace(/\/+$/u, "")}/api/v2/memory/${path}`).pipe(
       HttpClientRequest.bodyJsonUnsafe(body),
-      c.key ? HttpClientRequest.bearerToken(c.key) : (r) => r,
+      key ? HttpClientRequest.bearerToken(key) : (r) => r,
     );
     const answer = Effect.gen(function* () {
       const res = yield* http.execute(request);

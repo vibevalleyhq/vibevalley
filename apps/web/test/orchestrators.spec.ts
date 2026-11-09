@@ -53,7 +53,7 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
   // Images not set up yet: the line is not said, the settings that fix it open.
   await drawingsBox.fill("/imagegen 一只在麦田里打盹的橘猫");
   await drawingsBox.press("Enter");
-  await expect(page).toHaveURL(/\/settings\/providers$/u);
+  await expect(page).toHaveURL(/\/settings\/accounts$/u);
   expect(await api.channel.message.list({ id: drawings })).toEqual([]);
   // Set up (the test runtime answers MOSS), the line goes to the orchestrator there.
   const providers = await api.provider.get();

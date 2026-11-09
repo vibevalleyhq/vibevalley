@@ -1,3 +1,5 @@
+import type { Redacted } from "effect";
+
 import { t } from "@vibevalley/i18n";
 import { MemorySourceKindValues, type MemorySourceUpdate, type SettingsUpdate } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
@@ -10,8 +12,8 @@ const agoraID = /^[0-9a-fA-F]{32}$/u;
 
 const hasSpace = (s: string) => /\s/u.test(s);
 
-/** A memory source as settings.json keeps it, with its key: read together, so an address is never paired with another one's key. */
-export interface MemorySourceConfig {
+/** A memory source as settings.json keeps it, with its key as a plain string. */
+export interface StoredMemorySource {
   readonly kind: MemorySourceUpdate["kind"];
   readonly url: string;
   readonly enabled?: boolean;
@@ -20,6 +22,11 @@ export interface MemorySourceConfig {
   readonly everything?: boolean;
   readonly user?: string;
   readonly key?: string;
+}
+
+/** A memory source with its key, redacted until a call sends it: read together, so an address is never paired with another one's key. */
+export interface MemorySourceConfig extends Omit<StoredMemorySource, "key"> {
+  readonly key?: Redacted.Redacted;
 }
 
 export function memorySourcesProblem(sources: readonly MemorySourceUpdate[]): string {
@@ -37,7 +44,7 @@ export function memorySourcesProblem(sources: readonly MemorySourceUpdate[]): st
 }
 
 /** A source given without a key keeps the key saved for its kind. */
-export function memorySourcesOver(saved: readonly MemorySourceConfig[], given: readonly MemorySourceUpdate[]): MemorySourceConfig[] {
+export function memorySourcesOver(saved: readonly StoredMemorySource[], given: readonly MemorySourceUpdate[]): StoredMemorySource[] {
   return given.map((m) => {
     const key = m.key !== undefined ? m.key.trim() : saved.find((c) => c.kind === m.kind)?.key;
     return {

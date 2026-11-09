@@ -3,12 +3,12 @@ import type { Missing } from "@vibevalley/protocol";
 
 /** Where each thing a feature lacks is set up. */
 const placeOf: Record<Missing, string> = {
-  deepseekKey: "/settings/models",
-  mossAccount: "/settings/providers",
-  mossKey: "/settings/providers",
-  mossOff: "/settings/providers",
+  deepseekKey: "/settings/accounts",
+  mossAccount: "/settings/accounts",
+  mossKey: "/settings/accounts",
+  mossOff: "/settings/accounts",
   binding: "/settings/providers",
-  agora: "/settings/call",
+  agora: "/settings/accounts",
   dictationUrl: "/settings/dictation",
 };
 

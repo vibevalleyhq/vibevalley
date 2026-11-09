@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
+import { Deferred, Effect, Fiber, Layer, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import type { ProviderUpdate } from "@vibevalley/protocol";
@@ -265,7 +265,8 @@ it.effect("stale updates cannot overwrite another writer and general settings sa
     yield* Effect.all([provider.update({ ...configured("third-key"), revision: 1 }), setting.save({ deepseekApiKey: "test-deepseek" })], { concurrency: 2 });
     const liveKey5 = yield* keyNow(provider.live());
     expect(liveKey5).toBe("Bearer third-key");
-    expect(setting.deepseekApiKey()).toBe("test-deepseek");
+    const deepseek = setting.deepseekApiKey();
+    expect(deepseek === undefined ? undefined : Redacted.value(deepseek)).toBe("test-deepseek");
   }).pipe(Effect.provide(layer(http))),
 );
 

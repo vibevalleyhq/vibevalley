@@ -141,8 +141,9 @@ const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey";
 
-/** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or dictation. */
-type LineView = "call" | "moss" | "dictation";
+/** Which of the line's settings a page shows: the call (area, listening, who answers), MOSS Live, dictation, or Agora's
+ * credentials on the accounts page. */
+type LineView = "call" | "moss" | "dictation" | "accounts";
 
 export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
   const settings = useSettings();
@@ -270,8 +271,6 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
 
   const asr = () => draft().asr;
   const answer = () => draft().answer;
-  const credentialsReady = () =>
-    answer().vendor === "moss" ? base().readiness.live.ready : base().agoraAppId.source !== null && base().agoraAppCertificate.source !== null;
   const answerHint = () => {
     const source = base().deepseekApiKey.source;
     return answer().vendor === "orchestrator"
@@ -299,18 +298,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <MossVerify />
               </div>
             </Show>
-            <Show when={props.view === "call"}>
-              <div {...stylex.attrs(viewStyles.formDiv2)}>
-                <span {...stylex.attrs(variantStyles.formSpan, credentialsReady() ? variantStyles.formSpanVariant : variantStyles.formSpanVariant2)}>
-                  {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
-                </span>
-                <Hint
-                  text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
-                />
-                <span {...stylex.attrs(viewStyles.formSpan)} />
-                <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
-                <Hint text={t("web.base.form.storedIn", { file: base().file })} />
-              </div>
+            <Show when={props.view === "accounts"}>
               <Card
                 title={t("web.voice.voice.credentials")}
                 action={<OutLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
@@ -330,6 +318,20 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     />
                   </KeyField>
                   {secret("agoraAppCertificate", "App Certificate", () => base().agoraAppCertificate)}
+                </Cols>
+              </Card>
+            </Show>
+            <Show when={props.view === "call"}>
+              <div {...stylex.attrs(viewStyles.formDiv2)}>
+                <Hint
+                  text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
+                />
+                <span {...stylex.attrs(viewStyles.formSpan)} />
+                <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
+                <Hint text={t("web.base.form.storedIn", { file: base().file })} />
+              </div>
+              <Card title={t("web.voice.voice.line")} styles={viewStyles.voiceCard}>
+                <Cols>
                   <Labeled label={t("web.voice.voice.area")} hint={t("web.voice.voice.areaHint")}>
                     <Segmented
                       label={t("web.voice.voice.area")}

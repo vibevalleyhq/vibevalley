@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 
-const sections = ["general", "appearance", "models", "providers", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
+const sections = ["general", "appearance", "accounts", "providers", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
 
 test("settings lists its sections, opens on general, and the search narrows them", async ({ page }) => {
   await page.goto("/settings");
@@ -14,8 +14,9 @@ test("settings lists its sections, opens on general, and the search narrows them
   await expect(page).toHaveURL(/\/settings\/github$/u);
   await expect(page.getByTestId("github-recheck")).toBeVisible();
   // What a search matches is base/search.test.ts's; here it narrows the sections and lights the rows.
+  // MOSS is on the accounts page, the uses page and its own live page.
   await page.getByTestId("settings-search").fill("MOSS");
-  await expect(links).toHaveCount(2);
+  await expect(links).toHaveCount(3);
   await nav.locator('[data-key="moss"]').click();
   await expect(nav.locator('[data-key="moss"]')).toHaveAttribute("aria-current", "page");
   await page.getByTestId("settings-search").fill("");
@@ -47,7 +48,7 @@ test("appearance and general keep this device's choices", async ({ page }) => {
 });
 
 test("a DeepSeek key is saved, shown by its end and removed", async ({ page }) => {
-  await page.goto("/settings/models");
+  await page.goto("/settings/accounts");
   const row = page.getByTestId("deepseek-key");
   const mark = row.getByTestId("key-mark");
   await expect(mark).toHaveAttribute("data-state", "unset");
@@ -56,13 +57,13 @@ test("a DeepSeek key is saved, shown by its end and removed", async ({ page }) =
   await expect(key).toHaveAttribute("type", "password");
   await row.getByTestId("reveal").click();
   await expect(key).toHaveAttribute("type", "text");
-  await page.getByTestId("save").click();
+  await page.getByTestId("deepseek-form").getByTestId("save").click();
   await expect(key).toHaveValue("");
   await expect(mark).toHaveAttribute("data-state", "settings");
   await expect(mark).toHaveAttribute("data-hint", /cdef/u);
   await row.getByTestId("remove-key").click();
   await expect(mark).toHaveAttribute("data-state", "removing");
-  await page.getByTestId("save").click();
+  await page.getByTestId("deepseek-form").getByTestId("save").click();
   await expect(mark).toHaveAttribute("data-state", "unset");
 });
 

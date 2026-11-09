@@ -25,7 +25,7 @@ test("regression: a key receipt and query refresh never erase a newer secret", a
   page.on("console", (message) => {
     if (/\[(STRICT_|REACTIVITY_|NO_OWNER_|REACTIVE_WRITE_)/u.test(message.text())) diagnostics.push(message.text());
   });
-  await page.goto("/settings/models");
+  await page.goto("/settings/accounts");
   const input = page.getByTestId("deepseek-key").getByTestId("secret");
   const release = gate();
   const received = gate();
@@ -36,11 +36,11 @@ test("regression: a key receipt and query refresh never erase a newer secret", a
     await route.fulfill({ response });
   });
   await input.fill("test-key-first-1111");
-  await page.getByTestId("save").click();
+  await page.getByTestId("deepseek-form").getByTestId("save").click();
   await received.wait;
   await input.fill("test-key-newer-2222");
   release.open();
-  await expect(page.getByTestId("save")).toBeEnabled();
+  await expect(page.getByTestId("deepseek-form").getByTestId("save")).toBeEnabled();
   await expect(input).toHaveValue("test-key-newer-2222");
   expect((await api.setting.get()).deepseekApiKey.hint).toMatch(/1111/u);
   await page.unroute("**/api/v1/setting/update");
@@ -49,14 +49,14 @@ test("regression: a key receipt and query refresh never erase a newer secret", a
   await settled(page);
   await page.screenshot({ path: info.outputPath("secret-form-390.png") });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.getByTestId("save").click();
+  await page.getByTestId("deepseek-form").getByTestId("save").click();
   await expect(input).toHaveValue("");
   expect((await api.setting.get()).deepseekApiKey.hint).toMatch(/2222/u);
   expect(diagnostics).toEqual([]);
 });
 
 test("regression: a refused or lost key acknowledgement preserves input without retrying the write", async ({ page, api }) => {
-  await page.goto("/settings/models");
+  await page.goto("/settings/accounts");
   const input = page.getByTestId("deepseek-key").getByTestId("secret");
   let calls = 0;
   await page.route("**/api/v1/setting/update", async (route) => {
@@ -64,7 +64,7 @@ test("regression: a refused or lost key acknowledgement preserves input without 
     await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "test refusal" }) });
   });
   await input.fill("test-key-refused-3333");
-  await page.getByTestId("save").click();
+  await page.getByTestId("deepseek-form").getByTestId("save").click();
   await expect(page.getByTestId("deepseek-form").locator("[data-form-summary]")).toBeVisible();
   await expect(input).toHaveValue("test-key-refused-3333");
   expect((await api.setting.get()).deepseekApiKey.source).toBeNull();
@@ -76,8 +76,8 @@ test("regression: a refused or lost key acknowledgement preserves input without 
     await route.abort("failed");
   });
   await input.fill("test-key-unknown-4444");
-  await page.getByTestId("save").click();
-  await expect(page.getByTestId("save")).toBeEnabled();
+  await page.getByTestId("deepseek-form").getByTestId("save").click();
+  await expect(page.getByTestId("deepseek-form").getByTestId("save")).toBeEnabled();
   await expect(input).toHaveValue("test-key-unknown-4444");
   expect((await api.setting.get()).deepseekApiKey.hint).toMatch(/4444/u);
   expect(calls).toBe(2);

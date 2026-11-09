@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
-import { Clock, Console, Effect, Fiber, FiberHandle, Formatter, Option, Predicate, Queue, Schema, Stream } from "effect";
+import { Clock, Console, Effect, Fiber, FiberHandle, Formatter, Option, Predicate, Queue, Redacted, Schema, Stream } from "effect";
 import { FetchHttpClient } from "effect/http";
 
 import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
@@ -111,7 +111,7 @@ interface OwnChat {
 export const ownChat = (values: OwnChat) =>
   Effect.gen(function* () {
     const config = yield* loadConfig();
-    const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
+    const llm = modelClient(values.model || config.agent.model, Redacted.make(config.deepseek.apiKey), standaloneLlm());
     const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
     const home = join(homeOf(), "agent", values.name);
     const servers = yield* Effect.tryPromise({ try: () => readMcpConfig(values.mcp || join(home, "mcp.json")), catch: messageOf });

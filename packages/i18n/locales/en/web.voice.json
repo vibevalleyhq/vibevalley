@@ -17,8 +17,6 @@
     "intro": "The manager hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The manager's persona, greeting and voice are on the",
     "orchestratorPage": "manager page",
     "period": ".",
-    "ready": "Can connect",
-    "missing": "Credentials missing",
     "nextCall": "Changes take effect on the next call",
     "credentials": "Credentials",
     "console": "Agora console",
@@ -88,7 +86,8 @@
     },
     "dictationVia": "Dictation goes to",
     "dictationOwn": "Your own address",
-    "dictationMossIntro": "The server transcribes recordings using the MOSS connection and dictation model selected in AI services."
+    "dictationMossIntro": "The server transcribes recordings using the MOSS connection and dictation model selected in AI services.",
+    "line": "Line"
   },
   "choices": {
     "area": {

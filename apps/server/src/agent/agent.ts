@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { Context, Effect, FileSystem, Layer, Predicate, Schema } from "effect";
+import { Context, Effect, FileSystem, Layer, Predicate, Redacted, Schema } from "effect";
 
 import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
 import type { Llm } from "@vibevalley/ai/llm";
@@ -349,9 +349,16 @@ const make = Effect.gen(function* () {
 /** Where to put a key, in the owner's words. */
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
 
-export function modelClient(id: string, key: string | (() => string | undefined), service: Llm["Service"]): ModelClient {
+/** A DeepSeek client; the key is read out of its redaction only as each request is sent. */
+export function modelClient(id: string, key: Redacted.Redacted | (() => Redacted.Redacted | undefined), service: Llm["Service"]): ModelClient {
+  const plain = Redacted.isRedacted(key)
+    ? () => Redacted.value(key)
+    : () => {
+        const current = key();
+        return current === undefined ? undefined : Redacted.value(current);
+      };
   try {
-    return deepseek(id, key, service);
+    return deepseek(id, plain, service);
   } catch (e) {
     if (Schema.is(MissingKey)(e)) throw new Error(noDeepSeekKey(), { cause: e });
     throw e;

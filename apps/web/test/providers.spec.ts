@@ -4,7 +4,8 @@ test.use({ farm: "providers" });
 
 test("regression: the settings navigation leaves the provider form usable at 390px", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/settings/providers");
+  // The MOSS accounts are on the accounts page.
+  await page.goto("/settings/accounts");
   await expect(page.getByTestId("provider-form")).toBeVisible();
   const navigation = await page.getByTestId("settings-nav").boundingBox();
   expect(navigation?.height).toBeLessThanOrEqual(224);
@@ -28,14 +29,16 @@ test("regression: unbound provider choices keep a visible placeholder", async ({
 });
 
 test("MOSS connections bind uses, mask credentials, reject stale saves and require unbinding before clearing", async ({ page, api }) => {
-  await page.goto("/settings/providers");
+  // The accounts are made on the accounts page, the uses bound on the uses page: each form saves the whole settings.
   const form = page.getByTestId("provider-form");
+  const save = form.getByTestId("save");
+  const connection = page.getByTestId("provider-connection");
+  await page.goto("/settings/accounts");
   await expect(form).toHaveAttribute("data-revision", "0");
   await page.getByTestId("provider-add").click();
-  const connection = page.getByTestId("provider-connection");
   await connection.getByTestId("provider-name").fill("MOSS test account");
   await connection.getByTestId("secret").fill("test-provider-key-1234");
-  await page.getByTestId("save").click();
+  await save.click();
   await expect(form).toHaveAttribute("data-revision", "1");
   await expect(connection.getByTestId("secret")).toHaveValue("");
   await expect(connection.getByTestId("key-mark")).toHaveAttribute("data-hint", /1234/u);
@@ -43,6 +46,8 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   const id = saved.connections[0]?.id;
   expect(id).toBeTruthy();
   expect(JSON.stringify(saved)).not.toContain("test-provider-key");
+  await page.goto("/settings/providers");
+  await expect(form).toHaveAttribute("data-revision", "1");
   await page.getByTestId("provider-dictation").click();
   await page.locator(`[role="option"][data-key="${id}"]`).click();
   await page.getByTestId("provider-dictation-model").click();
@@ -77,7 +82,7 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
     await page.getByTestId(`provider-${use}-model`).click();
     await page.locator(`[role="option"][data-key="${model}"]`).click();
   }
-  await page.getByTestId("save").click();
+  await save.click();
   await expect(form).toHaveAttribute("data-revision", "2");
   expect((await api.provider.get()).dictation).toEqual({ connection: id, model: "moss-transcribe-diarize-pro" });
   expect((await api.provider.get()).image).toEqual({ connection: id, model: "moss-image-sft-1.0-2026-10-09" });
@@ -94,10 +99,11 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
     expect(restored[use]).toEqual({ connection: id, model });
     await expect(page.getByTestId(`provider-${use}-model`)).toHaveAttribute("data-value", model);
   }
+  await page.goto("/settings/accounts");
   await connection.getByTestId("provider-name").fill("unsaved edit");
   const current = await api.provider.get();
   await api.provider.update({ ...current, connections: current.connections.map(({ key: _key, ...item }) => ({ ...item, name: "other window" })) });
-  await page.getByTestId("save").click();
+  await save.click();
   await expect(page.getByTestId("provider-error")).toBeVisible();
   expect((await api.provider.get()).connections[0]?.name).toBe("other window");
   await expect(connection.getByTestId("provider-name")).toHaveValue("unsaved edit");
@@ -107,45 +113,24 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   await expect(connection.getByTestId("provider-name")).toHaveValue("other window");
 
   await connection.getByTestId("provider-key").locator('button:not([data-testid="reveal"])').click();
-  await page.getByTestId("save").click();
+  await save.click();
   await expect(page.getByTestId("provider-error")).toBeVisible();
   expect((await api.provider.get()).connections[0]?.key.source).toBe("settings");
-  await page.getByTestId("provider-dictation").click();
-  await page.locator('[role="option"][data-key=""]').click();
-  await page.getByTestId("provider-live").click();
-  await page.locator('[role="option"][data-key=""]').click();
-  const rejected = page.waitForResponse((response) => response.url().endsWith("/api/v1/provider/update"));
-  await page.getByTestId("save").click();
-  expect((await rejected).status()).toBe(409);
-  await expect(page.getByTestId("provider-error")).toBeVisible();
-  expect((await api.provider.get()).image?.connection).toBe(id);
-  await page.getByTestId("provider-image").click();
-  await page.locator('[role="option"][data-key=""]').click();
-  const boundUnderstanding = page.waitForResponse((response) => response.url().endsWith("/api/v1/provider/update"));
-  await page.getByTestId("save").click();
-  expect((await boundUnderstanding).status()).toBe(409);
-  expect((await api.provider.get()).understanding?.connection).toBe(id);
-  await page.getByTestId("provider-understanding").click();
-  await page.locator('[role="option"][data-key=""]').click();
-  const boundSpeech = page.waitForResponse((response) => response.url().endsWith("/api/v1/provider/update"));
-  await page.getByTestId("save").click();
-  expect((await boundSpeech).status()).toBe(409);
-  expect((await api.provider.get()).speech?.connection).toBe(id);
-  await page.getByTestId("provider-speech").click();
-  await page.locator('[role="option"][data-key=""]').click();
-  for (const [use] of audioAndRealtime) {
-    if (use === "live") continue;
+  // Bound uses keep the key: unbinding every use on the uses page lets the account go.
+  await page.goto("/settings/providers");
+  for (const use of ["dictation", "live", "image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "vision"]) {
     await page.getByTestId(`provider-${use}`).click();
     await page.locator('[role="option"][data-key=""]').click();
   }
-  await page.getByTestId("save").click();
+  await save.click();
   await expect(form).toHaveAttribute("data-revision", "4");
   expect(await api.setting.get()).toMatchObject({ readiness: { live: { ready: false, missing: "binding" }, dictation: { ready: false, missing: "binding" } } });
+  await page.goto("/settings/accounts");
   await connection.getByTestId("provider-models").click();
   await expect(page.getByTestId("provider-error")).toBeVisible();
   await page.getByTestId("provider-delete").click();
   await page.getByTestId("provider-delete-sure").click();
-  await page.getByTestId("save").click();
+  await save.click();
   await expect(form).toHaveAttribute("data-revision", "5");
   expect((await api.provider.get()).connections).toEqual([]);
 });

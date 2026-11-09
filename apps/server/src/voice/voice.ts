@@ -1,5 +1,5 @@
 import { type AgoraClient } from "agora-agents";
-import { Clock, Context, Effect, Fiber, FiberSet, Formatter, Layer, Option, Queue, Schema, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, Fiber, FiberSet, Formatter, Layer, Option, Queue, Redacted, Schema, type Scope, Stream } from "effect";
 import { HttpClient } from "effect/http";
 import { Socket } from "effect/socket";
 
@@ -48,6 +48,9 @@ import { extractMossToolAck, extractMossToolCalls, mossFrame, mossOrchestratorTo
 import { mossInstructions, noticeLine, onCallLine } from "./prompts.ts";
 
 export { agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, tunnelAnswers, vendorsFor, voiceAgentUid, voiceUnknown };
+
+/** The Agora credentials as Agora's token signer and REST client take them. */
+const plainAgora = (c: AgoraCredentials) => ({ appId: c.appId, appCertificate: Redacted.value(c.appCertificate) });
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
@@ -346,7 +349,7 @@ const make = (options: VoiceOptions = {}) =>
         }
         const c = yield* creds();
         const issued = yield* Effect.try({
-          try: () => sign(c, channel, uid),
+          try: () => sign(plainAgora(c), channel, uid),
           catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
         });
         if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
@@ -369,7 +372,7 @@ const make = (options: VoiceOptions = {}) =>
           return { appId: "moss", channel, uid, token: "moss" };
         }
         const issued = yield* Effect.try({
-          try: () => sign(g.credentials, channel, uid),
+          try: () => sign(plainAgora(g.credentials), channel, uid),
           catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
         });
         g.expires = now() + tokenSeconds * 1000;
@@ -441,9 +444,14 @@ const make = (options: VoiceOptions = {}) =>
             };
           }
           const forCall = about ? { ...voice, greeting: "" } : voice;
-          const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
+          const vendors = vendorsFor(
+            forCall,
+            { asrKey: Redacted.value(vendorKeys.asrKey), llmKey: Redacted.value(vendorKeys.llmKey), ttsKey: Redacted.value(vendorKeys.ttsKey) },
+            deepseekApiKey === undefined ? "" : Redacted.value(deepseekApiKey),
+            callLine,
+          );
           if ("_tag" in vendors) return yield* Effect.fail(vendors);
-          const agora = clientOf(g.credentials, voice.area, runHere, options.fetch);
+          const agora = clientOf(plainAgora(g.credentials), voice.area, runHere, options.fetch);
           client = agora;
           const session = agentFor(agora, forCall, vendors).createSession({
             channel,
@@ -536,7 +544,7 @@ const make = (options: VoiceOptions = {}) =>
           client = call.client;
         } else {
           const credentials = yield* creds();
-          client = clientOf(credentials, settings.voice().area, runHere, options.fetch);
+          client = clientOf(plainAgora(credentials), settings.voice().area, runHere, options.fetch);
         }
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),

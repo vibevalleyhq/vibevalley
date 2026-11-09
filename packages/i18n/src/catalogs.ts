@@ -3670,8 +3670,8 @@ export const catalogs = {
     },
     "web.provider": {
       speechNotice: "可独立选择 Flash 或 Pro，再到媒体页生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
-      title: "AI 服务",
-      intro: "保存 MOSS 连接，再为听写、生图、媒体理解、语音生成、音色设计、转写和实时音视频分别选择模型。",
+      title: "用途",
+      intro: "每个功能用哪个账号和模型。账号和钥匙在「账号与钥匙」里填。",
       words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 理解 语音 音频 AI",
       understandingNotice: "配置独立的连接和模型。在媒体页选择文件并明确确认上传；保存配置不会上传文件或发起推理。",
       imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
@@ -3713,6 +3713,7 @@ export const catalogs = {
       connectionFor: "{use}用的连接",
       modelFor: "{use}用的模型",
       openSpeechShort: "去生成",
+      adapted: "能用的模型",
     },
     "web.repo": {
       title: "仓库",
@@ -4040,7 +4041,6 @@ export const catalogs = {
         search: "搜索设置…",
         general: "通用",
         appearance: "外观",
-        models: "模型",
         about: "关于",
         memory: "记性",
         skills: "技能",
@@ -4049,12 +4049,12 @@ export const catalogs = {
         chat: "聊天软件",
         devices: "设备",
         width: "导航的宽窄（拖动，双击回默认）",
+        accounts: "账号与钥匙",
       },
       groups: { options: "选项", helpers: "帮工", voice: "语音", connect: "连接" },
       words: {
         general: "语言 language 启动 打开 工作台 农场",
         appearance: "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
-        models: "DeepSeek key 钥匙 模型 管家",
         about: "版本 家目录 设置文件 version",
         memory: "Nowledge EverOS 记性 记忆",
         skills: "技能 skill",
@@ -4064,6 +4064,7 @@ export const catalogs = {
         github: "gh PR 登录",
         chat: "微信 飞书 QQ 连接器 配对",
         devices: "手机 配对 连接到本机 局域网",
+        accounts: "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
@@ -4080,7 +4081,7 @@ export const catalogs = {
         scale: "界面大小",
         scaleHint: "缩放整个工作台；农场按整数倍放大，不跟着变",
       },
-      models: { intro: "管家和 VibeValley 自己的帮工用的模型。", deepseekHint: "管家和 VibeValley 自己的帮工用它" },
+      models: { deepseekHint: "管家和 VibeValley 自己的帮工用它" },
       memory: { intro: "帮工还能去外面的记性里查、往里记。" },
       about: {
         version: "版本",
@@ -4150,6 +4151,7 @@ export const catalogs = {
         call: "通话",
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
+      accounts: { intro: "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。" },
     },
     "web.tree": {
       kind: { leaf: "叶", fruit: "果", seed: "种子" },
@@ -4258,8 +4260,6 @@ export const catalogs = {
           "管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。管家的人设、开场白和音色在",
         orchestratorPage: "管家页",
         period: "。",
-        ready: "能接通",
-        missing: "还缺凭据",
         nextCall: "改了以后，下一通电话生效",
         credentials: "凭据",
         console: "声网控制台",
@@ -4326,6 +4326,7 @@ export const catalogs = {
         dictationVia: "听写走哪",
         dictationOwn: "自己的地址",
         dictationMossIntro: "录音经服务端交给 AI 服务中选定的 MOSS 连接和听写模型。",
+        line: "线路",
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -8385,9 +8386,8 @@ export const catalogs = {
     "web.provider": {
       speechNotice:
         "Choose a separate Flash or Pro binding, then generate one speaker on the Media page. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
-      title: "AI services",
-      intro:
-        "Save MOSS connections, then choose independent models for dictation, images, media understanding, speech, voice design, transcription and realtime audio or vision.",
+      title: "Uses",
+      intro: "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
       words: "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
       understandingNotice:
         "Configure the independent connection and model. Select files and explicitly approve uploads on the Media page. Saving this configuration does not upload or run inference.",
@@ -8431,6 +8431,7 @@ export const catalogs = {
       connectionFor: "Connection for {use}",
       modelFor: "Model for {use}",
       openSpeechShort: "Open",
+      adapted: "Models it can use",
     },
     "web.repo": {
       title: "Repos",
@@ -8771,7 +8772,6 @@ export const catalogs = {
         search: "Search settings…",
         general: "General",
         appearance: "Appearance",
-        models: "Models",
         about: "About",
         memory: "Memory",
         skills: "Skills",
@@ -8780,12 +8780,12 @@ export const catalogs = {
         chat: "Chat apps",
         devices: "Devices",
         width: "Navigation width (drag; double-click for the default)",
+        accounts: "Accounts and keys",
       },
       groups: { options: "Options", helpers: "Helpers", voice: "Voice", connect: "Connections" },
       words: {
         general: "language start open workbench farm",
         appearance: "theme dark light size zoom scale font",
-        models: "DeepSeek key model manager",
         about: "version home folder settings file",
         memory: "Nowledge EverOS memory recall",
         skills: "skill library",
@@ -8795,6 +8795,7 @@ export const catalogs = {
         github: "gh PR login",
         chat: "WeChat Feishu Lark QQ connectors pairing",
         devices: "phone pairing connect to this machine LAN",
+        accounts: "keys accounts DeepSeek MOSS Agora API key models",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
@@ -8811,7 +8812,7 @@ export const catalogs = {
         scale: "Interface size",
         scaleHint: "Scales the whole workbench; the farm keeps its whole-number scaling",
       },
-      models: { intro: "The models the manager and VibeValley's own helpers use.", deepseekHint: "The manager and VibeValley's own helpers use it" },
+      models: { deepseekHint: "The manager and VibeValley's own helpers use it" },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
         version: "Version",
@@ -8881,6 +8882,9 @@ export const catalogs = {
         call: "Calls",
       },
       readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
+      accounts: {
+        intro: "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses.",
+      },
     },
     "web.tree": {
       kind: { leaf: "Leaf", fruit: "Fruit", seed: "Seed" },
@@ -8989,8 +8993,6 @@ export const catalogs = {
           "The manager hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The manager's persona, greeting and voice are on the",
         orchestratorPage: "manager page",
         period: ".",
-        ready: "Can connect",
-        missing: "Credentials missing",
         nextCall: "Changes take effect on the next call",
         credentials: "Credentials",
         console: "Agora console",
@@ -9058,6 +9060,7 @@ export const catalogs = {
         dictationVia: "Dictation goes to",
         dictationOwn: "Your own address",
         dictationMossIntro: "The server transcribes recordings using the MOSS connection and dictation model selected in AI services.",
+        line: "Line",
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -12902,6 +12905,7 @@ export interface Messages {
   "web.pkm.toolbar.outdent": undefined;
   "web.pkm.toolbar.todo": undefined;
   "web.pkm.toolbar.up": undefined;
+  "web.provider.adapted": undefined;
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
   "web.provider.connectionFor": { readonly use: string | number };
@@ -13274,6 +13278,7 @@ export interface Messages {
   "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
+  "web.setting.accounts.intro": undefined;
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
@@ -13326,8 +13331,8 @@ export interface Messages {
   "web.setting.missing.mossKey": undefined;
   "web.setting.missing.mossOff": undefined;
   "web.setting.models.deepseekHint": undefined;
-  "web.setting.models.intro": undefined;
   "web.setting.nav.about": undefined;
+  "web.setting.nav.accounts": undefined;
   "web.setting.nav.appearance": undefined;
   "web.setting.nav.call": undefined;
   "web.setting.nav.chat": undefined;
@@ -13336,7 +13341,6 @@ export interface Messages {
   "web.setting.nav.general": undefined;
   "web.setting.nav.label": undefined;
   "web.setting.nav.memory": undefined;
-  "web.setting.nav.models": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
   "web.setting.nav.width": undefined;
@@ -13364,6 +13368,7 @@ export interface Messages {
   "web.setting.source.write": undefined;
   "web.setting.source.writeHint": undefined;
   "web.setting.words.about": undefined;
+  "web.setting.words.accounts": undefined;
   "web.setting.words.appearance": undefined;
   "web.setting.words.call": undefined;
   "web.setting.words.chat": undefined;
@@ -13372,7 +13377,6 @@ export interface Messages {
   "web.setting.words.general": undefined;
   "web.setting.words.github": undefined;
   "web.setting.words.memory": undefined;
-  "web.setting.words.models": undefined;
   "web.setting.words.moss": undefined;
   "web.setting.words.skills": undefined;
   "web.tree.aboutToFall": undefined;
@@ -13618,6 +13622,7 @@ export interface Messages {
   "web.voice.voice.intro": undefined;
   "web.voice.voice.language": undefined;
   "web.voice.voice.languageHint": undefined;
+  "web.voice.voice.line": undefined;
   "web.voice.voice.listen": undefined;
   "web.voice.voice.listenParts": undefined;
   "web.voice.voice.llmAddress": undefined;
@@ -13626,7 +13631,6 @@ export interface Messages {
   "web.voice.voice.llmModel": undefined;
   "web.voice.voice.microsoft": undefined;
   "web.voice.voice.microsoftKey": undefined;
-  "web.voice.voice.missing": undefined;
   "web.voice.voice.model": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.ok": undefined;
@@ -13661,7 +13665,6 @@ export interface Messages {
   "web.voice.voice.persona.voice": undefined;
   "web.voice.voice.persona.voiceId": undefined;
   "web.voice.voice.range": { readonly fallback: string | number; readonly max: string | number; readonly min: string | number };
-  "web.voice.voice.ready": undefined;
   "web.voice.voice.saved": undefined;
   "web.voice.voice.section.label": undefined;
   "web.voice.voice.speechServer": undefined;

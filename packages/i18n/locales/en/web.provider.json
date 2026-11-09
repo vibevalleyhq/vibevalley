@@ -1,7 +1,7 @@
 {
   "speechNotice": "Choose a separate Flash or Pro binding, then generate one speaker on the Media page. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
-  "title": "AI services",
-  "intro": "Save MOSS connections, then choose independent models for dictation, images, media understanding, speech, voice design, transcription and realtime audio or vision.",
+  "title": "Uses",
+  "intro": "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
   "words": "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
   "understandingNotice": "Configure the independent connection and model. Select files and explicitly approve uploads on the Media page. Saving this configuration does not upload or run inference.",
   "imageNotice": "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
@@ -42,5 +42,6 @@
   },
   "connectionFor": "Connection for {use}",
   "modelFor": "Model for {use}",
-  "openSpeechShort": "Open"
+  "openSpeechShort": "Open",
+  "adapted": "Models it can use"
 }

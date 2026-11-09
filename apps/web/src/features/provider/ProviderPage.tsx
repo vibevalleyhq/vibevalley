@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 import type { ProviderConnectionUpdate, ProviderModelListing, ProviderStatus, ProviderUpdate } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
@@ -92,6 +92,9 @@ const useGroups = [
   { title: "groupLive", uses: [{ use: "live", hint: "liveHint" }, { use: "vision" }] },
 ] as const;
 
+/** The uses an account serves, in the order the uses table shows them: what the account page lists as its models. */
+const adaptedUses = ["image", "understanding", "dictation", "speech", "speakers", "voiceDesign", "transcription", "live", "vision"] as const;
+
 const editable = (status: ProviderStatus): ProviderUpdate => ({
   revision: status.revision,
   connections: status.connections.map(({ key: _key, ...connection }) => connection),
@@ -106,18 +109,34 @@ const editable = (status: ProviderStatus): ProviderUpdate => ({
   vision: status.vision,
 });
 
-export function ProviderPage() {
+/** Which of the providers' settings a place shows: the MOSS accounts (with the other keys, on the accounts page), or
+ * the uses each feature is bound to. Each saves the whole settings, its own part changed. */
+type ProviderPart = "accounts" | "uses";
+
+function Provider(props: { part: ProviderPart }) {
   const query = useQuery(providerQuery);
   return (
+    <Show when={ready(query, undefined)} fallback={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.base.form.asking")}</Quiet>}>
+      {(status) => <ProviderForm initial={untrack(status)} part={props.part} />}
+    </Show>
+  );
+}
+
+/** The uses: which account and model each feature calls. */
+export function ProviderPage() {
+  return (
     <SettingsPage title={t("web.provider.title")} hint={t("web.provider.intro")}>
-      <Show when={ready(query, undefined)} fallback={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.base.form.asking")}</Quiet>}>
-        {(status) => <ProviderForm initial={untrack(status)} />}
-      </Show>
+      <Provider part="uses" />
     </SettingsPage>
   );
 }
 
-function ProviderForm(props: { initial: ProviderStatus }) {
+/** The MOSS accounts, for the accounts page. */
+export function MossAccounts() {
+  return <Provider part="accounts" />;
+}
+
+function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
   const start = untrack(() => props.initial);
   const [base, setBase] = createSignal(start);
   const [draft, setDraft] = createSignal(editable(start));
@@ -176,179 +195,198 @@ function ProviderForm(props: { initial: ProviderStatus }) {
       data-testid="provider-form"
       data-revision={base().revision}
     >
-      <section {...stylex.attrs(viewStyles.section)}>
-        <div {...stylex.attrs(viewStyles.sectionHead)}>
-          <h2 {...stylex.attrs(viewStyles.sectionTitle)}>{t("web.provider.connections")}</h2>
-          <OutLink href="https://platform.moss.cn/" label={t("web.provider.console")} />
-          <ConfirmButton
-            testid="provider-reload"
-            label={t("web.provider.reload")}
-            question={t("web.provider.reloadAsk")}
-            disabled={act.busy()}
-            onConfirm={() => void reload()}
-          />
-          <Button
-            data-testid="provider-add"
-            disabled={act.busy() || draft().connections.length >= 32}
-            onClick={() => {
-              setDraft((current) => ({
-                ...current,
-                connections: [...current.connections, { id: crypto.randomUUID(), name: "MOSS", adapter: "moss", enabled: true }],
-              }));
-            }}
-          >
-            {t("web.provider.add")}
-          </Button>
-        </div>
-        <Show when={draft().connections.length === 0}>
-          <Quiet>{t("web.provider.empty")}</Quiet>
-        </Show>
-        <For each={draft().connections} keyed={(connection) => connection.id}>
-          {(connection) => (
-            <Card
-              title={connection().name || "MOSS"}
-              testid="provider-connection"
-              item={connection().id}
-              styles={viewStyles.minimumWidth}
-              action={
-                <div {...stylex.attrs(viewStyles.toolbar)}>
-                  <Button data-testid="provider-models" disabled={act.busy() || dirty()} onClick={() => void discover(connection().id)}>
-                    {t("web.provider.discover")}
-                  </Button>
-                  <ConfirmButton
-                    testid="provider-delete"
-                    label={t("web.provider.remove")}
-                    question={t("web.provider.removeAsk")}
-                    disabled={act.busy()}
-                    onConfirm={() => {
-                      const id = connection().id;
-                      setDraft((current) => ({ ...current, connections: current.connections.filter((item) => item.id !== id) }));
-                    }}
-                  />
-                </div>
-              }
+      <Show when={props.part === "accounts"}>
+        <section {...stylex.attrs(viewStyles.section)}>
+          <div {...stylex.attrs(viewStyles.sectionHead)}>
+            <h2 {...stylex.attrs(viewStyles.sectionTitle)}>MOSS</h2>
+            <OutLink href="https://platform.moss.cn/" label={t("web.provider.console")} />
+            <ConfirmButton
+              testid="provider-reload"
+              label={t("web.provider.reload")}
+              question={t("web.provider.reloadAsk")}
+              disabled={act.busy()}
+              onConfirm={() => void reload()}
+            />
+            <Button
+              data-testid="provider-add"
+              disabled={act.busy() || draft().connections.length >= 32}
+              onClick={() => {
+                setDraft((current) => ({
+                  ...current,
+                  connections: [...current.connections, { id: crypto.randomUUID(), name: "MOSS", adapter: "moss", enabled: true }],
+                }));
+              }}
             >
-              <div {...stylex.attrs(viewStyles.form)}>
-                <div {...stylex.attrs(viewStyles.nameRow)}>
-                  <div {...stylex.attrs(viewStyles.nameField)}>
-                    <Field label={t("web.provider.name")}>
-                      <TextInput
-                        data-testid="provider-name"
-                        aria-label={t("web.provider.name")}
-                        disabled={act.busy()}
-                        value={connection().name}
-                        onInput={(event) => change(connection().id, { name: event.currentTarget.value })}
-                      />
-                    </Field>
-                  </div>
-                  <div {...stylex.attrs(viewStyles.row)}>
-                    <Checkbox
-                      testid="provider-enabled"
-                      label={t("web.provider.enabled")}
-                      checked={connection().enabled}
+              {t("web.provider.add")}
+            </Button>
+          </div>
+          <Show when={draft().connections.length === 0}>
+            <Quiet>{t("web.provider.empty")}</Quiet>
+          </Show>
+          <For each={draft().connections} keyed={(connection) => connection.id}>
+            {(connection) => (
+              <Card
+                title={connection().name || "MOSS"}
+                testid="provider-connection"
+                item={connection().id}
+                styles={viewStyles.minimumWidth}
+                action={
+                  <div {...stylex.attrs(viewStyles.toolbar)}>
+                    <Button data-testid="provider-models" disabled={act.busy() || dirty()} onClick={() => void discover(connection().id)}>
+                      {t("web.provider.discover")}
+                    </Button>
+                    <ConfirmButton
+                      testid="provider-delete"
+                      label={t("web.provider.remove")}
+                      question={t("web.provider.removeAsk")}
                       disabled={act.busy()}
-                      onChange={(enabled) => change(connection().id, { enabled })}
+                      onConfirm={() => {
+                        const id = connection().id;
+                        setDraft((current) => ({ ...current, connections: current.connections.filter((item) => item.id !== id) }));
+                      }}
                     />
-                    <span {...stylex.attrs(viewStyles.text)}>{t("web.provider.enabled")}</span>
                   </div>
-                </div>
-                <div data-testid="provider-key">
-                  <KeyField
-                    label="API Key"
-                    status={base().connections.find((item) => item.id === connection().id)?.key ?? { source: null }}
-                    removing={connection().key === null}
-                    onRemove={(remove) => (remove ? change(connection().id, { key: null }) : keepKey(connection().id))}
-                  >
-                    <SecretInput
-                      data-testid="secret"
-                      aria-label="MOSS API Key"
-                      disabled={act.busy() || connection().key === null}
-                      value={connection().key ?? ""}
-                      placeholder={t("web.base.form.keepEmpty")}
-                      onInput={(event) => (event.currentTarget.value ? change(connection().id, { key: event.currentTarget.value }) : keepKey(connection().id))}
-                    />
-                  </KeyField>
-                </div>
-                <p {...stylex.attrs(viewStyles.detail)}>{dirty() ? t("web.provider.saveFirst") : t("web.provider.discoveryHint")}</p>
-                <Show when={!dirty() && listing()?.revision === base().revision && listing()?.connection === connection().id ? listing() : undefined}>
-                  {(result) => (
-                    <div data-testid="provider-model-list" {...stylex.attrs(viewStyles.modelList)}>
-                      <Show when={result().models.length > 0} fallback={<Quiet>{t("web.provider.noModels")}</Quiet>}>
-                        <ul {...stylex.attrs(viewStyles.list)}>
-                          <For each={result().models}>{(model) => <li {...stylex.attrs(viewStyles.model)}>{model.id}</li>}</For>
-                        </ul>
-                      </Show>
+                }
+              >
+                <div {...stylex.attrs(viewStyles.form)}>
+                  <div {...stylex.attrs(viewStyles.nameRow)}>
+                    <div {...stylex.attrs(viewStyles.nameField)}>
+                      <Field label={t("web.provider.name")}>
+                        <TextInput
+                          data-testid="provider-name"
+                          aria-label={t("web.provider.name")}
+                          disabled={act.busy()}
+                          value={connection().name}
+                          onInput={(event) => change(connection().id, { name: event.currentTarget.value })}
+                        />
+                      </Field>
                     </div>
-                  )}
-                </Show>
-              </div>
-            </Card>
-          )}
-        </For>
-      </section>
-      <Card title={t("web.provider.uses")}>
-        <p {...stylex.attrs(viewStyles.detail)}>{t("web.provider.usesIntro")}</p>
-        <div {...stylex.attrs(viewStyles.uses)}>
-          <For each={useGroups}>
-            {(group) => (
-              <>
-                <div {...stylex.attrs(viewStyles.group)}>{t(`web.provider.${group.title}`)}</div>
-                <For each={group.uses}>
-                  {(item) => {
-                    const use = item.use;
-                    const name = t(`web.provider.use.${use}`);
-                    return (
-                      <div data-testid="provider-use" data-key={use} {...stylex.attrs(viewStyles.use)}>
-                        <span {...stylex.attrs(viewStyles.useName)}>
-                          {name}
-                          <Show when={"hint" in item ? item.hint : undefined}>{(hint) => <Hint text={t(`web.provider.${hint()}`)} />}</Show>
-                          <Show when={use === "speech"}>
-                            <Link href="/media?mode=speech" data-testid="provider-speech-open" {...stylex.attrs(viewStyles.link)}>
-                              {t("web.provider.openSpeechShort")}
-                            </Link>
-                          </Show>
-                        </span>
-                        <div {...stylex.attrs(viewStyles.usePicks)}>
-                          <Select
-                            label={t("web.provider.connectionFor", { use: name })}
-                            testid={`provider-${use}`}
-                            placeholder={t("web.provider.unbound")}
-                            disabled={act.busy()}
-                            value={draft()[use]?.connection ?? ""}
-                            options={choices()}
-                            onChange={(connection) =>
-                              setDraft((current) => ({
-                                ...current,
-                                [use]: connection ? { connection, model: current[use]?.model ?? base()[`${use}Models`][0] ?? "" } : null,
-                              }))
-                            }
-                          />
-                          <Show when={draft()[use]}>
-                            <Select
-                              label={t("web.provider.modelFor", { use: name })}
-                              testid={`provider-${use}-model`}
-                              disabled={act.busy()}
-                              value={draft()[use]?.model ?? ""}
-                              options={base()[`${use}Models`].map((model) => ({ value: model, label: model }))}
-                              onChange={(model) =>
-                                setDraft((current) => {
-                                  const binding = current[use];
-                                  return { ...current, [use]: binding ? { ...binding, model } : null };
-                                })
-                              }
-                            />
-                          </Show>
-                        </div>
+                    <div {...stylex.attrs(viewStyles.row)}>
+                      <Checkbox
+                        testid="provider-enabled"
+                        label={t("web.provider.enabled")}
+                        checked={connection().enabled}
+                        disabled={act.busy()}
+                        onChange={(enabled) => change(connection().id, { enabled })}
+                      />
+                      <span {...stylex.attrs(viewStyles.text)}>{t("web.provider.enabled")}</span>
+                    </div>
+                  </div>
+                  <div data-testid="provider-key">
+                    <KeyField
+                      label="API Key"
+                      status={base().connections.find((item) => item.id === connection().id)?.key ?? { source: null }}
+                      removing={connection().key === null}
+                      onRemove={(remove) => (remove ? change(connection().id, { key: null }) : keepKey(connection().id))}
+                    >
+                      <SecretInput
+                        data-testid="secret"
+                        aria-label="MOSS API Key"
+                        disabled={act.busy() || connection().key === null}
+                        value={connection().key ?? ""}
+                        placeholder={t("web.base.form.keepEmpty")}
+                        onInput={(event) =>
+                          event.currentTarget.value ? change(connection().id, { key: event.currentTarget.value }) : keepKey(connection().id)
+                        }
+                      />
+                    </KeyField>
+                  </div>
+                  <details data-testid="provider-adapted">
+                    <summary {...stylex.attrs(viewStyles.detail)}>{t("web.provider.adapted")}</summary>
+                    <ul {...stylex.attrs(viewStyles.list)}>
+                      <For each={adaptedUses}>
+                        {(use) => (
+                          <li {...stylex.attrs(viewStyles.text)}>
+                            {t(`web.provider.use.${use}`)}
+                            <span {...stylex.attrs(viewStyles.detail)}> {list(base()[`${use}Models`])}</span>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </details>
+                  <p {...stylex.attrs(viewStyles.detail)}>{dirty() ? t("web.provider.saveFirst") : t("web.provider.discoveryHint")}</p>
+                  <Show when={!dirty() && listing()?.revision === base().revision && listing()?.connection === connection().id ? listing() : undefined}>
+                    {(result) => (
+                      <div data-testid="provider-model-list" {...stylex.attrs(viewStyles.modelList)}>
+                        <Show when={result().models.length > 0} fallback={<Quiet>{t("web.provider.noModels")}</Quiet>}>
+                          <ul {...stylex.attrs(viewStyles.list)}>
+                            <For each={result().models}>{(model) => <li {...stylex.attrs(viewStyles.model)}>{model.id}</li>}</For>
+                          </ul>
+                        </Show>
                       </div>
-                    );
-                  }}
-                </For>
-              </>
+                    )}
+                  </Show>
+                </div>
+              </Card>
             )}
           </For>
-        </div>
-        <p {...stylex.attrs(viewStyles.detail)}>{t("web.provider.bindingHint")}</p>
-      </Card>
+        </section>
+      </Show>
+      <Show when={props.part === "uses"}>
+        <Card title={t("web.provider.uses")}>
+          <p {...stylex.attrs(viewStyles.detail)}>{t("web.provider.usesIntro")}</p>
+          <div {...stylex.attrs(viewStyles.uses)}>
+            <For each={useGroups}>
+              {(group) => (
+                <>
+                  <div {...stylex.attrs(viewStyles.group)}>{t(`web.provider.${group.title}`)}</div>
+                  <For each={group.uses}>
+                    {(item) => {
+                      const use = item.use;
+                      const name = t(`web.provider.use.${use}`);
+                      return (
+                        <div data-testid="provider-use" data-key={use} {...stylex.attrs(viewStyles.use)}>
+                          <span {...stylex.attrs(viewStyles.useName)}>
+                            {name}
+                            <Show when={"hint" in item ? item.hint : undefined}>{(hint) => <Hint text={t(`web.provider.${hint()}`)} />}</Show>
+                            <Show when={use === "speech"}>
+                              <Link href="/media?mode=speech" data-testid="provider-speech-open" {...stylex.attrs(viewStyles.link)}>
+                                {t("web.provider.openSpeechShort")}
+                              </Link>
+                            </Show>
+                          </span>
+                          <div {...stylex.attrs(viewStyles.usePicks)}>
+                            <Select
+                              label={t("web.provider.connectionFor", { use: name })}
+                              testid={`provider-${use}`}
+                              placeholder={t("web.provider.unbound")}
+                              disabled={act.busy()}
+                              value={draft()[use]?.connection ?? ""}
+                              options={choices()}
+                              onChange={(connection) =>
+                                setDraft((current) => ({
+                                  ...current,
+                                  [use]: connection ? { connection, model: current[use]?.model ?? base()[`${use}Models`][0] ?? "" } : null,
+                                }))
+                              }
+                            />
+                            <Show when={draft()[use]}>
+                              <Select
+                                label={t("web.provider.modelFor", { use: name })}
+                                testid={`provider-${use}-model`}
+                                disabled={act.busy()}
+                                value={draft()[use]?.model ?? ""}
+                                options={base()[`${use}Models`].map((model) => ({ value: model, label: model }))}
+                                onChange={(model) =>
+                                  setDraft((current) => {
+                                    const binding = current[use];
+                                    return { ...current, [use]: binding ? { ...binding, model } : null };
+                                  })
+                                }
+                              />
+                            </Show>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </>
+              )}
+            </For>
+          </div>
+          <p {...stylex.attrs(viewStyles.detail)}>{t("web.provider.bindingHint")}</p>
+        </Card>
+      </Show>
       <SaveBar
         dirty={dirty()}
         busy={act.busy()}

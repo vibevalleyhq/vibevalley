@@ -151,7 +151,7 @@ const make = (options: OrchestratorOptions = {}) =>
           const llmOf = (): ModelClient => {
             if (options.llm) return options.llm();
             // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-            return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
+            return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), settings.deepseekApiKey, service);
           };
           // One of its own crons (not a helper's) comes due within that long: it will be woken then.
           const wakeSoon = (withinMs: number) => {
@@ -391,7 +391,7 @@ const make = (options: OrchestratorOptions = {}) =>
         (a) =>
           Effect.gen(function* () {
             const me = yield* instanceOf(a.id);
-            if ((options.llm || settings.deepseekApiKey()) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
+            if ((options.llm !== undefined || settings.deepseekApiKey() !== undefined) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
           }),
         { discard: true },
       );

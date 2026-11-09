@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes.
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Clock, Effect, Option, Schema } from "effect";
+import { Clock, Effect, Option, Redacted, Schema } from "effect";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
@@ -92,7 +92,8 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart. The SDK's connect is the one call.
   const connect = () => {
-    const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
+    const key = c.key === undefined ? "" : Redacted.value(c.key);
+    const wire = new StreamableHTTPClientTransport(new URL(c.url), key ? { requestInit: { headers: { Authorization: `Bearer ${key}` } } } : {});
     transport = wire;
     const one = new Client({ name: app, version: "1" });
     return one
