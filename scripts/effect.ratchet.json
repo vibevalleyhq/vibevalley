@@ -175,7 +175,7 @@
   "strictBooleanExpressions": {
     "apps/server": 1697,
     "apps/cli": 47,
-    "packages/agent": 91,
+    "packages/agent": 90,
     "packages/ai": 70,
     "packages/provider": 26,
     "packages/pkm": 59,

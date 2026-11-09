@@ -9,6 +9,14 @@ import { type JsonSchema, toolArguments } from "@vibevalley/ai/tools";
 
 import { AgentBusy, CannotContinue, messageOf, type ToolFailed } from "./errors.ts";
 
+/** What an answer's stream tells: an event, or, last, how it failed. */
+type Told = { readonly _tag: "event"; readonly event: AssistantMessageEvent } | { readonly _tag: "failed"; readonly failure: LlmError };
+/** An answer folded so far: the partial message last seen, and how it ended once it has. */
+interface Answered {
+  readonly partial?: AssistantMessage;
+  readonly end?: { readonly _tag: "ended"; readonly message: AssistantMessage } | { readonly _tag: "failed"; readonly failure: LlmError };
+}
+
 export interface ToolResult {
   readonly content: readonly (TextContent | ImageContent)[];
   readonly isError?: boolean;
@@ -124,54 +132,55 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       Effect.gen(function* () {
         const started = yield* Clock.currentTimeMillis;
         const thinkingLevel = reasoning ?? "off";
-        let partial: AssistantMessage | undefined;
-        let ended: AssistantMessage | undefined;
         const finished = (m: AssistantMessage) =>
           Effect.map(Clock.currentTimeMillis, (now): AssistantMessage => ({ ...m, thinkingLevel, durationMs: now - started }));
-        const events = options.llm
-          .stream(options.model, options.toLlm(asked), { apiKey: options.apiKey(), ...(reasoning ? { reasoning } : {}) })
-          .pipe(Stream.interruptWhen(Deferred.await(stop)));
-        let failure: LlmError | undefined;
-        yield* Stream.runForEach(events, (e) =>
-          Effect.gen(function* () {
-            switch (e.type) {
-              case "start":
-                partial = e.partial;
-                yield* options.onEvent({ type: "message_start", message: partial });
-                return;
-              case "done":
-                ended = yield* finished(e.message);
-                return;
-              case "error":
-                ended = yield* finished(e.error);
-                return;
-              default:
-                partial = e.partial;
-                yield* options.onEvent({ type: "message_update", assistantMessageEvent: e, message: e.partial });
-            }
-          }),
-        ).pipe(
-          Effect.catchTag("LlmError", (e) =>
-            Effect.sync(() => {
-              failure = e;
-            }),
-          ),
+        // A failure of the stream is its last element, so the fold keeps what had come before it.
+        const told = options.llm.stream(options.model, options.toLlm(asked), { apiKey: options.apiKey(), ...(reasoning ? { reasoning } : {}) }).pipe(
+          Stream.interruptWhen(Deferred.await(stop)),
+          Stream.map((event): Told => ({ _tag: "event", event })),
+          Stream.catchTag("LlmError", (failure) => Stream.succeed<Told>({ _tag: "failed", failure })),
         );
-        if (ended === undefined) {
-          const base = partial ?? {
-            role: "assistant" as const,
-            content: [],
-            api: options.model.api,
-            provider: options.model.provider,
-            model: options.model.id,
-            usage: zeroUsage(),
-            stopReason: "error" as const,
-            timestamp: started,
-          };
-          ended = yield* finished(
-            failure ? failedMessage(options.model, started, failure) : { ...base, stopReason: "aborted", errorMessage: "Request was aborted" },
-          );
-        }
+        const got = yield* Stream.runFoldEffect(
+          told,
+          (): Answered => ({}),
+          (so, item): Effect.Effect<Answered> =>
+            Effect.gen(function* () {
+              // An answer already ended stays as it ended.
+              if (item._tag === "failed") return so.end === undefined ? { ...so, end: { _tag: "failed", failure: item.failure } } : so;
+              const e = item.event;
+              switch (e.type) {
+                case "start":
+                  yield* options.onEvent({ type: "message_start", message: e.partial });
+                  return { ...so, partial: e.partial };
+                case "done":
+                  return { ...so, end: { _tag: "ended", message: yield* finished(e.message) } };
+                case "error":
+                  return { ...so, end: { _tag: "ended", message: yield* finished(e.error) } };
+                default:
+                  yield* options.onEvent({ type: "message_update", assistantMessageEvent: e, message: e.partial });
+                  return { ...so, partial: e.partial };
+              }
+            }),
+        );
+        const partial = got.partial;
+        const base = partial ?? {
+          role: "assistant" as const,
+          content: [],
+          api: options.model.api,
+          provider: options.model.provider,
+          model: options.model.id,
+          usage: zeroUsage(),
+          stopReason: "error" as const,
+          timestamp: started,
+        };
+        const ended =
+          got.end?._tag === "ended"
+            ? got.end.message
+            : yield* finished(
+                got.end?._tag === "failed"
+                  ? failedMessage(options.model, started, got.end.failure)
+                  : { ...base, stopReason: "aborted", errorMessage: "Request was aborted" },
+              );
         if (partial === undefined) yield* options.onEvent({ type: "message_start", message: ended });
         yield* emit({ type: "message_end", message: ended });
         return ended;
