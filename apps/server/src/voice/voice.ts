@@ -91,27 +91,32 @@ const mapTranscriptionFailure = (e: AudioFailure | TranscriptionFailed): ApiErro
   }
 };
 
+/** A grant is issued with its token, starting while its call is being set up, and on once a call owns it. */
+type GrantPhase = { readonly _tag: "issued" } | { readonly _tag: "starting" } | { readonly _tag: "on"; readonly agent: string };
+
 type Grant =
   | {
       readonly kind: "agora";
       readonly credentials: AgoraCredentials;
       expires: number;
-      starting: boolean;
-      agent: string;
+      phase: GrantPhase;
     }
   | {
       readonly kind: "moss";
       expires: number;
-      starting: boolean;
-      agent: string;
+      phase: GrantPhase;
     };
 
+/** The MOSS Live line a call speaks through: waiting (pieces held, its link maybe open but not yet set up), ready once the
+ * session is updated, closed for good. A call and the page's relay share it, so it is one object whose phase moves on. */
+type MossPhase =
+  | { readonly _tag: "waiting"; readonly link?: RealtimeLink; readonly pending: string[] }
+  | { readonly _tag: "ready"; readonly link: RealtimeLink }
+  | { readonly _tag: "closed" };
 interface MossLine {
-  link?: RealtimeLink;
-  ready: boolean;
-  closed: boolean;
-  readonly pending: string[];
+  phase: MossPhase;
 }
+const waitingLine = (): MossLine => ({ phase: { _tag: "waiting", pending: [] } });
 
 /** A call's agent session: what it says goes through it, with the session's own ConvoAI token. */
 type CallSession = ReturnType<ReturnType<typeof agentFor>["createSession"]>;
@@ -128,9 +133,10 @@ interface Call {
   readonly quick: boolean;
   /** Said at every pickup; not worth keeping in the chat. */
   readonly greeting: string;
+  /** Aborted once the call is ending: what it still does checks this, and its requests are cut. */
   readonly life: AbortController;
-  ending: boolean;
 }
+const ending = (call: Call) => call.life.signal.aborted;
 
 export interface RealtimeLine {
   readonly run: (page: Socket.Socket) => Effect.Effect<void, never, Scope.Scope>;
@@ -211,7 +217,7 @@ const make = (options: VoiceOptions = {}) =>
 
     // Pending grants have the same validity as their signed token; active calls own their grant until stop.
     const prune = () => {
-      for (const [k, g] of grants) if (!g.starting && !g.agent && g.expires <= now()) grants.delete(k);
+      for (const [k, g] of grants) if (g.phase._tag === "issued" && g.expires <= now()) grants.delete(k);
     };
 
     // Asked each time: credentials saved from the title screen work without a restart.
@@ -254,18 +260,18 @@ const make = (options: VoiceOptions = {}) =>
 
     const callOf = (agentId: string) => {
       const call = calls.get(agentId);
-      return call && !call.ending ? Effect.succeed(call) : Effect.fail(failed(t("server.voice.hungUp")));
+      return call && !ending(call) ? Effect.succeed(call) : Effect.fail(failed(t("server.voice.hungUp")));
     };
 
-    const liveCall = () => [...calls].find(([, c]) => !c.ending)?.[0];
+    const liveCall = () => [...calls].find(([, c]) => !ending(c))?.[0];
 
     // Queued after what is being said (APPEND): never over the owner; the owner may talk over it.
     const speakOn = Effect.fnUntraced(
       function* (agentId: string, text: string) {
         const call = calls.get(agentId);
-        if (!call || call.ending) return false;
+        if (!call || ending(call)) return false;
         for (const piece of speakPieces(text)) {
-          if (stopped || call.ending || calls.get(agentId) !== call) return false;
+          if (stopped || ending(call) || calls.get(agentId) !== call) return false;
           yield* call.say(piece);
         }
         return true;
@@ -295,9 +301,9 @@ const make = (options: VoiceOptions = {}) =>
         const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
           Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
-          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.undefined : Effect.fail(e))),
+          Effect.catch((e) => (stopped || ending(call) || calls.get(on) !== call ? Effect.undefined : Effect.fail(e))),
         );
-        if (said === undefined || stopped || call.ending || calls.get(on) !== call) break;
+        if (said === undefined || stopped || ending(call) || calls.get(on) !== call) break;
         if (said) {
           tries = 0;
           yield* speakOn(on, said);
@@ -342,8 +348,7 @@ const make = (options: VoiceOptions = {}) =>
           grants.set(keyOf(channel, uid), {
             kind: "moss",
             expires: now() + tokenSeconds * 1000,
-            starting: false,
-            agent: "",
+            phase: { _tag: "issued" },
           });
           return { appId: "moss", channel, uid, token: "moss" };
         }
@@ -358,8 +363,7 @@ const make = (options: VoiceOptions = {}) =>
           kind: "agora",
           credentials: c,
           expires: now() + tokenSeconds * 1000,
-          starting: false,
-          agent: "",
+          phase: { _tag: "issued" },
         });
         return issued;
       }),
@@ -383,15 +387,14 @@ const make = (options: VoiceOptions = {}) =>
         const key = keyOf(channel, uid);
         const g = grants.get(key);
         if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
-        if (g.starting || g.agent) return yield* Effect.fail(unavailable(t("server.voice.connecting")));
+        if (g.phase._tag !== "issued") return yield* Effect.fail(unavailable(t("server.voice.connecting")));
         if (g.kind === "moss") {
           yield* provider.live().pipe(Effect.mapError(() => unavailable(t("server.voice.moss.noKey"), "moss")));
           if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
           const voice = settings.voice();
           const id = `moss-${channel}`;
-          g.agent = id;
-          g.starting = false;
-          activeMoss ??= { ready: false, closed: false, pending: [] };
+          g.phase = { _tag: "on", agent: id };
+          activeMoss ??= waitingLine();
           const target = activeMoss;
           calls.set(id, {
             kind: "moss",
@@ -399,30 +402,30 @@ const make = (options: VoiceOptions = {}) =>
             moss: target,
             say: (piece) =>
               Effect.gen(function* () {
-                if (target.closed || piece.length > 16000 || (!target.ready && target.pending.length >= 8))
+                const line = target.phase;
+                if (line._tag === "closed" || piece.length > 16000 || (line._tag === "waiting" && line.pending.length >= 8))
                   return yield* callStepFailed(new Error("MOSS commentary unavailable or full"));
-                if (target.ready && target.link) deliverMossPiece(piece, target.link);
-                else target.pending.push(piece);
+                if (line._tag === "ready") deliverMossPiece(piece, line.link);
+                else line.pending.push(piece);
               }),
             release: () => {
-              if (target.closed) return;
-              target.closed = true;
-              target.pending.length = 0;
-              target.link?.close();
+              const line = target.phase;
+              if (line._tag === "closed") return;
+              target.phase = { _tag: "closed" };
+              line.link?.close();
               if (activeMoss === target) activeMoss = undefined;
             },
             quick: true,
             greeting: (about ? "" : voice.greeting).trim(),
             // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
-            ending: false,
           });
           if (about) tell([], about);
           yield* core.did({ kind: "talked" });
           return { agentId: id };
         }
 
-        g.starting = true;
+        g.phase = { _tag: "starting" };
         let release = () => {};
         let callLine: CallLine | undefined;
         let openingLine: Fiber.Fiber<CallLine, LineFailed> | undefined;
@@ -467,8 +470,7 @@ const make = (options: VoiceOptions = {}) =>
             catch: (e) => failed(t("server.voice.joinFailed", { why: messageOf(e) })),
           });
           if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
-          g.agent = id;
-          g.starting = false;
+          g.phase = { _tag: "on", agent: id };
           calls.set(id, {
             kind: "agora",
             grant: key,
@@ -484,7 +486,6 @@ const make = (options: VoiceOptions = {}) =>
             greeting: forCall.greeting.trim(),
             // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
-            ending: false,
           });
           committed = true;
           if (about) tell([], about);
@@ -529,7 +530,6 @@ const make = (options: VoiceOptions = {}) =>
         const call = calls.get(agentId);
         if (call?.kind === "moss") {
           grants.delete(call.grant);
-          call.ending = true;
           call.life.abort();
           call.release();
           calls.delete(agentId);
@@ -539,7 +539,6 @@ const make = (options: VoiceOptions = {}) =>
         let client: AgoraClient;
         if (call && call.client) {
           grants.delete(call.grant);
-          call.ending = true;
           call.life.abort();
           client = call.client;
         } else {
@@ -558,7 +557,7 @@ const make = (options: VoiceOptions = {}) =>
       }),
       heard,
       heardCurrent: Effect.fn("Voice.heardCurrent")(function* (text, picked, sendKey) {
-        const live = [...calls].filter(([, c]) => !c.ending);
+        const live = [...calls].filter(([, c]) => !ending(c));
         if (live.length > 1) return yield* Effect.fail(failed(t("server.voice.manyCalls")));
         const [only] = live;
         if (!only) return yield* Effect.fail(failed(t("server.voice.noCall")));
@@ -607,7 +606,7 @@ const make = (options: VoiceOptions = {}) =>
                 Effect.sync(() => {
                   if (liveLineActive) return undefined;
                   liveLineActive = true;
-                  activeMoss ??= { ready: false, closed: false, pending: [] };
+                  activeMoss ??= waitingLine();
                   return activeMoss;
                 }),
                 (target) =>
@@ -616,13 +615,10 @@ const make = (options: VoiceOptions = {}) =>
                     liveLineActive = false;
                     active = false;
                     awaitingAck.clear();
-                    target.closed = true;
-                    target.ready = false;
-                    target.pending.length = 0;
+                    target.phase = { _tag: "closed" };
                     if (activeMoss === target) activeMoss = undefined;
                     for (const [id, call] of calls) {
                       if (call.moss !== target) continue;
-                      call.ending = true;
                       call.life.abort();
                       grants.delete(call.grant);
                       calls.delete(id);
@@ -641,11 +637,12 @@ const make = (options: VoiceOptions = {}) =>
               const forkMoss = yield* FiberSet.makeRuntime();
               yield* relay(page, lineOf(connection), {
                 onOpen: (link) => {
-                  if (acquired.closed) {
+                  const line = acquired.phase;
+                  if (line._tag === "closed") {
                     link.close();
                     return;
                   }
-                  acquired.link = link;
+                  acquired.phase = line._tag === "waiting" ? { ...line, link } : { _tag: "ready", link };
                   return () => {
                     active = false;
                     awaitingAck.clear();
@@ -656,7 +653,7 @@ const make = (options: VoiceOptions = {}) =>
                   if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
                   // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
                   const v = settings.voice();
-                  if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !c.ending)) return data;
+                  if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !ending(c))) return data;
                   toolsEnabled = true;
                   return Option.getOrUndefined(
                     mossFrame({
@@ -676,15 +673,16 @@ const make = (options: VoiceOptions = {}) =>
                     decoded.value.action === "session.updated" &&
                     decoded.value.data?.error === "" &&
                     activeMoss === acquired &&
-                    !acquired.closed
+                    acquired.phase._tag === "waiting"
                   ) {
-                    acquired.ready = true;
-                    for (const piece of acquired.pending.splice(0)) deliverMossPiece(piece, link);
+                    const held = acquired.phase.pending;
+                    acquired.phase = { _tag: "ready", link };
+                    for (const piece of held) deliverMossPiece(piece, link);
                   }
                   const ack = extractMossToolAck(data);
                   if (ack && awaitingAck.delete(ack)) sendMoss(link, { action: "response.create", response: { call_ids: [ack] } });
                   for (const toolCall of extractMossToolCalls(data)) {
-                    if (!active || acquired.closed || !toolsEnabled || executed.has(toolCall.callId)) continue;
+                    if (!active || acquired.phase._tag === "closed" || !toolsEnabled || executed.has(toolCall.callId)) continue;
                     if (executed.size >= 64 || inFlight >= 4) {
                       link.close();
                       return;
@@ -696,7 +694,7 @@ const make = (options: VoiceOptions = {}) =>
                         Effect.orElseSucceed(() => t("server.voice.moss.toolFailed")),
                         Effect.tap((answer) =>
                           Effect.sync(() => {
-                            if (!active || acquired.closed) return;
+                            if (!active || acquired.phase._tag === "closed") return;
                             awaitingAck.add(toolCall.callId);
                             sendMoss(link, {
                               action: "conversation.item.create",
