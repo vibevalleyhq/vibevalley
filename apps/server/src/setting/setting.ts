@@ -125,7 +125,7 @@ const make = Effect.gen(function* () {
   const file = join(config.home, "settings.json");
   const disk = yield* keptFile(file, { mode: 0o600 });
   const saving = yield* Semaphore.make(1);
-  const fromConfig = { deepseek: Redacted.make(config.deepseek.apiKey), appId: config.agora.appId, certificate: Redacted.make(config.agora.appCertificate) };
+  const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
   // Reset to defaults goes back to these.
   // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
   const defaults = (): VoiceSettings => {

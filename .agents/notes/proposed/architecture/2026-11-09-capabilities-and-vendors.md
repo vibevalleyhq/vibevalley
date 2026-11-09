@@ -32,7 +32,7 @@ Status: proposed
 |---|---|---|---|
 | 1 生图 | 完成 | `8d3b2d396` | `bindingOf`；`vendors.ts`（只放数据：名字、取钥匙处、模型表）；MOSS 的调用在 `provider.ts` 里、不导出；`Provider.image(request)` 交出的 `run` 不再要求 `HttpClient`（Provider 用自己的），Media 不再依赖 `HttpClient`、也不 import MOSS |
 | 2 其余能力 | 完成 | `140fd3eed` 语音；`26def4869` 多人语音、音色设计、克隆、转写、远端文件；`9cfeee7f7` 理解；`69f141383` 听写、Live、Vision | 能力方法（`speech()`、`speakers()`、`voiceDesign()`、`transcription()`、`understanding()`、`live()`、`vision()`）交出同一种 `Account`：连接、revision、模型、Key 的 `fingerprint`，和按能力分组、封着 Key 与 Provider 自己 `HttpClient` 的调用（`speech.check/generate/createTask/stream`、`tasks.get`、`speakers`／`voiceDesign`／`transcription` 的 `check/createTask(/stream)`、`voices.clone`、`files.upload/delete`、`understanding.check/ask`、`realtime.connect/redact/verify`），校验也经它；`Provider.connection(id)`（交出 Key）换成 `Provider.account({ connection, model })`，按存下的连接重新绑定，任务用 `fingerprint` 比对「账号换了没有」；`dictation()` 交出模型和封着地址、Key 的 `transcriber(format)`。错误是能力自己的：`AudioFailure`（`outcome`，和替轮询判断重试的 `retryable`：网络、超时、429、5xx）、`FileFailure`、`UnderstandingFailure`、`InvalidRequest`；删除远端文件时 404 在 Provider 里算已删。`vendors.ts` 加了各能力的模型表，DeepSeek、声网只作数据进目录（钥匙仍在各自的设置，调用方没改）。Media 不再 import `@vibevalley/provider/*`、不再依赖 `HttpClient`；语音只留 MOSS Live 的帧协议（`@vibevalley/provider/moss` 的 `decodeMossFrame`，页面说的就是这套帧）和听写错误的细节（`@vibevalley/provider/transcription` 的 `TranscriptionRequestError`，提示里要用它的原因和信息），实时线路的类型经 `vendors.ts` 的 `Realtime*` 别名。行为不变，只有一处：远端上传前「Key 为空或带空白就当账号换了」的检查去掉了，保存时已拒绝这种 Key，绑定的账号总有合法的 Key。改了写法、没改断言含义的 `regression:` 测试：`dictation accepts the explicit snapshot %s without substituting its stable alias`（改看所选模型和实际请求的 Key、地址）、`%s during remote upload records an unknown result`（Deferred 挪到测试外，好把假厂商交给 Provider） |
-| 3 `Redacted` | 未做 | — | |
+| 3 `Redacted` | 完成 | `71db3ef8c` 账号钥匙；`79588b7c6` 设置里其余的钥匙（和页面的改动同一个提交）；本提交 启动配置 | 账号钥匙（`setting/provider.ts` 的 `Connection.key`）和设置里其余的钥匙（DeepSeek、声网证书、通话三家、自建听写、记忆源）用 `Schema.RedactedFromValue(Schema.String)`：`settings.json` 仍是普通字符串，内存里是 `Redacted`；`Setting` 按 `Stored` 编码写盘（不再按 `Schema.Unknown`），保存时先把现有设置编码回普通字符串再叠更新；记忆源分成写盘的 `StoredMemorySource` 和带 `Redacted` 的 `MemorySourceConfig`。启动配置的 `deepseek.api_key`、`agora.app_certificate` 用 `Config.Redacted` 读。明文只在发请求的地方取：`Provider` 绑定账号时、`modelClient` 交给 DeepSeek 客户端时、语音签声网令牌和建客户端时、组通话三家时、记忆源连 Nowledge／EverOS 时；提示与指纹仍在原处从明文算。`Setting.deepseekApiKey()` 没有钥匙时是 `undefined`（原来是空字符串）。行为、文件格式和 HTTP 回答不变 |
 
 ## Alternatives considered
 
@@ -44,6 +44,7 @@ Status: proposed
 
 - Media 不 import `@vibevalley/provider/moss/*`；生图经 `Provider.image(request)`，交出的绑定里没有钥匙。
 - 其余能力（语音、多人语音、音色设计、克隆、转写、理解、远端文件、听写、Live、Vision）经 `Provider` 交出的账号调用，账号里没有钥匙，只有指纹；Media、语音不 import `@vibevalley/provider/moss/*`。
+- 钥匙在内存里是 `Redacted`（账号、设置、启动配置），`settings.json` 与 HTTP 回答不变。
 - 绑定规则只有一份（`bindingOf`），准备状态与 `Provider` 的能力方法都调它。
 - 现有的媒体测试（排队任务保留账号快照、换钥匙、未知结果、下载重试）不改断言地通过。
 - `server:check`、`web:check`、`effect:check`、`paths:check` 通过。

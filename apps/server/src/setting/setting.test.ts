@@ -22,7 +22,7 @@ const file = (config: ServerConfig["Service"]) => JSON.parse(readFileSync(join(c
 
 describe("settings", () => {
   it.effect("a key saved here wins over the configuration's, and only its end is ever shown", () => {
-    const config = testConfig({ deepseek: { apiKey: "sk-from-the-env-0000" } });
+    const config = testConfig({ deepseek: { apiKey: Redacted.make("sk-from-the-env-0000") } });
     return run(
       config,
       Effect.gen(function* () {

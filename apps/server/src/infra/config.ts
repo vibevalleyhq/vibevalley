@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Schema } from "effect";
+import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Redacted, Schema } from "effect";
 import { parse } from "yaml";
 
 import { defaultHome } from "@vibevalley/home";
@@ -26,8 +26,8 @@ export class ServerConfig extends Context.Service<
      * environment, comma-separated. */
     readonly agent: { readonly model: string; readonly starters: readonly string[] };
     /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
-    readonly deepseek: { readonly apiKey: string };
-    readonly agora: { readonly appId: string; readonly appCertificate: string };
+    readonly deepseek: { readonly apiKey: Redacted.Redacted };
+    readonly agora: { readonly appId: string; readonly appCertificate: Redacted.Redacted };
     readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
     readonly lan: { readonly port: number };
     /** Commits by these emails count as yours too; in the environment, comma-separated. */
@@ -62,8 +62,8 @@ export function defaults(home = homedir()): ServerConfig["Service"] {
     port: 8787,
     web: "",
     agent: { model: "", starters: [] },
-    deepseek: { apiKey: "" },
-    agora: { appId: "", appCertificate: "" },
+    deepseek: { apiKey: Redacted.make("") },
+    agora: { appId: "", appCertificate: Redacted.make("") },
     voice: { id: "", line: { port: 8788, url: "" } },
     lan: { port: 8790 },
     gitEmails: [],
@@ -88,6 +88,8 @@ export class ConfigError extends Schema.TaggedError<ConfigError, { readonly bran
 
 const port = (name: string, value: number) => Keys.Int(name).pipe(Keys.withDefault(value));
 const text = (name: string, value: string) => Keys.String(name).pipe(Keys.withDefault(value));
+/** A key: redacted from the moment it is read; empty when not given. */
+const secret = (name: string, value: Redacted.Redacted) => Keys.Redacted(name).pipe(Keys.withDefault(value));
 const number = (name: string, value: number) => Keys.Finite(name).pipe(Keys.withDefault(value));
 /** A list: comma-separated in the environment, a list in the file. */
 const list = (name: string) =>
@@ -104,8 +106,8 @@ const keys = (d: ServerConfig["Service"]) =>
     port: port("port", d.port),
     web: text("web", d.web),
     agent: Keys.nested(Keys.all({ model: text("model", d.agent.model), starters: list("starters") }), "agent"),
-    deepseek: Keys.nested(Keys.all({ apiKey: text("api_key", d.deepseek.apiKey) }), "deepseek"),
-    agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: text("app_certificate", d.agora.appCertificate) }), "agora"),
+    deepseek: Keys.nested(Keys.all({ apiKey: secret("api_key", d.deepseek.apiKey) }), "deepseek"),
+    agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: secret("app_certificate", d.agora.appCertificate) }), "agora"),
     voice: Keys.nested(
       Keys.all({
         id: text("id", d.voice.id),

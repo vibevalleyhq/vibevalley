@@ -2,8 +2,9 @@ import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { attachmentPath, type MediaImageRequest, type MediaImageJob } from "@vibevalley/protocol";
+import { type Feature, attachmentPath, type MediaImageRequest, type MediaImageJob } from "@vibevalley/protocol";
 
+import { Readiness } from "#/features/setting/index.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { Link, useSearchParams } from "#/infra/router.ts";
@@ -48,6 +49,14 @@ const viewStyles = stylex.create({
   prose: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
   image: { maxHeight: "calc(var(--spacing) * 96)", maxWidth: "100%", borderRadius: "var(--radius-md)", objectFit: "contain" },
 });
+
+/** What each mode of the page uses, for its readiness line. */
+const featuresOf = {
+  image: ["image"],
+  understanding: ["understanding"],
+  speech: ["speech"],
+  audio: ["speakers", "voiceDesign", "transcription"],
+} satisfies Record<string, readonly Feature[]>;
 
 export function MediaPage() {
   const state = useCore();
@@ -130,6 +139,7 @@ export function MediaPage() {
         </Button>
       </div>
       <div {...stylex.attrs(viewStyles.content)}>
+        <Readiness features={featuresOf[mode()]} />
         <Show when={mode() === "audio"}>
           <AudioPanel />
         </Show>

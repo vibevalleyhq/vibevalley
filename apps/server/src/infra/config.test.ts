@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Redacted } from "effect";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
@@ -32,12 +32,13 @@ it.effect("the defaults, then the file, then the environment", () =>
     expect(c.repo.maxSessions).toBe(5);
     expect(c.repo.checkTimeoutSeconds).toBe(45);
     expect(c.patrol.heartbeatMinutes).toBe(0.5);
-    expect(c.deepseek.apiKey).toBe("sk-env");
+    expect(Redacted.value(c.deepseek.apiKey)).toBe("sk-env");
     expect(c.gitEmails).toEqual(["a@x", "b@x"]);
     expect(dbDir(c)).toBe("memory");
     expect(c.cron.tickMs).toBe(20_000);
     expect((yield* load("", { ...env, VIBEVALLEY_GIT_EMAILS: "c@x, d@x,e@x" })).gitEmails).toEqual(["c@x", "d@x", "e@x"]);
-    expect((yield* load("", { ...env, VIBEVALLEY_DEEPSEEK_API_KEY: "sk-farm" })).deepseek.apiKey).toBe("sk-farm");
+    const farm = yield* load("", { ...env, VIBEVALLEY_DEEPSEEK_API_KEY: "sk-farm" });
+    expect(Redacted.value(farm.deepseek.apiKey)).toBe("sk-farm");
     expect((yield* load("", { ...env, VIBEVALLEY_GIT_EMAILS: "" })).gitEmails).toEqual([]);
   }).pipe(Effect.provide(NodeServices.layer)),
 );
