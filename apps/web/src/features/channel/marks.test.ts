@@ -51,7 +51,14 @@ const message = (id: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
   outcome: over.outcome ?? null,
 });
 
-const kept = <I>(input: I, over: Partial<Intent<I, never>> = {}): Intent<I, never> => ({ key: "k", input, status: "pending", queued: false, ...over });
+const kept = <I>(input: I, over: Partial<Intent<I, never>> = {}): Intent<I, never> => ({
+  key: "k",
+  input,
+  phase: "sending",
+  status: "pending",
+  queued: false,
+  ...over,
+});
 
 const channel = (over: Partial<Channel> = {}): Channel => ({
   id: "c",

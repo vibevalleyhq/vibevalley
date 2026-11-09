@@ -553,36 +553,40 @@ const foldPx = 360;
 
 export function MessageBody(props: { m: ChatMessage }) {
   let box: HTMLDivElement | undefined;
-  const [long, setLong] = createSignal(false);
-  const [open, setOpen] = createSignal(false);
+  const [fold, setFold] = createSignal<"short" | "folded" | "expanded">("short");
   onSettled(() => {
     const el = box;
     if (!el) return;
-    const watch = new ResizeObserver(() => setLong(el.scrollHeight > foldPx + 40));
+    const watch = new ResizeObserver(() => {
+      const isLong = el.scrollHeight > foldPx + 40;
+      setFold((prev) => (!isLong ? "short" : prev === "short" ? "folded" : prev));
+    });
     watch.observe(el);
     return () => watch.disconnect();
   });
+  const isFolded = () => fold() === "folded";
+  const isExpanded = () => fold() === "expanded";
   return (
     <Show when={props.m.deleted === undefined} fallback={<p {...stylex.attrs(viewStyles.messageBodyP)}>{t("web.channel.messages.deleted")}</p>}>
       <Show when={props.m.text}>
         <div
           ref={(el) => (box = el)}
           data-testid="message-body"
-          data-folded={long() && !open() ? "" : undefined}
-          {...stylex.attrs(long() && !open() ? recipeStyles2.messageBodyDivVariant1Case2 : recipeStyles2.messageBodyDivVariant1Case1)}
-          style={long() && !open() ? { "max-height": `${foldPx}px` } : undefined}
+          data-folded={isFolded() ? "" : undefined}
+          {...stylex.attrs(isFolded() ? recipeStyles2.messageBodyDivVariant1Case2 : recipeStyles2.messageBodyDivVariant1Case1)}
+          style={isFolded() ? { "max-height": `${foldPx}px` } : undefined}
         >
           <Markdown text={props.m.text} mentions />
         </div>
-        <Show when={long()}>
+        <Show when={fold() !== "short"}>
           <button
             type="button"
             data-testid="message-more"
-            aria-expanded={open() ? "true" : "false"}
-            onClick={() => setOpen(!open())}
+            aria-expanded={isExpanded() ? "true" : "false"}
+            onClick={() => setFold(isExpanded() ? "folded" : "expanded")}
             {...stylex.attrs(viewStyles.messageMore)}
           >
-            {open() ? t("web.base.rich.longLess") : t("web.base.rich.longMore")}
+            {isExpanded() ? t("web.base.rich.longLess") : t("web.base.rich.longMore")}
           </button>
         </Show>
       </Show>
@@ -768,14 +772,17 @@ function AddReaction(props: { m: ChatMessage }) {
   );
 }
 
+type ToolbarMenu = "closed" | "quickEmoji" | "fullEmoji" | "more" | "confirmDelete";
+
 export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit: () => void }) {
   const router = useRouter();
   const core = useCore();
-  const [picking, setPicking] = createSignal(false);
-  const [everyEmoji, setEveryEmoji] = createSignal(false);
+  const [menu, setMenu] = createSignal<ToolbarMenu>("closed");
   let moreEmoji: HTMLButtonElement | undefined;
-  const [sure, setSure] = createSignal(false);
-  const [more, setMore] = createSignal(false);
+  const picking = () => menu() === "quickEmoji" || menu() === "fullEmoji";
+  const everyEmoji = () => menu() === "fullEmoji";
+  const sure = () => menu() === "confirmDelete";
+  const more = () => menu() === "more";
   const react = useReact();
   const pins = useIntents(pinSet);
   const unreads = useIntents(unreadMark);
@@ -809,7 +816,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
                 data-key={emoji}
                 aria-label={emoji}
                 onClick={() => {
-                  setPicking(false);
+                  setMenu("closed");
                   const m = props.m;
                   react(m, emoji, reactionOn(m, emoji));
                 }}
@@ -825,7 +832,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             aria-label={t("web.channel.emoji.more")}
             title={t("web.channel.emoji.more")}
             aria-expanded={aria(everyEmoji())}
-            onClick={() => setEveryEmoji(!everyEmoji())}
+            onClick={() => setMenu(everyEmoji() ? "quickEmoji" : "fullEmoji")}
           >
             <Icon name="add" size={14} />
           </Toolbar.Button>
@@ -834,10 +841,9 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       <Show when={everyEmoji()}>
         <EmojiPicker
           anchor={moreEmoji}
-          onClose={() => setEveryEmoji(false)}
+          onClose={() => setMenu("quickEmoji")}
           onPick={(emoji) => {
-            setEveryEmoji(false);
-            setPicking(false);
+            setMenu("closed");
             const m = untrack(() => props.m);
             react(m, emoji, reactionOn(m, emoji));
           }}
@@ -849,7 +855,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         data-key="react"
         aria-label={t("web.channel.tools.react")}
         title={t("web.channel.tools.react")}
-        onClick={() => setPicking(!picking())}
+        onClick={() => setMenu(picking() ? "closed" : "quickEmoji")}
       >
         <Icon name="react" size={16} />
       </Toolbar.Button>
@@ -917,7 +923,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         dataKey="more"
         side="top"
         open={more()}
-        onOpenChange={setMore}
+        onOpenChange={(next) => setMenu((prev) => (next ? "more" : prev === "more" ? "closed" : prev))}
         render={(p) => <Toolbar.Button {...p} />}
         items={[
           { key: "copy-link", label: t("web.channel.more.copyLink"), icon: "copy", onSelect: copyLink },
@@ -934,10 +940,10 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         data-sure={sure() ? "" : undefined}
         aria-label={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
         title={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
-        onBlur={() => setSure(false)}
+        onBlur={() => setMenu((prev) => (prev === "confirmDelete" ? "closed" : prev))}
         onClick={() => {
-          if (!sure()) return void setSure(true);
-          setSure(false);
+          if (!sure()) return void setMenu("confirmDelete");
+          setMenu("closed");
           const id = props.m.id;
           void act.run(() => api.channel.message.delete({ id }));
         }}

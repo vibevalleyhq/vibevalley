@@ -242,6 +242,7 @@
 | `useAgentProblems` | `agents.ts` |  |
 | `api` | `api.ts` | The page is served by the server it talks to: the same origin. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
+| `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
 | `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's). a new one after. |
 | `useForm` | `form.ts` |  |
@@ -266,6 +267,8 @@
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
+| `nextLocalMidnight` | `local-day.ts` |  |
+| `localDay` | `local-day.ts` |  |
 | `uploadMediaInput` | `media.ts` |  |
 | `reveal` | `opening.ts` |  |
 | `retryRead` | `query.ts` |  |

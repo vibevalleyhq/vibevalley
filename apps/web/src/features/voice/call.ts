@@ -1,10 +1,9 @@
 import { t } from "@vibevalley/i18n";
-import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
 
 import { messageOf } from "#/base/format.ts";
-import { api, reasonOf } from "#/infra/api.ts";
+import { api, faultOf, reasonOf } from "#/infra/api.ts";
 import { currentHost } from "#/infra/host.ts";
 import { prefsNow } from "#/state/prefs.ts";
 
@@ -349,12 +348,10 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
       this.set("live");
     } catch (e) {
       await this.teardown();
-      if (!cancelled)
-        this.set(
-          "idle",
-          e instanceof Error && e.name === "NotAllowedError" ? t("web.voice.call.noMic") : reasonOf(e),
-          e instanceof VibeValleyApiError && e.error?._tag === "VoiceUnavailable" ? e.error.settings : undefined,
-        );
+      if (!cancelled) {
+        const fault = faultOf(e);
+        this.set("idle", e instanceof Error && e.name === "NotAllowedError" ? t("web.voice.call.noMic") : fault.reason, fault.settings);
+      }
     }
   }
 

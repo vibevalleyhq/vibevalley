@@ -15,6 +15,7 @@ const todo = (n: number): BoardCard => ({ kind: "todo", id: `i${n}`, lane: "todo
 const move = (id: string, over: Partial<Intent<IssueMove, AppliedIssue>> = {}): Intent<IssueMove, AppliedIssue> => ({
   key: `k-${id}`,
   input: { id, status: "todo", lane: "working" },
+  phase: "sending",
   status: "pending",
   queued: false,
   ...over,
@@ -31,7 +32,11 @@ test("a card on its way shows in the lane it was dropped on, moving, and nothing
 
 test("a failed move stays in sight with why, and a card with no move is the frame's", () => {
   const [a] = [todo(1)];
-  expect(movedCards([a], [move("i1", { status: "failed", reason: "进行中满了" })])[0]?.move).toEqual({ key: "k-i1", state: "failed", reason: "进行中满了" });
+  expect(movedCards([a], [move("i1", { phase: "failed", status: "failed", reason: "进行中满了" })])[0]?.move).toEqual({
+    key: "k-i1",
+    state: "failed",
+    reason: "进行中满了",
+  });
   expect(movedCards([a], [])).toEqual([a]);
 });
 
@@ -44,7 +49,7 @@ test("of two moves of one card, the newer is shown", () => {
 
 test("a move made off the board (a button on the issue's page) keeps the card in its lane, moving", () => {
   const [a] = [todo(1)];
-  const offBoard: Intent<IssueMove, AppliedIssue> = { key: "k", input: { id: "i1", status: "backlog" }, status: "pending", queued: false };
+  const offBoard: Intent<IssueMove, AppliedIssue> = { key: "k", input: { id: "i1", status: "backlog" }, phase: "sending", status: "pending", queued: false };
   expect(movedCards([a], [offBoard])[0]).toMatchObject({ lane: "todo", move: { key: "k", state: "moving" } });
 });
 
@@ -52,7 +57,7 @@ test("the issue's page shows the status moved to while it is on its way, and the
   const i = issue(1, "第 1 件", "in_review", "medium");
   const going = move("i1", { input: { id: "i1", status: "canceled" } });
   expect(movedIssue(i, [going]).status).toBe("canceled");
-  expect(movedIssue(i, [{ ...going, status: "failed", reason: "不行" }]).status).toBe("in_review");
+  expect(movedIssue(i, [{ ...going, phase: "failed", status: "failed", reason: "不行" }]).status).toBe("in_review");
   expect(issueMoveOf("i1", [going])).toEqual({ key: "k-i1", state: "moving" });
   expect(issueMoveOf("i2", [going])).toBeUndefined();
 });

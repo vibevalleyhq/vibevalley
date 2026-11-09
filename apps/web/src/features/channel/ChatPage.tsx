@@ -430,6 +430,8 @@ const tabs: { tab: Tab; icon: IconName; label: string }[] = [
   { tab: "crons", icon: "clock", label: t("web.channel.tab.crons") },
 ];
 
+type HeaderOverlay = "none" | "threads" | "pins";
+
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
 function ChannelMain(props: {
   channel: Channel | undefined;
@@ -441,10 +443,11 @@ function ChannelMain(props: {
 }) {
   const router = useRouter();
   const [tab, setTab] = createSignal<Tab>("chat");
-  const [threadsOpen, setThreadsOpen] = createSignal(false);
+  const [overlay, setOverlay] = createSignal<HeaderOverlay>("none");
+  const threadsOpen = () => overlay() === "threads";
+  const pinsOpen = () => overlay() === "pins";
   const [search, setSearch] = createSignal<string>();
   const [settings, setSettings] = createSignal(false);
-  const [pinsOpen, setPinsOpen] = createSignal(false);
   const [membersOpen, setMembersOpen] = createSignal(false);
   const name = () => channelName(props.channel);
   const about = () =>
@@ -509,12 +512,12 @@ function ChannelMain(props: {
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
                 title={t("web.channel.threadList.title")}
-                onClick={() => setThreadsOpen(!threadsOpen())}
+                onClick={() => setOverlay(threadsOpen() ? "none" : "threads")}
               >
                 <Icon name="thread" size={20} />
               </button>
               <Show when={threadsOpen()}>
-                <ThreadList channel={c()} onPick={() => setThreadsOpen(false)} />
+                <ThreadList channel={c()} onPick={() => setOverlay("none")} />
               </Show>
             </div>
           )}
@@ -531,11 +534,11 @@ function ChannelMain(props: {
             aria-expanded={aria(pinsOpen())}
             title={t("web.channel.pins.open")}
             disabled={!props.channel}
-            onClick={() => setPinsOpen(!pinsOpen())}
+            onClick={() => setOverlay(pinsOpen() ? "none" : "pins")}
           >
             <Icon name="pin" size={20} />
           </button>
-          <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} onPick={() => setPinsOpen(false)} />}</Show>
+          <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} onPick={() => setOverlay("none")} />}</Show>
         </div>
         <button
           type="button"
@@ -547,7 +550,11 @@ function ChannelMain(props: {
           data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
-          onClick={() => setMembersOpen(!membersOpen())}
+          onClick={() => {
+            const next = !membersOpen();
+            setMembersOpen(next);
+            if (next) setTab("chat");
+          }}
         >
           {t("web.channel.members.open")}
         </button>

@@ -3,7 +3,7 @@ import { type Accessor, createSignal } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 
-import { reasonOf } from "#/infra/api.ts";
+import { faultOf, reasonOf } from "#/infra/api.ts";
 import type { Submission } from "#/infra/form.ts";
 import { linkIn, useRegistry } from "#/state/atom.ts";
 
@@ -33,8 +33,9 @@ export function createAct(say: (reason: string) => void = (reason) => toast(reas
     } catch (error) {
       const message = reasonOf(error);
       say(message);
-      return error instanceof VibeValleyApiError && [400, 401, 403, 404, 409, 422].includes(error.status)
-        ? { kind: "rejected", message }
+      const fault = faultOf(error);
+      return error instanceof VibeValleyApiError && (error.error !== undefined || [400, 401, 403, 404, 409, 422].includes(error.status))
+        ? { kind: "rejected", message: fault.reason }
         : { kind: "unknown", message: t("web.base.form.deliveryUnknown") };
     } finally {
       setRunning((n) => n - 1);

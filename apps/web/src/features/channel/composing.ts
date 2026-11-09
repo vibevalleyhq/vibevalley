@@ -83,7 +83,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
   const [closed, setClosed] = createSignal(false);
-  let sending = false;
+  const [sending, setSending] = createSignal(false);
   let disposed = false;
   onSettled(() => () => {
     disposed = true;
@@ -92,6 +92,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   const commanding = createAct((reason) => {
     if (!disposed) ways.failed(reason);
   });
+  const busy = () => sending() || commanding.busy();
   const intent = (): Said => ({ ...ways.target(), text: text().trim() });
   const channelOf = (id: string | undefined): Channel | undefined => {
     const all = core()?.chat?.channels ?? [];
@@ -133,7 +134,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
 
   // A line that is a command runs it: the box empties once it went through, and keeps the line when it did not.
   const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
-    sending = true;
+    setSending(true);
     try {
       const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() }));
       if (disposed || !done) return;
@@ -141,12 +142,12 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
       if ("open" in done) ways.opened?.(done.open);
       else ways.told?.(done.say);
     } finally {
-      sending = false;
+      setSending(false);
     }
   };
 
   const send = async () => {
-    if (disposed || sending) return;
+    if (disposed || busy()) return;
     const asked = commandOf(text());
     if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
@@ -191,7 +192,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
 
   return {
     text,
-    busy: commanding.busy,
+    busy,
     active,
     setActive,
     offered,
@@ -204,7 +205,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     /** The menu closes when the box loses the focus and comes back with it. */
     blur: () => setClosed(true),
     focus: () => setClosed(false),
-    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !commanding.busy(),
+    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     here,
     /** The place's orchestrator is in a round the owner may stop. */
     stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),

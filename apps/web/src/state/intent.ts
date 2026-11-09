@@ -5,17 +5,19 @@ import { t } from "@vibevalley/i18n";
 import type { StateFrame } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { newSendKey, reasonOf } from "#/infra/api.ts";
+import { faultOf, newSendKey, type UiFault } from "#/infra/api.ts";
 import type { Frames, Link } from "#/infra/frame.ts";
 
 import { framesAtom, useAtom, useRegistry } from "./atom";
 
 type IntentStatus = "pending" | "failed";
+export type IntentPhase = "queued" | "sending" | "confirming" | "failed";
 
 export interface Intent<I, R> {
   /** The request key: every send of this intent carries it, so the server acts on it once. */
   readonly key: string;
   readonly input: I;
+  readonly phase: IntentPhase;
   readonly status: IntentStatus;
   /** Held back while the link was lost; sent once it is back. */
   readonly queued: boolean;
@@ -23,6 +25,50 @@ export interface Intent<I, R> {
   readonly replied?: { readonly reply: R };
   /** Why it failed, in the owner's words. */
   readonly reason?: string;
+  /** The structured fault when phase is "failed". */
+  readonly fault?: UiFault;
+}
+
+type IntentState<R> =
+  | { readonly _tag: "queued" }
+  | { readonly _tag: "sending"; readonly attempt: number; readonly replied?: { readonly reply: R } }
+  | { readonly _tag: "confirming"; readonly replied: { readonly reply: R } }
+  | { readonly _tag: "failed"; readonly fault: UiFault; readonly replied?: { readonly reply: R } };
+
+function projectIntent<I, R>(key: string, input: I, state: IntentState<R>): Intent<I, R> {
+  switch (state._tag) {
+    case "queued":
+      return { key, input, phase: "queued", status: "pending", queued: true };
+    case "sending":
+      return {
+        key,
+        input,
+        phase: "sending",
+        status: "pending",
+        queued: false,
+        ...(state.replied === undefined ? {} : { replied: state.replied }),
+      };
+    case "confirming":
+      return {
+        key,
+        input,
+        phase: "confirming",
+        status: "pending",
+        queued: false,
+        replied: state.replied,
+      };
+    case "failed":
+      return {
+        key,
+        input,
+        phase: "failed",
+        status: "failed",
+        queued: false,
+        reason: state.fault.reason,
+        fault: state.fault,
+        ...(state.replied === undefined ? {} : { replied: state.replied }),
+      };
+  }
 }
 
 interface IntentKind<I, R> {
@@ -115,10 +161,12 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
 
   const get = (key: string) => registry.get(type.one(key));
   const frames = (): Frames => registry.get(framesAtom);
-  const put = (key: string, intent: Intent<I, R>) => {
+  const put = (key: string, input: I, state: IntentState<R>): Intent<I, R> => {
+    const intent = projectIntent(key, input, state);
     if (!mounts.has(key)) mounts.set(key, registry.mount(type.one(key)));
     registry.set(type.one(key), intent);
     if (!registry.get(type.keys).includes(key)) registry.update(type.keys, (all) => [...all, key]);
+    return intent;
   };
   const answer = (key: string, answered: Intent<I, R> | undefined) => {
     for (const resolve of waiting.get(key) ?? []) resolve(answered);
@@ -146,16 +194,19 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
   const check = (key: string) => {
     const intent = get(key);
     // Failed ones too: replied and then timed out waiting, or a reply lost after the change went in.
-    if (intent && !intent.queued && kind.confirmed(frames().frame, intent)) remove(key);
+    if (intent && intent.phase !== "queued" && kind.confirmed(frames().frame, intent)) remove(key);
   };
 
-  const failed = (key: string, reason: string) => {
+  const failed = (key: string, fault: UiFault) => {
     const intent = get(key);
     if (!intent) return;
     clearTimeout(timers.get(key));
     timers.delete(key);
-    const now: Intent<I, R> = { ...intent, status: "failed", reason };
-    put(key, now);
+    const now = put(key, intent.input, {
+      _tag: "failed",
+      fault,
+      ...(intent.replied === undefined ? {} : { replied: intent.replied }),
+    });
     answer(key, now);
   };
 
@@ -163,7 +214,7 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
     clearTimeout(timers.get(key));
     timers.set(
       key,
-      setTimeout(() => failed(key, t("web.base.intent.timedOut")), kind.timeoutMs),
+      setTimeout(() => failed(key, { tag: "Network", reason: t("web.base.intent.timedOut"), retryable: true }), kind.timeoutMs),
     );
   };
 
@@ -175,7 +226,7 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
       const back = now.link === "open" && link !== "open";
       link = now.link;
       for (const key of registry.get(type.keys)) {
-        if (back && get(key)?.queued === true) dispatch(key);
+        if (back && get(key)?.phase === "queued") dispatch(key);
         else check(key);
       }
     });
@@ -186,22 +237,25 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
     if (!intent) return;
     const attempt = (attempts.get(key) ?? 0) + 1;
     attempts.set(key, attempt);
-    put(key, { key, input: intent.input, status: "pending", queued: false, ...(intent.replied === undefined ? {} : { replied: intent.replied }) });
+    put(key, intent.input, {
+      _tag: "sending",
+      attempt,
+      ...(intent.replied === undefined ? {} : { replied: intent.replied }),
+    });
     arm(key);
     void kind.send(intent.input, key).then(
       (reply) => {
         const now = get(key);
         if (!now) return;
         // A late reply after a timeout still counts: the change went in.
-        const replied: Intent<I, R> = { key, input: now.input, status: "pending", queued: false, replied: { reply } };
-        put(key, replied);
+        const replied = put(key, now.input, { _tag: "confirming", replied: { reply } });
         if (now.status === "failed") arm(key);
         answer(key, replied);
         check(key);
       },
       (e: unknown) => {
         if (attempts.get(key) !== attempt) return;
-        failed(key, reasonOf(e));
+        failed(key, faultOf(e));
         check(key);
       },
     );
@@ -216,14 +270,16 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
       );
     const lost = frames().link === "lost";
     if (lost && kind.whileLost === "refuse") {
-      const refused: Intent<I, R> = { key, input, status: "failed", queued: false, reason: t("web.base.intent.offline") };
-      put(key, refused);
+      const refused = put(key, input, {
+        _tag: "failed",
+        fault: { tag: "Network", reason: t("web.base.intent.offline"), retryable: true },
+      });
       return Promise.resolve(refused);
     }
     const done = waitFor(key);
-    if (lost) put(key, { key, input, status: "pending", queued: true });
+    if (lost) put(key, input, { _tag: "queued" });
     else {
-      put(key, { key, input, status: "pending", queued: false });
+      put(key, input, { _tag: "sending", attempt: 0 });
       dispatch(key);
     }
     return done;

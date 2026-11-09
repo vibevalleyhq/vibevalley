@@ -500,19 +500,19 @@ export function ChatRow(props: {
   );
 }
 
+type FarmMenuState = "closed" | "menu" | "confirmDelete" | "emojiPicker";
+
 /** What the owner can do to a message from the farm's window: the same requests as the workbench's tools. */
 function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
   const core = useCore();
-  const [open, setOpen] = createSignal(false);
-  const [sure, setSure] = createSignal(false);
-  const [every, setEvery] = createSignal(false);
+  const [menu, setMenu] = createSignal<FarmMenuState>("closed");
+  const open = () => menu() !== "closed";
+  const sure = () => menu() === "confirmDelete";
+  const every = () => menu() === "emojiPicker";
   let plus: HTMLButtonElement | undefined;
   const act = createPixelAct();
   const reactions = useIntents(reactionSet);
-  const close = () => {
-    setOpen(false);
-    setEvery(false);
-  };
+  const close = () => setMenu("closed");
   const run = (call: () => Promise<unknown>) => {
     close();
     void act.run(call);
@@ -532,10 +532,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
         aria-label={t("web.farm.chat.actions.open")}
         title={t("web.farm.chat.actions.open")}
         aria-expanded={aria(open())}
-        onClick={() => {
-          setOpen(!open());
-          setSure(false);
-        }}
+        onClick={() => setMenu(open() ? "closed" : "menu")}
         {...styleProps(recipeStyles3.menuTrigger)}
       >
         <SpriteIcon name="button-more" size={16} />
@@ -563,7 +560,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               aria-label={t("web.farm.chat.actions.moreEmoji")}
               aria-expanded={aria(every())}
               {...stylex.attrs(recipeStyles2.messageMenuButton2)}
-              onClick={() => setEvery(!every())}
+              onClick={() => setMenu(every() ? "menu" : "emojiPicker")}
             >
               <SpriteIcon name="button-add" size={12} />
             </button>
@@ -601,7 +598,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               data-key="edit"
               {...stylex.attrs(recipeStyles2.messageMenuButton3)}
               onClick={() => {
-                setOpen(false);
+                close();
                 untrack(() => props.onEdit)();
               }}
             >
@@ -615,7 +612,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             data-sure={sure() ? "" : undefined}
             {...stylex.attrs(recipeStyles2.messageMenuButton4)}
             onClick={() => {
-              if (!sure()) return void setSure(true);
+              if (!sure()) return void setMenu("confirmDelete");
               const id = props.m.id;
               close();
               void act.run(() => api.channel.message.delete({ id }));
@@ -628,7 +625,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
       <Show when={every()}>
         <EmojiPicker
           anchor={plus}
-          onClose={() => setEvery(false)}
+          onClose={() => setMenu("menu")}
           onPick={(emoji) => {
             react(
               untrack(() => props.m),

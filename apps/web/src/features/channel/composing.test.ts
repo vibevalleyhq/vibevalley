@@ -105,12 +105,15 @@ test("a channel's lines on their way are the ones its messages do not have yet, 
   const said = (key: string, id: string, over: Partial<Intent<Said, void>> = {}): Intent<Said, void> => ({
     key,
     input: { id, text: key },
+    phase: "sending",
     status: "pending",
     queued: false,
     ...over,
   });
   const arrived = [{ sendKey: "b" }];
-  expect(pendingLines([said("a", "c1"), said("b", "c1"), said("x", "c2"), said("d", "c1", { status: "failed", reason: "不行" })], "c1", arrived)).toEqual([
+  expect(
+    pendingLines([said("a", "c1"), said("b", "c1"), said("x", "c2"), said("d", "c1", { phase: "failed", status: "failed", reason: "不行" })], "c1", arrived),
+  ).toEqual([
     { key: "a", text: "a", state: "sending" },
     { key: "d", text: "d", state: "failed", reason: "不行" },
   ]);
