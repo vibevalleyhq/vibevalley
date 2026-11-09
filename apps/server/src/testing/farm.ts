@@ -1,8 +1,8 @@
 import { Effect, Layer } from "effect";
 
-import { app } from "#/http/app.ts";
 import { registryOf } from "#/runtime/runtime.ts";
 
+import { app } from "./http.ts";
 import { testConfig } from "./layers.ts";
 import { helper, installedOnly } from "./worker.ts";
 import { quietApp } from "./world.ts";

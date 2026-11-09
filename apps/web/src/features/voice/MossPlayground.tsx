@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
@@ -11,6 +11,8 @@ import { Card } from "#/ui/layout.tsx";
 import { Hint, Tip } from "#/ui/Tip.tsx";
 
 import { type MossLine, mossLine, type MossSetup } from "./mossLine";
+import { VisionPlayground, VisualSourceField } from "./VisionPlayground.tsx";
+import { canCapture, localRelayHost, type VisualSource } from "./visual-capture.ts";
 
 const recipeStyles = stylex.create({
   mossLineViewP: {
@@ -205,8 +207,55 @@ function Stat(props: { label: string; value: string; tip: string; bad?: boolean 
 
 export function MossPlayground() {
   const version = createExternal(mossLine.subscribe, () => mossLine.version);
+  const [source, setSource] = createSignal<VisualSource>(canCapture("camera") ? "camera" : "screen");
+  const line = () => (version(), mossLine);
+  onSettled(() => () => mossLine.end());
   return (
-    <MossLineView line={(version(), mossLine)} onTalk={(setup) => void mossLine.start(setup)} onEnd={() => mossLine.end()} onMute={(on) => mossLine.mute(on)} />
+    <div {...stylex.attrs(viewStyles.mossLine)}>
+      <Show when={!localRelayHost(location.hostname)}>
+        <p role="status" {...stylex.attrs(viewStyles.mossLineViewP2)}>
+          {t("web.voice.moss.localOnly")}
+        </p>
+      </Show>
+      <VisionPlayground />
+      <MossLineView
+        enabled={localRelayHost(location.hostname)}
+        line={line()}
+        onTalk={(setup) => void mossLine.start(setup)}
+        onEnd={() => mossLine.end()}
+        onMute={(on) => mossLine.mute(on)}
+      />
+      <Card title={t("web.voice.vision.liveTitle")}>
+        <div {...stylex.attrs(viewStyles.mossLineViewDiv)} data-testid="live-visual" data-state={line().visualSource ?? "idle"}>
+          <p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.vision.notice")}</p>
+          <p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.vision.hostNotice")}</p>
+          <VisualSourceField source={source()} disabled={line().visualSource !== undefined} onChange={setSource} />
+          <Show
+            when={line().visualSource !== undefined}
+            fallback={
+              <Button
+                data-testid="live-visual-start"
+                disabled={line().phase !== "live" || !canCapture(source())}
+                onClick={() => void mossLine.startVisual(source())}
+              >
+                {t("web.voice.vision.start")}
+              </Button>
+            }
+          >
+            <Button data-testid="live-visual-stop" onClick={() => mossLine.stopVisual()}>
+              {t("web.voice.vision.stop")}
+            </Button>
+          </Show>
+          <Show when={line().visualProblem}>
+            {(problem) => (
+              <p role="alert" {...stylex.attrs(viewStyles.mossLineViewP)}>
+                {problem()}
+              </p>
+            )}
+          </Show>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -214,7 +263,13 @@ export function MossPlayground() {
 export type MossLineState = Pick<MossLine, "phase" | "problem" | "muted" | "micLevel" | "mossLevel" | "turns" | "events" | "qos">;
 
 /** The playground as it looks at any moment of a call: what MossPlayground draws, and its stories. */
-export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossSetup) => void; onEnd: () => void; onMute: (on: boolean) => void }) {
+export function MossLineView(props: {
+  line: MossLineState;
+  enabled?: boolean;
+  onTalk: (setup: MossSetup) => void;
+  onEnd: () => void;
+  onMute: (on: boolean) => void;
+}) {
   const line = () => props.line;
   const [persona, setPersona] = createSignal("");
   const [instructions, setInstructions] = createSignal(t("web.voice.moss.defaultInstructions"));
@@ -246,7 +301,13 @@ export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossS
                 </Button>
               }
             >
-              <Button tone="primary" icon="record" data-testid="moss-talk" onClick={() => props.onTalk({ persona: persona(), instructions: instructions() })}>
+              <Button
+                tone="primary"
+                icon="record"
+                data-testid="moss-talk"
+                disabled={props.enabled === false}
+                onClick={() => props.onTalk({ persona: persona(), instructions: instructions() })}
+              >
                 {t("web.voice.moss.talk")}
               </Button>
             </Show>

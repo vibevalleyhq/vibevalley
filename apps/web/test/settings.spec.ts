@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 
-const sections = ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
+const sections = ["general", "appearance", "models", "providers", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
 
 test("settings lists its sections, opens on general, and the search narrows them", async ({ page }) => {
   await page.goto("/settings");
@@ -15,9 +15,9 @@ test("settings lists its sections, opens on general, and the search narrows them
   await expect(page.getByTestId("github-recheck")).toBeVisible();
   // What a search matches is base/search.test.ts's; here it narrows the sections and lights the rows.
   await page.getByTestId("settings-search").fill("MOSS");
-  await expect(links).toHaveCount(1);
+  await expect(links).toHaveCount(2);
   await nav.locator('[data-key="moss"]').click();
-  await expect(page.locator("[data-found]").first()).toBeVisible();
+  await expect(nav.locator('[data-key="moss"]')).toHaveAttribute("aria-current", "page");
   await page.getByTestId("settings-search").fill("");
   await expect(links).toHaveCount(sections.length);
 });
@@ -154,10 +154,10 @@ test("dictation goes to MOSS unless the owner picks an own address, which then s
   await page.goto("/settings/dictation");
   const via = page.getByTestId("dictation-via");
   await expect(via.locator('[data-key="moss"]')).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("dictation-moss-key").locator("input")).toBeVisible();
+  await expect(page.getByTestId("dictation-provider-link").locator("a")).toHaveAttribute("href", "/settings/providers");
   await expect(page.getByTestId("dictation-url")).toHaveCount(0);
   await via.locator('[data-key="own"]').click();
-  await expect(page.getByTestId("dictation-moss-key")).toHaveCount(0);
+  await expect(page.getByTestId("dictation-provider-link")).toHaveCount(0);
   await page.getByTestId("dictation-url").fill("http://127.0.0.1:8080/v1");
   await page.getByTestId("dictation-model").fill("qwen3");
   await page.getByTestId("save").click();

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { scriptedRuntime } from "@botiverse/oar/testing";
 import { Effect, Predicate } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
@@ -8,9 +9,19 @@ import type { Tool } from "@vibevalley/agent/core/loop";
 import { type BrainMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
 import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { noResult } from "#/orchestrator/prompts.ts";
+import { Agent } from "#/agent/agent.ts";
+import { orchestrator } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { noResult, situationWords } from "#/orchestrator/prompts.ts";
+import { Repo } from "#/repo/repo.ts";
+import { channelLine } from "#/tool/prompts.ts";
 import { type Op, schemas, toolName } from "#/tool/schemas.ts";
+import { Tool as FarmTool } from "#/tool/tool.ts";
+
+import { starter, testConfig } from "./layers.ts";
+import { world } from "./world.ts";
 
 /** One check on a turn, a closed set by kind. */
 export interface Expect {
@@ -19,6 +30,7 @@ export interface Expect {
   readonly argContains?: string;
   readonly argLacks?: string;
   readonly contains?: string;
+  readonly maxChars?: number;
 }
 
 /** As saved in evals/<id>.json under the orchestrator's home. */
@@ -32,12 +44,14 @@ export interface EvalCase {
   readonly tools: readonly string[];
   readonly before: readonly BrainMessage[];
   readonly input: BrainMessage;
+  /** An isolated synthetic farm, not a reconstruction of the historical farm in did. */
+  readonly scenario?: { readonly repos: readonly string[] };
   readonly did: readonly BrainMessage[];
   /** Empty when saved. */
   readonly expect: readonly Expect[];
 }
 
-export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as const;
+export const kinds = ["called", "notCalled", "silent", "says", "saysNot", "brief"] as const;
 
 /** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). */
 export const orchestratorToolNames = () => [
@@ -46,18 +60,21 @@ export const orchestratorToolNames = () => [
 ];
 
 type Checked =
-  | { readonly kind: "called"; readonly tool: string; readonly argContains?: string | undefined; readonly argLacks?: string | undefined }
-  | { readonly kind: "notCalled"; readonly tool: string }
+  | { readonly kind: "called" | "notCalled"; readonly tool: string; readonly argContains?: string | undefined; readonly argLacks?: string | undefined }
   | { readonly kind: "silent" }
+  | { readonly kind: "brief"; readonly maxChars: number }
   | { readonly kind: "says" | "saysNot"; readonly contains: string };
 
 /** The expectation as its kind reads it, or what is missing from it. */
 function checkedOf(e: Expect): Checked | string {
   switch (e.kind) {
     case "called":
-      return e.tool ? { kind: "called", tool: e.tool, argContains: e.argContains, argLacks: e.argLacks } : e.kind + " without a tool";
     case "notCalled":
-      return e.tool ? { kind: "notCalled", tool: e.tool } : e.kind + " without a tool";
+      return e.tool ? { kind: e.kind, tool: e.tool, argContains: e.argContains, argLacks: e.argLacks } : e.kind + " without a tool";
+    case "brief":
+      return e.maxChars !== undefined && Number.isInteger(e.maxChars) && e.maxChars > 0
+        ? { kind: "brief", maxChars: e.maxChars }
+        : "brief without a positive integer maxChars";
     case "says":
     case "saysNot":
       return e.contains ? { kind: e.kind, contains: e.contains } : e.kind + " without contains";
@@ -99,16 +116,27 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
       missed.push(c);
       continue;
     }
-    const ok =
-      c.kind === "called"
-        ? called(c.tool, c.argContains, c.argLacks)
-        : c.kind === "notCalled"
-          ? !called(c.tool)
-          : c.kind === "silent"
-            ? words === ""
-            : c.kind === "says"
-              ? words.includes(c.contains)
-              : !words.includes(c.contains);
+    let ok: boolean;
+    switch (c.kind) {
+      case "called":
+        ok = called(c.tool, c.argContains, c.argLacks);
+        break;
+      case "notCalled":
+        ok = !called(c.tool, c.argContains, c.argLacks);
+        break;
+      case "silent":
+        ok = words === "";
+        break;
+      case "brief":
+        ok = words.length > 0 && [...words].length <= c.maxChars && !/[\r\n]|[。！？.!?]\s*\S/u.test(words);
+        break;
+      case "says":
+        ok = words.includes(c.contains);
+        break;
+      case "saysNot":
+        ok = !words.includes(c.contains);
+        break;
+    }
     if (!ok) missed.push(JSON.stringify(e));
   }
   return missed;
@@ -154,3 +182,43 @@ export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): T
       }),
   }));
 }
+
+const evalRuntime = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("Synthetic eval worker received the task.") });
+
+export function replayWorld(c: EvalCase) {
+  const config = testConfig();
+  return world(
+    c.scenario
+      ? {
+          config: { ...config, agent: { ...config.agent, starters: ["lab"] } },
+          repos: c.scenario.repos,
+          runtimes: [evalRuntime],
+        }
+      : { config },
+  );
+}
+
+export const replaySetup = Effect.fn("Eval.replaySetup")(function* (c: EvalCase) {
+  const farm = yield* FarmTool;
+  const chat = yield* Channel;
+  const here = chat.defaultChannel();
+  const tools = farm.orchestrator(() => ({ agent: defaultOrchestrator, session: "", repo: "", here, picked: "", envelope: "", actor: orchestrator(true) }));
+  if (!c.scenario) return { tools: stubbed(tools, c.did), input: c.input };
+  if (c.input.role !== "custom") throw new Error("A scenario needs an orchestrator input");
+  const agents = yield* Agent;
+  const profile = yield* agents.save({ ...starter("lab"), enabled: true, effort: "" });
+  const repos = yield* Repo;
+  const folders = yield* repos.list();
+  const channels = yield* chat.channels();
+  const address = yield* chat.addressOf(here);
+  const situation = situationWords.whole(
+    repos.root,
+    situationWords.repos(folders.map((repo) => repo.name)),
+    "",
+    situationWords.agent(profile.name, profile.id, profile.runtime, ""),
+    channels.map((channel) => channelLine(channel) + "\n" + situationWords.noHelpers).join("\n"),
+    address.target,
+    "zh",
+  );
+  return { tools, input: { ...c.input, content: situation + "\n\n" + messageText(c.input) } };
+});

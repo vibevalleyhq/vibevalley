@@ -18,3 +18,6 @@ export * from "./lan/shapes";
 export * from "./connector/shapes";
 export * from "./voice/shapes";
 export * from "./setting/shapes";
+export * from "./provider/shapes";
+export * from "./media/shapes";
+export * from "./media/audio-shapes";

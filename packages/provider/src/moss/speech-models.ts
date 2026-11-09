@@ -1,0 +1,37 @@
+export const mossSpeechModels = ["moss-tts-1.5-flash", "moss-tts-1.5-flash-2026-06-26", "moss-tts-1.0-pro", "moss-tts-1.0-pro-2026-02-07"] as const;
+
+export const mossSpeechLanguages = [
+  "Chinese",
+  "Cantonese",
+  "English",
+  "Arabic",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "Finnish",
+  "French",
+  "German",
+  "Greek",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Italian",
+  "Japanese",
+  "Korean",
+  "Macedonian",
+  "Malay",
+  "Persian",
+  "Polish",
+  "Portuguese",
+  "Romanian",
+  "Russian",
+  "Spanish",
+  "Swahili",
+  "Swedish",
+  "Tagalog",
+  "Thai",
+  "Turkish",
+  "Vietnamese",
+] as const;
+
+export const mossSpeechFormats = ["mp3", "wav", "pcm", "flac", "aac", "opus"] as const;

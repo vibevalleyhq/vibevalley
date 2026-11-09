@@ -151,6 +151,24 @@ export async function reveal(client: QueryClient, signal: AbortSignal) {
   }
   cover.style.pointerEvents = "none";
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  await cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: still ? 0 : 240, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" }).finished;
-  cover.remove();
+  const animation = cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: still ? 0 : 240, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" });
+  try {
+    await limited(500, signal, (waiting) =>
+      until(
+        () => animation.playState === "finished" || animation.playState === "idle",
+        (check) => {
+          animation.addEventListener("finish", check);
+          animation.addEventListener("cancel", check);
+          return () => {
+            animation.removeEventListener("finish", check);
+            animation.removeEventListener("cancel", check);
+          };
+        },
+        waiting,
+      ),
+    );
+  } finally {
+    animation.cancel();
+    cover.remove();
+  }
 }

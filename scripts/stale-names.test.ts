@@ -8,6 +8,8 @@ it("regression: browser worker feature detection is not a stale domain name", ()
   const browser = "apps/web/src/features/voice/moss-worker.ts";
   expect(staleNamesIn(browser, 'if (typeof Worker !== "undefined") {}')).toEqual([]);
   expect(staleNamesIn(browser, "const worker: Worker = new Worker(url);")).toEqual([]);
+  expect(staleNamesIn(browser, 'Object.defineProperty(window, "Worker", { value: undefined });')).toEqual([]);
+  expect(staleNamesIn(browser, 'Object.defineProperty(profile, "Worker", { value: undefined });')).toHaveLength(1);
   expect(staleNamesIn(browser, "const worker = Worker;")).toHaveLength(1);
 });
 

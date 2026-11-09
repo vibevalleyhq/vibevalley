@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
+import { t } from "@vibevalley/i18n";
 import { serverFiles } from "@vibevalley/server/assets";
 import { baselineHash } from "@vibevalley/server/baseline";
 
@@ -99,6 +100,10 @@ await build({
       category: "public.app-category.developer-tools",
       icon: join(desktop, "resources/icon.icns"),
       identity: null,
+      extendInfo: {
+        NSCameraUsageDescription: t("desktop.media.camera"),
+        NSMicrophoneUsageDescription: t("desktop.media.microphone"),
+      },
       artifactName: "VibeValley-${version}-${arch}.${ext}",
     },
     // lzfse (ULFO) rather than zlib: made and opened faster, a little smaller; macOS has read it since 10.11.

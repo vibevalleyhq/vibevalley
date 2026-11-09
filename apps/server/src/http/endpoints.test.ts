@@ -5,10 +5,9 @@ import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 import { blockId } from "@vibevalley/protocol/schema";
 
 import { newId } from "#/base/ids.ts";
+import { app } from "#/testing/http.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { quietApp } from "#/testing/world.ts";
-
-import { app } from "./app.ts";
 
 const farm = Effect.gen(function* () {
   let address = "";

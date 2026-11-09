@@ -27,7 +27,11 @@ interface ToggleProps extends ButtonProps {
 export function Toggle(props: ToggleProps) {
   const group = useContext(GroupContext);
   const rest = omit(props, "pressed", "defaultPressed", "onPressedChange", "value", "onClick", "onKeyDown");
-  const [own, setOwn] = createControllable({ value: () => props.pressed, initial: props.defaultPressed ?? false, onChange: (v) => props.onPressedChange?.(v) });
+  const [own, setOwn] = createControllable({
+    value: () => props.pressed,
+    initial: () => props.defaultPressed ?? false,
+    onChange: (v) => props.onPressedChange?.(v),
+  });
   const pressed = () => (group && props.value !== undefined ? group.value().includes(props.value) : own());
   const disabled = () => Boolean(props.disabled) || (group?.disabled() ?? false);
   return (
@@ -67,7 +71,7 @@ export function ToggleGroup(props: ToggleGroupProps) {
   const rest = omit(props, "value", "defaultValue", "onValueChange", "multiple", "disabled", "orientation", "loop", "onKeyDown", "ref");
   const [value, setValue] = createControllable<readonly string[]>({
     value: () => props.value,
-    initial: props.defaultValue ?? [],
+    initial: () => props.defaultValue ?? [],
     onChange: (v) => props.onValueChange?.([...v]),
   });
   let root: HTMLDivElement | undefined;
@@ -83,7 +87,7 @@ export function ToggleGroup(props: ToggleGroupProps) {
       <div
         role="group"
         {...rest}
-        ref={refs(props.ref, (el: HTMLDivElement) => {
+        ref={refs(props, (el: HTMLDivElement) => {
           root = el;
           queueMicrotask(() => setFirst(itemsIn(el, "[data-base-toggle]")[0]?.dataset.value));
         })}

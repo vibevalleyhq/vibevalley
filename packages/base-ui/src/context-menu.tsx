@@ -39,7 +39,7 @@ function Trigger(props: DivProps) {
   return (
     <div
       {...rest}
-      ref={refs(props.ref, a.setArea)}
+      ref={refs(props, a.setArea)}
       data-popup-open={flag(c.open())}
       onContextMenu={(e) => {
         call(props.onContextMenu, e);

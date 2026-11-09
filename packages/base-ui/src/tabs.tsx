@@ -32,7 +32,7 @@ function Root(props: TabsRootProps) {
   const rest = omit(props, "value", "defaultValue", "onValueChange", "orientation", "children");
   const [chosen, setChosen] = createControllable<string | undefined>({
     value: () => props.value,
-    initial: props.defaultValue,
+    initial: () => props.defaultValue,
     onChange: (v) => v !== undefined && props.onValueChange?.(v),
   });
   const [tabs, setTabs] = createSignal<readonly string[]>([]);
@@ -78,7 +78,7 @@ function List(props: TabsListProps) {
     <div
       role="tablist"
       {...rest}
-      ref={refs(props.ref, (el: HTMLDivElement) => (list = el))}
+      ref={refs(props, (el: HTMLDivElement) => (list = el))}
       aria-orientation={c.orientation()}
       data-orientation={c.orientation()}
       onKeyDown={(e) => {

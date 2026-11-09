@@ -78,7 +78,7 @@ function Trigger(props: TooltipTriggerProps) {
     <El
       type={buttonType(props.render)}
       {...rest}
-      ref={refs(props.ref, c.setTrigger)}
+      ref={refs(props, c.setTrigger)}
       aria-describedby={c.open() ? c.popupId : undefined}
       data-popup-open={flag(c.open())}
       onPointerEnter={(e: PointerEvent) => {

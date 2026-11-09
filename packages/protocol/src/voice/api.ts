@@ -15,7 +15,7 @@ export interface VoiceHandlers<R = never> {
   readonly "voice.call.say": (a: T.VoiceSaid) => Effect.Effect<void, ApiError, R>;
   readonly "voice.dictate": (a: T.DictateRequest) => Effect.Effect<T.Dictated, ApiError, R>;
   /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
-  readonly "voice.moss.verify": (a: T.MossVerifyRequest) => Effect.Effect<T.Validation, ApiError, R>;
+  readonly "voice.moss.verify": () => Effect.Effect<T.Validation, ApiError, R>;
 }
 
 export const voiceEndpoints: readonly Endpoint[] = [
@@ -29,9 +29,9 @@ export const voiceEndpoints: readonly Endpoint[] = [
   {
     op: "voice.moss.verify",
     about: [],
-    input: S.MossVerifyRequest,
+    input: undefined,
     result: S.Validation,
-    can: ["owner", "remote"],
+    can: ["owner"],
   },
   {
     op: "voice.grant.create",

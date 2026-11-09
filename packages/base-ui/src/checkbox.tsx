@@ -23,7 +23,7 @@ function Root(props: CheckboxRootProps) {
   const rest = omit(props, "checked", "defaultChecked", "onCheckedChange", "indeterminate", "onClick", "children");
   const [checked, setChecked] = createControllable({
     value: () => props.checked,
-    initial: props.defaultChecked ?? false,
+    initial: () => props.defaultChecked ?? false,
     onChange: (v) => props.onCheckedChange?.(v),
   });
   const c: Ctx = { checked, indeterminate: () => props.indeterminate ?? false, disabled: () => Boolean(props.disabled) };

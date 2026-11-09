@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { Context, Effect, Layer, Predicate, Schema } from "effect";
+import { Context, Effect, Layer, Predicate, Schema, Semaphore } from "effect";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
@@ -11,6 +11,7 @@ import { pkmDir, reposDir, ServerConfig, worktreesDir } from "#/infra/config.ts"
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 
 import { keyHint, memorySourcesOver, settingsProblem } from "./memorySources.ts";
+import { boundConnection, emptyProviders, ProviderSettings } from "./provider.ts";
 import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 const MemorySourceConfig = Schema.Struct({
@@ -44,7 +45,7 @@ const Stored = Schema.Struct({
   voice: Schema.optionalKey(S.SettingsUpdateVoice),
   dictationKey: Schema.optionalKey(Schema.String),
   dictation: Schema.optionalKey(StoredDictation),
-  mossKey: Schema.optionalKey(Schema.String),
+  providers: Schema.optionalKey(ProviderSettings),
   memorySources: Schema.optionalKey(Schema.Array(MemorySourceConfig)),
 });
 type Stored = typeof Stored.Type;
@@ -62,10 +63,8 @@ interface VoiceConfig {
   readonly deepseekApiKey: string;
 }
 
-/** Read together, so an address is never paired with another one's key. MOSS's key is the one Settings > MOSS keeps. */
-type DictationConfig =
-  | { readonly via: "moss"; readonly key: string }
-  | { readonly via: "own"; readonly url: string; readonly model: string; readonly key: string };
+/** Read together, so an address is never paired with another one's key. */
+type DictationConfig = { readonly via: "moss" } | { readonly via: "own"; readonly url: string; readonly model: string; readonly key: string };
 
 export interface AgoraCredentials {
   readonly appId: string;
@@ -89,8 +88,10 @@ export class Setting extends Context.Service<
     readonly voice: () => VoiceSettings;
     /** Undefined when the owner's own address is chosen and not set. */
     readonly dictation: () => DictationConfig | undefined;
-    /** "" when none is saved. */
-    readonly mossKey: () => string;
+    readonly providers: () => ProviderSettings;
+    readonly updateProviders: (
+      change: (current: ProviderSettings) => Effect.Effect<ProviderSettings, SettingRefused>,
+    ) => Effect.Effect<ProviderSettings, SettingRefused>;
     readonly memorySources: () => readonly MemorySourceConfig[];
     readonly voiceConfig: () => VoiceConfig;
   }
@@ -110,6 +111,7 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "settings.json");
   const disk = yield* keptFile(file, { mode: 0o600 });
+  const saving = yield* Semaphore.make(1);
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
   // Reset to defaults goes back to these.
   // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
@@ -146,8 +148,9 @@ const make = Effect.gen(function* () {
       ttsKey: secret(s.ttsKey, "settings"),
       dictation: { via: s.dictation?.via ?? "moss", url: s.dictation?.url ?? "", model: s.dictation?.model ?? "" },
       dictationKey: secret(s.dictationKey, "settings"),
-      dictationReady: s.dictation?.via === "own" ? !!s.dictation.url : !!s.mossKey,
-      mossKey: secret(s.mossKey, "settings"),
+      dictationReady:
+        s.dictation?.via === "own" ? !!s.dictation.url : !!boundConnection(s.providers ?? emptyProviders, s.providers?.dictation?.connection ?? null),
+      mossReady: !!boundConnection(s.providers ?? emptyProviders, s.providers?.live?.connection ?? null),
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
         everything: m.everything ?? false,
@@ -159,11 +162,20 @@ const make = Effect.gen(function* () {
     };
   };
 
+  // Once the rename starts, cancellation must not leave memory at the previous revision.
+  const persist = Effect.fn("Setting.persist")(function* (next: Stored) {
+    yield* disk
+      .save(JSON.stringify(next, null, 2) + "\n")
+      .pipe(Effect.mapError((e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: e.message }), cause: e })));
+    stored = next;
+    setLocale(next.locale ?? "zh");
+  }, Effect.uninterruptible);
+
   const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
     const problem = settingsProblem(u);
     if (problem) return yield* new SettingRefused({ message: problem });
     const next: Record<string, unknown> = { ...stored };
-    for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey", "mossKey"] as const) {
+    for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
       const given = u[key];
       if (given !== undefined) next[key] = given.trim();
     }
@@ -181,13 +193,9 @@ const make = Effect.gen(function* () {
     if (Predicate.isObject(next.voice) && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = yield* Schema.decodeEffect(Stored)(compact(next)).pipe(Effect.mapError((e) => new SettingRefused({ message: e.message, cause: e })));
-    yield* disk
-      .save(JSON.stringify(kept, null, 2) + "\n")
-      .pipe(Effect.mapError((e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: e.message }), cause: e })));
-    stored = kept;
-    setLocale(kept.locale ?? "zh");
+    yield* persist(kept);
     return status();
-  });
+  }, saving.withPermits(1));
 
   const shape = Setting.of({
     status,
@@ -202,10 +210,15 @@ const make = Effect.gen(function* () {
     voice: () => voiceOf(stored),
     dictation: () => {
       const d = stored.dictation;
-      if (d?.via !== "own") return { via: "moss", key: stored.mossKey ?? "" };
+      if (d?.via !== "own") return { via: "moss" };
       return d.url ? { via: "own", url: d.url, model: d.model, key: stored.dictationKey ?? "" } : undefined;
     },
-    mossKey: () => stored.mossKey ?? "",
+    providers: () => stored.providers ?? emptyProviders,
+    updateProviders: Effect.fn("Setting.updateProviders")(function* (change) {
+      const next = yield* change(stored.providers ?? emptyProviders);
+      yield* persist({ ...stored, providers: next });
+      return next;
+    }, saving.withPermits(1)),
     memorySources: () => [...(stored.memorySources ?? [])],
     voiceConfig: () => ({
       voice: voiceOf(stored),

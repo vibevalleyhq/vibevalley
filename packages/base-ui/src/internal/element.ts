@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { untrack } from "solid-js";
 
 /** A state as a data attribute: present (empty) when on, absent when off. */
 export const flag = (on: boolean | undefined): "" | undefined => (on === true ? "" : undefined);
@@ -12,11 +13,12 @@ export function call(handler: unknown, event: Event) {
 }
 
 /** A ref given as a JSX prop, and the component's own, both told of the element. */
-export function refs<T>(given: unknown, own: (el: T) => void) {
+export function refs<T extends HTMLElement>(props: { ref?: JSX.Ref<T> }, own: (el: T) => void) {
   return (el: T) => {
+    // Ref callbacks belong to this element binding, not later parent prop updates.
+    const given = untrack(() => props.ref);
     own(el);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a JSX ref prop that is a function is Solid's ref callback
-    if (typeof given === "function") (given as (el: T) => void)(el);
+    if (typeof given === "function") given(el);
   };
 }
 

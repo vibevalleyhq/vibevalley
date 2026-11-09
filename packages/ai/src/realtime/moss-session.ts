@@ -3,9 +3,12 @@ import { appendVoiceTurn, type VoiceTurn } from "./turns.ts";
 
 export type MossTurn = VoiceTurn<"owner" | "moss">;
 
-/** The turns with a turn's words so far (MOSS sends them whole each time). A new turn starts a new line. */
-export const heard = (turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] =>
-  appendVoiceTurn(turns, who, key, text, done);
+export const heard = (turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] => {
+  if (key && turns.some((turn) => turn.who === who && turn.key === key)) {
+    return turns.map((turn) => (turn.who === who && turn.key === key ? { ...turn, text, done: turn.done || done } : turn));
+  }
+  return appendVoiceTurn(turns, who, key, text, done);
+};
 
 /** 0..100 from a frame's loudness. */
 export const levelOf = pcm16RmsLevel;
@@ -35,7 +38,7 @@ export interface MossQos {
   replyMs?: number;
   replyMeanMs?: number;
   replies: number;
-  /** Answers MOSS stopped itself, by the reason it gave (response.audio.stop). */
+  /** Local stop categories; vendor reason payloads are not retained in diagnostics. */
   stops: Record<string, number>;
 }
 

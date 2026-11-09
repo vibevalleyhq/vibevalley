@@ -41,6 +41,50 @@
 | `setting.validate` | 这些设置会被拒的第一处，不存 | `/api/v1/setting/validate` | ✓ | ✓ |   |   |
 | `setting.update` | 改设置 | `/api/v1/setting/update` | ✓ |   |   |   |
 
+## provider
+
+
+
+| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|---|
+| `provider.get` | 读取供应商连接和默认用途，密钥只显示提示 | `/api/v1/provider/get` | ✓ |   |   |   |
+| `provider.update` | 按版本保存供应商连接和默认用途 | `/api/v1/provider/update` | ✓ |   |   |   |
+| `provider.voice.list` | 查询指定 MOSS 账号的一页音色，不生成音频 | `/api/v1/provider/voice/list` | ✓ |   |   |   |
+| `provider.model.list` | 查询已配置 MOSS 账号的可用模型，不发推理请求 | `/api/v1/provider/model/list` | ✓ |   |   |   |
+
+## media
+
+
+
+| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|---|
+| `media.dialogue.create` | 使用指定账号的音色生成多人对话 | `/api/v1/media/dialogue/create` | ✓ |   | ✓ |   |
+| `media.voiceDesign.create` | 设计合成音色试听，不保存可复用音色 | `/api/v1/media/voiceDesign/create` | ✓ |   | ✓ |   |
+| `media.clone.create` | 克隆已明确授权的本机声音样本 | `/api/v1/media/clone/create` | ✓ |   |   |   |
+| `media.transcription.create` | 转写已授权上传的音频，可区分说话人 | `/api/v1/media/transcription/create` | ✓ |   |   |   |
+| `media.audio.resume` | 继续查询同一个已知音频任务，不重复生成 | `/api/v1/media/audio/resume` | ✓ |   |   |   |
+| `media.audio.previewCleanup` | 预览清理已知远端音频文件，不实际改动 | `/api/v1/media/audio/previewCleanup` | ✓ |   |   |   |
+| `media.audio.cleanup` | 清理已知远端音频文件，不重复转写或合成 | `/api/v1/media/audio/cleanup` | ✓ |   |   |   |
+| `media.input.create` | 为媒体输入预留有限的本机空间，不上传给供应商 | `/api/v1/media/input/create` | ✓ |   |   |   |
+| `media.input.get` | 查看本机的媒体输入 | `/api/v1/media/input/get` | ✓ |   |   |   |
+| `media.input.list` | 列出本机的媒体输入 | `/api/v1/media/input/list` | ✓ |   |   |   |
+| `media.input.delete` | 删除没有被任务保留的本机媒体输入 | `/api/v1/media/input/delete` | ✓ |   |   |   |
+| `media.input.previewDelete` | 预览删除本机媒体输入，不实际改动 | `/api/v1/media/input/previewDelete` | ✓ |   |   |   |
+| `media.image.create` | 创建生图任务，同一编号不重复生成 | `/api/v1/media/image/create` | ✓ |   | ✓ |   |
+| `media.understanding.create` | 确认账号和上传许可后理解选中的本机输入 | `/api/v1/media/understanding/create` | ✓ |   |   |   |
+| `media.understanding.authorize` | 登记不可变理解请求，只授权指定频道的管家执行一次 | `/api/v1/media/understanding/authorize` | ✓ |   |   |   |
+| `media.understanding.start` | 管家按已授权任务编号执行理解，不接受新的输入或授权声明 | `/api/v1/media/understanding/start` |   |   | ✓ |   |
+| `media.speech.create` | 创建单人语音任务，生成后下载到本机，不重复提交同一编号 | `/api/v1/media/speech/create` | ✓ |   | ✓ |   |
+| `media.speech.resume` | 继续查询已知语音任务，不重新提交 | `/api/v1/media/speech/resume` | ✓ |   |   |   |
+| `media.understanding.previewCleanup` | 预览远端清理和本机保留释放，不改变任何文件 | `/api/v1/media/understanding/previewCleanup` | ✓ |   |   |   |
+| `media.understanding.cleanup` | 清理已知远端文件，不重复理解请求 | `/api/v1/media/understanding/cleanup` | ✓ |   |   |   |
+| `media.job.get` | 读取生成任务 | `/api/v1/media/job/get` | ✓ |   | ✓ |   |
+| `media.job.cancel` | 取消本机等待，不保证停止厂商计费 | `/api/v1/media/job/cancel` | ✓ |   | ✓ |   |
+| `media.job.previewRelease` | 预览释放本机音频资产并放弃后续恢复 | `/api/v1/media/job/previewRelease` | ✓ |   |   |   |
+| `media.job.release` | 释放这个任务的本机音频资产，不删除共享资产，也不停止厂商计费 | `/api/v1/media/job/release` | ✓ |   |   |   |
+| `media.job.download` | 只重试结果下载，不重新生成 | `/api/v1/media/job/download` | ✓ |   | ✓ |   |
+| `media.job.list` | 列出最近生成任务 | `/api/v1/media/job/list` | ✓ |   | ✓ |   |
+
 ## channel
 
 频道和私聊，和里面的消息
@@ -90,7 +134,7 @@
 | 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|---|
 | `voice.hear` | 交上正在通的那通电话里听到的一句 | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
-| `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ | ✓ |   |   |
+| `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ |   |   |   |
 | `voice.grant.create` | 拿通话用的声网令牌 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
 | `voice.grant.renew` | 给通话换新的声网令牌 | `/api/v1/voice/grant/renew` | ✓ | ✓ |   |   |
 | `voice.call.start` | 开始和管家通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |

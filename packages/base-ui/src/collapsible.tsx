@@ -24,7 +24,7 @@ interface CollapsibleRootProps extends DivProps {
 
 function Root(props: CollapsibleRootProps) {
   const rest = omit(props, "open", "defaultOpen", "onOpenChange", "disabled", "children");
-  const [open, setOpen] = createControllable({ value: () => props.open, initial: props.defaultOpen ?? false, onChange: (v) => props.onOpenChange?.(v) });
+  const [open, setOpen] = createControllable({ value: () => props.open, initial: () => props.defaultOpen ?? false, onChange: (v) => props.onOpenChange?.(v) });
   const ctx: Ctx = { open, setOpen, disabled: () => Boolean(props.disabled), panelId: createUniqueId() };
   return (
     <Context value={ctx}>

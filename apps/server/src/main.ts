@@ -13,6 +13,7 @@ import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
 import { loadConfig, pkmDir, reposDir, worktreesDir } from "./infra/config.ts";
 import { leaseHome } from "./infra/lease.ts";
+import { PublicHttp } from "./infra/publicHttp.ts";
 
 const { values: flags } = parseArgs({
   options: {
@@ -40,7 +41,12 @@ const testRuntimes = Effect.gen(function* () {
 const main = Effect.gen(function* () {
   const loaded = yield* loadConfig(flags.config);
   const config = flags.web ? { ...loaded, web: flags.web } : loaded;
-  const runtime = testRuntimesAsked ? yield* testRuntimes : undefined;
+  const options = testRuntimesAsked
+    ? { runtime: yield* testRuntimes, voice: { moss: (yield* Effect.promise(() => import("./testing/realtime.ts"))).realtimeFixture } }
+    : {};
+  const network = testRuntimesAsked
+    ? (yield* Effect.promise(() => import("./testing/network.ts"))).network
+    : Layer.merge(FetchHttpClient.layer, PublicHttp.layer);
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(config.home, { recursive: true });
   const repos = reposDir(config);
@@ -71,7 +77,7 @@ const main = Effect.gen(function* () {
         withdraw = announce(config.home, `http://${address}`);
         if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid } satisfies ServerReady) + "\n");
       }),
-    runtime ? { runtime } : {},
+    options,
   );
   // With otlp.url the services' spans (Effect.fn), logs and metrics go to that collector; without it nothing is sent.
   const observed = config.otlp.url
@@ -83,7 +89,7 @@ const main = Effect.gen(function* () {
         ),
       )
     : farm;
-  return yield* Layer.launch(observed);
+  return yield* Layer.launch(observed.pipe(Layer.provide(network)));
 });
 
 NodeRuntime.runMain(main.pipe(Effect.scoped, Effect.provide(NodeServices.layer)));

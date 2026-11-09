@@ -17,3 +17,6 @@ vpx scripts/i18n.ts check     # in docs:verify: missing, unused, untranslated, m
 vpx scripts/i18n.ts find 存好  # which key says it
 vp run test                   # vitest: t, the formats, the types
 ```
+
+Usage checks include application and package `src/` and `scripts/`, app Vite configs, and the capability generator.
+Packaging-only text, such as macOS camera and microphone permission descriptions, counts as used.

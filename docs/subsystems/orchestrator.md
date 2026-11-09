@@ -19,7 +19,7 @@
 | `apps/server/src/orchestrator/situation.ts` | 农场现状增量 `situationDelta` 与长汇报截断 |
 | `apps/server/src/orchestrator/response.ts`、`openai.ts` | 电话与 `POST /v1/chat/completions` 的进程内流式响应端口（`Caller`） |
 | `apps/server/src/orchestrator/prompts.ts` | 管家系统提示词 |
-| `apps/server/src/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 管家的 28 个工具与帮工 `/mcp` 的 10 个工具（参数钉在 `testdata/parameters.json`） |
+| `apps/server/src/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 管家和帮工 `/mcp` 的工具；参数与接口权限对应，媒体流程由脚本模型验证 |
 | `$VIBEVALLEY_HOME/agent/<档案 id>/` | 对话文件 `<档案 id>.jsonl`、压缩归档 `archive/` 与错轮评测 `evals/` |
 | `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台管家页（记性、轨迹、旧账、声音） |
 

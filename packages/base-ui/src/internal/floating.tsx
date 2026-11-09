@@ -1,5 +1,5 @@
 import { Portal as SolidPortal, type JSX } from "@solidjs/web";
-import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show } from "solid-js";
+import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show, untrack } from "solid-js";
 
 import { type Align, createAnchored, type Side } from "./anchored";
 import { createControllable } from "./controllable";
@@ -33,7 +33,7 @@ export function createFloating<R extends string>(props: FloatingRootProps<R>, fi
   let reason = first;
   const [open, setOpen] = createControllable({
     value: () => props.open,
-    initial: props.defaultOpen ?? false,
+    initial: () => props.defaultOpen ?? false,
     onChange: (v) => props.onOpenChange?.(v, reason),
   });
   const [trigger, setTrigger] = createSignal<HTMLElement>();
@@ -108,7 +108,7 @@ export function makePositioner(use: () => FloatingParts, defaults: { side: Side;
     return (
       <div
         {...rest}
-        ref={refs(props.ref, (el: HTMLDivElement) => {
+        ref={refs(props, (el: HTMLDivElement) => {
           setBox(el);
           c.setPositioner(el);
         })}
@@ -138,9 +138,11 @@ export const tabbable =
 /** Once the positioner is placed, gives the focus to what `target` picks in the popup. */
 export function focusWhenPlaced(c: FloatingParts, popup: Accessor<HTMLElement | undefined>, target: (popup: HTMLElement) => HTMLElement) {
   createEffect(
-    () => (c.placed() ? popup() : undefined),
-    (el) => {
-      if (el) target(el).focus({ preventScroll: true });
+    () => {
+      const el = c.placed() ? popup() : undefined;
+      // The target is an opening-time snapshot; value changes must not steal focus again.
+      return el ? untrack(() => target(el)) : undefined;
     },
+    (el) => el?.focus({ preventScroll: true }),
   );
 }

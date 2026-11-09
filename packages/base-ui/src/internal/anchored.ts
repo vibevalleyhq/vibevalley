@@ -1,5 +1,5 @@
 import { autoUpdate, computePosition, flip, offset, type Placement, shift } from "@floating-ui/dom";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, untrack } from "solid-js";
 
 export type Side = "top" | "bottom" | "left" | "right";
 export type Align = "start" | "center" | "end";
@@ -17,24 +17,46 @@ const placementOf = (side: Side, align: Align): Placement => (align === "center"
 
 /** Where the floating element is, and on which side and alignment it ended up, while both elements exist. */
 export function createAnchored(anchor: () => Element | undefined, floating: () => HTMLElement | undefined, o: () => AnchorOptions) {
-  const [at, setAt] = createSignal({ x: 0, y: 0, side: o().side ?? "bottom", align: o().align ?? "center", placed: false, anchorWidth: 0 });
+  const [at, setAt] = createSignal(
+    untrack(() => {
+      const { side = "bottom", align = "center" } = o();
+      return { x: 0, y: 0, side, align, placed: false, anchorWidth: 0 };
+    }),
+  );
   createEffect(
-    () => [anchor(), floating()] as const,
-    ([a, f]) => {
+    () => {
+      const { side = "bottom", align = "center", sideOffset = 4, collisionPadding = 8 } = o();
+      return { a: anchor(), f: floating(), side, align, sideOffset, collisionPadding };
+    },
+    ({ a, f, side, align, sideOffset, collisionPadding }) => {
       if (!a || !f) return;
+      const placement = placementOf(side, align);
+      const middleware = [offset(sideOffset), flip({ padding: collisionPadding }), shift({ padding: collisionPadding })];
+      let active = true;
+      let request = 0;
       const place = () => {
-        const { side = "bottom", align = "center", sideOffset = 4, collisionPadding = 8 } = o();
+        const current = ++request;
         void computePosition(a, f, {
           strategy: "fixed",
-          placement: placementOf(side, align),
-          middleware: [offset(sideOffset), flip({ padding: collisionPadding }), shift({ padding: collisionPadding })],
+          placement,
+          middleware,
         }).then((p) => {
+          if (!active || current !== request) return;
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- floating-ui's Placement is a Side, or a Side and start or end
           const [s, al = "center"] = p.placement.split("-") as [Side, Align?];
-          setAt({ x: p.x, y: p.y, side: s, align: al, placed: true, anchorWidth: a.getBoundingClientRect().width });
+          const anchorWidth = a.getBoundingClientRect().width;
+          setAt((prev) =>
+            prev.placed && prev.x === p.x && prev.y === p.y && prev.side === s && prev.align === al && prev.anchorWidth === anchorWidth
+              ? prev
+              : { x: p.x, y: p.y, side: s, align: al, placed: true, anchorWidth },
+          );
         });
       };
-      return autoUpdate(a, f, place);
+      const cleanup = autoUpdate(a, f, place);
+      return () => {
+        active = false;
+        cleanup();
+      };
     },
   );
   return at;

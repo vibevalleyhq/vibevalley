@@ -30,7 +30,7 @@ export function RadioGroup(props: RadioGroupProps) {
   const rest = omit(props, "value", "defaultValue", "onValueChange", "disabled", "readOnly", "name", "ref", "onKeyDown", "children");
   const [value, setValue] = createControllable<string | undefined>({
     value: () => props.value,
-    initial: props.defaultValue,
+    initial: () => props.defaultValue,
     onChange: (v) => v !== undefined && props.onValueChange?.(v),
   });
   const [first, setFirst] = createSignal<string>();
@@ -49,7 +49,7 @@ export function RadioGroup(props: RadioGroupProps) {
       <div
         role="radiogroup"
         {...rest}
-        ref={refs(props.ref, (el: HTMLDivElement) => {
+        ref={refs(props, (el: HTMLDivElement) => {
           root = el;
           queueMicrotask(() => setFirst(itemsIn(el, `${radio}:not([data-disabled])`)[0]?.dataset.value));
         })}

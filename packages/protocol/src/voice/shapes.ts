@@ -6,6 +6,7 @@ export type VoiceFix = (typeof VoiceFixValues)[number];
 
 /** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. */
 export const mossLinePath = "/api/v1/voice/moss/line";
+export const visionLinePath = "/api/v1/voice/vision/line";
 
 export const voiceSilenceMsMin = 200;
 
@@ -40,8 +41,7 @@ export interface AgoraGrant {
   token: string;
 }
 
-/** Where dictation's recordings are transcribed: MOSS (moss-transcribe-1.0, with the MOSS key), or an OpenAI-compatible
- * address of the owner's (own). */
+/** MOSS uses the provider binding; own uses an explicitly configured compatible endpoint. */
 export const DictationViaValues = ["moss", "own"] as const;
 export type DictationVia = (typeof DictationViaValues)[number];
 
@@ -64,11 +64,6 @@ export interface VoiceSettings {
   silenceMs: number;
   interruptMs: number;
   idleSeconds: number;
-}
-
-/** A MOSS Live key to try; the saved one when absent. */
-export interface MossVerifyRequest {
-  key?: string;
 }
 
 export interface AgoraAppID {

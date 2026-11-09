@@ -58,7 +58,7 @@ function Trigger(props: PreviewCardTriggerProps) {
   return (
     <El
       {...rest}
-      ref={refs(props.ref, c.setTrigger)}
+      ref={refs(props, c.setTrigger)}
       data-popup-open={flag(c.open())}
       onPointerEnter={(e: PointerEvent) => {
         call(props.onPointerEnter, e);

@@ -2,14 +2,14 @@ import { ByteSize, Cause, Deferred, Effect, Exit, Metric, Schema } from "effect"
 import { HttpIncomingMessage, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
-import { artifactPrefix, attachmentMax, attachmentPath, mossLinePath } from "@vibevalley/protocol";
+import { artifactPrefix, attachmentMax, attachmentPath, mossLinePath, visionLinePath } from "@vibevalley/protocol";
 import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "#/artifact/artifact.ts";
 import { artifactHeaders } from "#/artifact/policy.ts";
 import { withShell } from "#/artifact/shell.ts";
-import { messageOf, refused } from "#/base/errors.ts";
+import { messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { wireOf } from "#/base/json.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Voice } from "#/voice/voice.ts";
@@ -130,22 +130,29 @@ export const artifactContent = HttpRouter.add(
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 
-// A page's line to MOSS Live (voice/moss.ts relay): a WebSocket at mossLinePath, for the farm's own page only, as the RPC socket is (rpc.ts fromTheFarm).
+// Both protocols freeze their own provider binding before upgrading the owner's page.
 export const mossLine = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const voice = yield* Voice;
-    yield* router.add(
-      "GET",
-      mossLinePath,
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest;
-        if (!fromTheFarm(request.headers)) return HttpServerResponse.text("not the farm's page", { status: 403 });
-        const problem = voice.mossProblem();
-        if (problem) return HttpServerResponse.text(problem, { status: 409 });
-        const page = yield* Effect.orDie(request.upgrade);
-        yield* voice.mossLine(page);
-        return HttpServerResponse.empty();
-      }),
+    yield* Effect.forEach(
+      [
+        [mossLinePath, voice.mossLine],
+        [visionLinePath, voice.visionLine],
+      ] as const,
+      ([path, prepare]) =>
+        router.add(
+          "GET",
+          path,
+          Effect.gen(function* () {
+            const request = yield* HttpServerRequest.HttpServerRequest;
+            if (!fromTheFarm(request.headers)) return HttpServerResponse.text("not the farm's page", { status: 403 });
+            const line = yield* prepare();
+            const page = yield* Effect.orDie(request.upgrade);
+            yield* line.run(page);
+            return HttpServerResponse.empty();
+          }).pipe(Effect.catch((error) => Effect.succeed(HttpServerResponse.text(reasonOf(error), { status: 409 })))),
+        ),
+      { discard: true },
     );
   }),
 );

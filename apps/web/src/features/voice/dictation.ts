@@ -34,6 +34,14 @@ class Dictation {
   /** The field it was started from: the words go there, or nowhere once it is gone. */
   private owner: object | undefined = undefined;
   private readonly listeners = new Set<() => void>();
+  private generation = 0;
+  private releasePending: (() => void) | undefined;
+  private background = () => {
+    if (document.hidden && this.owner) this.release(this.owner);
+  };
+  private leave = () => {
+    if (this.owner) this.release(this.owner);
+  };
 
   subscribe = (f: () => void) => {
     this.listeners.add(f);
@@ -53,6 +61,9 @@ class Dictation {
   async toggle(owner: object, onWords: (words: string) => void) {
     if (this.phase === "transcribing") return;
     if (this.phase === "recording") return this.finish();
+    const generation = ++this.generation;
+    document.addEventListener("visibilitychange", this.background);
+    window.addEventListener("pagehide", this.leave);
     this.owner = owner;
     this.startedAt = performance.now();
     this.set("recording", "");
@@ -60,14 +71,16 @@ class Dictation {
     let context: AudioContext | undefined;
     const drop = () => {
       stream?.getTracks().forEach((t) => t.stop());
-      void context?.close();
+      if (context && context.state !== "closed") void context.close();
     };
+    this.releasePending = drop;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      if (generation !== this.generation) return drop();
       context = new AudioContext({ sampleRate: dictateRate });
       await context.audioWorklet.addModule((captureUrl ??= URL.createObjectURL(new Blob([dictateWorkletCode], { type: "text/javascript" }))));
       // After every wait: the field may have been released, or another may have stopped it, meanwhile.
-      if (this.owner !== owner) return drop();
+      if (generation !== this.generation) return drop();
       const node = new AudioWorkletNode(context, "vibevalley-capture", { channelCount: 1 });
       const chunks: Float32Array[] = [];
       node.port.onmessage = (e: MessageEvent<Float32Array>) => chunks.push(e.data);
@@ -79,8 +92,19 @@ class Dictation {
       // Connected on to the output (it writes silence there), as a node nobody pulls may not be run.
       node.connect(context.destination);
       this.recording = { stream, context, node, meter, chunks, onWords };
+      this.releasePending = undefined;
+      for (const track of stream.getTracks())
+        track.addEventListener(
+          "ended",
+          () => {
+            if (generation === this.generation) this.cancel(owner);
+          },
+          { once: true },
+        );
     } catch (e) {
       drop();
+      if (generation !== this.generation) return;
+      this.close();
       this.owner = undefined;
       this.startedAt = 0;
       this.blamed = owner;
@@ -88,6 +112,8 @@ class Dictation {
         "idle",
         e instanceof Error && e.name === "NotAllowedError" ? t("web.voice.dictation.noMic") : t("web.voice.dictation.cannot", { why: reasonOf(e) }),
       );
+    } finally {
+      if (this.releasePending === drop) this.releasePending = undefined;
     }
   }
 
@@ -112,6 +138,7 @@ class Dictation {
   /** Stops what `owner` started and drops it, untranscribed. */
   cancel(owner: object) {
     if (this.owner !== owner || this.phase !== "recording") return;
+    this.generation++;
     this.owner = undefined;
     this.close();
     this.set("idle", "");
@@ -130,12 +157,17 @@ class Dictation {
   /** The field it was started for is gone: what it hears goes nowhere. */
   release(owner: object) {
     if (this.owner !== owner) return;
+    this.generation++;
     this.owner = undefined;
     this.close();
     this.set("idle");
   }
 
   private close() {
+    document.removeEventListener("visibilitychange", this.background);
+    window.removeEventListener("pagehide", this.leave);
+    this.releasePending?.();
+    this.releasePending = undefined;
     const r = this.recording;
     this.recording = undefined;
     this.startedAt = 0;
@@ -147,22 +179,28 @@ class Dictation {
   }
 
   private async finish() {
+    const generation = ++this.generation;
     const r = this.recording;
     const owner = this.owner;
     this.close();
-    if (!r) return this.set("idle");
+    if (!r) {
+      this.owner = undefined;
+      return this.set("idle");
+    }
     this.set("transcribing");
     try {
       const audio = encodeWavBase64(r.chunks);
       if (!audio) throw new Error(t("web.voice.dictation.nothing"));
       const said = await api.voice.dictate({ audio, format: "wav" });
+      if (generation !== this.generation) return;
       if (this.owner === owner && said.text) r.onWords(said.text);
       this.set("idle", "");
     } catch (e) {
+      if (generation !== this.generation) return;
       this.blamed = owner;
       this.set("idle", reasonOf(e));
     } finally {
-      if (this.owner === owner) this.owner = undefined;
+      if (generation === this.generation) this.owner = undefined;
     }
   }
 }

@@ -51,7 +51,11 @@ function Root(props: SliderRootProps) {
   const min = () => props.min ?? 0;
   const max = () => props.max ?? 100;
   const step = () => props.step ?? 1;
-  const [value, setValue] = createControllable({ value: () => props.value, initial: props.defaultValue ?? min(), onChange: (v) => props.onValueChange?.(v) });
+  const [value, setValue] = createControllable({
+    value: () => props.value,
+    initial: () => props.defaultValue ?? min(),
+    onChange: (v) => props.onValueChange?.(v),
+  });
   const [thumb, setThumb] = createSignal<HTMLElement>();
   const [dragging, setDragging] = createSignal(false);
   const ctx: Ctx = {
@@ -98,7 +102,7 @@ function Control(props: DivProps) {
   return (
     <div
       {...rest}
-      ref={refs(props.ref, (x: HTMLDivElement) => (el = x))}
+      ref={refs(props, (x: HTMLDivElement) => (el = x))}
       data-orientation={c.orientation()}
       data-disabled={flag(c.disabled())}
       data-dragging={flag(c.dragging())}
@@ -167,7 +171,7 @@ function Thumb(props: DivProps & { getValueText?: ((value: number) => string) | 
       role="slider"
       tabindex={c.disabled() ? -1 : 0}
       {...rest}
-      ref={refs(props.ref, c.setThumb)}
+      ref={refs(props, c.setThumb)}
       aria-valuemin={c.min()}
       aria-valuemax={c.max()}
       aria-valuenow={c.value()}

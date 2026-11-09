@@ -3,6 +3,54 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./moss/speech-stream": {
+      "types": "./dist/moss/speech-stream.d.ts",
+      "default": "./src/moss/speech-stream.ts"
+    },
+    "./moss/transcription-stream": {
+      "types": "./dist/moss/transcription-stream.d.ts",
+      "default": "./src/moss/transcription-stream.ts"
+    },
+    "./moss/vision": {
+      "types": "./dist/moss/vision.d.ts",
+      "default": "./src/moss/vision.ts"
+    },
+    "./moss/vision-models": {
+      "types": "./dist/moss/vision-models.d.ts",
+      "default": "./src/moss/vision-models.ts"
+    },
+    "./moss/live-models": {
+      "types": "./dist/moss/live-models.d.ts",
+      "default": "./src/moss/live-models.ts"
+    },
+    "./moss/speakers-models": {
+      "types": "./dist/moss/speakers-models.d.ts",
+      "default": "./src/moss/speakers-models.ts"
+    },
+    "./moss/voice-design-models": {
+      "types": "./dist/moss/voice-design-models.d.ts",
+      "default": "./src/moss/voice-design-models.ts"
+    },
+    "./moss/transcription-models": {
+      "types": "./dist/moss/transcription-models.d.ts",
+      "default": "./src/moss/transcription-models.ts"
+    },
+    "./moss/speakers": {
+      "types": "./dist/moss/speakers.d.ts",
+      "default": "./src/moss/speakers.ts"
+    },
+    "./moss/voice-design": {
+      "types": "./dist/moss/voice-design.d.ts",
+      "default": "./src/moss/voice-design.ts"
+    },
+    "./moss/transcription": {
+      "types": "./dist/moss/transcription.d.ts",
+      "default": "./src/moss/transcription.ts"
+    },
+    "./moss/audio-submission": {
+      "types": "./dist/moss/audio-submission.d.ts",
+      "default": "./src/moss/audio-submission.ts"
+    },
     "./deepseek/models": {
       "types": "./dist/deepseek/models.d.ts",
       "default": "./src/deepseek/models.ts"
@@ -34,6 +82,46 @@
     "./moss": {
       "types": "./dist/moss.d.ts",
       "default": "./src/moss.ts"
+    },
+    "./moss/speech": {
+      "types": "./dist/moss/speech.d.ts",
+      "default": "./src/moss/speech.ts"
+    },
+    "./moss/speech-models": {
+      "types": "./dist/moss/speech-models.d.ts",
+      "default": "./src/moss/speech-models.ts"
+    },
+    "./moss/audio-tasks": {
+      "types": "./dist/moss/audio-tasks.d.ts",
+      "default": "./src/moss/audio-tasks.ts"
+    },
+    "./moss/voices": {
+      "types": "./dist/moss/voices.d.ts",
+      "default": "./src/moss/voices.ts"
+    },
+    "./moss/image": {
+      "types": "./dist/moss/image.d.ts",
+      "default": "./src/moss/image.ts"
+    },
+    "./moss/image-models": {
+      "types": "./dist/moss/image-models.d.ts",
+      "default": "./src/moss/image-models.ts"
+    },
+    "./moss/files": {
+      "types": "./dist/moss/files.d.ts",
+      "default": "./src/moss/files.ts"
+    },
+    "./moss/understanding": {
+      "types": "./dist/moss/understanding.d.ts",
+      "default": "./src/moss/understanding.ts"
+    },
+    "./moss/understanding-models": {
+      "types": "./dist/moss/understanding-models.d.ts",
+      "default": "./src/moss/understanding-models.ts"
+    },
+    "./moss/models": {
+      "types": "./dist/moss/models.d.ts",
+      "default": "./src/moss/models.ts"
     },
     "./moss/server": {
       "types": "./dist/moss/server.d.ts",

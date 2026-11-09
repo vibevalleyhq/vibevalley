@@ -132,6 +132,15 @@ const blockDeleteParameters = Schema.Struct({
 
 /** The orchestrator's, by endpoint. */
 export const parameters = {
+  "media.image.create": S.MediaImageRequest,
+  "media.understanding.start": S.MediaJobRequest,
+  "media.speech.create": S.MediaSpeechRequest,
+  "media.dialogue.create": S.MediaSpeakersRequest,
+  "media.voiceDesign.create": S.MediaVoiceDesignRequest,
+  "media.job.get": S.MediaJobRequest,
+  "media.job.cancel": S.MediaJobRequest,
+  "media.job.download": S.MediaJobRequest,
+  "media.job.list": Schema.Struct({}),
   "artifact.content.get": artifactRead,
   "artifact.create": Schema.Struct({
     ...artifactText,
@@ -366,7 +375,7 @@ const shown = (all: Record<string, Schema.Struct<Schema.Struct.Fields>>): Record
 
 /** As the model is shown them, by endpoint. */
 export const schemas = shown(parameters);
-export const sessionSchemas = shown(sessionParameters);
+const sessionSchemas = shown(sessionParameters);
 
 export type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
 

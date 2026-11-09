@@ -38,6 +38,7 @@
     "@vibevalley/provider": "workspace:*",
     "agora-agents": "catalog:",
     "effect": "catalog:",
+    "music-metadata": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {

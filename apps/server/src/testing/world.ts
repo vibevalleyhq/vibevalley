@@ -19,7 +19,7 @@ import { WorkerAccess, type workerAccess } from "#/session/worker.ts";
 import { Tool } from "#/tool/tool.ts";
 
 import { repo } from "./git.ts";
-import { testConfig } from "./layers.ts";
+import { offlineNetwork, testConfig } from "./layers.ts";
 import { installedOnly } from "./worker.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
@@ -60,7 +60,7 @@ export function worldBelowIngress(options: WorldOptions = {}) {
     runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
     repo: { gh: noGitHub, ...options.repoHooks },
   };
-  const below = platform(config);
+  const below = platform(config).pipe(Layer.provideMerge(offlineNetwork));
   return said.pipe(
     Layer.provideMerge(below),
     agents(o),

@@ -40,7 +40,7 @@ function Root(props: AccordionRootProps) {
   const rest = omit(props, "value", "defaultValue", "onValueChange", "multiple", "disabled", "orientation", "ref", "onKeyDown");
   const [value, setValue] = createControllable<readonly string[]>({
     value: () => props.value,
-    initial: props.defaultValue ?? [],
+    initial: () => props.defaultValue ?? [],
     onChange: (v) => props.onValueChange?.([...v]),
   });
   let root: HTMLDivElement | undefined;
@@ -54,7 +54,7 @@ function Root(props: AccordionRootProps) {
     <RootContext value={ctx}>
       <div
         {...rest}
-        ref={refs(props.ref, (el: HTMLDivElement) => (root = el))}
+        ref={refs(props, (el: HTMLDivElement) => (root = el))}
         data-orientation={ctx.orientation()}
         data-disabled={flag(ctx.disabled())}
         onKeyDown={(e) => {

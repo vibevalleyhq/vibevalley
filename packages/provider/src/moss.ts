@@ -7,8 +7,18 @@ export const mossFrameSamples = 320;
 export const mossTaggedFrameBytes = 1 + mossFrameSamples * 2;
 export const mossAudioTag = 0x00;
 
-const MossErrorObjectSchema = Schema.Struct({ message: Schema.optionalKey(Schema.String) });
+const MossErrorObjectSchema = Schema.Struct({
+  message: Schema.optionalKey(Schema.String),
+  code: Schema.optionalKey(Schema.String),
+  client_event_id: Schema.optionalKey(Schema.String),
+});
 const MossEventPayloadSchema = Schema.Struct({
+  session_id: Schema.optionalKey(Schema.String),
+  memory_scope: Schema.optionalKey(Schema.String),
+  delegation: Schema.optionalKey(Schema.String),
+  status: Schema.optionalKey(Schema.String),
+  reconnect: Schema.optionalKey(Schema.Boolean),
+  code: Schema.optionalKey(Schema.Union([Schema.String, Schema.Finite])),
   text: Schema.optionalKey(Schema.String),
   turn: Schema.optionalKey(Schema.String),
   turn_id: Schema.optionalKey(Schema.String),

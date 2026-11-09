@@ -82,16 +82,13 @@
       "play": "试听 {name}"
     },
     "moss": {
-      "console": "MOSS 开放平台",
       "verify": "测一下能不能接通",
       "checking": "在接…",
-      "ok": "接通了",
-      "keyHint": "MOSS 开放平台的 key，只在这台电脑的服务端用"
+      "ok": "接通了"
     },
     "dictationVia": "听写走哪",
     "dictationOwn": "自己的地址",
-    "dictationMossIntro": "录音经服务端交给 MOSS 转写，用 MOSS Live 的同一把 Key。",
-    "dictationMossKey": "API Key"
+    "dictationMossIntro": "录音经服务端交给 AI 服务中选定的 MOSS 连接和听写模型。"
   },
   "choices": {
     "area": {
@@ -161,7 +158,37 @@
     "cannotHear": "声网：听不到对面：{why}",
     "agora": "声网：{code} {msg}"
   },
+  "vision": {
+    "silence": "本轮没有回答，会话仍然连接。",
+    "interrupted": "回答已被打断",
+    "title": "实时视觉理解",
+    "liveTitle": "向 Live 通话分享画面",
+    "notice": "开始后会请求摄像头或屏幕权限。选中的画面经本机服务端上传至配置的 MOSS 账号，每秒至多一张 JPEG，每张不超过 256 KiB。展示隐私内容前请停止分享。内容不存入田头。",
+    "hostNotice": "需要安全的本机浏览器环境和可用的采集能力。桌面摄像头需要系统授权；桌面屏幕采集和手机壳视觉输入尚不可用。离开此页或切到后台会停止采集。",
+    "source": "画面来源",
+    "camera": "摄像头",
+    "screen": "屏幕或窗口",
+    "unavailable": "当前宿主或浏览器环境不支持画面采集。",
+    "denied": "摄像头或屏幕权限被拒绝。",
+    "deviceLost": "采集设备或屏幕分享已停止。",
+    "captureFailed": "无法采集所选画面。",
+    "closed": "视觉会话已断开。请检查 AI 服务中独立的视觉模型用途，再重新开始。",
+    "start": "开始分享",
+    "stop": "停止分享",
+    "idle": "尚未连接",
+    "connecting": "正在请求权限并连接…",
+    "ready": "已连接",
+    "ended": "会话已结束",
+    "error": "会话失败",
+    "prompt": "询问分享的画面",
+    "final": "回答此问题后结束会话",
+    "send": "发送问题",
+    "transcript": "视觉回答"
+  },
   "moss": {
+    "busy": "已有 Live 会话正在连接或通话，请先结束它，再开始新的会话。",
+    "localOnly": "浏览器实时会话仅在本机（localhost）可用，配对的远程浏览器无法打开这些线路。",
+    "requestFailed": "MOSS Live 未能完成此请求。请检查通话配置后再试。",
     "intro": "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
     "persona": "人设（不填用 MOSS 默认的）",
     "personaHint": "比如：你是我的管家，说话简短。",

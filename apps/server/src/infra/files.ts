@@ -1,9 +1,18 @@
 import { randomUUID } from "node:crypto";
+import { openAsBlob } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
-import { Clock, Effect, FiberHandle, FileSystem, Schema, Semaphore } from "effect";
+import { Clock, Effect, FiberHandle, FileSystem, PlatformError, Schema, Semaphore } from "effect";
 
 import { Inconsistent, messageOf } from "#/base/errors.ts";
+
+// FileSystem has no Blob adapter; the native Blob keeps multipart uploads disk-backed rather than buffering the file.
+export const fileBlob = Effect.fn("Files.blob")((path: string, type: string) =>
+  Effect.tryPromise({
+    try: () => openAsBlob(path, { type }),
+    catch: (cause) => PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "openAsBlob", pathOrDescriptor: path, cause }),
+  }),
+);
 
 export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand: unique symbol }>()("NotWritten", {
   message: Schema.String,
@@ -12,16 +21,22 @@ export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand:
 
 const notWritten = (cause: unknown) => new NotWritten({ message: messageOf(cause), cause });
 
-/** Writes a file named by its bytes (their hash), making its folder: the same bytes are the same file, so one already
- * there is left as it is. */
+// Publish hash-named files only after writing all bytes; cancellation must not leave a partial file at the hash.
 export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, bytes: Uint8Array) {
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(dirname(path), { recursive: true });
-  yield* fs.writeFile(path, bytes, { flag: "wx" }).pipe(
-    Effect.catchIf(
-      (e) => e.reason._tag === "AlreadyExists",
-      () => Effect.void,
-    ),
+  yield* Effect.scoped(
+    Effect.gen(function* () {
+      const directory = yield* fs.makeTempDirectoryScoped({ directory: dirname(path), prefix: ".upload-" });
+      const temporary = join(directory, "asset");
+      yield* fs.writeFile(temporary, bytes, { mode: 0o600 });
+      yield* fs.link(temporary, path).pipe(
+        Effect.catchIf(
+          (error) => error.reason._tag === "AlreadyExists",
+          () => Effect.void,
+        ),
+      );
+    }),
   );
 }, Effect.mapError(notWritten));
 

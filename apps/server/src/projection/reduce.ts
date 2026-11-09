@@ -16,6 +16,8 @@ export function reduce(state: T.SpaceState, fact: T.Fact): [T.SpaceState, boolea
 
 function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
   switch (f.type) {
+    case "mediaChanged":
+      return same(state.media, f.jobs) ? [state, false] : [{ ...state, media: f.jobs }, true];
     case "callChanged": {
       if (state.call === f.state && state.callReason === f.reason) return [state, false];
       return [{ ...state, call: f.state, callReason: f.reason }, true];

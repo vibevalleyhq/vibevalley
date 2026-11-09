@@ -7,8 +7,8 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { VibeValleyApi } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { app } from "#/http/app.ts";
 import { gitSync, repo } from "#/testing/git.ts";
+import { app } from "#/testing/http.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { quietApp } from "#/testing/world.ts";
 

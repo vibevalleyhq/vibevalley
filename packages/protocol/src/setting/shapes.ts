@@ -39,8 +39,8 @@ export interface SettingsStatus {
   dictationKey: KeyStatus;
   /** Whether a recording has somewhere to go: MOSS with its key, or an own address. */
   dictationReady: boolean;
-  /** MOSS Live (wss://api.mosi.cn/v1/realtime): a realtime voice model the server connects to. */
-  mossKey: KeyStatus;
+  /** A configured connection is bound to MOSS Live; this does not verify the remote service. */
+  mossReady: boolean;
   memorySources: MemorySource[];
 }
 
@@ -80,6 +80,5 @@ export interface SettingsUpdate {
   ttsKey?: string;
   dictation?: Dictation;
   dictationKey?: string;
-  mossKey?: string;
   memorySources?: MemorySourceUpdate[];
 }

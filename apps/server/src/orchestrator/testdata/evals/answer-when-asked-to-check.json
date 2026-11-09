@@ -19,7 +19,7 @@
     "issue_update",
     "memory_create",
     "memory_search",
-    "project_list",
+    "repo_list",
     "cron_create",
     "cron_delete",
     "cron_list",

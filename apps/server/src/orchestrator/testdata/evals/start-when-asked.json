@@ -4,6 +4,7 @@
   "model": "deepseek-flash",
   "want": "主人要马上做，管家只记进了备选。应该记下并开工（start: true）。",
   "memory": "",
+  "scenario": { "repos": ["demo"] },
   "tools": [
     "channel_create",
     "channel_list",
@@ -19,7 +20,7 @@
     "issue_update",
     "memory_create",
     "memory_search",
-    "project_list",
+    "repo_list",
     "cron_create",
     "cron_delete",
     "cron_list",

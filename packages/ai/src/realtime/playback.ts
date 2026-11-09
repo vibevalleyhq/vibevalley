@@ -24,8 +24,8 @@ export class Playback {
   gaps = 0;
   private nextAt = 0;
   private lastRun = "";
-  /** Per run: the ms played to the end, and whether MOSS has sent all of it. */
-  private runs = new Map<string, { ms: number; sent: boolean; turn: string }>();
+  private runs = new Map<string, { sent: boolean; turn: string }>();
+  private readonly finishedRuns = new Set<string>();
 
   /** Puts a piece seconds long after what is queued, or now if nothing is. */
   queue(piece: Piece, seconds: number, now: number): Queued {
@@ -35,7 +35,7 @@ export class Playback {
     this.nextAt = at + seconds;
     const queued = { ...piece, at, ms: seconds * 1000 };
     this.playing.push(queued);
-    if (!this.runs.has(piece.run)) this.runs.set(piece.run, { ms: 0, sent: false, turn: piece.turn });
+    if (!this.runs.has(piece.run)) this.runs.set(piece.run, { sent: false, turn: piece.turn });
     return queued;
   }
 
@@ -48,8 +48,6 @@ export class Playback {
   ended(q: Queued): PlaybackAction[] {
     if (!this.playing.includes(q)) return [];
     this.playing = this.playing.filter((p) => p !== q);
-    const run = this.runs.get(q.run);
-    if (run) run.ms += q.ms;
     return [{ action: "playback.chunk.completed", chunk_id: q.chunk, run_id: q.run, turn_id: q.turn }, ...this.finished(q.run)];
   }
 
@@ -61,7 +59,9 @@ export class Playback {
 
   /** MOSS has sent all of a run (response.audio.done). */
   sent(run: string, turn: string): PlaybackAction[] {
-    const r = this.runs.get(run) ?? { ms: 0, sent: false, turn };
+    if (this.finishedRuns.has(run)) return [];
+    const r = this.runs.get(run) ?? { sent: false, turn };
+    if (r.turn !== turn) return [];
     r.sent = true;
     this.runs.set(run, r);
     return this.finished(run);
@@ -71,25 +71,31 @@ export class Playback {
   cut(run: string, turn: string, now: number): { stop: Queued[]; actions: PlaybackAction[] } {
     const stop = this.playing.filter((p) => p.run === run);
     if (stop.length === 0 && !this.runs.has(run)) return { stop, actions: [] };
-    let ms = this.runs.get(run)?.ms ?? 0;
-    for (const p of stop) if (now > p.at) ms += Math.min(p.ms, (now - p.at) * 1000);
+    const actions: PlaybackAction[] = [];
+    let partial = 0;
+    for (const p of stop) {
+      const played = Math.max(0, (now - p.at) * 1000);
+      if (played >= p.ms) actions.push({ action: "playback.chunk.completed", chunk_id: p.chunk, run_id: run, turn_id: turn });
+      else if (played > 0) partial = played;
+    }
     this.playing = this.playing.filter((p) => p.run !== run);
-    this.nextAt = 0;
+    this.nextAt = this.playing.reduce((end, p) => Math.max(end, p.at + p.ms / 1000), 0);
     this.runs.delete(run);
-    return { stop, actions: [{ action: "playback.stopped", run_id: run, turn_id: turn, played_audio_ms: Math.round(ms) }] };
+    this.finishedRuns.add(run);
+    actions.push({ action: "playback.stopped", run_id: run, turn_id: turn, played_audio_ms: Math.round(partial) });
+    return { stop, actions };
   }
 
   /** Sample-accurate cut when the audio worklet reports the exact partial ms played in the interrupted chunk. */
   cutSampleAccurate(run: string, turn: string, partialPlayedMs: number): { stop: Queued[]; actions: PlaybackAction[] } {
     const stop = this.playing.filter((p) => p.run === run);
     if (stop.length === 0 && !this.runs.has(run)) return { stop, actions: [] };
-    const completedMs = this.runs.get(run)?.ms ?? 0;
-    const activeBudgetMs = stop.reduce((acc, p) => acc + p.ms, 0);
-    const totalMs = completedMs + Math.min(activeBudgetMs, Math.max(0, partialPlayedMs));
+    const partial = Number.isFinite(partialPlayedMs) ? Math.min(stop[0]?.ms ?? 0, Math.max(0, partialPlayedMs)) : 0;
     this.playing = this.playing.filter((p) => p.run !== run);
-    this.nextAt = 0;
+    this.nextAt = this.playing.reduce((end, p) => Math.max(end, p.at + p.ms / 1000), 0);
     this.runs.delete(run);
-    return { stop, actions: [{ action: "playback.stopped", run_id: run, turn_id: turn, played_audio_ms: Math.round(totalMs) }] };
+    this.finishedRuns.add(run);
+    return { stop, actions: [{ action: "playback.stopped", run_id: run, turn_id: turn, played_audio_ms: Math.round(partial) }] };
   }
 
   clear(): void {
@@ -98,12 +104,14 @@ export class Playback {
     this.nextAt = 0;
     this.lastRun = "";
     this.runs.clear();
+    this.finishedRuns.clear();
   }
 
   private finished(run: string): PlaybackAction[] {
     const r = this.runs.get(run);
     if (r?.sent !== true || this.playing.some((p) => p.run === run)) return [];
     this.runs.delete(run);
+    this.finishedRuns.add(run);
     return [{ action: "playback.completed", run_id: run, turn_id: r.turn }];
   }
 }

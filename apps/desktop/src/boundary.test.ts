@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { navigationOf, pageWebPreferences, revealable } from "./boundary";
+import { navigationOf, pagePermission, pageWebPreferences, revealable } from "./boundary";
 
 describe("what the page may do to this machine", () => {
   it("runs sandboxed, isolated from the preload, without Node", () => {
@@ -16,6 +16,22 @@ describe("what the page may do to this machine", () => {
     expect(navigationOf("javascript:alert(1)", server)).toBe("block");
     expect(navigationOf("not a url", server)).toBe("block");
     expect(navigationOf("http://127.0.0.1:8787/", undefined)).toBe("browser");
+  });
+
+  it("grants media only to the owner's main frame, not display capture or embedded content", () => {
+    const server = "http://127.0.0.1:8787";
+    expect(pagePermission("media", `${server}/settings/moss`, server, true, ["video"])).toBe(true);
+    expect(pagePermission("media", server, server, true, ["audio", "video"])).toBe(true);
+    expect(pagePermission("media", server, server, false, ["audio"])).toBe(false);
+    expect(pagePermission("media", "https://untrusted.example", server, true, ["video"])).toBe(false);
+    expect(pagePermission("media", "http://127.0.0.1:9999", server, true, ["audio"])).toBe(false);
+    expect(pagePermission("media", "null", server, true, ["video"])).toBe(false);
+    expect(pagePermission("media", "file:///opening.html", undefined, true, ["video"])).toBe(false);
+    expect(pagePermission("media", server, server, true, ["unknown"])).toBe(false);
+    expect(pagePermission("media", server, server, true, [])).toBe(false);
+    expect(pagePermission("display-capture", server, server, true, ["video"])).toBe(false);
+    expect(pagePermission("clipboard-sanitized-write", server, server, true)).toBe(true);
+    expect(pagePermission("clipboard-read", server, server, true)).toBe(false);
   });
 
   it("shows only a path under one of its roots", () => {

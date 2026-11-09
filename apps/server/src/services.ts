@@ -1,6 +1,5 @@
 import { NodeServices } from "@effect/platform-node";
 import { Layer } from "effect";
-import { FetchHttpClient } from "effect/http";
 
 import { Llm } from "@vibevalley/ai/llm";
 
@@ -20,10 +19,12 @@ import { Issue, start as issueStart } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
+import { Media, start as mediaStart } from "./media/media.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { Pkm } from "./pkm/pkm.ts";
 import { layer as projection } from "./projection/frame.ts";
+import { Provider } from "./provider/provider.ts";
 import { Repo, type RepoHooks, start as repoStart } from "./repo/repo.ts";
 import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
@@ -54,11 +55,11 @@ export const platform = (config: ServerConfig["Service"]) =>
   Database.pipe(
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),
     Layer.provideMerge(NodeServices.layer),
-    Layer.provideMerge(FetchHttpClient.layer),
     on(Db.layer),
     on(projection),
     on(Core.layer),
     on(Setting.layer),
+    on(Provider.layer),
     on(Llm.layer),
   );
 
@@ -78,7 +79,7 @@ export const sourceControl =
 export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents, the owner's notes; the sessions register as its helpers. */
-export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Artifact.layer), on(Pkm.layer));
+export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Media.layer), on(Artifact.layer), on(Pkm.layer));
 
 /** Mailbox: delivery priority, durable per-Session input and the execution pump. */
 export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));
@@ -114,7 +115,7 @@ const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
 /** Collaboration's startup, after the sessions came back: their threads, and what waited for them. */
-export const collaborationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(channelStart));
+export const collaborationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(channelStart), on(mediaStart));
 /** Mailbox's startup: restore open deliveries, replay committed messages without a route receipt, then wake sessions. */
 export const mailboxReady = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(mailboxStart));
 const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(issueStart), on(cronStart));

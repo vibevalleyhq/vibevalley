@@ -82,16 +82,13 @@
       "play": "Listen to {name}"
     },
     "moss": {
-      "console": "MOSS platform",
       "verify": "Check that it connects",
       "checking": "Connecting…",
-      "ok": "Connected",
-      "keyHint": "A key from the MOSS platform, used only by this machine's server"
+      "ok": "Connected"
     },
     "dictationVia": "Dictation goes to",
     "dictationOwn": "Your own address",
-    "dictationMossIntro": "The server hands recordings to MOSS, with the same key as MOSS Live.",
-    "dictationMossKey": "API key"
+    "dictationMossIntro": "The server transcribes recordings using the MOSS connection and dictation model selected in AI services."
   },
   "choices": {
     "area": {
@@ -161,7 +158,37 @@
     "cannotHear": "Agora: cannot hear the other side: {why}",
     "agora": "Agora: {code} {msg}"
   },
+  "vision": {
+    "silence": "No response for this turn; the session remains connected.",
+    "interrupted": "Response interrupted",
+    "title": "Realtime visual understanding",
+    "liveTitle": "Share a picture with the Live call",
+    "notice": "Starting requests camera or screen permission. Selected images are uploaded through this server to the configured MOSS account, at most once a second (JPEG, up to 256 KiB). Stop sharing before showing private content. Nothing is saved to chat.",
+    "hostNotice": "Requires a secure local browser and available capture support. Desktop camera requires system permission; desktop screen capture and mobile-shell visual input are unavailable. Leaving this page or moving it to the background stops capture.",
+    "source": "Picture source",
+    "camera": "Camera",
+    "screen": "Screen or window",
+    "unavailable": "Capture is unavailable in this host or browser context.",
+    "denied": "Camera or screen permission was denied.",
+    "deviceLost": "The capture device or screen share stopped.",
+    "captureFailed": "Could not capture the selected source.",
+    "closed": "The visual session disconnected. Check the independent visual model binding in AI services before starting again.",
+    "start": "Start sharing",
+    "stop": "Stop sharing",
+    "idle": "Not connected",
+    "connecting": "Requesting permission and connecting…",
+    "ready": "Connected",
+    "ended": "Session ended",
+    "error": "Session failed",
+    "prompt": "Ask about the shared picture",
+    "final": "Finish the session after this question",
+    "send": "Send question",
+    "transcript": "Visual responses"
+  },
   "moss": {
+    "busy": "Another Live session is already open or connecting. End it before starting this one.",
+    "localOnly": "Realtime browser sessions are available only on this computer (localhost). Paired remote browsers cannot open these relays.",
+    "requestFailed": "MOSS Live could not complete this request. Check the call setup before trying again.",
     "intro": "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
     "persona": "Persona (MOSS's own when empty)",
     "personaHint": "E.g.: You are my steward; keep it short.",

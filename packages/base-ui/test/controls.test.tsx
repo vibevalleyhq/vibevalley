@@ -97,3 +97,58 @@ test("a toggle group keeps one value, moves by arrows with one tab stop, and wit
   await settle();
   expect([...document.querySelectorAll("[data-testid=many] [data-pressed]")].map((e) => e.textContent)).toEqual(["X", "Y"]);
 });
+
+test("regression: reactive parent props preserve an uncontrolled selection and its element ref", async () => {
+  const bound: HTMLDivElement[] = [];
+  const rebound: HTMLDivElement[] = [];
+  const [options, setOptions] = createSignal({
+    defaultValue: ["a"],
+    class: "before",
+    ref: (el: HTMLDivElement) => bound.push(el),
+  });
+  mount(() => (
+    <ToggleGroup {...options()} data-testid="choices">
+      <Toggle value="a">A</Toggle>
+      <Toggle value="b">B</Toggle>
+      <Toggle value="c">C</Toggle>
+    </ToggleGroup>
+  ));
+  const group = $("[data-testid=choices]", HTMLDivElement);
+  const choice = (v: string) => $(`[data-testid=choices] [data-value=${v}]`);
+  expect(bound).toEqual([group]);
+  expect(choice("a").getAttribute("aria-pressed")).toBe("true");
+
+  await userEvent.click(choice("b"));
+  await settle();
+  setOptions({ defaultValue: ["c"], class: "after", ref: (el) => rebound.push(el) });
+  await settle();
+  expect($("[data-testid=choices]")).toBe(group);
+  expect(group.className).toBe("after");
+  expect(["a", "b", "c"].map((v) => choice(v).getAttribute("aria-pressed"))).toEqual(["false", "true", "false"]);
+  expect(bound).toEqual([group]);
+  expect(rebound).toEqual([]);
+
+  choice("a").focus();
+  await userEvent.keyboard("{ArrowRight}");
+  expect(document.activeElement).toBe(choice("b"));
+});
+
+test("regression: reactive checkbox props keep the controlled value owned by the parent", async () => {
+  const said: boolean[] = [];
+  const [options, setOptions] = createSignal({ checked: false, defaultChecked: true });
+  mount(() => <Checkbox.Root {...options()} onCheckedChange={(value) => said.push(value)} />);
+  const checkbox = $("[role=checkbox]");
+  expect(checkbox.getAttribute("aria-checked")).toBe("false");
+
+  setOptions({ checked: true, defaultChecked: false });
+  await settle();
+  expect(checkbox.getAttribute("aria-checked")).toBe("true");
+  await userEvent.click(checkbox);
+  await settle();
+  expect(said).toEqual([false]);
+  expect(checkbox.getAttribute("aria-checked")).toBe("true");
+
+  setOptions({ checked: false, defaultChecked: true });
+  await settle();
+  expect(checkbox.getAttribute("aria-checked")).toBe("false");
+});

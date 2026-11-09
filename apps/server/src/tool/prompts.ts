@@ -323,7 +323,29 @@ export const blockLine = (b: T.Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${
 export const memoryWhere = (m: T.Memory) => (m.repo ? "仓库 " + m.repo : "所有仓库");
 
 /** The orchestrator's tools' descriptions, shown to the model alongside each name and parameters (tool.ts). */
+const mediaDescriptions = {
+  create:
+    "替主人提交一次生图任务。只有主人明确要生成图片时使用；提示词会发给 MOSS，可能计费。id 用新的唯一请求编号，网络中断后重试必须保持同一编号和全部参数；不要为了重试换编号。text 为文生图，layout 为布局 JSON，尺寸须为 256–2048 的 16 倍数且总像素不超过 2097152。不支持参考图编辑。返回排队中的任务，不等生图结束；不要密集轮询。用主人的语言回答。",
+  get: "读取一次媒体任务。图片和语音 ready 才有本机附件；理解结果保留文本和截断信息。unknown 表示厂商可能仍在执行或已计费，不要自动重做。用主人的语言回答。",
+  list: "查看最近 100 次媒体任务，包括授权、来源、结果、状态和可用操作。用主人的语言回答。",
+  cancel: "停止媒体任务的本机等待或撤销未执行授权，不保证厂商停止计算或计费。只有主人要取消时使用。用主人的语言回答。",
+  download: "只重试已经生成的图片或语音结果的下载和本机保存，不重新生成；只有 canRetryDownload 为真才使用。用主人的语言回答。",
+};
+
 export const descriptions = {
+  "media.image.create": mediaDescriptions.create,
+  "media.understanding.start":
+    "按任务 id 执行主人预先登记的图片或视频理解授权。只能在授权频道替主人执行；输入、问题、模型和输出上限已冻结，不能自报上传许可、换参数或提供服务器路径。过期、取消或重启后不能启动。重复同一 id 不重复上传或计费；用 media_job_get 看结果，勿密集轮询。用主人的语言回答。",
+  "media.speech.create":
+    "主人明确要求时生成一次 Flash 或 Pro 单人语音。输入文字、账号与 revision、该账号音色和音频格式，可选择 asynchronous 持久异步任务；文字会发给 MOSS，可能计费。id 与全部参数在重试时保持不变，unknown 不自动重做。返回本机任务，ready 后可用附件；非流式结果不会冒充流式播放，PCM 仅下载。用主人的语言回答。",
+  "media.dialogue.create":
+    "主人明确要求时生成多人对话语音。给定唯一说话人 id 与该账号 voice 的映射，以及引用这些 id 的 segments。冻结 id、账号 revision、文字、格式；重复提交只读取同一任务，不重新计费。通过 media_job_get 查询，ready 后取得本机附件。不能替主人确认样本克隆授权。用主人的语言回答。",
+  "media.voiceDesign.create":
+    "主人明确要求时，提交文字和音色描述生成预览语音。预览不是可复用 voice_id；保存为音色必须由主人在页面明确授权上传。保持同一请求 id 和参数，结果未知不能重复提交新请求。用 media_job_get 查询本机任务。用主人的语言回答。",
+  "media.job.get": mediaDescriptions.get,
+  "media.job.cancel": mediaDescriptions.cancel,
+  "media.job.download": mediaDescriptions.download,
+  "media.job.list": mediaDescriptions.list,
   "repo.list": "列出工作目录下的仓库（每个文件夹是一个仓库），以及是不是 git 仓库。",
   "channel.list": "列出频道：名字、哪个是默认的、是做什么的、默认仓库。频道是安排活的地方。",
   "session.list": "列出在场的所有帮工：在做什么、上一轮的结果。",

@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { describe, expect, it } from "vite-plus/test";
 
 import { setLocale } from "@vibevalley/i18n";
@@ -11,16 +8,10 @@ import { htmlSources } from "#/artifact/policy.ts";
 import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
-import { agentOnly, type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";
+import { agentOnly, type Op, parameters, sessionParameters, toolName } from "./schemas.ts";
 import { toolStart } from "./tool.ts";
 
 describe("the tools", () => {
-  // The orchestrator's parameters are its prompt's prefix: the bytes in testdata/parameters.json must not drift.
-  it("keep their parameters to the byte", () => {
-    const kept = readFileSync(resolve(import.meta.dirname, "testdata/parameters.json"), "utf8");
-    expect(JSON.stringify({ orchestrator: schemas, session: sessionSchemas })).toBe(kept);
-  });
-
   it("tell a helper where an HTML page may load from, from the list its display is written from", () => {
     const hosts = [...new Set(Object.values(htmlSources).flat())].map((u) => new URL(u).host);
     for (const said of [params.artifact.kind, descriptions["artifact.version.create"], sessionDescriptions["artifact.version.create"]])

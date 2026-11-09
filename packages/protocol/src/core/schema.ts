@@ -7,6 +7,7 @@ import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema
 import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
+import { MediaJob, FactMediaChanged } from "../media/schema";
 import { RuntimeInfo } from "../runtime/schema";
 import {
   FactSessionToolChanged,
@@ -24,6 +25,7 @@ import { CallState, FactCallChanged } from "../voice/schema";
 const spaceFields = {
   call: CallState,
   callReason: Schema.String,
+  media: Schema.optionalKey(Schema.mutable(Schema.Array(MediaJob))),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
   progress: Schema.optionalKey(Progress),
@@ -77,6 +79,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactCronChanged,
   FactCronRemoved,
   FactConnectorChanged,
+  FactMediaChanged,
 ]);
 
 export const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
@@ -123,6 +126,7 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactCronChanged,
   FactCronRemoved,
   FactConnectorChanged,
+  FactMediaChanged,
   ServerEventSnapshot,
   ServerEventStep,
   ServerEventNotice,

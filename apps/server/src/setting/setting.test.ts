@@ -124,21 +124,51 @@ describe("settings", () => {
     );
   });
 
-  it.effect("a MOSS Live key is a hint, kept until cleared", () => {
+  it.effect("provider credentials persist once and settings expose only readiness", () => {
     const config = testConfig();
     return run(
       config,
       Effect.gen(function* () {
-        const s = yield* Setting;
-        expect([s.status().mossKey, s.mossKey()]).toEqual([{ source: null }, ""]);
-        const after = yield* s.save({ mossKey: " sk-moss-live-key-6b9c " });
-        expect(after.mossKey).toEqual({ source: "settings", hint: "…6b9c" });
-        expect(JSON.stringify(after)).not.toContain("sk-moss");
-        expect(s.mossKey()).toBe("sk-moss-live-key-6b9c");
-        expect(s.validate({ mossKey: "sk with space" }).problem).toBeDefined();
-        expect((yield* s.save({ mossKey: "" })).mossKey).toEqual({ source: null });
-        expect(s.mossKey()).toBe("");
+        const setting = yield* Setting;
+        expect(setting.status().mossReady).toBe(false);
+        yield* setting.updateProviders(() =>
+          Effect.succeed({
+            revision: 1,
+            connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-private-key" }],
+            dictation: { connection: "moss", model: "moss-transcribe-1.0" },
+            image: { connection: "moss", model: "moss-image-sft-1.0-2026-10-09" },
+            understanding: { connection: "moss", model: "moss-vl-1.0-2026-07-08" },
+            speech: { connection: "moss", model: "moss-tts-1.0-pro-2026-02-07" },
+            live: { connection: "moss", model: "moss-live-1.0" },
+            speakers: { connection: "moss", model: "moss-ttsd-1.0" },
+            voiceDesign: { connection: "moss", model: "moss-voice-generator-1.0" },
+            transcription: { connection: "moss", model: "moss-transcribe-diarize-pro" },
+            vision: { connection: "moss", model: "moss-vl-realtime-1.0" },
+          }),
+        );
+        expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
+        expect(JSON.stringify(setting.status())).not.toContain("test-private-key");
+        expect(file(config)).not.toHaveProperty("mossKey");
+        expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);
       }),
+    ).pipe(
+      Effect.andThen(
+        run(
+          config,
+          Effect.gen(function* () {
+            const setting = yield* Setting;
+            expect(setting.providers().connections[0]?.key).toBe("test-private-key");
+            expect(setting.providers().revision).toBe(1);
+            expect(setting.providers().image).toEqual({ connection: "moss", model: "moss-image-sft-1.0-2026-10-09" });
+            expect(setting.providers().understanding).toEqual({ connection: "moss", model: "moss-vl-1.0-2026-07-08" });
+            expect(setting.providers().live).toEqual({ connection: "moss", model: "moss-live-1.0" });
+            expect(setting.providers().speakers).toEqual({ connection: "moss", model: "moss-ttsd-1.0" });
+            expect(setting.providers().voiceDesign).toEqual({ connection: "moss", model: "moss-voice-generator-1.0" });
+            expect(setting.providers().transcription).toEqual({ connection: "moss", model: "moss-transcribe-diarize-pro" });
+            expect(setting.providers().vision).toEqual({ connection: "moss", model: "moss-vl-realtime-1.0" });
+          }),
+        ),
+      ),
     );
   });
 
