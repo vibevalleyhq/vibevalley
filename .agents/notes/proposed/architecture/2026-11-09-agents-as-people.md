@@ -57,7 +57,7 @@ Status: proposed
 | 步 | 状态 | 提交 | 做了什么 |
 |---|---|---|---|
 | 1 当值 | 完成 | `edf285f44` | `isOnDuty`、`isHired` 在 `session/roster.ts` 各定义一次（两个都正着写：黄金数据里有没带 `role` 的会话，取反会把它们算成雇来的）；`keepOnDuty`；`Session.workers` 改叫 `hired` |
-| 2 频道有成员 | 完成 | 本提交 | 删掉频道负责人；`channel_follow` 改名 `channel_member`，频道和串的成员都记在这里（投递原因 `follower` 改叫 `member`）；`orchestratorIn`；页面勾选成员 |
+| 2 频道有成员 | 完成 | `6e3bdacff` | 删掉频道负责人；`channel_follow` 改名 `channel_member`，频道和串的成员都记在这里（投递原因 `follower` 改叫 `member`）；`orchestratorIn`；页面勾选成员 |
 | 3 在哪干 | 未做 | — | |
 | 4 名字只说职务的 | 未做 | — | |
 | 5 话是谁说的 | 未做 | — | |
