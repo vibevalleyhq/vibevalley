@@ -82,8 +82,8 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     ingress.owner({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
 
   let account: Account | undefined;
-  let progress: Progress | undefined;
-  let verifyCode = "";
+  /** A login going on: how far it is, and the code the owner typed for it. None when no login is. */
+  let signingIn: { readonly progress: Progress; readonly code: string } | undefined;
   // A login stopped by a newer one leaves the newer one's progress alone.
   let loginTry = 0;
   let err = "";
@@ -167,7 +167,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       const where = a.channel ? channelOf(state, a.channel) : defaultOf(state);
       if (where?.name) s.channel = where.name;
     }
-    if (progress) return { ...s, state: progress.state, qr: progress.qr };
+    if (signingIn !== undefined) return { ...s, state: signingIn.progress.state, qr: signingIn.progress.qr };
     if (!a) return s;
     if (!a.owner)
       return {
@@ -473,8 +473,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const connected = () =>
     account && !isClosing() ? generation(Effect.all([receiving, inboxRun, outboxRun], { concurrency: "unbounded", discard: true })) : undefined;
   const resetProgress = () => {
-    progress = undefined;
-    verifyCode = "";
+    signingIn = undefined;
     changed();
   };
   const loginResult = (g: Fiber.Fiber<unknown, unknown>, result: Linked | AppFailed) =>
@@ -525,10 +524,10 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       input,
       (p) =>
         Effect.sync(() => {
-          progress = p;
+          signingIn = { progress: p, code: signingIn?.code ?? "" };
           changed();
         }),
-      Effect.sync(() => verifyCode),
+      Effect.sync(() => signingIn?.code ?? ""),
     );
     // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
     return generation(
@@ -558,12 +557,11 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     login: Effect.fnUntraced(function* (input: ConnectorLogin) {
       const started = yield* commands.withPermits(1)(
         Effect.gen(function* () {
-          if (progress && input.force !== true) return loginTry;
+          if (signingIn !== undefined && input.force !== true) return loginTry;
           yield* stopGeneration;
           loginTry++;
           setErr("");
-          verifyCode = "";
-          progress = { state: "waiting", qr: "" };
+          signingIn = { progress: { state: "waiting", qr: "" }, code: "" };
           current = loggingIn(input);
           told();
           return loginTry;
@@ -572,7 +570,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       // The answer carries the code when it shows within a moment.
       const shown = Deferred.makeUnsafe<void>();
       const done = () => {
-        if (loginTry !== started || !progress || progress.qr) Deferred.doneUnsafe(shown, Effect.void);
+        if (loginTry !== started || signingIn === undefined || signingIn.progress.qr) Deferred.doneUnsafe(shown, Effect.void);
       };
       progressed.add(done);
       done();
@@ -581,8 +579,12 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     }),
     verify: (code: string) =>
       Effect.suspend(() => {
-        verifyCode = code.trim();
-        if (progress?.state === "verify") progress = { state: "scanned", qr: progress.qr };
+        // A code with no login going on is for none: the next login starts with none.
+        if (signingIn !== undefined)
+          signingIn = {
+            progress: signingIn.progress.state === "verify" ? { state: "scanned", qr: signingIn.progress.qr } : signingIn.progress,
+            code: code.trim(),
+          };
         told();
         return status;
       }),
