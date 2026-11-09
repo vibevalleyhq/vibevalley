@@ -1,4 +1,4 @@
-import { Array as Arr, Effect, Option, Semaphore } from "effect";
+import { Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -101,22 +101,22 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       const { issue: _issue, hiring: _hiring, ...sending } = opt;
       const received = yield* mailbox
         .receive({
-          _tag: "Open",
+          _tag: "Hire",
           agent,
           brief: [brief, constraints].filter(Boolean).join("\n\n"),
           where,
           options: { ...sending, ...(base ? { base, worktree: true } : {}), context: { kind: "issue", issue } },
-          letters: { _tag: "Queued", triggers: opt.inputs ?? [] },
-          joining: (w) => (opt.refining === true ? Effect.void : recordWorkerStart(issue.id, w)),
+          envelopes: { _tag: "Queued", triggers: opt.inputs ?? [] },
+          hiring: (w) => (opt.refining === true ? Effect.void : recordWorkerStart(issue.id, w)),
         })
         .pipe(Effect.catch((error) => Effect.succeed<Received>({ heldNotice: "", refused: reasonOf(error) })));
-      if (!received.opened && !opt.issue && !received.retainedWork) {
+      if (!received.hired && !opt.issue && !received.retainedWork) {
         yield* remove(issue.id);
       }
       const hired: Hired = received.retainedWork
         ? { refused: t("server.issue.workKept", { refused: received.refused ?? "", n: issue.number }), retainedWork: true }
-        : received.opened
-          ? { session: received.opened, ...(received.evicted ? { evicted: received.evicted } : {}) }
+        : received.hired
+          ? { session: received.hired, ...(received.evicted ? { evicted: received.evicted } : {}) }
           : { refused: received.refused ?? "" };
       return hired;
     });
@@ -166,8 +166,8 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       inputs: readonly T.Trigger[] = [],
     ): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
-      const queued = inputs.length > 0 || mine._tag === "None" ? undefined : yield* mailbox.pending({ _tag: "Issue", issue: id });
-      const initial = queued === undefined ? inputs : Arr.map(queued, (waiting) => waiting.trigger);
+      const queued = inputs.length > 0 || mine._tag === "None" ? undefined : yield* mailbox.triggersOf(id);
+      const initial = queued ?? inputs;
       if (Option.isSome(mine)) {
         const children = (yield* everyIssue).filter((child) => child.parent === mine.value.id);
         if (children.length > 0) {
@@ -216,7 +216,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
 
     /** In the board's order: one that cannot go any more leaves the queue. */
     const refreshQueue = Effect.fn("Issue.refreshQueue")(function* () {
-      const inputs = yield* mailbox.pending({ _tag: "Queue" });
+      const inputs = yield* mailbox.queuedTriggers;
       yield* joinChildren().pipe(bestEffort("vibevalley: child issues could not be merged"));
       const all = yield* everyIssue;
       for (const issue of all) {
@@ -226,14 +226,14 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
         yield* Effect.gen(function* () {
           const [, agent, repo] = yield* ready(issue.id);
           if (sessions.noRoom(agent.runtime, repo)) return "";
-          const issueInputs = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
-          const input = issueInputs[0];
+          const triggers = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
+          const input = triggers[0];
           if (!input) return "";
           const by: T.RunTrigger = {
             ...(input.meta.trigger ?? { kind: "issue" }),
             message: input.id,
           };
-          return yield* send(issue, agent, repo, input.replyChannel ?? chat.defaultChannel(), by, issueInputs).pipe(
+          return yield* send(issue, agent, repo, input.replyChannel ?? chat.defaultChannel(), by, triggers).pipe(
             Effect.catch((error) => Effect.as(core.notice("warn", t("server.issue.queuedStuck", { title, why: reasonOf(error) })), "")),
           );
         }).pipe(

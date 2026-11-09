@@ -18,6 +18,18 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "a delivery name the one-door plan retired",
+    pattern:
+      /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange)\b/u,
+    says: "Mailbox's door: receive (a Trigger, or a Hire), withdraw, news, triggersOf, queuedTriggers, deliveriesOf, handBack, decline (.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md); its own steps inside apps/server/src/mailbox are its business",
+    except: /apps\/server\/src\/mailbox\//u,
+  },
+  {
+    name: "send for hiring a helper",
+    pattern: /\b(sessions?\.send\(|Session\.send\b|Session\["Service"\]\["send"\])/u,
+    says: "a helper is hired: Session.hire (send is for a message; docs/style/naming.md)",
+  },
+  {
     name: "产出 for an artifact",
     pattern: /产出/u,
     says: "the owner and the prompts call an artifact 稿子, and its versions 第 N 稿 (docs/README.md 用语); 产出 named nothing a person would say",

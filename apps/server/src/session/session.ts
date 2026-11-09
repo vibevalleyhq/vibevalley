@@ -78,7 +78,7 @@ export class Session extends Context.Service<
     /** Room for one more on runtime in repo: refused when either is at its limit; a full farm sends home whoever has
      * been idle longest, and says who. */
     readonly makeRoom: (runtime: string, repo: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
-    readonly send: (agent: T.Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
+    readonly hire: (agent: T.Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
     readonly deliver: (id: string, text: string, input: DeliveryInput) => Effect.Effect<Delivered>;
     readonly stop: (id: string) => Effect.Effect<boolean>;
     /** Closes an idle execution, keeping the context and native session identity for its next input. */
@@ -349,7 +349,7 @@ const make = Effect.gen(function* () {
       const freeing = oldest.issue ? shape.dismiss(oldest.id) : shape.suspend(oldest.id);
       return yield* freeing.pipe(Effect.match({ onFailure: (e) => ({ refused: reasonOf(e) }), onSuccess: () => ({ evicted: oldest.name }) }));
     }),
-    send: Effect.fn("Session.send")(function* (agent, brief, where, opt) {
+    hire: Effect.fn("Session.hire")(function* (agent, brief, where, opt) {
       const scope2 = yield* Effect.scope;
       const permit = yield* Scope.fork(scope2);
       yield* Effect.acquireRelease(Effect.interruptible(admission.take(1)), (taken) => admission.release(taken)).pipe(

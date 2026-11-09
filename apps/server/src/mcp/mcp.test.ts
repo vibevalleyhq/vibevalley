@@ -150,13 +150,13 @@ describe("mcp", () => {
       const extra = (yield* chat.say("顺手做另一件事", thread, "extra")).message;
       const mailbox = yield* Mailbox;
       yield* waitFor(
-        Effect.succeed(mailbox.openDeliveries(id).find((row) => row.envelope_id === extra.id)?.channel_id),
+        Effect.succeed(mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id),
         (channel) => channel === thread,
         "the mailbox handoff",
       );
       const tool2 = yield* Effect.promise(() => c.tool("issue_handback", { envelope: extra.id, reason: "不是当前工单" }));
       expect(tool2).toContain("重新分流");
-      expect(mailbox.openDeliveries(id).some((input) => input.envelope_id === extra.id)).toBe(false);
+      expect(mailbox.deliveriesOf(id).some((input) => input.envelope_id === extra.id)).toBe(false);
       expect((yield* Effect.promise(() => c.result("issue_pr_submit"))).result?.isError).toBe(true);
       const tool3 = yield* Effect.promise(() => c.tool("issue_pr_submit"));
       expect(tool3).toContain("没有主人明确授予");

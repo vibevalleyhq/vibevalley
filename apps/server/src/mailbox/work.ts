@@ -394,7 +394,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       if (forwarded && recipient) dispatch(recipient);
     });
 
-    const registered = Effect.fn("Mailbox.registered")(function* (trigger: string) {
+    const isRouted = Effect.fn("Mailbox.isRouted")(function* (trigger: string) {
       return (yield* db.run(qr.isRouted({ envelope_id: trigger }))).routed;
     });
 
@@ -407,7 +407,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         if (existing.state === "held") yield* flush(existing.issue_id);
         return;
       }
-      if (!audience && (yield* registered(trigger.id))) return;
+      if (!audience && (yield* isRouted(trigger.id))) return;
       const threads = audience && trigger.actor.kind !== "owner" ? [] : trigger.threads;
       const matches = yield* db.run(qs.subscribedIssues({ keys: [...threads] }));
       const ids = new Set(matches.map((row) => row.issue_id));
@@ -456,7 +456,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       return undefined;
     });
 
-    const returnInput = Effect.fn("Mailbox.returnOwnedInput")(function* (session: string, delivery: string, reason: string) {
+    const decline = Effect.fn("Mailbox.returnOwnedInput")(function* (session: string, delivery: string, reason: string) {
       const payload = yield* db.one(qd.deliveryPayload({ session_id: session, envelope_id: delivery }));
       if (!payload) return false;
       const source = yield* db.one(qr.triggerById({ id: readPayload(payload.payload_json).trigger.id }));
@@ -482,8 +482,8 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       receive,
       flush,
       ownerOf,
-      returnInput,
-      registered,
+      decline,
+      isRouted,
       queuedInputs,
       issueInputs,
       retireDispatches,

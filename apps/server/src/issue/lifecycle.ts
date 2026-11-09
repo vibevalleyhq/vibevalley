@@ -344,7 +344,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* publish(id);
   });
 
-  const retireDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
+  const withdrawDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
 
   /** The issue already owns its number and workplace before its session starts. */
   const recordWorkerStart = Effect.fn("Issue.recordWorkerStart")(function* (id: string, session: T.Session) {
@@ -359,7 +359,7 @@ export const issueLifecycle = Effect.gen(function* () {
             executor: session.id,
             started_at: session.hiredAt,
           });
-          yield* retireDispatches(id, session.hiredAt);
+          yield* withdrawDispatches(id, session.hiredAt);
           return { assignment, execution };
         }),
       )
@@ -418,7 +418,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* db.inTx(
       Effect.gen(function* () {
         if (!queued) {
-          yield* retireDispatches(id, at);
+          yield* withdrawDispatches(id, at);
           yield* db.run(q.unqueueIssue({ id }));
           return;
         }
@@ -448,7 +448,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* db.inTx(
       Effect.all(
         [
-          retireDispatches(id, now),
+          withdrawDispatches(id, now),
           db.run(q.unqueueIssue({ id })),
           db.run(q.cancelIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: "dismissed", id })),
         ],

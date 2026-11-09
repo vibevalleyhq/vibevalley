@@ -45,7 +45,7 @@ it.live("regression: cancelling a close caller leaves disposal owned by the exec
     const sessions = yield* Session;
     const agent = { ...starter("lab"), effort: "" };
     yield* (yield* Agent).save(agent);
-    const hired = yield* sessions.send(agent, "work", "demo", {
+    const hired = yield* sessions.hire(agent, "work", "demo", {
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
       hiring: (session) =>
         Effect.gen(function* () {

@@ -73,7 +73,7 @@
 
 ## 怎么走
 
-**派出帮工（`Session.send`）**
+**派出帮工（`Session.hire`）**
 
 1. 在准入锁内检查容量上限，分配 `w<n>` 编号，调用 `Repo.workplace` 准备目录，调用 `Runtime.resolve` 确定农机与模型。
 2. 召回档案记忆，拼装规矩、人设、技能与任务说明，通过 `Executor` 启动 oar 会话。

@@ -45,11 +45,11 @@ it.effect("regression: the source cursor and Mailbox trigger share commit and ro
     const trigger = yield* db.inTx(write);
     expect((yield* db.run(cursor.gitHubCursor(scope))).check_revision).toBe(1);
     expect((yield* mailbox.readTrigger(id))?.trigger).toEqual(trigger);
-    const registered2 = yield* mailbox.registered(id);
+    const registered2 = yield* mailbox.isRouted(id);
     expect(registered2).toBe(false);
     const allOpenDeliveries2 = yield* db.run(allOpenDeliveries());
     expect(allOpenDeliveries2).toEqual([]);
-    expect(mailbox.openDeliveries(defaultOrchestrator)).toEqual([]);
+    expect(mailbox.deliveriesOf(defaultOrchestrator)).toEqual([]);
     expect(core.state()).toBe(state);
   }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
 );
@@ -86,9 +86,9 @@ it.effect("regression: cron replay supplies decoded source payloads without rout
       { id: first.id, data: { occurrence: 1 } },
       { id: second.id, data: { occurrence: 2 } },
     ]);
-    const registered2 = yield* mailbox.registered(first.id);
+    const registered2 = yield* mailbox.isRouted(first.id);
     expect(registered2).toBe(false);
-    const registered3 = yield* mailbox.registered(second.id);
+    const registered3 = yield* mailbox.isRouted(second.id);
     expect(registered3).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
 );

@@ -12,7 +12,7 @@ interface PumpPorts<Message> {
   readonly hand: (session: string, envelope: string, launch: string, at: number) => Effect.Effect<void>;
   readonly consume: (session: string, envelope: string, at: number) => Effect.Effect<void>;
   readonly returnHanded: (session: string) => Effect.Effect<readonly string[]>;
-  readonly returnOne: (session: string, envelope: string) => Effect.Effect<void>;
+  readonly handBack: (session: string, envelope: string) => Effect.Effect<void>;
   readonly dropSession: (session: string, why: string) => Effect.Effect<void>;
   readonly breakerSpoke: (session: string) => void;
   readonly breakerFailed: (session: string) => { readonly count: number; readonly tripped: boolean };
@@ -157,6 +157,6 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         yield* Effect.forEach(input.envelopeIds, (id) => ports.consume(input.session, id, now), { discard: true });
         yield* ports.consumedMessages(input.session, messages);
       }),
-    returned: (input) => Effect.forEach(input.envelopeIds, (id) => ports.returnOne(input.session, id), { discard: true }),
+    returned: (input) => Effect.forEach(input.envelopeIds, (id) => ports.handBack(input.session, id), { discard: true }),
   };
 };

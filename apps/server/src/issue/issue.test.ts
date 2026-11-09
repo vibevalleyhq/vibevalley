@@ -509,7 +509,7 @@ describe("issues", () => {
     const f = farm();
     return Effect.gen(function* () {
       const sessions = yield* Session;
-      const got = yield* sessions.send({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", {
+      const got = yield* sessions.hire({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", {
         context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
       });
       expect([got.session, got.refused !== undefined]).toEqual([undefined, true]);
@@ -579,8 +579,8 @@ describe("issues", () => {
       const core = yield* Core;
       const got = yield* Effect.all(
         [
-          sessions.send(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } }),
-          sessions.send(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } }),
+          sessions.hire(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } }),
+          sessions.hire(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } }),
         ],
         { concurrency: "unbounded" },
       );

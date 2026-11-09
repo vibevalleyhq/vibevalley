@@ -75,11 +75,11 @@ it.live("regression: chat triggers keep their original payload through edits and
     yield* chat.edit(current.message.id, "edited voice input");
     yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
     yield* (yield* Mailbox).replay;
-    const registered2 = yield* mailbox.registered(current.message.id);
+    const registered2 = yield* mailbox.isRouted(current.message.id);
     expect(registered2).toBe(false);
     yield* chat.start;
     yield* mailbox.start;
-    const registered3 = yield* mailbox.registered(current.message.id);
+    const registered3 = yield* mailbox.isRouted(current.message.id);
     expect(registered3).toBe(true);
     const source = yield* ingress.read(current.message.id);
     expect(source?.trigger.source).toBe("voice");
@@ -149,7 +149,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     };
     yield* mailbox.insert(delivery);
     yield* mailbox.restore;
-    expect(mailbox.openDeliveries(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
+    expect(mailbox.deliveriesOf(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
     yield* mailbox.start;
     expect(inputs.some((input) => input.includes(trigger.card.readUri))).toBe(false);
     yield* (yield* Ingress).accept({
@@ -163,9 +163,9 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
       at: 2,
     });
     yield* until(() => inputs.some((input) => input.includes(trigger.card.readUri)), "the machine card delivered");
-    yield* until(() => mailbox.openDeliveries(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
+    yield* until(() => mailbox.deliveriesOf(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
     yield* mailbox.insert(delivery);
-    expect(mailbox.openDeliveries(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
+    expect(mailbox.deliveriesOf(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
     const messages = yield* await_(
       () => chat.history(thread),
       (items) => items.some((message) => message.kind === "report"),

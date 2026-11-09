@@ -364,7 +364,7 @@ Brain 的 scope 拥有 Loop、提醒和事件跟随纤程。`ask` 返回证明�
 
 ```mermaid
 flowchart LR
-  A[Session.send 准入锁] --> B[准备工作目录与凭据]
+  A[Session.hire 准入锁] --> B[准备工作目录与凭据]
   B --> C[Executor 分配并开会话]
   C --> D[释放准入锁后登记]
   D --> E[持久化 / Core / attach]

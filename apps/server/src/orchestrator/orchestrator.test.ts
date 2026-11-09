@@ -665,7 +665,7 @@ describe("the orchestrator", () => {
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
       yield* TestClock.adjust(3 * 3_600_000);
       yield* inbox.patrol;
-      expect((yield* Mailbox).openDeliveries(defaultOrchestrator).some((row) => row.source === "patrol" && row.urgency === "digest")).toBe(true);
+      expect((yield* Mailbox).deliveriesOf(defaultOrchestrator).some((row) => row.source === "patrol" && row.urgency === "digest")).toBe(true);
       yield* marked(f);
       const line = yield* until(() => f.requests.map(lastInput).find((input) => input.includes("【巡查】")), "the patrol digest");
       expect(line).toContain("「加个 CHANGELOG」");

@@ -70,7 +70,7 @@ flowchart LR
 
 [Mailbox](docs/subsystems/mailbox.md) 的文档已经这样规定（上游记下 `Trigger`，提交后调 `Mailbox.receive`）；`registerTalk`、`registerInitialInputs`、`deliverDirect`、`kick` 是绕开它的旁路，收进这一条。
 
-门上的动词，各合并了一批现在分开的入口。退回（`returnOne`、`returnInput`：把一封信还回去重新投递）和撤回意思相反，不并进 `withdraw`；`waitingOn`、`openDeliveries` 是投递的读。这几个留在接口上，各说各的事。
+门上的动词，各合并了一批现在分开的入口。退回和撤回意思相反，不并进 `withdraw`：`handBack` 把一封信还回去重新投递，`decline` 是帮工说这封不归它、带着理由退回工单池；`waitingOn`、`deliveriesOf` 是投递的读。这几个留在接口上，各说各的事。
 
 
 
@@ -78,8 +78,8 @@ flowchart LR
 |---|---|---|
 | `receive` | 把一个触发交给它的受众 | `registerTalk`、`registerInitialInputs`、`deliverDirect`、`kick`，和工单、频道直接用帮工的 `makeRoom`、`send`、`register` |
 | `withdraw` | 撤回一个帮工、一封信或一张工单的待投递 | `dropSession`、`dropEnvelope`、`retireDispatches` |
-| `pending` | 工单池里等着的触发：排队的工单的（派活的在前），或一张工单的（按路由的顺序） | `queuedInputs`、`issueInputs` |
-| `changes` | 投递的变化：消费、刹车 | `consumed`、`breakerNotices` |
+| `triggersOf`、`queuedTriggers` | 工单池里等着的触发：一张工单的（按路由的顺序）、所有排队工单的（派活的在前）；两个问题筛法和排序不同，起两个名字 | `issueInputs`、`queuedInputs` |
+| `news` | 投递的变化：消费、刹车（`changes` 是代码的改动，见 [命名](docs/style/naming.md#现有的双关)） | `consumed`、`breakerNotices` |
 
 两件事已定（2026-11-09，主人）：
 
@@ -95,6 +95,8 @@ flowchart LR
 - 派活的顺序变了一处：腾位置挪进 Mailbox 后在记下工单之后。依赖未完、父工单的工作区出错而被拒时，不再先请走一个空闲的帮工；新工单遇上农场满了，记下后随即删掉（开帮工被拒时原来就删）。
 - 第三步不用另做：帮工投递和开帮工的成员（`deliver`、`launches`、`inputsConsumed`、`inputsReturned`、`makeRoom`、`send`）在帮工模块之外只剩 Mailbox 在用。
 - 工单还直接用帮工的：`noRoom`（只问有没有位置，排队用）和管家的 `register`（管家不经 `send` 开）。这两处是读和管家自己的事，不归投递，留在帮工。
+
+- 改名（2026-11-09，照 [命名](docs/style/naming.md) 的「一词一义」）：`Session.send` 叫 `hire`，`receive` 的 `Open` 叫 `Hire`（`hired`、`envelopes`、`hiring`）；`pending` 拆成 `triggersOf`、`queuedTriggers`；`changes` 叫 `news`（`DeliveryNews`）；`openDeliveries` 叫 `deliveriesOf`；`registered` 叫 `isRouted`；`returnOne`、`returnInput` 叫 `handBack`、`decline`。旧名字写进 `scripts/stale-names.ts`。
 
 ## Alternatives considered
 

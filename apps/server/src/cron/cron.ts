@@ -124,7 +124,7 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      if (!(yield* mailbox.registered(trigger.id))) {
+      if (!(yield* mailbox.isRouted(trigger.id))) {
         const issue = yield* issues.scheduled(due, trigger);
         yield* mailbox.subscribe(issue.id, [thread]);
         yield* mailbox.receive({ _tag: "Trigger", trigger });

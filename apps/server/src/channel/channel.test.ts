@@ -1147,15 +1147,15 @@ describe("the chat", () => {
         const id = message!.id;
         const rows = yield* f.sql`select session_id from mailbox_delivery where envelope_id = ${id}`;
         expect(rows).toEqual([]);
-        const registered2 = yield* f.mailbox.registered(id);
+        const registered2 = yield* f.mailbox.isRouted(id);
         expect(registered2).toBe(false);
-        expect(f.mailbox.openDeliveries("w1").some((row) => row.envelope_id === id)).toBe(false);
+        expect(f.mailbox.deliveriesOf("w1").some((row) => row.envelope_id === id)).toBe(false);
         yield* drop(f.sql, "fail_second_recipient", "mailbox_delivery");
         yield* f.chat.start;
         yield* f.chat.start;
         const rows2 = yield* f.sql`select session_id from mailbox_delivery where envelope_id = ${id} order by session_id`;
         expect(rows2).toEqual([{ session_id: "w1" }, { session_id: "w2" }]);
-        const registered3 = yield* f.mailbox.registered(id);
+        const registered3 = yield* f.mailbox.isRouted(id);
         expect(registered3).toBe(true);
       }),
     ),

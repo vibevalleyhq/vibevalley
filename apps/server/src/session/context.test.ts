@@ -41,7 +41,7 @@ describe("an agent's channel context", () => {
       const channel = (yield* Channel).defaultChannel();
       const agent = profile();
       yield* (yield* Agent).save(agent);
-      const hired = yield* sessions.send(agent, "discuss", "must-not-create", { context: { kind: "channel", channel } });
+      const hired = yield* sessions.hire(agent, "discuss", "must-not-create", { context: { kind: "channel", channel } });
       const session = hired.session;
       expect(session).toBeDefined();
       if (!session) return;
@@ -101,7 +101,7 @@ describe("an agent's channel context", () => {
       const ids: string[] = [];
       for (let i = 0; i < maxRunning; i++) {
         const channel = (yield* chat.openChannel(`context-${i}`, "", "")).id;
-        const hired = yield* sessions.send(agent, "discuss", "", { context: { kind: "channel", channel } });
+        const hired = yield* sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } });
         const id = hired.session?.id;
         expect(id).toBeDefined();
         if (!id) return;
@@ -126,7 +126,7 @@ describe("an agent's channel context", () => {
       const sessions = yield* Session;
       const channel = (yield* Channel).defaultChannel();
       const agent = { ...profile(), runtime: "not-installed" };
-      const hired = yield* sessions.send(agent, "discuss", "", { context: { kind: "channel", channel } });
+      const hired = yield* sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } });
       expect(hired.session).toBeUndefined();
       expect(hired.retainedWork).toBeUndefined();
       expect(readdirSync(join(config.workRoot, "contexts"))).toEqual([]);
@@ -161,7 +161,7 @@ describe("an agent's channel context", () => {
       const channel = (yield* Channel).defaultChannel();
       const agent = profile();
       yield* (yield* Agent).save(agent);
-      const hired = yield* sessions.send(agent, "first", "", {
+      const hired = yield* sessions.hire(agent, "first", "", {
         context: { kind: "channel", channel },
         hiring: () =>
           Effect.andThen(
@@ -172,7 +172,7 @@ describe("an agent's channel context", () => {
       expect(hired.session).toBeUndefined();
       expect(hired.retainedWork).toBe(true);
       expect(readFileSync(join(cwd, "kept.txt"), "utf8")).toBe("keep\n");
-      const again = yield* sessions.send(agent, "again", "", { context: { kind: "channel", channel } });
+      const again = yield* sessions.hire(agent, "again", "", { context: { kind: "channel", channel } });
       expect(again.session).toBeUndefined();
       expect(again.retainedWork).toBe(true);
       expect(opened).toBe(1);
@@ -204,7 +204,7 @@ describe("an agent's channel context", () => {
         const agent = profile();
         yield* (yield* Agent).save(agent);
         channel = (yield* Channel).defaultChannel();
-        const hired = yield* sessions.send(agent, "first", "", { context: { kind: "channel", channel } });
+        const hired = yield* sessions.hire(agent, "first", "", { context: { kind: "channel", channel } });
         id = hired.session?.id ?? "";
         expect(id).not.toBe("");
         yield* until(() => core.session(id)?.phase._tag === "done", "the answer before restart");
@@ -251,7 +251,7 @@ describe("an agent's channel context", () => {
       yield* Effect.gen(function* () {
         const sessions = yield* Session;
         const channel = (yield* Channel).defaultChannel();
-        const refused = yield* sessions.send(profile(), "first", "", {
+        const refused = yield* sessions.hire(profile(), "first", "", {
           context: { kind: "channel", channel },
           hiring: () =>
             Effect.andThen(
@@ -267,7 +267,7 @@ describe("an agent's channel context", () => {
         const core = yield* Core;
         yield* sessions.restore;
         const channel = (yield* Channel).defaultChannel();
-        const hired = yield* sessions.send({ ...profile(), id: "other", name: "Other" }, "second", "", { context: { kind: "channel", channel } });
+        const hired = yield* sessions.hire({ ...profile(), id: "other", name: "Other" }, "second", "", { context: { kind: "channel", channel } });
         const id = hired.session?.id;
         expect(id).toBeDefined();
         if (!id) return;

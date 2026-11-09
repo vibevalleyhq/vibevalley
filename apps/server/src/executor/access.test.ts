@@ -26,7 +26,7 @@ it.live("regression: worker environments merge proxy bypasses without changing t
   };
   return Effect.gen(function* () {
     const sessions = yield* Session;
-    const sent = yield* sessions.send({ ...starter("lab"), effort: "", env }, "work", "demo", {
+    const sent = yield* sessions.hire({ ...starter("lab"), effort: "", env }, "work", "demo", {
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
     });
     expect(sent.refused).toBeUndefined();
@@ -76,7 +76,7 @@ it.live("regression: early tool connection failures reach the journal and core w
   return Effect.gen(function* () {
     const sessions = yield* Session;
     const core = yield* Core;
-    const sent = yield* sessions.send({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
+    const sent = yield* sessions.hire({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
       hiring: () =>
         Effect.sync(() => {
           observing = true;

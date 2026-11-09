@@ -516,12 +516,12 @@ const make = Effect.gen(function* () {
   yield* Effect.forkScoped(Stream.runForEach(news2, onSessionNews));
   const subscribe2 = yield* PubSub.subscribe(said);
   yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(subscribe2), onDirectMessage));
-  const changes = yield* mailbox.changes;
+  const news = yield* mailbox.news;
   yield* Effect.forkScoped(
-    Stream.runForEach(changes, (change) => {
+    Stream.runForEach(news, (change) => {
       switch (change._tag) {
         case "Consumed":
-          return reacting(change.message, change.session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${change.message}`));
+          return reacting(change.envelope, change.session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${change.envelope}`));
         case "Braked":
           return Effect.gen(function* () {
             const where = (yield* shape.threadOfSession(change.session)) ?? model.defaultId();

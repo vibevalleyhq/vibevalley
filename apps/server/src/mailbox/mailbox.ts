@@ -1,4 +1,4 @@
-import { Array as Arr, Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
 import type { SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -72,7 +72,7 @@ export interface TalkRow {
 export type Arrival =
   | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelMail | { readonly session: string } }
   | {
-      readonly _tag: "Open";
+      readonly _tag: "Hire";
       readonly agent: T.Agent;
       readonly brief: string;
       /** The repo or workdir it works in; empty for a direct conversation. */
@@ -80,20 +80,20 @@ export type Arrival =
       /** How it is sent (its issue or channel, what its first run is for, its branch); the door adds the rest. */
       readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
       /** What is handed with its first request: a conversation's recent messages, or an issue's queued triggers. */
-      readonly letters: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly T.Trigger[] };
+      readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly T.Trigger[] };
       /** The caller's own rows, written with the session before anyone can see it. */
-      readonly joining: (session: T.Session, launch: string, at: number) => Effect.Effect<void, NotRecorded>;
+      readonly hiring: (session: T.Session, launch: string, at: number) => Effect.Effect<void, NotRecorded>;
     };
 
-type SendOptions = Parameters<Session["Service"]["send"]>[3];
+type SendOptions = Parameters<Session["Service"]["hire"]>[3];
 
-/** What the door did: a held notice for a channel; for an opening, the session opened or why none was, and who was
+/** What the door did: a held notice for a channel; for a hire, the session hired or why none was, and who was
  * sent home to make room. */
 export interface Received extends ChannelRouteResult {
-  readonly opened?: T.Session;
+  readonly hired?: T.Session;
   readonly refused?: string;
   readonly evicted?: string;
-  /** A refused opening left work behind: its issue identity must be kept. */
+  /** A refused hire left work behind: its issue identity must be kept. */
   readonly retainedWork?: true;
 }
 
@@ -104,12 +104,9 @@ export type Withdrawal =
   /** An issue's dispatches up to at, once it is closed or handed on: its own transaction, not the write lock. */
   | { readonly _tag: "Issue"; readonly issue: string; readonly at: number };
 
-/** Which triggers wait in the issues' pool: those of queued issues (dispatches first), or one issue's in routed order. */
-export type Waiting = { readonly _tag: "Queue" } | { readonly _tag: "Issue"; readonly issue: string };
-
 /** What happened to deliveries: a message taken into a model (its 👀), or a session that failed every wake. */
-export type DeliveryChange =
-  | { readonly _tag: "Consumed"; readonly session: string; readonly message: string }
+export type DeliveryNews =
+  | { readonly _tag: "Consumed"; readonly session: string; readonly envelope: string }
   | { readonly _tag: "Braked"; readonly session: string; readonly failed: number };
 
 export class Mailbox extends Context.Service<
@@ -121,23 +118,26 @@ export class Mailbox extends Context.Service<
     readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
     readonly replayCronTriggers: (consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
     readonly unreadSummary: (participant: string, channel: string) => Effect.Effect<UnreadRow[]>;
-    readonly pending: (of: Waiting) => Effect.Effect<readonly QueuedInput[]>;
-    readonly registered: (trigger: string) => Effect.Effect<boolean>;
+    /** The triggers waiting in the issues' pool for one issue, in routed order. */
+    readonly triggersOf: (issue: string) => Effect.Effect<readonly T.Trigger[]>;
+    /** The triggers of every queued, open issue: dispatches first, then in routed order. */
+    readonly queuedTriggers: Effect.Effect<readonly QueuedInput[]>;
+    readonly isRouted: (trigger: string) => Effect.Effect<boolean>;
     readonly receive: (arrival: Arrival) => Effect.Effect<Received, ApiError>;
     readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
     readonly ownerOf: (trigger: string) => Effect.Effect<string | undefined>;
-    readonly openDeliveries: (session: string) => readonly DeliveryRow[];
+    readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
     readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
     readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
     readonly start: Effect.Effect<void>;
     readonly restore: Effect.Effect<void>;
     readonly replay: Effect.Effect<void>;
     readonly insert: (input: InsertDelivery) => Effect.Effect<void, SqlError.SqlError | Schema.SchemaError>;
-    readonly changes: Effect.Effect<Stream.Stream<DeliveryChange>, never, Scope.Scope>;
-    readonly returnOne: (session: string, envelope: string) => Effect.Effect<void>;
+    readonly news: Effect.Effect<Stream.Stream<DeliveryNews>, never, Scope.Scope>;
+    readonly handBack: (session: string, envelope: string) => Effect.Effect<void>;
     readonly withdraw: (what: Withdrawal) => Effect.Effect<void>;
     readonly waitingOn: (envelope: string) => Effect.Effect<number>;
-    readonly returnInput: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
+    readonly decline: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
   }
 >()("@vibevalley/server/mailbox/mailbox") {
   static readonly layer = Layer.effect(
@@ -194,7 +194,7 @@ export class Mailbox extends Context.Service<
       };
       const breaker = new WakeBreaker();
       const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
-      const changesHub = yield* PubSub.unbounded<DeliveryChange>();
+      const newsHub = yield* PubSub.unbounded<DeliveryNews>();
       const routeLock = yield* Semaphore.make(1);
       const routeLocked = <A, E>(effect: Effect.Effect<A, E>) => routeLock.withPermits(1)(effect);
       const pumpLock = yield* Semaphore.make(1);
@@ -268,7 +268,7 @@ export class Mailbox extends Context.Service<
                   },
                 ];
         const result = yield* work.receive(trigger, audience);
-        if (!(yield* work.registered(trigger.id))) {
+        if (!(yield* work.isRouted(trigger.id))) {
           const at = yield* Clock.currentTimeMillis;
           const markRouted2 = yield* db.run(
             qr.markRouted({
@@ -282,31 +282,31 @@ export class Mailbox extends Context.Service<
         return result ?? { heldNotice: "" };
       });
 
-      const openSession = Effect.fn("Mailbox.open")(function* (arrival: Extract<Arrival, { readonly _tag: "Open" }>): Effect.fn.Return<Received> {
+      const hire = Effect.fn("Mailbox.hire")(function* (arrival: Extract<Arrival, { readonly _tag: "Hire" }>): Effect.fn.Return<Received> {
         const room = yield* sessions.makeRoom(arrival.agent.runtime, arrival.where);
         if ("refused" in room) return { heldNotice: "", refused: room.refused };
-        const letters = arrival.letters;
-        const hired = yield* sessions.send(arrival.agent, arrival.brief, arrival.where, {
+        const envelopes = arrival.envelopes;
+        const hired = yield* sessions.hire(arrival.agent, arrival.brief, arrival.where, {
           ...arrival.options,
-          ...(letters._tag === "Talk" ? { envelopeIds: letters.rows.map((letter) => letter.row.envelope_id) } : {}),
+          ...(envelopes._tag === "Talk" ? { envelopeIds: envelopes.rows.map((envelope) => envelope.row.envelope_id) } : {}),
           hiring: (session, launch) =>
             Effect.gen(function* () {
               const at = yield* Clock.currentTimeMillis;
-              yield* arrival.joining(session, launch, at);
-              switch (letters._tag) {
+              yield* arrival.hiring(session, launch, at);
+              switch (envelopes._tag) {
                 case "Talk":
-                  return yield* work.registerTalk(session.id, launch, at, letters.rows);
+                  return yield* work.registerTalk(session.id, launch, at, envelopes.rows);
                 case "Queued":
-                  if (letters.triggers.length > 0) yield* work.registerInitialInputs(session, launch, letters.triggers);
+                  if (envelopes.triggers.length > 0) yield* work.registerInitialInputs(session, launch, envelopes.triggers);
                   return;
               }
             }),
         });
-        const opened = hired.session;
-        if (opened === undefined) return { heldNotice: "", refused: hired.refused ?? "", ...(hired.retainedWork ? { retainedWork: true as const } : {}) };
-        // A conversation's later messages may have come while it opened: the pump looks for them now.
-        if (letters._tag === "Talk") yield* Effect.sync(() => later(`kick:${opened.id}`, 0, () => pump.kick(opened.id)));
-        return { heldNotice: "", opened, ...(room.evicted ? { evicted: room.evicted } : {}) };
+        const session = hired.session;
+        if (session === undefined) return { heldNotice: "", refused: hired.refused ?? "", ...(hired.retainedWork ? { retainedWork: true as const } : {}) };
+        // A conversation's later messages may have come while it was hired: the pump looks for them now.
+        if (envelopes._tag === "Talk") yield* Effect.sync(() => later(`kick:${session.id}`, 0, () => pump.kick(session.id)));
+        return { heldNotice: "", hired: session, ...(room.evicted ? { evicted: room.evicted } : {}) };
       });
 
       const dropSession = (session: string, why: string) =>
@@ -319,31 +319,22 @@ export class Mailbox extends Context.Service<
       const api = Mailbox.of({
         ...journal,
         unreadSummary,
-        registered: work.registered,
-        pending: Effect.fnUntraced(function* (of: Waiting) {
-          switch (of._tag) {
-            case "Queue":
-              return yield* work.queuedInputs;
-            case "Issue": {
-              const triggers = yield* work.issueInputs(of.issue);
-              return Arr.map(triggers, (trigger) => ({ issue: of.issue, trigger }));
-            }
-          }
-        }),
-        // An opening starts a runtime: outside the route lock, as it was before it came here.
+        isRouted: work.isRouted,
+        triggersOf: work.issueInputs,
+        queuedTriggers: work.queuedInputs,
         receive: Effect.fnUntraced(function* (arrival: Arrival) {
           switch (arrival._tag) {
             case "Trigger":
               return yield* routeLocked(Effect.uninterruptible(route(arrival.trigger, arrival.to)));
-            case "Open":
-              return yield* openSession(arrival);
+            case "Hire":
+              return yield* hire(arrival);
           }
         }),
         subscribe: Effect.fnUntraced(function* (issue: string, threads: readonly string[]) {
           return yield* work.subscribe(issue, threads);
         }),
         ownerOf: work.ownerOf,
-        openDeliveries: (session) => open.of(session),
+        deliveriesOf: (session) => open.of(session),
         forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
         orchestratorDigest: Effect.fn("Mailbox.orchestratorDigest")((agent) =>
           Effect.sync(() =>
@@ -373,8 +364,8 @@ export class Mailbox extends Context.Service<
           }
         }),
         insert: work.insert,
-        changes: Effect.map(PubSub.subscribe(changesHub), Stream.fromSubscription),
-        returnOne: Effect.fn("Mailbox.returnOne")(function* (session, envelope) {
+        news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
+        handBack: Effect.fn("Mailbox.handBack")(function* (session, envelope) {
           yield* db.run(qd.rollbackOne({ session_id: session, envelope_id: envelope }));
           open.handedBackOne(session, envelope);
         }, writtenLocked),
@@ -396,10 +387,10 @@ export class Mailbox extends Context.Service<
         waitingOn: Effect.fn("Mailbox.waitingOn")(function* (envelope) {
           return (yield* db.run(qd.waitingOn({ message_id: envelope }))).length;
         }),
-        returnInput: Effect.fn("Mailbox.returnInput")(function* (session, envelope, reason) {
+        decline: Effect.fn("Mailbox.decline")(function* (session, envelope, reason) {
           const why = reason.trim();
           if (!why) return yield* Effect.fail(refused(t("server.issue.noTitle")));
-          if (yield* routeLocked(work.returnInput(session, envelope, why))) return;
+          if (yield* routeLocked(work.decline(session, envelope, why))) return;
           return yield* Effect.fail(missing(t("server.issue.issueRef", { ref: envelope }), [lookIn.issue]));
         }),
       });
@@ -420,9 +411,9 @@ export class Mailbox extends Context.Service<
           });
         });
       const pump = makePump<InboxMessage>(sessions, {
-        pending: api.openDeliveries,
+        pending: api.deliveriesOf,
         dropSession: (session, why) => writtenLocked(dropSession(session, why)),
-        returnOne: api.returnOne,
+        handBack: api.handBack,
         hand: work.hand,
         consume: Effect.fn("Mailbox.consume")(function* (session, envelope, at) {
           yield* db.run(qd.consumeDelivery({ session_id: session, envelope_id: envelope, consumed_at: at }));
@@ -474,9 +465,9 @@ export class Mailbox extends Context.Service<
         publishOrchestrator,
         consumedMessages: (recipient, messages) =>
           Effect.sync(() => {
-            for (const message of messages) PubSub.publishUnsafe(changesHub, { _tag: "Consumed", session: recipient, message });
+            for (const message of messages) PubSub.publishUnsafe(newsHub, { _tag: "Consumed", session: recipient, envelope: message });
           }),
-        breakerNotice: (recipient, failed) => Effect.sync(() => PubSub.publishUnsafe(changesHub, { _tag: "Braked", session: recipient, failed })),
+        breakerNotice: (recipient, failed) => Effect.sync(() => PubSub.publishUnsafe(newsHub, { _tag: "Braked", session: recipient, failed })),
         later,
         noticeBatchMs: config.chat.noticeBatchMs,
         retryWakeMs: config.chat.retryWakeMs,

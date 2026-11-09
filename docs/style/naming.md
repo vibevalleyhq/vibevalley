@@ -60,6 +60,14 @@
 | 给主人看的一句话 | `xText` | `quotaText`、`dueText` |
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
+| 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
+| 服务开机时做的事 | `boot`（layer 和服务的成员同名）；`start` 只指开始干一件事 | `Mailbox.boot`；`issues.start`、`executor.start` |
+| 一个服务往外说发生了什么 | 一条流，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `Session.news`、`Mailbox.news`（`DeliveryNews`） |
+
+两条容易犯的：
+
+- **一个名字只答一个问题**：带标签的参数只用来给同一个动作不同的输入（`receive` 收下一个触发或开一个帮工，`withdraw` 撤回一个帮工、一封信或一张工单的待投递）；两个不同的问题（筛法、排序不同）起两个名字，不用标签把它们并成一个。
+- **命令不只答一个是非**：做没做成要么在错误通道里说为什么，要么返回做成的结果；只返回 `boolean` 的命令，调用方不知道没做成的原因。
 
 ## 单位、时刻和长短
 
@@ -97,11 +105,15 @@
 
 ## 现有的双关
 
-下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；其余的意思改名之前，写的时候带上限定。
+下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；右列的意思各起各的名字（不靠上下文区分，也不带限定凑合），改完把旧名字写进 `scripts/stale-names.ts`。
 
 | 词 | 指的是 | 也被用来指 |
 |---|---|---|
 | rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
+| changes | 代码的改动（用语表的「改动」：`Issue.changes`、`Repo.changes`、`T.Changes`） | 投递的变化流（`Mailbox.changes`）：改叫 `news` |
+| open | 形容词，还没了结（`openQuestions`、`openFindings`；`Lan.setOpen` 的开着） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个帮工的投递（`openDeliveries`）：改叫 `deliveriesOf` |
+| start | 开始干一件事（`issue.start`、`Executor.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
+| input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`inputsConsumed`、`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
 
 已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`repo.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、仓库的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 

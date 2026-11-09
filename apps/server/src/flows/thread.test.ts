@@ -44,13 +44,13 @@ describe("an issue's thread", () => {
       ))!;
       const followup = (yield* chat.say("这条还没处理", thread, "release-on-close")).message;
       yield* await_(
-        () => Effect.succeed(mailbox.openDeliveries(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
+        () => Effect.succeed(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
         (id) => id === thread,
         "the followup stored",
       );
       yield* (yield* Issue).setStatus(issue.id, "canceled", "", "", owner);
       const returned = yield* await_(
-        () => Effect.succeed(mailbox.openDeliveries(chat.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
+        () => Effect.succeed(mailbox.deliveriesOf(chat.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
         (rows) => rows.length === 1,
         "the unread followup returned",
       );
@@ -89,13 +89,13 @@ describe("an issue's thread", () => {
       const session = sessions.presentSessions()[0]!;
       const mailbox = yield* Mailbox;
       yield* await_(
-        () => Effect.succeed(mailbox.openDeliveries(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
+        () => Effect.succeed(mailbox.deliveriesOf(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
         (channel) => channel === thread,
         "the followup owned by the session",
       );
-      yield* (yield* Mailbox).returnInput(session.id, followup.id, "超出当前范围");
-      yield* (yield* Mailbox).returnInput(session.id, followup.id, "超出当前范围");
-      const returned = mailbox.openDeliveries(channels.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
+      yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
+      yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
+      const returned = mailbox.deliveriesOf(channels.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
       expect(returned).toHaveLength(1);
       expect(returned[0]!.payload.trigger.id).toBe(followup.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

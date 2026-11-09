@@ -176,7 +176,7 @@ export const issueTools = Effect.gen(function* () {
       Schema.decodeUnknownEffect(IssueHandbackInput),
       Effect.fn("Tool.issueHandback")(function* ({ envelope, reason }) {
         const caller = yield* callerOf(who);
-        yield* mailbox.returnInput(caller.session, envelope, reason);
+        yield* mailbox.decline(caller.session, envelope, reason);
         return issueHandbackRecorded;
       }),
     );

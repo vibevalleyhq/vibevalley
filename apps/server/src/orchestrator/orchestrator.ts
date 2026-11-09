@@ -367,7 +367,7 @@ const make = (options: OrchestratorOptions = {}) =>
           ...(n.by ? { by: n.by } : {}),
           ...(caller ? { caller } : {}),
         }).pipe(
-          Effect.tap((taken) => (taken ? Effect.void : Effect.forEach(n.messages, (message) => mailbox.returnOne(n.agent, message.id), { discard: true }))),
+          Effect.tap((taken) => (taken ? Effect.void : Effect.forEach(n.messages, (message) => mailbox.handBack(n.agent, message.id), { discard: true }))),
         );
       });
 
