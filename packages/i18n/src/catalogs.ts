@@ -1196,6 +1196,7 @@ export const catalogs = {
         canceled: "已取消等待",
         download_failed: "下载失败",
       },
+      imageMade: "画好了：{prompt}",
     },
     "server.memory": {
       source: { local: "本地", nowledge: "Nowledge Mem", everos: "EverOS" },
@@ -2454,7 +2455,13 @@ export const catalogs = {
         remember: { name: "让管家记住", note: "/remember 一句话：记进照看这里的管家的记性", needs: "/remember 后面写要它记住的话" },
         stop: { name: "叫停管家", note: "照看这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
         dm: { name: "私聊", note: "/dm 名字：打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
-        done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了" },
+        imagegen: {
+          name: "生图",
+          note: "/imagegen 描述：交给这里的管家，用 MOSS 画一张图，画好发回这里",
+          needs: "/imagegen 后面写想要的画面",
+          nowhere: "先打开一个频道再生图",
+        },
+        done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了", imagegen: "交给管家了，画好会发到这里" },
       },
     },
     "web.connector": {
@@ -5698,6 +5705,7 @@ export const catalogs = {
         canceled: "Waiting canceled",
         download_failed: "Download failed",
       },
+      imageMade: "Here it is: {prompt}",
     },
     "server.memory": {
       source: { local: "Local", nowledge: "Nowledge Mem", everos: "EverOS" },
@@ -7029,7 +7037,13 @@ export const catalogs = {
         },
         stop: { name: "Stop the manager", note: "The manager looking after this stops its round; helpers it sent keep working", needs: "" },
         dm: { name: "Direct message", note: "/dm name: open the direct channel with that profile", needs: "Write the profile's name or id after /dm" },
-        done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped" },
+        imagegen: {
+          name: "Make an image",
+          note: "/imagegen description: the manager here draws it with MOSS and posts it here",
+          needs: "Write what to draw after /imagegen",
+          nowhere: "Open a channel first to make an image",
+        },
+        done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped", imagegen: "Handed to the manager; the image will be posted here" },
       },
     },
     "web.connector": {
@@ -10216,6 +10230,7 @@ export interface Messages {
   "server.media.consentChanged": undefined;
   "server.media.corrupt": undefined;
   "server.media.downloadFailed": undefined;
+  "server.media.imageMade": { readonly prompt: string | number };
   "server.media.inputBusy": undefined;
   "server.media.inputChanged": undefined;
   "server.media.inputDeleteBytes": undefined;
@@ -11341,9 +11356,14 @@ export interface Messages {
   "web.channel.commands.dm.name": undefined;
   "web.channel.commands.dm.needs": undefined;
   "web.channel.commands.dm.note": undefined;
+  "web.channel.commands.done.imagegen": undefined;
   "web.channel.commands.done.issue": { readonly n: string | number };
   "web.channel.commands.done.remember": undefined;
   "web.channel.commands.done.stop": undefined;
+  "web.channel.commands.imagegen.name": undefined;
+  "web.channel.commands.imagegen.needs": undefined;
+  "web.channel.commands.imagegen.note": undefined;
+  "web.channel.commands.imagegen.nowhere": undefined;
   "web.channel.commands.issue.name": undefined;
   "web.channel.commands.issue.needs": undefined;
   "web.channel.commands.issue.note": undefined;

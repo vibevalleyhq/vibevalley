@@ -90,6 +90,9 @@ interface SpeakOptions {
   readonly reply?: number;
 }
 
+/** What an announcement shows: an artifact's card, or attachments by id. */
+export type Made = { readonly card: T.ArtifactCard } | { readonly attachments: readonly string[] };
+
 export interface SayMore {
   readonly source?: "connector" | "voice";
   readonly responsePort?: string;
@@ -100,6 +103,8 @@ export interface SayMore {
   /** The blocks the owner pointed at, to be read as they are now before the message is stored. */
   readonly blockRefs?: readonly T.BlockRef[];
   readonly blocks?: readonly T.QuotedBlock[];
+  /** The orchestrator it is said to: only it hears it. */
+  readonly to?: string;
 }
 
 interface ReadOptions {
@@ -209,8 +214,9 @@ export interface ChannelService {
   /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
    * session's own thread, else the default channel. */
   readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** Words that announce an artifact (artifact/), with its card, said as from (the owner, a session or an orchestrator) in a channel placeOf names. */
-  readonly announce: (from: string, channel: string, text: string, card: T.ArtifactCard) => Effect.Effect<T.ChatMessage, ApiError>;
+  /** Words that announce what was made, with it: an artifact's card (artifact/) or a made file's attachments (media/), said as from
+   * (the owner, a session or an orchestrator) in a channel placeOf names. A sendKey said before is that message again. */
+  readonly announce: (from: string, channel: string, text: string, made: Made, sendKey?: string) => Effect.Effect<T.ChatMessage, ApiError>;
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
   /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */

@@ -265,10 +265,17 @@
       "note": "/dm 名字：打开和这份档案的私聊",
       "needs": "/dm 后面写档案的名字或 id"
     },
+    "imagegen": {
+      "name": "生图",
+      "note": "/imagegen 描述：交给这里的管家，用 MOSS 画一张图，画好发回这里",
+      "needs": "/imagegen 后面写想要的画面",
+      "nowhere": "先打开一个频道再生图"
+    },
     "done": {
       "issue": "记下了 #{n}",
       "remember": "记下了",
-      "stop": "叫停了"
+      "stop": "叫停了",
+      "imagegen": "交给管家了，画好会发到这里"
     }
   }
 }

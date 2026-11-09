@@ -7,10 +7,12 @@ import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
 
+import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { Provider } from "#/provider/provider.ts";
 import * as audioQueries from "#db/media_audio.sql.ts";
@@ -154,6 +156,19 @@ const make = Effect.gen(function* () {
     Effect.uninterruptible,
   );
 
+  /** A made image goes back to the channel an orchestrator was asked for it in, under its name, once: the send key is the
+   * job's, so a retried download or a restart says nothing again. The owner's own jobs (the media page) stay where they are. */
+  const postBack = Effect.fnUntraced(function* (id: string) {
+    const row = yield* found(id);
+    if (row.phase !== "ready" || row.attachment === null) return;
+    const source = yield* Schema.decodeEffect(Schema.fromJsonString(S.MediaSource))(row.source);
+    if (source.kind !== "orchestrator") return;
+    const attachment = yield* Schema.decodeEffect(Schema.fromJsonString(S.Attachment))(row.attachment);
+    const request = yield* decodeRequest(row.request);
+    const words = t("server.media.imageMade", { prompt: head(request.prompt, 80) });
+    yield* channel.announce(source.agent, source.channel, words, { attachments: [attachment.id] }, `media:${id}`);
+  });
+
   const download = Effect.fnUntraced(function* (id: string) {
     const row = yield* found(id);
     if (row.phase !== "downloading" || row.result_url === null) return;
@@ -166,6 +181,8 @@ const make = Effect.gen(function* () {
       Effect.catch(() => change(id, ["downloading"], { phase: "download_failed", problem: t("server.media.downloadFailed") })),
       Effect.asVoid,
     );
+    // Outside the download's failure: the image is ready whether or not the channel takes it.
+    yield* postBack(id).pipe(bestEffort(`media: posting image ${id}`));
   });
   const run = Effect.fnUntraced(function* (id: string, work: Effect.Effect<void, ApiError>) {
     yield* FiberMap.run(
@@ -398,6 +415,9 @@ const make = Effect.gen(function* () {
       yield* speech.restore();
       yield* audio.restore();
       yield* publish();
+      // A stop between ready and the post leaves it unposted: the recent ones are posted again, the send key keeping each once.
+      const recent = yield* db.run(q.recentGenerations());
+      yield* Effect.forEach(recent, (row) => postBack(row.id).pipe(bestEffort(`media: posting image ${row.id}`)), { discard: true });
       const pendingGenerations2 = yield* db.run(q.pendingGenerations());
       yield* Effect.forEach(pendingGenerations2, (row) => (row.phase === "downloading" ? run(row.id, download(row.id)) : Effect.void), {
         discard: true,

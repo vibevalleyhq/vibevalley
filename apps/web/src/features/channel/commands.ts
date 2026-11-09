@@ -4,7 +4,7 @@ import type { Channel } from "@vibevalley/protocol";
 import { api, createRequestKey } from "#/infra/api.ts";
 
 import type { Nameable } from "./mentions";
-const CommandNames = ["issue", "remember", "stop", "dm"] as const;
+const CommandNames = ["issue", "remember", "stop", "dm", "imagegen"] as const;
 type CommandName = (typeof CommandNames)[number];
 
 /** Where a command runs: the place the box writes to, and the orchestrator that looks after it. */
@@ -17,7 +17,7 @@ interface CommandPlace {
 type CommandDone = { readonly say: string } | { readonly open: string };
 
 /** Whether a command needs words after it (a title, a note, a profile). */
-const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true };
+const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true, imagegen: true };
 
 // A command that makes something keeps its request key per line until it went through.
 const keys = new Map<string, ReturnType<typeof createRequestKey>>();
@@ -44,6 +44,15 @@ const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<Comma
     return { say: t("web.channel.commands.done.stop") };
   },
   dm: async (who) => ({ open: `/chat/${await api.channel.direct.create({ agent: who })}` }),
+  // The line is said in the place as it is, to the orchestrator there alone: it loads its imagegen skill, and the image is
+  // posted back here when it is made.
+  imagegen: (text, at) => {
+    const channel = at.channel;
+    if (channel === undefined) return Promise.reject(new Error(t("web.channel.commands.imagegen.nowhere")));
+    return once(`imagegen\n${channel.id}\n${text}`, (sendKey) =>
+      api.channel.message.send({ id: channel.id, text: `/imagegen ${text}`, to: at.orchestrator, sendKey }),
+    ).then(() => ({ say: t("web.channel.commands.done.imagegen") }));
+  },
 };
 
 /** The commands as the menu offers them, like names: /issue, /stop… */

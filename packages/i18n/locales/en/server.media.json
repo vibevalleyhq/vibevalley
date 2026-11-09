@@ -79,5 +79,6 @@
     "unknown": "Outcome unknown",
     "canceled": "Waiting canceled",
     "download_failed": "Download failed"
-  }
+  },
+  "imageMade": "Here it is: {prompt}"
 }

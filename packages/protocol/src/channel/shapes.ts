@@ -178,6 +178,8 @@ export interface SayRequest {
   agent?: string;
   repo?: string;
   sendKey?: string;
+  /** The orchestrator it is said to, by profile id: only it hears it (a skill asked of the orchestrator in the place, /imagegen). */
+  to?: string;
 }
 
 export interface ChannelUpdate {

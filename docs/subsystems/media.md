@@ -45,6 +45,8 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 - **可用意味着落盘**：小音频与图片沿用 `Channel.attach`；超过附件上限的音频由 Media 输入存储持有，不强塞 Base64 附件。内容以 SHA256 寻址，完整写临时文件后原子发布，取消或写失败不暴露半文件。
 - **页面不折事实**：每次状态变化由 `Core.apply(mediaChanged)` 投影；`phaseText`、可取消和可重试下载均由服务端给出。页面不在本地猜任务是否完成。
 
+**管家在频道里生的图自动发回。** 主人在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的管家）发出去，只交给这个管家；管家读自带的 `imagegen` skill（`apps/server/src/orchestrator/skills/imagegen/SKILL.md`，随服务端打包），调 `media.image.create`。来源是管家、带来源频道的生图任务下载完成后，Media 以那个管家的名义用 `Channel.announce` 在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；主人在本页发起的任务不自动发。
+
 发布沿用 Channel 接口与附件 ID。页面用命名空间、任务 ID、目标频道的 JSON 元组计算 SHA256，作为 64 字符的 `sendKey`；刷新后再次发布到同一频道不会多发一条，不同频道各有自己的发布。稿子引用同一个本机附件地址，不复制资产。
 
 ## 本机输入

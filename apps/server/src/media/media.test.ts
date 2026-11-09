@@ -1,8 +1,9 @@
-import { expect, it } from "@effect/vitest";
+import { expect, it, layer as withLayer } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, FileSystem, Layer, Path, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
+import { SqlClient } from "effect/sql";
 
-import type { MediaImageRequest } from "@vibevalley/protocol";
+import { defaultOrchestrator, type MediaImageRequest } from "@vibevalley/protocol";
 
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
@@ -399,4 +400,35 @@ it.effect("restart marks unsent and ambiguous tasks separately and resumes only 
     yield* waitFor(media.get("downloading"), (row) => row.phase === "ready", "restored download");
     expect(calls).toBe(0);
   }).pipe(Effect.provide(layer(http)));
+});
+
+withLayer(layer())("images asked for in a channel", (it) => {
+  it.effect("an image an orchestrator was asked for in a channel is posted back there under its name, once; the owner's own stays", () =>
+    Effect.gen(function* () {
+      yield* configured;
+      const media = yield* Media;
+      const chat = yield* Channel;
+      const sql = yield* SqlClient.SqlClient;
+      const channel = chat.defaultChannel();
+      const postsOf = (id: string) =>
+        Effect.map(
+          sql<{ sender_id: string; meta: string }>`select sender_id, meta from channel_message where send_key = ${`media:${id}`}`.pipe(Effect.orDie),
+          (rows) => [...rows],
+        );
+      // One execution slot runs the tasks in turn: once the orchestrator's image is posted, the owner's task is through too.
+      yield* media.createImage({ ...input, id: "owners-own" }, { kind: "owner" });
+      yield* media.createImage({ ...input, id: "asked-in-channel" }, { kind: "orchestrator", agent: defaultOrchestrator, channel, forOwner: true });
+      const posted = yield* waitFor(postsOf("asked-in-channel"), (rows) => rows.length > 0, "the image posted back");
+      const ready = yield* media.get("asked-in-channel");
+      if (ready.kind !== "image") return yield* Effect.die("Expected image task");
+      expect(posted).toMatchObject([{ sender_id: defaultOrchestrator }]);
+      expect(posted[0]?.meta).toContain(ready.attachment?.id ?? "missing");
+      const ownersPosts = yield* postsOf("owners-own");
+      expect(ownersPosts).toEqual([]);
+      // A restart posts what is ready again; the send key keeps it once.
+      yield* media.restore();
+      const afterRestart = yield* postsOf("asked-in-channel");
+      expect(afterRestart).toHaveLength(1);
+    }),
+  );
 });

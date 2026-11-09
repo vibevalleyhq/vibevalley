@@ -19,7 +19,7 @@
   "Artifact.updateBlock": ["tool"],
   "Artifact.version": ["tool"],
   "Channel.addressOf": ["orchestrator", "tool"],
-  "Channel.announce": ["artifact"],
+  "Channel.announce": ["artifact", "media"],
   "Channel.attach": ["media"],
   "Channel.attachment": ["media"],
   "Channel.channelByName": ["connector", "tool"],

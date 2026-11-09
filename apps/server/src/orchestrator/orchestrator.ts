@@ -10,6 +10,7 @@ import { defaultOrchestrator, orchestratorRuntime, ownerId } from "@vibevalley/p
 import { Agent, modelClient, noDeepSeekKey } from "#/agent/agent.ts";
 import { traitsOf } from "#/agent/prompts.ts";
 import { orchestrator } from "#/base/actor.ts";
+import { serverFile } from "#/base/assets.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
 import { ownersLanguage } from "#/base/prompts.ts";
@@ -36,6 +37,8 @@ import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voi
 import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
+/** VibeValley's own skills for its orchestrators (imagegen/SKILL.md…), shipped with the server. */
+export const orchestratorSkills = serverFile("src/orchestrator/skills");
 const keepEvents = 1000;
 const notesShown = 8;
 const notesRecalled = 3;
@@ -181,6 +184,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
                 llm: llmOf,
                 tools: toolsFor(id),
+                skills: [orchestratorSkills],
                 wakeSoon,
                 first: { channel: chat.defaultChannel(), envelope: "", source: "owner" },
                 quiet: (r) => r.quiet ?? false,

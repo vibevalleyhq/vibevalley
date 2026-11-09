@@ -5,6 +5,7 @@ test("a line that is a command runs it with the words after it; any other line i
   expect(commandOf("/issue 给打卡页加分页")).toEqual({ name: "issue", text: "给打卡页加分页" });
   expect(commandOf("  /stop  ")).toEqual({ name: "stop", text: "" });
   expect(commandOf("/remember 提交信息写中文\n别用缩写")).toEqual({ name: "remember", text: "提交信息写中文\n别用缩写" });
+  expect(commandOf("/imagegen 一只在麦田里打盹的橘猫")).toEqual({ name: "imagegen", text: "一只在麦田里打盹的橘猫" });
   expect([commandOf("/usr/bin/env"), commandOf("/issues"), commandOf("看 /issue 怎么用"), commandOf("/")]).toEqual([
     undefined,
     undefined,

@@ -135,6 +135,8 @@ export interface HostOptions<R> {
   readonly llm: () => ModelClient;
   /** The tools; each reads the route of the input taken last. */
   readonly tools: (current: () => R) => Tool[];
+  /** The folders of the skills it may load (<folder>/<name>/SKILL.md); none when absent. */
+  readonly skills?: readonly string[];
   readonly wakeSoon?: (withinMs: number) => boolean;
   /** The route before any input is taken. */
   readonly first: R;
@@ -357,7 +359,7 @@ export const makeHost = <R>(
         home: o.home,
         cwd: o.cwd,
         tools: o.tools(() => current().route),
-        noSkills: true,
+        ...(o.skills === undefined ? { noSkills: true } : { skills: o.skills }),
         noSubagents: true,
         reminders: false,
         ...(o.wakeSoon ? { wakeSoon: o.wakeSoon } : {}),

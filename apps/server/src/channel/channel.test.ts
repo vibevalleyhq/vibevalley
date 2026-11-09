@@ -313,6 +313,22 @@ describe("the chat", () => {
       }),
     ),
   );
+  it.live("a line said to an orchestrator reaches it alone, even where no one is in; said to a helper it is refused", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const quiet = (yield* f.chat.openChannel("quiet", "", "")).id;
+        yield* f.chat.updateChannel(quiet, { members: [] });
+        // Routing is done when say returns: the deliveries are written with the message.
+        const unheard = (yield* f.chat.say("有人吗", quiet, "")).message;
+        const asked = (yield* f.chat.say("/imagegen 一只在麦田里打盹的橘猫", quiet, "", { to: defaultOrchestrator })).message;
+        const toNoOne = yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, unheard.id));
+        const toIt = yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, asked.id));
+        expect([toNoOne, toIt?.reason]).toEqual([undefined, "addressed"]);
+        const refused = yield* Effect.flip(f.chat.say("画一张", quiet, "", { to: "lab" }));
+        expect(refused).toMatchObject({ _tag: "Refused" });
+      }),
+    ),
+  );
   it.live("regression: publishing to the orchestrator does not acknowledge model consumption", () =>
     run((f, x) =>
       Effect.gen(function* () {

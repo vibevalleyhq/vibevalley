@@ -79,5 +79,6 @@
     "unknown": "结果未知",
     "canceled": "已取消等待",
     "download_failed": "下载失败"
-  }
+  },
+  "imageMade": "画好了：{prompt}"
 }

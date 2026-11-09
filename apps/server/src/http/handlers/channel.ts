@@ -22,6 +22,7 @@ export const channelHandlers = Effect.gen(function* () {
           ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
           ...(body.attachments ? { attachments: body.attachments } : {}),
           ...(body.blocks ? { blockRefs: body.blocks } : {}),
+          ...(body.to !== undefined ? { to: body.to } : {}),
         }),
       ),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.repo ?? ""), (c) => c.id),

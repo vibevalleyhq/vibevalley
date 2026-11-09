@@ -265,10 +265,17 @@
       "note": "/dm name: open the direct channel with that profile",
       "needs": "Write the profile's name or id after /dm"
     },
+    "imagegen": {
+      "name": "Make an image",
+      "note": "/imagegen description: the manager here draws it with MOSS and posts it here",
+      "needs": "Write what to draw after /imagegen",
+      "nowhere": "Open a channel first to make an image"
+    },
     "done": {
       "issue": "Written down as #{n}",
       "remember": "Remembered",
-      "stop": "Stopped"
+      "stop": "Stopped",
+      "imagegen": "Handed to the manager; the image will be posted here"
     }
   }
 }

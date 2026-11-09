@@ -265,6 +265,8 @@ describe("the orchestrator", () => {
       yield* ingress.say("默认频道里随便说", {}, undefined, "");
       yield* until(() => from(chat.defaultChannel(), defaultOrchestrator)[0], "the default one's answer");
       expect(asked("默认频道里随便说")[0]!.system).not.toContain("你是管家");
+      // Its own skills are listed for it to load: /imagegen is one.
+      expect(asked("默认频道里随便说")[0]!.system).toContain("imagegen");
       expect(from(chat.defaultChannel(), lead.id)).toHaveLength(1);
       expect((yield* Effect.flip(chat.updateChannel(notes, { members: ["lab"] })))._tag).toBe("Refused");
     }).pipe(Effect.scoped, Effect.provide(f.layer));

@@ -141,6 +141,7 @@ const make = Effect.gen(function* () {
     const files = yield* attachmentsOf(more.attachments ?? []);
     if (!text.trim() && files.length === 0) return yield* Effect.fail(refused(t("server.channel.empty")));
     if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
+    if (more.to !== undefined && !agents.isOrchestrator(more.to)) return yield* Effect.fail(refused(t("server.channel.notOrchestrator", { id: more.to })));
     // A channel as the owner names it (general, #general, @fox) as well as by id; none is the default one.
     const where = channel === undefined || model.channel(channel) ? (channel ?? model.defaultId()) : yield* resolveTarget(ownerId, channel);
     if (!model.channel(where)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]));
@@ -153,9 +154,10 @@ const make = Effect.gen(function* () {
       sendKey,
       readBy: ownerId,
       ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
-      ...(files.length > 0 || more.picked || (more.blocks?.length ?? 0) > 0 || source || responsePort || voiceMode
+      ...(files.length > 0 || more.picked || (more.blocks?.length ?? 0) > 0 || source || responsePort || voiceMode || more.to !== undefined
         ? {
             meta: {
+              ...(more.to !== undefined ? { ingressRecipient: more.to } : {}),
               ...(files.length > 0 ? { attachments: files } : {}),
               ...(more.picked ? { picked: more.picked } : {}),
               ...((more.blocks?.length ?? 0) > 0 ? { blocks: more.blocks } : {}),
@@ -410,17 +412,19 @@ const make = Effect.gen(function* () {
       if (model.channel(channel)) return channel;
       return yield* resolveTarget(from, channel);
     }),
-    announce: Effect.fn("Channel.announce")(function* (from, channel, text, card) {
+    announce: Effect.fn("Channel.announce")(function* (from, channel, text, made, sendKey = "") {
       const where = model.channel(channel) ? channel : yield* resolveTarget(from, channel);
       if (!model.channel(where)) return yield* Effect.fail(refused(t("server.channel.channelGone")));
       const run = sessions.runOf(from);
       if (agents.isOrchestrator(from)) yield* seat(from);
+      const shown = "card" in made ? { artifact: made.card } : { attachments: yield* attachmentsOf(made.attachments) };
       const written = yield* write({
         channel: where,
         from,
         kind: "chat",
         text: text.trim(),
-        meta: { ...(run ? { run } : {}), artifact: card },
+        meta: { ...(run ? { run } : {}), ...shown },
+        sendKey,
         ...(from === ownerId ? { readBy: ownerId } : {}),
       });
       if (from !== ownerId) {

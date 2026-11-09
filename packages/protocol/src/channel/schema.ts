@@ -106,6 +106,7 @@ export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
   repo: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),
+  to: Schema.optionalKey(Schema.String),
 });
 
 export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
