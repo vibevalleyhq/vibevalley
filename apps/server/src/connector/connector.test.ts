@@ -154,12 +154,14 @@ const echoing = Layer.effectDiscard(
   Effect.gen(function* () {
     const chat = yield* Channel;
     const mailbox = yield* Mailbox;
-    const forOrchestrator2 = yield* mailbox.forOrchestrator;
+    const news2 = yield* mailbox.news;
     yield* Effect.forkScoped(
-      Stream.runForEach(forOrchestrator2, (news) =>
-        Effect.forEach(news.messages, (message) => chat.orchestratorSays(news.channel, "收到：**" + message.text + "**", "", defaultOrchestrator), {
-          discard: true,
-        }),
+      Stream.runForEach(news2, (news) =>
+        news._tag === "Handed"
+          ? Effect.forEach(news.messages, (message) => chat.orchestratorSays(news.channel, "收到：**" + message.text + "**", "", defaultOrchestrator), {
+              discard: true,
+            })
+          : Effect.void,
       ),
     );
   }),

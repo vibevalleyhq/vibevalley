@@ -17,6 +17,7 @@ import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { dbQueries, Database, Db } from "#/infra/db.ts";
 import { wakeBreaker } from "#/mailbox/brakes.ts";
+import type { Handed } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { layer as projection } from "#/projection/frame.ts";
 import { restoredSession, sessionState } from "#/session/history.ts";
@@ -31,7 +32,7 @@ import { orchestratorForChannel, setOrchestrator } from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
 
-import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./channel.ts";
+import { Channel, catchUpMax, type Delivered, type LaunchActivity } from "./channel.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports. the slow mode is held until release (unless holds is off), the fail mode fails. */
 class FakeSessions {
@@ -293,9 +294,9 @@ const hireAndRun = (f: Farm, x: FakeSessions, id: string, brief: string, repo: s
 
 const news = (f: Farm) =>
   Effect.gen(function* () {
-    const heard: OrchestratorNews[] = [];
-    const forOrchestrator2 = yield* f.mailbox.forOrchestrator;
-    yield* Effect.forkScoped(Stream.runForEach(forOrchestrator2, (n) => Effect.sync(() => heard.push(n))));
+    const heard: Handed[] = [];
+    const news2 = yield* f.mailbox.news;
+    yield* Effect.forkScoped(Stream.runForEach(news2, (n) => Effect.sync(() => void (n._tag === "Handed" && heard.push(n)))));
     return {
       of: (message: string) =>
         Effect.gen(function* () {

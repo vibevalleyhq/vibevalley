@@ -13,13 +13,13 @@ import { orchestrator } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
 import { ownersLanguage } from "#/base/prompts.ts";
-import { Channel, type OrchestratorNews } from "#/channel/channel.ts";
+import { Channel } from "#/channel/channel.ts";
 import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
 import { agentHome, reposDir, ServerConfig } from "#/infra/config.ts";
 import { localeMinute } from "#/infra/time.ts";
 import { Ingress } from "#/ingress/ingress.ts";
-import type { Picked } from "#/mailbox/envelope.ts";
+import type { Handed, Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
 import { Repo } from "#/repo/repo.ts";
@@ -329,7 +329,7 @@ const make = (options: OrchestratorOptions = {}) =>
       return note;
     };
 
-    const heardInChat = (n: OrchestratorNews) =>
+    const heardInChat = (n: Handed) =>
       Effect.suspend(() => {
         const fromPerson = n.messages.every((m) => m.from === ownerId);
         const owner = n.messages.some((m) => m.from === ownerId);
@@ -379,8 +379,8 @@ const make = (options: OrchestratorOptions = {}) =>
 
     // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
-      const forOrchestrator2 = yield* mailbox.forOrchestrator;
-      yield* Effect.forkScoped(Stream.runForEach(forOrchestrator2, (n) => logged("a line", heardInChat(n))));
+      const news = yield* mailbox.news;
+      yield* Effect.forkScoped(Stream.runForEach(news, (n) => (n._tag === "Handed" ? logged("a line", heardInChat(n)) : Effect.void)));
       // Each orchestrator goes on with the run a stop cut off.
       yield* Effect.forEach(
         store.orchestrators(),

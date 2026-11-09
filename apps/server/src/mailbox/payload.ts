@@ -7,7 +7,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
 import { senderKind } from "#/mailbox/envelope.ts";
-import type { InboxMessage, OrchestratorNews } from "#/mailbox/envelope.ts";
+import type { Handed, InboxMessage } from "#/mailbox/envelope.ts";
 
 export type InputContext = T.TriggerContext;
 export interface DeliveryPayload {
@@ -129,7 +129,7 @@ export function inputContext({
   return context;
 }
 
-export const orchestratorSource = (source: T.TriggerSource): OrchestratorNews["source"] => {
+export const orchestratorSource = (source: T.TriggerSource): Handed["source"] => {
   switch (source) {
     case "cron":
     case "patrol":

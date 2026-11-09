@@ -16,7 +16,7 @@ import {
   type ChannelEnvelopeRow,
   type ChannelRouteResult,
   type InboxMessage,
-  type OrchestratorNews,
+  type Handed,
   senderKind,
   channelType,
   targetOf,
@@ -103,10 +103,12 @@ export type Withdrawal =
   /** An issue's dispatches up to at, once it is closed or handed on: its own transaction, not the write lock. */
   | { readonly _tag: "Issue"; readonly issue: string; readonly at: number };
 
-/** What happened to deliveries: a message taken into a model (its 👀), or a session that failed every wake. */
+/** What happened to deliveries: a message taken into a model (its 👀), a session that failed every wake, or what came
+ * for an orchestrator in one conversation, handed to it. */
 export type DeliveryNews =
   | { readonly _tag: "Consumed"; readonly session: string; readonly envelope: string }
-  | { readonly _tag: "Braked"; readonly session: string; readonly failed: number };
+  | { readonly _tag: "Braked"; readonly session: string; readonly failed: number }
+  | Handed;
 
 export class Mailbox extends Context.Service<
   Mailbox,
@@ -125,7 +127,6 @@ export class Mailbox extends Context.Service<
     readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
     readonly ownerOf: (trigger: string) => Effect.Effect<string | undefined>;
     readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
-    readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
     readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
     readonly start: Effect.Effect<void>;
     readonly restore: Effect.Effect<void>;
@@ -190,7 +191,6 @@ export class Mailbox extends Context.Service<
         });
       };
       const breaker = new WakeBreaker();
-      const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
       const newsHub = yield* PubSub.unbounded<DeliveryNews>();
       const routeLock = yield* Semaphore.make(1);
       const routeLocked = <A, E>(effect: Effect.Effect<A, E>) => routeLock.withPermits(1)(effect);
@@ -332,7 +332,6 @@ export class Mailbox extends Context.Service<
         }),
         ownerOf: work.ownerOf,
         deliveriesOf: (session) => open.of(session),
-        forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
         orchestratorDigest: Effect.fn("Mailbox.orchestratorDigest")((agent) =>
           Effect.sync(() =>
             open
@@ -395,7 +394,8 @@ export class Mailbox extends Context.Service<
         Effect.gen(function* () {
           const meta = primary.payload.trigger.meta;
           const source = orchestratorSource(primary.payload.trigger.source);
-          PubSub.publishUnsafe(orchestratorHub, {
+          PubSub.publishUnsafe(newsHub, {
+            _tag: "Handed",
             agent: recipient,
             channel: primary.channel_id ?? (yield* defaultChannelOf),
             type: primary.payload.channelType,

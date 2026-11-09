@@ -11,7 +11,7 @@ import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelRow } from "./rooms.ts";
 
-export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteInput, Meta, OrchestratorNews } from "#/mailbox/envelope.ts";
+export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteInput, Meta } from "#/mailbox/envelope.ts";
 export type { InboxMessage, Picked } from "#/mailbox/envelope.ts";
 export { channelType, inboxMore, metaOf, metaText, senderKind } from "#/mailbox/envelope.ts";
 export type { Delivered, LaunchActivity, SessionNews } from "#/session/signals.ts";

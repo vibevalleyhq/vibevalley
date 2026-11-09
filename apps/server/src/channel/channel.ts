@@ -39,7 +39,7 @@ const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
 const afterAll = "\uffff";
 
-export type { Info, Spoken, SayMore, OrchestratorNews, Delivered, LaunchActivity } from "./contracts.ts";
+export type { Info, Spoken, SayMore, Delivered, LaunchActivity } from "./contracts.ts";
 
 export class Channel extends Context.Service<Channel, ChannelService>()("@vibevalley/server/channel/channel") {
   static readonly layer = Layer.effect(
@@ -522,6 +522,8 @@ const make = Effect.gen(function* () {
       switch (change._tag) {
         case "Consumed":
           return reacting(change.envelope, change.session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${change.envelope}`));
+        case "Handed":
+          return Effect.void;
         case "Braked":
           return Effect.gen(function* () {
             const where = (yield* shape.threadOfSession(change.session)) ?? model.defaultId();

@@ -180,8 +180,10 @@ export interface ChannelRouteResult {
   readonly heldNotice: string;
 }
 
-/** What came to an orchestrator in one channel, to wake it with. */
-export interface OrchestratorNews {
+/** What came to an orchestrator in one conversation, handed to it: the orchestrator module answers it (an
+ * orchestrator is told, where a worker is woken through its session). */
+export interface Handed {
+  readonly _tag: "Handed";
   /** The orchestrator it came to, by its profile id. */
   readonly agent: string;
   readonly channel: string;
