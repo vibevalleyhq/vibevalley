@@ -1,5 +1,5 @@
 import { NodeServices } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
+import { describe, expect, it, layer as withLayer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
@@ -10,6 +10,7 @@ import { providerHandlers } from "#/http/handlers/provider.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { heard } from "#/testing/refuse.ts";
 
 import { type Account, type Dictation, Provider } from "./provider.ts";
 import type { ImageRequest } from "./vendors.ts";
@@ -432,4 +433,25 @@ it.effect.each([
     const resultFailure2 = yield* bound().pipe(Effect.flip);
     expect(resultFailure2).toMatchObject({ _tag: "Refused" });
   }).pipe(Effect.provide(layer(http)));
+});
+
+describe("a failed vendor call", () => {
+  const logs = heard();
+  withLayer(Layer.merge(layer(unavailable), logs.layer))((it) => {
+    it.effect("is logged once with the vendor and the call, never with the key", () =>
+      Effect.gen(function* () {
+        const provider = yield* Provider;
+        const image = { id: "image", name: "Images", adapter: "moss", enabled: true, key: "test-logged-key" } as const;
+        yield* provider.update({
+          ...configured(),
+          connections: [...configured().connections, image],
+          image: { connection: "image", model: "moss-image-sft-1.0" },
+        });
+        const bound = yield* provider.image(drawing);
+        yield* keyUsedBy(bound.run);
+        expect(logs.count("provider: moss image.generate failed")).toBe(1);
+        expect(logs.count("test-logged-key")).toBe(0);
+      }),
+    );
+  });
 });

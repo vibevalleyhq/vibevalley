@@ -418,6 +418,18 @@ export const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err
 // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
 export const participant = (c: Caller) => c.session || c.agent;
 
+/** A tool's run as one step of a turn: its input read, its body run, in a span, its log lines marked with the tool. */
+const toolRun = <A, E>(name: string, read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>, body: (input: A) => Effect.Effect<string, E>) =>
+  Effect.fnUntraced(
+    function* (args: unknown) {
+      const input = yield* read(args);
+      return yield* body(input);
+    },
+    Effect.mapError(toFailed),
+    Effect.annotateLogs({ tool: name }),
+    Effect.withSpan(`Tool.${name}`),
+  );
+
 // A tool's arguments are read by its Schema before it runs. the model's JSON Schema is made from the same one.
 const toolOf =
   <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(
@@ -431,7 +443,7 @@ const toolOf =
       name: toolName(op),
       description: words[op],
       parameters: shown[op] ?? {},
-      run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+      run: toolRun(toolName(op), read, body),
     });
   };
 
@@ -452,5 +464,5 @@ export const customTool = <A, E>(
     name,
     description,
     parameters,
-    run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+    run: toolRun(name, read, body),
   });
