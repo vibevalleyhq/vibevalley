@@ -10,24 +10,21 @@ import type { Frames, Link } from "#/infra/frame.ts";
 
 import { framesAtom, useAtom, useRegistry } from "./atom";
 
-type IntentStatus = "pending" | "failed";
-export type IntentPhase = "queued" | "sending" | "confirming" | "failed";
-
-export interface Intent<I, R> {
+/** An intent as the page reads it: its phase says where it is, and only a failed one has a fault. */
+export type Intent<I, R> = {
   /** The request key: every send of this intent carries it, so the server acts on it once. */
   readonly key: string;
   readonly input: I;
-  readonly phase: IntentPhase;
-  readonly status: IntentStatus;
-  /** Held back while the link was lost; sent once it is back. */
-  readonly queued: boolean;
   /** The server's answer, boxed so that an answer of nothing still counts: the change is in, and waits to be shown. */
   readonly replied?: { readonly reply: R };
-  /** Why it failed, in the owner's words. */
-  readonly reason?: string;
-  /** Only when phase is "failed". */
-  readonly fault?: UiFault;
-}
+} & IntentAt<R>;
+/** Where an intent is, and what comes with being there. */
+export type IntentAt<R> =
+  | { /** Held back while the link was lost; sent once it is back. */ readonly phase: "queued" }
+  | { readonly phase: "sending" }
+  | { /** Answered; waits until the frame shows it. */ readonly phase: "confirming"; readonly replied: { readonly reply: R } }
+  | { /** Why, in the owner's words (fault.reason) and as the page acts on it. */ readonly phase: "failed"; readonly fault: UiFault };
+export type IntentPhase = Intent<unknown, unknown>["phase"];
 
 type IntentState<R> =
   | { readonly _tag: "queued" }
@@ -38,36 +35,13 @@ type IntentState<R> =
 function projectIntent<I, R>(key: string, input: I, state: IntentState<R>): Intent<I, R> {
   switch (state._tag) {
     case "queued":
-      return { key, input, phase: "queued", status: "pending", queued: true };
+      return { key, input, phase: "queued" };
     case "sending":
-      return {
-        key,
-        input,
-        phase: "sending",
-        status: "pending",
-        queued: false,
-        ...(state.replied === undefined ? {} : { replied: state.replied }),
-      };
+      return { key, input, phase: "sending", ...(state.replied === undefined ? {} : { replied: state.replied }) };
     case "confirming":
-      return {
-        key,
-        input,
-        phase: "confirming",
-        status: "pending",
-        queued: false,
-        replied: state.replied,
-      };
+      return { key, input, phase: "confirming", replied: state.replied };
     case "failed":
-      return {
-        key,
-        input,
-        phase: "failed",
-        status: "failed",
-        queued: false,
-        reason: state.fault.reason,
-        fault: state.fault,
-        ...(state.replied === undefined ? {} : { replied: state.replied }),
-      };
+      return { key, input, phase: "failed", fault: state.fault, ...(state.replied === undefined ? {} : { replied: state.replied }) };
   }
 }
 
@@ -124,7 +98,7 @@ export interface Intents<I, R> {
 export function sendOnce<I, R>(intents: Intents<I, R>, input: I): Promise<Intent<I, R> | undefined> {
   const kept = intents.all().find((i) => same(i.input, input));
   if (!kept) return intents.send(input).done;
-  return kept.status === "failed" ? intents.retry(kept.key) : Promise.resolve(kept);
+  return kept.phase === "failed" ? intents.retry(kept.key) : Promise.resolve(kept);
 }
 
 /** A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). */
@@ -249,7 +223,7 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
         if (!now) return;
         // A late reply after a timeout still counts: the change went in.
         const replied = put(key, now.input, { _tag: "confirming", replied: { reply } });
-        if (now.status === "failed") arm(key);
+        if (now.phase === "failed") arm(key);
         answer(key, replied);
         check(key);
       },
@@ -292,7 +266,7 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
     },
     retry: (key) => {
       const intent = get(key);
-      if (intent?.status !== "failed") return Promise.resolve(undefined);
+      if (intent?.phase !== "failed") return Promise.resolve(undefined);
       return start(key, intent.input);
     },
     drop: (key) => {

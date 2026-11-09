@@ -992,7 +992,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
     setBusy(true);
     const end = await sendOnce(says, { id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
     setBusy(false);
-    if (end?.status === "failed") return toast(end.reason ?? "", "bad");
+    if (end?.phase === "failed") return toast(end.fault.reason, "bad");
     setText("");
     toast(props.version ? t("web.artifact.talk.sentVersion", { version: props.version.version }) : t("web.artifact.talk.sent"));
   };

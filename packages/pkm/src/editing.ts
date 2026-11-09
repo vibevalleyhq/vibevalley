@@ -142,7 +142,7 @@ export interface Completion {
   readonly from: number;
 }
 
-/** The completion the caret is in; none once a line break comes between, or for a caret of -1 (a list closed). */
+/** The completion the caret is in; none once a line break comes between, or for a caret before the text. */
 export function completionAt(value: string, caret: number): Completion | undefined {
   if (caret < 0) return undefined;
   const before = value.slice(0, caret);
@@ -158,6 +158,24 @@ export function completionAt(value: string, caret: number): Completion | undefin
   if (link) return link;
   const tag = pkmTagTyped.exec(before);
   return tag ? { kind: "tag", query: tag[1] ?? "", from: caret - (tag[1] ?? "").length - 1 } : undefined;
+}
+
+/** A trigger the owner closed with Escape: its list stays shut while the caret is in it. */
+export interface Shut {
+  readonly kind: CompletionKind;
+  readonly from: number;
+}
+
+/** The list to offer at the caret, and what stays shut: the closed trigger while the caret is in it, nothing once it
+ * leaves (a trigger typed again in the same place opens its list). */
+export function offered(at: { readonly value: string; readonly caret: number; readonly shut: Shut | undefined }): {
+  readonly completion: Completion | undefined;
+  readonly shut: Shut | undefined;
+} {
+  const { value, caret, shut } = at;
+  const c = completionAt(value, caret);
+  const closed = c !== undefined && shut !== undefined && c.kind === shut.kind && c.from === shut.from;
+  return { completion: closed ? undefined : c, shut: closed ? shut : undefined };
 }
 
 /** [[title]], ((id)) or #tag : a closer already after the caret is not doubled. */

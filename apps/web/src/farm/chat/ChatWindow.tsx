@@ -633,7 +633,7 @@ export function ChatWindow() {
                         data-testid="pending-retry"
                         onClick={() => {
                           setProblem(undefined);
-                          void says.retry(p().key).then((end) => end?.status === "failed" && notSent(end.reason));
+                          void says.retry(p().key).then((end) => end?.phase === "failed" && notSent(end.fault.reason));
                         }}
                         {...stylex.attrs(viewStyles.pendingRetry)}
                       >
@@ -691,7 +691,7 @@ export function ChatWindow() {
                     setProblem(undefined);
                     const c = shown();
                     if (!c) return;
-                    void sendOnce(says, { id: c.id, text: line }).then((end) => end?.status === "failed" && notSent(end.reason));
+                    void sendOnce(says, { id: c.id, text: line }).then((end) => end?.phase === "failed" && notSent(end.fault.reason));
                   }}
                   {...stylex.attrs(viewStyles.chatWindowButton)}
                 >

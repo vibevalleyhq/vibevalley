@@ -61,7 +61,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   /** True once the server took it; a failed move shows on the page with why. */
   const moveTo = async (a: IssueAct, status: IssueStatus, words: string) => {
     const done = await sendMove(moves, omitUndefined({ id: issue().id, status, text: words || undefined })).done;
-    const ok = done !== undefined && done.status !== "failed";
+    const ok = done !== undefined && done.phase !== "failed";
     if (ok) ways.done?.(a);
     return ok;
   };

@@ -51,9 +51,7 @@ export function pendingLines(
   return says
     .filter((s) => s.input.id === channel && !arrived(s.key, messages))
     .map((s) =>
-      s.status === "failed"
-        ? { key: s.key, text: s.input.text, state: "failed", ...(s.reason === undefined ? {} : { reason: s.reason }) }
-        : { key: s.key, text: s.input.text, state: "sending" },
+      s.phase === "failed" ? { key: s.key, text: s.input.text, state: "failed", reason: s.fault.reason } : { key: s.key, text: s.input.text, state: "sending" },
     );
 }
 
@@ -161,7 +159,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     edit("", 0);
     ways.sent?.();
     const end = await ways.says.send(said).done;
-    if (!disposed && end?.status === "failed") ways.failed(end.reason ?? "");
+    if (!disposed && end?.phase === "failed") ways.failed(end.fault.reason);
   };
 
   const onKey = (e: KeyboardEvent) => {

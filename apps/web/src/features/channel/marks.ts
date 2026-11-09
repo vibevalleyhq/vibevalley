@@ -106,7 +106,7 @@ export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say
 /** A channel with the owner's mark unread on its way laid over its read; the same object with none. */
 export function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[]): Channel {
   const mark = unreads.findLast((u) => u.input.channel === c.id);
-  if (!mark) return c;
+  if (mark === undefined) return c;
   const read = unreadUpTo(mark.input.number);
   return (c.read ?? 0) <= read ? c : { ...c, read };
 }
@@ -158,9 +158,9 @@ export const notifySet = defineIntent<NotifyMark, void>({
  */
 export function setMark<I, R>(intents: Intents<I, R>, input: I, same: (a: I, b: I) => boolean, say: (reason: string) => void) {
   void sendReplacing(intents, input, same).done.then((end) => {
-    if (end?.status !== "failed") return;
+    if (end?.phase !== "failed") return;
     intents.drop(end.key);
-    say(end.reason ?? "");
+    say(end.fault.reason);
   });
 }
 
@@ -189,7 +189,7 @@ export function markedMessages(
     let shown = m;
     for (const r of reactions) if (r.input.id === m.id) shown = withReaction(shown, r.input.emoji, r.input.on);
     const pin = pins.findLast((p) => p.input.id === m.id);
-    if (pin && (shown.pinned !== undefined) !== pin.input.on) {
+    if (pin !== undefined && (shown.pinned !== undefined) !== pin.input.on) {
       const { pinned: _, ...rest } = shown;
       shown = pin.input.on ? { ...rest, pinned: pin.input.at } : rest;
     }
@@ -245,4 +245,4 @@ export function useMarkedChat() {
 
 /** A choice on its way, for a control to draw (Select's state). */
 export const markState = <I>(intents: readonly Intent<I, unknown>[], is: (input: I) => boolean): "pending" | undefined =>
-  intents.some((i) => is(i.input) && i.status === "pending") ? "pending" : undefined;
+  intents.some((i) => is(i.input) && i.phase !== "failed") ? "pending" : undefined;

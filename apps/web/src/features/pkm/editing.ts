@@ -12,6 +12,8 @@ export {
   type Focus,
   type Keys,
   noteMarks,
+  offered,
   pasteAction,
   saved,
+  type Shut,
 } from "@vibevalley/pkm/editing";

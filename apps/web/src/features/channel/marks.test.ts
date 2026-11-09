@@ -5,7 +5,7 @@ import { messageId } from "@vibevalley/protocol/schema";
 
 import { api } from "#/infra/api.ts";
 import { frameAt, testFrames } from "#/infra/testing.ts";
-import { type Intent, intentsIn } from "#/state/intent.ts";
+import { type Intent, type IntentAt, intentsIn } from "#/state/intent.ts";
 import { deferred, testRegistry } from "#/state/testing.ts";
 
 import { followed } from "./follow";
@@ -52,12 +52,13 @@ const message = (id: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
   outcome: over.outcome ?? null,
 });
 
-const kept = <I>(input: I, over: Partial<Intent<I, never>> = {}): Intent<I, never> => ({
+const kept = <I>(
+  input: I,
+  over: Partial<Pick<Intent<I, never>, "key" | "input">> & ({ readonly phase?: "sending" } | IntentAt<never>) = {},
+): Intent<I, never> => ({
   key: "k",
   input,
   phase: "sending",
-  status: "pending",
-  queued: false,
   ...over,
 });
 

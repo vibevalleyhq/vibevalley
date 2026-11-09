@@ -23,12 +23,13 @@ import {
   commandAction,
   type Completion,
   completed,
-  completionAt,
   type EditAction,
   editAction,
   type Focus,
   type Keys,
+  type Shut,
   noteMarks,
+  offered,
   pasteAction,
   saved,
 } from "./editing";
@@ -508,6 +509,7 @@ export function Editor(props: {
   const id = untrack(() => props.block.id);
   const [draft, setDraft] = createSignal(untrack(() => props.block.body));
   const [caretAt, setCaretAt] = createSignal(0);
+  const [shut, setShut] = createSignal<Shut>();
   const [picked, setPicked] = createSignal(0);
   const [composing, setComposing] = createSignal(false);
   const later = useTimeout();
@@ -536,7 +538,12 @@ export function Editor(props: {
       grow();
     },
   );
-  const completion = (): Completion | undefined => (composing() ? undefined : completionAt(draft(), caretAt()));
+  const completion = (): Completion | undefined => (composing() ? undefined : offered({ value: draft(), caret: caretAt(), shut: shut() }).completion);
+  // Read from the box: the draft signal set in the same handler may not show the new words yet.
+  const caretTo = (at: number) => {
+    setCaretAt(at);
+    setShut((s) => offered({ value: el.value, caret: at, shut: s }).shut);
+  };
   const blockQuery = () => {
     const c = completion();
     return c?.kind === "block" && c.query.trim() !== "" ? c.query.trim() : undefined;
@@ -613,8 +620,9 @@ export function Editor(props: {
       }
       if (e.key === "Escape") {
         e.preventDefault?.();
-        // The words typed stay; the list goes until the caret moves into another trigger.
-        setCaretAt(-1);
+        // The words typed stay; the list goes until the caret leaves this trigger.
+        const c = completion();
+        if (c) setShut({ kind: c.kind, from: c.from });
         return;
       }
     }
@@ -686,16 +694,16 @@ export function Editor(props: {
         onInput={(e) => {
           if (!e.isComposing && typeMarks(e.currentTarget, noteMarks)) return;
           setDraft(e.currentTarget.value);
-          setCaretAt(e.currentTarget.selectionStart);
+          caretTo(e.currentTarget.selectionStart);
           setPicked(0);
           grow();
           // Words are kept a moment after the last key, not only when the box is left.
           later(save, 800);
         }}
         onKeyUp={(e) => {
-          if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") setCaretAt(e.currentTarget.selectionStart);
+          if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") caretTo(e.currentTarget.selectionStart);
         }}
-        onClick={(e) => setCaretAt(e.currentTarget.selectionStart)}
+        onClick={(e) => caretTo(e.currentTarget.selectionStart)}
         onKeyDown={(e) => key(e)}
         onPaste={(e) => {
           const text = e.clipboardData?.getData("text/plain") ?? "";

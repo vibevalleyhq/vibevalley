@@ -57,7 +57,7 @@ export function shownDeliver(
 ): { readonly value: Deliverable; readonly state?: "pending" | "failed" } {
   const p = picks.findLast((x) => x.input.id === id);
   if (!p) return { value: frame };
-  return p.status === "failed" ? { value: frame, state: "failed" } : { value: p.input.deliver, state: "pending" };
+  return p.phase === "failed" ? { value: frame, state: "failed" } : { value: p.input.deliver, state: "pending" };
 }
 
 // Words for the helper on an issue (an answer, reject's findings, a word mid-turn).
@@ -87,8 +87,6 @@ export function pendingWords(says: readonly Intent<IssueSaid, Applied>[], issue:
   return says
     .filter((s) => s.input.id === issue)
     .map((s) =>
-      s.status === "failed"
-        ? { key: s.key, text: s.input.text, state: "failed", ...(s.reason === undefined ? {} : { reason: s.reason }) }
-        : { key: s.key, text: s.input.text, state: "sending" },
+      s.phase === "failed" ? { key: s.key, text: s.input.text, state: "failed", reason: s.fault.reason } : { key: s.key, text: s.input.text, state: "sending" },
     );
 }

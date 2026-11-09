@@ -733,7 +733,7 @@ function SowHere(props: { repo: string; onDone: () => void }) {
     setSending(true);
     const end = await sendOnce(says, { id, text: text().trim(), repo: props.repo });
     setSending(false);
-    if (end?.status === "failed") toast(end.reason ?? "", "bad");
+    if (end?.phase === "failed") toast(end.fault.reason, "bad");
     else props.onDone();
   };
   // The same key until the issue went in: a retry after a lost reply is that issue, not a second.
