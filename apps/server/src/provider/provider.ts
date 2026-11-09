@@ -1,14 +1,18 @@
-import { Context, Effect, Layer } from "effect";
+import { createHash } from "node:crypto";
+
+import { Context, Effect, Layer, Stream } from "effect";
 import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import type { Refused } from "@vibevalley/protocol/api";
+import { getMossAudioTask, type MossAudioTask } from "@vibevalley/provider/moss/audio-tasks";
 import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
 import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
 import { type MossModelError, mossModels } from "@vibevalley/provider/moss/models";
 import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
-import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
+import { createMossSpeechTask, generateMossSpeech, prepareMossSpeech } from "@vibevalley/provider/moss/speech";
+import { streamMossSpeech } from "@vibevalley/provider/moss/speech-stream";
 import { mossTranscriptionModels } from "@vibevalley/provider/moss/transcription-models";
 import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding-models";
 import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
@@ -20,7 +24,18 @@ import { bindingOf, boundConnection } from "#/setting/provider.ts";
 import { Setting } from "#/setting/setting.ts";
 
 import { connectionsOver, providerStatus } from "./connections.ts";
-import { type GeneratedImage, ImageFailure, type ImageRequest, vendors } from "./vendors.ts";
+import {
+  AudioFailure,
+  type AudioTask,
+  type GeneratedAudio,
+  type GeneratedImage,
+  ImageFailure,
+  type ImageRequest,
+  InvalidRequest,
+  type SpeechEvent,
+  type SpeechRequest,
+  vendors,
+} from "./vendors.ts";
 
 /** An account bound to draw, as it was when a task was asked for, and the call that draws. */
 export interface BoundImage {
@@ -63,6 +78,107 @@ const mossImage: ImageCall = Effect.fnUntraced(function* (model, request) {
 
 /** How each vendor draws, by adapter; one with no image use has none. */
 const imageCalls: Record<keyof typeof vendors, ImageCall | undefined> = { moss: mossImage };
+
+/** What an account can be asked, with its key, the account's model and the Provider's own HttpClient sealed in; every
+ * answer is in the capability's own shapes (vendors.ts). */
+export interface Calls {
+  readonly speech: {
+    /** Whether the model takes the request, and a stream only from a model that streams; nothing is sent. */
+    readonly check: (request: SpeechRequest & { readonly streaming: boolean }) => Effect.Effect<void, InvalidRequest>;
+    readonly generate: (request: SpeechRequest) => Effect.Effect<GeneratedAudio, AudioFailure>;
+    /** Starts the speech as a task the vendor runs; its ID, to ask after with `tasks.get`. */
+    readonly createTask: (request: SpeechRequest) => Effect.Effect<string, AudioFailure>;
+    readonly stream: (request: SpeechRequest) => Stream.Stream<SpeechEvent, AudioFailure>;
+  };
+  readonly tasks: { readonly get: (id: string) => Effect.Effect<AudioTask, AudioFailure> };
+}
+
+/** An account as it was when it was bound: the connection, the settings revision, the model, and the key's
+ * fingerprint (a stored task keeps it to tell later whether the account still has the key it started with). */
+export interface Account extends Calls {
+  readonly connection: string;
+  readonly revision: number;
+  readonly model: string;
+  readonly fingerprint: string;
+}
+
+const fingerprint = (key: string) => createHash("sha256").update(key).digest("hex");
+
+const audioFailure = (error: Effect.Error<ReturnType<typeof getMossAudioTask>>) =>
+  AudioFailure.make({
+    // Not sent is refused too: nothing was asked of the vendor, so nothing can have been made or paid for.
+    outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected",
+    retryable:
+      error.reason === "Network" || error.reason === "Timeout" || (error.reason === "HttpStatus" && (error.status === 429 || (error.status ?? 0) >= 500)),
+  });
+
+const mossTask = (task: MossAudioTask): AudioTask => {
+  const kind = task.object === "audio.speech" ? "speech" : task.object === "audio.voice_generation" ? "voiceGeneration" : "transcription";
+  switch (task.status) {
+    case "PENDING":
+    case "PROCESSING":
+      return { kind, status: "waiting" };
+    case "FAILED":
+      return { kind, status: "failed" };
+    case "SUCCESS":
+      switch (task.object) {
+        case "audio.speech":
+        case "audio.voice_generation":
+          return {
+            kind: task.object === "audio.speech" ? "speech" : "voiceGeneration",
+            status: "ready",
+            url: task.url,
+            format: task.format,
+            contentType: task.contentType,
+            ...(task.usage !== undefined ? { usage: task.usage } : {}),
+          };
+        case "audio.transcription":
+          return {
+            kind: "transcription",
+            status: "ready",
+            text: task.text,
+            ...(task.segments !== undefined ? { segments: task.segments } : {}),
+            ...(task.usage !== undefined ? { usage: task.usage } : {}),
+          };
+      }
+  }
+};
+
+/** MOSS's flash models are the ones that stream speech. */
+const mossStreamingSpeech: ReadonlySet<string> = new Set(["moss-tts-1.5-flash", "moss-tts-1.5-flash-2026-06-26"]);
+
+const mossCalls =
+  (http: HttpClient.HttpClient) =>
+  (key: string, model: string): Calls => {
+    const sealed = Effect.provideService(HttpClient.HttpClient, http);
+    const synthesis = (request: SpeechRequest) => ({ model, text: request.text, voice: request.voice, format: request.format });
+    return {
+      speech: {
+        check: (request) =>
+          prepareMossSpeech(synthesis(request)).pipe(
+            Effect.mapError(() => InvalidRequest.make()),
+            Effect.flatMap(() => (request.streaming && !mossStreamingSpeech.has(model) ? Effect.fail(InvalidRequest.make()) : Effect.void)),
+          ),
+        generate: (request) =>
+          generateMossSpeech(key, synthesis(request)).pipe(
+            sealed,
+            Effect.mapBoth({
+              onSuccess: (result) => ({
+                url: result.url,
+                format: result.format,
+                contentType: result.contentType,
+                ...(result.usage !== undefined ? { usage: result.usage } : {}),
+              }),
+              onFailure: audioFailure,
+            }),
+          ),
+        createTask: (request) =>
+          createMossSpeechTask(key, synthesis(request)).pipe(sealed, Effect.mapBoth({ onSuccess: (result) => result.taskId, onFailure: audioFailure })),
+        stream: (request) => streamMossSpeech(key, synthesis(request)).pipe(Stream.provideService(HttpClient.HttpClient, http), Stream.mapError(audioFailure)),
+      },
+      tasks: { get: (id) => getMossAudioTask(key, id).pipe(sealed, Effect.mapBoth({ onSuccess: mossTask, onFailure: audioFailure })) },
+    };
+  };
 
 const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMossVoices>>): Refused => {
   const reason = () => {
@@ -116,10 +232,11 @@ export class Provider extends Context.Service<
     readonly connection: (id: string) => Effect.Effect<{ readonly connection: string; readonly revision: number; readonly key: string }, Refused>;
     readonly update: (input: T.ProviderUpdate) => Effect.Effect<T.ProviderStatus, Refused>;
     readonly voices: (input: T.ProviderVoiceRequest) => Effect.Effect<T.ProviderVoiceListing, Refused>;
-    readonly speech: () => Effect.Effect<
-      { readonly connection: string; readonly revision: number; readonly model: (typeof mossSpeechModels)[number]; readonly key: string },
-      Refused
-    >;
+    /** A stored task's account again, by its connection, with its model: the calls with the key it has now, at the
+     * current revision. Compare `fingerprint` with the one the task kept to tell whether the key changed. */
+    readonly account: (stored: { readonly connection: string; readonly model: string }) => Effect.Effect<Account, Refused>;
+    /** The account bound to speak, as it is now. */
+    readonly speech: () => Effect.Effect<Account, Refused>;
     readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, Refused>;
     readonly dictation: () => Effect.Effect<{ readonly url: string; readonly model: string; readonly key: string }, Refused>;
     /** Image generation, whichever vendor the bound account is of: the request checked against the bound model, and
@@ -142,6 +259,18 @@ export class Provider extends Context.Service<
 const make = Effect.gen(function* () {
   const settings = yield* Setting;
   const http = yield* HttpClient.HttpClient;
+  const clients: Record<keyof typeof vendors, (key: string, model: string) => Calls> = { moss: mossCalls(http) };
+  const bind = (
+    connection: { readonly id: string; readonly adapter: keyof typeof vendors; readonly key: string },
+    revision: number,
+    model: string,
+  ): Account => ({
+    connection: connection.id,
+    revision,
+    model,
+    fingerprint: fingerprint(connection.key),
+    ...clients[connection.adapter](connection.key, model),
+  });
   const account = Effect.fnUntraced(function* (
     use: "speakers" | "voiceDesign" | "transcription" | "vision" | "live",
     models: readonly string[],
@@ -201,14 +330,19 @@ const make = Effect.gen(function* () {
       if (settings.providers().revision !== config.revision) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.changed") });
       return { connection: id, revision, ...listing };
     }),
+    account: Effect.fn("Provider.account")(function* (stored) {
+      const config = settings.providers();
+      const connection = boundConnection(config, stored.connection);
+      if (!connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.noKey") });
+      return bind(connection, config.revision, stored.model);
+    }),
     speech: Effect.fn("Provider.speech")(function* () {
       const config = settings.providers();
-      const binding = config.speech;
-      const connection = boundConnection(config, binding?.connection ?? null);
-      if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.speechUnbound") });
-      const model = mossSpeechModels.find((id) => id === binding.model);
-      if (!model) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.speechModel") });
-      return { connection: connection.id, revision: config.revision, model, key: connection.key };
+      const bound = bindingOf("speech")(config);
+      if (!bound.ready) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.speechUnbound") });
+      if (vendors[bound.connection.adapter].speech?.models.includes(bound.model) !== true)
+        return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.speechModel") });
+      return bind(bound.connection, config.revision, bound.model);
     }),
     dictation: Effect.fn("Provider.dictation")(function* () {
       const own = settings.dictation();

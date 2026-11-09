@@ -12,7 +12,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { Provider } from "./provider.ts";
+import { type Account, Provider } from "./provider.ts";
 
 const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const notIn = (value: unknown, secret: string) =>
@@ -41,6 +41,20 @@ const layer = (http: HttpClient.HttpClient) =>
     Layer.provideMerge(Setting.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     Layer.provide(Layer.succeed(HttpClient.HttpClient, http)),
   );
+/** A vendor that answers 503 and keeps each request's key: what a bound account's call sends, run once. */
+const recording = () => {
+  const keys: string[] = [];
+  const http = HttpClient.make((request) => {
+    keys.push(request.headers.authorization ?? "");
+    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status: 503 })));
+  });
+  const keyUsedBy = (account: Account) =>
+    account.tasks.get("task").pipe(
+      Effect.exit,
+      Effect.map(() => keys.at(-1) ?? ""),
+    );
+  return { http, keyUsedBy };
+};
 const page = {
   object: "list",
   data: [{ id: "voice-one", object: "audio.voice", name: "One", created_at: 1 }],
@@ -50,8 +64,9 @@ const page = {
   next_cursor: "next-page",
 };
 
-it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable and protected while in use", (model) =>
-  Effect.gen(function* () {
+it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable and protected while in use", (model) => {
+  const { http, keyUsedBy } = recording();
+  return Effect.gen(function* () {
     const provider = yield* Provider;
     const speechFailure = yield* provider.speech().pipe(Effect.flip);
     expect(speechFailure).toMatchObject({ _tag: "Refused" });
@@ -59,7 +74,10 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
     const saved = yield* provider.update(input);
     expect(saved.speechModels).toEqual(mossSpeechModels);
     const frozen = yield* provider.speech();
-    expect(frozen).toEqual({ connection: "second", revision: 1, model, key: "test-second-private" });
+    expect(frozen).toMatchObject({ connection: "second", revision: 1, model });
+    const frozenKey = yield* keyUsedBy(frozen);
+    expect(frozenKey).toBe("Bearer test-second-private");
+    yield* notIn(frozen, "test-second-private");
     expect((yield* provider.dictation()).key).toBe("test-first-private");
     expect((yield* provider.live()).key).toBe("test-first-private");
     yield* notIn(saved, "test-second-private");
@@ -79,13 +97,14 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
       revision: 1,
       connections: config.connections.map((c) => (c.id === "second" ? { ...c, key: "test-rotated-private" } : c)),
     });
-    expect((yield* provider.speech()).key).toBe("test-rotated-private");
-    expect(frozen.key).toBe("test-second-private");
+    const rotated = yield* provider.speech();
+    const keys = [yield* keyUsedBy(rotated), yield* keyUsedBy(frozen)];
+    expect(keys).toEqual(["Bearer test-rotated-private", "Bearer test-second-private"]);
     yield* provider.update({ ...input, revision: 2, speech: null });
     const speechFailure2 = yield* provider.speech().pipe(Effect.flip);
     expect(speechFailure2).toMatchObject({ _tag: "Refused" });
-  }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
-);
+  }).pipe(Effect.provide(layer(http)));
+});
 
 it.effect("voice listing uses only the selected account and forwards one page, not the default binding", () => {
   const keys: (string | undefined)[] = [];

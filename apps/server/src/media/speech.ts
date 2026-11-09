@@ -1,22 +1,18 @@
-import { createHash } from "node:crypto";
-
 import { type Cause, Clock, Effect, Fiber, FiberMap, FileSystem, Option, Queue, Schedule, Schema, Stream, type Semaphore } from "effect";
-import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { MediaAudioFormatValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
-import { getMossAudioTask } from "@vibevalley/provider/moss/audio-tasks";
-import { createMossSpeechTask, generateMossSpeech, prepareMossSpeech } from "@vibevalley/provider/moss/speech";
 
 import { type ApiError, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
-import { Provider } from "#/provider/provider.ts";
+import { type Account, Provider } from "#/provider/provider.ts";
+import type { SpeechRequest } from "#/provider/vendors.ts";
 import * as q from "#db/media_speech.sql.ts";
 
 import { saveAudioResult, releaseAudioResult, type MediaInputs } from "./audioResult.ts";
@@ -31,7 +27,6 @@ interface Ports {
   capacity: () => Effect.Effect<void, ApiError>;
   otherExists: (id: string) => Effect.Effect<boolean>;
 }
-const fingerprint = (key: string) => createHash("sha256").update(key).digest("hex");
 const encodeJson = <A, I>(schema: Schema.Codec<A, I>) => {
   const encode = Schema.encodeEffect(Schema.fromJsonString(schema));
   return (value: A) => encode(value).pipe(Effect.mapError(() => refused(t("server.media.corrupt"))));
@@ -47,7 +42,6 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
   const channel = yield* Channel;
   const provider = yield* Provider;
-  const http = yield* HttpClient.HttpClient;
   const downloads = yield* PublicHttp;
   const fs = yield* FileSystem.FileSystem;
   const fibers = yield* FiberMap.make<string, void, ApiError>();
@@ -194,25 +188,19 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
     const once = Effect.gen(function* () {
       const row = yield* found(id);
       if (row.phase !== "generating" || row.remote_task === null) return true;
-      const account = yield* provider.connection(row.connection);
-      if (fingerprint(account.key) !== row.credential_hash) return yield* Effect.fail(refused(t("server.media.remoteAccountChanged")));
-      const result = yield* getMossAudioTask(account.key, row.remote_task).pipe(
-        Effect.provideService(HttpClient.HttpClient, http),
+      const account = yield* provider.account({ connection: row.connection, model: row.model });
+      if (account.fingerprint !== row.credential_hash) return yield* Effect.fail(refused(t("server.media.remoteAccountChanged")));
+      const result = yield* account.tasks.get(row.remote_task).pipe(
         Effect.retry(($) =>
           $(Schedule.exponential("1 second")).pipe(
             Schedule.upTo({ times: 4 }),
-            Schedule.while(
-              ({ input }) =>
-                input.reason === "Network" ||
-                input.reason === "Timeout" ||
-                (input.reason === "HttpStatus" && (input.status === 429 || (input.status ?? 0) >= 500)),
-            ),
+            Schedule.while(({ input }) => input.retryable),
           ),
         ),
       );
-      if (result.object !== "audio.speech") return yield* Effect.fail(refused(t("server.media.corrupt")));
-      if (result.status !== "SUCCESS") {
-        if (result.status !== "FAILED") return false;
+      if (result.kind !== "speech") return yield* Effect.fail(refused(t("server.media.corrupt")));
+      if (result.status !== "ready") {
+        if (result.status !== "failed") return false;
         yield* change(id, ["generating"], { phase: "failed", problem: t("server.media.speechRejected") });
         return true;
       }
@@ -241,10 +229,10 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
     yield* change(id, ["generating"], { phase: "unknown", problem: t("server.media.speechPollPaused") });
   });
 
-  const receive = Effect.fnUntraced(function* (id: string, key: string, synthesis: { model: string; text: string; voice: string; format: string }) {
+  const receive = Effect.fnUntraced(function* (id: string, account: Account, synthesis: SpeechRequest) {
     const session = streams.get(id);
     if (!session) return yield* Effect.fail(refused(t("server.media.speechInvalid")));
-    yield* receiveSpeechStream(id, key, synthesis, {
+    yield* receiveSpeechStream(id, account.speech.stream(synthesis), {
       inputs: ports.inputs,
       task: (taskId) => change(id, ["generating", "canceled"], { remote_task: taskId }).pipe(Effect.asVoid),
       emit: (event) => Queue.offer(session.queue, event).pipe(Effect.asVoid),
@@ -268,7 +256,6 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           yield* releaseAudioResult(id, saved, ports.inputs);
       }),
     }).pipe(
-      Effect.provideService(HttpClient.HttpClient, http),
       Effect.provideService(Channel, channel),
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.catch(() =>
@@ -344,10 +331,11 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           const account = yield* provider.speech();
           if (input.connection !== account.connection || input.revision !== account.revision)
             return yield* Effect.fail(refused(t("server.media.speechChanged")));
-          const synthesis = { model: account.model, text: input.text, voice: input.voice, format: input.format };
-          yield* prepareMossSpeech(synthesis).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
-          if (input.streaming === true && (streams.size >= 8 || (account.model !== "moss-tts-1.5-flash" && account.model !== "moss-tts-1.5-flash-2026-06-26")))
-            return yield* Effect.fail(refused(t("server.media.speechInvalid")));
+          const synthesis: SpeechRequest = { text: input.text, voice: input.voice, format: input.format };
+          yield* account.speech
+            .check({ ...synthesis, streaming: input.streaming === true })
+            .pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
+          if (input.streaming === true && streams.size >= 8) return yield* Effect.fail(refused(t("server.media.speechInvalid")));
           yield* db.run(
             q.insertSpeech({
               id: input.id,
@@ -356,7 +344,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
               connection: account.connection,
               revision: account.revision,
               model: account.model,
-              credential_hash: fingerprint(account.key),
+              credential_hash: account.fingerprint,
               now: yield* Clock.currentTimeMillis,
             }),
           );
@@ -365,16 +353,16 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           const work = Effect.gen(function* () {
             if (!(yield* change(input.id, ["queued"], { phase: "generating" }))) return;
             if (input.streaming === true) {
-              yield* receive(input.id, account.key, synthesis);
+              yield* receive(input.id, account, synthesis);
               return;
             }
             if (input.asynchronous === true) {
               yield* Effect.uninterruptibleMask((resume) =>
-                resume(createMossSpeechTask(account.key, synthesis).pipe(Effect.provideService(HttpClient.HttpClient, http))).pipe(
-                  Effect.flatMap((result) => change(input.id, ["generating", "canceled"], { remote_task: result.taskId })),
+                resume(account.speech.createTask(synthesis)).pipe(
+                  Effect.flatMap((taskId) => change(input.id, ["generating", "canceled"], { remote_task: taskId })),
                 ),
               ).pipe(
-                Effect.catchTag("MossAudioError", (error) =>
+                Effect.catchTag("AudioFailure", (error) =>
                   change(input.id, ["generating"], {
                     phase: error.outcome === "Unknown" ? "unknown" : "failed",
                     problem: error.outcome === "Unknown" ? t("server.media.speechUnknown") : t("server.media.speechRejected"),
@@ -384,8 +372,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
               yield* poll(input.id);
               return;
             }
-            yield* generateMossSpeech(account.key, synthesis).pipe(
-              Effect.provideService(HttpClient.HttpClient, http),
+            yield* account.speech.generate(synthesis).pipe(
               Effect.flatMap((result) =>
                 Effect.gen(function* () {
                   if (
@@ -400,7 +387,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
                     yield* download(input.id);
                 }),
               ),
-              Effect.catchTag("MossAudioError", (error) =>
+              Effect.catchTag("AudioFailure", (error) =>
                 change(input.id, ["generating"], {
                   phase: error.outcome === "Unknown" ? "unknown" : "failed",
                   problem: error.outcome === "Unknown" ? t("server.media.speechUnknown") : t("server.media.speechRejected"),
@@ -453,8 +440,8 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           const row = yield* found(id);
           if (row.phase === "generating") return yield* view(row);
           if ((yield* view(row)).canResume !== true) return yield* Effect.fail(refused(t("server.media.speechNoResume")));
-          const account = yield* provider.connection(row.connection);
-          if (fingerprint(account.key) !== row.credential_hash) return yield* Effect.fail(refused(t("server.media.remoteAccountChanged")));
+          const account = yield* provider.account({ connection: row.connection, model: row.model });
+          if (account.fingerprint !== row.credential_hash) return yield* Effect.fail(refused(t("server.media.remoteAccountChanged")));
           yield* ports.capacity();
           yield* db.run(q.changeSpeech({ ...row, phase: "generating", problem: "", now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();

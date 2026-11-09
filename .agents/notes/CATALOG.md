@@ -23,7 +23,7 @@
 
 - 2026-11-09 [工单和频道经 Mailbox 一道门找到帮工](.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md)
 - 2026-11-09 [一件事一条路：按调用表收敛服务之间的路径](.agents/notes/proposed/architecture/2026-11-09-converge-paths.md)
-- 2026-11-09 [能力是服务，供应商是适配器](.agents/notes/proposed/architecture/2026-11-09-capabilities-and-vendors.md)
+- 2026-11-09 [能力不认供应商，供应商是适配器](.agents/notes/proposed/architecture/2026-11-09-capabilities-and-vendors.md)
 - 2026-11-09 [把 agent 当人：角色只管职责](.agents/notes/proposed/architecture/2026-11-09-agents-as-people.md)
 - 2026-11-08 [显式状态机分层体系、Effect v4 原语与全链路错误契约](.agents/notes/proposed/architecture/2026-11-08-explicit-state-machines-and-error-contracts.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)

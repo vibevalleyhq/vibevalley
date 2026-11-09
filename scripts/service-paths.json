@@ -134,6 +134,7 @@
   "Pkm.page": ["tool"],
   "Pkm.search": ["orchestrator", "tool"],
   "Pkm.suggest": ["tool"],
+  "Provider.account": ["media"],
   "Provider.connection": ["media"],
   "Provider.dictation": ["voice"],
   "Provider.image": ["media"],
