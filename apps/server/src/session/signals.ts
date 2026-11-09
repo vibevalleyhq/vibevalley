@@ -19,21 +19,27 @@ export interface Delivered {
 
 /** What a helper's launch did: it spoke, its turn ended or closed, it compacts. */
 export type LaunchActivity =
-  | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
-  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: T.Outcome; readonly spoke: boolean }
-  | { readonly kind: "handedOff"; readonly id: string; readonly launch: string; readonly outcome: T.Outcome; readonly spoke: boolean }
-  | { readonly kind: "settling"; readonly id: string; readonly launch: string }
-  | { readonly kind: "closed"; readonly id: string; readonly launch: string }
-  | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
+  | { readonly _tag: "Spoke"; readonly id: string; readonly launch: string }
+  | { readonly _tag: "Ended"; readonly id: string; readonly launch: string; readonly outcome: T.Outcome; readonly spoke: boolean }
+  | { readonly _tag: "HandedOff"; readonly id: string; readonly launch: string; readonly outcome: T.Outcome; readonly spoke: boolean }
+  | { readonly _tag: "Settling"; readonly id: string; readonly launch: string }
+  | { readonly _tag: "Closed"; readonly id: string; readonly launch: string }
+  | { readonly _tag: "Compacting"; readonly id: string; readonly on: boolean };
+
+export interface RunFinished {
+  readonly id: string;
+  readonly issues: T.IssueId[];
+  readonly outcome: T.Outcome;
+}
 
 /** The messages a helper took as input: they are seen. */
-export interface InputConsumed {
+export interface Consumed {
   readonly session: string;
   readonly envelopeIds: readonly string[];
 }
 
 /** Inputs returned before the runtime consumed them. */
-export interface InputReturned {
+export interface Returned {
   readonly session: string;
   readonly envelopeIds: readonly string[];
 }
@@ -44,8 +50,15 @@ export interface DeliveryInput {
   readonly byOwnerComment: boolean;
 }
 
-/** What happened to a helper: the fact, and the session as it stood after it (none once it left). */
+/** Everything Session tells, in the order it happened: a helper hired, reported or gone (with the session as it stood
+ * after; none once it left), a run started on an issue or finished, its inputs taken or given back, and what its
+ * launch did. */
 export type SessionNews =
-  | { readonly _tag: "hired"; readonly session: T.Session }
-  | { readonly _tag: "reported"; readonly report: T.FactSessionReported; readonly session: T.Session | undefined }
-  | { readonly _tag: "left"; readonly left: T.FactSessionLeft };
+  | { readonly _tag: "Hired"; readonly session: T.Session }
+  | { readonly _tag: "Reported"; readonly report: T.FactSessionReported; readonly session: T.Session | undefined }
+  | { readonly _tag: "Left"; readonly left: T.FactSessionLeft }
+  | { readonly _tag: "IssueStarted"; readonly issue: string }
+  | ({ readonly _tag: "RunFinished" } & RunFinished)
+  | ({ readonly _tag: "Consumed" } & Consumed)
+  | ({ readonly _tag: "Returned" } & Returned)
+  | LaunchActivity;

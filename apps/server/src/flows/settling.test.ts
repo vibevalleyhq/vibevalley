@@ -6,7 +6,7 @@ import { Agent } from "#/agent/agent.ts";
 import { Executor } from "#/executor/executor.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Session } from "#/session/session.ts";
-import type { LaunchActivity } from "#/session/signals.ts";
+import type { SessionNews } from "#/session/signals.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
@@ -44,9 +44,9 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
         const executor = yield* Executor;
         const issue2 = yield* Issue;
         const issues = testIssues(issue2);
-        const events: LaunchActivity[] = [];
-        const launches2 = yield* sessions.launches;
-        yield* Effect.forkScoped(Stream.runForEach(launches2, (event) => Effect.sync(() => events.push(event))));
+        const events: SessionNews[] = [];
+        const news = yield* sessions.news;
+        yield* Effect.forkScoped(Stream.runForEach(news, (event) => Effect.sync(() => events.push(event))));
         yield* (yield* Agent).save(lab());
         const issue = yield* issues.add({ title: "work", repo: "background", agent: "lab" });
         const sent = yield* issues.start(issue.id, "");
@@ -54,7 +54,7 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
         yield* until(() => task !== undefined && sessions.runOf(id) !== undefined, "a background task and open run");
         if (handoff) yield* sessions.report(id, { summary: "preview ready", questions: [], checks: [], remember: [], prSubmit: false });
         finish.resolve();
-        yield* until(() => events.some((event) => event.kind === (handoff ? "handedOff" : "settling")), "the end-of-turn signal");
+        yield* until(() => events.some((event) => event._tag === (handoff ? "HandedOff" : "Settling")), "the end-of-turn signal");
         expect(executor.find(id)?.pendingTasks).toBe(child ? 2 : 1);
         expect(sessions.sessionOf(id)?.phase._tag).toBe(handoff ? "done" : "working");
         expect(sessions.noRoom("pi", "background") === "").toBe(handoff);
@@ -78,7 +78,7 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
           expect(executor.find(id)).toBeUndefined();
           expect(sessions.noRoom("pi", "background")).toBe("");
           task!.end();
-          expect(events.filter((event) => event.kind === "handedOff")).toHaveLength(0);
+          expect(events.filter((event) => event._tag === "HandedOff")).toHaveLength(0);
           return;
         }
         task!.end(mode === "failed" ? "failed" : "completed", { summary: mode === "failed" ? "build failed" : "finished" });
@@ -93,7 +93,7 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
           "the background task settled",
         );
         expect(sessions.noRoom("pi", "background")).toBe("");
-        expect(events.filter((event) => event.kind === "handedOff")).toHaveLength(mode === "failed" ? 0 : 1);
+        expect(events.filter((event) => event._tag === "HandedOff")).toHaveLength(mode === "failed" ? 0 : 1);
         expect(executor.find(id)?.attached).toBe(true);
       }).pipe(Effect.scoped, Effect.provide(f.layer));
     },

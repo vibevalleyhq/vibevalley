@@ -113,7 +113,7 @@
 | changes | 代码的改动（用语表的「改动」：`Issue.changes`、`Repo.changes`、`T.Changes`） | 投递的变化流（`Mailbox.changes`）：改叫 `news` |
 | open | 形容词，还没了结（`openQuestions`、`openFindings`；`Lan.setOpen` 的开着） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个帮工的投递（`openDeliveries`）：改叫 `deliveriesOf` |
 | start | 开始干一件事（`issue.start`、`Executor.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
-| input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`inputsConsumed`、`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
+| input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
 
 已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`repo.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、仓库的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 

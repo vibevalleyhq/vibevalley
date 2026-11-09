@@ -353,13 +353,15 @@ describe("a session's work", () => {
       const sessions = yield* Session;
       const kinds: string[] = [];
       let id = "";
-      const launches2 = yield* sessions.launches;
-      yield* Effect.forkScoped(Stream.runForEach(launches2, (a) => Effect.sync(() => a.id === id && kinds.push(a.kind))));
+      const news = yield* sessions.news;
+      yield* Effect.forkScoped(
+        Stream.runForEach(news, (n) => Effect.sync(() => (n._tag === "Spoke" || n._tag === "HandedOff") && n.id === id && kinds.push(n._tag))),
+      );
       const hired = yield* issues.hire(lab(), "看看", "talk");
       const session = mustHire(hired);
       id = session.id;
-      yield* until(() => kinds.includes("handedOff"), "the turn handed off");
-      expect(kinds.filter((k) => k === "spoke" || k === "handedOff")).toEqual(["spoke", "handedOff"]);
+      yield* until(() => kinds.includes("HandedOff"), "the turn handed off");
+      expect(kinds).toEqual(["Spoke", "HandedOff"]);
       const server = f.turns[0]!.options.mcpServers?.find((server) => server.name === "vibevalley");
       if (!server || !("headers" in server)) throw new Error("the runtime received no authenticated MCP endpoint");
       const token = server.headers?.authorization?.replace("Bearer ", "") ?? "";

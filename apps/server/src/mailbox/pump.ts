@@ -3,7 +3,7 @@ import { Clock, Effect } from "effect";
 import { isBusy } from "@vibevalley/protocol/rules";
 
 import type { Session } from "#/session/session.ts";
-import type { Delivered, InputConsumed, InputReturned, LaunchActivity } from "#/session/signals.ts";
+import type { Delivered, Consumed, Returned, LaunchActivity } from "#/session/signals.ts";
 
 import type { DeliveryRow } from "./deliveries.ts";
 
@@ -33,8 +33,8 @@ interface PumpPorts<Message> {
 interface Pump {
   readonly kick: (recipient: string) => Effect.Effect<void>;
   readonly activity: (activity: LaunchActivity) => Effect.Effect<void>;
-  readonly consumed: (input: InputConsumed) => Effect.Effect<void>;
-  readonly returned: (input: InputReturned) => Effect.Effect<void>;
+  readonly consumed: (input: Consumed) => Effect.Effect<void>;
+  readonly returned: (input: Returned) => Effect.Effect<void>;
 }
 
 export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts<Message>): Pump => {
@@ -117,14 +117,14 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
 
   const activity = Effect.fnUntraced(function* (activity: LaunchActivity): Effect.fn.Return<void> {
     if (ports.closed()) return;
-    switch (activity.kind) {
-      case "spoke":
+    switch (activity._tag) {
+      case "Spoke":
         ports.breakerSpoke(activity.id);
         return;
-      case "settling":
+      case "Settling":
         return;
-      case "handedOff":
-      case "ended": {
+      case "HandedOff":
+      case "Ended": {
         const rolled = yield* ports.returnHanded(activity.id);
         if (rolled.length > 0) {
           if (!activity.spoke) {
@@ -136,10 +136,10 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         }
         return yield* kick(activity.id);
       }
-      case "closed":
+      case "Closed":
         yield* ports.returnHanded(activity.id);
         return;
-      case "compacting":
+      case "Compacting":
         hold(activity.id, "compacting", activity.on);
         if (!activity.on && !held(activity.id)) yield* kick(activity.id);
         return;

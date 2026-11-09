@@ -57,7 +57,7 @@
 - **结构化交接（`issue_report`）**：
   - 报告先同步写入 `session.pending_report`，回合结束时转为 `sessionReported` 并清空。
   - PR 在途或 `prSubmit=true` 时结束后进 `resting` 并释放槽位；仅 `prSubmit=false` 才进 `done`。
-- **真实消费回执**：Mailbox 投递在模型真正消费输入时才经 `inputsConsumed` 标为 `consumed`；回合结束或中断时未消费的 `handed` 一律退回 `pending`。
+- **真实消费回执**：Mailbox 投递在模型真正消费输入时才经 `Session.news` 的 `Consumed` 标为 `consumed`；回合结束或中断时未消费的 `handed` 一律退回 `pending`。
 - **触发来源（`RunTrigger`）**：分 `issue`、`comment`、`cron`、`refining` 和 `runtime`；执行中途插入的话记入当前 `Run.heard`，不另开新 `Run`。
 
 ### 容量上限、轨迹与花费
@@ -99,8 +99,8 @@
 
 ## 和谁打交道
 
-- **工单（`issue`）**：调用 `send`、`deliver`、`handOver`、`dismiss`；订阅 `Session.news` 与 `finishedRuns`。
-- **信箱与频道（`mailbox`、`channel`）**：Mailbox 调 `deliver` 并订阅 `inputsConsumed`；Channel 订阅 `news` 管理工单串与汇报。
+- **工单（`issue`）**：开帮工经 `Mailbox.receive`（`Hire`），调用 `withWorkplace`、`clearWorkplace`、`discardWork`、`dismiss`；订阅 `Session.news`（`Reported`、`Left`、`IssueStarted`、`RunFinished`）。
+- **信箱与频道（`mailbox`、`channel`）**：Mailbox 调 `deliver` 并订阅 `news` 的回执和启动动静；Channel 订阅 `news` 的 `Hired`、`Left`、`Reported` 管理工单串与汇报。帮工做的每件事都只在这一条 `news` 上说，各订阅方按 `_tag` 取自己要的。
 - **仓库、农机与记性（`repo`、`runtime`、`memory`）**：提供工作目录、农机探测/计费和每轮前后的记忆召回与写入。
 - **管家（`orchestrator`）**：通过 `Session.host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run` 表。
 

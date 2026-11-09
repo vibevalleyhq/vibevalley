@@ -22,16 +22,10 @@ import { restoredSession, sessionState } from "./history.ts";
 import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
 import { type Tracking } from "./reaction.ts";
-import type { DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./signals.ts";
+import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
-
-export interface RunFinished {
-  readonly id: string;
-  readonly issues: T.IssueId[];
-  readonly outcome: T.Outcome;
-}
 
 export interface Hand {
   readonly id: T.SessionId;
@@ -69,7 +63,7 @@ export interface RunStore {
   readonly issues: (run: string) => Effect.Effect<T.IssueId[], NotRecorded>;
   readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Effect.Effect<void, NotRecorded>;
   readonly finished: (r: RunFinished) => void;
-  readonly consumed: (c: InputConsumed) => void;
+  readonly consumed: (c: Consumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
 }
 
@@ -106,15 +100,10 @@ export const sessionRegistry = Effect.gen(function* () {
   // A hand is acquired before admission; no path holding admission waits for a hand.
   const admission = yield* Semaphore.make(1);
 
-  const launchesHub = yield* scopedPubSub<LaunchActivity>();
-  // The sessions' own facts, told as news in the order they were applied.
   const newsHub = yield* scopedPubSub<SessionNews>();
   const [, moves] = yield* core.transitions;
-  const startedIssuesHub = yield* scopedPubSub<string>();
-  const finishedHub = yield* scopedPubSub<RunFinished>();
-  const consumedHub = yield* scopedPubSub<InputConsumed>();
-  const returnedHub = yield* scopedPubSub<InputReturned>();
-  const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
+  const tell = (news: SessionNews) => void PubSub.publishUnsafe(newsHub, news);
+  const signal = (a: LaunchActivity) => tell(a);
 
   const hands = new Map<string, Hand>();
   const executions = new Map<string, () => string>();
@@ -258,7 +247,7 @@ export const sessionRegistry = Effect.gen(function* () {
     if (fresh.length === 0) return;
     h.heard.push(...fresh);
     if (h.run) recordRun(runs.heard(h.run, h.heard).pipe(bestEffort(`vibevalley: run ${h.run}`)));
-    PubSub.publishUnsafe(consumedHub, { session: h.id, envelopeIds: fresh });
+    tell({ _tag: "Consumed", session: h.id, envelopeIds: fresh });
   };
 
   const inputChanged = (h: Hand, input: ExecutionInput) => {
@@ -266,7 +255,7 @@ export const sessionRegistry = Effect.gen(function* () {
     if (envelopeIds === undefined) return;
     h.inputs.delete(input.inputId);
     if (input.kind === "consumed") consume(h, envelopeIds);
-    else PubSub.publishUnsafe(returnedHub, { session: h.id, envelopeIds });
+    else tell({ _tag: "Returned", session: h.id, envelopeIds });
   };
 
   const endRun = (h: Hand, outcome: T.Outcome, summary: string, spent?: T.Spent) => {
@@ -289,7 +278,7 @@ export const sessionRegistry = Effect.gen(function* () {
         .pipe(
           Effect.tap(() =>
             Effect.sync(() => {
-              if (issue) PubSub.publishUnsafe(finishedHub, { id, issues: [issue], outcome });
+              if (issue) tell({ _tag: "RunFinished", id, issues: [issue], outcome });
             }),
           ),
           bestEffort(`vibevalley: run ${id}`),
@@ -321,14 +310,14 @@ export const sessionRegistry = Effect.gen(function* () {
     ...runs,
     start: Effect.fn("Session.startHostedRun")(function* (id, session, issue, trigger) {
       yield* runs.start(id, session, issue, trigger);
-      if (issue) PubSub.publishUnsafe(startedIssuesHub, issue);
+      if (issue) tell({ _tag: "IssueStarted", issue });
     }),
     link: Effect.fn("Session.linkHostedIssue")(function* (run, issue) {
       yield* runs.link(run, issue);
-      PubSub.publishUnsafe(startedIssuesHub, issue);
+      tell({ _tag: "IssueStarted", issue });
     }),
-    finished: (r) => PubSub.publishUnsafe(finishedHub, r),
-    consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
+    finished: (r) => tell({ _tag: "RunFinished", ...r }),
+    consumed: (c) => tell({ _tag: "Consumed", ...c }),
     register: (session, current) => void executions.set(session, current),
   };
   return {
@@ -341,13 +330,9 @@ export const sessionRegistry = Effect.gen(function* () {
     mcpEndpoint,
     trajectories,
     admission,
-    launchesHub,
     newsHub,
+    tell,
     moves,
-    startedIssuesHub,
-    finishedHub,
-    consumedHub,
-    returnedHub,
     signal,
     hands,
     executions,

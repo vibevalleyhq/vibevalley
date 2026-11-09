@@ -16,8 +16,8 @@ import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 
 import { Caller } from "./host.ts";
-import { Session, type RunFinished } from "./session.ts";
-import type { InputConsumed } from "./signals.ts";
+import { Session } from "./session.ts";
+import type { SessionNews } from "./signals.ts";
 describe("Caller", () => {
   it.effect("keeps what came before its reader, then streams until it ends", () =>
     Effect.gen(function* () {
@@ -83,13 +83,18 @@ describe("AgentHost", () => {
       ]);
       const memory = yield* Memory;
       yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: owner });
-      const finished: RunFinished[] = [];
-      const consumed: InputConsumed[] = [];
+      const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
+      const consumed: Extract<SessionNews, { _tag: "Consumed" }>[] = [];
       const answeringRuns: (string | undefined)[] = [];
-      const finishedRuns2 = yield* sessions.finishedRuns;
-      yield* Effect.forkScoped(Stream.runForEach(finishedRuns2, (run) => Effect.sync(() => void finished.push(run))));
-      const inputsConsumed2 = yield* sessions.inputsConsumed;
-      yield* Effect.forkScoped(Stream.runForEach(inputsConsumed2, (input) => Effect.sync(() => void consumed.push(input))));
+      const news = yield* sessions.news;
+      yield* Effect.forkScoped(
+        Stream.runForEach(news, (n) =>
+          Effect.sync(() => {
+            if (n._tag === "RunFinished") finished.push(n);
+            else if (n._tag === "Consumed") consumed.push(n);
+          }),
+        ),
+      );
       const said: string[] = [];
       const states: string[] = [];
       const core = yield* Core;
@@ -135,8 +140,8 @@ describe("AgentHost", () => {
       yield* Fiber.join(reading);
       expect(said).toEqual(["我看一下", "看完了，一切正常"]);
       yield* until(() => finished.length === 1 && consumed.length === 1, "the public run events");
-      expect(finished).toEqual([{ id: expect.any(String), issues: [], outcome: "completed" }]);
-      expect(consumed).toEqual([{ session: "orchestrator", envelopeIds: ["m1"] }]);
+      expect(finished).toEqual([{ _tag: "RunFinished", id: expect.any(String), issues: [], outcome: "completed" }]);
+      expect(consumed).toEqual([{ _tag: "Consumed", session: "orchestrator", envelopeIds: ["m1"] }]);
       expect(answeringRuns).toEqual([finished[0]!.id, finished[0]!.id]);
       expect(requests[0]!.system).toContain("database preference");
       expect((yield* memory.list("orchestrator")).some((note) => note.text === "remembered in database")).toBe(true);

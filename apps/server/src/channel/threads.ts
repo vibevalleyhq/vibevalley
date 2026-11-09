@@ -126,17 +126,19 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
     // The sessions' news: hired and left open and close threads, a report is posted in the thread. One at a time, before the
     // next.
     const onSessionNews = Effect.fnUntraced(function* (n: SessionNews) {
+      // Runs, inputs and launches are the issues' and Mailbox's.
+      if (n._tag !== "Hired" && n._tag !== "Left" && n._tag !== "Reported") return;
       yield* locked(
         Effect.suspend(() => {
           if (closed) return Effect.void;
           switch (n._tag) {
-            case "hired":
+            case "Hired":
               return Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), {
                 discard: true,
               });
-            case "left":
+            case "Left":
               return sessionsLeft;
-            case "reported":
+            case "Reported":
               return postReport(n.report.id, n.report.outcome, n.report.summary, n.report.spent, n.report.run);
           }
         }),

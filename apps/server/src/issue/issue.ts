@@ -198,10 +198,10 @@ const make = Effect.gen(function* () {
 
   const onSessionNews = Effect.fn("Issue.onSessionNews")(function* (n: SessionNews) {
     switch (n._tag) {
-      case "left":
+      case "Left":
         yield* closeIfOpen(n.left.id, n.left.closed);
         return;
-      case "reported": {
+      case "Reported": {
         const e = n.report;
         const issue = yield* recordReport(e.id, e.outcome, e.questions, e.checks, e.answer);
         yield* handedBack(e);
@@ -215,7 +215,15 @@ const make = Effect.gen(function* () {
         yield* joinChildren();
         return;
       }
-      case "hired":
+      case "IssueStarted":
+        yield* unqueue(n.issue);
+        return;
+      case "RunFinished":
+        // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
+        yield* Effect.forEach(n.issues, (id) => endRun(id).pipe(bestEffort(`vibevalley: run ${n.id} finished on issue ${id}`)), { discard: true });
+        return;
+      default:
+        // A hire is the channels' to follow; inputs and launches are Mailbox's.
         return;
     }
   });
@@ -231,28 +239,17 @@ const make = Effect.gen(function* () {
   yield* loadKept;
   const news = yield* sessions.news;
   const ownerWords = yield* chat.ownerInThread;
-  const finished = yield* sessions.finishedRuns;
-  const startedIssues2 = yield* sessions.startedIssues;
-  yield* Effect.forkScoped(Stream.runForEach(startedIssues2, (id) => unqueue(id).pipe(bestEffort(`issue: run started on ${id}`))));
   // One at a time: a report and the owner's word on it do not cross.
   yield* Effect.forkScoped(
     Stream.runForEach(
       Stream.merge(
         news,
-        Stream.map(ownerWords, (w) => ({ _tag: "owner" as const, thread: w.thread, message: w.message })),
+        Stream.map(ownerWords, (w) => ({ _tag: "OwnerSaid" as const, thread: w.thread, message: w.message })),
       ),
       (n) =>
-        n._tag === "owner"
+        n._tag === "OwnerSaid"
           ? onOwnerInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the owner's words in ${n.thread}`))
           : onSessionNews(n).pipe(bestEffort(`vibevalley: issues after ${n._tag}`)),
-    ),
-  );
-  yield* Effect.forkScoped(
-    // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
-    Stream.runForEach(finished, (run) =>
-      Effect.forEach(run.issues, (id) => endRun(id).pipe(bestEffort(`vibevalley: run ${run.id} finished on issue ${id}`)), {
-        discard: true,
-      }),
     ),
   );
 

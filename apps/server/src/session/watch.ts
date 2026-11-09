@@ -31,7 +31,7 @@ export const sessionWatch = (r: SessionRegistry) =>
     const stallMs = config.session.stallSeconds * 1000;
 
     const closedLaunch = (h: Hand) => {
-      if (h.launch) signal({ kind: "closed", id: h.id, launch: h.launch });
+      if (h.launch) signal({ _tag: "Closed", id: h.id, launch: h.launch });
       h.launch = "";
     };
 
@@ -79,10 +79,10 @@ export const sessionWatch = (r: SessionRegistry) =>
         } else if (event.kind === "reasoning" || event.kind === "text_delta" || event.kind === "tool_call_started") {
           if (!h.spoke) {
             h.spoke = true;
-            signals.push({ kind: "spoke", id: h.id, launch: h.launch });
+            signals.push({ _tag: "Spoke", id: h.id, launch: h.launch });
           }
-        } else if (event.kind === "compaction_started") signals.push({ kind: "compacting", id: h.id, on: true });
-        else if (event.kind === "compaction_ended") signals.push({ kind: "compacting", id: h.id, on: false });
+        } else if (event.kind === "compaction_started") signals.push({ _tag: "Compacting", id: h.id, on: true });
+        else if (event.kind === "compaction_ended") signals.push({ _tag: "Compacting", id: h.id, on: false });
       }
       const reaction = reactionTo(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
       h.tracking = reaction.tracking;
@@ -115,7 +115,7 @@ export const sessionWatch = (r: SessionRegistry) =>
           ...(channel !== undefined ? { channel } : {}),
           phase: { _tag: "working", since: clock.currentTimeMillisUnsafe(), doing: { action: "wait", label: "" } },
         });
-        signal({ kind: "settling", id: h.id, launch: h.launch });
+        signal({ _tag: "Settling", id: h.id, launch: h.launch });
         return;
       }
       delete h.settling;
@@ -171,7 +171,7 @@ export const sessionWatch = (r: SessionRegistry) =>
           ).pipe(bestEffort(`vibevalley: ${h.id}'s declared memories were not kept`)),
         );
       if (read.needsYou) notice("error", t("server.session.life.stoppedNeedsYou", { name: session.name, why: read.failure }));
-      if (launch) signal({ kind: read.outcome === "completed" && !waiting ? "handedOff" : "ended", id: h.id, launch, outcome: read.outcome, spoke });
+      if (launch) signal({ _tag: read.outcome === "completed" && !waiting ? "HandedOff" : "Ended", id: h.id, launch, outcome: read.outcome, spoke });
       runtimes.usageSoon(session.runtime);
       save();
     };

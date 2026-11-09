@@ -12,7 +12,6 @@ import type * as T from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import type { LaunchActivity } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { watchStalls } from "#/executor/executor.ts";
 import { Repo } from "#/repo/repo.ts";
@@ -22,7 +21,7 @@ import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
-import type { DeliveryInput } from "./signals.ts";
+import type { SessionNews, DeliveryInput } from "./signals.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
 
@@ -238,9 +237,9 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const core = yield* Core;
-      const seen: LaunchActivity[] = [];
-      const launches2 = yield* sessions.launches;
-      const following = yield* Effect.forkScoped(Stream.runForEach(launches2, (a) => Effect.sync(() => seen.push(a))));
+      const seen: SessionNews[] = [];
+      const news = yield* sessions.news;
+      const following = yield* Effect.forkScoped(Stream.runForEach(news, (a) => Effect.sync(() => seen.push(a))));
 
       const hired = yield* sessions.hire(lab(), "给打卡接口加分页", "demo", {
         context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
@@ -272,7 +271,7 @@ describe("sessions", () => {
       yield* until(() => core.session(id)?.runs === 2 && phase(core, id) === "done", "the second run");
       const both = yield* waitFor(sessions.issueRuns("i1"), (rs) => rs.length === 2, "both runs of the issue");
       expect(both.map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
-      expect(seen.some((a) => a.kind === "handedOff" && a.id === id)).toBe(true);
+      expect(seen.some((a) => a._tag === "HandedOff" && a.id === id)).toBe(true);
 
       const repos = yield* Repo;
       const merged = yield* sessions.handOver(id, "merged", (place) => repos.merge(place));

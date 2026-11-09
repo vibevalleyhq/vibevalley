@@ -25,7 +25,7 @@ import { sourceBrief } from "./prompts.ts";
 import { handsToOwner, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
-import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionNews } from "./signals.ts";
+import type { Delivered, DeliveryInput, RunFinished, SessionNews } from "./signals.ts";
 
 export type { SessionNews };
 export type { RunFinished, RunStore };
@@ -123,14 +123,8 @@ export class Session extends Context.Service<
     readonly issueRuns: (issue: string) => Effect.Effect<T.Run[]>;
     /** A session's log, oldest first; a run's only when run is given. */
     readonly events: (id: string, run?: string) => Effect.Effect<T.SessionEvent[] | undefined>;
-    /** These four are subscribed before they return: nothing published after is missed. */
-    readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
-    /** A session hired, reported or gone, with the session as it stood after: what the issues and their child issues follow. */
+    /** Everything Session tells, subscribed before it returns: nothing told after is missed. */
     readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
-    readonly startedIssues: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
-    readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
-    readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
-    readonly inputsReturned: Effect.Effect<Stream.Stream<InputReturned>, never, Scope.Scope>;
     /** An orchestrator profile's session, kept before anything can record a Run or address its mailbox: written when
      * there is none or its name changed. A profile that is not an orchestrator is left alone. */
     readonly registerOrchestrator: (profile: T.Agent) => Effect.Effect<void, NotRecorded>;
@@ -155,14 +149,14 @@ export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefin
   switch (fact.type) {
     case "sessionChanged": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
-      return session?.role === "worker" ? { _tag: "hired", session } : undefined;
+      return session?.role === "worker" ? { _tag: "Hired", session } : undefined;
     }
     case "sessionReported": {
       const session = after.sessions.find((h) => h.id === fact.id);
-      return session?.role === "worker" ? { _tag: "reported", report: fact, session } : undefined;
+      return session?.role === "worker" ? { _tag: "Reported", report: fact, session } : undefined;
     }
     case "sessionLeft":
-      return { _tag: "left", left: fact };
+      return { _tag: "Left", left: fact };
     default:
       return undefined;
   }
@@ -170,7 +164,7 @@ export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefin
 
 import { restoredSession, sessionState, runOf, endedSession, placeOf, heardOf, pendingReportOf } from "./history.ts";
 import { NotTakenIn, reasonText, sessionLaunch } from "./launch.ts";
-import { type Hand, type RunFinished, type RunStore, sessionRegistry } from "./registry.ts";
+import { type Hand, type RunStore, sessionRegistry } from "./registry.ts";
 import { sessionWatch } from "./watch.ts";
 export { runOf } from "./history.ts";
 const make = Effect.gen(function* () {
@@ -183,13 +177,9 @@ const make = Effect.gen(function* () {
     mcpEndpoint,
     trajectories,
     admission,
-    launchesHub,
     newsHub,
+    tell,
     moves,
-    startedIssuesHub,
-    finishedHub,
-    consumedHub,
-    returnedHub,
     hands,
     executions,
     launchOf,
@@ -215,7 +205,7 @@ const make = Effect.gen(function* () {
   yield* Effect.forkScoped(
     Stream.runForEach(moves, ({ fact, after }) => {
       const news = newsOf(fact, after);
-      if (news?._tag === "reported" && news.session?.role === "worker" && news.session.issue === undefined) {
+      if (news?._tag === "Reported" && news.session?.role === "worker" && news.session.issue === undefined) {
         const id = news.session.id;
         const deadline = fact.at + 10 * 60_000;
         void later(
@@ -247,7 +237,7 @@ const make = Effect.gen(function* () {
         Effect.gen(function* () {
           yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted"));
           const linked = yield* runs.issues(r.id);
-          PubSub.publishUnsafe(finishedHub, { id: r.id, issues: linked, outcome: "interrupted" } satisfies RunFinished);
+          tell({ _tag: "RunFinished", id: r.id, issues: linked, outcome: "interrupted" });
         }).pipe(bestEffort(`vibevalley: run ${r.id}`)),
       { discard: true },
     );
@@ -655,12 +645,7 @@ const make = Effect.gen(function* () {
       );
     }),
     onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
-    launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    startedIssues: Effect.map(PubSub.subscribe(startedIssuesHub), Stream.fromSubscription),
-    finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
-    inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
-    inputsReturned: Effect.map(PubSub.subscribe(returnedHub), Stream.fromSubscription),
     registerOrchestrator: Effect.fn("Session.registerOrchestrator")(function* (profile: T.Agent) {
       if (profile.role !== "orchestrator") return;
       const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");

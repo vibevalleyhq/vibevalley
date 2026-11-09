@@ -80,6 +80,8 @@ flowchart LR
 | `triggersOf`、`queuedTriggers` | 工单池里等着的触发：一张工单的（按路由的顺序）、所有排队工单的（派活的在前）。两个问题筛法和排序不同，起两个名字 | `issueInputs`、`queuedInputs` |
 | `news` | 投递的变化：一封信被模型收下（`Consumed`）、一个帮工被熔断（`Braked`） | `consumed`、`breakerNotices` |
 
+帮工那头也只有一条流：`Session.news`。帮工做的每件事都在上面说，订阅方按 `_tag` 取自己要的：`Hired`、`Reported`、`Left`（频道开关串、贴汇报，工单收汇报），`IssueStarted`、`RunFinished`（工单出池、一轮结束），`Consumed`、`Returned`（投递的回执），和一次启动的动静 `Spoke`、`Ended`、`HandedOff`、`Settling`、`Closed`、`Compacting`（Mailbox 的泵）。它取代原来的六条流 `news`、`launches`、`startedIssues`、`finishedRuns`、`inputsConsumed`、`inputsReturned`。
+
 留在接口上、各说各的事的：退回和撤回意思相反，不并进 `withdraw`：`handBack` 把一封信还回去重新投递，`decline` 是帮工说这封不归它、带着理由退回工单池。`deliveriesOf`（一个帮工的投递）、`waitingOn`（一封信还在等的投递数）、`isRouted`（一个触发路由过没有）是投递的读。
 
 主人定的两件（2026-11-09）：
@@ -97,6 +99,7 @@ flowchart LR
 | 工单 | 完成 | `f5f0ce669` | 派活走 `receive` 的 `Hire`；工单池走 `triggersOf`、`queuedTriggers`；撤回一张工单的派活走 `withdraw`（照旧在工单自己的事务里，不拿 Mailbox 的写锁） |
 | Mailbox 用帮工 | 完成，不用另改 | — | 帮工投递和开帮工的成员在帮工模块之外只剩 Mailbox 在用 |
 | 改名 | 完成 | `39ed4f87c` | 照「名词和路径」；旧名字写进 `scripts/stale-names.ts`（Mailbox 自己的文件夹除外，内部步骤怎么叫不限） |
+| 帮工的流 | 完成 | 本提交 | 六条流并成一条 `Session.news`，一次启动的动静从 `kind` 改成 `_tag`；旧名字写进 `scripts/stale-names.ts` |
 | 假 Mailbox 的测试 | 未做 | — | 验收的第三条 |
 
 改之前没有、改之后有的行为：
@@ -107,7 +110,7 @@ flowchart LR
 
 数的时候发现、写在这里免得再数错的：Mailbox 对外的成员实际是 34 个（服务和泵各有一组），Problem 的表少算了 7 个。
 
-工单还直接用帮工的 `noRoom`（只问有没有位置，排队用）和管家的 `register`（管家不经 `hire` 开）是读和管家自己的事，不归投递，留在帮工。
+工单还直接用帮工的 `noRoom`（只问有没有位置，排队用）和 `registerOrchestrator`（管家不经 `hire` 开）是读和管家自己的事，不归投递，留在帮工。
 
 ## Alternatives considered
 

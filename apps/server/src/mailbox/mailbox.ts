@@ -460,17 +460,26 @@ export class Mailbox extends Context.Service<
         retryWakeMs: config.chat.retryWakeMs,
       });
 
-      const launches2 = yield* sessions.launches;
+      const sessionNews = yield* sessions.news;
       yield* Effect.forkScoped(
-        Stream.runForEach(launches2, (activity) => pumpLocked(pump.activity(activity)).pipe(bestEffort(`mailbox: ${activity.id} ${activity.kind}`))),
-      );
-      const inputsConsumed2 = yield* sessions.inputsConsumed;
-      yield* Effect.forkScoped(
-        Stream.runForEach(inputsConsumed2, (input) => pumpLocked(pump.consumed(input)).pipe(bestEffort(`mailbox: input consumed by ${input.session}`))),
-      );
-      const inputsReturned2 = yield* sessions.inputsReturned;
-      yield* Effect.forkScoped(
-        Stream.runForEach(inputsReturned2, (input) => pumpLocked(pump.returned(input)).pipe(bestEffort(`mailbox: input returned by ${input.session}`))),
+        Stream.runForEach(sessionNews, (news) => {
+          switch (news._tag) {
+            case "Consumed":
+              return pumpLocked(pump.consumed(news)).pipe(bestEffort(`mailbox: input consumed by ${news.session}`));
+            case "Returned":
+              return pumpLocked(pump.returned(news)).pipe(bestEffort(`mailbox: input returned by ${news.session}`));
+            case "Spoke":
+            case "Ended":
+            case "HandedOff":
+            case "Settling":
+            case "Closed":
+            case "Compacting":
+              return pumpLocked(pump.activity(news)).pipe(bestEffort(`mailbox: ${news.id} ${news._tag}`));
+            default:
+              // The rest are the issues' and the channels' to follow.
+              return Effect.void;
+          }
+        }),
       );
 
       const bindIssue = (issue: T.Issue) =>

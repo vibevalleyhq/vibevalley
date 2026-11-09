@@ -30,7 +30,7 @@
   - 上游经 Mailbox 记录 `Trigger`，来源游标可与它在同一事务内提交；提交后再调用 `Mailbox.receive`。
   - `Mailbox` 在同一事务内写入 `mailbox_delivery` 并更新 `mailbox_trigger` 的路由回执；中途崩溃时于重启后重放。
 - **至少投递一次，真实入模才算消费（`consumed`）**：
-  - 投递交给会话时标为 `handed`；仅当收到 `Session.inputsConsumed` 回执时才标为 `consumed`。
+  - 投递交给会话时标为 `handed`；仅当 `Session.news` 传来 `Consumed` 回执时才标为 `consumed`。
   - 若回合结束、会话关闭或服务重启时仍未收到回执，`handed` 自动退回 `pending` 重新投递。
 - **两级缓冲（工单蓄水池 Tier 1 → 会话信箱 Tier 2）**：
   - 发往工单的输入先匹配 `mailbox_subscription` 进入 `mailbox_issue`。
@@ -51,7 +51,7 @@
 
 ## 和谁打交道
 
-- **底层依赖（`session`、`agent`、`core`）**：调用 `Session.deliver` 投递输入，订阅 `Session.inputsConsumed` 与 `Session.news` 推进状态机。
+- **底层依赖（`session`、`agent`、`core`）**：调用 `Session.deliver` 投递输入，订阅 `Session.news`（`Consumed`、`Returned` 和启动的 `Spoke`、`Ended`、`HandedOff`、`Settling`、`Closed`、`Compacting`）推进状态机。
 - **上层调用方（`channel`、`issue`、`cron`、`ingress`、`orchestrator`）**：不反向 import 上层服务；对频道与工单的只读查询经窄查询完成。
 
 ## 为什么这样

@@ -24,7 +24,7 @@ import { restoredSession, sessionState } from "#/session/history.ts";
 import { summaryOf } from "#/session/report.ts";
 import { sessionOnIssue } from "#/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "#/session/session.ts";
-import type { InputConsumed, InputReturned } from "#/session/signals.ts";
+import type { Consumed, LaunchActivity } from "#/session/signals.ts";
 import { testConfig, offline, testDatabase, until, waitFor } from "#/testing/layers.ts";
 import { allow, heard, refuse } from "#/testing/refuse.ts";
 import { Said, said } from "#/testing/world.ts";
@@ -32,7 +32,7 @@ import { orchestratorForChannel, setOrchestrator } from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
 
-import { Channel, catchUpMax, type Delivered, type LaunchActivity } from "./channel.ts";
+import { Channel, catchUpMax, type Delivered } from "./channel.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports. the slow mode is held until release (unless holds is off), the fail mode fails. */
 class FakeSessions {
@@ -49,15 +49,12 @@ class FakeSessions {
   running = new Map<string, string>();
   n = 0;
   core!: Core["Service"];
-  launches!: PubSub.PubSub<LaunchActivity>;
   news!: PubSub.PubSub<SessionNews>;
-  inputsConsumedHub!: PubSub.PubSub<InputConsumed>;
-  inputsReturnedHub!: PubSub.PubSub<InputReturned>;
-  consumed = (c: InputConsumed) => void PubSub.publishUnsafe(this.inputsConsumedHub, c);
+  consumed = (c: Consumed) => void PubSub.publishUnsafe(this.news, { _tag: "Consumed", ...c });
 
   runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
   steersOf = (id: string) => [...(this.steers.get(id) ?? [])];
-  private publish = (a: LaunchActivity) => PubSub.publishUnsafe(this.launches, a);
+  private publish = (a: LaunchActivity) => PubSub.publishUnsafe(this.news, a);
   private apply = (...f: Parameters<Core["Service"]["apply"]>) => Effect.runSync(this.core.apply(...f));
 
   deliver = (id: string, text: string, read: () => void = () => {}): Delivered => {
@@ -105,15 +102,15 @@ class FakeSessions {
         summary: "provider said no",
         runs,
       });
-      this.publish({ kind: "ended", id, launch, outcome: "failed", spoke: false });
+      this.publish({ _tag: "Ended", id, launch, outcome: "failed", spoke: false });
       return;
     }
     const line = input.split("\n").find((l) => l.startsWith("[target=")) ?? head(input, 20);
     this.last.set(id, "收到了（" + line + "）");
-    this.publish({ kind: "spoke", id, launch });
+    this.publish({ _tag: "Spoke", id, launch });
     this.running.delete(id);
     this.apply({ type: "sessionReported", questions: [], checks: [], id: sessionId(id), outcome: "completed", summary: "收到了", runs });
-    this.publish({ kind: "ended", id, launch, outcome: "completed", spoke: true });
+    this.publish({ _tag: "Ended", id, launch, outcome: "completed", spoke: true });
   }
 }
 
@@ -141,10 +138,7 @@ const channelLayer = (x: FakeSessions) =>
           hired_at: 0,
         }),
       );
-      x.launches = yield* PubSub.unbounded<LaunchActivity>();
       x.news = yield* PubSub.unbounded<SessionNews>();
-      x.inputsConsumedHub = yield* PubSub.unbounded<InputConsumed>();
-      x.inputsReturnedHub = yield* PubSub.unbounded<InputReturned>();
       const sessions = {
         present: (id: string) => x.core.session(id) !== undefined,
         sessionOf: (id: string) => x.core.session(id),
@@ -154,9 +148,6 @@ const channelLayer = (x: FakeSessions) =>
         runOf: () => undefined,
         reportOf: (id: string) => summaryOf(x.last.get(id) ?? ""),
         onIssue: (issue: string) => sessionOnIssue(x.core.state(), issue)?.id,
-        launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
-        inputsConsumed: Effect.map(PubSub.subscribe(x.inputsConsumedHub), Stream.fromSubscription),
-        inputsReturned: Effect.map(PubSub.subscribe(x.inputsReturnedHub), Stream.fromSubscription),
         registerOrchestrator: (profile: T.Agent) =>
           db.run(
             qsession.keepSession({
