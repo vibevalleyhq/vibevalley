@@ -1,11 +1,15 @@
-import { Schema } from "effect";
+import { Array as Arr, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
+import { deepseekModels } from "@vibevalley/provider/deepseek/models";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
+import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
+import type { MossEvents, MossLink, MossTransport, MossVerify } from "@vibevalley/provider/moss/server";
 import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
 import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
 import { mossTranscriptionModels } from "@vibevalley/provider/moss/transcription-models";
 import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding-models";
+import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
 import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-models";
 
 /** What an image is asked for with, whoever draws it. A layout prompt is the parsed layout. */
@@ -134,28 +138,55 @@ export class AudioFailure extends Schema.TaggedError<AudioFailure, { readonly br
   retryable: Schema.Boolean,
 }) {}
 
-/** A vendor an account is of: its name, where its keys are made, and the models it has for each thing it serves. */
+/** A realtime line (Live, Vision) as the page and the vendor speak it: MOSS Live's WebSocket frames, the only one yet. */
+export type RealtimeLink = MossLink;
+export type RealtimeEvents = MossEvents;
+/** How a realtime line is reached: the vendor's own WebSocket and HTTPS, or a test's stand-in. */
+export type RealtimeTransport = MossTransport;
+/** Whether the line takes the account's key, and why not. */
+export type RealtimeCheck = MossVerify;
+
+/** A vendor: its name, where its keys are made and where VibeValley keeps them (an account in AI services, or its own
+ * setting), and the models it has for each thing it serves. */
 export interface Vendor {
   readonly name: string;
   readonly console: string;
+  readonly keys: "account" | "setting";
   readonly image?: { readonly models: readonly string[] };
   readonly speech?: { readonly models: readonly string[] };
   readonly speakers?: { readonly models: readonly string[] };
   readonly voiceDesign?: { readonly models: readonly string[] };
   readonly transcription?: { readonly models: readonly string[] };
   readonly understanding?: { readonly models: readonly string[] };
+  readonly live?: { readonly models: readonly string[] };
+  readonly vision?: { readonly models: readonly string[] };
+  /** The orchestrator's conversation. */
+  readonly chat?: { readonly models: readonly string[] };
+  /** The call line (RTC), with its own speech recognition and voices. */
+  readonly call?: { readonly line: "rtc" };
 }
 
-/** Every vendor, by the adapter an account names. How each one is called is the Provider's business (provider.ts). */
-export const vendors: Record<"moss", Vendor> = {
+/** Every vendor: MOSS by the adapter an account names; DeepSeek and Agora keep their keys in their own settings. How
+ * an account's vendor is called is the Provider's business (provider.ts). */
+export const vendors: Record<"moss" | "deepseek" | "agora", Vendor> = {
   moss: {
     name: "MOSS",
     console: "https://platform.moss.cn/",
+    keys: "account",
     image: { models: mossImageModels },
     speech: { models: mossSpeechModels },
     speakers: { models: mossSpeakersModels },
     voiceDesign: { models: mossVoiceDesignModels },
     transcription: { models: mossTranscriptionModels },
     understanding: { models: mossUnderstandingModels },
+    live: { models: mossLiveModels },
+    vision: { models: mossVisionModels },
   },
+  deepseek: {
+    name: "DeepSeek",
+    console: "https://platform.deepseek.com/api_keys",
+    keys: "setting",
+    chat: { models: Arr.map(deepseekModels, (model) => model.id) },
+  },
+  agora: { name: "Agora", console: "https://console.agora.io/", keys: "setting", call: { line: "rtc" } },
 };

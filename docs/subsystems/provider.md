@@ -10,7 +10,7 @@
 | MOSS 账号模型目录查询、用途模型校验和解析 | 录音设备、通话、中继与字幕（[语音](docs/subsystems/voice.md)） |
 | 脱敏的公共状态、配置版本冲突与迟到查询结果 | 外部编码农机的登录、模型和凭据（[档案和农机](docs/subsystems/agent.md)） |
 
-当前适配器为 MOSS。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
+当前适配器为 MOSS；供应商目录（`apps/server/src/provider/vendors.ts`）还列出 DeepSeek（管家的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 HttpClient 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
 
 ## 在哪
 
@@ -49,7 +49,7 @@
 2. 主人为所需用途选择连接与模型；选择「不使用」解除相应用途绑定。
 3. Provider 校验整个候选配置，Setting 在锁内检查并原子保存，返回脱敏状态；发生版本冲突时页面保留草稿，主人可重新加载。
 4. 主人查询模型时，Provider 取该版本的连接 Key，调用官方 `https://api.mosi.cn/v1/models`；没有可用凭据时在本机拒绝。
-5. Voice 发起听写时向 Provider 要解析后的地址、模型、Key，经现有 Provider 转写实现与 AI Core 调用，返回文本给原输入框。普通听写继续使用同步 multipart 和 `response_format=json`，不因选多说话人模型就自动启用分段、热词或流式。
+5. Voice 发起听写时向 Provider 要绑定好的听写：模型和封着地址、Key 的转写器（现有 Provider 转写实现），经 AI Core 调用，返回文本给原输入框。普通听写继续使用同步 multipart 和 `response_format=json`，不因选多说话人模型就自动启用分段、热词或流式。
 
 目录请求不跟随重定向，不重试，不从环境中取 Key；15 秒超时覆盖响应体读取，结果最多 1 MiB、1000 条。认证、权限、限流、网络、超时、格式与上限错误各有提示，不将原始响应正文或带认证头的异常回传页面。协议依据见 [MOSS 模型列表](https://platform.moss.cn/docs/reference/models)与[音频转写](https://platform.moss.cn/docs/reference/transcriptions)。
 

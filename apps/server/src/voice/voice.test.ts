@@ -193,7 +193,12 @@ const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
         Layer.provideMerge(base),
       )
     : orchestrating;
-  return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(FetchHttpClient.layer), Layer.provideMerge(chosen));
+  // world already builds a Provider; a fresh one must send dictation through this fetch client.
+  return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(
+    Layer.provideMerge(Layer.fresh(Provider.layer)),
+    Layer.provideMerge(FetchHttpClient.layer),
+    Layer.provideMerge(chosen),
+  );
 };
 
 /** A helper at work on an issue, and the issue, as the core has them. */

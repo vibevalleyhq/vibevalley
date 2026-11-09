@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Context, Effect, Layer, Stream, String as Str } from "effect";
+import { Context, Effect, Layer, type Scope, Stream, String as Str } from "effect";
 import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -9,20 +9,19 @@ import type { Refused } from "@vibevalley/protocol/api";
 import { getMossAudioTask, type MossAudioTask } from "@vibevalley/provider/moss/audio-tasks";
 import { deleteMossFile, uploadMossFile } from "@vibevalley/provider/moss/files";
 import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
-import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
 import { type MossModelError, mossModels } from "@vibevalley/provider/moss/models";
+import { nodeMossTransport, verifyMoss } from "@vibevalley/provider/moss/server";
 import { createMossSpeakersTask, prepareMossSpeakers } from "@vibevalley/provider/moss/speakers";
 import { createMossSpeechTask, generateMossSpeech, prepareMossSpeech } from "@vibevalley/provider/moss/speech";
 import { streamMossSpeech } from "@vibevalley/provider/moss/speech-stream";
 import { createMossTranscriptionTask, prepareMossTranscription } from "@vibevalley/provider/moss/transcription";
 import { streamMossTranscription } from "@vibevalley/provider/moss/transcription-stream";
 import { prepareMossUnderstanding, understandMossMedia } from "@vibevalley/provider/moss/understanding";
-import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
 import { createMossVoiceDesignTask, prepareMossVoiceDesign } from "@vibevalley/provider/moss/voice-design";
 import { createMossVoice, listMossVoices } from "@vibevalley/provider/moss/voices";
-import { mossTranscription } from "@vibevalley/provider/transcription";
+import { mossTranscription, type TranscriptionFormat, transcriptionModel } from "@vibevalley/provider/transcription";
 
-import { bindingOf, boundConnection } from "#/setting/provider.ts";
+import { bindingOf, boundConnection, type ProviderSettings } from "#/setting/provider.ts";
 import { Setting } from "#/setting/setting.ts";
 
 import { connectionsOver, providerStatus } from "./connections.ts";
@@ -37,6 +36,10 @@ import {
   ImageFailure,
   type ImageRequest,
   InvalidRequest,
+  type RealtimeCheck,
+  type RealtimeEvents,
+  type RealtimeLink,
+  type RealtimeTransport,
   type SpeakersRequest,
   type SpeechEvent,
   type SpeechRequest,
@@ -88,8 +91,11 @@ const mossImage: ImageCall = Effect.fnUntraced(function* (model, request) {
   return (key: string) => mossDraw(key, prepared);
 });
 
+/** The vendor an account is of, by the adapter it names. */
+type Adapter = ProviderSettings["connections"][number]["adapter"];
+
 /** How each vendor draws, by adapter; one with no image use has none. */
-const imageCalls: Record<keyof typeof vendors, ImageCall | undefined> = { moss: mossImage };
+const imageCalls: Record<Adapter, ImageCall | undefined> = { moss: mossImage };
 
 /** What an account can be asked, with its key, the account's model and the Provider's own HttpClient sealed in; every
  * answer is in the capability's own shapes (vendors.ts). */
@@ -128,6 +134,19 @@ export interface Calls {
     /** Deletes the vendor's copy; one already gone counts as deleted. */
     readonly delete: (id: string) => Effect.Effect<void, FileFailure>;
   };
+  /** A realtime line (Live, Vision) to the account's model, through the given transport or the vendor's own. */
+  readonly realtime: {
+    readonly connect: (on: RealtimeEvents, transport?: RealtimeTransport) => RealtimeLink;
+    /** The text with the key taken out: what the vendor sends back may echo it. */
+    readonly redact: (text: string) => string;
+    readonly verify: (transport?: RealtimeTransport) => Effect.Effect<RealtimeCheck>;
+  };
+}
+
+/** The bound dictation model, and how to make its transcriber for one recording's format; the key is sealed in. */
+export interface Dictation {
+  readonly model: string;
+  readonly transcriber: (format: TranscriptionFormat) => Effect.Effect<Effect.Success<ReturnType<typeof transcriptionModel>>, never, Scope.Scope>;
 }
 
 /** An account as it was when it was bound: the connection, the settings revision, the model, and the key's
@@ -281,6 +300,11 @@ const mossCalls =
           }).pipe(sealed, Effect.mapError(audioFailure)),
       },
       tasks: { get: (id) => getMossAudioTask(key, id).pipe(sealed, Effect.mapBoth({ onSuccess: mossTask, onFailure: audioFailure })) },
+      realtime: {
+        connect: (on, transport = nodeMossTransport) => transport.connect(key, on, model),
+        redact: (text) => Str.replaceAll(key, "[redacted]")(text),
+        verify: (transport) => verifyMoss(key, transport, model),
+      },
       files: {
         upload: (file) =>
           uploadMossFile(key, { file: file.file, filename: file.filename, purpose: file.purpose }).pipe(
@@ -334,13 +358,6 @@ const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMoss
   return { _tag: "Refused", reason: reason() };
 };
 
-export interface ProviderAccount {
-  readonly connection: string;
-  readonly revision: number;
-  readonly model: string;
-  readonly key: string;
-}
-
 export class Provider extends Context.Service<
   Provider,
   {
@@ -353,7 +370,8 @@ export class Provider extends Context.Service<
     /** The account bound to speak, as it is now. */
     readonly speech: () => Effect.Effect<Account, Refused>;
     readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, Refused>;
-    readonly dictation: () => Effect.Effect<{ readonly url: string; readonly model: string; readonly key: string }, Refused>;
+    /** The dictation the owner set: a model of an account's, or their own compatible endpoint. */
+    readonly dictation: () => Effect.Effect<Dictation, Refused>;
     /** Image generation, whichever vendor the bound account is of: the request checked against the bound model, and
      * the account as it is now (a queued task keeps it), with the call to run later. */
     readonly image: (request: ImageRequest) => Effect.Effect<BoundImage, Refused>;
@@ -363,8 +381,9 @@ export class Provider extends Context.Service<
     readonly speakers: () => Effect.Effect<Account, Refused>;
     readonly voiceDesign: () => Effect.Effect<Account, Refused>;
     readonly transcription: () => Effect.Effect<Account, Refused>;
-    readonly vision: () => Effect.Effect<ProviderAccount, Refused>;
-    readonly live: () => Effect.Effect<ProviderAccount, Refused>;
+    /** The account bound for each realtime line, as it is now. */
+    readonly vision: () => Effect.Effect<Account, Refused>;
+    readonly live: () => Effect.Effect<Account, Refused>;
   }
 >()("@vibevalley/server/provider/provider") {
   static readonly layer = Layer.effect(
@@ -376,19 +395,15 @@ export class Provider extends Context.Service<
 const make = Effect.gen(function* () {
   const settings = yield* Setting;
   const http = yield* HttpClient.HttpClient;
-  const clients: Record<keyof typeof vendors, (key: string, model: string) => Calls> = { moss: mossCalls(http) };
-  const bind = (
-    connection: { readonly id: string; readonly adapter: keyof typeof vendors; readonly key: string },
-    revision: number,
-    model: string,
-  ): Account => ({
+  const clients: Record<Adapter, (key: string, model: string) => Calls> = { moss: mossCalls(http) };
+  const bind = (connection: { readonly id: string; readonly adapter: Adapter; readonly key: string }, revision: number, model: string): Account => ({
     connection: connection.id,
     revision,
     model,
     fingerprint: fingerprint(connection.key),
     ...clients[connection.adapter](connection.key, model),
   });
-  const audio = Effect.fnUntraced(function* (use: "speakers" | "voiceDesign" | "transcription"): Effect.fn.Return<Account, Refused> {
+  const capable = Effect.fnUntraced(function* (use: "speakers" | "voiceDesign" | "transcription" | "vision" | "live"): Effect.fn.Return<Account, Refused> {
     const config = settings.providers();
     const bound = bindingOf(use)(config);
     const capability = t(`server.provider.use.${use}`);
@@ -397,31 +412,26 @@ const make = Effect.gen(function* () {
       return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.capabilityModel", { capability }) });
     return bind(bound.connection, config.revision, bound.model);
   });
-  const account = Effect.fnUntraced(function* (use: "vision" | "live", models: readonly string[]): Effect.fn.Return<ProviderAccount, Refused> {
-    const config = settings.providers();
-    const binding = config[use];
-    const connection = boundConnection(config, binding?.connection ?? null);
-    const capability = t(`server.provider.use.${use}`);
-    if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.capabilityUnbound", { capability }) });
-    if (!models.includes(binding.model)) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.capabilityModel", { capability }) });
-    return { connection: connection.id, revision: config.revision, model: binding.model, key: connection.key };
-  });
+  const transcriber =
+    (connection: { readonly url: string; readonly model: string; readonly key: string }): Dictation["transcriber"] =>
+    (format) =>
+      transcriptionModel(connection, format).pipe(Effect.provideService(HttpClient.HttpClient, http));
   return Provider.of({
     status: () => providerStatus(settings.providers()),
     speakers: Effect.fn("Provider.speakers")(function* () {
-      return yield* audio("speakers");
+      return yield* capable("speakers");
     }),
     voiceDesign: Effect.fn("Provider.voiceDesign")(function* () {
-      return yield* audio("voiceDesign");
+      return yield* capable("voiceDesign");
     }),
     transcription: Effect.fn("Provider.transcription")(function* () {
-      return yield* audio("transcription");
+      return yield* capable("transcription");
     }),
     vision: Effect.fn("Provider.vision")(function* () {
-      return yield* account("vision", mossVisionModels);
+      return yield* capable("vision");
     }),
     live: Effect.fn("Provider.live")(function* () {
-      return yield* account("live", mossLiveModels);
+      return yield* capable("live");
     }),
     update: Effect.fn("Provider.update")(function* (input) {
       const next = yield* settings
@@ -463,13 +473,11 @@ const make = Effect.gen(function* () {
     }),
     dictation: Effect.fn("Provider.dictation")(function* () {
       const own = settings.dictation();
-      if (own?.via === "own") return { url: own.url, model: own.model, key: own.key };
+      if (own?.via === "own") return { model: own.model, transcriber: transcriber(own) };
       if (!own) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.voice.dictation.unset") });
-      const config = settings.providers();
-      const binding = config.dictation;
-      const connection = boundConnection(config, binding?.connection ?? null);
-      if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.unbound") });
-      return { url: mossTranscription.url, model: binding.model, key: connection.key };
+      const bound = bindingOf("dictation")(settings.providers());
+      if (!bound.ready) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.unbound") });
+      return { model: bound.model, transcriber: transcriber({ url: mossTranscription.url, model: bound.model, key: bound.connection.key }) };
     }),
     image: Effect.fn("Provider.image")(function* (request: ImageRequest) {
       const config = settings.providers();

@@ -12,7 +12,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { type Account, Provider } from "./provider.ts";
+import { type Account, type Dictation, Provider } from "./provider.ts";
 
 const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const notIn = (value: unknown, secret: string) =>
@@ -48,11 +48,19 @@ const recording = () => {
     keys.push(request.headers.authorization ?? "");
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status: 503 })));
   });
-  const keyUsedBy = (account: Account) =>
-    account.tasks.get("task").pipe(
-      Effect.exit,
-      Effect.map(() => keys.at(-1) ?? ""),
-    );
+  const keyUsedBy = (account: Account | Dictation) =>
+    ("tasks" in account
+      ? account.tasks.get("task").pipe(Effect.ignore)
+      : Effect.scoped(
+          account
+            .transcriber("wav")
+            .pipe(
+              Effect.flatMap((model) =>
+                Effect.tryPromise({ try: () => model.doGenerate({ audio: new Uint8Array([1]), mediaType: "audio/wav" }), catch: () => "not transcribed" }),
+              ),
+            ),
+        ).pipe(Effect.ignore)
+    ).pipe(Effect.map(() => keys.at(-1) ?? ""));
   return { http, keyUsedBy };
 };
 const page = {
@@ -78,8 +86,10 @@ it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable an
     const frozenKey = yield* keyUsedBy(frozen);
     expect(frozenKey).toBe("Bearer test-second-private");
     yield* notIn(frozen, "test-second-private");
-    expect((yield* provider.dictation()).key).toBe("test-first-private");
-    expect((yield* provider.live()).key).toBe("test-first-private");
+    const dictation = yield* provider.dictation();
+    const live = yield* provider.live();
+    const others = [yield* keyUsedBy(dictation), yield* keyUsedBy(live)];
+    expect(others).toEqual(["Bearer test-first-private", "Bearer test-first-private"]);
     yield* notIn(saved, "test-second-private");
     if (saved.speech) saved.speech.model = "caller-mutated";
     expect(provider.status().speech?.model).toBe(model);

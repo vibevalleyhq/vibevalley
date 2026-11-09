@@ -23,7 +23,7 @@ Status: proposed
 三步，一步一个提交，行为不变：
 
 1. 绑定规则合成一个（`setting/provider.ts` 的 `bindingOf`）；供应商目录（`provider/vendors.ts`），MOSS 生图走通；`Provider.image(request)` 交出不认供应商的绑定；Media 不再 import MOSS。
-2. 其余 MOSS 能力（理解、语音、多人语音、音色设计、转写、听写、Live、实时视觉）照做，DeepSeek（管家的对话模型）、声网（通话线路）进目录；`Provider` 只剩连接的增删改与目录查询。
+2. 其余 MOSS 能力（理解、语音、多人语音、音色设计、转写、听写、Live、实时视觉）照做，DeepSeek（管家的对话模型）、声网（通话线路）进目录；`Provider` 除了连接的增删改与目录查询，只剩不认供应商的能力方法。
 3. 钥匙改 `Redacted` 与 `Config.redacted`。
 
 ## 进度
@@ -31,7 +31,7 @@ Status: proposed
 | 步 | 状态 | 提交 | 做了什么 |
 |---|---|---|---|
 | 1 生图 | 完成 | `8d3b2d396` | `bindingOf`；`vendors.ts`（只放数据：名字、取钥匙处、模型表）；MOSS 的调用在 `provider.ts` 里、不导出；`Provider.image(request)` 交出的 `run` 不再要求 `HttpClient`（Provider 用自己的），Media 不再依赖 `HttpClient`、也不 import MOSS |
-| 2 其余能力 | 未做 | — | |
+| 2 其余能力 | 完成 | `140fd3eed` 语音；`26def4869` 多人语音、音色设计、克隆、转写、远端文件；`9cfeee7f7` 理解；本提交 听写、Live、Vision | 能力方法（`speech()`、`speakers()`、`voiceDesign()`、`transcription()`、`understanding()`、`live()`、`vision()`）交出同一种 `Account`：连接、revision、模型、Key 的 `fingerprint`，和按能力分组、封着 Key 与 Provider 自己 `HttpClient` 的调用（`speech.check/generate/createTask/stream`、`tasks.get`、`speakers`／`voiceDesign`／`transcription` 的 `check/createTask(/stream)`、`voices.clone`、`files.upload/delete`、`understanding.check/ask`、`realtime.connect/redact/verify`），校验也经它；`Provider.connection(id)`（交出 Key）换成 `Provider.account({ connection, model })`，按存下的连接重新绑定，任务用 `fingerprint` 比对「账号换了没有」；`dictation()` 交出模型和封着地址、Key 的 `transcriber(format)`。错误是能力自己的：`AudioFailure`（`outcome`，和替轮询判断重试的 `retryable`：网络、超时、429、5xx）、`FileFailure`、`UnderstandingFailure`、`InvalidRequest`；删除远端文件时 404 在 Provider 里算已删。`vendors.ts` 加了各能力的模型表，DeepSeek、声网只作数据进目录（钥匙仍在各自的设置，调用方没改）。Media 不再 import `@vibevalley/provider/*`、不再依赖 `HttpClient`；语音只留 MOSS Live 的帧协议（`@vibevalley/provider/moss` 的 `decodeMossFrame`，页面说的就是这套帧）和听写错误的细节（`@vibevalley/provider/transcription` 的 `TranscriptionRequestError`，提示里要用它的原因和信息），实时线路的类型经 `vendors.ts` 的 `Realtime*` 别名。行为不变，只有一处：远端上传前「Key 为空或带空白就当账号换了」的检查去掉了，保存时已拒绝这种 Key，绑定的账号总有合法的 Key。改了写法、没改断言含义的 `regression:` 测试：`dictation accepts the explicit snapshot %s without substituting its stable alias`（改看所选模型和实际请求的 Key、地址）、`%s during remote upload records an unknown result`（Deferred 挪到测试外，好把假厂商交给 Provider） |
 | 3 `Redacted` | 未做 | — | |
 
 ## Alternatives considered
@@ -43,6 +43,7 @@ Status: proposed
 ## Acceptance criteria
 
 - Media 不 import `@vibevalley/provider/moss/*`；生图经 `Provider.image(request)`，交出的绑定里没有钥匙。
+- 其余能力（语音、多人语音、音色设计、克隆、转写、理解、远端文件、听写、Live、Vision）经 `Provider` 交出的账号调用，账号里没有钥匙，只有指纹；Media、语音不 import `@vibevalley/provider/moss/*`。
 - 绑定规则只有一份（`bindingOf`），准备状态与 `Provider` 的能力方法都调它。
 - 现有的媒体测试（排队任务保留账号快照、换钥匙、未知结果、下载重试）不改断言地通过。
 - `server:check`、`web:check`、`effect:check`、`paths:check` 通过。

@@ -8,8 +8,7 @@ import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, type VoiceCall } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { decodeMossFrame } from "@vibevalley/provider/moss";
-import { type MossLink, type MossTransport, verifyMoss } from "@vibevalley/provider/moss/server";
-import { transcriptionModel, TranscriptionRequestError } from "@vibevalley/provider/transcription";
+import { TranscriptionRequestError } from "@vibevalley/provider/transcription";
 
 import { messageOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -19,7 +18,8 @@ import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, callbackLog } from "#/infra/log.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
-import { Provider } from "#/provider/provider.ts";
+import { type Account, Provider } from "#/provider/provider.ts";
+import type { RealtimeEvents, RealtimeLink, RealtimeTransport } from "#/provider/vendors.ts";
 import { type AgoraCredentials, Setting } from "#/setting/setting.ts";
 
 import {
@@ -58,7 +58,7 @@ const aborted = (signal: AbortSignal) =>
     return Effect.sync(() => signal.removeEventListener("abort", done));
   });
 
-const sendMoss = (link: MossLink, frame: Parameters<typeof mossFrame>[0]) => {
+const sendMoss = (link: RealtimeLink, frame: Parameters<typeof mossFrame>[0]) => {
   const text = mossFrame(frame);
   if (Option.isSome(text)) link.send(text.value);
 };
@@ -104,7 +104,7 @@ type Grant =
     };
 
 interface MossLine {
-  link?: MossLink;
+  link?: RealtimeLink;
   ready: boolean;
   closed: boolean;
   readonly pending: string[];
@@ -168,7 +168,7 @@ export interface VoiceOptions {
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
   /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
-  readonly moss?: MossTransport;
+  readonly moss?: RealtimeTransport;
 }
 
 /** Something to tell on the call: updates, and what rang when the call answers a ring. */
@@ -196,6 +196,8 @@ const make = (options: VoiceOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     const runHere: Run = yield* FiberSet.makeRuntimePromise();
     const now = () => clock.currentTimeMillisUnsafe();
+    /** A bound account's realtime line, through the transport this Voice was given. */
+    const lineOf = (account: Account) => ({ connect: (on: RealtimeEvents) => account.realtime.connect(on, options.moss), redact: account.realtime.redact });
 
     const grants = new Map<string, Grant>();
     const calls = new Map<string, Call>();
@@ -216,7 +218,7 @@ const make = (options: VoiceOptions = {}) =>
     };
 
     let commentarySequence = 0;
-    const deliverMossPiece = (piece: string, link: MossLink) => {
+    const deliverMossPiece = (piece: string, link: RealtimeLink) => {
       const characters = Array.from(piece.trim());
       for (let start = 0; start < characters.length; start += 2000)
         sendMoss(link, {
@@ -565,7 +567,7 @@ const make = (options: VoiceOptions = {}) =>
       verifyMoss: Effect.fn("Voice.verifyMoss")(function* () {
         const connection = yield* provider.live().pipe(Effect.option);
         if (connection._tag === "None") return { problem: t("server.voice.moss.noKey") };
-        const r = yield* verifyMoss(connection.value.key, options.moss, connection.value.model);
+        const r = yield* connection.value.realtime.verify(options.moss);
         switch (r.kind) {
           case "ok":
             return { problem: "" };
@@ -581,7 +583,7 @@ const make = (options: VoiceOptions = {}) =>
       }),
       visionLine: Effect.fn("Voice.visionLine")(function* () {
         const connection = yield* provider.vision();
-        return { run: (page: Socket.Socket) => relay(page, connection.key, options.moss, undefined, connection.model) };
+        return { run: (page: Socket.Socket) => relay(page, lineOf(connection)) };
       }),
       mossLine: Effect.fn("Voice.mossLine")(function* () {
         const connection = yield* provider.live();
@@ -629,95 +631,89 @@ const make = (options: VoiceOptions = {}) =>
                 return;
               }
               const forkMoss = yield* FiberSet.makeRuntime();
-              yield* relay(
-                page,
-                connection.key,
-                options.moss,
-                {
-                  onOpen: (link) => {
-                    if (acquired.closed) {
+              yield* relay(page, lineOf(connection), {
+                onOpen: (link) => {
+                  if (acquired.closed) {
+                    link.close();
+                    return;
+                  }
+                  acquired.link = link;
+                  return () => {
+                    active = false;
+                    awaitingAck.clear();
+                  };
+                },
+                onPageText: (data) => {
+                  const decoded = decodeMossFrame(data);
+                  if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
+                  // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
+                  const v = settings.voice();
+                  if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !c.ending)) return data;
+                  toolsEnabled = true;
+                  return Option.getOrUndefined(
+                    mossFrame({
+                      action: "session.update",
+                      session: {
+                        persona: { prompt: v.persona },
+                        instructions: mossInstructions(v.greeting),
+                        tools: [mossOrchestratorTool],
+                      },
+                    }),
+                  );
+                },
+                onMossText: (data, link) => {
+                  const decoded = decodeMossFrame(data);
+                  if (
+                    decoded._tag === "Some" &&
+                    decoded.value.action === "session.updated" &&
+                    decoded.value.data?.error === "" &&
+                    activeMoss === acquired &&
+                    !acquired.closed
+                  ) {
+                    acquired.ready = true;
+                    for (const piece of acquired.pending.splice(0)) deliverMossPiece(piece, link);
+                  }
+                  const ack = extractMossToolAck(data);
+                  if (ack && awaitingAck.delete(ack)) sendMoss(link, { action: "response.create", response: { call_ids: [ack] } });
+                  for (const toolCall of extractMossToolCalls(data)) {
+                    if (!active || acquired.closed || !toolsEnabled || executed.has(toolCall.callId)) continue;
+                    if (executed.size >= 64 || inFlight >= 4) {
                       link.close();
                       return;
                     }
-                    acquired.link = link;
-                    return () => {
-                      active = false;
-                      awaitingAck.clear();
-                    };
-                  },
-                  onPageText: (data) => {
-                    const decoded = decodeMossFrame(data);
-                    if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
-                    // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
-                    const v = settings.voice();
-                    if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !c.ending)) return data;
-                    toolsEnabled = true;
-                    return Option.getOrUndefined(
-                      mossFrame({
-                        action: "session.update",
-                        session: {
-                          persona: { prompt: v.persona },
-                          instructions: mossInstructions(v.greeting),
-                          tools: [mossOrchestratorTool],
-                        },
-                      }),
-                    );
-                  },
-                  onMossText: (data, link) => {
-                    const decoded = decodeMossFrame(data);
-                    if (
-                      decoded._tag === "Some" &&
-                      decoded.value.action === "session.updated" &&
-                      decoded.value.data?.error === "" &&
-                      activeMoss === acquired &&
-                      !acquired.closed
-                    ) {
-                      acquired.ready = true;
-                      for (const piece of acquired.pending.splice(0)) deliverMossPiece(piece, link);
-                    }
-                    const ack = extractMossToolAck(data);
-                    if (ack && awaitingAck.delete(ack)) sendMoss(link, { action: "response.create", response: { call_ids: [ack] } });
-                    for (const toolCall of extractMossToolCalls(data)) {
-                      if (!active || acquired.closed || !toolsEnabled || executed.has(toolCall.callId)) continue;
-                      if (executed.size >= 64 || inFlight >= 4) {
-                        link.close();
-                        return;
-                      }
-                      executed.add(toolCall.callId);
-                      inFlight++;
-                      forkMoss(
-                        response.brief(toolCall.question).pipe(
-                          Effect.orElseSucceed(() => t("server.voice.moss.toolFailed")),
-                          Effect.tap((answer) =>
-                            Effect.sync(() => {
-                              if (!active || acquired.closed) return;
-                              awaitingAck.add(toolCall.callId);
-                              sendMoss(link, {
-                                action: "conversation.item.create",
-                                item: { type: "function_call_output", call_id: toolCall.callId, output: answer || t("server.voice.moss.toolFailed") },
-                              });
-                            }),
-                          ),
-                          Effect.ignore({ log: "Warn", message: "vibevalley: voice: ask_orchestrator tool result failed" }),
-                          Effect.ensuring(
-                            Effect.sync(() => {
-                              inFlight--;
-                            }),
-                          ),
+                    executed.add(toolCall.callId);
+                    inFlight++;
+                    forkMoss(
+                      response.brief(toolCall.question).pipe(
+                        Effect.orElseSucceed(() => t("server.voice.moss.toolFailed")),
+                        Effect.tap((answer) =>
+                          Effect.sync(() => {
+                            if (!active || acquired.closed) return;
+                            awaitingAck.add(toolCall.callId);
+                            sendMoss(link, {
+                              action: "conversation.item.create",
+                              item: { type: "function_call_output", call_id: toolCall.callId, output: answer || t("server.voice.moss.toolFailed") },
+                            });
+                          }),
                         ),
-                      );
-                    }
-                  },
+                        Effect.ignore({ log: "Warn", message: "vibevalley: voice: ask_orchestrator tool result failed" }),
+                        Effect.ensuring(
+                          Effect.sync(() => {
+                            inFlight--;
+                          }),
+                        ),
+                      ),
+                    );
+                  }
                 },
-                connection.model,
-              );
+              });
             }),
         };
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const connection = yield* provider.dictation().pipe(Effect.mapError((error) => unavailable(error.reason, "dictation")));
         const input = yield* transcriptionAudio(audio64, given).pipe(Effect.mapError(mapTranscriptionFailure));
-        const selected = yield* transcriptionModel(connection, input.format).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+        const selected = yield* connection.transcriber(input.format);
         const result = yield* transcribeAudio(selected, input.audio).pipe(Effect.mapError(mapTranscriptionFailure));
         return { text: result.text };
       }, Effect.scoped),

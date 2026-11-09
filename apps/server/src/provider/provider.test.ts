@@ -11,7 +11,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { type Account, type ProviderAccount, Provider } from "./provider.ts";
+import { type Account, type Dictation, Provider } from "./provider.ts";
 import type { ImageRequest } from "./vendors.ts";
 
 const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
@@ -20,11 +20,42 @@ const notIn = (value: unknown, secret: string) =>
     expect(text).not.toContain(secret);
   });
 
+/** Every request the Provider's calls have sent, last one last: its key and address. */
+const sent: { readonly key: string; readonly url: string }[] = [];
 const layer = (http: HttpClient.HttpClient) =>
   Provider.layer.pipe(
     Layer.provideMerge(Setting.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    Layer.provide(Layer.succeed(HttpClient.HttpClient, http)),
+    Layer.provide(
+      Layer.succeed(
+        HttpClient.HttpClient,
+        HttpClient.make((request) => {
+          sent.push({ key: request.headers.authorization ?? "", url: request.url });
+          return http.execute(request);
+        }),
+      ),
+    ),
   );
+/** The key a call sent, run once whatever the vendor answers. */
+const keyUsedBy = <A, E>(call: Effect.Effect<A, E>) =>
+  call.pipe(
+    Effect.exit,
+    Effect.map(() => sent.at(-1)?.key ?? ""),
+  );
+/** One recording transcribed by a dictation. */
+const dictated = (dictation: Dictation) =>
+  Effect.scoped(
+    dictation
+      .transcriber("wav")
+      .pipe(
+        Effect.flatMap((model) =>
+          Effect.tryPromise({ try: () => model.doGenerate({ audio: new Uint8Array([1]), mediaType: "audio/wav" }), catch: () => "not transcribed" }),
+        ),
+      ),
+  );
+/** The key a bound account's or a dictation's calls send. */
+const keyOf = (bound: Account | Dictation) => keyUsedBy("tasks" in bound ? bound.tasks.get("task").pipe(Effect.ignore) : dictated(bound).pipe(Effect.ignore));
+/** The key the use's binding sends now. */
+const keyNow = <E>(bound: Effect.Effect<Account | Dictation, E>) => bound.pipe(Effect.flatMap(keyOf));
 const configured = (key = "test-first-key"): ProviderUpdate => ({
   revision: 0,
   connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key }],
@@ -40,22 +71,8 @@ const configured = (key = "test-first-key"): ProviderUpdate => ({
 });
 
 const drawing: ImageRequest = { prompt: "A quiet farm", width: 256, height: 256, enhance: false, watermark: true };
-/** A vendor that answers 503 and keeps each request's key: what a bound call sends, run once. */
-const recording = () => {
-  const keys: string[] = [];
-  const http = HttpClient.make((request) => {
-    keys.push(request.headers.authorization ?? "");
-    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status: 503 })));
-  });
-  const keyUsedBy = <A, E>(call: Effect.Effect<A, E>) =>
-    call.pipe(
-      Effect.exit,
-      Effect.map(() => keys.at(-1) ?? ""),
-    );
-  /** The key an account's calls send; a realtime account still hands its key over. */
-  const keyOf = (account: Account | ProviderAccount) => ("key" in account ? Effect.succeed(`Bearer ${account.key}`) : keyUsedBy(account.tasks.get("task")));
-  return { http, keyUsedBy, keyOf };
-};
+/** A vendor that answers every call 503. */
+const unavailable = HttpClient.make((request) => Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status: 503 }))));
 
 it.effect.each(["moss-transcribe-1.0-2026-07-22", "moss-transcribe-diarize-pro-2026-07-03"])(
   "regression: dictation accepts the explicit snapshot %s without substituting its stable alias",
@@ -64,12 +81,15 @@ it.effect.each(["moss-transcribe-1.0-2026-07-22", "moss-transcribe-diarize-pro-2
       const provider = yield* Provider;
       yield* provider.update({ ...configured(), dictation: { connection: "moss", model } });
       const dictation2 = yield* provider.dictation();
-      expect(dictation2).toEqual({ url: "https://api.mosi.cn/v1", model, key: "test-first-key" });
+      expect(dictation2.model).toBe(model);
+      const key = yield* keyOf(dictation2);
+      expect(key).toBe("Bearer test-first-key");
+      expect(sent.at(-1)?.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
     }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Selecting a snapshot must not invoke the vendor"))))),
 );
 
 it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding %s is independent, private and frozen per call", (model) => {
-  const { http, keyOf } = recording();
+  const http = unavailable;
   return Effect.gen(function* () {
     const provider = yield* Provider;
     const understandingFailure = yield* Effect.flip(provider.understanding());
@@ -85,8 +105,10 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
     const frozenKey = yield* keyOf(frozen);
     expect(frozenKey).toBe("Bearer vision-private-key");
     yield* notIn(frozen, "vision-private-key");
-    expect((yield* provider.live()).key).toBe("test-first-key");
-    expect((yield* provider.dictation()).key).toBe("test-first-key");
+    const liveKey1 = yield* keyNow(provider.live());
+    expect(liveKey1).toBe("Bearer test-first-key");
+    const dictationKey2 = yield* keyNow(provider.dictation());
+    expect(dictationKey2).toBe("Bearer test-first-key");
     if (saved.understanding) saved.understanding.model = "changed-by-caller";
     expect(provider.status().understanding?.model).toBe(model);
     for (const connections of [
@@ -109,7 +131,7 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
 });
 
 it.effect("cleanup resolves the original connection rather than the current default binding", () => {
-  const { http, keyOf } = recording();
+  const http = unavailable;
   return Effect.gen(function* () {
     const provider = yield* Provider;
     const config: ProviderUpdate = {
@@ -144,8 +166,9 @@ const http = HttpClient.make((request) => Effect.succeed(HttpClientResponse.from
 
 it.effect("connections and uses share credentials; replacing and clearing observe revisions", () => {
   const keys: (string | undefined)[] = [];
+  // Only the model catalog's requests: the others here are the test asking which key a binding sends.
   const capture = HttpClient.make((request) => {
-    keys.push(request.headers.authorization);
+    if (request.url.endsWith("/models")) keys.push(request.headers.authorization);
     return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(catalog)));
   });
   return Effect.gen(function* () {
@@ -159,9 +182,13 @@ it.effect("connections and uses share credentials; replacing and clearing observ
     expect(saved.connections[0]?.key).toEqual({ source: "settings", hint: "…-key" });
     yield* notIn(saved, "test-first-key");
     expect(setting.status()).toMatchObject({ readiness: { live: { ready: true }, dictation: { ready: true } } });
-    expect((yield* provider.live()).key).toBe("test-first-key");
+    const liveKey3 = yield* keyNow(provider.live());
+    expect(liveKey3).toBe("Bearer test-first-key");
     const dictation2 = yield* provider.dictation();
-    expect(dictation2).toEqual({ url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0", key: "test-first-key" });
+    expect(dictation2.model).toBe("moss-transcribe-1.0");
+    const dictationKey = yield* keyOf(dictation2);
+    expect(dictationKey).toBe("Bearer test-first-key");
+    expect(sent.at(-1)?.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
     const modelList = yield* api["provider.model.list"]({ connection: "moss", revision: 1 });
     expect(modelList).toEqual({
       connection: "moss",
@@ -210,7 +237,8 @@ it.effect("deletion, disabling and clearing require explicit unbinding and unsup
       .pipe(Effect.flip);
     expect(updatedFailure).toMatchObject({ _tag: "Refused" });
     yield* provider.update({ ...configured(), revision: 1, connections: [kept] });
-    expect((yield* provider.live()).key).toBe("test-first-key");
+    const liveKey4 = yield* keyNow(provider.live());
+    expect(liveKey4).toBe("Bearer test-first-key");
     expect(provider.status().connections[0]?.name).toBe("renamed");
     yield* provider.update({
       ...configured(),
@@ -235,7 +263,8 @@ it.effect("stale updates cannot overwrite another writer and general settings sa
     expect(results.toSorted()).toEqual(["refused", "saved"]);
     expect(provider.status().revision).toBe(1);
     yield* Effect.all([provider.update({ ...configured("third-key"), revision: 1 }), setting.save({ deepseekApiKey: "test-deepseek" })], { concurrency: 2 });
-    expect((yield* provider.live()).key).toBe("third-key");
+    const liveKey5 = yield* keyNow(provider.live());
+    expect(liveKey5).toBe("Bearer third-key");
     expect(setting.deepseekApiKey()).toBe("test-deepseek");
   }).pipe(Effect.provide(layer(http))),
 );
@@ -280,8 +309,10 @@ it.effect("each use resolves its own account without key fallback", () =>
       ],
       live: { connection: "live", model: "moss-live-1.0" },
     });
-    expect((yield* provider.live()).key).toBe("live-key");
-    expect((yield* provider.dictation()).key).toBe("dictation-key");
+    const liveKey6 = yield* keyNow(provider.live());
+    expect(liveKey6).toBe("Bearer live-key");
+    const dictationKey7 = yield* keyNow(provider.dictation());
+    expect(dictationKey7).toBe("Bearer dictation-key");
   }).pipe(Effect.provide(layer(http))),
 );
 
@@ -306,7 +337,7 @@ it.effect.each(["moss-image-base-1.0", "moss-image-sft-1.0", "moss-image-base-1.
 );
 
 it.effect("image references protect their account, allow atomic rebinding, and freeze credentials for a started task", () => {
-  const { http, keyUsedBy } = recording();
+  const http = unavailable;
   return Effect.gen(function* () {
     const provider = yield* Provider;
     const first = configured().connections[0];
@@ -317,8 +348,10 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     const frozen = yield* provider.image(drawing);
     const frozenKey = yield* keyUsedBy(frozen.run);
     expect(frozenKey).toBe("Bearer test-image-key");
-    expect((yield* provider.live()).key).toBe("test-first-key");
-    expect((yield* provider.dictation()).key).toBe("test-first-key");
+    const liveKey8 = yield* keyNow(provider.live());
+    expect(liveKey8).toBe("Bearer test-first-key");
+    const dictationKey9 = yield* keyNow(provider.dictation());
+    expect(dictationKey9).toBe("Bearer test-first-key");
     for (const connections of [[first], [first, { ...image, enabled: false }], [first, { ...image, key: null }]]) {
       const updatedFailure = yield* provider.update({ ...config, revision: 1, connections }).pipe(Effect.flip);
       expect(updatedFailure).toMatchObject({ _tag: "Refused" });
@@ -334,7 +367,8 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     yield* provider.update({ ...configured("rotated-key"), revision: 2 });
     const imageFailure = yield* provider.image(drawing).pipe(Effect.flip);
     expect(imageFailure).toMatchObject({ _tag: "Refused" });
-    expect((yield* provider.live()).key).toBe("rotated-key");
+    const liveKey10 = yield* keyNow(provider.live());
+    expect(liveKey10).toBe("Bearer rotated-key");
   }).pipe(Effect.provide(layer(http)));
 });
 
@@ -363,10 +397,10 @@ it.effect.each([
   { use: "vision", model: "moss-vl-realtime-1.0" },
   { use: "live", model: "moss-live-1.0" },
 ] as const)("$use protects and freezes its own account independently of other bindings", ({ use, model }) => {
-  const { http, keyOf } = recording();
+  const http = unavailable;
   return Effect.gen(function* () {
     const provider = yield* Provider;
-    const bound = (): Effect.Effect<Account | ProviderAccount, Refused> => provider[use]();
+    const bound = (): Effect.Effect<Account, Refused> => provider[use]();
     const resultFailure = yield* bound().pipe(Effect.flip);
     expect(resultFailure).toMatchObject({ _tag: "Refused" });
     const connection = { id: "separate", name: "Separate", adapter: "moss", enabled: true, key: "separate-private-key" } as const;
@@ -376,7 +410,8 @@ it.effect.each([
     expect(frozen).toMatchObject({ connection: connection.id, revision: 1, model });
     const frozenKey = yield* keyOf(frozen);
     expect(frozenKey).toBe(`Bearer ${connection.key}`);
-    expect((yield* provider.dictation()).key).toBe("test-first-key");
+    const dictationKey11 = yield* keyNow(provider.dictation());
+    expect(dictationKey11).toBe("Bearer test-first-key");
     if (saved[use]) saved[use].model = "caller-mutated";
     expect((yield* bound()).model).toBe(model);
     for (const patch of [

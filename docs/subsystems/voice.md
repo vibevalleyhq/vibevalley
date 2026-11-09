@@ -42,7 +42,7 @@
   - 通话中若 `Inbox.news` 出现新事项，先等 3 秒合并同批事项，经 `Orchestrator.brief` 生成口语摘要，再调声网 `session.say`（`APPEND` 排在当前话音后，按句切分为 480 字节以内）播报。
   - 未通话时手机按 Inbox 响铃；主人接听时带该事项启动通话，跳过开场白直接由管家播报该事项。
 - **一段听写绑定唯一输入框目标**：录音开始时锁定发起的输入框；切换焦点或在别处点停止不会写错目标，组件卸载时自动取消在途转写。
-- **MOSS Live 经服务端隐藏密钥中继**：页面连 `/api/v1/voice/moss/line`（校验同源 `Origin` 与回环 `Host`），服务端从 Provider 取 MOSS Live 绑定连接的 Key，握手时注入并双向透传帧。
+- **MOSS Live 经服务端隐藏密钥中继**：页面连 `/api/v1/voice/moss/line`（校验同源 `Origin` 与回环 `Host`），服务端向 Provider 要 MOSS Live 绑定的账号，用它封着 Key 的线路握手（Key 由 Provider 注入，回传的帧里也由它抹掉），双向透传帧。
 
 ## 怎么走
 
@@ -56,7 +56,7 @@
 **语音听写**
 
 1. 点击或按住听写键录制 16kHz 单声道 WAV，松开后将 base64 音频交 `POST /api/v1/voice/dictate`（上限 25MB）。
-2. Voice 向 Provider 要解析后的调用配置：MOSS 使用「AI 服务」中绑定的连接与模型，自建使用听写设置；经唯一 `/audio/transcriptions` 实现调用（限时 2 分钟），返回文本插入原输入框光标处。
+2. Voice 向 Provider 要绑定好的听写（模型，和封着地址与 Key 的转写器）：MOSS 使用「AI 服务」中绑定的连接与模型，自建使用听写设置；经唯一 `/audio/transcriptions` 实现调用（限时 2 分钟），返回文本插入原输入框光标处。
 
 ### Live 与独立 Vision
 
@@ -80,7 +80,7 @@ Vision 的帧要先等 `input.frame.ready` 再发送二进制，等 `input.frame
 
 - **管家与频道（`orchestrator`、`channel`）**：管家经 `response.ts` 处理流式回答与 `brief` 播报；定稿文字经 `Channel.spoken` 写默认频道。
 - **通知与设置（`inbox`、`setting`）**：订阅 `Inbox.news` 驱动通话内主动播报；从 `Setting` 实时读取声网凭据与语音配置。
-- **[AI 服务](docs/subsystems/provider.md)**：Provider 解析听写连接与默认模型、提供 MOSS Live 绑定凭据；语音页不再保存独立的 MOSS Key。
+- **[AI 服务](docs/subsystems/provider.md)**：Provider 解析听写连接与默认模型、交出 MOSS Live 与 Vision 绑定的账号（Key 封在线路里）；语音页不再保存独立的 MOSS Key。
 
 ## 为什么这样
 
