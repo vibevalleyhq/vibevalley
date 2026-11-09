@@ -365,15 +365,18 @@ const make = Effect.gen(function* () {
       if (full) return { refused: full };
       hired++;
       const id = sessionId(`w${hired}`);
-      let placeError = "";
-      const openedPlace = yield* Effect.option(
-        (issue && repo
+      const openedPlace = yield* (
+        issue && repo
           ? repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
           : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
-        ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message }))))),
+      ).pipe(
+        Effect.match({
+          onFailure: (e) => ({ ok: false as const, refused: t("server.session.life.noPlace", { name: agent.name, why: e.message }) }),
+          onSuccess: (place) => ({ ok: true as const, place }),
+        }),
       );
-      if (Option.isNone(openedPlace)) return { refused: placeError };
-      const place = openedPlace.value;
+      if (!openedPlace.ok) return { refused: openedPlace.refused };
+      const place = openedPlace.place;
       const releasePlace = place.repo ? repos.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
       let committed = false;
       let released = false;

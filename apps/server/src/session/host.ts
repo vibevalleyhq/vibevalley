@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { Cause, Clock, Deferred, Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Semaphore, Stream } from "effect";
 
 import { type Brain, type BrainEvent, makeBrain, sessionUnfinished } from "@vibevalley/agent/brain";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -30,39 +30,82 @@ export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly bran
   cause: Schema.Defect(),
 }) {}
 
+type CallerState =
+  | { readonly _tag: "buffering"; readonly kept: string[] }
+  | { readonly _tag: "streaming"; readonly reader: Queue.Queue<string, NotAnswered | Cause.Done> }
+  | { readonly _tag: "ended"; readonly kept: readonly string[] }
+  | { readonly _tag: "failed"; readonly kept: readonly string[]; readonly failure: Cause.Cause<NotAnswered> };
+
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before. */
 export class Caller {
-  private kept: string[] = [];
-  private ended = false;
-  private failure: Cause.Cause<NotAnswered> | undefined;
-  private reader: Queue.Queue<string, NotAnswered | Cause.Done> | undefined;
+  private state: CallerState = { _tag: "buffering", kept: [] };
 
   push(text: string) {
-    if (this.ended) return;
-    if (this.reader) Queue.offerUnsafe(this.reader, text);
-    else this.kept.push(text);
+    switch (this.state._tag) {
+      case "buffering":
+        this.state.kept.push(text);
+        return;
+      case "streaming":
+        Queue.offerUnsafe(this.state.reader, text);
+        return;
+      case "ended":
+      case "failed":
+        return;
+    }
   }
 
   end() {
-    if (this.ended) return;
-    this.ended = true;
-    if (this.reader) Queue.endUnsafe(this.reader);
+    switch (this.state._tag) {
+      case "buffering":
+        this.state = { _tag: "ended", kept: this.state.kept };
+        return;
+      case "streaming":
+        Queue.endUnsafe(this.state.reader);
+        this.state = { _tag: "ended", kept: [] };
+        return;
+      case "ended":
+      case "failed":
+        return;
+    }
   }
 
   fail(cause: unknown) {
-    if (this.ended) return;
-    this.failure = Cause.fail(new NotAnswered({ message: messageOf(cause), cause }));
-    this.ended = true;
-    if (this.reader) Queue.failCauseUnsafe(this.reader, this.failure);
+    const failure = Cause.fail(new NotAnswered({ message: messageOf(cause), cause }));
+    switch (this.state._tag) {
+      case "buffering":
+        this.state = { _tag: "failed", kept: this.state.kept, failure };
+        return;
+      case "streaming":
+        Queue.failCauseUnsafe(this.state.reader, failure);
+        this.state = { _tag: "failed", kept: [], failure };
+        return;
+      case "ended":
+      case "failed":
+        return;
+    }
   }
 
   readonly words: Stream.Stream<string, NotAnswered> = Stream.callback<string, NotAnswered>((queue) =>
     Effect.sync(() => {
-      for (const w of this.kept) Queue.offerUnsafe(queue, w);
-      this.kept = [];
-      if (this.failure) Queue.failCauseUnsafe(queue, this.failure);
-      else if (this.ended) Queue.endUnsafe(queue);
-      else this.reader = queue;
+      switch (this.state._tag) {
+        case "buffering":
+          for (const w of this.state.kept) Queue.offerUnsafe(queue, w);
+          this.state = { _tag: "streaming", reader: queue };
+          return;
+        case "ended":
+          for (const w of this.state.kept) Queue.offerUnsafe(queue, w);
+          this.state = { _tag: "ended", kept: [] };
+          Queue.endUnsafe(queue);
+          return;
+        case "failed":
+          for (const w of this.state.kept) Queue.offerUnsafe(queue, w);
+          Queue.failCauseUnsafe(queue, this.state.failure);
+          this.state = { _tag: "failed", kept: [], failure: this.state.failure };
+          return;
+        case "streaming":
+          this.state = { _tag: "streaming", reader: queue };
+          return;
+      }
     }),
   );
 }
@@ -151,7 +194,7 @@ export const makeHost = <R>(
     let open = false;
     let prefixChanged: string[] = [];
     let closing = false;
-    const closed = yield* Deferred.make<void>();
+    let closer: Fiber.Fiber<void> | undefined;
     let brain: { readonly brain: Brain; readonly scope: Scope.Closeable; readonly following: Fiber.Fiber<void> } | undefined;
     /** Held from building an input to handing it over, so that each input's text follows the one before. */
     const inputs = yield* Semaphore.make(1);
@@ -396,10 +439,12 @@ export const makeHost = <R>(
       yield* inProcess.close.pipe(Effect.catch((err) => log(`in-process run: ${err.message}`)));
     });
 
-    const close = Effect.suspend(() => {
-      if (closing) return Deferred.await(closed);
+    const close = Effect.gen(function* () {
       closing = true;
-      return closeOnce.pipe(Effect.ensuring(Deferred.done(closed, Exit.void)), Effect.andThen(Deferred.await(closed)));
+      // On the owner's scope, not the first caller's fiber: a caller that is interrupted stops waiting, and the close
+      // goes on for every other caller (the owner closing waits for it too).
+      closer ??= yield* Effect.forkIn(closeOnce, owner, { uninterruptible: true });
+      yield* Fiber.await(closer);
     });
 
     const markWrong = (on: number, want: string, model: string, tools: readonly string[]) =>

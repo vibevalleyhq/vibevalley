@@ -49,21 +49,27 @@ const who = (from: From | undefined) => (from ?? []).join("/");
 
 export type Journal = ReturnType<typeof makeJournal>;
 
+type ActiveDraft =
+  | { readonly _tag: "none" }
+  | { readonly _tag: "text"; readonly event: SessionEvent; readonly who: string }
+  | { readonly _tag: "toolCall"; readonly event: SessionEvent; readonly callKey: string };
+
 function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e: SessionEvent) => void, time: Time, keep: number = keepEvents) {
   let steps = [...initial];
   let next = (steps.at(-1)?.seq ?? -1) + 1;
   const calls = new Map<string, number>();
   const started = new Map<string, number>();
-  let draft: SessionEvent | undefined;
-  let draftWho = "";
-  let draftCall = "";
+  let draft: ActiveDraft = { _tag: "none" };
   let dirty: number[] = [];
   let pushing: (() => void) | undefined;
   let closed = false;
   let run: string | undefined;
 
+  const currentDraft = (): SessionEvent | undefined => (draft._tag === "none" ? undefined : draft.event);
+
   function events() {
-    return [...steps, ...(draft ? [{ ...draft }] : [])];
+    const d = currentDraft();
+    return [...steps, ...(d ? [{ ...d }] : [])];
   }
 
   const body = () => JSON.stringify(steps);
@@ -71,8 +77,9 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
   const flush = () => {
     pushing?.();
     pushing = undefined;
+    const d = currentDraft();
     const out = dirty.flatMap((n) => {
-      const step = steps.findLast((s) => s.seq === n) ?? (draft?.seq === n ? draft : undefined);
+      const step = steps.findLast((s) => s.seq === n) ?? (d?.seq === n ? d : undefined);
       return step ? [{ ...step }] : [];
     });
     dirty = [];
@@ -108,11 +115,9 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
 
   /** Writes the draft, as it is, after every event before it. */
   function seal() {
-    if (!draft) return;
-    const d = draft;
-    draft = undefined;
-    draftWho = "";
-    draftCall = "";
+    if (draft._tag === "none") return;
+    const d = draft.event;
+    draft = { _tag: "none" };
     append(d);
   }
 
@@ -132,11 +137,10 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
   /** Makes e the draft, sealing the one before; it is pushed live from now on. */
   function makeDraft(e: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined, call: string) {
     seal();
-    draft = stamp(e, from);
-    draftWho = who(from);
-    draftCall = call;
-    changed(draft.seq);
-    return draft.seq;
+    const event = stamp(e, from);
+    draft = call ? { _tag: "toolCall", event, callKey: call } : { _tag: "text", event, who: who(from) };
+    changed(event.seq);
+    return event.seq;
   }
 
   /** Opens run id: every event after it is the run's until runEnded closes it with how it ended. */
@@ -158,11 +162,10 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
   /** Goes on with what is being said or thought, by the same one, in the draft; anything else starts a new one. */
   function runOn(kind: SessionEventType, text: string, from?: From) {
     if (!text) return;
-    const d = draft;
-    if (d && d.type === kind && draftWho === who(from)) {
-      d.text = cut(d.text + text, textMax);
-      d.revision++;
-      changed(d.seq);
+    if (draft._tag === "text" && draft.event.type === kind && draft.who === who(from)) {
+      draft.event.text = cut(draft.event.text + text, textMax);
+      draft.event.revision++;
+      changed(draft.event.seq);
       return;
     }
     makeDraft({ type: kind, text: cut(text, textMax) }, from, "");
@@ -200,11 +203,10 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
 
   function toolInput(callId: string, input: string, text: string, from?: From) {
     // Only the draft takes it: a call already written is not changed (its input came too late to be in it).
-    const d = draft;
-    if (d && draftCall === callKey(from, callId)) {
-      d.input = cut(input, inputMax);
-      if (text) d.text = text;
-      d.revision++;
+    if (draft._tag === "toolCall" && draft.callKey === callKey(from, callId)) {
+      draft.event.input = cut(input, inputMax);
+      if (text) draft.event.text = text;
+      draft.event.revision++;
       seal();
     }
   }

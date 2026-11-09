@@ -54,13 +54,21 @@ interface Device extends LanDevice {
   written: number;
 }
 
-interface Pairing {
-  readonly code: string;
-  expires: number;
-  asking: string;
-  answer?: (allow: boolean) => void;
-  wrong: number;
-}
+type ListenerState =
+  | { readonly _tag: "closed" }
+  | { readonly _tag: "listening"; readonly server: Server; readonly port: number }
+  | { readonly _tag: "failed"; readonly problem: string };
+
+type PairingState =
+  | { readonly _tag: "idle" }
+  | { readonly _tag: "awaitingCode"; readonly code: string; readonly expires: number; wrong: number }
+  | {
+      readonly _tag: "awaitingApproval";
+      readonly code: string;
+      readonly asking: string;
+      readonly expires: number;
+      answer?: (allow: boolean) => void;
+    };
 
 export class Lan extends Context.Service<
   Lan,
@@ -169,14 +177,12 @@ const make = (options: LanOptions = {}) =>
       });
     }
     // No row yet is shut.
-    let open = Option.match(yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen())), {
+    const initialOpen = Option.match(yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen())), {
       onNone: () => false,
       onSome: (r) => r.open,
     });
-    let server: Server | undefined;
-    let port = 0;
-    let problem = "";
-    let pairing: Pairing | undefined;
+    let listener: ListenerState = { _tag: "closed" };
+    let pairing: PairingState = { _tag: "idle" };
     // Opening binds the port after its write: a shut that came in between would find no server yet and leave the one bound after it listening.
     const opening = yield* Semaphore.make(1);
     let upstream = "";
@@ -194,17 +200,21 @@ const make = (options: LanOptions = {}) =>
       return d ? Effect.succeed(d) : Effect.fail(missing(t("server.lan.noDevice", { id }), [lookIn.device]));
     };
     const dropPairing = () => {
-      pairing?.answer?.(false);
-      pairing = undefined;
+      if (pairing._tag === "awaitingApproval") pairing.answer?.(false);
+      pairing = { _tag: "idle" };
     };
-    const livePairing = () => {
-      if (pairing && now() >= pairing.expires) dropPairing();
+    const livePairing = (): Exclude<PairingState, { readonly _tag: "idle" }> | undefined => {
+      if (pairing._tag === "idle") return undefined;
+      if (now() >= pairing.expires) {
+        dropPairing();
+        return undefined;
+      }
       return pairing;
     };
     const url = () => {
-      if (!server) return "";
+      if (listener._tag !== "listening") return "";
       const host = address();
-      return host ? `http://${host}:${port}` : "";
+      return host ? `http://${host}:${listener.port}` : "";
     };
 
     const deviceOf = (req: IncomingMessage) => {
@@ -326,28 +336,27 @@ const make = (options: LanOptions = {}) =>
 
     // A port taken is said in the status; the farm runs on.
     const listen = Effect.callback<void>((resume) => {
-      if (server) return resume(Effect.void);
+      if (listener._tag === "listening") return resume(Effect.void);
       const s = createServer(guard);
       s.on("upgrade", tunnel);
       s.once("error", (e) => {
-        problem = t("server.lan.cannotOpen", { why: e.message });
+        listener = { _tag: "failed", problem: t("server.lan.cannotOpen", { why: e.message }) };
         logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
         resume(Effect.void);
       });
       s.listen(config.lan.port, options.host, () => {
-        problem = "";
-        server = s;
         const a = s.address();
-        port = a === null || typeof a === "string" ? config.lan.port : a.port;
-        logs.info(`vibevalley: lan access is open on port ${port}`);
+        const boundPort = a === null || typeof a === "string" ? config.lan.port : a.port;
+        listener = { _tag: "listening", server: s, port: boundPort };
+        logs.info(`vibevalley: lan access is open on port ${boundPort}`);
         resume(Effect.void);
       });
     });
 
     const shut = Effect.suspend(() => {
       dropPairing();
-      const current = server;
-      server = undefined;
+      const current = listener._tag === "listening" ? listener.server : undefined;
+      listener = { _tag: "closed" };
       if (!current) return Effect.void;
       // An upgraded socket is no longer the server's to close.
       for (const mine of conns.values()) for (const cut of mine) cut();
@@ -358,19 +367,27 @@ const make = (options: LanOptions = {}) =>
     });
 
     const status = (): LanStatus => {
+      const open = listener._tag !== "closed";
+      const problem = listener._tag === "failed" ? listener.problem : "";
       const s: LanStatus = { open, hostName: hostName(), devices: [], problem };
       const addr = url();
-      if (open && server) {
+      if (listener._tag === "listening") {
         if (!addr) s.problem = t("server.lan.noAddress");
         else s.url = addr;
       }
       const p = livePairing();
-      if (p && addr) s.pairing = { code: p.code, link: pairLink(addr, p.code), expiresAt: p.expires, ...(p.asking ? { asking: p.asking } : {}) };
+      if (p && addr)
+        s.pairing = {
+          code: p.code,
+          link: pairLink(addr, p.code),
+          expiresAt: p.expires,
+          ...(p._tag === "awaitingApproval" ? { asking: p.asking } : {}),
+        };
       s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).toSorted((a, b) => a.pairedAt - b.pairedAt);
       return s;
     };
 
-    if (open) yield* listen;
+    if (initialOpen) yield* listen;
     yield* Effect.addFinalizer(() => shut);
 
     const addDevice = Effect.fn("Lan.addDevice")(function* (name: string) {
@@ -386,19 +403,15 @@ const make = (options: LanOptions = {}) =>
       status,
       setOpen: Effect.fn("Lan.setOpen")(function* (want) {
         yield* db.run(lanQ.setLanOpen({ open: want }));
-        open = want;
         if (want) yield* listen;
-        else {
-          problem = "";
-          yield* shut;
-        }
+        else yield* shut;
         return status();
       }, opening.withPermits(1)),
       startPairing: Effect.fn("Lan.startPairing")(function* () {
-        if (!open || !server) return yield* Effect.fail(refuse(t("server.lan.notOpen")));
+        if (listener._tag !== "listening") return yield* Effect.fail(refuse(t("server.lan.notOpen")));
         if (!url()) return yield* Effect.fail(refuse(t("server.lan.noAddress")));
         dropPairing();
-        pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
+        pairing = { _tag: "awaitingCode", code: newCode(10), expires: now() + pairingForMs, wrong: 0 };
         return status();
       }),
       stopPairing: () => {
@@ -407,36 +420,43 @@ const make = (options: LanOptions = {}) =>
       },
       answer: Effect.fn("Lan.answer")(function* (allow) {
         const p = livePairing();
-        if (!p || !p.asking) return yield* Effect.fail(refuse(t("server.lan.noneAsking")));
+        if (!p || p._tag !== "awaitingApproval") return yield* Effect.fail(refuse(t("server.lan.noneAsking")));
         const answer = p.answer;
-        pairing = undefined;
+        pairing = { _tag: "idle" };
         answer?.(allow);
         return status();
       }),
       pair: Effect.fn("Lan.pair")(function* (code, given) {
         const name = deviceName(given);
         const p = livePairing();
-        if (!open) return yield* Effect.fail(refuse(t("server.lan.closedThere")));
+        if (listener._tag === "closed") return yield* Effect.fail(refuse(t("server.lan.closedThere")));
         if (!p) return yield* Effect.fail(refuse(t("server.lan.codeExpired")));
         if (!same(code.trim().toUpperCase(), p.code)) {
-          p.wrong++;
-          if (p.wrong >= wrongTries) dropPairing();
+          if (p._tag === "awaitingCode") {
+            p.wrong++;
+            if (p.wrong >= wrongTries) dropPairing();
+          }
           return yield* Effect.fail(refuse(t("server.lan.wrongCode")));
         }
-        if (p.asking) return yield* Effect.fail(refuse(t("server.lan.anotherAsking")));
-        p.asking = name;
-        p.expires = now() + pairingForMs;
+        if (p._tag === "awaitingApproval") return yield* Effect.fail(refuse(t("server.lan.anotherAsking")));
+        const approval: Extract<PairingState, { readonly _tag: "awaitingApproval" }> = {
+          _tag: "awaitingApproval",
+          code: p.code,
+          asking: name,
+          expires: now() + pairingForMs,
+        };
+        pairing = approval;
         logs.info(`vibevalley: lan access: "${name}" questions to pair`);
         const allow = yield* Effect.callback<boolean>((resume) => {
-          p.answer = (a) => resume(Effect.succeed(a));
+          approval.answer = (a) => resume(Effect.succeed(a));
           // Cut short (the time ran out, or the request went away): unless the owner has answered or a new pairing
           // replaced it.
           return Effect.sync(() => {
-            if (pairing === p) pairing = undefined;
+            if (pairing === approval) pairing = { _tag: "idle" };
           });
         }).pipe(Effect.timeoutOption(pairingForMs), Effect.map(Option.getOrElse(() => "late" as const)));
         if (allow === "late") {
-          if (pairing === p) pairing = undefined;
+          if (pairing === approval) pairing = { _tag: "idle" };
           return yield* Effect.fail(refuse(t("server.lan.ownerLate")));
         }
         if (!allow) return yield* Effect.fail(refuse(t("server.lan.denied")));
@@ -445,7 +465,9 @@ const make = (options: LanOptions = {}) =>
       previewStopPairing: () => {
         const p = livePairing();
         if (!p) return { does: [t("server.lan.noCode")] };
-        return { does: [t("server.lan.dropCode", { code: p.code }), ...(p.asking ? [t("server.lan.dropAsking", { name: p.asking })] : [])] };
+        return {
+          does: [t("server.lan.dropCode", { code: p.code }), ...(p._tag === "awaitingApproval" ? [t("server.lan.dropAsking", { name: p.asking })] : [])],
+        };
       },
       forget: Effect.fn("Lan.forget")(function* (id) {
         yield* known(id);

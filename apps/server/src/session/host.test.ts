@@ -40,6 +40,32 @@ describe("Caller", () => {
       expect(read).toMatchObject({ _tag: "NotAnswered", message: "no model", cause: new Error("no model") });
     }),
   );
+  it.effect("ended before its reader, still hands over what it kept, once", () =>
+    Effect.gen(function* () {
+      const caller = new Caller();
+      caller.push("kept");
+      caller.end();
+      caller.fail(new Error("too late"));
+      expect(yield* Stream.mkString(caller.words)).toBe("kept");
+      expect(yield* Stream.mkString(caller.words)).toBe("");
+    }),
+  );
+
+  it.effect("failed while streaming, the reader gets the words before the failure", () =>
+    Effect.gen(function* () {
+      const caller = new Caller();
+      const heard: string[] = [];
+      const reading = yield* Effect.forkChild(
+        Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))),
+        { startImmediately: true },
+      );
+      caller.push("partly");
+      caller.fail(new Error("no model"));
+      caller.end();
+      expect(yield* Effect.flip(Fiber.join(reading))).toMatchObject({ _tag: "NotAnswered", message: "no model" });
+      expect(heard).toEqual(["partly"]);
+    }),
+  );
 });
 
 describe("AgentHost", () => {
@@ -164,6 +190,48 @@ describe("AgentHost", () => {
       yield* host.close;
       expect(host.current().route).toBe("first");
       expect(yield* Stream.mkString(caller.words)).toBe("");
+    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+  });
+  it.live("regression: a later close still waits for the cleanup when the first closing caller is interrupted", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sessions = yield* Session;
+      const { llm } = scriptedLLM();
+      const host = yield* sessions.host({
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", runtime: "vibevalley", brief: "" },
+        inputType: "testInput",
+        home: config.home,
+        cwd: config.workRoot,
+        instructions: "",
+        llm: () => llm,
+        tools: () => [],
+        first: "first",
+        quiet: () => true,
+        say: () => Effect.void,
+        channel: () => undefined,
+        fresh: () => {},
+        restored: () => ({ by: { kind: "" } }),
+        toolStart: (tool) => ({ text: tool, action: "other", tool }),
+      });
+      const building = yield* Deferred.make<void>();
+      const gate = yield* Deferred.make<void>();
+      yield* Effect.addFinalizer(() => Deferred.succeed(gate, undefined));
+      const submitting = yield* Effect.forkChild(
+        host.submit(
+          () => Effect.as(Effect.andThen(Deferred.succeed(building, undefined), Deferred.await(gate)), { text: "late" }),
+          { route: "late", run: { by: { kind: "" } } },
+          true,
+        ),
+      );
+      yield* Deferred.await(building);
+      const first = yield* Effect.forkChild(host.close, { startImmediately: true });
+      yield* Fiber.interrupt(first);
+      const second = yield* Effect.forkChild(host.close, { startImmediately: true });
+      yield* aTurn;
+      expect(second.pollUnsafe()).toBeUndefined();
+      yield* Deferred.succeed(gate, undefined);
+      expect((yield* Fiber.join(submitting)).ok).toBe(false);
+      yield* Fiber.join(second);
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
 });
