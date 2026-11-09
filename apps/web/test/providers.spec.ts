@@ -83,7 +83,7 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   expect((await api.provider.get()).image).toEqual({ connection: id, model: "moss-image-sft-1.0-2026-10-09" });
   expect((await api.provider.get()).understanding).toEqual({ connection: id, model: "moss-vl-1.0-2026-07-08" });
   expect((await api.provider.get()).speech).toEqual({ connection: id, model: "moss-tts-1.0-pro-2026-02-07" });
-  expect(await api.setting.get()).toMatchObject({ mossReady: true, dictationReady: true });
+  expect(await api.setting.get()).toMatchObject({ readiness: { live: { ready: true }, dictation: { ready: true } } });
   await page.reload();
   await expect(page.getByTestId("provider-dictation-model")).toHaveAttribute("data-value", "moss-transcribe-diarize-pro");
   await expect(page.getByTestId("provider-image-model")).toHaveAttribute("data-value", "moss-image-sft-1.0-2026-10-09");
@@ -140,7 +140,7 @@ test("MOSS connections bind uses, mask credentials, reject stale saves and requi
   }
   await page.getByTestId("save").click();
   await expect(form).toHaveAttribute("data-revision", "4");
-  expect(await api.setting.get()).toMatchObject({ mossReady: false, dictationReady: false });
+  expect(await api.setting.get()).toMatchObject({ readiness: { live: { ready: false, missing: "binding" }, dictation: { ready: false, missing: "binding" } } });
   await connection.getByTestId("provider-models").click();
   await expect(page.getByTestId("provider-error")).toBeVisible();
   await page.getByTestId("provider-delete").click();

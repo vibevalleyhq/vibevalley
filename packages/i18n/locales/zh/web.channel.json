@@ -275,7 +275,8 @@
       "args": "描述",
       "note": "交给这里的管家用 MOSS 画一张，画好发回这里",
       "needs": "/imagegen 后面写想要的画面",
-      "nowhere": "先打开一个频道再生图"
+      "nowhere": "先打开一个频道再生图",
+      "notReady": "生图还没设置好：{why}，回车去设置"
     },
     "done": {
       "issue": "记下了 #{n}",

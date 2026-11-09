@@ -275,7 +275,8 @@
       "args": "description",
       "note": "The manager here draws it with MOSS and posts it here",
       "needs": "Write what to draw after /imagegen",
-      "nowhere": "Open a channel first to make an image"
+      "nowhere": "Open a channel first to make an image",
+      "notReady": "Images aren't set up: {why}. Press Enter to set it up"
     },
     "done": {
       "issue": "Written down as #{n}",

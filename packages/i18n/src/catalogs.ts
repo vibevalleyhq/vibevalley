@@ -2462,6 +2462,7 @@ export const catalogs = {
           note: "交给这里的管家用 MOSS 画一张，画好发回这里",
           needs: "/imagegen 后面写想要的画面",
           nowhere: "先打开一个频道再生图",
+          notReady: "生图还没设置好：{why}，回车去设置",
         },
         done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了", imagegen: "交给管家了，画好会发到这里" },
       },
@@ -4125,6 +4126,15 @@ export const catalogs = {
         cliTaken: "{link} 已经有别的文件，没有换掉：先挪开它再装",
         cliInstall: "安装",
         cliRemove: "移除",
+      },
+      missing: {
+        deepseekKey: "还没填 DeepSeek 的钥匙",
+        mossAccount: "还没有 MOSS 账号",
+        mossKey: "MOSS 账号还没填钥匙",
+        mossOff: "用到的 MOSS 账号停用了",
+        binding: "还没选用哪个账号和模型",
+        agora: "还缺声网的凭据",
+        dictationUrl: "还没填听写的地址",
       },
     },
     "web.tree": {
@@ -7046,6 +7056,7 @@ export const catalogs = {
           note: "The manager here draws it with MOSS and posts it here",
           needs: "Write what to draw after /imagegen",
           nowhere: "Open a channel first to make an image",
+          notReady: "Images aren't set up: {why}. Press Enter to set it up",
         },
         done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped", imagegen: "Handed to the manager; the image will be posted here" },
       },
@@ -8831,6 +8842,15 @@ export const catalogs = {
         cliTaken: "{link} is another program's file and was not replaced: move it away, then install",
         cliInstall: "Install",
         cliRemove: "Remove",
+      },
+      missing: {
+        deepseekKey: "No DeepSeek key yet",
+        mossAccount: "No MOSS account yet",
+        mossKey: "The MOSS account has no key yet",
+        mossOff: "The MOSS account it uses is turned off",
+        binding: "No account and model chosen for it yet",
+        agora: "Agora's credentials are missing",
+        dictationUrl: "No dictation address yet",
       },
     },
     "web.tree": {
@@ -11365,6 +11385,7 @@ export interface Messages {
   "web.channel.commands.imagegen.args": undefined;
   "web.channel.commands.imagegen.name": undefined;
   "web.channel.commands.imagegen.needs": undefined;
+  "web.channel.commands.imagegen.notReady": { readonly why: string | number };
   "web.channel.commands.imagegen.note": undefined;
   "web.channel.commands.imagegen.nowhere": undefined;
   "web.channel.commands.issue.args": undefined;
@@ -13256,6 +13277,13 @@ export interface Messages {
   "web.setting.language.title": undefined;
   "web.setting.language.zh": undefined;
   "web.setting.memory.intro": undefined;
+  "web.setting.missing.agora": undefined;
+  "web.setting.missing.binding": undefined;
+  "web.setting.missing.deepseekKey": undefined;
+  "web.setting.missing.dictationUrl": undefined;
+  "web.setting.missing.mossAccount": undefined;
+  "web.setting.missing.mossKey": undefined;
+  "web.setting.missing.mossOff": undefined;
   "web.setting.models.deepseekHint": undefined;
   "web.setting.models.intro": undefined;
   "web.setting.nav.about": undefined;

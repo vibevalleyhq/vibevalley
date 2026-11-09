@@ -271,7 +271,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   const asr = () => draft().asr;
   const answer = () => draft().answer;
   const credentialsReady = () =>
-    answer().vendor === "moss" ? base().mossReady : base().agoraAppId.source !== null && base().agoraAppCertificate.source !== null;
+    answer().vendor === "moss" ? base().readiness.live.ready : base().agoraAppId.source !== null && base().agoraAppCertificate.source !== null;
   const answerHint = () => {
     const source = base().deepseekApiKey.source;
     return answer().vendor === "orchestrator"

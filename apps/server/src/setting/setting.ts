@@ -10,7 +10,8 @@ import { pkmDir, reposDir, ServerConfig, worktreesDir } from "#/infra/config.ts"
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 
 import { keyHint, memorySourcesOver, settingsProblem } from "./memorySources.ts";
-import { boundConnection, emptyProviders, ProviderSettings } from "./provider.ts";
+import { emptyProviders, ProviderSettings } from "./provider.ts";
+import { readinessOf } from "./readiness.ts";
 import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 const MemorySourceConfig = Schema.Struct({
@@ -150,9 +151,13 @@ const make = Effect.gen(function* () {
       ttsKey: secret(s.ttsKey, "settings"),
       dictation: { via: s.dictation?.via ?? "moss", url: s.dictation?.url ?? "", model: s.dictation?.model ?? "" },
       dictationKey: secret(s.dictationKey, "settings"),
-      dictationReady:
-        s.dictation?.via === "own" ? !!s.dictation.url : !!boundConnection(s.providers ?? emptyProviders, s.providers?.dictation?.connection ?? null),
-      mossReady: !!boundConnection(s.providers ?? emptyProviders, s.providers?.live?.connection ?? null),
+      readiness: readinessOf({
+        providers: s.providers ?? emptyProviders,
+        deepseekKey: deepseek !== undefined,
+        agora: appId !== undefined && certificate !== undefined,
+        dictation: { via: s.dictation?.via ?? "moss", url: s.dictation?.url ?? "" },
+        callAnswer: voiceOf(s).answer.vendor,
+      }),
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
         everything: m.everything ?? false,

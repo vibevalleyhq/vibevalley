@@ -223,7 +223,7 @@ export function useDictation(field: {
   // Unknown until the settings are read; the server says what is missing then.
   const settings = useSettings();
   const router = useRouter();
-  const off = () => ready(settings, undefined)?.dictationReady === false;
+  const off = () => ready(settings, undefined)?.readiness.dictation.ready === false;
   const toggle = () =>
     // Like an event handler, it reads the field as it is when the words come.
     void dictation.toggle(me, (words) => {

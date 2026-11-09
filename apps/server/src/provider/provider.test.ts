@@ -130,7 +130,7 @@ it.effect("connections and uses share credentials; replacing and clearing observ
     const saved = yield* api["provider.update"](configured());
     expect(saved.connections[0]?.key).toEqual({ source: "settings", hint: "…-key" });
     yield* notIn(saved, "test-first-key");
-    expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
+    expect(setting.status()).toMatchObject({ readiness: { live: { ready: true }, dictation: { ready: true } } });
     expect((yield* provider.live()).key).toBe("test-first-key");
     const dictation2 = yield* provider.dictation();
     expect(dictation2).toEqual({ url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0", key: "test-first-key" });
@@ -159,7 +159,7 @@ it.effect("connections and uses share credentials; replacing and clearing observ
     expect(cleared.connections[0]?.key).toEqual({ source: null });
     const liveFailure = yield* provider.live().pipe(Effect.flip);
     expect(liveFailure).toMatchObject({ _tag: "Refused" });
-    expect(setting.status()).toMatchObject({ mossReady: false, dictationReady: false });
+    expect(setting.status()).toMatchObject({ readiness: { live: { ready: false, missing: "binding" }, dictation: { ready: false, missing: "binding" } } });
     const modelsFailure = yield* provider.models({ connection: "moss", revision: 3 }).pipe(Effect.flip);
     expect(modelsFailure).toMatchObject({ _tag: "Refused" });
     expect(keys).toHaveLength(2);

@@ -800,7 +800,7 @@ describe("voice", () => {
   it.live("says dictation is not set up: MOSS without its key, or an own address left empty", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
-      expect((yield* Setting).status().dictationReady).toBe(false);
+      expect((yield* Setting).status().readiness.dictation.ready).toBe(false);
       const dictateFailure = yield* Effect.flip(voice.dictate("AAAA", "wav"));
       expect(dictateFailure).toMatchObject({
         _tag: "VoiceUnavailable",
@@ -846,7 +846,7 @@ describe("voice", () => {
         live: null,
       });
       expect(setting.status().dictation.via).toBe("moss");
-      expect(setting.status().dictationReady).toBe(true);
+      expect(setting.status().readiness.dictation.ready).toBe(true);
       const voice = yield* Voice;
       const dictate2 = yield* voice.dictate("AAAA", "wav");
       expect(dictate2).toEqual({ text: "你好" });

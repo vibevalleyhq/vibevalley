@@ -9,6 +9,7 @@ import type { Mark } from "#/base/typedMarks.ts";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
 import { orchestratorMood } from "#/infra/frame.ts";
+import { ready, settingsQuery, useQuery } from "#/infra/query.ts";
 import { defineAtom } from "#/state/atom.ts";
 import { defineIntent, type Intent, type Intents } from "#/state/intent.ts";
 import { defineStored, orFallback } from "#/state/stored.ts";
@@ -100,14 +101,17 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   };
 
   const orchestrators = useOrchestrators();
-  /** The orchestrator that looks after the place the next line goes to. */
+  const settings = useQuery(settingsQuery);
+  /** What is set up, for the commands that need it (/imagegen); unknown while the settings are on their way. */
+  const readiness = () => ready(settings, undefined)?.readiness;
+  /** The orchestrator in the place the next line goes to. */
   const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
   // A command (/ first in the box) is offered anywhere; no one else is in a direct channel to be named.
   const commandTyping = createMemo(() => (closed() ? undefined : typedCommand(text(), caret())));
   const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
   const offered = createMemo(() => {
     const c = commandTyping();
-    if (c) return offeredFor(commandNameables(), c.query);
+    if (c) return offeredFor(commandNameables(readiness()), c.query);
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
@@ -136,7 +140,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
     setSending(true);
     try {
-      const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() }));
+      const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here(), readiness: readiness() }));
       if (disposed || !done) return;
       edit("", 0);
       if ("open" in done) ways.opened?.(done.open);

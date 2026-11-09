@@ -130,7 +130,7 @@ describe("settings", () => {
       config,
       Effect.gen(function* () {
         const setting = yield* Setting;
-        expect(setting.status().mossReady).toBe(false);
+        expect(setting.status().readiness.live).toEqual({ ready: false, missing: "mossAccount" });
         yield* setting.updateProviders(() =>
           Effect.succeed({
             revision: 1,
@@ -146,7 +146,7 @@ describe("settings", () => {
             vision: { connection: "moss", model: "moss-vl-realtime-1.0" },
           }),
         );
-        expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
+        expect(setting.status()).toMatchObject({ readiness: { live: { ready: true }, dictation: { ready: true } } });
         expect(Formatter.formatJson(setting.status())).not.toContain("test-private-key");
         expect(file(config)).not.toHaveProperty("mossKey");
         expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);

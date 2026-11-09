@@ -50,8 +50,30 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
   const drawingsBox = await composerOn(page, drawings);
   await drawingsBox.fill("/im");
   await expect(page.getByTestId("mentions").locator('[role="option"][data-key="/imagegen"]')).toBeVisible();
+  // Images not set up yet: the line is not said, the settings that fix it open.
   await drawingsBox.fill("/imagegen 一只在麦田里打盹的橘猫");
   await drawingsBox.press("Enter");
+  await expect(page).toHaveURL(/\/settings\/providers$/u);
+  expect(await api.channel.message.list({ id: drawings })).toEqual([]);
+  // Set up (the test runtime answers MOSS), the line goes to the orchestrator there.
+  const providers = await api.provider.get();
+  await api.provider.update({
+    revision: providers.revision,
+    connections: [{ id: "drawings-moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-only-key" }],
+    dictation: null,
+    live: null,
+    image: { connection: "drawings-moss", model: "moss-image-sft-1.0" },
+    understanding: null,
+    speech: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
+  });
+  await page.goto(`/chat/${drawings}`);
+  const again = await composerOn(page, drawings);
+  await again.fill("/imagegen 一只在麦田里打盹的橘猫");
+  await again.press("Enter");
   await expect(page.getByTestId("messages").locator(`[data-testid="message"][data-from="${defaultOrchestrator}"]`).first()).toBeVisible({
     timeout: 15_000,
   });

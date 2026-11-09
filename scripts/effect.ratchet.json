@@ -173,7 +173,7 @@
     "apps/desktop": 3
   },
   "strictBooleanExpressions": {
-    "apps/server": 1725,
+    "apps/server": 1722,
     "apps/cli": 47,
     "packages/agent": 91,
     "packages/ai": 70,

@@ -151,5 +151,14 @@
     "cliTaken": "{link} is another program's file and was not replaced: move it away, then install",
     "cliInstall": "Install",
     "cliRemove": "Remove"
+  },
+  "missing": {
+    "deepseekKey": "No DeepSeek key yet",
+    "mossAccount": "No MOSS account yet",
+    "mossKey": "The MOSS account has no key yet",
+    "mossOff": "The MOSS account it uses is turned off",
+    "binding": "No account and model chosen for it yet",
+    "agora": "Agora's credentials are missing",
+    "dictationUrl": "No dictation address yet"
   }
 }

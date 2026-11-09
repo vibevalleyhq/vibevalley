@@ -151,5 +151,14 @@
     "cliTaken": "{link} 已经有别的文件，没有换掉：先挪开它再装",
     "cliInstall": "安装",
     "cliRemove": "移除"
+  },
+  "missing": {
+    "deepseekKey": "还没填 DeepSeek 的钥匙",
+    "mossAccount": "还没有 MOSS 账号",
+    "mossKey": "MOSS 账号还没填钥匙",
+    "mossOff": "用到的 MOSS 账号停用了",
+    "binding": "还没选用哪个账号和模型",
+    "agora": "还缺声网的凭据",
+    "dictationUrl": "还没填听写的地址"
   }
 }
