@@ -42,6 +42,20 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
   const kept = (await api.channel.list()).filter((c) => c.id === general.id);
   expect(kept.map((c) => [c.members, c.orchestrator])).toEqual([[[id], id]]);
 
+  // /imagegen is said to the orchestrator in the place alone: in a channel no one is in, the default one still hears it.
+  // Without a model key it says it cannot start; that it says anything there is that the line reached it.
+  const drawings = await api.channel.create({ name: "drawings" });
+  await api.channel.update({ id: drawings, members: [] });
+  await page.goto(`/chat/${drawings}`);
+  const drawingsBox = await composerOn(page, drawings);
+  await drawingsBox.fill("/im");
+  await expect(page.getByTestId("mentions").locator('[role="option"][data-key="/imagegen"]')).toBeVisible();
+  await drawingsBox.fill("/imagegen 一只在麦田里打盹的橘猫");
+  await drawingsBox.press("Enter");
+  await expect(page.getByTestId("messages").locator(`[data-testid="message"][data-from="${defaultOrchestrator}"]`).first()).toBeVisible({
+    timeout: 15_000,
+  });
+
   await page.goto("/agents");
   await page.locator(`[data-testid="agent-card"][data-key="${id}"]`).getByRole("link").click();
   await expect(page).toHaveURL(new RegExp(`/orchestrator/${id}/memory$`, "u"));
