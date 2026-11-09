@@ -1,4 +1,4 @@
-import { Clock, Effect, FiberMap } from "effect";
+import { Effect, FiberMap } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -10,7 +10,7 @@ import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { inputContext } from "#/mailbox/payload.ts";
 import { inboxLines, talkBrief } from "#/mailbox/prompts.ts";
-import { NotRecorded, Session } from "#/session/session.ts";
+import { NotRecorded } from "#/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 
@@ -25,14 +25,15 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
   Effect.gen(function* () {
     const agents = yield* Agent;
     const db = yield* Db;
-    const sessions = yield* Session;
     const mailbox = yield* Mailbox;
     const { model, locked, talkSession, targetOfChannel, channelEnvelope, asInbox, inboxOf } = r;
     const { sessionsLeft } = th;
     const { settle } = w;
     const talkStarts = yield* FiberMap.make<string>();
 
-    const registerTalk = (session: T.Session, launch: string, snapshot: readonly MsgRow[]) =>
+    const ownerChat = (message: MsgRow) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null;
+
+    const joining = (session: T.Session, at: number) =>
       locked(
         Effect.gen(function* () {
           const joined: qp.UpsertParticipantParams = {
@@ -41,20 +42,9 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
             name: session.name,
             agent_id: session.agent,
             runtime: session.runtime,
-            joined_at: yield* Clock.currentTimeMillis,
+            joined_at: at,
           };
           yield* db.attempt(qp.upsertParticipant(joined));
-          yield* mailbox.registerTalk(
-            session.id,
-            launch,
-            joined.joined_at,
-            snapshot
-              .filter((message) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null)
-              .map((message) => {
-                const row = channelEnvelope(message);
-                return { row, context: inputContext(asInbox(row)) };
-              }),
-          );
           model.joined(joined);
         }).pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause }))),
       );
@@ -65,34 +55,35 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
       if (place?.type !== "direct") return;
       const agent = agents.agent(agentId);
       if (!agent) return;
-      const problem = !agent.enabled
-        ? t("server.channel.profileDisabled", { name: agent.name })
-        : yield* Effect.map(sessions.makeRoom(agent.runtime, ""), (room) => ("refused" in room ? room.refused : undefined));
-      if (problem) return yield* notice(channel, t("server.channel.talkFailed", { why: problem }), "talk_refused");
+      if (!agent.enabled)
+        return yield* notice(channel, t("server.channel.talkFailed", { why: t("server.channel.profileDisabled", { name: agent.name }) }), "talk_refused");
       const snapshot = yield* locked(db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n: talkContext })));
       const ordered = snapshot.toReversed();
       const last = ordered.at(-1);
-      const owner = ordered.findLast((m) => m.sender_id === ownerId && m.kind === "chat" && m.deleted_at === null);
+      const owner = ordered.findLast(ownerChat);
       if (!owner) return;
       const target = targetOfChannel(place);
-      const hired = yield* sessions.send(agent, talkBrief(agent.name, inboxLines(ordered.map((m) => inboxOf(m, target)))), "", {
-        context: { kind: "channel", channel },
-        envelopeIds: ordered
-          .filter((message) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null)
-          .map((message) => message.id),
-        trigger: { kind: "comment", channel, message: owner.id },
-        hiring: (session, launch) => registerTalk(session, launch, ordered),
+      const received = yield* mailbox.receive({
+        _tag: "Talk",
+        agent,
+        channel,
+        brief: talkBrief(agent.name, inboxLines(ordered.map((m) => inboxOf(m, target)))),
+        letters: ordered.filter(ownerChat).map((message) => {
+          const row = channelEnvelope(message);
+          return { row, context: inputContext(asInbox(row)) };
+        }),
+        answering: owner.id,
+        joining,
       });
-      if (!hired.session) {
+      const opened = received.opened;
+      if (opened === undefined) {
         yield* locked(sessionsLeft);
-        return yield* notice(channel, t("server.channel.talkFailed", { why: hired.refused ?? "" }), "talk_refused");
+        return yield* notice(channel, t("server.channel.talkFailed", { why: received.refused ?? "" }), "talk_refused");
       }
-      const recipient = hired.session.id;
       yield* locked(
         Effect.gen(function* () {
-          const missed = yield* db.run(qm.missingDirectDeliveries({ channel_id: channel, recipient_id: recipient, after_number: last?.number ?? 0 }));
+          const missed = yield* db.run(qm.missingDirectDeliveries({ channel_id: channel, recipient_id: opened, after_number: last?.number ?? 0 }));
           yield* Effect.forEach(missed, (row) => settle(row), { discard: true });
-          yield* mailbox.kick(recipient);
         }),
       );
     });

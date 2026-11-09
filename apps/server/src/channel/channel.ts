@@ -8,6 +8,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { type ApiError, refused, lookIn, missing } from "#/base/errors.ts";
+import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -321,10 +322,25 @@ const make = Effect.gen(function* () {
     tellSession: Effect.fn("Channel.tellSession")(function* (from, session, text, sendKey) {
       const thread = yield* threadOfSession(session);
       if (!thread) {
-        // Sent with no channel, so no thread to say it in: the session hears it straight.
+        // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
         if (!sessions.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
         const channel = sessionOf(session)?.channel;
-        yield* mailbox.deliverDirect(session, text.trim(), channel, from === ownerId);
+        const at = yield* Clock.currentTimeMillis;
+        const speaker = sessionOf(from);
+        const trigger = yield* mailbox.recordTrigger({
+          source: "channel",
+          key: sendKey || newId(at),
+          actor:
+            from === ownerId
+              ? { kind: "owner", id: ownerId }
+              : { kind: agents.isOrchestrator(from) ? "orchestrator" : "session", id: from, ...(speaker ? { name: speaker.name } : {}) },
+          text: text.trim(),
+          threads: [],
+          addressed: "direct",
+          ...(channel ? { replyChannel: channel } : {}),
+          at,
+        });
+        yield* mailbox.receive({ _tag: "Trigger", trigger, to: { session } });
         return undefined;
       }
       const run = sessions.runOf(from);

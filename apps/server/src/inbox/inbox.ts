@@ -124,7 +124,7 @@ const make = Effect.gen(function* () {
               at: now,
               text: patrolText(top.name, notes),
             })
-            .pipe(Effect.flatMap(mailbox.receive)),
+            .pipe(Effect.flatMap((trigger) => mailbox.receive({ _tag: "Trigger", trigger }))),
         ),
       { discard: true },
     ).pipe(bestEffort("vibevalley: patrol inputs were not kept"));

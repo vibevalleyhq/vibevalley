@@ -8,7 +8,7 @@
     "apps/web": 26
   },
   "asyncFunction": {
-    "apps/server": 265,
+    "apps/server": 266,
     "packages/agent": 48,
     "packages/ai": 9,
     "packages/artifact": 4,
@@ -40,7 +40,7 @@
     "apps/desktop": 4
   },
   "globalDateInEffect": {
-    "apps/server": 7,
+    "apps/server": 8,
     "packages/agent": 21
   },
   "globalFetch": {
@@ -113,7 +113,7 @@
     "apps/desktop": 48
   },
   "preferEffectArray": {
-    "apps/server": 1879,
+    "apps/server": 1878,
     "apps/cli": 119,
     "packages/agent": 181,
     "packages/ai": 94,
@@ -173,7 +173,7 @@
     "apps/desktop": 3
   },
   "strictBooleanExpressions": {
-    "apps/server": 1736,
+    "apps/server": 1734,
     "apps/cli": 47,
     "packages/agent": 91,
     "packages/ai": 70,

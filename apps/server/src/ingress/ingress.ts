@@ -59,7 +59,7 @@ const make = Effect.gen(function* () {
   });
   const accept = Effect.fn("Ingress.accept")(function* (event: SourceEvent) {
     const trigger = yield* record(event);
-    if (trigger) yield* mailbox.receive(trigger);
+    if (trigger) yield* mailbox.receive({ _tag: "Trigger", trigger });
     return trigger;
   });
   const github = yield* githubInputs(accept);

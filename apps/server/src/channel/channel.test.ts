@@ -7,7 +7,7 @@ import { Effect, Fiber, Formatter, Layer, Metric, PubSub, type Scope, Stream } f
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator } from "@vibevalley/protocol";
+import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { channelOf, defaultOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
@@ -652,6 +652,37 @@ describe("the chat", () => {
         yield* until(async () => (await f.deliveryOf("w6", message.id))?.state === "consumed", "the retried input consumed");
         expect(x.runsOf("w6").length).toBeGreaterThan(1);
         expect(x.runsOf("w6").at(-1)).toContain("followup without a model receipt");
+      }),
+    ),
+  );
+
+  it.live("a line told to a session with no thread is a recorded trigger delivered to it alone", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        // Only workers get a thread: a second orchestrator session is present and has none.
+        const session: T.Session = {
+          id: sessionId("o2"),
+          role: "orchestrator",
+          name: "另一个管家",
+          agent: "lab",
+          runtime: "pi",
+          brief: "",
+          repo: "",
+          hiredAt: Date.now(),
+          runs: 0,
+          phase: { _tag: "resting" },
+          refining: false,
+        };
+        yield* keepSession(f, session);
+        yield* f.core.apply({ type: "sessionChanged", session });
+        const thread = yield* f.chat.threadOfSession("o2");
+        expect(thread).toBeUndefined();
+        yield* f.chat.tellSession(ownerId, "o2", "直接说给它", "");
+        const recorded = yield* f.sql<{ id: string }>`select id from mailbox_trigger where trigger_json like ${"%直接说给它%"}`;
+        expect(recorded).toHaveLength(1);
+        yield* until(async () => (await f.deliveryOf("o2", recorded[0]!.id)) !== undefined, "its delivery");
+        const delivered = yield* Effect.promise(() => f.deliveryOf("o2", recorded[0]!.id));
+        expect(delivered).toMatchObject({ reason: "addressed", held_by: "" });
       }),
     ),
   );

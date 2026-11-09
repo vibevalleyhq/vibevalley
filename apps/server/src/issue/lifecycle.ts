@@ -405,7 +405,7 @@ export const issueLifecycle = Effect.gen(function* () {
         }),
       ),
     );
-    if (dispatch) yield* mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`));
+    if (dispatch) yield* mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`));
     worked.changed(linked.assignment.changed);
     worked.executed(issue.id, linked.execution);
     yield* publish(issue.id);
@@ -437,7 +437,7 @@ export const issueLifecycle = Effect.gen(function* () {
           });
       }),
     );
-    if (dispatch) yield* mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`));
+    if (dispatch) yield* mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`));
     yield* publish(id);
     return yield* get(id);
   });
@@ -533,7 +533,9 @@ export const issueLifecycle = Effect.gen(function* () {
         }),
       );
     for (const assignment of assignments) worked.changed(assignment.changed);
-    yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`)), { discard: true });
+    yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`)), {
+      discard: true,
+    });
     yield* Effect.forEach(rows, (row) => publish(row.id), { discard: true });
     yield* publish(id);
   });

@@ -79,15 +79,17 @@ flowchart LR
 | `pending` | 一个工单、帮工或一封信现在等着什么 | `queuedInputs`、`issueInputs`、`waitingOn`，和现有的同步 `pending(session)` |
 | `changes` | 投递的变化：消费、刹车 | `consumed`、`breakerNotices` |
 
-未决的两件，挪下去之前定：
+两件事已定（2026-11-09，主人）：
 
-- **开一个帮工**：工单派活、私聊里主人第一次对一个档案说话（`channel/talk.ts`）都要开一个帮工（`makeRoom`、`send`，开的同时用 `registerTalk`、`registerInitialInputs` 登记最初的几封信，再 `kick`）。选哪个档案是工单或频道的决定；开帮工和登记最初的信是经 `receive` 带着这个决定，还是留在调用方。
-- **直说**（`deliverDirect`）：频道的 `tellSession` 在帮工没有串时把话直接交给它，不记触发、不过刹车。并进 `receive` 就要先记下触发、过刹车，是行为上的变化。
+- **开一个帮工**：选哪个档案是工单或频道的决定；开帮工、登记最初的信、唤醒都在 Mailbox 里。门上是 `receive` 的 `Talk` 这一种：调用方给档案、开场的话、最初的几封信，和它自己要和帮工一起写下的东西（频道的 `channel_participant`），Mailbox 腾位置、开帮工、登记、唤醒。工单派活照此办。
+- **直说**并进 `receive`：调用方先记下触发（`recordTrigger`），再 `receive` 给那一个帮工；记进 `mailbox_trigger`，过三道刹车，至少投递一次。
 
 ## 进度
 
-- 第一步（频道）的前半：`withdraw` 取代 `dropSession`、`dropEnvelope`，`changes` 取代 `consumed`、`breakerNotices`；行为不变，频道、Mailbox、流程、会话、工单和 MCP 的测试通过。Mailbox 对外的成员实际是 34 个（服务和泵各有一组），比上表多数的那张少算了 7 个。
-- 频道剩下的旁路是开帮工（`talk.ts`）和直说（`deliverDirect`），等上一节两件定了再挪。
+- 第一步（频道）做完：`withdraw` 取代 `dropSession`、`dropEnvelope`；`changes` 取代 `consumed`、`breakerNotices`；`receive(arrival)` 收下记好的触发（可带频道消息的受众或一个帮工）和私聊开帮工（`Talk`），`registerTalk`、`kick`、`deliverDirect` 从接口上去掉。频道用 Mailbox 的成员从 10 个降到 `recordChannelTrigger`、`recordTrigger`、`receive`、`withdraw`、`changes`、`unreadSummary`。频道不再用帮工的 `makeRoom`、`send`、`register`。
+- 直说的行为变化有测试：没有串的帮工被直说一句，`mailbox_trigger` 记下一条，投递给它、原因是 `addressed`。
+- Mailbox 对外的成员实际是 34 个（服务和泵各有一组），比上表少算了 7 个。
+- 下一步是工单：`pending` 合并 `queuedInputs`、`issueInputs`、`waitingOn` 和同步的 `pending(session)`，派活走 `receive` 的开帮工。
 
 ## Alternatives considered
 

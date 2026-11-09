@@ -127,7 +127,7 @@ const make = Effect.gen(function* () {
       if (!(yield* mailbox.registered(trigger.id))) {
         const issue = yield* issues.scheduled(due, trigger);
         yield* mailbox.subscribe(issue.id, [thread]);
-        yield* mailbox.receive(trigger);
+        yield* mailbox.receive({ _tag: "Trigger", trigger });
       } else {
         const issue = yield* mailbox.ownerOf(trigger.id);
         if (issue) yield* mailbox.subscribe(issue, [thread]);
