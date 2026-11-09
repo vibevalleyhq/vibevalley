@@ -66,7 +66,33 @@ export const metaText = (m: Meta | undefined) =>
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
-export const senderKind = (kind: string): T.ActorKind => (Schema.is(S.ActorKind)(kind) ? kind : "system");
+/** Who said it, read from the kind its participant is stored as; an agent comes with its role. */
+export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind; readonly fromRole?: T.AgentRole } => {
+  switch (participant) {
+    case "owner":
+      return { fromKind: "owner" };
+    case "orchestrator":
+      return { fromKind: "agent", fromRole: "orchestrator" };
+    case "session":
+    case "profile":
+      return { fromKind: "agent", fromRole: "worker" };
+    default:
+      return { fromKind: "system" };
+  }
+};
+/** Who started a trigger, as a message's speaker: a collaborator, a bot or CI outside the farm is the farm's own doing. */
+export const actorKindOf = (kind: T.TriggerActorKind): T.ActorKind => {
+  switch (kind) {
+    case "owner":
+    case "agent":
+    case "system":
+      return kind;
+    case "collaborator":
+    case "bot":
+    case "ci":
+      return "system";
+  }
+};
 export const channelType = (type: string): T.ChannelType => (Schema.is(S.ChannelType)(type) ? type : "channel");
 
 export const envelopeMore = (
@@ -109,6 +135,7 @@ export interface Envelope extends T.TriggerContext {
   readonly originTrigger?: string;
   readonly from: string;
   readonly fromKind: T.ActorKind;
+  readonly fromRole?: T.AgentRole;
   readonly name: string;
   readonly text: string;
 }

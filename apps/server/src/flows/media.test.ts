@@ -7,7 +7,7 @@ import type { ModelClient } from "@vibevalley/ai/client";
 import { answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { orchestrator, session } from "#/base/actor.ts";
+import { orchestrator, worker } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Media } from "#/media/media.ts";
@@ -105,7 +105,7 @@ it.effect("unknown outcomes reach the model without usage guesses, while autonom
     const create = tools.orchestrator(caller).find((tool) => tool.name === "media_image_create");
     if (create === undefined) throw new Error("media_image_create is missing");
     expect((yield* Effect.flip(create.execute({ ...input, id: "autonomous" }, { id: "blocked" }))).message).toBeTruthy();
-    expect(tools.session(() => ({ ...caller(), session: "worker", actor: session("worker") })).filter((tool) => tool.name.startsWith("media_"))).toEqual([]);
+    expect(tools.session(() => ({ ...caller(), session: "worker", actor: worker("worker") })).filter((tool) => tool.name.startsWith("media_"))).toEqual([]);
     const medias = yield* media.list();
     expect(medias).toHaveLength(1);
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));

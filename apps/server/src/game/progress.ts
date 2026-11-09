@@ -231,7 +231,7 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
           const h = named !== defaultOrchestrator && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }
-      } else if (fact.message.fromKind === "session" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
+      } else if (fact.message.fromRole === "worker" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
     case "progressChanged": {

@@ -57,7 +57,7 @@
 | `owner` | `actor.ts` |  |
 | `system` | `actor.ts` |  |
 | `orchestrator` | `actor.ts` | forOwner: the owner's own words are in the run it acts in. |
-| `session` | `actor.ts` |  |
+| `worker` | `actor.ts` | A helper at work, by its session's id. |
 | `actsForOwner` | `actor.ts` | On the owner's word: the owner, or the orchestrator in a run the owner's words are in. |
 | `serverFiles` | `assets.ts` | What the package script copies beside the bundle: every path serverFile is given lies under one of these. |
 | `serverFile` | `assets.ts` |  |

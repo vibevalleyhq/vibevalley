@@ -24,7 +24,7 @@ export function plainText(markdown: string): string {
 
 /** The owner sees one chat, the farm has many threads. */
 export function ownerLine(m: T.ChatMessage, where: T.Channel | undefined): string {
-  const who = m.fromKind === "orchestrator" ? t("server.connector.line.orchestrator") : m.name;
+  const who = m.fromRole === "orchestrator" ? t("server.connector.line.orchestrator") : m.name;
   const what =
     m.kind === "report"
       ? t(`shared.outcome.${m.outcome ?? "interrupted"}`)

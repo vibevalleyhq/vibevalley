@@ -27,6 +27,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   channel: Schema.String,
   from: Schema.String,
   fromKind: ActorKind,
+  fromRole: Schema.optionalKey(Schema.Literals(T.AgentRoleValues)),
   name: Schema.String,
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,

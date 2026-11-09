@@ -7,7 +7,7 @@ export const releasedInputWords = (orchestrator: string, issue: number, uri: str
 
 /** Line breaks are marked, so no message can pass for a header. */
 export function messageLine(m: Envelope): string {
-  const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
+  const from = m.fromRole === "worker" ? m.from + " " + m.name : m.name;
   const head =
     m.number === 0
       ? `[input=${m.id} from=${from}]`

@@ -6,7 +6,7 @@ import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { session as sessionActor } from "#/base/actor.ts";
+import { worker as sessionActor } from "#/base/actor.ts";
 import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";

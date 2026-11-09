@@ -30,6 +30,7 @@
 - **单一配置文件与副本事务**：档案、技能库和农机设置存于 `config.json`，经 `Agent.change` 在深拷贝副本上修改并写盘成功后才替换内存引用（删除技能时同事务清理档案引用）。
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
 - **角色固定为 `orchestrator` 与 `worker`**：默认管家 `orchestrator` 不可删除或改为帮工；所有管家档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
+- **角色只管职责，别的各问一处**：档案是农场里的一个人，`role` 只决定他能做什么（工具、权限、能不能派去改代码）。他怎么上班、在哪干活、话算谁说的，各由一处回答：当值（会话 id 就是档案 id、开机就在）问 `isOnDuty`，按活雇来的问 `isHired`（`session/roster.ts`）；在服务端进程里干活、由 `Session.host` 收消息的问 `Agent.isHosted`；交给当值的人的工单问 `assignedOnDuty`。今天这几处都由角色推出来，以后有不当值的管家或在进程里干活的帮工，只改这几处。话是谁说的（`ActorKind`）只有 `owner`、`agent`、`system`，agent 另带 `role`（消息的 `fromRole`、触发的 `actor.role`、服务端的 `Actor`）；库里存的说话的人和定时任务、记忆的作者都只记这三种。
 - **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组，`chooseAgent` 按工单文字命中的关键词数挑选帮工档案。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型。
 - **外观确定性补齐（`withCast`）**：缺省外观按档案 `id` 哈希取模补齐，前后端 `castOf` 算法一致。

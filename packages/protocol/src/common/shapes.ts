@@ -36,8 +36,8 @@ export interface Validation {
   problem: string;
 }
 
-/** Who did a thing, as it is kept: the owner, the orchestrator, a session (a helper at work), or the farm itself; also who said a message. */
-export const ActorKindValues = ["owner", "orchestrator", "session", "system"] as const;
+/** Who did a thing, as it is kept: the owner, an agent (whatever its role), or the farm itself; also who said a message. */
+export const ActorKindValues = ["owner", "agent", "system"] as const;
 export type ActorKind = (typeof ActorKindValues)[number];
 
 export const OutcomeValues = ["completed", "failed", "interrupted"] as const;

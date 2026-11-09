@@ -9,7 +9,7 @@ import { Agent } from "#/agent/agent.ts";
 import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
 import { Db, causeMessage } from "#/infra/db.ts";
-import { channelType, senderKind, type ChannelRouteResult } from "#/mailbox/envelope.ts";
+import { channelType, actorKindOf, type ChannelRouteResult } from "#/mailbox/envelope.ts";
 import { NotRecorded, Session } from "#/session/session.ts";
 import { issueExists } from "#db/issue.sql.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
@@ -119,7 +119,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         const deliveries = brakes(
           group.map((draft) => draft.candidate),
           {
-            fromKind: senderKind(first.input.trigger.actor.kind),
+            fromKind: actorKindOf(first.input.trigger.actor.kind),
             orchestrators: agents.orchestrators().map((agent) => agent.id),
             hops: reach.hops(first.scope),
             cooling: group.filter((draft) => at - reach.lastWake(draft.input.session) < agentWakeCooldownMs).map((draft) => draft.input.session),

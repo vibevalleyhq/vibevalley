@@ -188,7 +188,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 wakeSoon,
                 first: { channel: chat.defaultChannel(), envelope: "", source: "owner" },
                 quiet: (r) => r.quiet ?? false,
-                say: (r, text, runId) => chat.orchestratorSays(r.channel, text, runId, id),
+                say: (r, text, runId) => chat.runSays(r.channel, text, runId, id),
                 // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
                 channel: (r) => (r.quiet === true ? undefined : r.channel),
                 fresh: () => {
@@ -308,7 +308,7 @@ const make = (options: OrchestratorOptions = {}) =>
         const words = taken.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: taken.why });
         const again = me.cannot.get(i.channel) === words;
         me.cannot.set(i.channel, words);
-        if (!again) yield* chat.orchestratorSays(i.channel, words, taken.run, me.id);
+        if (!again) yield* chat.runSays(i.channel, words, taken.run, me.id);
         return false;
       });
 

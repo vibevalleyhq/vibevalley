@@ -41,9 +41,7 @@ export default stories({
       grid: { rows: ["state", ["enabled", "disabled", "pending"]] },
       render: (a) => (
         <div {...stylex.attrs(viewStyles.tabsStoriesDiv)}>
-          <CronCard
-            s={a.state === "disabled" ? cron({ enabled: false }) : a.state === "pending" ? neverRun(cron({ pending: true, by: "orchestrator" })) : cron({})}
-          />
+          <CronCard s={a.state === "disabled" ? cron({ enabled: false }) : a.state === "pending" ? neverRun(cron({ pending: true, by: "agent" })) : cron({})} />
         </div>
       ),
     }),

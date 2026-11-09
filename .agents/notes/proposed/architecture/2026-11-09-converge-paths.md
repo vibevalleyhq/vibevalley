@@ -31,7 +31,7 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 | `_tag` | 取代 | 写之前的检查 |
 |---|---|---|
 | `Owner` | `say` | `sendKey`、附件 |
-| `Agent` | `speak`、`orchestratorSays` | 帮工：查重复、没读的、跨串确认；管家：一整条、不查 |
+| `Agent` | `speak`、`runSays`（原 `orchestratorSays`） | 帮工：查重复、没读的、跨串确认；管家：一整条、不查 |
 | `Artifact` | `announce` | 带卡片 |
 | `Spoken` | `spoken` | 默认频道、不唤醒 |
 | `Notice` | `notice` | 以 `system` 名义、按 `code` 去重 |
@@ -50,7 +50,7 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 |---|---|---|---|
 | 调用表做成检查 | 完成 | `2901cd8e1` | `scripts/service-paths.ts`、`vp run paths:check`（提交前的钩子），表在 `scripts/service-paths.json` |
 | 管家的会话 | 完成 | `902031e44` | `Agent.whenKept`；顺带修了改名要重启才显示 |
-| 「在」分成两个名字 | 完成 | `72cac0f0f` | `isReachable`、`workers`（后来照[把 agent 当人](.agents/notes/proposed/architecture/2026-11-09-agents-as-people.md)改叫 `hired`） |
+| 「在」分成两个名字 | 完成 | `72cac0f0f` | `isReachable`、`workers`（后来照[角色只管职责](docs/subsystems/agent.md#模型和不变量)改叫 `hired`） |
 | 频道写话 | 未做 | — | 见下 |
 
 频道写话还没动：七个入口的返回和错误不同（`{ message, again }`、`Spoken` 的 sent/held/confirm、`ChatMessage`、`boolean`；`notice`、`orchestratorSays` 不失败），收成一个 `post` 要么靠条件类型加断言，要么调用方拆走不到的分支。`writing.ts` 那层多余的参数已经并掉，落点本来就是一个 `write`。

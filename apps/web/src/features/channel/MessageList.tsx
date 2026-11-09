@@ -690,6 +690,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                 data-key={item().message.id}
                 data-from={item().message.from}
                 data-from-kind={item().message.fromKind}
+                data-from-role={item().message.fromRole}
                 data-edited={item().message.edited !== undefined ? "" : undefined}
                 data-deleted={item().message.deleted !== undefined ? "" : undefined}
                 data-pinned={item().message.pinned !== undefined ? "" : undefined}
@@ -919,9 +920,9 @@ export function MessageRow(props: {
       .filter(Boolean)
       .join(" · ");
   const agentOf = useAgent(() => props.m.agent);
-  const session = () => (props.m.fromKind === "session" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
+  const session = () => (props.m.fromRole === "worker" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
   const who = () => {
-    if (props.m.fromKind !== "session") return "";
+    if (props.m.fromRole !== "worker") return "";
     const agent = agentOf();
     const s = session();
     return [`@${props.m.from}`, s ? (runtimeLabel[s.runtime] ?? s.runtime) : "", agent?.duty ? dutyShort(agent.duty) : ""].filter(Boolean).join(" ");
@@ -999,10 +1000,10 @@ export function MessageRow(props: {
           </div>
         )}
       </Show>
-      <Show when={props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
+      <Show when={props.m.fromRole === "orchestrator" && props.m.kind !== "dispatch"}>
         <RunSteps session={props.m.from} run={props.m.run} orchestrator />
       </Show>
-      <Show when={props.m.fromKind === "session" && props.m.kind === "report"}>
+      <Show when={props.m.fromRole === "worker" && props.m.kind === "report"}>
         <RunSteps session={props.m.from} run={props.m.run} />
       </Show>
       <Show when={props.thread}>{(thread) => <ThreadPreview thread={thread()} />}</Show>

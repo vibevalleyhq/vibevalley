@@ -624,10 +624,10 @@ describe("the orchestrator", () => {
       yield* crons.tick;
       yield* until(() => words().some((w) => w.startsWith("定时任务：定好了，等主人同意才生效")), "the orchestrator told it waits");
       const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
-      expect(mine(false)).toMatchObject([{ pending: true, by: "orchestrator" }]);
+      expect(mine(false)).toMatchObject([{ pending: true, by: "agent" }]);
       yield* ingress.say("每天九点跑一遍测试", {}, undefined, "");
       const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's cron on");
-      expect(on[0]).toMatchObject({ by: "orchestrator" });
+      expect(on[0]).toMatchObject({ by: "agent" });
       expect(on[0]!.pending).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

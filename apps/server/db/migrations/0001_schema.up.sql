@@ -411,7 +411,7 @@ CREATE TABLE cron (
   last_run    real,
   -- Who set it, and whether it waits for the owner to say yes (cron/rules.go's needsOK): a waiting one stays off
   -- until the owner turns it on, which clears pending.
-  set_by      text not null default 'owner' check (set_by in ('owner', 'orchestrator', 'session', 'system')),
+  set_by      text not null default 'owner' check (set_by in ('owner', 'agent', 'system')),
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
@@ -433,7 +433,7 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   repo      text,                -- null: every repo
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'orchestrator', 'session', 'system')),
+  author       text not null check (author in ('owner', 'agent', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   real not null,
   updated_at   real not null,

@@ -31,7 +31,7 @@ export const issueSplitting = (r: IssueLifecycle) =>
     const splitting = yield* Semaphore.make(1);
     const split = Effect.fn("Issue.split")(function* (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) {
       const parent = yield* get(id);
-      if (by.kind === "session") {
+      if (by.kind === "agent" && by.role === "worker") {
         const caller = sessions.sessionOf(by.id);
         if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id)
           return yield* Effect.fail(refused(t("server.issue.split.notCurrent")));

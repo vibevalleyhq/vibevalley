@@ -225,7 +225,7 @@ describe("crons", () => {
       yield* Effect.gen(function* () {
         const s = yield* Cron;
         const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), orchestrator(false));
-        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "orchestrator", "等主人同意"]);
+        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "agent", "等主人同意"]);
         id = made.id;
         const due = yield* collect;
         yield* TestClock.adjust(10 * 60_000);
@@ -235,7 +235,7 @@ describe("crons", () => {
       }).pipe(Effect.scoped, Effect.provide(farm(config)));
       yield* Effect.gen(function* () {
         const s = yield* Cron;
-        expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "orchestrator"]]);
+        expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "agent"]]);
         const on = yield* s.setEnabled(id, true);
         expect([on.enabled, on.pending]).toEqual([true, false]);
       }).pipe(Effect.scoped, Effect.provide(farm(config)));

@@ -42,7 +42,7 @@ export type Sqlite_channel_type = typeof Sqlite_channel_type.Type
 export const Sqlite_connector_account_connector = Schema.Literals(["weixin","feishu","qq"])
 export type Sqlite_connector_account_connector = typeof Sqlite_connector_account_connector.Type
 
-export const Sqlite_cron_set_by = Schema.Literals(["owner","orchestrator","session","system"])
+export const Sqlite_cron_set_by = Schema.Literals(["owner","agent","system"])
 export type Sqlite_cron_set_by = typeof Sqlite_cron_set_by.Type
 
 export const Sqlite_issue_canceled = Schema.Literals(["dismissed","lost"])
@@ -108,7 +108,7 @@ export type Sqlite_media_understanding_cleanup = typeof Sqlite_media_understandi
 export const Sqlite_media_understanding_phase = Schema.Literals(["authorized","queued","uploading","generating","ready","incomplete","failed","unknown","canceled"])
 export type Sqlite_media_understanding_phase = typeof Sqlite_media_understanding_phase.Type
 
-export const Sqlite_memory_author = Schema.Literals(["owner","orchestrator","session","system"])
+export const Sqlite_memory_author = Schema.Literals(["owner","agent","system"])
 export type Sqlite_memory_author = typeof Sqlite_memory_author.Type
 
 export const Sqlite_memory_kind = Schema.Literals(["note","issue"])

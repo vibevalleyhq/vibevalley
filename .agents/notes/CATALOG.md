@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（32 篇）
+## proposed（31 篇）
 
 ### feature
 
@@ -24,7 +24,6 @@
 - 2026-11-09 [工单和频道经 Mailbox 一道门找到帮工](.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md)
 - 2026-11-09 [一件事一条路：按调用表收敛服务之间的路径](.agents/notes/proposed/architecture/2026-11-09-converge-paths.md)
 - 2026-11-09 [能力不认供应商，供应商是适配器](.agents/notes/proposed/architecture/2026-11-09-capabilities-and-vendors.md)
-- 2026-11-09 [把 agent 当人：角色只管职责](.agents/notes/proposed/architecture/2026-11-09-agents-as-people.md)
 - 2026-11-08 [显式状态机分层体系、Effect v4 原语与全链路错误契约](.agents/notes/proposed/architecture/2026-11-08-explicit-state-machines-and-error-contracts.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
 - 2026-11-06 [Space 隔离单元（repos、worktrees、pkm）与 VibeValley 自举开发全链路收敛步骤](.agents/notes/proposed/architecture/2026-11-06-space-isolation-and-self-hosting.md)

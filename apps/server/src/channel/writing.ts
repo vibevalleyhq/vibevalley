@@ -15,7 +15,7 @@ import * as qc from "#db/channel.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
-import { metaOf, metaText, type MsgRow, senderKind, messageKind, channelType, type Write, type Written, type ChannelHearers } from "./contracts.ts";
+import { metaOf, metaText, type MsgRow, speakerOf, messageKind, channelType, type Write, type Written, type ChannelHearers } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import type { ChannelHub } from "./hub.ts";
 import { mentionsIn } from "./mentions.ts";
@@ -95,7 +95,7 @@ export const channelWriting = (r: ChannelHub) =>
       const audience = sessionsNow.filter((h) => ch.type === "thread" || channelOfSession(h) === ch.id).map((h) => h.id);
       const heard = {
         from: row.sender_id,
-        fromKind: senderKind(row.sender_kind),
+        fromKind: speakerOf(row.sender_kind).fromKind,
         kind: messageKind(row.kind),
         mentions,
         channel: { type: channelType(ch.type), ...(ch.peer_id !== null ? { peer: ch.peer_id } : {}) },

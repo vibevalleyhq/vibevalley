@@ -6,14 +6,14 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { type ApiError } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
-import { type Envelope, type Meta, metaOf, type Picked, senderKind } from "#/mailbox/envelope.ts";
+import { type Envelope, type Meta, metaOf, type Picked, speakerOf } from "#/mailbox/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelRow } from "./rooms.ts";
 
 export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/mailbox/envelope.ts";
 export type { Envelope, Picked } from "#/mailbox/envelope.ts";
-export { channelType, envelopeMore, metaOf, metaText, senderKind } from "#/mailbox/envelope.ts";
+export { channelType, envelopeMore, metaOf, metaText, speakerOf } from "#/mailbox/envelope.ts";
 export type { Delivered, SessionNews } from "#/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
@@ -38,7 +38,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     number: row.number,
     channel: row.channel_id,
     from: row.sender_id,
-    fromKind: senderKind(row.sender_kind),
+    ...speakerOf(row.sender_kind),
     name: row.sender_name,
     ...(row.sender_agent ? { agent: row.sender_agent } : {}),
     kind: messageKind(row.kind),
@@ -219,8 +219,8 @@ export interface ChannelService {
   readonly announce: (from: string, channel: string, text: string, made: Made, sendKey?: string) => Effect.Effect<T.ChatMessage, ApiError>;
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
-  readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
+  /** The words a run of an agent hosted here said (from: its profile id), one whole message each: it shows once said in full. */
+  readonly runSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
   readonly notice: (channel: string, text: string, code: string, sendKey?: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;

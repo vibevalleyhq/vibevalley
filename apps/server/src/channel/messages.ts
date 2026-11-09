@@ -3,7 +3,7 @@ import { DateTime } from "effect";
 import type * as T from "@vibevalley/protocol";
 
 import { compareText, or } from "#/base/order.ts";
-import { type ChannelHearers, type Meta, metaOf, senderKind, targetOf, channelType } from "#/mailbox/envelope.ts";
+import { type ChannelHearers, type Meta, metaOf, speakerOf, targetOf, channelType } from "#/mailbox/envelope.ts";
 import type { InputContext, TriggerInput } from "#/mailbox/payload.ts";
 
 import { chatNamed } from "./mentions.ts";
@@ -121,17 +121,9 @@ const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, T.TriggerSourc
   github: "github",
 };
 
-const ingressActorKind = (raw: string): T.TriggerActorKind => {
-  switch (senderKind(raw)) {
-    case "owner":
-      return "owner";
-    case "session":
-      return "session";
-    case "orchestrator":
-      return "orchestrator";
-    case "system":
-      return "system";
-  }
+const actorOf = (participant: string, id: string, name: string): T.TriggerActor => {
+  const { fromKind, fromRole } = speakerOf(participant);
+  return { kind: fromKind, id, name, ...(fromRole !== undefined ? { role: fromRole } : {}) };
 };
 
 /** A committed channel message as the one trigger Mailbox routes, and what it needs to fan it out. */
@@ -143,7 +135,7 @@ export const channelTrigger = (fact: ChannelHearers, context: InputContext): Tri
     id: fact.row.envelope_id,
     key: fact.row.envelope_id,
     source,
-    actor: { kind: ingressActorKind(fact.row.sender_kind), id: fact.row.sender_id, name: fact.row.name },
+    actor: actorOf(fact.row.sender_kind, fact.row.sender_id, fact.row.name),
     addressed: fact.addressed
       ? "direct"
       : fact.audience.mentions.length > 0

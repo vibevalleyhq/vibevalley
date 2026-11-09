@@ -13,7 +13,7 @@ it.effect("regression: owner read cursors and later replies suppress external no
     const inbox = yield* Inbox;
     const channel = chat.defaultChannel();
     const agent = chat.orchestratorIn(channel);
-    yield* chat.orchestratorSays(channel, "需要你确认", "read-receipt", agent);
+    yield* chat.runSays(channel, "需要你确认", "read-receipt", agent);
     const message = (yield* chat.history(channel)).at(-1)!;
     const handoffState2 = yield* inbox.handoffState(message.id);
     expect(handoffState2).toBe("unseen");
@@ -23,7 +23,7 @@ it.effect("regression: owner read cursors and later replies suppress external no
     yield* chat.say("确认", channel, "owner-reply");
     const handoffState4 = yield* inbox.handoffState(message.id);
     expect(handoffState4).toBeUndefined();
-    yield* chat.orchestratorSays(channel, "又有一项变化", "incremental-update", agent);
+    yield* chat.runSays(channel, "又有一项变化", "incremental-update", agent);
     const update = (yield* chat.history(channel)).at(-1)!;
     const handoffState5 = yield* inbox.handoffState(update.id);
     expect(handoffState5).toBe("unseen");

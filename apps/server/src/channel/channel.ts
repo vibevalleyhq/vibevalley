@@ -335,7 +335,7 @@ const make = Effect.gen(function* () {
           actor:
             from === ownerId
               ? { kind: "owner", id: ownerId }
-              : { kind: agents.isOrchestrator(from) ? "orchestrator" : "session", id: from, ...(speaker ? { name: speaker.name } : {}) },
+              : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
           text: text.trim(),
           threads: [],
           addressed: "direct",
@@ -451,10 +451,10 @@ const make = Effect.gen(function* () {
       Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false)),
       locked,
     ),
-    orchestratorSays: Effect.fn("Channel.orchestratorSays")(function* (channel, text, run, from) {
+    runSays: Effect.fn("Channel.runSays")(function* (channel, text, run, from) {
       if (!text.trim()) return;
       yield* locked(Effect.andThen(seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })));
-    }, bestEffort("chat: the orchestrator's words")),
+    }, bestEffort("chat: a run's words")),
     notice: Effect.fn("Channel.notice")(
       function* (channel, text, code, sendKey = "") {
         return yield* write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });

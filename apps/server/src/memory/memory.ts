@@ -9,7 +9,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import type { Actor } from "#/base/actor.ts";
+import { type Actor, orchestrator, worker } from "#/base/actor.ts";
 import { clip } from "#/base/clip.ts";
 import { type ApiError, memoriesOf, missing, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -135,7 +135,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const shape = Memory.of({
       forAgent: (agent, session) => {
-        const by = agents.isOrchestrator(agent) ? { kind: "orchestrator" as const, forOwner: false } : { kind: "session" as const, id: session };
+        const by = agents.isOrchestrator(agent) ? orchestrator(false) : worker(session);
         return {
           read: () =>
             Effect.map(
@@ -380,7 +380,7 @@ const makeMemoryStore = Effect.gen(function* () {
     const body = clip(n.text, noteMaxChars);
     if (body === "") return yield* MemoryRefused.make({ message: t("server.memory.empty") });
     const repo = n.repo.trim() || undefined;
-    const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
+    const session = n.by.kind === "agent" && n.by.role === "worker" ? n.by.id || undefined : undefined;
     const { id, at } = yield* insertNote(n.agent, body, repo, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
         Effect.andThen(

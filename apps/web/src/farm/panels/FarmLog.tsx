@@ -110,7 +110,7 @@ export function FarmLog() {
   const rows = (): Row[] =>
     [
       ...general()
-        .messages.filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromKind === "orchestrator"))
+        .messages.filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromRole === "orchestrator"))
         .map((message) => ({ kind: "said" as const, message })),
       ...reports().map((message) => ({ kind: "report" as const, message })),
     ].toSorted((a, b) => b.message.at - a.message.at);

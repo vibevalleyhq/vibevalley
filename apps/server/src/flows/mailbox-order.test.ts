@@ -15,7 +15,7 @@ import { testIssues } from "#/testing/world.ts";
 
 import { farm, lab, until } from "./farm.ts";
 
-const signal = (key: string, kind: "owner" | "session" = "session", threads: readonly string[] = [], at = 0): SourceEvent => ({
+const signal = (key: string, kind: "owner" | "agent" = "agent", threads: readonly string[] = [], at = 0): SourceEvent => ({
   source: "channel",
   key,
   actor: { kind, id: kind === "owner" ? "owner" : "other-session" },
@@ -70,7 +70,7 @@ it.live("regression: independent input hops survive restore and only a new owner
   return Effect.gen(function* () {
     const ingress = yield* Ingress;
     const mailbox = yield* Mailbox;
-    const accept = (key: string, kind: "owner" | "session" = "session") => ingress.accept(signal(key, kind));
+    const accept = (key: string, kind: "owner" | "agent" = "agent") => ingress.accept(signal(key, kind));
     for (const n of [1, 2, 3, 4, 5]) yield* accept(`before-owner-${n}`);
     const rows = () => mailbox.deliveriesOf(defaultOrchestrator);
     expect(rows().map((row) => row.held_by)).toEqual([null, null, null, null, "hop_limit"]);
@@ -150,14 +150,14 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     const issue = yield* issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = yield* issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
-    const first = (yield* ingress.accept(signal("first-wake", "session", threads)))!;
+    const first = (yield* ingress.accept(signal("first-wake", "agent", threads)))!;
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
     yield* until(
       () => steers().some((text) => text.includes("first-wake")) && !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === first.id),
       "the first agent input consumed",
     );
     yield* mailbox.restore;
-    const second = (yield* ingress.accept(signal("future-source-clock", "session", threads, 9_000_000_000_000)))!;
+    const second = (yield* ingress.accept(signal("future-source-clock", "agent", threads, 9_000_000_000_000)))!;
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
     const queued = (yield* ingress.accept({
       source: "github",

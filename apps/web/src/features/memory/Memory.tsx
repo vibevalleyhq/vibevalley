@@ -443,10 +443,10 @@ export function MemoryPanel(props: { agent: string }) {
   const whose = (m: Memory) =>
     m.author === "owner"
       ? t("web.memory.memory.yours")
-      : m.author === "orchestrator"
-        ? t("web.memory.memory.orchestrators")
-        : m.session
-          ? t("web.memory.memory.sessions", { name: sessions().get(m.session) ?? m.session })
+      : m.session
+        ? t("web.memory.memory.sessions", { name: sessions().get(m.session) ?? m.session })
+        : m.author === "agent"
+          ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");
   return (
     <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>

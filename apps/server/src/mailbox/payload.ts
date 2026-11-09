@@ -6,7 +6,7 @@ import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
-import { senderKind } from "#/mailbox/envelope.ts";
+import { actorKindOf } from "#/mailbox/envelope.ts";
 import type { Handed, Envelope } from "#/mailbox/envelope.ts";
 
 export type InputContext = T.TriggerContext;
@@ -109,7 +109,8 @@ export function inputOf({ envelope_id, payload }: { readonly envelope_id: string
     id: envelope_id,
     originTrigger: trigger.id,
     from: trigger.actor.id,
-    fromKind: senderKind(trigger.actor.kind),
+    fromKind: actorKindOf(trigger.actor.kind),
+    ...(trigger.actor.role !== undefined ? { fromRole: trigger.actor.role } : {}),
     name: trigger.actor.name ?? trigger.actor.id,
     text: [payload.note, trigger.card.truncated || context.number === 0 ? `${trigger.card.summary}\n${trigger.card.readUri}` : trigger.card.summary]
       .filter(Boolean)

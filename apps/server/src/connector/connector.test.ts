@@ -158,7 +158,7 @@ const echoing = Layer.effectDiscard(
     yield* Effect.forkScoped(
       Stream.runForEach(news2, (news) =>
         news._tag === "Handed"
-          ? Effect.forEach(news.messages, (message) => chat.orchestratorSays(news.channel, "收到：**" + message.text + "**", "", defaultOrchestrator), {
+          ? Effect.forEach(news.messages, (message) => chat.runSays(news.channel, "收到：**" + message.text + "**", "", defaultOrchestrator), {
               discard: true,
             })
           : Effect.void,
@@ -275,7 +275,7 @@ describe("the chat apps", () => {
       const chat = yield* Channel;
       yield* weixinConnected(script);
       const channel = chat.defaultChannel();
-      yield* chat.orchestratorSays(channel, "已经接下来了", "", defaultOrchestrator);
+      yield* chat.runSays(channel, "已经接下来了", "", defaultOrchestrator);
       const statusOf2 = yield* statusOf("weixin");
       yield* waitFor(Effect.promise(statusOf2), (status) => status.pending === 1, "the handoff waiting outside");
       const [message] = yield* chat.history(channel);
@@ -327,7 +327,7 @@ describe("the chat apps", () => {
       expect(setChannelFailure).toMatchObject({
         reason: expect.stringContaining("没有叫"),
       });
-      yield* chat.orchestratorSays(chat.defaultChannel(), "默认频道里的话", "", defaultOrchestrator);
+      yield* chat.runSays(chat.defaultChannel(), "默认频道里的话", "", defaultOrchestrator);
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       const nth2 = yield* nth(script, "weixin", 0, "the answer in WeChat");
       expect(nth2).toEqual({
@@ -662,7 +662,7 @@ describe("the chat apps", () => {
         const chat = yield* Channel;
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
-        yield* chat.orchestratorSays(thread, "在旧串里继续答复", "", defaultOrchestrator);
+        yield* chat.runSays(thread, "在旧串里继续答复", "", defaultOrchestrator);
         expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
         expect(second.by("weixin")).toHaveLength(1);
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);

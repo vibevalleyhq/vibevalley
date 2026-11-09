@@ -31,7 +31,7 @@ describe("the orchestrator's rules", () => {
 
   it("cut what others said long, never the owner's words", () => {
     const line = (text: string) =>
-      orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "session", name: "测试小吴", text }]);
+      orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "agent", fromRole: "worker", name: "测试小吴", text }]);
     const head = "[target=#general:3 msg=4 from=w1 测试小吴] ";
     const cases: [string, string, string][] = [
       ["799", "a".repeat(799), "a".repeat(799)],

@@ -97,7 +97,7 @@ test("with several orchestrators: the place's hears the owner, 管家 is the pla
   ]);
   expect(chatAudience({ ...base, channel: { type: "direct", peer: "lead" }, orchestrator: "lead" }).map((d) => d.recipient)).toEqual(["lead"]);
   // An orchestrator answering another is never cooled down, as a session would be.
-  expect(chatAudience({ ...base, from: "orchestrator", fromKind: "orchestrator", mentions: ["lead"], cooling: ["lead"] })).toEqual([
+  expect(chatAudience({ ...base, from: "orchestrator", fromKind: "agent", mentions: ["lead"], cooling: ["lead"] })).toEqual([
     { recipient: "lead", reason: "mention", wakes: true },
   ]);
 });

@@ -8,7 +8,7 @@ import { Effect } from "effect";
 import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, session as sessionActor } from "#/base/actor.ts";
+import { owner, worker as sessionActor } from "#/base/actor.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";

@@ -229,7 +229,7 @@ export const AgentWakesByScopeResult = Schema.Struct({
 export type AgentWakesByScopeResult = typeof AgentWakesByScopeResult.Type
 
 
-export const AgentWakesByScopeSql = "-- name: AgentWakesByScope :many\n-- bound: a row per routing scope.\nwith owners as (\n  select scope, max(position) as position from mailbox_owner_route group by scope\n)\nselect d.scope, cast(count(*) as integer) as n from mailbox_delivery d\nleft join owners o on o.scope = d.scope\nwhere d.position > coalesce(o.position, 0)\n  and d.payload_json -> 'trigger' -> 'actor' ->> 'kind' in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.scope;"
+export const AgentWakesByScopeSql = "-- name: AgentWakesByScope :many\n-- bound: a row per routing scope.\nwith owners as (\n  select scope, max(position) as position from mailbox_owner_route group by scope\n)\nselect d.scope, cast(count(*) as integer) as n from mailbox_delivery d\nleft join owners o on o.scope = d.scope\nwhere d.position > coalesce(o.position, 0)\n  and d.payload_json -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null\ngroup by d.scope;"
 
 export const agentWakesByScope = Effect.fn("AgentWakesByScope")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -253,7 +253,7 @@ export const LastAgentWakesResult = Schema.Struct({
 export type LastAgentWakesResult = typeof LastAgentWakesResult.Type
 
 
-export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- bound: a row per participant.\nselect d.session_id, cast(max(d.created_at) as real) as at from mailbox_delivery d\nwhere d.payload_json -> 'trigger' -> 'actor' ->> 'kind' in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.session_id;"
+export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- bound: a row per participant.\nselect d.session_id, cast(max(d.created_at) as real) as at from mailbox_delivery d\nwhere d.payload_json -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null\ngroup by d.session_id;"
 
 export const lastAgentWakes = Effect.fn("LastAgentWakes")(function* () {
   const sql = yield* SqlClient.SqlClient

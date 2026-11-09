@@ -597,6 +597,7 @@ export function ChatWindow() {
                   data-key={item().message.id}
                   data-from={item().message.from}
                   data-from-kind={item().message.fromKind}
+                  data-from-role={item().message.fromRole}
                   data-kind={item().message.kind}
                   data-deleted={item().message.deleted !== undefined ? "" : undefined}
                   data-edited={item().message.edited !== undefined ? "" : undefined}
@@ -794,7 +795,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <RunSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
+    props.m.fromRole === "orchestrator" && props.m.kind !== "dispatch" ? <RunSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
   return (
     <Switch
       fallback={
@@ -822,7 +823,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.fromKind === "session" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={props.m.fromRole === "worker" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
       <Match when={props.m.fromKind === "owner"}>

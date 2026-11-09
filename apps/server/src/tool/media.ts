@@ -14,7 +14,7 @@ export const mediaTools = Effect.gen(function* () {
       "media.image.create",
       Effect.fn("Tool.mediaImageCreate")(function* (input) {
         const caller = yield* callerOf(who);
-        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        if (caller.actor.kind !== "agent" || caller.actor.role !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
         const imageCreated = yield* media.createImage(input, {
           kind: "orchestrator",
           agent: caller.agent,
@@ -28,7 +28,7 @@ export const mediaTools = Effect.gen(function* () {
       "media.understanding.start",
       Effect.fn("Tool.mediaUnderstandingStart")(function* ({ id }) {
         const caller = yield* callerOf(who);
-        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        if (caller.actor.kind !== "agent" || caller.actor.role !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
         const understandingStarted = yield* media.startUnderstanding(id, {
           kind: "orchestrator",
           agent: caller.agent,
@@ -42,7 +42,7 @@ export const mediaTools = Effect.gen(function* () {
       "media.speech.create",
       Effect.fn("Tool.mediaSpeechCreate")(function* (input) {
         const caller = yield* callerOf(who);
-        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        if (caller.actor.kind !== "agent" || caller.actor.role !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
         const speechCreated = yield* media.createSpeech(input, {
           kind: "orchestrator",
           agent: caller.agent,
@@ -56,7 +56,7 @@ export const mediaTools = Effect.gen(function* () {
       "media.dialogue.create",
       Effect.fn("Tool.mediaSpeakersCreate")(function* (input) {
         const caller = yield* callerOf(who);
-        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        if (caller.actor.kind !== "agent" || caller.actor.role !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
         const speakersCreated = yield* media.createSpeakers(input, {
           kind: "orchestrator",
           agent: caller.agent,
@@ -70,7 +70,7 @@ export const mediaTools = Effect.gen(function* () {
       "media.voiceDesign.create",
       Effect.fn("Tool.mediaVoiceDesignCreate")(function* (input) {
         const caller = yield* callerOf(who);
-        if (caller.actor.kind !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
+        if (caller.actor.kind !== "agent" || caller.actor.role !== "orchestrator") return yield* refuse(t("server.media.ownerRequired"));
         const voiceDesignCreated = yield* media.createVoiceDesign(input, {
           kind: "orchestrator",
           agent: caller.agent,

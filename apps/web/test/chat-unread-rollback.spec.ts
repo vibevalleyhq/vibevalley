@@ -16,7 +16,7 @@ test("a mark unread the server refuses gives the read back and says why in the e
   const helper = await api.agent.create({ ...template, id: "", name: "read receipt", effort: "" });
   const channel = await api.channel.direct.create({ agent: helper.id });
   await api.channel.message.send({ id: channel, text: "first" });
-  await expect.poll(async () => (await api.channel.message.list({ id: channel })).some((message) => message.fromKind === "session")).toBe(true);
+  await expect.poll(async () => (await api.channel.message.list({ id: channel })).some((message) => message.fromRole === "worker")).toBe(true);
   const first = await firstId(api, channel);
   const server = gate();
   await page.route(`**${pathOf("channel.markUnread")}`, async (route) => {

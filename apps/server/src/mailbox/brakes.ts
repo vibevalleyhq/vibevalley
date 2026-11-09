@@ -25,7 +25,7 @@ interface HeldRecipient extends Recipient {
 /** Agent-to-agent wake brakes, in priority order. Human messages bypass all three. */
 export function brakes(deliveries: readonly Recipient[], input: BrakeInput): HeldRecipient[] {
   const out: HeldRecipient[] = [];
-  const byAgent = input.fromKind === "session" || input.fromKind === "orchestrator";
+  const byAgent = input.fromKind === "agent";
   let hops = input.hops;
   for (const delivery of deliveries) {
     let heldBy: HeldBy | undefined;
@@ -83,8 +83,6 @@ export class WakeBreaker {
   }
 }
 
-const isAgent = (kind: T.ActorKind) => kind === "session" || kind === "orchestrator";
-
 export class Reach {
   private readonly hopsIn = new Map<string, number>();
   private readonly ownerLast = new Map<string, number>();
@@ -118,7 +116,7 @@ export class Reach {
   }
 
   delivered(input: ReachDelivery) {
-    if (!input.wakes || input.held || !isAgent(input.senderKind)) return;
+    if (!input.wakes || input.held || input.senderKind !== "agent") return;
     this.lastWakeOf.set(input.session, Math.max(this.lastWakeOf.get(input.session) ?? 0, input.at));
     if (input.position > (this.ownerLast.get(input.scope) ?? 0)) this.hopsIn.set(input.scope, this.hops(input.scope) + 1);
   }

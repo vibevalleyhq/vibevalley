@@ -24,7 +24,7 @@ export function forOwner(m: T.ChatMessage, notify: Notify = "all"): boolean {
     case "dispatch":
       return true;
     case "chat":
-      return m.fromKind === "orchestrator" || m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+      return m.fromRole === "orchestrator" || m.mentions.includes(ownerId) || m.mentions.includes(everyone);
     case "notice":
       break;
   }
@@ -158,7 +158,7 @@ function gathered(state: T.SpaceState): Unworded[] {
   }
 
   for (const { message: m, channel, address } of chat?.ownerMentions ?? []) {
-    const from: T.InboxFrom = m.fromKind === "session" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
+    const from: T.InboxFrom = m.fromRole === "worker" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
     out.push({
       item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", channel: m.channel } },
       channel,

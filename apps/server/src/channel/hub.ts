@@ -23,7 +23,7 @@ import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import {
   type MsgRow,
-  senderKind,
+  speakerOf,
   channelType,
   subjectKind,
   toMessage,
@@ -379,7 +379,7 @@ export const channelHub = Effect.gen(function* () {
     number: r.number,
     target: deliveryTarget(r),
     from: r.sender_id,
-    fromKind: senderKind(r.sender_kind),
+    ...speakerOf(r.sender_kind),
     name: r.name,
     text: r.body,
     ...envelopeMore(r, filesAt),
@@ -406,7 +406,7 @@ export const channelHub = Effect.gen(function* () {
     number: row.number,
     target,
     from: row.sender_id,
-    fromKind: senderKind(row.sender_kind),
+    ...speakerOf(row.sender_kind),
     name: row.sender_name,
     text: row.body,
     ...envelopeMore(row, filesAt),

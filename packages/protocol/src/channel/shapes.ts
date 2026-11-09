@@ -1,3 +1,4 @@
+import type { AgentRole } from "../agent/shapes";
 import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes";
 import type { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
 
@@ -10,6 +11,8 @@ export interface ChatMessage {
   channel: string;
   from: string;
   fromKind: ActorKind;
+  /** The speaking agent's role, when fromKind is agent. */
+  fromRole?: AgentRole;
   name: string;
   agent?: string;
   kind: MessageKind;

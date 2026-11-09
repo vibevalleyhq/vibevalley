@@ -52,13 +52,13 @@ with owners as (
 select d.scope, count(*)::int as n from mailbox_delivery d
 left join owners o on o.scope = d.scope
 where d.position > coalesce(o.position, 0)
-  and d.payload_json -> 'trigger' -> 'actor' ->> 'kind' in ('session', 'orchestrator') and d.wakes and d.held_by is null
+  and d.payload_json -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null
 group by d.scope;
 
 -- name: LastAgentWakes :many
 -- bound: a row per participant.
 select d.session_id, max(d.created_at)::float8 as at from mailbox_delivery d
-where d.payload_json -> 'trigger' -> 'actor' ->> 'kind' in ('session', 'orchestrator') and d.wakes and d.held_by is null
+where d.payload_json -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null
 group by d.session_id;
 
 -- name: AllOpenDeliveries :many

@@ -15,7 +15,7 @@ import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, session } from "#/base/actor.ts";
+import { owner, worker } from "#/base/actor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -234,8 +234,8 @@ describe("Nowledge Mem", () => {
       const fake = new FakeNowledge();
       yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: true });
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234", repo: "demo", by: session("w1") });
-      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234", repo: "demo", by: worker("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: worker("w1") });
       yield* until(() => fake.adds.length === 2);
       expect([fake.adds[0]!.content, fake.adds[0]!.labels, fake.adds[0]!.source_app]).toEqual([
         "测试前要 export DEEPSEEK_API_KEY=[redacted]",
@@ -319,7 +319,7 @@ describe("EverOS", () => {
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       const source = nowledge({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: false, write: true });
-      const note = { agent: "lab", text: "记住：苹果", repo: "", by: session("w1") };
+      const note = { agent: "lab", text: "记住：苹果", repo: "", by: worker("w1") };
       fake.addResult = { title: "已经有了" };
       expect((yield* source.add(note))?.id).toBe("");
       fake.addResult = { id: 42 };

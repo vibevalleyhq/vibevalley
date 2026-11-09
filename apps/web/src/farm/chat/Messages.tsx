@@ -457,7 +457,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
       <Match when={props.m.fromKind === "owner"}>
         <OwnerFace size={size()} />
       </Match>
-      <Match when={props.m.fromKind === "orchestrator"}>
+      <Match when={props.m.fromRole === "orchestrator"}>
         <OrchestratorFace size={size()} agent={props.m.from} />
       </Match>
     </Switch>
@@ -466,7 +466,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
 
 function SenderName(props: { m: ChatMessage }) {
   return (
-    <Show when={props.m.fromKind === "session"} fallback={<>{props.m.name}</>}>
+    <Show when={props.m.fromRole === "worker"} fallback={<>{props.m.name}</>}>
       {props.m.name} <span {...stylex.attrs(viewStyles.senderNameSpan)}>@{props.m.from}</span>
     </Show>
   );

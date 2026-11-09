@@ -175,7 +175,7 @@ describe("mcp", () => {
       const tool5 = yield* Effect.promise(() => c.tool("channel_message_send", { text: "从 MCP 说一句", anyway: true }));
       expect(tool5).toContain("发出去了");
       const m = saidIn(thread!).find((x) => x.text === "从 MCP 说一句");
-      expect(m).toMatchObject({ from: id, fromKind: "session" });
+      expect(m).toMatchObject({ from: id, fromKind: "agent", fromRole: "worker" });
       const tool6 = yield* Effect.promise(() => c.tool("channel_unread_list"));
       expect(tool6).not.toBe("");
       const tool7 = yield* Effect.promise(() => c.tool("channel_message_list"));
@@ -366,7 +366,7 @@ describe("mcp", () => {
       yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
       // What it wrote is its own, not the owner's: the Memory tab says which helper wrote it.
-      for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["session", "w1"]);
+      for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["agent", "w1"]);
       const found = yield* tool("memory_search", { text: "测试" });
       expect(found).toContain("pnpm test");
       expect(found).not.toContain("make check");

@@ -41,8 +41,8 @@ const msg = (fromKind: ChatMessage["fromKind"], from: string, name: string, text
 });
 
 const owner = (text: string, more: Partial<ChatMessage> = {}) => msg("owner", "owner", "主人", text, more);
-const orchestrator = (text: string, more: Partial<ChatMessage> = {}) => msg("orchestrator", "orchestrator", "管家", text, more);
-const helper = (text: string, more: Partial<ChatMessage> = {}) => msg("session", "w1", "老周", text, { agent: "老周", ...more });
+const orchestrator = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "orchestrator", "管家", text, { fromRole: "orchestrator", ...more });
+const helper = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "w1", "老周", text, { fromRole: "worker", agent: "老周", ...more });
 
 /** Rows as the channel draws them: one after another, a row from the same sender soon after folds under the one before. */
 const list = (note: string, rows: { m: ChatMessage; continues?: boolean }[]): Story =>

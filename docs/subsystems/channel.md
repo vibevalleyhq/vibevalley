@@ -86,7 +86,7 @@
 ## 和谁打交道
 
 - **信箱**：Channel 算出候选受众并落库后，交 [Mailbox](docs/subsystems/mailbox.md) 执行刹车、蓄水与唤醒。
-- **帮工与管家（`session`、`orchestrator`）**：订阅 `Session` 事件维护串；管家经 `Channel.orchestratorSays` 写回复。
+- **帮工与管家（`session`、`orchestrator`）**：订阅 `Session` 事件维护串；管家经 `Channel.runSays` 写回复（在服务端里跑的 agent 一轮说的话，一整条）。
 - **工单与通知（`issue`、`inbox`）**：向工单广播 `ownerInThread`；向 Inbox 提供 `ownerMentions` 并消费 `Inbox.toOwner`。
 
 ## 为什么这样

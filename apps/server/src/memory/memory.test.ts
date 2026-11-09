@@ -8,7 +8,7 @@ import { TestClock } from "effect/testing";
 import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, session } from "#/base/actor.ts";
+import { owner, worker } from "#/base/actor.ts";
 import { agentHome, ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -49,8 +49,8 @@ describe("memory", () => {
   it.effect("runs are kept, recalled and counted; notes written and forgotten", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "clock", by: session("w1") });
-      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "clock", by: worker("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: worker("w1") });
       yield* m.keep({
         agent: "lab",
         session: "w1",
@@ -113,7 +113,7 @@ describe("memory", () => {
       const port = m.forAgent(defaultOrchestrator, defaultOrchestrator);
       yield* port.remember("agent note");
       const written = yield* m.remember({ agent: defaultOrchestrator, text: "owner note", repo: "", by: owner });
-      expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["owner", "orchestrator"]);
+      expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["owner", "agent"]);
       expect((yield* port.read()).prompt).toContain("主人交代：owner note");
       yield* port.rewrite("# notes\n- replacement note\n- 主人交代：owner note");
       const notes = (yield* m.memoriesOf(defaultOrchestrator)).memories;
@@ -211,7 +211,7 @@ describe("memory", () => {
       yield* m.keep({ agent: "lab", session: "chat", repo: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
       const ms = yield* m.list("lab");
       expect(ms).toEqual([]);
-      yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "", by: session("chat") });
+      yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "", by: worker("chat") });
       expect((yield* m.list("lab")).map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
         { kind: "note", text: "这个仓库用 pnpm test 跑测试", session: "chat" },
       ]);
@@ -240,8 +240,8 @@ describe("memory", () => {
   it.effect("explicit notes are independent records", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: session("s1") });
-      yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: session("s1") });
+      yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: worker("s1") });
+      yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: worker("s1") });
       const ms = yield* m.list("lab");
       expect(ms).toHaveLength(2);
     }).pipe(Effect.provide(world())),
@@ -254,14 +254,14 @@ describe("memory", () => {
       const m = yield* Memory;
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
-        if (i % 2 === 0) yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: null, author: "session", created_at: 1 });
+        if (i % 2 === 0) yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: null, author: "agent", created_at: 1 });
         else yield* q.keepIssueMemory({ id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: id, created_at: 1 });
       }
       const before = yield* m.list("lab");
       const predicted = before.filter((x) => x.fading).map((x) => x.id);
       yield* Effect.forEach(
         ["apple", "banana", "cherry", "durian", "elephant", "flamingo", "giraffe", "hamster"],
-        (text, index) => m.write({ agent: "lab", text, repo: "", by: session(String(index)) }),
+        (text, index) => m.write({ agent: "lab", text, repo: "", by: worker(String(index)) }),
         { discard: true },
       );
       yield* m.keep(run("0", ""));
