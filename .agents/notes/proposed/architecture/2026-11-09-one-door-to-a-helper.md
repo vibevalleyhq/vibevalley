@@ -70,12 +70,14 @@ flowchart LR
 
 [Mailbox](docs/subsystems/mailbox.md) 的文档已经这样规定（上游记下 `Trigger`，提交后调 `Mailbox.receive`）；`registerTalk`、`registerInitialInputs`、`deliverDirect`、`kick` 是绕开它的旁路，收进这一条。
 
-门上的动词，各合并了一批现在分开的入口：
+门上的动词，各合并了一批现在分开的入口。退回（`returnOne`、`returnInput`：把一封信还回去重新投递）和撤回意思相反，不并进 `withdraw`；`waitingOn`、`openDeliveries` 是投递的读。这几个留在接口上，各说各的事。
+
+
 
 | 动词 | 做什么 | 合并的 |
 |---|---|---|
 | `receive` | 把一个触发交给它的受众 | `registerTalk`、`registerInitialInputs`、`deliverDirect`、`kick`，和工单、频道直接用帮工的 `makeRoom`、`send`、`register` |
-| `withdraw` | 撤回一个帮工、一封信或一张工单的待投递 | `dropSession`、`dropEnvelope`、`retireDispatches`、`returnOne`、`returnInput` |
+| `withdraw` | 撤回一个帮工、一封信或一张工单的待投递 | `dropSession`、`dropEnvelope`、`retireDispatches` |
 | `pending` | 工单池里等着的触发：排队的工单的（派活的在前），或一张工单的（按路由的顺序） | `queuedInputs`、`issueInputs` |
 | `changes` | 投递的变化：消费、刹车 | `consumed`、`breakerNotices` |
 
@@ -91,6 +93,7 @@ flowchart LR
 - Mailbox 对外的成员实际是 34 个（服务和泵各有一组），比上表少算了 7 个。
 - 第二步（工单）做完：派活走 `receive` 的 `Open`（私聊的 `Talk` 推广成它：最初的信是私聊最近的话，或工单池里的触发）；`pending` 合并 `queuedInputs`、`issueInputs`，两种查法返回同一种形状；`withdraw` 多了 `Issue`，取代 `retireDispatches`（照旧在工单自己的事务里，不拿 Mailbox 的写锁）；`registerInitialInputs` 从接口上去掉。原来同步的 `pending(session)` 是一个帮工的投递，改名 `openDeliveries`，免得一个名字指两件事；`waitingOn`（一封信还在等的投递数）同理是投递的读，留着。
 - 派活的顺序变了一处：腾位置挪进 Mailbox 后在记下工单之后。依赖未完、父工单的工作区出错而被拒时，不再先请走一个空闲的帮工；新工单遇上农场满了，记下后随即删掉（开帮工被拒时原来就删）。
+- 第三步不用另做：帮工投递和开帮工的成员（`deliver`、`launches`、`inputsConsumed`、`inputsReturned`、`makeRoom`、`send`）在帮工模块之外只剩 Mailbox 在用。
 - 工单还直接用帮工的：`noRoom`（只问有没有位置，排队用）和管家的 `register`（管家不经 `send` 开）。这两处是读和管家自己的事，不归投递，留在帮工。
 
 ## Alternatives considered
@@ -107,7 +110,7 @@ flowchart LR
 - 工单和频道不再用帮工跑一轮相关的成员，也不再用 Mailbox 的内部步骤；Mailbox 对它们只交出 `receive`、`withdraw`、`pending`、`changes`。
 - 频道和工单各至少有一组测试只用假的 Mailbox，不用 `world()`。
 - `vp run server:check` 通过；派活、带话、刹车和私聊的流程测试（`src/flows`）不改断言。
-- 投递这件事上只用「名词和路径」一节留下的名字：表里收掉的标识符（`queuedInputs`、`issueInputs`、`registerInitialInputs`、`returnInput`、`registerTalk`、`TalkRow`、`ChannelMail`、`retireDispatches`、`deliverDirect`、`dropSession`、`dropEnvelope`、`returnOne`、`waitingOn`、`breakerNotices`）不再出现在 Mailbox 的接口和 Mailbox 以外的代码里（Mailbox 内部的步骤怎么叫不限）。
+- 投递这件事上只用「名词和路径」一节留下的名字：表里收掉的标识符（`queuedInputs`、`issueInputs`、`registerInitialInputs`、`registerTalk`、`retireDispatches`、`deliverDirect`、`dropSession`、`dropEnvelope`、`breakerNotices`）不再出现在 Mailbox 的接口和 Mailbox 以外的代码里（Mailbox 内部的步骤怎么叫不限）。
 - 投递行为不变：`mailbox_delivery` 的状态、刹车计数和唤醒顺序和改之前一样。
 
 ## Risks
