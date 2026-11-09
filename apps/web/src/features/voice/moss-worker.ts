@@ -1,65 +1,6 @@
 import { Predicate } from "effect";
 
-const mossRelayWorkerCode = `
-let ws = null;
-let capturePort = null;
-let playbackPort = null;
-let micEnabled = false;
-const meter = setInterval(() => {
-  if (ws) self.postMessage({ type: "buffered", bufferedAmount: ws.bufferedAmount });
-}, 1000);
-self.onmessage = (event) => {
-  const d = event.data;
-  if (d.type === "connect") {
-    let opened = false;
-    const socket = new WebSocket(d.url);
-    socket.binaryType = "arraybuffer";
-    ws = socket;
-    socket.onopen = () => { opened = true; self.postMessage({ type: "open" }); };
-    socket.onmessage = (message) => {
-      if (typeof message.data === "string") self.postMessage({ type: "text", data: message.data, bufferedAmount: socket.bufferedAmount });
-      else if (message.data instanceof ArrayBuffer) self.postMessage({ type: "binary", data: message.data, bufferedAmount: socket.bufferedAmount }, [message.data]);
-    };
-    socket.onclose = (e) => {
-      if (ws === socket) self.postMessage({ type: "close", opened, code: e.code, reason: e.reason });
-    };
-  } else if (d.type === "ports") {
-    capturePort = d.capturePort;
-    playbackPort = d.playbackPort;
-    capturePort.onmessage = (event) => {
-      const frame = event.data;
-      if (micEnabled && frame.type === "mic_frame" && frame.frame instanceof ArrayBuffer && frame.frame.byteLength === 641 &&
-          ws && ws.readyState === WebSocket.OPEN && ws.bufferedAmount + 641 <= 65536) {
-        ws.send(frame.frame);
-        self.postMessage({ type: "mic_sent", byteLength: 641, level: frame.level, bufferedAmount: ws.bufferedAmount });
-      }
-    };
-    playbackPort.onmessage = (event) => self.postMessage(event.data);
-  } else if (d.type === "mic") {
-    micEnabled = d.enabled;
-  } else if (d.type === "send_text") {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(d.text);
-  } else if (d.type === "send_binary") {
-    if (ws && ws.readyState === WebSocket.OPEN && ws.bufferedAmount + d.bytes.byteLength <= 524288) ws.send(d.bytes);
-    self.postMessage({ type: "sent_binary", bufferedAmount: ws ? ws.bufferedAmount : 0 });
-  } else if (d.type === "enqueue") {
-    if (playbackPort) playbackPort.postMessage(d, [d.pcm]);
-  } else if (d.type === "cut_playback") {
-    if (playbackPort) playbackPort.postMessage({ type: "cut", run: d.run, turn: d.turn });
-  } else if (d.type === "close") {
-    micEnabled = false;
-    clearInterval(meter);
-    if (capturePort) capturePort.close();
-    if (playbackPort) { playbackPort.postMessage({ type: "clear" }); playbackPort.close(); }
-    const socket = ws;
-    ws = null;
-    if (socket && socket.readyState !== WebSocket.CLOSED) socket.close(1000);
-    self.postMessage({ type: "closed" });
-  }
-};
-`;
-
-let workerBlobUrl: string | undefined;
+import { mossRelay, type RelayCommand, type RelayEvent } from "./moss-relay.ts";
 
 export interface MossRelayHandlers {
   readonly onOpen: () => void;
@@ -79,10 +20,13 @@ export interface MossRelayBridge {
   readonly attachWorkletPorts: (capturePort: MessagePort, playbackPort: MessagePort) => void;
   readonly cutPlayback: (run: string, turn: string) => void;
   readonly bufferedAmount: () => number;
+  /** Asks the relay how full the socket is; bufferedAmount reads the answer once it comes. */
+  readonly measure: () => void;
   readonly setMic: (enabled: boolean) => void;
   readonly close: () => void;
 }
 
+/** The relay in a worker, or on the page where there is none: the same relay (moss-relay.ts) and the same events either way. */
 export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): MossRelayBridge {
   const playbackMessage = (d: unknown) => {
     if (!Predicate.isObject(d)) return;
@@ -98,124 +42,74 @@ export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): M
     else if (d["type"] === "cut_ack" && typeof d["run"] === "string" && typeof d["turn"] === "string" && typeof d["partialMs"] === "number")
       handlers.onAudioStopped(d["run"], d["turn"], d["partialMs"]);
   };
-  if (typeof Worker !== "undefined" && typeof URL.createObjectURL === "function") {
-    workerBlobUrl ??= URL.createObjectURL(new Blob([mossRelayWorkerCode], { type: "text/javascript" }));
-    const worker = new Worker(workerBlobUrl);
-    let lastBuffered = 0;
-    let closed = false;
-    let binaryPending = false;
-    worker.onmessage = (event: MessageEvent<unknown>) => {
-      const d = event.data;
-      if (!Predicate.isObject(d)) return;
-      if (d["type"] === "closed") {
-        worker.terminate();
+  let lastBuffered = 0;
+  let closed = false;
+  // One binary send at a time: the next waits until the relay says how full the socket is.
+  let binaryPending = false;
+  let ended = () => {};
+  const heard = (d: RelayEvent) => {
+    if (d.type === "closed") {
+      ended();
+      return;
+    }
+    if (closed) return;
+    if ("bufferedAmount" in d) lastBuffered = d.bufferedAmount;
+    switch (d.type) {
+      case "open":
+        handlers.onOpen();
         return;
-      }
-      if (closed) return;
-      if (typeof d["bufferedAmount"] === "number") lastBuffered = d["bufferedAmount"];
-      if (d["type"] === "sent_binary") binaryPending = false;
-      switch (d["type"]) {
-        case "open":
-          handlers.onOpen();
-          break;
-        case "text":
-          if (typeof d["data"] === "string") handlers.onText(d["data"]);
-          break;
-        case "binary":
-          if (d["data"] instanceof ArrayBuffer) handlers.onBinary(d["data"]);
-          break;
-        case "mic_sent":
-          if (typeof d["byteLength"] === "number" && typeof d["level"] === "number") handlers.onMicSent(d["byteLength"], d["level"]);
-          break;
-        case "close":
-          if (typeof d["opened"] === "boolean" && typeof d["code"] === "number" && typeof d["reason"] === "string")
-            handlers.onClose(d["opened"], d["code"], d["reason"]);
-          break;
-        default:
-          playbackMessage(d);
-      }
-    };
+      case "text":
+        handlers.onText(d.data);
+        return;
+      case "binary":
+        handlers.onBinary(d.data);
+        return;
+      case "mic_sent":
+        handlers.onMicSent(d.byteLength, d.level);
+        return;
+      case "sent_binary":
+        binaryPending = false;
+        return;
+      case "playback":
+        playbackMessage(d.data);
+        return;
+      case "close":
+        handlers.onClose(d.opened, d.code, d.reason);
+        return;
+      case "buffered":
+        return;
+    }
+  };
+  let send: (command: RelayCommand, transfer?: Transferable[]) => void;
+  if (typeof Worker === "undefined") send = mossRelay(heard);
+  else {
+    const worker = new Worker(new URL("./moss-relay.worker.ts", import.meta.url), { type: "module" });
+    ended = () => worker.terminate();
+    worker.onmessage = (event: MessageEvent<RelayEvent>) => heard(event.data);
     worker.onerror = () => {
       if (!closed) handlers.onClose(false, 1011, "");
     };
-    worker.postMessage({ type: "connect", url });
-    return {
-      sendText: (text) => worker.postMessage({ type: "send_text", text }),
-      sendBinary: (bytes) => {
-        if (binaryPending || closed) return;
-        binaryPending = true;
-        const buffer = bytes instanceof Uint8Array ? bytes.slice().buffer : bytes.slice(0);
-        lastBuffered += buffer.byteLength;
-        worker.postMessage({ type: "send_binary", bytes: buffer }, [buffer]);
-      },
-      enqueuePlayback: (chunk, run, turn, pcm) => worker.postMessage({ type: "enqueue", chunk, run, turn, pcm }, [pcm]),
-      attachWorkletPorts: (capturePort, playbackPort) => worker.postMessage({ type: "ports", capturePort, playbackPort }, [capturePort, playbackPort]),
-      cutPlayback: (run, turn) => worker.postMessage({ type: "cut_playback", run, turn }),
-      bufferedAmount: () => (binaryPending ? Infinity : lastBuffered),
-      setMic: (enabled) => worker.postMessage({ type: "mic", enabled }),
-      close: () => {
-        closed = true;
-        worker.postMessage({ type: "close" });
-      },
-    };
+    send = (command, transfer) => worker.postMessage(command, transfer ?? []);
   }
-
-  const socket = new WebSocket(url);
-  socket.binaryType = "arraybuffer";
-  let opened = false;
-  let micEnabled = false;
-  let capturePort: MessagePort | undefined;
-  let playbackPort: MessagePort | undefined;
-  socket.onopen = () => {
-    opened = true;
-    handlers.onOpen();
-  };
-  socket.onmessage = (event: MessageEvent<unknown>) => {
-    if (typeof event.data === "string") handlers.onText(event.data);
-    else if (event.data instanceof ArrayBuffer) handlers.onBinary(event.data);
-  };
-  socket.onclose = (event) => handlers.onClose(opened, event.code, event.reason);
+  send({ type: "connect", url });
   return {
-    sendText: (text) => {
-      if (socket.readyState === WebSocket.OPEN) socket.send(text);
-    },
+    sendText: (text) => send({ type: "send_text", text }),
     sendBinary: (bytes) => {
-      if (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount + bytes.byteLength > 524288) return;
-      if (bytes instanceof ArrayBuffer) socket.send(bytes);
-      else socket.send(bytes.buffer instanceof ArrayBuffer ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) : new Uint8Array(bytes));
+      if (binaryPending || closed) return;
+      binaryPending = true;
+      const buffer = bytes instanceof Uint8Array ? bytes.slice().buffer : bytes.slice(0);
+      lastBuffered += buffer.byteLength;
+      send({ type: "send_binary", bytes: buffer }, [buffer]);
     },
-    enqueuePlayback: (chunk, run, turn, pcm) => playbackPort?.postMessage({ type: "enqueue", chunk, run, turn, pcm }, [pcm]),
-    attachWorkletPorts: (capture, playback) => {
-      capturePort = capture;
-      playbackPort = playback;
-      capture.onmessage = (event: MessageEvent<unknown>) => {
-        const d = event.data;
-        if (
-          Predicate.isObject(d) &&
-          d["type"] === "mic_frame" &&
-          d["frame"] instanceof ArrayBuffer &&
-          d["frame"].byteLength === 641 &&
-          micEnabled &&
-          socket.readyState === WebSocket.OPEN &&
-          socket.bufferedAmount + 641 <= 65536
-        ) {
-          socket.send(d["frame"]);
-          handlers.onMicSent(641, typeof d["level"] === "number" ? d["level"] : 0);
-        }
-      };
-      playback.onmessage = (event: MessageEvent<unknown>) => playbackMessage(event.data);
-    },
-    cutPlayback: (run, turn) => playbackPort?.postMessage({ type: "cut", run, turn }),
-    bufferedAmount: () => socket.bufferedAmount,
-    setMic: (enabled) => {
-      micEnabled = enabled;
-    },
+    enqueuePlayback: (chunk, run, turn, pcm) => send({ type: "enqueue", chunk, run, turn, pcm }, [pcm]),
+    attachWorkletPorts: (capturePort, playbackPort) => send({ type: "ports", capturePort, playbackPort }, [capturePort, playbackPort]),
+    cutPlayback: (run, turn) => send({ type: "cut_playback", run, turn }),
+    bufferedAmount: () => (binaryPending ? Infinity : lastBuffered),
+    measure: () => send({ type: "measure" }),
+    setMic: (enabled) => send({ type: "mic", enabled }),
     close: () => {
-      micEnabled = false;
-      capturePort?.close();
-      playbackPort?.postMessage({ type: "clear" });
-      playbackPort?.close();
-      if (socket.readyState !== WebSocket.CLOSED) socket.close(1000);
+      closed = true;
+      send({ type: "close" });
     },
   };
 }

@@ -161,7 +161,7 @@ Status: proposed
 | F10 启动遮罩 | 不改 | — | 阶段已是协议的 `Opening["phase"]`；`data-opening` 是组件与遮罩约好的接口 |
 | F12 帧流 | 不改 | — | 帧是 Solid store 逐 id reconcile，`open` 无帧只在一处构造、构造时不会出现；改成联合会整份重建画面 |
 | F13 表单 | 不改 | — | 校验、提交、`submitted`、组字是独立维度，提交里本就要校验 |
-| F2 MOSS Worker | 不改 | — | 不是状态机：连接状态是 WebSocket 自己的 `readyState`，麦克风、端口各管一件；问题是 Worker 是内联的 JS 字符串，和主线程各写一份。要共用得改成 Vite 打的独立 Worker 模块，牵动桌面壳和手机 WebView 的加载，单独一步 |
+| F2 MOSS Worker | 完成 | 本步的提交 | 不是状态机，是重复：Worker 原是内联的 JS 字符串，主线程另写一份。现在中继是一份 TypeScript（`moss-relay.ts`），Worker（`moss-relay.worker.ts`，照 `highlight.worker.ts` 用 `new URL` 加载）和没有 Worker 时的页面都跑它，事件有类型；关掉以后不再回调，两边一样。每秒一次的缓冲量改由页面已有的那一跳经 `measure` 去问，不再多一个定时器 |
 | F5 农场加载 | 不改 | — | 只有 `useVillage` 一处写、每次只设 `village` 或 `error` 之一，读的五处都只问 `village` 在不在 |
 | F8 稿子块焦点 | 不改 | — | 四样不同的东西：`focusId`、`caret` 是编辑器给视图的一次性请求（光标请求不换块也会发），`focused` 是协同合并要读的事实，`editing` 是视图自己的显示方式；并起来会把请求和事实混成一个 |
 | 清单外 | 完成 | `ecc18f83d`、`2c35bc545`、`7f4d01a4b`、`922d9e4e0` | MOSS 引擎的 `stopped`、`cutting` 合成 `stop`；闪播流解析的 `stage`；`FlashPlayer` 一次播放一条 `Playing` 记录；聊天框的菜单（开着、失焦收起、Esc 关在一处触发，和大纲编辑器一个规矩）；聊天页的新建频道与搜索合成一个 `dialog`；视觉回答没给轮次就没有 `turn`，不再是 -1 |

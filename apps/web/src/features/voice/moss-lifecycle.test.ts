@@ -11,6 +11,7 @@ vi.mock("./moss-worker.ts", () => ({
     attachWorkletPorts: vi.fn(),
     cutPlayback: vi.fn(),
     bufferedAmount: () => 0,
+    measure: vi.fn(),
     setMic: vi.fn(),
     close: vi.fn(),
   })),
