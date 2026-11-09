@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Cron, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
+import { Clock, Cron, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
 
 import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
@@ -72,8 +73,10 @@ interface Reminders {
 }
 
 /** The reminders in home: read once, then held. a fiber of the scope sleeps until the next is due and hands what came due to wake. */
-export const makeReminders = (home: string, now: () => number, wake: (due: string[]) => Effect.Effect<void>): Effect.Effect<Reminders, never, Scope.Scope> =>
+export const makeReminders = (home: string, wake: (due: string[]) => Effect.Effect<void>): Effect.Effect<Reminders, never, Scope.Scope> =>
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
+    const now = () => clock.currentTimeMillisUnsafe();
     const file = join(home, "reminders.json");
     const read = yield* Effect.promise(() =>
       readFile(file, "utf8").then(
@@ -153,7 +156,7 @@ export const makeReminders = (home: string, now: () => number, wake: (due: strin
         }
         const made = new Date(now());
         const reminder: Reminder = {
-          id: "reminder-" + made.getTime().toString(36),
+          id: "reminder-" + randomUUID(),
           name: p.name,
           message: p.message,
           ...(p.cron != null ? { cron: p.cron } : {}),

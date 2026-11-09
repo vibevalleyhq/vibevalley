@@ -2,7 +2,8 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Clock, Effect } from "effect";
+import { TestClock } from "effect/testing";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
@@ -18,12 +19,14 @@ const update = process.env.VIBEVALLEY_GOLDEN === "update";
 
 it.effect("the brain's tools are declared to the model as they always were", () =>
   Effect.gen(function* () {
+    yield* TestClock.setTime(1798758000000);
+    const clock = yield* Clock.Clock;
     const dir = tempDir("vibevalley-declared-");
     try {
-      const reminders = yield* makeReminders(dir, Date.now, () => Effect.void);
+      const reminders = yield* makeReminders(dir, () => Effect.void);
       const sets = {
         coding: codingTools({ cwd: dir }),
-        self: selfTools({ now: Date.now, home: dir, skills: async () => [], memory: true }),
+        self: selfTools({ now: () => clock.currentTimeMillisUnsafe(), home: dir, skills: async () => [], memory: true }),
         subagent: [subagentTool(() => Effect.succeed(""))],
         reminders: reminders.tools,
         tasks: todoTools(memoryStore(), true, Effect.void),

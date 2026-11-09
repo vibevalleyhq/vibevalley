@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Exit, Fiber, Scope, Stream } from "effect";
+import { Clock, Effect, Exit, Fiber, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
 
 import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
@@ -53,6 +53,66 @@ const settled = (r: Rig) => r.events.find((e) => e.type === "agent_settled") as 
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
+  it.effect("the fixture observes the first event and each target run before ask returns, then closes", () =>
+    Effect.gen(function* () {
+      const epoch = 1798758000000;
+      yield* TestClock.setTime(epoch);
+      const rig = yield* withAgent(home(), [answer("first"), answer("second")], (r) =>
+        Effect.gen(function* () {
+          const observer = yield* Scope.make();
+          yield* Effect.addFinalizer(() => Scope.close(observer, Exit.void));
+          const observed: string[] = [];
+          let observerEnded = false;
+          const stream = yield* Scope.provide(r.agent.events, observer);
+          yield* Scope.provide(
+            Effect.forkScoped(
+              Stream.runForEach(stream, (e) => Effect.sync(() => void observed.push(e.type))).pipe(Effect.ensuring(Effect.sync(() => (observerEnded = true)))),
+            ),
+            observer,
+          );
+          expect(yield* r.ask("one")).toBe("first");
+          expect(r.events[0]?.type).toBe("agent_start");
+          expect(r.events.at(-1)).toMatchObject({ type: "agent_settled", run: { id: 1, settled: true } });
+          expect(r.agent.history()[0]).toMatchObject({ role: "user", timestamp: epoch });
+          yield* until(() => observed.at(-1) === "agent_settled", "the independent observer consumed the first run");
+          expect(observed[0]).toBe("agent_start");
+          yield* Scope.close(observer, Exit.void);
+          expect(observerEnded).toBe(true);
+          const beforeSecondRun = [...observed];
+          yield* TestClock.adjust(25);
+          expect(yield* r.ask("two")).toBe("second");
+          expect(r.events.filter((e) => e.type === "agent_settled").map((e) => e.run.id)).toEqual([1, 2]);
+          expect(r.events.at(-1)).toMatchObject({ type: "agent_settled", run: { id: 2, settled: true } });
+          expect(r.agent.progress().current.id).toBe(2);
+          expect(r.agent.history()[2]).toMatchObject({ role: "user", timestamp: epoch + 25 });
+          expect(observed).toEqual(beforeSecondRun);
+          return r;
+        }),
+      );
+      const observed = [...rig.events];
+      expect(yield* Effect.flip(rig.ask("closed"))).toMatchObject({ _tag: "AgentClosed" });
+      yield* rig.agent.send(userMessage("ignored", yield* Clock.currentTimeMillis));
+      yield* TestClock.adjust(3_600_000);
+      expect(rig.events).toEqual(observed);
+      expect(rig.requests).toHaveLength(2);
+    }),
+  );
+
+  it.effect("a missing scripted answer is an observable failed run", () =>
+    withAgent(home(), [], (r) =>
+      Effect.gen(function* () {
+        expect(yield* r.ask("unscripted")).toBe("");
+        expect(r.requests).toHaveLength(1);
+        expect(r.script.pending()).toBe(0);
+        expect(r.agent.history().at(-1)).toMatchObject({ role: "assistant", stopReason: "error", errorMessage: "the script has no answer 1" });
+        expect(r.events.at(-1)).toMatchObject({
+          type: "agent_settled",
+          run: { id: 1, settled: true, failed: true, error: "the script has no answer 1" },
+        });
+      }),
+    ),
+  );
+
   it.effect("stops waiting for an ask that is interrupted, and goes on with the run", () => {
     const dir = home();
     const wake = gate();
@@ -72,7 +132,7 @@ describe("the agent", () => {
       [answer([toolCall("nap", {})]), answer("睡好了")],
       (r) =>
         Effect.gen(function* () {
-          const asking = yield* Effect.forkChild(r.agent.ask(userMessage("睡", Date.now())));
+          const asking = yield* Effect.forkChild(r.ask("睡"));
           yield* until(() => napping, "napping");
           yield* Fiber.interrupt(asking);
           wake.open();
@@ -99,7 +159,7 @@ describe("the agent", () => {
       const scope = yield* Scope.fork(owner);
       const agent = yield* Scope.provide(makeBrain(testBrain(home(), held)), scope);
       yield* Effect.gen(function* () {
-        yield* agent.send(userMessage("说", Date.now()));
+        yield* agent.send(userMessage("说", yield* Clock.currentTimeMillis));
         yield* until(() => started, "started");
         yield* Scope.close(owner, Exit.void);
         yield* until(() => cut, "cut");
@@ -175,10 +235,10 @@ describe("the agent", () => {
       [answer([toolCall("nap", {})]), step((c) => answer("第二次听到：" + lastUser(c))), step((c) => answer("第三次听到：" + lastUser(c)))],
       (r) =>
         Effect.gen(function* () {
-          yield* r.agent.send(userMessage("开始", Date.now()));
+          yield* r.agent.send(userMessage("开始", yield* Clock.currentTimeMillis));
           yield* until(() => napping, "napping");
-          yield* r.agent.later(userMessage("完了再说这个", Date.now()));
-          yield* r.agent.send(userMessage("顺便", Date.now()));
+          yield* r.agent.later(userMessage("完了再说这个", yield* Clock.currentTimeMillis));
+          yield* r.agent.send(userMessage("顺便", yield* Clock.currentTimeMillis));
           wake.open();
           yield* until(() => r.agent.history().length >= 7, "r.agent.history().length >= 7");
           expect(said(r.agent.history())).toEqual([
@@ -327,7 +387,7 @@ describe("the agent", () => {
     }),
   );
 
-  it.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
+  it.effect("is woken when a reminder comes due an hour later, at the exact deadline, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
       const dir = home();
@@ -337,9 +397,9 @@ describe("the agent", () => {
       );
       yield* withAgent(dir, [step((c) => answer("收到：" + lastUser(c)))], (r) =>
         Effect.gen(function* () {
-          yield* TestClock.adjust(59 * 60_000);
+          yield* TestClock.adjust(60 * 60_000 - 1);
           expect(r.has("agent_start")).toBe(false);
-          yield* TestClock.adjust(60_000 + 20_000);
+          yield* TestClock.adjust(1);
           yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
           expect(messageText(r.agent.history()[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
         }),
@@ -378,7 +438,8 @@ describe("the agent", () => {
       (r) =>
         Effect.gen(function* () {
           yield* r.ask("第 1 件事");
-          yield* Effect.promise(() => remember(dir, "记在折叠之前", new Date()));
+          const now = yield* Clock.currentTimeMillis;
+          yield* Effect.promise(() => remember(dir, "记在折叠之前", new Date(now)));
           const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
           for (let n = 2; n <= 5 && !folded(); n++) yield* r.ask(`第 ${n} 件事`);
           yield* until(folded, "the history folded");
@@ -395,7 +456,7 @@ describe("the agent", () => {
   it.effect("stops the run under way", () =>
     withAgent(home(), [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })], (r) =>
       Effect.gen(function* () {
-        yield* r.agent.send(userMessage("说", Date.now()));
+        yield* r.agent.send(userMessage("说", yield* Clock.currentTimeMillis));
         yield* until(
           () => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"),
           'r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta")',
@@ -412,7 +473,7 @@ describe("the agent", () => {
   it.effect("is stopped while a tool runs", () =>
     withAgent(home(), [answer([toolCall("bash", { command: "sleep 5" })])], (r) =>
       Effect.gen(function* () {
-        yield* r.agent.send(userMessage("睡", Date.now()));
+        yield* r.agent.send(userMessage("睡", yield* Clock.currentTimeMillis));
         yield* until(() => r.has("tool_execution_start"), 'r.has("tool_execution_start")');
         yield* r.agent.stop;
         yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
@@ -543,7 +604,7 @@ describe("the agent", () => {
   });
 
   it("cuts where the last words stay", () => {
-    const u = (text: string) => userMessage(text, Date.now());
+    const u = (text: string) => userMessage(text, 1798758000000);
     const a = (words: string) => assistantMessage(words);
     const call = assistantMessage([toolCall("x", {})]);
     const result: BrainMessage = {
@@ -564,7 +625,7 @@ describe("the agent", () => {
   });
 
   describe("a run cut off", () => {
-    const now = Date.now();
+    const now = 1798758000000;
     const asked: BrainMessage = { role: "user", content: "列一下", timestamp: now };
     const call = assistantMessage([toolCall("list_dir", {}, "call-1")], {
       timestamp: now,

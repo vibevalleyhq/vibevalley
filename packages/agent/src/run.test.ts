@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Exit, Fiber, Scope, Stream } from "effect";
+import { Clock, Effect, Exit, Fiber, Scope, Stream } from "effect";
+import { TestClock } from "effect/testing";
 
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
 import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { until } from "@vibevalley/testkit/until";
+import { gate, until } from "@vibevalley/testkit/until";
 
 import { type BrainEvent, type BrainOptions, makeBrain } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
@@ -82,7 +83,7 @@ describe("a run's receipt", () => {
         [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
         { tools: [echo] },
       );
-      expect(yield* agent.ask(userMessage("one", Date.now()))).toBe("first");
+      expect(yield* agent.ask(userMessage("one", yield* Clock.currentTimeMillis))).toBe("first");
       yield* until(() => receipts.length === 1, "receipts.length === 1");
       expect(receipts[0]).toMatchObject({
         id: 1,
@@ -90,7 +91,7 @@ describe("a run's receipt", () => {
         usage: { input: 60, output: 12, cacheRead: 15 },
         contextTokens: 43,
       });
-      expect(yield* agent.ask(userMessage("two", Date.now()))).toBe("second");
+      expect(yield* agent.ask(userMessage("two", yield* Clock.currentTimeMillis))).toBe("second");
       yield* until(() => receipts.length === 2, "receipts.length === 2");
       expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
       expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
@@ -103,10 +104,10 @@ describe("a run's receipt", () => {
       yield* Effect.scoped(
         Effect.gen(function* () {
           const { agent, receipts } = yield* receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
-          expect(yield* agent.ask(userMessage("fail", Date.now()))).toBe("failed words");
+          expect(yield* agent.ask(userMessage("fail", yield* Clock.currentTimeMillis))).toBe("failed words");
           yield* until(() => receipts.length === 1, "receipts.length === 1");
           expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
-          yield* agent.ask(userMessage("retry", Date.now()));
+          yield* agent.ask(userMessage("retry", yield* Clock.currentTimeMillis));
           yield* until(() => receipts.length === 2, "receipts.length === 2");
           expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
         }),
@@ -143,9 +144,9 @@ describe("a run's receipt", () => {
           maxSteps: 3,
         },
       );
-      const answer = yield* Effect.forkChild(agent.ask(userMessage("A", Date.now())), { startImmediately: true });
+      const answer = yield* Effect.forkChild(agent.ask(userMessage("A", yield* Clock.currentTimeMillis)), { startImmediately: true });
       yield* until(() => entered, "entered");
-      yield* agent.later(userMessage("B", Date.now()));
+      yield* agent.later(userMessage("B", yield* Clock.currentTimeMillis));
       release();
       expect(yield* Fiber.join(answer)).toBe("");
       yield* until(() => receipts.length === 1, "receipts.length === 1");
@@ -188,7 +189,7 @@ describe("a run's receipt", () => {
       );
       const events: BrainEvent[] = [];
       const reader = yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
-      yield* agent.send(userMessage("start", Date.now()));
+      yield* agent.send(userMessage("start", yield* Clock.currentTimeMillis));
       yield* until(
         () => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"),
         'events.some((e) => e.type === "message_update" && messageText(e.message) === "partial")',
@@ -216,9 +217,9 @@ describe("a compaction", () => {
   it("replays its whole kept tail", async () => {
     const dir = home();
     const messages: BrainMessage[] = [
-      userMessage("old", Date.now()),
+      userMessage("old", 1798758000000),
       assistantMessage("old answer"),
-      userMessage("keep", Date.now()),
+      userMessage("keep", 1798758000001),
       assistantMessage("a"),
       assistantMessage("b"),
       assistantMessage("c"),
@@ -365,6 +366,38 @@ describe("the agent's own todos", () => {
       // The task was one change.
       expect(changed.length).toBe(1);
       expect(changed[0]!.type === "todos_changed" && changed[0]!.todos.length).toBe(2);
+    }),
+  );
+
+  it.effect("the fixture consumes its settled run without waiting for an already-started nudge", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1798758000000);
+      const release = gate();
+      let entered = false;
+      let returned = false;
+      yield* withAgent(
+        home(),
+        [
+          answer([toolCall("todo_add", { tasks: [{ id: "a", brief: "read" }] })]),
+          answer("first settled"),
+          () => {
+            entered = true;
+            return release.opened.then(() => answer("nudge settled"));
+          },
+        ],
+        (r) =>
+          Effect.gen(function* () {
+            const asking = yield* Effect.forkChild(Effect.tap(r.ask("start"), () => Effect.sync(() => (returned = true))));
+            yield* until(() => entered, "the next nudge has entered its model request");
+            yield* until(() => returned, "the fixture consumed the first run while the nudge is held");
+            expect(yield* Fiber.join(asking)).toBe("first settled");
+            expect(r.agent.progress().current).toMatchObject({ id: 2, settled: false });
+            expect(r.events.filter((e) => e.type === "agent_settled").map((e) => e.run.id)).toEqual([1]);
+            release.open();
+            yield* until(() => r.events.some((e) => e.type === "agent_settled" && e.run.id === 2), "the released nudge settles");
+          }).pipe(Effect.ensuring(Effect.sync(release.open))),
+        { todos: memoryStore(), maxNudges: 1, reminders: false },
+      );
     }),
   );
 

@@ -469,7 +469,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     yield* refreshPrefix;
     let tools = allowed([...hostTools, ...own], options.disallowedTools);
     if (options.reminders ?? sessionFile !== undefined) {
-      const reminders = yield* makeReminders(options.home, now, (due) =>
+      const reminders = yield* makeReminders(options.home, (due) =>
         Effect.forEach(due, (text) => later(customMessage("reminder", text, now())), { discard: true }),
       );
       tools = allowed([...tools, ...reminders.tools], options.disallowedTools);

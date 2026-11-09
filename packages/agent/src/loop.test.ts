@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Clock, Effect } from "effect";
 
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
@@ -31,7 +31,6 @@ describe("a run's turns", () => {
     withAgent(home(), [answer([toolCall("list_dir", {})]), answer("好了")], (r) =>
       Effect.gen(function* () {
         yield* r.ask("列一下");
-        yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(shape(r)).toEqual([
           "agent_start",
           "turn_start",
@@ -108,10 +107,10 @@ describe("a run's turns", () => {
       [answer([toolCall("nap", {})]), answer("一起")],
       (r) =>
         Effect.gen(function* () {
-          yield* r.agent.send(userMessage("开始", Date.now()));
+          yield* r.agent.send(userMessage("开始", yield* Clock.currentTimeMillis));
           yield* until(() => napping, "napping");
-          yield* r.agent.send(userMessage("甲", Date.now()));
-          yield* r.agent.send(userMessage("乙", Date.now()));
+          yield* r.agent.send(userMessage("甲", yield* Clock.currentTimeMillis));
+          yield* r.agent.send(userMessage("乙", yield* Clock.currentTimeMillis));
           wake.open();
           yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
           expect(said(r)).toEqual(["user:开始", "assistant:", "toolResult:醒了", "user:甲", "user:乙", "assistant:一起"]);
@@ -140,7 +139,7 @@ describe("a run's turns", () => {
       [answer([text("两个"), toolCall("slow", {}), toolCall("fast", {})]), answer("都好了")],
       (r) =>
         Effect.gen(function* () {
-          yield* r.agent.send(userMessage("一起", Date.now()));
+          yield* r.agent.send(userMessage("一起", yield* Clock.currentTimeMillis));
           yield* until(
             () => slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast"),
             'slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast")',

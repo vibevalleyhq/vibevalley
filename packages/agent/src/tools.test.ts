@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "n
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Exit, Fiber, Result } from "effect";
+import { Clock, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { TestClock } from "effect/testing";
 
 import { objectSchema, toolArguments } from "@vibevalley/ai/tools";
@@ -179,6 +179,8 @@ describe("skills and memory", () => {
 });
 
 describe("reminders", () => {
+  const epoch = 1798758000000;
+
   it("are due by their kind", () => {
     const created = "2026-10-12T00:00:00.000Z";
     const at: Reminder = { id: "a", name: "a", message: "", at: "2026-10-12T01:00:00.000Z", created };
@@ -198,23 +200,18 @@ describe("reminders", () => {
   it.effect("run a missed reminder once", () =>
     Effect.gen(function* () {
       const dir = home();
-      // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
-      let at = Date.now();
-      const s = yield* makeReminders(
-        dir,
-        () => ++at,
-        () => Effect.void,
-      );
+      yield* TestClock.setTime(epoch);
+      const s = yield* makeReminders(dir, () => Effect.void);
       expect(yield* fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/u);
       expect(yield* fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/u);
       yield* call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
       yield* call(s.tools, "reminder", {
         name: "提醒",
         message: "开会",
-        at: new Date(Date.now() + 60_000).toISOString(),
+        at: new Date(epoch + 60_000).toISOString(),
       });
       expect(yield* call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/u);
-      const later = new Date(Date.now() + 3_600_000);
+      const later = new Date(epoch + 3_600_000);
       const woke = yield* s.claimDue(later);
       expect(woke.length).toBe(2);
       expect(woke[0]).toMatch(/^【提醒「巡检」到点了/u);
@@ -223,6 +220,68 @@ describe("reminders", () => {
       expect(left.map((j) => j.name)).toEqual(["巡检"]);
       yield* call(s.tools, "cancel_reminder", { id: left[0]!.id });
       expect(yield* call(s.tools, "list_reminders", {})).toBe("没有定好的事。");
+    }),
+  );
+
+  it.effect("regression: same-time reminder IDs preserve future reminders and cancel only the addressed reminder", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(epoch);
+      const dir = home();
+      const s = yield* makeReminders(dir, () => Effect.void);
+      for (const [name, offset] of [
+        ["first", 60_000],
+        ["future", 120_000],
+        ["cancel", 180_000],
+      ] as const) {
+        yield* call(s.tools, "reminder", { name, message: name, at: new Date(epoch + offset).toISOString() });
+      }
+      const saved = yield* Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, created: Schema.String })))(
+        JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")),
+      );
+      expect(new Set(saved.map((r) => r.id)).size).toBe(3);
+      expect(saved.map((r) => r.created)).toEqual(Array(3).fill(new Date(epoch).toISOString()));
+      expect(yield* call(s.tools, "list_reminders", {})).toMatch(/「first」[\s\S]*「future」[\s\S]*「cancel」/u);
+      yield* call(s.tools, "cancel_reminder", { id: saved[2]!.id });
+      expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ id: saved[0]!.id }, { id: saved[1]!.id }]);
+      expect(yield* s.claimDue(new Date(epoch + 60_000 - 1))).toEqual([]);
+      expect(yield* s.claimDue(new Date(epoch + 60_000))).toEqual([expect.stringContaining("「first」")]);
+      expect(yield* s.claimDue(new Date(epoch + 60_000))).toEqual([]);
+      expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ id: saved[1]!.id, name: "future" }]);
+      expect(yield* s.claimDue(new Date(epoch + 120_000))).toEqual([expect.stringContaining("「future」")]);
+    }),
+  );
+
+  it.effect("canceling a waiting reminder and closing its scope prevent later wakes", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(epoch);
+      const dir = home();
+      const woke: string[] = [];
+      const owner = yield* Scope.make();
+      yield* Effect.addFinalizer(() => Scope.close(owner, Exit.void));
+      const s = yield* Scope.provide(
+        makeReminders(dir, (due) => Effect.sync(() => void woke.push(...due))),
+        owner,
+      );
+      yield* call(s.tools, "reminder", { name: "cancel", message: "", at: new Date(epoch + 60_000).toISOString() });
+      yield* call(s.tools, "reminder", { name: "keep", message: "", at: new Date(epoch + 120_000).toISOString() });
+      const saved = yield* Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))(
+        JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")),
+      );
+      yield* call(s.tools, "cancel_reminder", { id: saved[0]!.id });
+      yield* TestClock.adjust(60_000);
+      expect(woke).toEqual([]);
+      yield* TestClock.adjust(60_000);
+      yield* waitFor(
+        Effect.sync(() => woke.length),
+        (n) => n === 1,
+        "uncanceled reminder wakes",
+      );
+      expect(woke).toEqual([expect.stringContaining("「keep」")]);
+      yield* call(s.tools, "reminder", { name: "closed", message: "", at: new Date(epoch + 180_000).toISOString() });
+      yield* Scope.close(owner, Exit.void);
+      yield* TestClock.adjust(60_000);
+      expect(woke).toEqual([expect.stringContaining("「keep」")]);
+      expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ name: "closed" }]);
     }),
   );
 
@@ -239,11 +298,12 @@ describe("reminders", () => {
         ]),
       );
       const woke: string[] = [];
-      const clock = yield* Clock.Clock;
-      yield* makeReminders(
-        dir,
-        () => clock.currentTimeMillisUnsafe(),
-        (due) => Effect.sync(() => void woke.push(...due)),
+      const storedAtWake: unknown[] = [];
+      yield* makeReminders(dir, (due) =>
+        Effect.sync(() => {
+          storedAtWake.push(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")));
+          woke.push(...due);
+        }),
       );
       yield* waitFor(
         Effect.sync(() => woke.length),
@@ -251,6 +311,7 @@ describe("reminders", () => {
         "the missed one",
       );
       expect(woke[0]).toMatch(/错过的/u);
+      expect(storedAtWake).toEqual([[expect.objectContaining({ id: "soon" })]]);
       yield* TestClock.adjust(10 * 60_000 - 1);
       expect(woke.length).toBe(1);
       yield* TestClock.adjust(1);
@@ -260,13 +321,15 @@ describe("reminders", () => {
         "the one due now",
       );
       expect(woke[1]).toMatch(/一会儿/u);
+      expect(storedAtWake[1]).toEqual([]);
     }),
   );
 
   it.effect("come due only once the claim is stored", () =>
     Effect.gen(function* () {
       const dir = home();
-      const now = new Date();
+      yield* TestClock.setTime(epoch);
+      const now = new Date(epoch + 60_000);
       writeFileSync(
         join(dir, "reminders.json"),
         JSON.stringify([
@@ -274,25 +337,30 @@ describe("reminders", () => {
             id: "once",
             name: "",
             message: "",
-            at: new Date(now.getTime() - 60_000).toISOString(),
-            created: new Date(now.getTime() - 3_600_000).toISOString(),
+            at: now.toISOString(),
+            created: new Date(epoch).toISOString(),
           },
         ]),
       );
       // A directory at the temporary file's path makes the atomic write fail.
       mkdirSync(join(dir, "reminders.json.tmp"));
-      const s = yield* makeReminders(dir, Date.now, () => Effect.void);
+      const woke: string[] = [];
+      const s = yield* makeReminders(dir, (due) => Effect.sync(() => void woke.push(...due)));
       yield* Effect.flip(s.claimDue(now));
       yield* Effect.flip(s.claimDue(now));
+      expect(woke).toEqual([]);
+      expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ id: "once" }]);
       rmdirSync(join(dir, "reminders.json.tmp"));
       expect((yield* s.claimDue(now)).length).toBe(1);
       expect(yield* s.claimDue(now)).toEqual([]);
+      expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
     }),
   );
 
   it.effect("do not run a persisted reminder whose shape is wrong", () =>
     Effect.gen(function* () {
       const dir = home();
+      yield* TestClock.setTime(epoch);
       const damaged = JSON.stringify([
         {
           id: "important",
@@ -303,8 +371,8 @@ describe("reminders", () => {
         },
       ]);
       writeFileSync(join(dir, "reminders.json"), damaged);
-      const s = yield* makeReminders(dir, Date.now, () => Effect.void);
-      yield* Effect.flip(s.claimDue(new Date()));
+      const s = yield* makeReminders(dir, () => Effect.void);
+      yield* Effect.flip(s.claimDue(new Date(yield* Clock.currentTimeMillis)));
       expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
     }),
   );
@@ -312,12 +380,13 @@ describe("reminders", () => {
   it.effect("do not read a damaged file as an empty list", () =>
     Effect.gen(function* () {
       const dir = home();
+      yield* TestClock.setTime(epoch);
       const damaged = `[{"id":"important"`;
       writeFileSync(join(dir, "reminders.json"), damaged);
-      const s = yield* makeReminders(dir, Date.now, () => Effect.void);
+      const s = yield* makeReminders(dir, () => Effect.void);
       yield* fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));
       yield* fails(call(s.tools, "list_reminders", {}));
-      yield* Effect.flip(s.claimDue(new Date()));
+      yield* Effect.flip(s.claimDue(new Date(yield* Clock.currentTimeMillis)));
       expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
     }),
   );
