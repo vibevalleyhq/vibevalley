@@ -184,7 +184,7 @@
     "packages/bridge": 2,
     "packages/testkit": 16,
     "packages/health": 7,
-    "apps/web": 1110,
+    "apps/web": 1109,
     "apps/desktop": 34
   },
   "strictEffectProvide": {

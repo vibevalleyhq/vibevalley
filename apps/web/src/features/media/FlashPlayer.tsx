@@ -22,6 +22,14 @@ const viewStyles = stylex.create({
 
 type PlaybackPhase = "idle" | "connecting" | "playing" | "draining" | "done" | "stopped" | "failed";
 
+/** A playback's own: its transfer, and the audio and job it came to hold. */
+interface Playing {
+  readonly transfer: AbortController;
+  audio?: AudioContext;
+  job?: string;
+  canceled: boolean;
+}
+
 export function FlashPlayer(props: {
   request: MediaSpeechRequest | undefined;
   valid: boolean;
@@ -38,23 +46,21 @@ export function FlashPlayer(props: {
   const cancelAct = createAct((reason) => {
     if (!disposed) setError(reason);
   });
-  let controller: AbortController | undefined;
-  let context: AudioContext | undefined;
-  let jobId: string | undefined;
-  let canceled = false;
-  let active = false;
-  const cancelTask = () => {
-    const id = jobId;
-    if (id && !canceled) {
-      canceled = true;
+  /** One playback while it lasts, with what it holds: none when nothing plays. */
+  let run: Playing | undefined;
+  const cancelTask = (r: Playing) => {
+    const id = r.job;
+    if (id !== undefined && !r.canceled) {
+      r.canceled = true;
       void cancelAct.run(() => api.media.job.cancel({ id }));
     }
   };
   const stop = (reason?: string) => {
-    if (!active) return;
-    controller?.abort();
-    cancelTask();
-    const current = context;
+    const r = run;
+    if (!r) return;
+    r.transfer.abort();
+    cancelTask(r);
+    const current = r.audio;
     if (current && current.state !== "closed")
       void current.close().catch((cause) => {
         if (!disposed) setError(reasonOf(cause));
@@ -74,13 +80,11 @@ export function FlashPlayer(props: {
     };
   });
   const start = () => {
-    if (active || act.busy() || props.request || !props.valid || typeof AudioContext === "undefined") return;
+    if (run || act.busy() || props.request || !props.valid || typeof AudioContext === "undefined") return;
     const { prepare, onActive } = props;
-    const transfer = new AbortController();
-    controller = transfer;
-    active = true;
-    canceled = false;
-    jobId = undefined;
+    const r: Playing = { transfer: new AbortController(), canceled: false };
+    run = r;
+    const { transfer } = r;
     setError(undefined);
     setProgress({ receivedSeconds: 0, playedSeconds: 0, bufferedSeconds: 0, complete: false });
     setPhase("connecting");
@@ -94,7 +98,7 @@ export function FlashPlayer(props: {
         };
         try {
           audio = new AudioContext();
-          context = audio;
+          r.audio = audio;
           const resumed = audio.resume();
           const request = prepare();
           await resumed;
@@ -104,7 +108,7 @@ export function FlashPlayer(props: {
             if (!disposed) setPhase("stopped");
             return;
           }
-          jobId = request.id;
+          r.job = request.id;
           await api.media.speech.create(request, { signal: transfer.signal });
           await playFlashStream(request.id, audio, transfer.signal, (value) => {
             if (disposed) return;
@@ -120,22 +124,19 @@ export function FlashPlayer(props: {
           }
         } finally {
           transfer.abort();
-          if (!completed) cancelTask();
+          if (!completed) cancelTask(r);
           audio?.removeEventListener("statechange", stateChanged);
           try {
             if (audio && audio.state !== "closed") await audio.close();
           } finally {
-            context = undefined;
-            controller = undefined;
-            active = false;
+            if (run === r) run = undefined;
             if (!disposed) onActive(false);
           }
         }
       })
       .finally(() => {
-        if (active && !jobId) {
-          active = false;
-          controller = undefined;
+        if (run === r && r.job === undefined) {
+          run = undefined;
           if (!disposed) {
             onActive(false);
             setPhase("failed");
