@@ -27,7 +27,7 @@ export class Issues extends Effect.Service<Issues>()("Issues", {
 ```ts
 export class Issue extends Context.Service<Issue, {
   readonly get: (id: string) => Effect.Effect<T.Issue, ApiError>;
-}>()("vibevalley/Issue") {
+}>()("@vibevalley/server/issue/issue") {
   static readonly layer = Layer.effect(Issue, make);
 }
 

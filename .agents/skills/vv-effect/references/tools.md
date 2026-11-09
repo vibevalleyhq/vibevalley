@@ -46,7 +46,7 @@
 - **先问能不能写成代码**（更好的结构、更强的类型），再写检查，最后才写进文字（`AGENTS.md` 的「怎么让 agent 做对」）。
 - **lint 规则**写在 `scripts/oxlint-plugin.ts`，用 `says(错在哪, Fix, See)` 写报错，测试写在 `scripts/oxlint-plugin.test.ts`（`vp run scripts:test`），在根目录 `vite.config.ts` 的 `lint` 里打开；能机械改对的写自动修复。这个仓库不另加 ast-grep：oxlint 已经在 `vp check` 里跑、带类型（[vv-governance](.agents/skills/vv-governance/SKILL.md)）。
 - **存量太多一次改不完的**，先进逃生口的棘轮（`packages/health`），只许减；新写的照规则来。
-- **Effect 自己的诊断**能开就开：在 `tsconfig.base.json` 的 `plugins` 里把它调成 `error`，`vp run effect:check` 会报。
+- **Effect 自己的诊断**能开就开：在 `tsconfig.base.json` 的 `plugins` 里把它调成 `error`，`vp run effect:check` 会报。`@effect/tsgo` 的规则没写进配置的，`scripts/effect-check.ts` 按「规则 × 项目」数命中，记在 `scripts/effect.ratchet.json`：多了失败（报出这次改到的文件里的命中），少了也失败，跑 `vp run effect:write` 降下来；一条规则归零就写成 `error`、退出棘轮。提交前的钩子（`.vite-hooks/pre-commit`）跑它，所以新代码加不进这些问题。不为让检查过而关规则或写 `@effect-diagnostics…:off`：要修。
 
 ## 外面的工具
 

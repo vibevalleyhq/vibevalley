@@ -101,23 +101,8 @@ export default defineConfig({
       // The health package's tests, then the escape ratchet (scripts/health.config.ts); the report is `vp run health`.
       "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/health.config.ts --check"],
       // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
-      "effect:check": [
-        "vp run packages:build",
-        "effect-tsgo diagnostics --project apps/server/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project apps/cli/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/provider/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/pkm/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/artifact/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/home/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/bridge/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/testkit/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/health/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project apps/web/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project apps/desktop/tsconfig.json --strict",
-      ],
+      // Effect's diagnostics: the rules tsconfig.base.json names fail on any hit; the rest may only go down (scripts/effect.ratchet.json).
+      "effect:check": ["vp run packages:build", "vpx scripts/effect-check.ts"],
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
       deadcode: "vpx scripts/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },

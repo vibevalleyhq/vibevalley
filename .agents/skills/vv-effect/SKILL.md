@@ -29,7 +29,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 | 约定 | 写法 | 家 |
 |---|---|---|
-| 服务 | `class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }`，`make` 里 `yield*` 用到的服务，用 `Issue.of({ … })` 拼出来；要类型写 `Issue["Service"]` | [AGENTS.md](AGENTS.md#规矩)「服务端的服务」 |
+| 服务 | `class Issue extends Context.Service<Issue, { … }>()("@vibevalley/server/issue/issue") { static readonly layer = … }`（标签是包名加文件的路径，`deterministicKeys` 查），`make` 里 `yield*` 用到的服务，用 `Issue.of({ … })` 拼出来；要类型写 `Issue["Service"]` | [AGENTS.md](AGENTS.md#规矩)「服务端的服务」 |
 | layer 的次序 | `apps/server/src/services.ts` 按次序叠，模块只用排在它前面的；开机要做的放在最后的 `start`、`ready` | [architecture.md](docs/architecture.md) |
 | 库 | 经 `Db` 服务（`run`、`attempt`、`one`、`inTx`、`attemptTx`），模块不自己 `provideService(SqlClient)`、`withTransaction`（lint `vibevalley/db-door`）；SQL 只写在 `db/queries/<表>.sql` | [地基](docs/subsystems/foundation.md) |
 | 文件、进程、外面的 HTTP | `FileSystem`、`ChildProcessSpawner`、`HttpClient`；不用 `node:fs/promises`、`fetch`（effect:check 的 `globalFetchInEffect`；测试像浏览器一样打服务端的，在那一行关掉并说为什么） | [地基](docs/subsystems/foundation.md) |

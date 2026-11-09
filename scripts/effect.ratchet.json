@@ -1,0 +1,197 @@
+{
+  "apiStabilityLeak": {
+    "apps/server": 123,
+    "apps/cli": 37,
+    "packages/ai": 3,
+    "packages/provider": 21,
+    "packages/protocol": 1,
+    "apps/web": 26
+  },
+  "asyncFunction": {
+    "apps/server": 265,
+    "packages/agent": 48,
+    "packages/ai": 9,
+    "packages/artifact": 4,
+    "packages/protocol": 21,
+    "packages/bridge": 12,
+    "packages/testkit": 4,
+    "apps/web": 665,
+    "apps/desktop": 53
+  },
+  "cryptoRandomUUID": {
+    "packages/pkm": 1,
+    "packages/artifact": 2,
+    "apps/web": 17
+  },
+  "globalConsole": {
+    "apps/server": 2,
+    "packages/artifact": 1,
+    "packages/health": 5,
+    "apps/web": 10,
+    "apps/desktop": 14
+  },
+  "globalDate": {
+    "apps/server": 7,
+    "packages/agent": 5,
+    "packages/pkm": 10,
+    "packages/artifact": 5,
+    "packages/health": 1,
+    "apps/web": 118,
+    "apps/desktop": 4
+  },
+  "globalDateInEffect": {
+    "apps/server": 7,
+    "packages/agent": 21
+  },
+  "globalFetch": {
+    "apps/server": 5,
+    "packages/protocol": 2,
+    "apps/web": 11,
+    "apps/desktop": 5
+  },
+  "globalJson": {
+    "apps/server": 14,
+    "packages/agent": 6,
+    "packages/ai": 2,
+    "packages/provider": 3,
+    "packages/protocol": 3,
+    "packages/health": 3,
+    "apps/web": 87,
+    "apps/desktop": 12
+  },
+  "globalJsonInEffect": {
+    "packages/agent": 11
+  },
+  "globalRandom": {
+    "apps/web": 12
+  },
+  "globalTimers": {
+    "apps/server": 5,
+    "packages/agent": 1,
+    "packages/artifact": 4,
+    "packages/protocol": 1,
+    "packages/bridge": 1,
+    "packages/testkit": 2,
+    "apps/web": 30,
+    "apps/desktop": 6
+  },
+  "missingPipeableSignature": {
+    "apps/server": 206,
+    "apps/cli": 7,
+    "packages/agent": 35,
+    "packages/ai": 20,
+    "packages/provider": 8,
+    "packages/pkm": 42,
+    "packages/artifact": 8,
+    "packages/protocol": 17,
+    "packages/home": 2,
+    "packages/bridge": 2,
+    "packages/testkit": 15,
+    "packages/health": 5,
+    "apps/web": 228,
+    "apps/desktop": 20
+  },
+  "newPromise": {
+    "apps/server": 21,
+    "packages/agent": 2,
+    "packages/protocol": 1,
+    "packages/bridge": 5,
+    "packages/testkit": 3,
+    "apps/web": 38,
+    "apps/desktop": 11
+  },
+  "nodeBuiltinImport": {
+    "apps/server": 167,
+    "packages/agent": 23,
+    "packages/pkm": 1,
+    "packages/protocol": 3,
+    "packages/home": 4,
+    "packages/bridge": 2,
+    "packages/testkit": 11,
+    "packages/health": 5,
+    "apps/web": 47,
+    "apps/desktop": 48
+  },
+  "preferEffectArray": {
+    "apps/server": 1880,
+    "apps/cli": 119,
+    "packages/agent": 181,
+    "packages/ai": 94,
+    "packages/provider": 70,
+    "packages/pkm": 84,
+    "packages/artifact": 56,
+    "packages/protocol": 75,
+    "packages/bridge": 1,
+    "packages/testkit": 34,
+    "packages/health": 45,
+    "apps/web": 1275,
+    "apps/desktop": 45
+  },
+  "preferEffectRecord": {
+    "apps/server": 74,
+    "apps/cli": 3,
+    "packages/agent": 8,
+    "packages/ai": 10,
+    "packages/pkm": 9,
+    "packages/artifact": 2,
+    "packages/protocol": 6,
+    "packages/bridge": 4,
+    "packages/testkit": 7,
+    "packages/health": 11,
+    "apps/web": 57,
+    "apps/desktop": 4
+  },
+  "preferEffectString": {
+    "apps/server": 1109,
+    "apps/cli": 50,
+    "packages/agent": 112,
+    "packages/ai": 29,
+    "packages/provider": 82,
+    "packages/pkm": 153,
+    "packages/artifact": 89,
+    "packages/protocol": 65,
+    "packages/bridge": 5,
+    "packages/testkit": 33,
+    "packages/health": 21,
+    "apps/web": 529,
+    "apps/desktop": 37
+  },
+  "preferSchemaOverJson": {
+    "packages/agent": 11
+  },
+  "processEnv": {
+    "apps/server": 12,
+    "packages/agent": 1,
+    "packages/testkit": 4,
+    "apps/web": 19,
+    "apps/desktop": 5
+  },
+  "schemaSync": {
+    "apps/server": 15,
+    "packages/provider": 1,
+    "apps/web": 8,
+    "apps/desktop": 3
+  },
+  "strictBooleanExpressions": {
+    "apps/server": 1736,
+    "apps/cli": 47,
+    "packages/agent": 91,
+    "packages/ai": 70,
+    "packages/provider": 26,
+    "packages/pkm": 59,
+    "packages/artifact": 60,
+    "packages/protocol": 44,
+    "packages/bridge": 2,
+    "packages/testkit": 16,
+    "packages/health": 7,
+    "apps/web": 1121,
+    "apps/desktop": 34
+  },
+  "strictEffectProvide": {
+    "apps/server": 544,
+    "apps/cli": 8,
+    "packages/agent": 3,
+    "packages/ai": 8,
+    "packages/provider": 9
+  }
+}
