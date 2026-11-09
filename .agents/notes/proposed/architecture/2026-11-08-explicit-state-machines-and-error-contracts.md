@@ -141,7 +141,7 @@ Status: proposed
 
 ## 进度
 
-2026-11-10 逐条到代码里核对过（定下的写法已沉淀进 [模块设计](docs/style/module-design.md) 的「显式状态」，`practice:check` 的 `loose-flags` 拦新的散装 `let` 布尔）。
+2026-11-10 逐条到代码里核对过，又按 `let` 布尔、布尔信号、`-1` 哨兵在全仓扫过一遍（定下的写法已沉淀进 [模块设计](docs/style/module-design.md) 的「显式状态」，`practice:check` 的 `loose-flags` 拦新的散装 `let` 布尔）。
 
 | 编号 | 状态 | 提交 | 做了什么，或为什么不改 |
 |---|---|---|---|
@@ -153,7 +153,7 @@ Status: proposed
 | B12 agent 回答 | 完成 | `1199af053` | 流的失败作为最后一个元素，`Stream.runFoldEffect` 折成 `Answered`；先结束后失败的仍以结束为准 |
 | B10 笔记缓存 | 不改 | — | 读写都在同一把锁里，`loaded` 只说「开机后扫过一遍」，和 `pages` 不会矛盾 |
 | B11 `Brain` | 不改 | — | `stopping`（这一轮）和 `closed`（整个）是两个维度；`core` 是循环与工具互相需要打的结，构造完成前没人调 |
-| B1 连接器 | 未做 | — | 「没连、登录中（进度、验证码、纤程）、已连上（纤程）」可并成一个模式，`account` 另放；600 多行带扫码并发，单独一步 |
+| B1 连接器 | 完成 | `2298f5972` | `progress` 和 `verifyCode` 合成 `signingIn`（登录中才有）；`account`（存下的账号）、`current`（工作纤程）、`loginTry`（跨登录的代号）各管一件，留着 |
 | F3、F4、F6、F9 | 完成 | 本分支早先的提交 | 浮层、菜单、消息折叠一个联合；发送锁 `busy` 含发送中 |
 | F7 大纲补全 | 完成 | `fe349dc5e` | Esc 记下关掉的那处触发（`offered`、`Shut`，在 `@vibevalley/pkm`），不再用光标 `-1`；列表不会在同一处的下一个键又冒出来 |
 | F11 意图 | 完成 | `fe349dc5e` | `Intent` 按 `phase` 分的联合（`IntentAt`），删掉重复它的 `status`、`queued`、`reason`，失败的才有 `fault` |
@@ -161,10 +161,11 @@ Status: proposed
 | F10 启动遮罩 | 不改 | — | 阶段已是协议的 `Opening["phase"]`；`data-opening` 是组件与遮罩约好的接口 |
 | F12 帧流 | 不改 | — | 帧是 Solid store 逐 id reconcile，`open` 无帧只在一处构造、构造时不会出现；改成联合会整份重建画面 |
 | F13 表单 | 不改 | — | 校验、提交、`submitted`、组字是独立维度，提交里本就要校验 |
-| F2 MOSS Worker | 未做 | — | Worker 与主线程各一份连接状态，先把共用的迁移抽成纯函数 |
+| F2 MOSS Worker | 不改 | — | 不是状态机：连接状态是 WebSocket 自己的 `readyState`，麦克风、端口各管一件；问题是 Worker 是内联的 JS 字符串，和主线程各写一份。要共用得改成 Vite 打的独立 Worker 模块，牵动桌面壳和手机 WebView 的加载，单独一步 |
 | F5 农场加载 | 不改 | — | 只有 `useVillage` 一处写、每次只设 `village` 或 `error` 之一，读的五处都只问 `village` 在不在 |
-| F8 稿子块焦点 | 未做 | — | 焦点在稿子引擎 `BlockEditor` 的可变字段上，要改引擎接口，和协同修订并发 |
-| 清单外 | 完成 | `ecc18f83d`、`2c35bc545` | MOSS 引擎的 `stopped`、`cutting` 合成 `stop`；闪播流解析的 `stage`；`FlashPlayer` 一次播放一条 `Playing` 记录 |
+| F8 稿子块焦点 | 不改 | — | 四样不同的东西：`focusId`、`caret` 是编辑器给视图的一次性请求（光标请求不换块也会发），`focused` 是协同合并要读的事实，`editing` 是视图自己的显示方式；并起来会把请求和事实混成一个 |
+| 清单外 | 完成 | `ecc18f83d`、`2c35bc545`、`7f4d01a4b`、`922d9e4e0` | MOSS 引擎的 `stopped`、`cutting` 合成 `stop`；闪播流解析的 `stage`；`FlashPlayer` 一次播放一条 `Playing` 记录；聊天框的菜单（开着、失焦收起、Esc 关在一处触发，和大纲编辑器一个规矩）；聊天页的新建频道与搜索合成一个 `dialog`；视觉回答没给轮次就没有 `turn`，不再是 -1 |
+| 清单外、看过不改 | — | — | `loose-flags` 报的另三处是独立维度：农场小狗（醒、被指、被按）、待办详情（改过、新建仓库对话框、自己写）、样式迁移脚本；`-1` 当「没高亮」的列表框下标是惯用写法 |
 
 ## Alternatives considered
 
