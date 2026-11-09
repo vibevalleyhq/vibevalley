@@ -21,7 +21,8 @@
     "i18n:gen": "vpx scripts/i18n.ts gen",
     "health": "vpx packages/health/src/cli.ts --config scripts/health.config.ts",
     "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write",
-    "effect:write": "vpx scripts/effect-check.ts --write"
+    "effect:write": "vpx scripts/effect-check.ts --write",
+    "practice:write": "vpx scripts/practice-audit.ts --write"
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",

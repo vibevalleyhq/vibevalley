@@ -77,6 +77,7 @@ jobs:
       - run: vp run health:verify
       - run: vp run deadcode
       - run: vp run effect:check
+      - run: vp run practice:check
 
       # The server's tests in three parts at once; the types are the check job's (vp check covers every package).
       - name: Save Vite Task cache

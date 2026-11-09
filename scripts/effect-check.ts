@@ -1,10 +1,12 @@
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { Predicate } from "effect";
+
+import { type Counts, type RatchetWords, grownRules, ratchetProblems, touchedFiles } from "./ratchet.ts";
 
 /** Every project Effect's language service checks; each has its own tsconfig.json. */
 export const projects = [
@@ -26,36 +28,11 @@ export const projects = [
 
 export const ratchetPath = "scripts/effect.ratchet.json";
 
-/** Hits of each rule the config does not name yet, by project: they may only go down. */
-export type Counts = Readonly<Record<string, Readonly<Record<string, number>>>>;
-
-const see = "See .agents/skills/vv-effect/references/tools.md";
-
-/** What is wrong with today's counts against the ratchet (empty when nothing). */
-export function ratchetProblems(kept: Counts, now: Counts): string[] {
-  const problems: string[] = [];
-  for (const rule of [...new Set([...Object.keys(kept), ...Object.keys(now)])].toSorted()) {
-    const before = kept[rule] ?? {};
-    const after = now[rule] ?? {};
-    for (const project of [...new Set([...Object.keys(before), ...Object.keys(after)])].toSorted()) {
-      const was = before[project] ?? 0;
-      const is = after[project] ?? 0;
-      if (is > was)
-        problems.push(
-          `${project} has ${is} ${rule} (kept ${was}): this change adds what the rule reports, and it may only go down. ` +
-            `Fix: write it the way the rule's message says (the hits are listed above). ${see}`,
-        );
-      else if (is < was)
-        problems.push(
-          `${project} is down to ${is} ${rule} (kept ${was}). Fix: \`vp run effect:write\` lowers the ratchet, so the room is not spent by the next change. ${see}`,
-        );
-    }
-  }
-  for (const rule of Object.keys(kept).toSorted())
-    if (Object.values(now[rule] ?? {}).every((n) => n === 0))
-      problems.push(`${rule} has no hits left anywhere. Fix: set it to "error" in tsconfig.base.json's plugin and \`vp run effect:write\`. ${see}`);
-  return problems;
-}
+const words: RatchetWords = {
+  write: "vp run effect:write",
+  see: "See .agents/skills/vv-effect/references/tools.md",
+  cleared: () => 'Fix: set it to "error" in tsconfig.base.json\'s plugin and `vp run effect:write`. See .agents/skills/vv-effect/references/tools.md',
+};
 
 type Diagnostic = {
   readonly file: string;
@@ -139,16 +116,12 @@ if (import.meta.main) {
     console.log(`effect: ratchet written for ${ratcheted.length} rules the config does not name yet`);
   }
   const kept: Counts = values.write === true ? now : JSON.parse(readFileSync(ratchetPath, "utf8"));
-  const problems = ratchetProblems(kept, now);
+  const problems = ratchetProblems(kept, now, words);
   // The hits that broke the ratchet, in the files this change touches, so the message points at code.
-  const grown = new Set(Object.keys(now).filter((rule) => Object.entries(now[rule] ?? {}).some(([project, n]) => n > (kept[rule]?.[project] ?? 0))));
+  const grown = grownRules(kept, now);
   if (grown.size > 0) {
-    const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" }).split("\n").filter(Boolean);
-    // At a commit, what is staged; otherwise everything that differs from HEAD.
-    const staged = git("diff", "--cached", "--name-only");
-    const changed = staged.length > 0 ? staged : [...git("diff", "--name-only", "HEAD"), ...git("ls-files", "--others", "--exclude-standard")];
-    const touched = new Set(changed.map((f) => here + f));
-    for (const { diagnostics } of found) for (const d of diagnostics) if (grown.has(d.name) && touched.has(d.file)) failed.push(where(d));
+    const touched = touchedFiles();
+    for (const { diagnostics } of found) for (const d of diagnostics) if (grown.has(d.name) && touched.has(d.file.replace(here, ""))) failed.push(where(d));
   }
   for (const line of [...new Set(failed)]) console.error(line);
   for (const p of problems) console.error(`effect: ${p}`);

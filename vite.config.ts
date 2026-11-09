@@ -103,6 +103,9 @@ export default defineConfig({
       // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
       // Effect's diagnostics: the rules tsconfig.base.json names fail on any hit; the rest may only go down (scripts/effect.ratchet.json).
       "effect:check": ["vp run packages:build", "vpx scripts/effect-check.ts"],
+      // The test and Effect practices the review lists (scripts/practice-audit.ts): the findings may only go down
+      // (scripts/practice.ratchet.json).
+      "practice:check": "vpx scripts/practice-audit.ts --check",
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
       deadcode: "vpx scripts/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },

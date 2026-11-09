@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import { parseSync } from "vite";
+
+import { type Counts, type RatchetWords, grownRules, ratchetProblems, touchedFiles } from "./ratchet.ts";
 
 /** Syntax, not text: each rule stands for a practice written in docs/style/module-design.md, the testable-boundaries Note or the vv-effect cases. */
 
@@ -759,20 +761,52 @@ export function audit(files: ReadonlyArray<{ readonly path: string; readonly tex
 const scanned = /\.tsx?$/u;
 const skipped = /(^|\/)(node_modules|dist|generated)\/|\.d\.ts$/u;
 
+export const ratchetPath = "scripts/practice.ratchet.json";
+const words: RatchetWords = { write: "vp run practice:write", see: "See scripts/practice-audit.ts (each rule's message says where it is written)" };
+
+/** Where a finding counts: apps/<app> and packages/<package>, else its top folder. */
+export const areaOf = (file: string) => (/^(apps|packages)\//u.test(file) ? file.split("/").slice(0, 2).join("/") : (file.split("/")[0] ?? file));
+
+/** Findings of each rule by area. */
+export function countsOf(findings: readonly Finding[]): Counts {
+  const counts: Record<string, Record<string, number>> = Object.fromEntries(rules.map((r) => [r, {}]));
+  for (const f of findings) {
+    const byArea = (counts[f.rule] ??= {});
+    byArea[areaOf(f.file)] = (byArea[areaOf(f.file)] ?? 0) + 1;
+  }
+  return counts;
+}
+
 if (import.meta.main) {
-  const { values, positionals } = parseArgs({ allowPositionals: true, options: { json: { type: "boolean" }, rule: { type: "string", multiple: true } } });
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: { json: { type: "boolean" }, rule: { type: "string", multiple: true }, check: { type: "boolean" }, write: { type: "boolean" } },
+  });
   const paths = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", ...positionals], { encoding: "utf8" })
     .split("\n")
     .filter((p) => scanned.test(p) && !skipped.test(p));
-  const findings = audit(paths.map((path) => ({ path, text: readFileSync(path, "utf8") }))).filter(
-    (f) => values.rule === undefined || values.rule.includes(f.rule),
-  );
-  if (values.json === true) console.log(JSON.stringify(findings, null, 2));
-  else {
-    for (const f of findings) console.log(`${f.file}:${f.line}  ${f.rule}  ${f.message}\n`);
-    const counts = new Map<Rule, number>();
-    for (const f of findings) counts.set(f.rule, (counts.get(f.rule) ?? 0) + 1);
-    const byRule = [...counts].map(([r, n]) => `${r} ${n}`).join(", ");
-    console.log(`${paths.length} files, ${findings.length} findings${byRule === "" ? "" : ` (${byRule})`}`);
+  const all = audit(paths.map((path) => ({ path, text: readFileSync(path, "utf8") })));
+  if (values.check === true || values.write === true) {
+    // The whole repository against the ratchet: a practice the review lists may not come back in new code.
+    const now = countsOf(all);
+    if (values.write === true) writeFileSync(ratchetPath, JSON.stringify(now, null, 2) + "\n");
+    const kept: Counts = values.write === true ? now : JSON.parse(readFileSync(ratchetPath, "utf8"));
+    const problems = ratchetProblems(kept, now, words);
+    const grown = grownRules(kept, now);
+    const touched = grown.size > 0 ? touchedFiles() : new Set<string>();
+    for (const f of all) if (grown.has(f.rule) && touched.has(f.file)) console.error(`${f.file}:${f.line}  ${f.rule}  ${f.message}`);
+    for (const p of problems) console.error(`practice: ${p}`);
+    if (problems.length > 0) process.exit(1);
+    console.log(`practice: ${paths.length} files, ${all.length} findings, none new`);
+  } else {
+    const findings = all.filter((f) => values.rule === undefined || values.rule.includes(f.rule));
+    if (values.json === true) console.log(JSON.stringify(findings, null, 2));
+    else {
+      for (const f of findings) console.log(`${f.file}:${f.line}  ${f.rule}  ${f.message}\n`);
+      const counts = new Map<Rule, number>();
+      for (const f of findings) counts.set(f.rule, (counts.get(f.rule) ?? 0) + 1);
+      const byRule = [...counts].map(([r, n]) => `${r} ${n}`).join(", ");
+      console.log(`${paths.length} files, ${findings.length} findings${byRule === "" ? "" : ` (${byRule})`}`);
+    }
   }
 }
