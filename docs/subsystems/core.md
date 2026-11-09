@@ -29,7 +29,7 @@
 ### 核心状态与事实
 
 - **单一内存投影，按事实演进**：`SpaceState` 只在 `Core.apply(...facts)` 中修改。未改变状态的事实不广播、不递增 `seq`、不触发特效。
-- **「事实」专指 `Core.apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，频道路由输入叫 `ChannelRouteInput`，排序键叫 `RowKeys`。
+- **「事实」专指 `Core.apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，一条频道消息和它的听众叫 `ChannelHearers`，排序键叫 `RowKeys`。
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
 - **批次原子可见，单条保留因果**：`apply(...facts)` 先在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态并递增一次 `seq`。`reduce` 不得修改传入的旧状态。持有快照锁到事实发布完毕之间不主动让出调度，保证 oar 的同步回调不会遇到一个悬挂的写锁；这段只做同步折叠与发布，不放异步工作。
 - **先落库，后发事实**：各模块先提交 SQLite 事务或文件，再调 `Core.apply`。Core 不存 `state.json` 文件，重启时从空状态由各模块从数据库恢复。

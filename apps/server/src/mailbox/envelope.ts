@@ -69,7 +69,7 @@ export const metaText = (m: Meta | undefined) =>
 export const senderKind = (kind: string): T.ActorKind => (Schema.is(S.ActorKind)(kind) ? kind : "system");
 export const channelType = (type: string): T.ChannelType => (Schema.is(S.ChannelType)(type) ? type : "channel");
 
-export const inboxMore = (
+export const envelopeMore = (
   row: { readonly meta: string | null; readonly reply_number: number | null; readonly edited_at?: number | null; readonly deleted_at?: number | null },
   filesAt: (id: string) => string,
 ) => {
@@ -104,7 +104,7 @@ export interface Picked {
   readonly repo?: string;
 }
 
-export interface InboxMessage extends T.TriggerContext {
+export interface Envelope extends T.TriggerContext {
   readonly id: string;
   readonly originTrigger?: string;
   readonly from: string;
@@ -168,7 +168,8 @@ export interface ChannelAudience {
   readonly spoken?: boolean;
 }
 
-export interface ChannelRouteInput {
+/** A channel message and who hears it: what Mailbox.receive routes a channel trigger to. */
+export interface ChannelHearers {
   readonly row: ChannelEnvelopeRow;
   readonly audience: ChannelAudience;
   readonly addressed?: string;
@@ -189,7 +190,7 @@ export interface Handed {
   readonly channel: string;
   readonly type: T.ChannelType;
   readonly target: string;
-  readonly messages: InboxMessage[];
+  readonly messages: Envelope[];
   readonly source?: "issue" | "cron" | "patrol";
   readonly issue?: string;
   readonly by?: T.RunTrigger;

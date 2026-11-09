@@ -40,7 +40,7 @@ set last_number = max(coalesce(last_number, 0), sqlc.arg(number)::int),
     reply_count = reply_count + case when type = 'thread' then 1 else 0 end
 where id = sqlc.arg(id);
 
--- name: InboxOf :many
+-- name: UnreadOf :many
 -- A participant's unread: the channel it is in and the threads it follows, newest first.
 with unread as (
   select c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, coalesce(ch.name, c.name, '')::text as channel_name,

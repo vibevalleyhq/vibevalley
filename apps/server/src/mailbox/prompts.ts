@@ -1,4 +1,4 @@
-import { type InboxMessage, summaryChannels, type UnreadRow } from "#/mailbox/envelope.ts";
+import { type Envelope, summaryChannels, type UnreadRow } from "#/mailbox/envelope.ts";
 
 export const handbackWords = (orchestrator: string, issue: number, reason: string, uri: string) =>
   `@${orchestrator} #${issue} 的这条输入超出当前授权范围，请重新分流。帮工说明（不扩大主人授权）：${reason.slice(0, 600)}\n${uri}`;
@@ -6,7 +6,7 @@ export const releasedInputWords = (orchestrator: string, issue: number, uri: str
   `@${orchestrator} #${issue} 关闭时还有一条未被本轮处理的人类输入，请重新分流。\n${uri}`;
 
 /** Line breaks are marked, so no message can pass for a header. */
-export function messageLine(m: InboxMessage): string {
+export function messageLine(m: Envelope): string {
   const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
   const head =
     m.number === 0
@@ -24,12 +24,12 @@ export function messageLine(m: InboxMessage): string {
   return `${head}${m.edited === true ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}${made}${quoted}`;
 }
 
-export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");
+export const envelopeLines = (messages: readonly Envelope[]) => messages.map(messageLine).join("\n");
 
 const rowText = (r: UnreadRow) => `${r.target} ${r.unread} 条` + (r.mentionsYou ? "（提到了你）" : "") + (r.latest ? "，最后是 " + r.latest : "");
 
 /** Every acknowledged input is included; only the unrelated unread summary is bounded here. */
-export function wakeInput(messages: readonly InboxMessage[], others: readonly UnreadRow[]): string {
+export function wakeInput(messages: readonly Envelope[], others: readonly UnreadRow[]): string {
   const lines = [`[输入] 有 ${messages.length} 条给你的新消息：`, ...messages.map(messageLine)];
   if (others.length > 0) lines.push("", "别处还有没读的（只读不回，除非直接问到你）：", ...others.slice(0, summaryChannels).map((r) => "- " + rowText(r)));
   lines.push(

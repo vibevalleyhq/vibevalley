@@ -20,8 +20,8 @@ const RULES: readonly Rule[] = [
   {
     name: "a delivery name the one-door plan retired",
     pattern:
-      /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange)\b/u,
-    says: "Mailbox's door: receive (a Trigger, or a Hire), withdraw, news, triggersOf, queuedTriggers, deliveriesOf, handBack, decline (.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md); its own steps inside apps/server/src/mailbox are its business",
+      /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange|recordChannelTrigger|forOrchestrator|OrchestratorNews|ChannelMail|ChannelRouteInput|InboxMessage|asInbox|inboxLines|orchestratorInboxLines|inboxMore)\b|\bsessions\.register\(/u,
+    says: "Mailbox's door: recordTrigger, receive (a Trigger with ChannelHearers or a session, or a Hire), withdraw, news (Consumed, Braked, Handed), triggersOf, queuedTriggers, deliveriesOf, handBack, decline; an envelope as its helper reads it is Envelope; an orchestrator's session is Session.registerOrchestrator (.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md); its own steps inside apps/server/src/mailbox are its business",
     except: /apps\/server\/src\/mailbox\//u,
   },
   {

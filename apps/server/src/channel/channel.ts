@@ -12,13 +12,13 @@ import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { heldShown, type InboxMessage, retryWindowMs } from "#/mailbox/envelope.ts";
+import { heldShown, type Envelope, retryWindowMs } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
-import { type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, inboxMore, type ChannelService } from "./contracts.ts";
+import { type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, envelopeMore, type ChannelService } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
 import { channelHub, lastMax, lineOf } from "./hub.ts";
 import { mentionOf, parseChatTarget } from "./mentions.ts";
@@ -84,7 +84,7 @@ const make = Effect.gen(function* () {
     attach,
     attachment,
     inboxRows,
-    inboxOf,
+    envelopeOf,
   } = r;
   const { write, embedLater } = w;
   const { onSessionNews, start } = th;
@@ -180,7 +180,7 @@ const make = Effect.gen(function* () {
     const row = model.channel(channel);
     if (!row) return [];
     const target = targetOfChannel(row);
-    return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => inboxOf(m, target));
+    return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => envelopeOf(m, target));
   });
   const shape = Channel.of({
     ownerReads: Effect.map(PubSub.subscribe(ownerReadHub), Stream.fromSubscription),
@@ -202,7 +202,7 @@ const make = Effect.gen(function* () {
         message.reply_number === null ? undefined : yield* db.one(qm.messageByNumber({ channel_id: message.channel_id, number: message.reply_number }));
       return {
         message: toMessage(message),
-        attachments: inboxMore(message, filesAt).attachments ?? [],
+        attachments: envelopeMore(message, filesAt).attachments ?? [],
         ...(parent === undefined ? {} : { parent: toMessage(parent) }),
         around: [...before, ...after].map(toMessage),
       };
@@ -377,11 +377,11 @@ const make = Effect.gen(function* () {
       const unseen = (yield* db.run(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
       if (unseen.length > 0 && opt.anyway !== true) {
         const now = yield* Clock.currentTimeMillis;
-        const shown: InboxMessage[] = [];
+        const shown: Envelope[] = [];
         for (const id of unseen.slice(0, heldShown)) {
           const m = yield* db.one(qm.messageByID({ id }));
           if (!m) continue;
-          shown.push(inboxOf(m, target));
+          shown.push(envelopeOf(m, target));
         }
         const newest = shown.at(-1);
         if (newest) yield* setRead(from, channel, newest.number, now);
@@ -476,7 +476,7 @@ const make = Effect.gen(function* () {
       model.lastRead.set(who, target);
       const oldest = rows[0];
       const older = oldest !== undefined && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: oldest.number, n: 1 }))).length > 0;
-      return { target, messages: rows.map((m) => inboxOf(m, target)), older };
+      return { target, messages: rows.map((m) => envelopeOf(m, target)), older };
     }, locked),
     unread: Effect.fn("Channel.unread")(function* (who) {
       return yield* locked(

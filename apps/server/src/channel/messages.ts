@@ -3,8 +3,7 @@ import { DateTime } from "effect";
 import type * as T from "@vibevalley/protocol";
 
 import { compareText, or } from "#/base/order.ts";
-import { type ChannelRouteInput, type Meta, metaOf, senderKind, targetOf, channelType } from "#/mailbox/envelope.ts";
-import type { ChannelMail } from "#/mailbox/mailbox.ts";
+import { type ChannelHearers, type Meta, metaOf, senderKind, targetOf, channelType } from "#/mailbox/envelope.ts";
 import type { InputContext, TriggerInput } from "#/mailbox/payload.ts";
 
 import { chatNamed } from "./mentions.ts";
@@ -136,7 +135,8 @@ const ingressActorKind = (raw: string): T.TriggerActorKind => {
 };
 
 /** A committed channel message as the one trigger Mailbox routes, and what it needs to fan it out. */
-export const channelInput = (fact: ChannelRouteInput, context: InputContext): { readonly input: TriggerInput; readonly mail: ChannelMail } => {
+/** The trigger a channel message is recorded as: its own id, its words, where it was said and who it is for. */
+export const channelTrigger = (fact: ChannelHearers, context: InputContext): TriggerInput => {
   const meta = metaOf(fact.row.meta);
   const source = meta.ingressSource ? sourceByPurpose[meta.ingressSource] : "channel";
   const input: TriggerInput = {
@@ -166,14 +166,5 @@ export const channelInput = (fact: ChannelRouteInput, context: InputContext): { 
     at: fact.row.created_at,
     data: { kind: "channel_message", message: fact.row.envelope_id, channel: fact.row.channel_id },
   };
-  return {
-    input,
-    mail: {
-      row: fact.row,
-      audience: fact.audience,
-      ...(fact.addressed ? { addressed: { recipient: fact.addressed, reason: "addressed", wakes: true } } : {}),
-      roles: fact.roles,
-      ...(fact.outcome === undefined ? {} : { outcome: fact.outcome }),
-    },
-  };
+  return input;
 };

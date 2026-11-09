@@ -54,7 +54,7 @@ const sources = () =>
     .map((file) => inspect(file, readFileSync(file, "utf8"))));
 
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
-  mailbox: { "channel.sql.ts": ["defaultID", "orchestratorForChannel", "inboxOf"], "issue.sql.ts": ["issueExists"] },
+  mailbox: { "channel.sql.ts": ["defaultID", "orchestratorForChannel", "unreadOf"], "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "ownerReadReports"] },
 };
 const folders = readdirSync(src).filter((name) => statSync(join(src, name)).isDirectory());

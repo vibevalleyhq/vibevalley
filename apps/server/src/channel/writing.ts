@@ -15,11 +15,11 @@ import * as qc from "#db/channel.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
-import { metaOf, metaText, type MsgRow, senderKind, messageKind, channelType, type Write, type Written, type ChannelRouteInput } from "./contracts.ts";
+import { metaOf, metaText, type MsgRow, senderKind, messageKind, channelType, type Write, type Written, type ChannelHearers } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import type { ChannelHub } from "./hub.ts";
 import { mentionsIn } from "./mentions.ts";
-import { channelInput } from "./messages.ts";
+import { channelTrigger } from "./messages.ts";
 
 export const channelWriting = (r: ChannelHub) =>
   Effect.gen(function* () {
@@ -44,7 +44,7 @@ export const channelWriting = (r: ChannelHub) =>
       readUpTo,
       change,
       channelEnvelope,
-      asInbox,
+      asEnvelope,
     } = r;
     // Work set off by a timer belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
@@ -109,7 +109,7 @@ export const channelWriting = (r: ChannelHub) =>
       };
       const addressed = meta.ingressRecipient;
       const recipients = [...new Set([...present, ...orchestrators, ...(addressed ? [addressed] : [])])];
-      const fact: ChannelRouteInput = {
+      const fact: ChannelHearers = {
         row: channelEnvelope(row),
         audience: heard,
         ...(addressed ? { addressed } : {}),
@@ -117,10 +117,10 @@ export const channelWriting = (r: ChannelHub) =>
 
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
       };
-      const { input, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
+      const input = channelTrigger(fact, inputContext(asEnvelope(fact.row)));
       const routed = yield* Effect.gen(function* () {
         const original = yield* mailbox.recordTrigger(input);
-        return yield* mailbox.receive({ _tag: "Trigger", trigger: original, to: mail });
+        return yield* mailbox.receive({ _tag: "Trigger", trigger: original, to: fact });
       }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${fact.row.envelope_id}`, error), { heldNotice: "" })));
       const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
       if (routed.heldNotice && (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0) written.heldNotice = routed.heldNotice;

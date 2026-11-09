@@ -34,7 +34,7 @@ import { Tool } from "#/tool/tool.ts";
 import type { Answer } from "./openai.ts";
 import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { makeResponses } from "./response.ts";
-import { deepseekModel, intake, orchestratorInboxLines, quotaText, situationDelta, type Source } from "./situation.ts";
+import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
 const keepEvents = 1000;
 const notesShown = 8;
@@ -258,7 +258,7 @@ const make = (options: OrchestratorOptions = {}) =>
 
     const news = (me: Instance): Effect.Effect<[string, string[]], ApiError> =>
       Effect.map(mailbox.orchestratorDigest(me.id), (digest) =>
-        digest.length === 0 ? ["", []] : [situationWords.news(orchestratorInboxLines(digest)), digest.map((m) => m.id)],
+        digest.length === 0 ? ["", []] : [situationWords.news(orchestratorEnvelopeLines(digest)), digest.map((m) => m.id)],
       );
 
     const recall = (i: Intake) =>
@@ -345,10 +345,10 @@ const make = (options: OrchestratorOptions = {}) =>
             : voice?.voiceMode === "conversation"
               ? voiceNote + "\n" + lineWords.owner(n.messages.map((message) => message.text).join("\n"))
               : n.messages.every((message) => message.number === 0)
-                ? pickedNote(picked) + lineWords.events(orchestratorInboxLines(n.messages))
+                ? pickedNote(picked) + lineWords.events(orchestratorEnvelopeLines(n.messages))
                 : fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
                   ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
-                  : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
+                  : pickedNote(picked) + lineWords.chat(n.target, orchestratorEnvelopeLines(n.messages));
         return take({
           envelopes: n.messages.map((message) => message.id),
           to: n.agent,

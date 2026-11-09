@@ -6,14 +6,14 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { type ApiError } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
-import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "#/mailbox/envelope.ts";
+import { type Envelope, type Meta, metaOf, type Picked, senderKind } from "#/mailbox/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelRow } from "./rooms.ts";
 
-export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteInput, Meta } from "#/mailbox/envelope.ts";
-export type { InboxMessage, Picked } from "#/mailbox/envelope.ts";
-export { channelType, inboxMore, metaOf, metaText, senderKind } from "#/mailbox/envelope.ts";
+export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/mailbox/envelope.ts";
+export type { Envelope, Picked } from "#/mailbox/envelope.ts";
+export { channelType, envelopeMore, metaOf, metaText, senderKind } from "#/mailbox/envelope.ts";
 export type { Delivered, LaunchActivity, SessionNews } from "#/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
@@ -77,7 +77,7 @@ export interface Spoken {
   readonly message?: T.ChatMessage;
   readonly target: string;
   readonly absent?: string[];
-  readonly shown?: InboxMessage[];
+  readonly shown?: Envelope[];
   readonly more?: number;
   readonly lastRead?: string;
 }
@@ -111,7 +111,7 @@ interface ReadOptions {
 
 interface ReadResult {
   readonly target: string;
-  readonly messages: InboxMessage[];
+  readonly messages: Envelope[];
   readonly older: boolean;
 }
 
@@ -198,7 +198,7 @@ export interface ChannelService {
   readonly threadUnder: (id: T.MessageId) => Effect.Effect<string, ApiError>;
   readonly issueThread: (issue: string, title: string, channel?: string) => Effect.Effect<string, ApiError>;
   readonly issueThreadId: (issue: string) => Effect.Effect<string | null>;
-  readonly issueMessages: (issue: string) => Effect.Effect<InboxMessage[]>;
+  readonly issueMessages: (issue: string) => Effect.Effect<Envelope[]>;
   readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
   readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
   readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;

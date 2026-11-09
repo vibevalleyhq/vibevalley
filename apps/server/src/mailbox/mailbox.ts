@@ -12,10 +12,10 @@ import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import {
-  type ChannelAudience,
   type ChannelEnvelopeRow,
   type ChannelRouteResult,
-  type InboxMessage,
+  type Envelope,
+  type ChannelHearers,
   type Handed,
   senderKind,
   channelType,
@@ -24,11 +24,11 @@ import {
   type UnreadRow,
 } from "#/mailbox/envelope.ts";
 import { type NotRecorded, Session } from "#/session/session.ts";
-import { defaultID, orchestratorForChannel, inboxOf } from "#db/channel.sql.ts";
+import { defaultID, orchestratorForChannel, unreadOf } from "#db/channel.sql.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
 import * as qr from "#db/mailbox_trigger.sql.ts";
 
-import { type Recipient, Reach, WakeBreaker } from "./brakes.ts";
+import { Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
 import { inputOf, orchestratorSource, deliveryScope, type InputContext, type TriggerInput, type TriggerResource, type KnownGitHubEvent } from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
@@ -51,15 +51,6 @@ export interface QueuedInput {
   readonly trigger: T.Trigger;
 }
 
-/** What Collaboration hands Mailbox with a message it committed: who hears it and how it is answered. */
-export interface ChannelMail {
-  readonly row: ChannelEnvelopeRow;
-  readonly audience: ChannelAudience;
-  readonly addressed?: Recipient;
-  readonly roles: Readonly<Record<string, T.AgentRole>>;
-  readonly outcome?: T.Outcome;
-}
-
 /** A message already said in a direct channel, with what the reader sees of it, for the talk's first request. */
 export interface TalkRow {
   readonly row: ChannelEnvelopeRow;
@@ -69,7 +60,7 @@ export interface TalkRow {
 /** What comes to the door: a recorded trigger, for those its threads reach, the hearers of a channel message, or one
  * session told straight; or the owner's first words in a direct conversation with a profile that has no session yet. */
 export type Arrival =
-  | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelMail | { readonly session: string } }
+  | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelHearers | { readonly session: string } }
   | {
       readonly _tag: "Hire";
       readonly agent: T.Agent;
@@ -127,7 +118,7 @@ export class Mailbox extends Context.Service<
     readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
     readonly ownerOf: (trigger: string) => Effect.Effect<string | undefined>;
     readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
-    readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
+    readonly orchestratorDigest: (agent: string) => Effect.Effect<Envelope[]>;
     readonly start: Effect.Effect<void>;
     readonly restore: Effect.Effect<void>;
     readonly replay: Effect.Effect<void>;
@@ -157,7 +148,7 @@ export class Mailbox extends Context.Service<
           return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
         });
       const unreadSummary = Effect.fn("Mailbox.unreadSummary")((participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
-        Effect.map(db.run(inboxOf({ participant, channel })), (rows) =>
+        Effect.map(db.run(unreadOf({ participant, channel })), (rows) =>
           rows.slice(0, summaryChannels).map((row) => ({
             target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
             unread: row.unread ?? 0,
@@ -249,7 +240,7 @@ export class Mailbox extends Context.Service<
       );
 
       let start: Effect.Effect<void> = Effect.void;
-      const route = Effect.fn("Mailbox.receive")(function* (trigger: T.Trigger, to?: ChannelMail | { readonly session: string }) {
+      const route = Effect.fn("Mailbox.receive")(function* (trigger: T.Trigger, to?: ChannelHearers | { readonly session: string }) {
         const audience =
           to === undefined
             ? undefined
@@ -390,7 +381,7 @@ export class Mailbox extends Context.Service<
         }),
       });
 
-      const publishOrchestrator = (recipient: string, messages: readonly InboxMessage[], primary: DeliveryRow) =>
+      const publishOrchestrator = (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) =>
         Effect.gen(function* () {
           const meta = primary.payload.trigger.meta;
           const source = orchestratorSource(primary.payload.trigger.source);
@@ -406,7 +397,7 @@ export class Mailbox extends Context.Service<
             ...(meta.trigger ? { by: meta.trigger } : {}),
           });
         });
-      const pump = makePump<InboxMessage>(sessions, {
+      const pump = makePump<Envelope>(sessions, {
         pending: api.deliveriesOf,
         dropSession: (session, why) => writtenLocked(dropSession(session, why)),
         handBack: api.handBack,

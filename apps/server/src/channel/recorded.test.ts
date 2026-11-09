@@ -5,7 +5,7 @@ import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 import type { ChannelAudience } from "#/channel/contracts.ts";
 import { brakes, type BrakeInput } from "#/mailbox/brakes.ts";
-import type { InboxMessage, UnreadRow } from "#/mailbox/envelope.ts";
+import type { Envelope, UnreadRow } from "#/mailbox/envelope.ts";
 import { messageLine, wakeInput } from "#/mailbox/prompts.ts";
 import { whoHears } from "#/mailbox/routing.ts";
 import { checkCases, goldenCases } from "#/testing/golden.ts";
@@ -17,7 +17,7 @@ import { Follows } from "./rooms.ts";
 const chatAudience = (input: ChannelAudience & BrakeInput) => brakes(whoHears(input), input);
 
 test("regression: a delivery batch includes every acknowledged card", () => {
-  const messages: InboxMessage[] = Array.from({ length: 5 }, (_, i) => ({
+  const messages: Envelope[] = Array.from({ length: 5 }, (_, i) => ({
     id: `delivery-${i}`,
     number: i + 1,
     target: "#room",
@@ -49,7 +49,7 @@ test("the recorded cases", () => {
       case "audienceOf":
         return brakes(whoHears(c.in as ChannelAudience), c.in as BrakeInput);
       case "wakeInput": {
-        const i = c.in as { messages: InboxMessage[] | null; others: UnreadRow[] | null };
+        const i = c.in as { messages: Envelope[] | null; others: UnreadRow[] | null };
         return wakeInput(i.messages ?? [], i.others ?? []);
       }
       default:

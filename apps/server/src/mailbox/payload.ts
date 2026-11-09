@@ -7,7 +7,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
 import { senderKind } from "#/mailbox/envelope.ts";
-import type { Handed, InboxMessage } from "#/mailbox/envelope.ts";
+import type { Handed, Envelope } from "#/mailbox/envelope.ts";
 
 export type InputContext = T.TriggerContext;
 export interface DeliveryPayload {
@@ -102,7 +102,7 @@ export function triggerPayload(trigger: T.Trigger, issue?: string, note?: string
   };
 }
 
-export function inputOf({ envelope_id, payload }: { readonly envelope_id: string; readonly payload: DeliveryPayload }): InboxMessage {
+export function inputOf({ envelope_id, payload }: { readonly envelope_id: string; readonly payload: DeliveryPayload }): Envelope {
   const { trigger, context } = payload;
   return {
     ...context,
@@ -117,15 +117,7 @@ export function inputOf({ envelope_id, payload }: { readonly envelope_id: string
   };
 }
 
-export function inputContext({
-  id: _id,
-  from: _from,
-  fromKind: _kind,
-  name: _name,
-  text: _text,
-  originTrigger: _origin,
-  ...context
-}: InboxMessage): InputContext {
+export function inputContext({ id: _id, from: _from, fromKind: _kind, name: _name, text: _text, originTrigger: _origin, ...context }: Envelope): InputContext {
   return context;
 }
 

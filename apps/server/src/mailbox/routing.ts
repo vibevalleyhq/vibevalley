@@ -6,7 +6,7 @@ import { everyone, ownerId } from "@vibevalley/protocol";
 import type { ChannelAudience } from "#/mailbox/envelope.ts";
 
 import type { Recipient, DeliveryReason } from "./brakes.ts";
-import type { ChannelMail } from "./mailbox.ts";
+import type { ChannelHearers } from "./envelope.ts";
 import type { OutboundDelivery } from "./work.ts";
 
 /** The issue holds its mailbox until the owner answers: it asks, is stuck, or waits for the owner's verdict. */
@@ -52,8 +52,8 @@ export function whoHears(input: ChannelAudience): Recipient[] {
   return deliveries;
 }
 
-export function channelRecipients(trigger: T.Trigger, input: ChannelMail): OutboundDelivery[] {
-  const candidates = input.addressed ? [input.addressed] : whoHears(input.audience);
+export function channelRecipients(trigger: T.Trigger, input: ChannelHearers): OutboundDelivery[] {
+  const candidates = input.addressed ? [{ recipient: input.addressed, reason: "addressed" as const, wakes: true }] : whoHears(input.audience);
   return candidates.map((delivery) => ({
     trigger,
     session: delivery.recipient,

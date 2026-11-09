@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { patrolText } from "#/inbox/prompts.ts";
 
-import { intake, orchestratorInboxLines, situationDelta } from "./situation.ts";
+import { intake, orchestratorEnvelopeLines, situationDelta } from "./situation.ts";
 
 describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
@@ -31,7 +31,7 @@ describe("the orchestrator's rules", () => {
 
   it("cut what others said long, never the owner's words", () => {
     const line = (text: string) =>
-      orchestratorInboxLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "session", name: "测试小吴", text }]);
+      orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "session", name: "测试小吴", text }]);
     const head = "[target=#general:3 msg=4 from=w1 测试小吴] ";
     const cases: [string, string, string][] = [
       ["799", "a".repeat(799), "a".repeat(799)],
@@ -41,7 +41,7 @@ describe("the orchestrator's rules", () => {
       ["spaces around do not count", "  " + "a".repeat(800) + "\n", "a".repeat(800)],
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });
-    const owner = orchestratorInboxLines([{ id: "m4", number: 4, target: "#ops", from: "owner", fromKind: "owner", name: "主人", text: "字".repeat(900) }]);
+    const owner = orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#ops", from: "owner", fromKind: "owner", name: "主人", text: "字".repeat(900) }]);
     expect(owner).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
   });
 

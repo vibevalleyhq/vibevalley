@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import { ownerId, quotaLow, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { head } from "#/base/clip.ts";
-import { type InboxMessage } from "#/mailbox/envelope.ts";
+import { type Envelope } from "#/mailbox/envelope.ts";
 import { messageLine } from "#/mailbox/prompts.ts";
 import { yuan } from "#/runtime/quota.ts";
 
@@ -98,8 +98,8 @@ export function situationDelta(before: string, now: string): string {
 /** In UTF-16 units: enough for a report's conclusion; the rest stays in the chat for channel_message_list. */
 const lineMax = 800;
 
-/** As inboxLines, but what others said past lineMax is cut, with where to read it whole. The owner's words stay whole. */
-export const orchestratorInboxLines = (messages: readonly InboxMessage[]) =>
+/** As envelopeLines, but what others said past lineMax is cut, with where to read it whole. The owner's words stay whole. */
+export const orchestratorEnvelopeLines = (messages: readonly Envelope[]) =>
   messages
     .map((m) => {
       const text = m.text.trim();

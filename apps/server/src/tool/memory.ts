@@ -37,8 +37,8 @@ export const memoryTools = Effect.gen(function* () {
   // A session's memories are its profile's: "" is every repo, none is the one it works in.
   const sessionScope = (c: Caller, repo: string | undefined) => (repo === undefined ? c.repo : repo.trim());
 
-  const memorySearch = (who: Who, forOrchestrator: boolean) =>
-    forOrchestrator
+  const memorySearch = (who: Who, asOrchestrator: boolean) =>
+    asOrchestrator
       ? tool(
           "memory.search",
           Effect.fn("Tool.memorySearch")(function* (p: Orchestrator<"memory.search">) {
@@ -59,8 +59,8 @@ export const memoryTools = Effect.gen(function* () {
           }),
         );
 
-  const memoryCreate = (who: Who, forOrchestrator: boolean) =>
-    forOrchestrator
+  const memoryCreate = (who: Who, asOrchestrator: boolean) =>
+    asOrchestrator
       ? tool(
           "memory.create",
           Effect.fn("Tool.memoryCreate")(function* (p: Orchestrator<"memory.create">) {

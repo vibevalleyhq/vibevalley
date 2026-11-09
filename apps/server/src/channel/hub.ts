@@ -13,7 +13,7 @@ import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
-import { type InboxMessage } from "#/mailbox/envelope.ts";
+import { type Envelope } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
@@ -29,7 +29,7 @@ import {
   subjectKind,
   toMessage,
   notifyOf,
-  inboxMore,
+  envelopeMore,
   type ThreadSubject,
   subjectOf,
   type ChannelEnvelopeRow,
@@ -374,7 +374,7 @@ export const channelHub = Effect.gen(function* () {
 
   const { filesAt, attachmentsOf, attach, attachment } = yield* channelAttachments;
   const deliveryTarget = (r: ChannelEnvelopeRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
-  const asInbox = (r: ChannelEnvelopeRow): InboxMessage => ({
+  const asEnvelope = (r: ChannelEnvelopeRow): Envelope => ({
     id: r.envelope_id,
     number: r.number,
     target: deliveryTarget(r),
@@ -382,7 +382,7 @@ export const channelHub = Effect.gen(function* () {
     fromKind: senderKind(r.sender_kind),
     name: r.name,
     text: r.body,
-    ...inboxMore(r, filesAt),
+    ...envelopeMore(r, filesAt),
   });
 
   const inboxRows = Effect.fn("Channel.deliveryUnread")(function* (who: string) {
@@ -401,7 +401,7 @@ export const channelHub = Effect.gen(function* () {
     }),
   );
 
-  const inboxOf = (row: MsgRow, target: string): InboxMessage => ({
+  const envelopeOf = (row: MsgRow, target: string): Envelope => ({
     id: S.messageId(row.id),
     number: row.number,
     target,
@@ -409,7 +409,7 @@ export const channelHub = Effect.gen(function* () {
     fromKind: senderKind(row.sender_kind),
     name: row.sender_name,
     text: row.body,
-    ...inboxMore(row, filesAt),
+    ...envelopeMore(row, filesAt),
   });
   return {
     model,
@@ -453,9 +453,9 @@ export const channelHub = Effect.gen(function* () {
     filesAt,
     attach,
     attachment,
-    asInbox,
+    asEnvelope,
     inboxRows,
-    inboxOf,
+    envelopeOf,
   };
 });
 

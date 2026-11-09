@@ -15,7 +15,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/orchestrator/orchestrator.ts` | 管理各管家 `AgentHost` 实例、消费 `Mailbox.forOrchestrator`、拼装输入并写回回复 |
+| `apps/server/src/orchestrator/orchestrator.ts` | 管理各管家 `AgentHost` 实例、消费 `Mailbox.news` 的 `Handed`、拼装输入并写回回复 |
 | `apps/server/src/orchestrator/situation.ts` | 农场现状增量 `situationDelta` 与长汇报截断 |
 | `apps/server/src/orchestrator/response.ts`、`openai.ts` | 电话与 `POST /v1/chat/completions` 的进程内流式响应端口（`Caller`） |
 | `apps/server/src/orchestrator/prompts.ts` | 管家系统提示词 |
@@ -44,7 +44,7 @@
 
 **处理一条输入**
 
-1. `Mailbox.forOrchestrator` 投递待处理信封，并附上期间已完成汇报与巡查摘要（`orchestratorDigest`）。
+1. `Mailbox.news` 的 `Handed` 交来待处理的信，并附上期间已完成汇报与巡查摘要（`orchestratorDigest`）。
 2. 按 `intake` 表投递：纯主人发言、电话和 `chat/completions` 调 `send` 插话；含帮工发言的群聊、工单、定时和巡查调 `later` 排队。
 3. 模型调工具并生成回复，整条写入目标频道，在轨迹中记录 `llm/usage`（含缓存命中率）。
 

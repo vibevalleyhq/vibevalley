@@ -24,7 +24,7 @@
 
 ## 模型和不变量
 
-- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`、`recordChannelTrigger`、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。`unreadSummary` 统一读取未读摘要。
+- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`（频道消息的触发带上它自己的 id）、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。`unreadSummary` 统一读取未读摘要。
 - **跨模块入口由检查限定**：外部只导入 `mailbox.ts` 服务或 `payload.ts`、`envelope.ts`、`prompts.ts` 共享契约。共享契约不能导入数据库、基础设施或模块内部实现；`modules.test.ts` 同时检查直接导入、重导出与字面量动态导入。
 - **来源先落库，投递行与路由回执同事务提交**：
   - 上游经 Mailbox 记录 `Trigger`，来源游标可与它在同一事务内提交；提交后再调用 `Mailbox.receive`。
@@ -46,7 +46,7 @@
 
 1. `Channel`、`Ingress`、`Issue` 或 `Cron` 经 Mailbox 服务持久化 `Trigger`，提交后调用 `Mailbox.receive`。
 2. `Mailbox` 在信箱写锁内计算受众、检查工单蓄水门禁与三道刹车，原子写入 `mailbox_delivery` 与路由回执。
-3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或推入管家的 `forOrchestrator` 流。
+3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或把一段对话交给管家：`Mailbox.news` 的 `Handed`（管家由管家模块来答，帮工经 `Session.deliver` 唤醒）。
 4. 会话换人或关单时，未消费的主人追问以确定性返回编号转交新负责人或管家。
 
 ## 和谁打交道

@@ -9,7 +9,7 @@ import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { inputContext } from "#/mailbox/payload.ts";
-import { inboxLines, talkBrief } from "#/mailbox/prompts.ts";
+import { envelopeLines, talkBrief } from "#/mailbox/prompts.ts";
 import { NotRecorded } from "#/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
@@ -26,7 +26,7 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
     const agents = yield* Agent;
     const db = yield* Db;
     const mailbox = yield* Mailbox;
-    const { model, locked, talkSession, targetOfChannel, channelEnvelope, asInbox, inboxOf } = r;
+    const { model, locked, talkSession, targetOfChannel, channelEnvelope, asEnvelope, envelopeOf } = r;
     const { sessionsLeft } = th;
     const { settle } = w;
     const talkStarts = yield* FiberMap.make<string>();
@@ -66,14 +66,14 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
       const received = yield* mailbox.receive({
         _tag: "Hire",
         agent,
-        brief: talkBrief(agent.name, inboxLines(ordered.map((m) => inboxOf(m, target)))),
+        brief: talkBrief(agent.name, envelopeLines(ordered.map((m) => envelopeOf(m, target)))),
         where: "",
         options: { context: { kind: "channel", channel }, trigger: { kind: "comment", channel, message: owner.id } },
         envelopes: {
           _tag: "Talk",
           rows: ordered.filter(ownerChat).map((message) => {
             const row = channelEnvelope(message);
-            return { row, context: inputContext(asInbox(row)) };
+            return { row, context: inputContext(asEnvelope(row)) };
           }),
         },
         hiring: (session, _launch, at) => joining(session, at),
