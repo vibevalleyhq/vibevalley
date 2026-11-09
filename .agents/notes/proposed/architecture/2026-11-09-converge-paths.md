@@ -50,7 +50,7 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 |---|---|---|---|
 | 调用表做成检查 | 完成 | `2901cd8e1` | `scripts/service-paths.ts`、`vp run paths:check`（提交前的钩子），表在 `scripts/service-paths.json` |
 | 管家的会话 | 完成 | `902031e44` | `Agent.whenKept`；顺带修了改名要重启才显示 |
-| 「在」分成两个名字 | 完成 | 本提交 | `isReachable`、`workers` |
+| 「在」分成两个名字 | 完成 | `72cac0f0f` | `isReachable`、`workers` |
 | 频道写话 | 未做 | — | 见下 |
 
 频道写话还没动：七个入口的返回和错误不同（`{ message, again }`、`Spoken` 的 sent/held/confirm、`ChatMessage`、`boolean`；`notice`、`orchestratorSays` 不失败），收成一个 `post` 要么靠条件类型加断言，要么调用方拆走不到的分支。`writing.ts` 那层多余的参数已经并掉，落点本来就是一个 `write`。
