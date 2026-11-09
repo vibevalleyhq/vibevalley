@@ -1,22 +1,16 @@
-import { createHash } from "node:crypto";
-
 import { Clock, Effect, Semaphore } from "effect";
-import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
-import { deleteMossFile, uploadMossFile } from "@vibevalley/provider/moss/files";
 
 import { refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import type { Provider } from "#/provider/provider.ts";
+import type { Account } from "#/provider/provider.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 
 import type { makeInputs } from "./inputs.ts";
 
-type Account = Effect.Success<ReturnType<Provider["Service"]["connection"]>>;
-const fingerprint = (key: string) => createHash("sha256").update(key).digest("hex");
 const extensions = new Map([
   ["image/png", "png"],
   ["image/jpeg", "jpg"],
@@ -40,12 +34,11 @@ const extensions = new Map([
 
 export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInputs>) {
   const db = yield* Db;
-  const http = yield* HttpClient.HttpClient;
   const lock = yield* Semaphore.make(1);
   const changed = () => refused(t("server.media.remoteAccountChanged"));
   const unknown = () => refused(t("server.media.remoteUploadUnknown"));
   const checkAccount = (row: q.RemoteFileResult, account: Account) =>
-    row.connection === account.connection && row.credential_hash === fingerprint(account.key) ? Effect.void : Effect.fail(changed());
+    row.connection === account.connection && row.credential_hash === account.fingerprint ? Effect.void : Effect.fail(changed());
   const change = Effect.fnUntraced(function* (row: q.RemoteFileResult, phase: q.RemoteFileResult["phase"], remoteId: string | null = row.remote_id) {
     yield* db.run(q.changeRemoteFile({ id: row.id, phase, remote_id: remoteId, now: yield* Clock.currentTimeMillis }));
   });
@@ -56,7 +49,6 @@ export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Succe
       (holder: string, inputId: string, account: Account) =>
         Effect.uninterruptibleMask((resume) =>
           Effect.gen(function* () {
-            if (!account.key.trim() || /\s/u.test(account.key)) return yield* Effect.fail(changed());
             const previous = yield* db.one(q.remoteFile({ holder, input: inputId }));
             if (previous) {
               yield* checkAccount(previous, account);
@@ -79,7 +71,7 @@ export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Succe
                 input: inputId,
                 connection: account.connection,
                 revision: account.revision,
-                credential_hash: fingerprint(account.key),
+                credential_hash: account.fingerprint,
                 filename,
                 purpose: input.kind,
                 size: input.size,
@@ -87,18 +79,16 @@ export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Succe
                 now,
               }),
             );
-            return yield* resume(
-              uploadMossFile(account.key, { file, filename, purpose: input.kind }).pipe(Effect.provideService(HttpClient.HttpClient, http)),
-            ).pipe(
+            return yield* resume(account.files.upload({ file, filename, purpose: input.kind })).pipe(
               Effect.flatMap((result) =>
                 Effect.gen(function* () {
-                  const phase = result.status === "processed" || result.status === "active" ? "ready" : result.status === "failed" ? "rejected" : "unknown";
+                  const phase = result.state;
                   yield* db.run(q.changeRemoteFile({ id, phase, remote_id: result.id, now: yield* Clock.currentTimeMillis }));
                   if (phase !== "ready") return yield* Effect.fail(phase === "rejected" ? refused(t("server.media.remoteUploadRejected")) : unknown());
                   return result.id;
                 }),
               ),
-              Effect.catchTag("MossFileError", (error) =>
+              Effect.catchTag("FileFailure", (error) =>
                 Effect.gen(function* () {
                   yield* db.run(
                     q.changeRemoteFile({
@@ -135,13 +125,7 @@ export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Succe
             }
             if (row.remote_id === null) return yield* Effect.fail(unknown());
             yield* change(row, "deleting");
-            yield* resume(
-              deleteMossFile(account.key, row.remote_id).pipe(
-                Effect.provideService(HttpClient.HttpClient, http),
-                Effect.asVoid,
-                Effect.catchTag("MossFileError", (error) => (error.status === 404 ? Effect.void : Effect.fail(refused(t("server.media.remoteCleanupFailed"))))),
-              ),
-            );
+            yield* resume(account.files.delete(row.remote_id).pipe(Effect.mapError(() => refused(t("server.media.remoteCleanupFailed")))));
             yield* change(row, "deleted");
           }),
         ),

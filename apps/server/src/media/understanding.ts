@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { Clock, Effect, Fiber, FiberMap, Option, Schema, Semaphore } from "effect";
 import { HttpClient } from "effect/http";
 
@@ -117,7 +115,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
         rows.filter((row) => row.remote_id !== null && row.phase !== "deleted"),
         (row) =>
           Effect.gen(function* () {
-            const account = yield* provider.connection(row.connection);
+            const account = yield* provider.account({ connection: row.connection, model: "" });
             yield* ports.remote.remove(id, row.input_id, account);
           }),
         { discard: true },
@@ -143,7 +141,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       account.connection !== row.connection ||
       account.revision !== row.revision ||
       account.model !== row.model ||
-      createHash("sha256").update(account.key).digest("hex") !== approval.fingerprint
+      account.fingerprint !== approval.fingerprint
     )
       return yield* Effect.fail(refused(t("server.media.consentChanged")));
     return account;
@@ -247,9 +245,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
             authorization:
               channel === null
                 ? null
-                : yield* authorizationJson({ channel, expiresAt: now + 15 * 60_000, fingerprint: createHash("sha256").update(account.key).digest("hex") }).pipe(
-                    Effect.mapError(invalid),
-                  ),
+                : yield* authorizationJson({ channel, expiresAt: now + 15 * 60_000, fingerprint: account.fingerprint }).pipe(Effect.mapError(invalid)),
             connection: account.connection,
             revision: account.revision,
             model: account.model,

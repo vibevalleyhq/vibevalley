@@ -4,14 +4,14 @@ import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import type { ProviderUpdate } from "@vibevalley/protocol";
-import { endpoints } from "@vibevalley/protocol/api";
+import { endpoints, type Refused } from "@vibevalley/protocol/api";
 
 import { providerHandlers } from "#/http/handlers/provider.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { type BoundImage, Provider } from "./provider.ts";
+import { type Account, type ProviderAccount, Provider } from "./provider.ts";
 import type { ImageRequest } from "./vendors.ts";
 
 const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
@@ -40,19 +40,21 @@ const configured = (key = "test-first-key"): ProviderUpdate => ({
 });
 
 const drawing: ImageRequest = { prompt: "A quiet farm", width: 256, height: 256, enhance: false, watermark: true };
-/** A vendor that answers 503 and keeps each request's key: what a bound image call sends, run once. */
+/** A vendor that answers 503 and keeps each request's key: what a bound call sends, run once. */
 const recording = () => {
   const keys: string[] = [];
   const http = HttpClient.make((request) => {
     keys.push(request.headers.authorization ?? "");
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status: 503 })));
   });
-  const keyUsedBy = (bound: BoundImage) =>
-    bound.run.pipe(
+  const keyUsedBy = <A, E>(call: Effect.Effect<A, E>) =>
+    call.pipe(
       Effect.exit,
       Effect.map(() => keys.at(-1) ?? ""),
     );
-  return { http, keyUsedBy };
+  /** The key an account's calls send; a realtime account still hands its key over. */
+  const keyOf = (account: Account | ProviderAccount) => ("key" in account ? Effect.succeed(`Bearer ${account.key}`) : keyUsedBy(account.tasks.get("task")));
+  return { http, keyUsedBy, keyOf };
 };
 
 it.effect.each(["moss-transcribe-1.0-2026-07-22", "moss-transcribe-diarize-pro-2026-07-03"])(
@@ -78,7 +80,7 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
     expect(saved.understandingModels).toEqual(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"]);
     yield* notIn(saved, "vision-private-key");
     const frozen = yield* provider.understanding();
-    expect(frozen).toEqual({ connection: "vision", revision: 1, model, key: "vision-private-key" });
+    expect(frozen).toMatchObject({ connection: "vision", revision: 1, model, key: "vision-private-key" });
     expect((yield* provider.live()).key).toBe("test-first-key");
     expect((yield* provider.dictation()).key).toBe("test-first-key");
     if (saved.understanding) saved.understanding.model = "changed-by-caller";
@@ -101,8 +103,9 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
 );
 
-it.effect("cleanup resolves the original connection rather than the current default binding", () =>
-  Effect.gen(function* () {
+it.effect("cleanup resolves the original connection rather than the current default binding", () => {
+  const { http, keyOf } = recording();
+  return Effect.gen(function* () {
     const provider = yield* Provider;
     const config: ProviderUpdate = {
       ...configured(),
@@ -112,21 +115,24 @@ it.effect("cleanup resolves the original connection rather than the current defa
       understanding: { connection: "other", model: "moss-vl-1.0" },
     };
     yield* provider.update(config);
-    const original = yield* provider.connection("moss");
-    expect(original).toEqual({ connection: "moss", revision: 1, key: "test-first-key" });
+    const original = yield* provider.account({ connection: "moss", model: "" });
+    expect(original).toMatchObject({ connection: "moss", revision: 1 });
+    const originalKey = yield* keyOf(original);
+    expect(originalKey).toBe("Bearer test-first-key");
     expect((yield* provider.understanding()).connection).toBe("other");
     yield* provider.update({
       ...config,
       revision: 1,
       connections: config.connections.map((connection) => (connection.id === "moss" ? { ...connection, enabled: false } : connection)),
     });
-    const connectionFailure = yield* Effect.flip(provider.connection("moss"));
+    const connectionFailure = yield* Effect.flip(provider.account({ connection: "moss", model: "" }));
     expect(connectionFailure).toMatchObject({ _tag: "Refused" });
-    const connectionFailure2 = yield* Effect.flip(provider.connection("missing"));
+    const connectionFailure2 = yield* Effect.flip(provider.account({ connection: "missing", model: "" }));
     expect(connectionFailure2).toMatchObject({ _tag: "Refused" });
-    expect(original.key).toBe("test-first-key");
-  }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Resolving a connection must not invoke a provider"))))),
-);
+    const keptKey = yield* keyOf(original);
+    expect(keptKey).toBe("Bearer test-first-key");
+  }).pipe(Effect.provide(layer(http)));
+});
 
 const catalog = { object: "list", data: [{ id: "unknown-model", object: "model", created: 1, owned_by: "MOSS" }] };
 const http = HttpClient.make((request) => Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(catalog))));
@@ -304,7 +310,7 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     const config: ProviderUpdate = { ...configured(), connections: [first, image], image: { connection: "image", model: "moss-image-sft-1.0" } };
     yield* provider.update(config);
     const frozen = yield* provider.image(drawing);
-    const frozenKey = yield* keyUsedBy(frozen);
+    const frozenKey = yield* keyUsedBy(frozen.run);
     expect(frozenKey).toBe("Bearer test-image-key");
     expect((yield* provider.live()).key).toBe("test-first-key");
     expect((yield* provider.dictation()).key).toBe("test-first-key");
@@ -318,7 +324,7 @@ it.effect("image references protect their account, allow atomic rebinding, and f
     expect(image2).toMatchObject({ connection: "moss", revision: 2, model: "moss-image-sft-1.0-2026-10-09" });
     expect(frozen).toMatchObject({ connection: "image", revision: 1, model: "moss-image-sft-1.0" });
     // A started task keeps the key it was asked with, whatever the account has now.
-    const keys = [yield* keyUsedBy(image2), yield* keyUsedBy(frozen)];
+    const keys = [yield* keyUsedBy(image2.run), yield* keyUsedBy(frozen.run)];
     expect(keys).toEqual(["Bearer rotated-key", "Bearer test-image-key"]);
     yield* provider.update({ ...configured("rotated-key"), revision: 2 });
     const imageFailure = yield* provider.image(drawing).pipe(Effect.flip);
@@ -351,19 +357,23 @@ it.effect.each([
   { use: "transcription", model: "moss-transcribe-diarize-pro" },
   { use: "vision", model: "moss-vl-realtime-1.0" },
   { use: "live", model: "moss-live-1.0" },
-] as const)("$use protects and freezes its own account independently of other bindings", ({ use, model }) =>
-  Effect.gen(function* () {
+] as const)("$use protects and freezes its own account independently of other bindings", ({ use, model }) => {
+  const { http, keyOf } = recording();
+  return Effect.gen(function* () {
     const provider = yield* Provider;
-    const resultFailure = yield* provider[use]().pipe(Effect.flip);
+    const bound = (): Effect.Effect<Account | ProviderAccount, Refused> => provider[use]();
+    const resultFailure = yield* bound().pipe(Effect.flip);
     expect(resultFailure).toMatchObject({ _tag: "Refused" });
     const connection = { id: "separate", name: "Separate", adapter: "moss", enabled: true, key: "separate-private-key" } as const;
     const input = { ...configured(), connections: [...configured().connections, connection], [use]: { connection: connection.id, model } };
     const saved = yield* provider.update(input);
-    const frozen = yield* provider[use]();
-    expect(frozen).toEqual({ connection: connection.id, revision: 1, model, key: connection.key });
+    const frozen = yield* bound();
+    expect(frozen).toMatchObject({ connection: connection.id, revision: 1, model });
+    const frozenKey = yield* keyOf(frozen);
+    expect(frozenKey).toBe(`Bearer ${connection.key}`);
     expect((yield* provider.dictation()).key).toBe("test-first-key");
     if (saved[use]) saved[use].model = "caller-mutated";
-    expect((yield* provider[use]()).model).toBe(model);
+    expect((yield* bound()).model).toBe(model);
     for (const patch of [
       { connections: configured().connections },
       { connections: [...configured().connections, { ...connection, enabled: false }] },
@@ -374,10 +384,11 @@ it.effect.each([
       expect(updatedFailure).toMatchObject({ _tag: "Refused" });
     }
     yield* provider.update({ ...input, revision: 1, connections: [...configured().connections, { ...connection, key: "rotated-private-key" }] });
-    expect((yield* provider[use]()).key).toBe("rotated-private-key");
-    expect(frozen.key).toBe("separate-private-key");
+    const rotated = yield* bound();
+    const keys = [yield* keyOf(rotated), yield* keyOf(frozen)];
+    expect(keys).toEqual(["Bearer rotated-private-key", "Bearer separate-private-key"]);
     yield* provider.update({ ...input, revision: 2, [use]: null, connections: configured().connections });
-    const resultFailure2 = yield* provider[use]().pipe(Effect.flip);
+    const resultFailure2 = yield* bound().pipe(Effect.flip);
     expect(resultFailure2).toMatchObject({ _tag: "Refused" });
-  }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
-);
+  }).pipe(Effect.provide(layer(http)));
+});

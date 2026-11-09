@@ -2,7 +2,10 @@ import { Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
+import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
 import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
+import { mossTranscriptionModels } from "@vibevalley/provider/moss/transcription-models";
+import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-models";
 
 /** What an image is asked for with, whoever draws it. A layout prompt is the parsed layout. */
 export interface ImageRequest {
@@ -37,6 +40,52 @@ export interface SpeechRequest {
   readonly voice: string;
   readonly format: T.MediaAudioFormat;
 }
+
+/** A dialogue for several voices; the model is the account's. */
+export type SpeakersRequest = Pick<T.MediaSpeakersRequest, "speakers" | "segments" | "format">;
+
+/** A voice made from a description, saying the text; the model is the account's. */
+export type VoiceDesignRequest = Pick<T.MediaVoiceDesignRequest, "text" | "instruction" | "format">;
+
+/** A long recording to transcribe, by the vendor's ID of the uploaded file; the model is the account's. */
+export interface TranscriptionRequest {
+  readonly fileId: string;
+  readonly diarize?: boolean;
+  readonly keyterms?: readonly string[];
+}
+
+/** A short sample to clone a voice from, with its inspected duration (not one the page or a model asserts). */
+export interface CloneRequest {
+  readonly audio: Blob;
+  readonly filename: string;
+  readonly durationSeconds: number;
+  readonly name?: string;
+}
+
+/** One step of a streamed transcript: the vendor's task, more text, a finished segment, and the whole text at the end. */
+export type TranscriptionEvent =
+  | { readonly type: "task.created"; readonly taskId: string }
+  | { readonly type: "transcript.text.delta"; readonly text: string }
+  | { readonly type: "transcript.segment.done"; readonly index: number; readonly segment: T.MediaAudioSegment; readonly usage?: T.MediaAudioUsage }
+  | { readonly type: "transcript.text.done"; readonly text: string; readonly usage?: T.MediaAudioUsage };
+
+/** A file to put where the vendor's models can read it. */
+export interface FileUpload {
+  readonly file: Blob;
+  readonly filename: string;
+  readonly purpose: "image" | "video" | "audio";
+}
+
+/** An uploaded file: the vendor's ID, and whether it is ready to be read, refused, or not known yet. */
+export interface UploadedFile {
+  readonly id: string;
+  readonly state: "ready" | "rejected" | "unknown";
+}
+
+/** A file call that gave no answer: refused by the vendor, or with no answer to say whether it took. */
+export class FileFailure extends Schema.TaggedError<FileFailure, { readonly brand: unique symbol }>()("FileFailure", {
+  outcome: Schema.Literals(["Rejected", "Unknown"]),
+}) {}
 
 /** Made audio: where to fetch it (signed, short-lived), in which format, and what the vendor says it used. */
 export interface GeneratedAudio {
@@ -78,9 +127,20 @@ export interface Vendor {
   readonly console: string;
   readonly image?: { readonly models: readonly string[] };
   readonly speech?: { readonly models: readonly string[] };
+  readonly speakers?: { readonly models: readonly string[] };
+  readonly voiceDesign?: { readonly models: readonly string[] };
+  readonly transcription?: { readonly models: readonly string[] };
 }
 
 /** Every vendor, by the adapter an account names. How each one is called is the Provider's business (provider.ts). */
 export const vendors: Record<"moss", Vendor> = {
-  moss: { name: "MOSS", console: "https://platform.moss.cn/", image: { models: mossImageModels }, speech: { models: mossSpeechModels } },
+  moss: {
+    name: "MOSS",
+    console: "https://platform.moss.cn/",
+    image: { models: mossImageModels },
+    speech: { models: mossSpeechModels },
+    speakers: { models: mossSpeakersModels },
+    voiceDesign: { models: mossVoiceDesignModels },
+    transcription: { models: mossTranscriptionModels },
+  },
 };

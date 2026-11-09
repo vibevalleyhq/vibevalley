@@ -6,6 +6,8 @@ import { TestClock } from "effect/testing";
 
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
+import { Provider } from "#/provider/provider.ts";
+import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 
@@ -19,9 +21,31 @@ const notIn = (value: unknown, secret: string) =>
     expect(text).not.toContain(secret);
   });
 
-const layer = () =>
-  Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())));
-const account = { connection: "moss-a", revision: 1, model: "moss-vl-1.0", key: "isolated-test-key" } as const;
+/** The library, and a Provider whose accounts' calls go to the given vendor. */
+const layer = (http: HttpClient.HttpClient) =>
+  Layer.mergeAll(
+    Db.layer.pipe(Layer.provideMerge(Database)),
+    Provider.layer.pipe(Layer.provide(Setting.layer), Layer.provide(Layer.succeed(HttpClient.HttpClient, http))),
+  ).pipe(Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())));
+const key = "isolated-test-key";
+/** The account a task binds. */
+const bound = Effect.gen(function* () {
+  const provider = yield* Provider;
+  yield* provider.update({
+    revision: 0,
+    connections: [{ id: "moss-a", name: "MOSS", adapter: "moss", enabled: true, key }],
+    dictation: null,
+    image: null,
+    understanding: null,
+    speech: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
+    live: null,
+  });
+  return yield* provider.account({ connection: "moss-a", model: "moss-vl-1.0" });
+});
 const bytes = png();
 const fixture = Effect.gen(function* () {
   const inputs = yield* makeInputs;
@@ -37,7 +61,7 @@ it.effect("a real disk-backed input is uploaded once, recorded without its key, 
   const http = HttpClient.make((request) =>
     Effect.gen(function* () {
       calls.push(request.method);
-      expect(request.headers.authorization).toBe(`Bearer ${account.key}`);
+      expect(request.headers.authorization).toBe(`Bearer ${key}`);
       if (request.method === "POST") {
         if (request.body._tag !== "FormData") return yield* Effect.die("Expected multipart");
         const file = request.body.formData.get("file");
@@ -53,13 +77,14 @@ it.effect("a real disk-backed input is uploaded once, recorded without its key, 
   );
   return Effect.gen(function* () {
     const { remote, input } = yield* fixture;
+    const account = yield* bound;
     const effects = yield* Effect.all([remote.upload("task-a", input.id, account), remote.upload("task-a", input.id, account)], { concurrency: 2 });
     expect(effects).toEqual(["file-one", "file-one"]);
     const uploaded2 = yield* remote.upload("task-a", input.id, account);
     expect(uploaded2).toBe("file-one");
     const rows = yield* remote.list("task-a");
     expect(rows).toHaveLength(1);
-    yield* notIn(rows, account.key);
+    yield* notIn(rows, key);
     expect(rows[0]).toMatchObject({ phase: "ready", remote_id: "file-one", revision: 1 });
     yield* remote.remove("task-a", input.id, { ...account, revision: 2 });
     yield* remote.remove("task-a", input.id, account);
@@ -67,7 +92,7 @@ it.effect("a real disk-backed input is uploaded once, recorded without its key, 
     const uploadedFailure = yield* Effect.flip(remote.upload("task-a", input.id, account));
     expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
     expect((yield* remote.list("task-a"))[0]?.phase).toBe("deleted");
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
+  }).pipe(Effect.provide(layer(http)));
 });
 
 it.effect.each([400, 503])("an upload returning %s is never resubmitted, including after restart", (status) => {
@@ -78,6 +103,7 @@ it.effect.each([400, 503])("an upload returning %s is never resubmitted, includi
   });
   return Effect.gen(function* () {
     const { remote, inputs, input } = yield* fixture;
+    const account = yield* bound;
     const error = yield* Effect.flip(remote.upload("task-a", input.id, account));
     yield* notIn(error, "private response");
     const restarted = yield* makeRemoteFiles(inputs);
@@ -91,18 +117,19 @@ it.effect.each([400, 503])("an upload returning %s is never resubmitted, includi
       expect(removeFailure).toMatchObject({ _tag: "Refused" });
     }
     expect(calls).toBe(1);
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
+  }).pipe(Effect.provide(layer(http)));
 });
 
-it.effect.each(["cancel", "timeout"])("regression: %s during remote upload records an unknown result", (action) =>
-  Effect.gen(function* () {
-    const started = yield* Deferred.make<void>();
-    let calls = 0;
-    const http = HttpClient.make(() => {
-      calls++;
-      return Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never));
-    });
-    const { remote, input } = yield* fixture.pipe(Effect.provideService(HttpClient.HttpClient, http));
+it.effect.each(["cancel", "timeout"])("regression: %s during remote upload records an unknown result", (action) => {
+  const started = Deferred.makeUnsafe<void>();
+  let calls = 0;
+  const http = HttpClient.make(() => {
+    calls++;
+    return Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never));
+  });
+  return Effect.gen(function* () {
+    const { remote, input } = yield* fixture;
+    const account = yield* bound;
     const fiber = yield* remote.upload("task-a", input.id, account).pipe(Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     if (action === "cancel") yield* Fiber.interrupt(fiber);
@@ -115,18 +142,19 @@ it.effect.each(["cancel", "timeout"])("regression: %s during remote upload recor
     const uploadedFailure = yield* Effect.flip(remote.upload("task-a", input.id, account));
     expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(1);
-  }).pipe(Effect.provide(layer())),
-);
+  }).pipe(Effect.provide(layer(http)));
+});
 
 it.effect("a task without a retained input cannot upload another task's local file", () => {
   const http = HttpClient.make(() => Effect.die("Unretained input must not reach the network"));
   return Effect.gen(function* () {
     const { remote, input } = yield* fixture;
+    const account = yield* bound;
     const uploadedFailure = yield* Effect.flip(remote.upload("other-task", input.id, account));
     expect(uploadedFailure).toMatchObject({ _tag: "Refused" });
     const remotes = yield* remote.list("other-task");
     expect(remotes).toEqual([]);
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
+  }).pipe(Effect.provide(layer(http)));
 });
 
 it.effect("changed credentials or connection cannot access or delete a recorded upload", () => {
@@ -137,9 +165,10 @@ it.effect("changed credentials or connection cannot access or delete a recorded 
   });
   return Effect.gen(function* () {
     const { remote, input } = yield* fixture;
+    const account = yield* bound;
     yield* remote.upload("task-a", input.id, account);
     for (const replacement of [
-      { ...account, key: "replacement-key" },
+      { ...account, fingerprint: "another key's fingerprint" },
       { ...account, connection: "other-account" },
     ]) {
       yield* Effect.flip(remote.upload("task-a", input.id, replacement));
@@ -148,7 +177,7 @@ it.effect("changed credentials or connection cannot access or delete a recorded 
     const uploaded2 = yield* remote.upload("task-a", input.id, { ...account, revision: 42 });
     expect(uploaded2).toBe("file-one");
     expect(calls).toBe(1);
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
+  }).pipe(Effect.provide(layer(http)));
 });
 
 it.effect("failed deletion persists its intent and an explicit retry accepts an already absent file", () => {
@@ -160,6 +189,7 @@ it.effect("failed deletion persists its intent and an explicit retry accepts an 
   });
   return Effect.gen(function* () {
     const { remote, inputs, input } = yield* fixture;
+    const account = yield* bound;
     yield* remote.upload("task-a", input.id, account);
     yield* Effect.flip(remote.remove("task-a", input.id, account));
     expect((yield* remote.list("task-a"))[0]?.phase).toBe("deleting");
@@ -170,7 +200,7 @@ it.effect("failed deletion persists its intent and an explicit retry accepts an 
     yield* restarted.remove("task-a", input.id, account);
     expect((yield* restarted.list("task-a"))[0]?.phase).toBe("deleted");
     expect(calls).toEqual(["POST", "DELETE", "DELETE"]);
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
+  }).pipe(Effect.provide(layer(http)));
 });
 
 it.effect("startup marks an interrupted submission unknown without performing network requests", () => {
@@ -181,6 +211,7 @@ it.effect("startup marks an interrupted submission unknown without performing ne
   });
   return Effect.gen(function* () {
     const { remote, inputs, input } = yield* fixture;
+    const account = yield* bound;
     yield* remote.upload("task-a", input.id, account);
     const row = (yield* remote.list("task-a"))[0];
     if (!row) return yield* Effect.die("Missing fixture row");
@@ -191,5 +222,5 @@ it.effect("startup marks an interrupted submission unknown without performing ne
     yield* Effect.flip(restarted.upload("task-a", input.id, account));
     yield* Effect.flip(restarted.remove("task-a", input.id, account));
     expect(calls).toBe(1);
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.provide(layer()));
+  }).pipe(Effect.provide(layer(http)));
 });

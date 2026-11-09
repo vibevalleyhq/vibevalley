@@ -299,6 +299,7 @@
 | `QueryProvider` | `query/solid.tsx` |  |
 | `useQuery` | `query/solid.tsx` |  |
 | `ready` | `query/solid.tsx` |  |
+| `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
 | `useRouter` | `router/context.tsx` |  |
 | `Router` | `router/context.tsx` |  |
 | `useLocation` | `router/context.tsx` |  |

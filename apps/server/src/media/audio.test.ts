@@ -87,7 +87,11 @@ const harness = Effect.gen(function* () {
   return { audio: yield* makeAudio(ports), inputs, ports };
 });
 const layer = (http: HttpClient.HttpClient, downloads = download) =>
-  Layer.mergeAll(Layer.succeed(HttpClient.HttpClient, http), Layer.succeed(PublicHttp, downloads)).pipe(Layer.provideMerge(world()));
+  // world already builds a Provider; a fresh one must capture this offline client for the account's calls.
+  Layer.fresh(Provider.layer).pipe(
+    Layer.provideMerge(Layer.mergeAll(Layer.succeed(HttpClient.HttpClient, http), Layer.succeed(PublicHttp, downloads))),
+    Layer.provideMerge(world()),
+  );
 
 it.effect("regression: async speakers persist task ID before polling, retain actual format, and never repeat billing", () => {
   let submitted = 0;

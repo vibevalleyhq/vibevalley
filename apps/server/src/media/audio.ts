@@ -1,17 +1,9 @@
-import { createHash } from "node:crypto";
-
 import { Clock, Effect, Fiber, FiberMap, FileSystem, Option, Schedule, Schema, Semaphore } from "effect";
-import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
-import { getMossAudioTask } from "@vibevalley/provider/moss/audio-tasks";
-import { createMossSpeakersTask, prepareMossSpeakers } from "@vibevalley/provider/moss/speakers";
-import { createMossTranscriptionTask, prepareMossTranscription } from "@vibevalley/provider/moss/transcription";
-import { createMossVoiceDesignTask, prepareMossVoiceDesign } from "@vibevalley/provider/moss/voice-design";
-import { createMossVoice } from "@vibevalley/provider/moss/voices";
 
 import { type ApiError, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -19,7 +11,7 @@ import { Db } from "#/infra/db.ts";
 import { fileBlob } from "#/infra/files.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
-import { Provider } from "#/provider/provider.ts";
+import { type Account, Provider } from "#/provider/provider.ts";
 import * as q from "#db/media_audio.sql.ts";
 
 import { inspectAudio } from "./audioMetadata.ts";
@@ -27,12 +19,6 @@ import { type MediaInputs, releaseAudioResult, saveAudioResult } from "./audioRe
 import type { MediaCaller } from "./media.ts";
 import { receiveTranscriptionStream, type TranscriptionCheckpoint } from "./transcriptionStream.ts";
 
-interface AudioAccount {
-  readonly connection: string;
-  readonly revision: number;
-  readonly model: string;
-  readonly key: string;
-}
 interface AudioInputs extends MediaInputs {
   get: (id: string) => Effect.Effect<T.MediaInput, ApiError>;
   content: (id: string) => Effect.Effect<{ path: string; mime: string; size: number; name: string }, ApiError>;
@@ -41,8 +27,8 @@ interface AudioInputs extends MediaInputs {
   release: (holder: string) => Effect.Effect<void, ApiError>;
 }
 interface AudioRemoteFiles {
-  upload: (holder: string, input: string, account: AudioAccount) => Effect.Effect<string, ApiError>;
-  remove: (holder: string, input: string, account: AudioAccount) => Effect.Effect<void, ApiError>;
+  upload: (holder: string, input: string, account: Account) => Effect.Effect<string, ApiError>;
+  remove: (holder: string, input: string, account: Account) => Effect.Effect<void, ApiError>;
   list: (holder: string) => Effect.Effect<readonly { input_id: string; phase: string; remote_id: string | null }[]>;
 }
 interface AudioPorts {
@@ -84,7 +70,6 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
   const db = yield* Db;
   const provider = yield* Provider;
   const channel = yield* Channel;
-  const http = yield* HttpClient.HttpClient;
   const downloads = yield* PublicHttp;
   const fs = yield* FileSystem.FileSystem;
   const fibers = yield* FiberMap.make<string, void, ApiError>();
@@ -186,10 +171,10 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     ports.lock.withPermits(1),
     Effect.uninterruptible,
   );
-  const originalAccount = Effect.fnUntraced(function* (row: q.AudioResult): Effect.fn.Return<AudioAccount, ApiError> {
-    const account = yield* provider.connection(row.connection);
-    if (createHash("sha256").update(account.key).digest("hex") !== row.fingerprint) return yield* Effect.fail(refused(t("server.media.audioAccountChanged")));
-    return { ...account, revision: row.revision, model: row.model };
+  const originalAccount = Effect.fnUntraced(function* (row: q.AudioResult): Effect.fn.Return<Account, ApiError> {
+    const account = yield* provider.account({ connection: row.connection, model: row.model });
+    if (account.fingerprint !== row.fingerprint) return yield* Effect.fail(refused(t("server.media.audioAccountChanged")));
+    return { ...account, revision: row.revision };
   });
   const clean = Effect.fnUntraced(function* (id: string) {
     const row = yield* found(id);
@@ -309,26 +294,22 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       const remoteId = row.remote_task_id;
       const task = yield* Effect.gen(function* () {
         const account = yield* originalAccount(row);
-        return yield* getMossAudioTask(account.key, remoteId).pipe(Effect.provideService(HttpClient.HttpClient, http));
+        return yield* account.tasks.get(remoteId);
       }).pipe(
         Effect.retry({
           times: 3,
           schedule: Schedule.exponential("1 second"),
-          while: (error) =>
-            error._tag === "MossAudioError" &&
-            (error.reason === "Network" ||
-              error.reason === "Timeout" ||
-              (error.reason === "HttpStatus" && (error.status === 429 || (error.status ?? 0) >= 500))),
+          while: (error) => error._tag === "AudioFailure" && error.retryable,
         }),
       );
-      const expected = row.kind === "transcription" ? "audio.transcription" : row.kind === "voiceDesign" ? "audio.voice_generation" : "audio.speech";
-      if (task.object !== expected) return yield* Effect.fail(invalid());
-      if (task.status !== "SUCCESS") {
-        if (task.status !== "FAILED") return false;
+      const expected = row.kind === "transcription" ? "transcription" : row.kind === "voiceDesign" ? "voiceGeneration" : "speech";
+      if (task.kind !== expected) return yield* Effect.fail(invalid());
+      if (task.status !== "ready") {
+        if (task.status !== "failed") return false;
         yield* change(id, ["generating"], { phase: "failed", problem: t("server.media.audioRejected") });
         return true;
       }
-      if (task.object === "audio.transcription") {
+      if (task.kind === "transcription") {
         const result: T.MediaAudioResult = { kind: "transcription", text: task.text, segments: [...(task.segments ?? [])] };
         yield* change(id, ["generating"], {
           phase: "ready",
@@ -395,12 +376,12 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         attempted = true;
         yield* Effect.uninterruptibleMask((resume) =>
           resume(
-            createMossVoice(account.key, {
+            account.voices.clone({
               audio: blob,
               filename: `sample.${metadata.format}`,
               durationSeconds: metadata.duration,
               ...(input.name !== undefined ? { name: input.name } : {}),
-            }).pipe(Effect.provideService(HttpClient.HttpClient, http)),
+            }),
           ).pipe(
             Effect.flatMap((voice) => resultJson({ kind: "clone", voice }).pipe(Effect.mapError(corrupt))),
             Effect.flatMap((result) => change(id, ["generating", "canceled", "unknown"], { phase: "ready", result, problem: "" })),
@@ -414,13 +395,11 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         yield* originalAccount(found6);
         attempted = true;
         yield* receiveTranscriptionStream(
-          account.key,
-          {
-            model: account.model,
+          account.transcription.stream({
             fileId,
             ...(input.diarize === undefined ? {} : { diarize: input.diarize }),
             ...(input.keyterms === undefined ? {} : { keyterms: input.keyterms }),
-          },
+          }),
           {
             task: (taskId) => change(id, ["generating", "canceled"], { remote_task_id: taskId }).pipe(Effect.asVoid),
             save: Effect.fnUntraced(function* (checkpoint: TranscriptionCheckpoint) {
@@ -433,16 +412,15 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
               } else yield* change(id, ["generating", "canceled", "unknown"], patch);
             }),
           },
-        ).pipe(Effect.provideService(HttpClient.HttpClient, http));
+        );
         return;
       }
       const synthesis =
         input.kind === "speakers"
-          ? createMossSpeakersTask(account.key, { model: account.model, speakers: input.speakers, segments: input.segments, format: input.format })
+          ? account.speakers.createTask({ speakers: input.speakers, segments: input.segments, format: input.format })
           : input.kind === "voiceDesign"
-            ? createMossVoiceDesignTask(account.key, { model: account.model, text: input.text, instruction: input.instruction, format: input.format })
-            : createMossTranscriptionTask(account.key, {
-                model: account.model,
+            ? account.voiceDesign.createTask({ text: input.text, instruction: input.instruction, format: input.format })
+            : account.transcription.createTask({
                 fileId: yield* ports.remote.upload(id, input.input, account),
                 ...(input.diarize !== undefined ? { diarize: input.diarize } : {}),
                 ...(input.keyterms !== undefined ? { keyterms: input.keyterms } : {}),
@@ -452,13 +430,11 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       attempted = true;
       // Only the HTTP wait is interruptible: a returned task ID must reach durable storage before polling or cancellation can intervene.
       yield* Effect.uninterruptibleMask((resume) =>
-        resume(synthesis.pipe(Effect.provideService(HttpClient.HttpClient, http))).pipe(
-          Effect.flatMap((result) => change(id, ["generating", "canceled", "unknown"], { remote_task_id: result.taskId })),
-        ),
+        resume(synthesis).pipe(Effect.flatMap((taskId) => change(id, ["generating", "canceled", "unknown"], { remote_task_id: taskId }))),
       );
       yield* poll(id);
     }).pipe(
-      Effect.catchTag("MossAudioError", (error) =>
+      Effect.catchTag("AudioFailure", (error) =>
         change(id, ["generating"], {
           phase: error.outcome === "Unknown" ? "unknown" : "failed",
           problem: error.outcome === "Unknown" ? t("server.media.audioUnknown") : t("server.media.audioRejected"),
@@ -491,14 +467,14 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         }
         if (yield* ports.otherExists(input.id)) return yield* Effect.fail(refused(t("server.media.reusedId")));
         yield* ports.capacity();
-        const account: AudioAccount =
+        const account =
           input.kind === "speakers"
             ? yield* provider.speakers()
             : input.kind === "voiceDesign"
               ? yield* provider.voiceDesign()
               : input.kind === "transcription"
                 ? yield* provider.transcription()
-                : { ...(yield* provider.connection(input.connection)), model: "" };
+                : yield* provider.account({ connection: input.connection, model: "" });
         if (account.connection !== input.connection || account.revision !== input.revision)
           return yield* Effect.fail(refused(t("server.media.audioAccountChanged")));
         let reference: T.MediaInputReference | null = null;
@@ -516,22 +492,18 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
             return yield* Effect.fail(invalid());
         }
         if (input.kind === "speakers")
-          yield* prepareMossSpeakers({ model: account.model, speakers: input.speakers, segments: input.segments, format: input.format }).pipe(
-            Effect.mapError(invalid),
-          );
+          yield* account.speakers.check({ speakers: input.speakers, segments: input.segments, format: input.format }).pipe(Effect.mapError(invalid));
         if (input.kind === "voiceDesign")
-          yield* prepareMossVoiceDesign({ model: account.model, text: input.text, instruction: input.instruction, format: input.format }).pipe(
-            Effect.mapError(invalid),
-          );
+          yield* account.voiceDesign.check({ text: input.text, instruction: input.instruction, format: input.format }).pipe(Effect.mapError(invalid));
         if (input.kind === "transcription")
-          yield* prepareMossTranscription({
-            model: account.model,
-            fileId: input.input,
-            ...(input.diarize !== undefined ? { diarize: input.diarize } : {}),
-            ...(input.keyterms !== undefined ? { keyterms: input.keyterms } : {}),
-          }).pipe(Effect.mapError(invalid));
-        if (input.kind === "transcription" && input.streaming === true && !account.model.startsWith("moss-transcribe-diarize-pro"))
-          return yield* Effect.fail(invalid());
+          yield* account.transcription
+            .check({
+              fileId: input.input,
+              ...(input.diarize !== undefined ? { diarize: input.diarize } : {}),
+              ...(input.keyterms !== undefined ? { keyterms: input.keyterms } : {}),
+              streaming: input.streaming === true,
+            })
+            .pipe(Effect.mapError(invalid));
         const insert = db.run(
           q.insertAudio({
             id: input.id,
@@ -542,7 +514,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
             connection: account.connection,
             revision: account.revision,
             model: account.model,
-            fingerprint: createHash("sha256").update(account.key).digest("hex"),
+            fingerprint: account.fingerprint,
             now: yield* Clock.currentTimeMillis,
           }),
         );
