@@ -22,7 +22,8 @@
     "health": "vpx packages/health/src/cli.ts --config scripts/health.config.ts",
     "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write",
     "effect:write": "vpx scripts/effect-check.ts --write",
-    "practice:write": "vpx scripts/practice-audit.ts --write"
+    "practice:write": "vpx scripts/practice-audit.ts --write",
+    "paths:write": "vpx scripts/service-paths.ts --write"
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",

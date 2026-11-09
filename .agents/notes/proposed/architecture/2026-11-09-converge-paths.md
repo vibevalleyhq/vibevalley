@@ -24,7 +24,7 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 
 ## Proposal
 
-**一、调用表做成检查。** `scripts/service-paths.ts` 用上面的读法写出「服务成员 → 调用模块」，存进 `scripts/service-paths.json`；挂在 `practice:check` 下，只在本机提交前跑。规则只有两条：表里没有的边（一个模块开始用另一个服务的某个成员）就失败，要么走已有的门，要么跑 `--write` 明确加上；边只许少。失败时说：哪个模块、哪个成员、现在谁是这件事的门（`Fix:`）、`See` 本 Note。
+**一、调用表做成检查。** `scripts/service-paths.ts` 用上面的读法写出「服务成员 → 调用模块」，存进 `scripts/service-paths.json`；任务 `paths:check`，和 `practice:check` 一样只在本机提交前跑。规则只有两条：表里没有的边（一个模块开始用另一个服务的某个成员）就失败，要么走已有的门，要么跑 `--write` 明确加上；边只许少。失败时说：哪个模块、哪个成员、现在谁是这件事的门（`Fix:`）、`See` 本 Note。
 
 **二、频道写话收成一个 `post`。** `Channel.post(Post)`，`Post` 按谁说的分：
 
@@ -52,7 +52,7 @@ Channel 对外 48 个成员、其中 30 个只有 http 在用，是接口宽，�
 
 ## Acceptance criteria
 
-- `vp run practice:check` 在新加一条服务成员的调用边时失败，提示里有 `Fix:` 和 `See`；`--write` 之后通过。
+- `vp run paths:check` 在新加一条服务成员的调用边时失败，提示里有 `Fix:` 和 `See`；`--write` 之后通过。
 - `Channel` 的接口上没有 `say`、`speak`、`announce`、`spoken`、`orchestratorSays`、`notice`，只有 `post`；频道、工单、稿子、通话、管家、工具都经它写话。
 - `Session` 的接口上没有 `registerOrchestrator`；新存的管家档案不经任何调用方就有会话（测试：存一个管家档案，`sessionOf` 立刻读得到）。
 - `present`、`presentSessions` 不在代码里，`stale-names` 拦着。

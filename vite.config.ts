@@ -106,6 +106,9 @@ export default defineConfig({
       // The test and Effect practices the review lists (scripts/practice-audit.ts): the findings may only go down
       // (scripts/practice.ratchet.json).
       "practice:check": "vpx scripts/practice-audit.ts --check",
+      // Which server module uses which member of another module's service (scripts/service-paths.ts): a new path fails until
+      // it is written down on purpose (scripts/service-paths.json).
+      "paths:check": "vpx scripts/service-paths.ts --check",
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
       deadcode: "vpx scripts/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },

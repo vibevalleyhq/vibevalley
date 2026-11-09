@@ -85,6 +85,7 @@ vp run i18n:gen                                                 # 改了 package
 vp run effect:check                                             # 改了 Effect 代码：Effect 自己的诊断（@effect/tsgo，scripts/effect-check.ts）：tsconfig.base.json 的 plugins 里写了的规则有一处就失败，没写的进棘轮 scripts/effect.ratchet.json，只许减（变少了跑 vp run effect:write 降下来，一条规则归零就把它写成 error）；提交前的钩子、server:check 和 CI 都跑
 vp run health                                                   # 看先改哪里：热点和逃生口；vp run health:verify 对棘轮（逃生口变少了跑 vp run health:write 降下来）
 vp run practice:check                                           # 评审列出、还没有 lint 管的测试和 Effect 写法（scripts/practice-audit.ts，按语法树读）：存量记在 scripts/practice.ratchet.json，只许减（变少了跑 vp run practice:write）；只在本机提交前的钩子里跑，vpx scripts/practice-audit.ts 列出全部
+vp run paths:check                                              # 服务端模块之间的路径（scripts/service-paths.ts，按语法树读）：哪个模块用了别的模块服务的哪个成员，记在 scripts/service-paths.json；多一条路就失败，要么走已有的门，要么 vp run paths:write 写下来并在 PR 里说明；只在本机提交前的钩子里跑，vpx scripts/service-paths.ts 列出整张表
 vp run deadcode                                                 # 改完代码：knip 查没人用的文件、导出和依赖（knip.ts 写什么在跑），报出的照它说的删
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
 vp run docs:verify                                              # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接、旧名字
