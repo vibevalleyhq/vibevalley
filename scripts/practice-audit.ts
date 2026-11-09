@@ -45,6 +45,7 @@ const sourceRules = [
   "unbounded-retry",
   "ref-read-modify-write",
   "pipe-on-effect-fn",
+  "logic-in-pipe",
   "option-get-or-throw",
   "die-with-plain-error",
   "swallow-without-record",
@@ -108,6 +109,10 @@ const why: Record<Rule, string> = {
     "Effect.fn(…)(…).pipe(…) pipes the function, not the Effect each call returns. " +
     'Fix: pass the combinators as Effect.fn\'s further arguments: Effect.fn("X.m")(function* () {…}, locked). ' +
     "See .agents/skills/vv-effect/references/cases.md (4.)",
+  "logic-in-pipe":
+    "two or more steps of logic chained in .pipe (Effect.map, flatMap, andThen, tap…): the flow reads inside out and each step's value is nameless. " +
+    "Fix: write the steps in Effect.gen (or Effect.fn), one yield* to a named const each; keep .pipe for behaviour attached to the whole (retry, timeout, catch, annotate). " +
+    "See apps/server/node_modules/effect/AGENTS.md (Writing Effect code)",
   "option-get-or-throw":
     "Option.getOrThrow throws a plain exception outside the error channel: a nameless defect. " +
     "Fix: Option.match into a tagged error (or Inconsistent for a bug), Option.getOrElse for a default. " +
@@ -512,6 +517,13 @@ function pipeOnEffectFn(n: Node, report: (n: Node) => void) {
   if (isFn(callee) || (callName(made, "Effect") === "fnUntraced" && !isFn(callee))) report(n);
 }
 
+/** The combinators that carry a step of the flow's own logic; the rest of .pipe's arguments attach behaviour. */
+const logicSteps = new Set(["map", "flatMap", "andThen", "tap", "zipWith", "filterOrFail", "flatten"]);
+function logicInPipe(n: Node, report: (n: Node) => void) {
+  if (n.type !== "CallExpression" || memberOf(field(n, "callee"))?.name !== "pipe") return;
+  if (list(n, "arguments").filter((arg) => logicSteps.has(callName(arg, "Effect") ?? "")).length >= 2) report(n);
+}
+
 const plainErrors = new Set(["Error", "TypeError", "RangeError"]);
 function dieWithPlainError(n: Node, report: (n: Node) => void) {
   const name = callName(n, "Effect");
@@ -722,6 +734,7 @@ export function audit(files: ReadonlyArray<{ readonly path: string; readonly tex
         if (block) forkThenJoin(block, add("fork-then-join"));
         if (block) refReadModifyWrite(block, text, add("ref-read-modify-write"));
         pipeOnEffectFn(n, add("pipe-on-effect-fn"));
+        logicInPipe(n, add("logic-in-pipe"));
       }
       if (effect && !isTest) {
         spanAfterResult(n, add("span-after-result"));

@@ -24,6 +24,7 @@
     "apps/server": 2
   },
   "pipe-on-effect-fn": {},
+  "logic-in-pipe": {},
   "option-get-or-throw": {},
   "die-with-plain-error": {
     "packages/testkit": 1

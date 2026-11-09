@@ -194,9 +194,11 @@ export function nowledge(c: MemorySourceConfig): Source {
         (h): Effect.Effect<MemoryScope> => {
           const id = hitID(h);
           if (!id) return Effect.succeed({ kind: "unknown" });
-          return call("get_memory_by_id", { memory_id: id }).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(DetailResponse)),
-            Effect.map((detail) => scopeOf(detail.labels)),
+          return Effect.gen(function* () {
+            const answer = yield* call("get_memory_by_id", { memory_id: id });
+            const detail = yield* Schema.decodeEffect(DetailResponse)(answer);
+            return scopeOf(detail.labels);
+          }).pipe(
             // An unreadable detail does not turn an unknown repo into a global memory.
             Effect.orElseSucceed((): MemoryScope => ({ kind: "unknown" })),
           );

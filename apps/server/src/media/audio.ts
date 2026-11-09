@@ -375,17 +375,18 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         yield* originalAccount(found5);
         attempted = true;
         yield* Effect.uninterruptibleMask((resume) =>
-          resume(
-            account.voices.clone({
-              audio: blob,
-              filename: `sample.${metadata.format}`,
-              durationSeconds: metadata.duration,
-              ...(input.name !== undefined ? { name: input.name } : {}),
-            }),
-          ).pipe(
-            Effect.flatMap((voice) => resultJson({ kind: "clone", voice }).pipe(Effect.mapError(corrupt))),
-            Effect.flatMap((result) => change(id, ["generating", "canceled", "unknown"], { phase: "ready", result, problem: "" })),
-          ),
+          Effect.gen(function* () {
+            const voice = yield* resume(
+              account.voices.clone({
+                audio: blob,
+                filename: `sample.${metadata.format}`,
+                durationSeconds: metadata.duration,
+                ...(input.name !== undefined ? { name: input.name } : {}),
+              }),
+            );
+            const result = yield* resultJson({ kind: "clone", voice }).pipe(Effect.mapError(corrupt));
+            return yield* change(id, ["generating", "canceled", "unknown"], { phase: "ready", result, problem: "" });
+          }),
         );
         return;
       }

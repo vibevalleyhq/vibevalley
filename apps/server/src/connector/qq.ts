@@ -117,9 +117,12 @@ export class QQClient implements QQApi {
         Effect.mapError((e) => failedWith(t("server.connector.qq.auth", { why: e.message }))),
       );
       const request = HttpClientRequest.bodyText(HttpClientRequest.post(this.tokenAt), asked, "application/json");
-      const body = yield* this.http.execute(request).pipe(
-        Effect.flatMap((res) => res.json),
-        Effect.flatMap(Schema.decodeUnknownEffect(TokenResponse)),
+      const http = this.http;
+      const body = yield* Effect.gen(function* () {
+        const res = yield* http.execute(request);
+        const json = yield* res.json;
+        return yield* Schema.decodeUnknownEffect(TokenResponse)(json);
+      }).pipe(
         Effect.timeoutOrElse({ duration: 20_000, orElse: () => Effect.fail(failedWith(t("server.connector.qq.authTimeout"))) }),
         Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.qq.auth", { why: e.message })))),
       );
@@ -142,11 +145,13 @@ export class QQClient implements QQApi {
     return Effect.scoped(
       Effect.gen({ self: this }, function* () {
         const token = yield* this.token(app);
-        const gateway = yield* this.http.execute(HttpClientRequest.setHeaders(HttpClientRequest.get(this.api + "/gateway"), this.headers(app, token))).pipe(
-          Effect.flatMap((res) => res.json),
-          Effect.flatMap(Schema.decodeUnknownEffect(GatewayResponse)),
-          Effect.mapError((e) => failedWith(t("server.connector.qq.gateway", { why: e.message }))),
-        );
+        const gatewayRequest = HttpClientRequest.setHeaders(HttpClientRequest.get(this.api + "/gateway"), this.headers(app, token));
+        const http = this.http;
+        const gateway = yield* Effect.gen(function* () {
+          const res = yield* http.execute(gatewayRequest);
+          const json = yield* res.json;
+          return yield* Schema.decodeUnknownEffect(GatewayResponse)(json);
+        }).pipe(Effect.mapError((e) => failedWith(t("server.connector.qq.gateway", { why: e.message }))));
         if (!gateway.url) return yield* failedWith(t("server.connector.qq.noGateway"));
         const ws = yield* Effect.acquireRelease(
           Effect.sync(() => new WebSocket(gateway.url)),

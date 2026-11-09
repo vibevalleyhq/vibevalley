@@ -99,14 +99,11 @@ const make = Effect.gen(function* () {
     if (pending) return;
     pending = true;
     yield* Effect.forkIn(
-      Effect.sleep(countAfterRunMs).pipe(
-        Effect.andThen(
-          Effect.sync(() => {
-            pending = false;
-          }),
-        ),
-        Effect.andThen(refresh),
-      ),
+      Effect.gen(function* () {
+        yield* Effect.sleep(countAfterRunMs);
+        pending = false;
+        yield* refresh;
+      }),
       scope,
     );
   });

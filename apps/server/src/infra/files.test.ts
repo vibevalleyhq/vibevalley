@@ -16,7 +16,11 @@ it.effect("regression: interrupted attachment writes cannot publish a partial ha
     const partial = FileSystem.FileSystem.of({
       ...fs,
       writeFile: (path, data) =>
-        fs.writeFile(path, data.subarray(0, 1)).pipe(Effect.andThen(Deferred.succeed(started, undefined)), Effect.andThen(Effect.never)),
+        Effect.gen(function* () {
+          yield* fs.writeFile(path, data.subarray(0, 1));
+          yield* Deferred.succeed(started, undefined);
+          return yield* Effect.never;
+        }),
     });
     const fiber = yield* writeOnce(target, bytes).pipe(Effect.provideService(FileSystem.FileSystem, partial), Effect.forkChild);
     yield* Deferred.await(started);

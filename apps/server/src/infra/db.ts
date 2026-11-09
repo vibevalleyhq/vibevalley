@@ -98,12 +98,11 @@ export class Db extends Context.Service<
       });
       // One connection: a transaction holds every other query until it ends.
       const held = <A, E, R>(tx: Effect.Effect<A, E, R>) =>
-        Effect.timed(tx).pipe(
-          Effect.tap(([took]) =>
-            Duration.toMillis(took) > txLongMs ? Effect.logWarning(`vibevalley: a transaction held the database ${Duration.format(took)}`) : Effect.void,
-          ),
-          Effect.map(([, a]) => a),
-        );
+        Effect.gen(function* () {
+          const [took, a] = yield* Effect.timed(tx);
+          if (Duration.toMillis(took) > txLongMs) yield* Effect.logWarning(`vibevalley: a transaction held the database ${Duration.format(took)}`);
+          return a;
+        });
       return Db.of({
         run,
         attempt,

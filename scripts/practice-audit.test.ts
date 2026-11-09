@@ -145,6 +145,11 @@ describe("effect practices in source", () => {
     expect(inSource("pipe-on-effect-fn", 'const say = Effect.fn("Channel.say")(function* () {}, locked);')).toEqual([]);
   });
 
+  test("logic-in-pipe: two steps of logic chained in .pipe, not behaviour attached to the whole", () => {
+    expect(inSource("logic-in-pipe", "const x = read.pipe(Effect.map((a) => a + 1), Effect.flatMap(save));")).toEqual([1]);
+    expect(inSource("logic-in-pipe", "const x = read.pipe(Effect.map((a) => a + 1), Effect.retry(policy), Effect.timeout(1000));")).toEqual([]);
+  });
+
   test("option-get-or-throw and die-with-plain-error", () => {
     expect(inSource("option-get-or-throw", "const v = Option.getOrThrow(found);")).toEqual([1]);
     expect(inSource("option-get-or-throw", "const v = Option.getOrElse(found, () => 0);")).toEqual([]);

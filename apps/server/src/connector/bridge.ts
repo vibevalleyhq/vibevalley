@@ -487,22 +487,24 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
           const linked = result;
           const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
           const at = yield* Clock.currentTimeMillis;
-          const failedConnect = yield* inTx(
-            Effect.gen(function* () {
-              yield* accountQ.connectAccount({
-                connector: id,
-                secrets: yield* encodeSecrets(linked.secrets),
-                owner_id: linked.owner || null,
-                pair_code: pair,
-                connected_at: at,
-              });
-              yield* inboundQ.clearInbound({ connector: id });
-              yield* retire(t("server.connector.switched"));
-            }),
-          ).pipe(
-            Effect.andThen(Effect.sync(() => outboxChanged(() => 0))),
-            Effect.andThen(reload),
-            Effect.as(undefined),
+          const failedConnect = yield* Effect.gen(function* () {
+            yield* inTx(
+              Effect.gen(function* () {
+                yield* accountQ.connectAccount({
+                  connector: id,
+                  secrets: yield* encodeSecrets(linked.secrets),
+                  owner_id: linked.owner || null,
+                  pair_code: pair,
+                  connected_at: at,
+                });
+                yield* inboundQ.clearInbound({ connector: id });
+                yield* retire(t("server.connector.switched"));
+              }),
+            );
+            outboxChanged(() => 0);
+            yield* reload;
+            return undefined;
+          }).pipe(
             Effect.catch((e) =>
               Effect.sync(() => {
                 outboxChanged();

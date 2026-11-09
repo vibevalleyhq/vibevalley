@@ -120,12 +120,18 @@ export const makeReminders = (home: string, wake: (due: string[]) => Effect.Effe
         .reduce<number | undefined>((soonest, d) => (d && (soonest === undefined || d.getTime() < soonest) ? d.getTime() : soonest), undefined);
       if (next === undefined) return void start(Effect.void);
       start(
-        Effect.sleep(Math.max(0, next - now())).pipe(
-          Effect.andThen(Effect.suspend(() => claimDue(DateTime.toDateUtc(DateTime.makeUnsafe(now()))))),
-          Effect.flatMap(wake),
-          Effect.andThen(Effect.sync(arm)),
+        Effect.gen(function* () {
+          yield* Effect.sleep(Math.max(0, next - now()));
+          const due = yield* claimDue(DateTime.toDateUtc(DateTime.makeUnsafe(now())));
+          yield* wake(due);
+          arm();
+        }).pipe(
           Effect.catch((e) =>
-            Effect.logError("agent: cannot claim due reminders:", e).pipe(Effect.andThen(Effect.sleep(retryClaimMs)), Effect.andThen(Effect.sync(arm))),
+            Effect.gen(function* () {
+              yield* Effect.logError("agent: cannot claim due reminders:", e);
+              yield* Effect.sleep(retryClaimMs);
+              arm();
+            }),
           ),
         ),
       );

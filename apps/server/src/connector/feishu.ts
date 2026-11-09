@@ -86,9 +86,12 @@ export class FeishuClient implements FeishuApi {
   }
 
   private form<S extends Schema.Top>(domain: Domain, fields: Record<string, string>, schema: S) {
-    return this.http.execute(HttpClientRequest.bodyUrlParams(HttpClientRequest.post(accounts[domain] + "/oauth/v1/app/registration"), fields)).pipe(
-      Effect.flatMap((res) => res.json),
-      Effect.flatMap(Schema.decodeUnknownEffect(schema)),
+    const http = this.http;
+    return Effect.gen(function* () {
+      const res = yield* http.execute(HttpClientRequest.bodyUrlParams(HttpClientRequest.post(accounts[domain] + "/oauth/v1/app/registration"), fields));
+      const json = yield* res.json;
+      return yield* Schema.decodeEffect(schema)(json);
+    }).pipe(
       Effect.timeoutOrElse({ duration: 10_000, orElse: () => Effect.fail(failedWith(t("server.connector.feishu.registerTimeout"))) }),
       Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.feishu.register", { why: e.message })))),
     );

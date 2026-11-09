@@ -57,11 +57,12 @@ export const jsonText = (value: unknown, layout: "line" | "laidOut" = "line") =>
   (layout === "laidOut" ? laidOut : oneLine)(value).pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "InvalidJson", text: e.message })));
 
 /** A document as stdout takes it: laid out for a person on a terminal, one line otherwise. */
-const printDocument = (value: unknown) =>
-  Effect.flatMap(Stdio.Stdio, (io) => io.stdoutIsTerminal).pipe(
-    Effect.flatMap((tty) => jsonText(value, tty ? "laidOut" : "line")),
-    Effect.flatMap(out),
-  );
+const printDocument = Effect.fnUntraced(function* (value: unknown) {
+  const io = yield* Stdio.Stdio;
+  const tty = yield* io.stdoutIsTerminal;
+  const text = yield* jsonText(value, tty ? "laidOut" : "line");
+  return yield* out(text);
+});
 
 const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
@@ -69,7 +70,9 @@ const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 export const printBody = (text: string) => (text.trim() === "" ? Effect.void : Option.match(json(text), { onNone: () => out(text), onSome: printDocument }));
 
 /** The failure on stderr, always one line, so a script can read the last line as JSON. */
-export const printFailure = (f: Failure) =>
-  jsonText({
+export const printFailure = Effect.fnUntraced(function* (f: Failure) {
+  const text = yield* jsonText({
     error: { tag: f.tag, message: f.text, ...(f.status !== undefined ? { status: f.status } : {}), ...(f.next && f.next.length > 0 ? { next: f.next } : {}) },
-  }).pipe(Effect.flatMap(err));
+  });
+  return yield* err(text);
+});
