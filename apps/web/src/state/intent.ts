@@ -24,7 +24,6 @@ export type IntentAt<R> =
   | { readonly phase: "sending" }
   | { /** Answered; waits until the frame shows it. */ readonly phase: "confirming"; readonly replied: { readonly reply: R } }
   | { /** Why, in the owner's words (fault.reason) and as the page acts on it. */ readonly phase: "failed"; readonly fault: UiFault };
-export type IntentPhase = Intent<unknown, unknown>["phase"];
 
 type IntentState<R> =
   | { readonly _tag: "queued" }
