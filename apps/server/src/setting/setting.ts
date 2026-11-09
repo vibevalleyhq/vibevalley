@@ -107,8 +107,10 @@ const secret = (value: string | undefined, source: KeySource): KeyStatus => (val
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
 
-/** As it is written: keys in the order they were set. */
-const encodeStored = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+/** As it is written: the keys as plain strings, as they were typed. */
+const encodeStored = Schema.encodeEffect(Schema.fromJsonString(Stored, { space: 2 }));
+/** The file's fields before decoding: keys as plain strings, so an update can be laid over them. */
+const plainStored = Schema.encodeEffect(Stored);
 
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
@@ -182,7 +184,8 @@ const make = Effect.gen(function* () {
   const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
     const problem = settingsProblem(u);
     if (problem) return yield* SettingRefused.make({ message: problem });
-    const next: Record<string, unknown> = { ...stored };
+    const plain = yield* plainStored(stored).pipe(Effect.mapError((e) => SettingRefused.make({ message: e.message, cause: e })));
+    const next: Record<string, unknown> = { ...plain };
     for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
       const given = u[key];
       if (given !== undefined) next[key] = given.trim();

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Context, Effect, Layer, type Scope, Stream, String as Str } from "effect";
+import { Context, Effect, Layer, Redacted, type Scope, Stream, String as Str } from "effect";
 import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -396,12 +396,12 @@ const make = Effect.gen(function* () {
   const settings = yield* Setting;
   const http = yield* HttpClient.HttpClient;
   const clients: Record<Adapter, (key: string, model: string) => Calls> = { moss: mossCalls(http) };
-  const bind = (connection: { readonly id: string; readonly adapter: Adapter; readonly key: string }, revision: number, model: string): Account => ({
+  const bind = (connection: { readonly id: string; readonly adapter: Adapter; readonly key: Redacted.Redacted }, revision: number, model: string): Account => ({
     connection: connection.id,
     revision,
     model,
-    fingerprint: fingerprint(connection.key),
-    ...clients[connection.adapter](connection.key, model),
+    fingerprint: fingerprint(Redacted.value(connection.key)),
+    ...clients[connection.adapter](Redacted.value(connection.key), model),
   });
   const capable = Effect.fnUntraced(function* (use: "speakers" | "voiceDesign" | "transcription" | "vision" | "live"): Effect.fn.Return<Account, Refused> {
     const config = settings.providers();
@@ -444,7 +444,7 @@ const make = Effect.gen(function* () {
       if (input.revision !== config.revision) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.changed") });
       const connection = boundConnection(config, input.connection);
       if (!connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.noKey") });
-      const models = yield* mossModels(connection.key).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.mapError(refusal));
+      const models = yield* mossModels(Redacted.value(connection.key)).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.mapError(refusal));
       if (settings.providers().revision !== config.revision) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.changed") });
       return { connection: connection.id, revision: config.revision, models };
     }),
@@ -453,7 +453,10 @@ const make = Effect.gen(function* () {
       if (revision !== config.revision) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.changed") });
       const connection = boundConnection(config, id);
       if (!connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.noKey") });
-      const listing = yield* listMossVoices(connection.key, pagination).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.mapError(refusal));
+      const listing = yield* listMossVoices(Redacted.value(connection.key), pagination).pipe(
+        Effect.provideService(HttpClient.HttpClient, http),
+        Effect.mapError(refusal),
+      );
       if (settings.providers().revision !== config.revision) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.changed") });
       return { connection: id, revision, ...listing };
     }),
@@ -477,7 +480,7 @@ const make = Effect.gen(function* () {
       if (!own) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.voice.dictation.unset") });
       const bound = bindingOf("dictation")(settings.providers());
       if (!bound.ready) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.unbound") });
-      return { model: bound.model, transcriber: transcriber({ url: mossTranscription.url, model: bound.model, key: bound.connection.key }) };
+      return { model: bound.model, transcriber: transcriber({ url: mossTranscription.url, model: bound.model, key: Redacted.value(bound.connection.key) }) };
     }),
     image: Effect.fn("Provider.image")(function* (request: ImageRequest) {
       const config = settings.providers();
@@ -493,7 +496,7 @@ const make = Effect.gen(function* () {
         connection: bound.connection.id,
         revision: config.revision,
         model: bound.model,
-        run: run(bound.connection.key).pipe(Effect.provideService(HttpClient.HttpClient, http)),
+        run: run(Redacted.value(bound.connection.key)).pipe(Effect.provideService(HttpClient.HttpClient, http)),
       };
     }),
     understanding: Effect.fn("Provider.understanding")(function* () {

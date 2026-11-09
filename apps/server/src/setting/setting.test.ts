@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Formatter, Layer } from "effect";
+import { Effect, Formatter, Layer, Redacted } from "effect";
 
 import { ServerConfig } from "#/infra/config.ts";
 import { testConfig } from "#/testing/layers.ts";
@@ -134,7 +134,7 @@ describe("settings", () => {
         yield* setting.updateProviders(() =>
           Effect.succeed({
             revision: 1,
-            connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-private-key" }],
+            connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: Redacted.make("test-private-key") }],
             dictation: { connection: "moss", model: "moss-transcribe-1.0" },
             image: { connection: "moss", model: "moss-image-sft-1.0-2026-10-09" },
             understanding: { connection: "moss", model: "moss-vl-1.0-2026-07-08" },
@@ -157,7 +157,8 @@ describe("settings", () => {
           config,
           Effect.gen(function* () {
             const setting = yield* Setting;
-            expect(setting.providers().connections[0]?.key).toBe("test-private-key");
+            const key = setting.providers().connections[0]?.key;
+            expect(key === undefined ? undefined : Redacted.value(key)).toBe("test-private-key");
             expect(setting.providers().revision).toBe(1);
             expect(setting.providers().image).toEqual({ connection: "moss", model: "moss-image-sft-1.0-2026-10-09" });
             expect(setting.providers().understanding).toEqual({ connection: "moss", model: "moss-vl-1.0-2026-07-08" });

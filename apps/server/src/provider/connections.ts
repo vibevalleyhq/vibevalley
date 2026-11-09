@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Redacted } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -20,7 +20,7 @@ export const providerStatus = (settings: ProviderSettings): T.ProviderStatus => 
   revision: settings.revision,
   connections: settings.connections.map(({ key, ...connection }) => ({
     ...connection,
-    key: key ? { source: "settings", hint: keyHint(key) } : { source: null },
+    key: Redacted.value(key) ? { source: "settings", hint: keyHint(Redacted.value(key)) } : { source: null },
   })),
   dictation: settings.dictation ? { ...settings.dictation } : null,
   image: settings.image ? { ...settings.image } : null,
@@ -52,10 +52,11 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
     seen.add(input.id);
     const name = input.name.trim();
     if (!name || name.length > 80) return yield* SettingRefused.make({ message: t("server.provider.name") });
-    const key = input.key === undefined ? (current.connections.find((c) => c.id === input.id)?.key ?? "") : input.key === null ? "" : input.key.trim();
+    const kept = current.connections.find((c) => c.id === input.id)?.key;
+    const key = input.key === undefined ? (kept === undefined ? "" : Redacted.value(kept)) : input.key === null ? "" : input.key.trim();
     if ((input.key !== undefined && input.key !== null && key === "") || /\s/u.test(key) || key.length > 4096)
       return yield* SettingRefused.make({ message: t("server.provider.key") });
-    connections.push({ id: input.id, name, adapter: input.adapter, enabled: input.enabled, key });
+    connections.push({ id: input.id, name, adapter: input.adapter, enabled: input.enabled, key: Redacted.make(key) });
   }
   const next: ProviderSettings = {
     revision: current.revision + 1,

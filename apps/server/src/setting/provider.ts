@@ -1,11 +1,12 @@
-import { Array as Arr, Option, Schema } from "effect";
+import { Array as Arr, Option, Redacted, Schema } from "effect";
 
 const Connection = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   adapter: Schema.Literal("moss"),
   enabled: Schema.Boolean,
-  key: Schema.String,
+  // A plain string in settings.json; in memory it stays redacted until a call sends it.
+  key: Schema.RedactedFromValue(Schema.String),
 });
 
 export const ProviderSettings = Schema.Struct({
@@ -57,9 +58,9 @@ export const bindingOf =
     if (binding === null || Option.isNone(found)) return { ready: false, missing: "binding" };
     const connection = found.value;
     if (!connection.enabled) return { ready: false, missing: "mossOff" };
-    if (connection.key === "") return { ready: false, missing: "mossKey" };
+    if (Redacted.value(connection.key) === "") return { ready: false, missing: "mossKey" };
     return { ready: true, connection, model: binding.model };
   };
 
 export const boundConnection = (settings: ProviderSettings, id: string | null) =>
-  settings.connections.find((connection) => connection.id === id && connection.enabled && connection.key !== "");
+  settings.connections.find((connection) => connection.id === id && connection.enabled && Redacted.value(connection.key) !== "");
