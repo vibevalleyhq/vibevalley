@@ -31,8 +31,8 @@ interface Response {
   readonly chunks: Set<string>;
   audioDone: boolean;
   ended: boolean;
-  stopped: boolean;
-  cutting: boolean;
+  /** Whether its audio was cut: cutting until the page says where playback stopped, then cut. */
+  stop: "none" | "cutting" | "cut";
 }
 
 // Local safety budgets, not vendor-advertised protocol limits.
@@ -259,7 +259,7 @@ export class MossEngine {
       case "output.transcript.updated":
       case "output.transcript.done": {
         const response = run || turn ? this.response(run, turn) : undefined;
-        if ((run || turn) && (!response || response.ended || response.stopped)) break;
+        if ((run || turn) && (!response || response.ended || response.stop !== "none")) break;
         this.turns = heard(this.turns, "moss", turn, text, action.endsWith("done")).slice(-200);
         break;
       }
@@ -269,7 +269,15 @@ export class MossEngine {
       case "response.audio.context": {
         this.piece = undefined;
         const response = this.response(run, turn);
-        if (!response || response.audioDone || response.ended || response.stopped || !d.chunk_id || d.chunk_id.length > 256 || response.chunks.has(d.chunk_id))
+        if (
+          !response ||
+          response.audioDone ||
+          response.ended ||
+          response.stop !== "none" ||
+          !d.chunk_id ||
+          d.chunk_id.length > 256 ||
+          response.chunks.has(d.chunk_id)
+        )
           break;
         if (this.chunkCount >= maxChunks) return this.end("live_chunk_limit");
         response.chunks.add(d.chunk_id);
@@ -279,7 +287,7 @@ export class MossEngine {
       }
       case "response.audio.done": {
         const response = this.responses.get(run);
-        if (!response || response.turn !== turn || response.audioDone || response.stopped) break;
+        if (!response || response.turn !== turn || response.audioDone || response.stop !== "none") break;
         response.audioDone = true;
         this.tell(this.playback.sent(run, turn));
         break;
@@ -291,7 +299,7 @@ export class MossEngine {
       case "response.interrupted": {
         const response = this.responses.get(run);
         if (!response || response.turn !== turn) break;
-        if (!response.stopped) {
+        if (response.stop === "none") {
           const reason = action === "response.audio.stop" ? "stopped" : "interrupted";
           this.qos = { ...this.qos, stops: { ...this.qos.stops, [reason]: (this.qos.stops[reason] ?? 0) + 1 } };
         }
@@ -319,7 +327,7 @@ export class MossEngine {
   socketBinary(data: ArrayBuffer): void {
     const piece = this.piece;
     this.piece = undefined;
-    if (this.phase !== "live" || !piece || this.responses.get(piece.run)?.stopped === true) return;
+    if (this.phase !== "live" || !piece || (this.responses.get(piece.run)?.stop ?? "none") !== "none") return;
     if (data.byteLength === 0 || data.byteLength % 2 !== 0 || data.byteLength > maxPcmBytes) return this.end("live_pcm_invalid");
     const durationMs = (data.byteLength / (mossOutRate * 2)) * 1000;
     if (this.playback.playing.length >= 512 || this.playback.playing.reduce((sum, q) => sum + q.ms, 0) + durationMs > maxQueuedMs)
@@ -360,8 +368,8 @@ export class MossEngine {
 
   audioStopped(run: string, turn: string, partialPlayedMs: number): void {
     const response = this.responses.get(run);
-    if (this.phase !== "live" || response?.cutting !== true || response.turn !== turn) return;
-    response.cutting = false;
+    if (this.phase !== "live" || response?.stop !== "cutting" || response.turn !== turn) return;
+    response.stop = "cut";
     const { actions } = this.playback.cutSampleAccurate(run, turn, partialPlayedMs);
     this.tell(actions.length > 0 ? actions : [{ action: "playback.stopped", run_id: run, turn_id: turn, played_audio_ms: 0 }]);
     this.mossLevel = 0;
@@ -423,16 +431,15 @@ export class MossEngine {
       this.end("live_response_limit");
       return undefined;
     }
-    const response: Response = { turn, chunks: new Set(), audioDone: false, ended: false, stopped: false, cutting: false };
+    const response: Response = { turn, chunks: new Set(), audioDone: false, ended: false, stop: "none" };
     this.responses.set(run, response);
     return response;
   }
 
   private cut(run: string, turn: string): void {
     const response = this.responses.get(run);
-    if (!response || response.stopped) return;
-    response.stopped = true;
-    response.cutting = true;
+    if (!response || response.stop !== "none") return;
+    response.stop = "cutting";
     if (this.piece?.run === run) this.piece = undefined;
     this.callbacks.onCutAudio(
       run,
@@ -454,7 +461,7 @@ export class MossEngine {
 
   private tell(actions: readonly PlaybackAction[]): void {
     for (const action of actions) {
-      if (action.action === "playback.completed" && this.responses.get(action.run_id)?.stopped === true) continue;
+      if (action.action === "playback.completed" && (this.responses.get(action.run_id)?.stop ?? "none") !== "none") continue;
       this.send(action);
     }
   }
