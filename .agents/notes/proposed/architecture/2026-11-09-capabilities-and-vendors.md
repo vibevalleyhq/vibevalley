@@ -30,7 +30,7 @@ Status: proposed
 
 | 步 | 状态 | 提交 | 做了什么 |
 |---|---|---|---|
-| 1 生图 | 完成 | 本提交 | `bindingOf`；`vendors.ts`（只放数据：名字、取钥匙处、模型表）；MOSS 的调用在 `provider.ts` 里、不导出；`Provider.image(request)` 交出的 `run` 不再要求 `HttpClient`（Provider 用自己的），Media 不再依赖 `HttpClient`、也不 import MOSS |
+| 1 生图 | 完成 | `8d3b2d396` | `bindingOf`；`vendors.ts`（只放数据：名字、取钥匙处、模型表）；MOSS 的调用在 `provider.ts` 里、不导出；`Provider.image(request)` 交出的 `run` 不再要求 `HttpClient`（Provider 用自己的），Media 不再依赖 `HttpClient`、也不 import MOSS |
 | 2 其余能力 | 未做 | — | |
 | 3 `Redacted` | 未做 | — | |
 
