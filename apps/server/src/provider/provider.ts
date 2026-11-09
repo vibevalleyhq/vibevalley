@@ -16,7 +16,7 @@ import { createMossSpeechTask, generateMossSpeech, prepareMossSpeech } from "@vi
 import { streamMossSpeech } from "@vibevalley/provider/moss/speech-stream";
 import { createMossTranscriptionTask, prepareMossTranscription } from "@vibevalley/provider/moss/transcription";
 import { streamMossTranscription } from "@vibevalley/provider/moss/transcription-stream";
-import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding-models";
+import { prepareMossUnderstanding, understandMossMedia } from "@vibevalley/provider/moss/understanding";
 import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
 import { createMossVoiceDesignTask, prepareMossVoiceDesign } from "@vibevalley/provider/moss/voice-design";
 import { createMossVoice, listMossVoices } from "@vibevalley/provider/moss/voices";
@@ -42,6 +42,8 @@ import {
   type SpeechRequest,
   type TranscriptionEvent,
   type TranscriptionRequest,
+  type UnderstandingRequest,
+  UnderstandingFailure,
   type UploadedFile,
   vendors,
   type VoiceDesignRequest,
@@ -113,6 +115,10 @@ export interface Calls {
     readonly check: (request: TranscriptionRequest & { readonly streaming: boolean }) => Effect.Effect<void, InvalidRequest>;
     readonly createTask: (request: TranscriptionRequest) => Effect.Effect<string, AudioFailure>;
     readonly stream: (request: TranscriptionRequest) => Stream.Stream<TranscriptionEvent, AudioFailure>;
+  };
+  readonly understanding: {
+    readonly check: (request: UnderstandingRequest) => Effect.Effect<void, InvalidRequest>;
+    readonly ask: (request: UnderstandingRequest) => Effect.Effect<T.MediaUnderstandingResult, UnderstandingFailure>;
   };
   readonly voices: { readonly clone: (request: CloneRequest) => Effect.Effect<T.MediaAudioVoice, AudioFailure> };
   /** Audio tasks of any kind, by the ID their creation gave. */
@@ -194,6 +200,7 @@ const mossCalls =
       ...(request.diarize !== undefined ? { diarize: request.diarize } : {}),
       ...(request.keyterms !== undefined ? { keyterms: request.keyterms } : {}),
     });
+    const question = (request: UnderstandingRequest) => ({ model, text: request.text, media: request.media, maxOutputTokens: request.maxOutputTokens });
     const taskId = (result: { readonly taskId: string }) => result.taskId;
     return {
       speech: {
@@ -248,6 +255,21 @@ const mossCalls =
           createMossTranscriptionTask(key, transcript(request)).pipe(sealed, Effect.mapBoth({ onSuccess: taskId, onFailure: audioFailure })),
         stream: (request) =>
           streamMossTranscription(key, transcript(request)).pipe(Stream.provideService(HttpClient.HttpClient, http), Stream.mapError(audioFailure)),
+      },
+      understanding: {
+        check: (request) =>
+          prepareMossUnderstanding(question(request)).pipe(
+            Effect.mapError(() => InvalidRequest.make()),
+            Effect.asVoid,
+          ),
+        ask: (request) =>
+          understandMossMedia(key, question(request)).pipe(
+            sealed,
+            Effect.mapBoth({
+              onSuccess: ({ id: _responseId, ...result }) => result,
+              onFailure: (error) => UnderstandingFailure.make({ outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected" }),
+            }),
+          ),
       },
       voices: {
         clone: (request) =>
@@ -312,11 +334,6 @@ const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMoss
   return { _tag: "Refused", reason: reason() };
 };
 
-export interface UnderstandingAccount extends Account {
-  readonly model: (typeof mossUnderstandingModels)[number];
-  readonly key: string;
-}
-
 export interface ProviderAccount {
   readonly connection: string;
   readonly revision: number;
@@ -340,7 +357,8 @@ export class Provider extends Context.Service<
     /** Image generation, whichever vendor the bound account is of: the request checked against the bound model, and
      * the account as it is now (a queued task keeps it), with the call to run later. */
     readonly image: (request: ImageRequest) => Effect.Effect<BoundImage, Refused>;
-    readonly understanding: () => Effect.Effect<UnderstandingAccount, Refused>;
+    /** The account bound to understand images and video, as it is now. */
+    readonly understanding: () => Effect.Effect<Account, Refused>;
     /** The account bound for each audio use, as it is now. */
     readonly speakers: () => Effect.Effect<Account, Refused>;
     readonly voiceDesign: () => Effect.Effect<Account, Refused>;
@@ -472,12 +490,11 @@ const make = Effect.gen(function* () {
     }),
     understanding: Effect.fn("Provider.understanding")(function* () {
       const config = settings.providers();
-      const binding = config.understanding;
-      const connection = boundConnection(config, binding?.connection ?? null);
-      if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.understandingUnbound") });
-      const model = mossUnderstandingModels.find((id) => id === binding.model);
-      if (!model) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.understandingModel") });
-      return { ...bind(connection, config.revision, model), model, key: connection.key };
+      const bound = bindingOf("understanding")(config);
+      if (!bound.ready) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.understandingUnbound") });
+      if (vendors[bound.connection.adapter].understanding?.models.includes(bound.model) !== true)
+        return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.understandingModel") });
+      return bind(bound.connection, config.revision, bound.model);
     }),
   });
 });

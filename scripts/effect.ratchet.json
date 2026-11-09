@@ -1,6 +1,6 @@
 {
   "apiStabilityLeak": {
-    "apps/server": 120,
+    "apps/server": 119,
     "apps/cli": 37,
     "packages/ai": 3,
     "packages/provider": 21,
@@ -113,7 +113,7 @@
     "apps/desktop": 48
   },
   "preferEffectArray": {
-    "apps/server": 1875,
+    "apps/server": 1874,
     "apps/cli": 119,
     "packages/agent": 181,
     "packages/ai": 94,
@@ -173,7 +173,7 @@
     "apps/desktop": 3
   },
   "strictBooleanExpressions": {
-    "apps/server": 1715,
+    "apps/server": 1712,
     "apps/cli": 47,
     "packages/agent": 91,
     "packages/ai": 70,

@@ -5,6 +5,7 @@ import { mossImageModels } from "@vibevalley/provider/moss/image-models";
 import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
 import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
 import { mossTranscriptionModels } from "@vibevalley/provider/moss/transcription-models";
+import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding-models";
 import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-models";
 
 /** What an image is asked for with, whoever draws it. A layout prompt is the parsed layout. */
@@ -69,6 +70,18 @@ export type TranscriptionEvent =
   | { readonly type: "transcript.segment.done"; readonly index: number; readonly segment: T.MediaAudioSegment; readonly usage?: T.MediaAudioUsage }
   | { readonly type: "transcript.text.done"; readonly text: string; readonly usage?: T.MediaAudioUsage };
 
+/** A question about uploaded images or a video, by the vendor's IDs of the files; the model is the account's. */
+export interface UnderstandingRequest {
+  readonly text: string;
+  readonly media: readonly { readonly kind: T.MediaInputReference["kind"]; readonly fileId: string }[];
+  readonly maxOutputTokens: number;
+}
+
+/** An understanding call that gave no answer: refused by the vendor, or with no answer to say whether it ran. */
+export class UnderstandingFailure extends Schema.TaggedError<UnderstandingFailure, { readonly brand: unique symbol }>()("UnderstandingFailure", {
+  outcome: Schema.Literals(["Rejected", "Unknown"]),
+}) {}
+
 /** A file to put where the vendor's models can read it. */
 export interface FileUpload {
   readonly file: Blob;
@@ -130,6 +143,7 @@ export interface Vendor {
   readonly speakers?: { readonly models: readonly string[] };
   readonly voiceDesign?: { readonly models: readonly string[] };
   readonly transcription?: { readonly models: readonly string[] };
+  readonly understanding?: { readonly models: readonly string[] };
 }
 
 /** Every vendor, by the adapter an account names. How each one is called is the Provider's business (provider.ts). */
@@ -142,5 +156,6 @@ export const vendors: Record<"moss", Vendor> = {
     speakers: { models: mossSpeakersModels },
     voiceDesign: { models: mossVoiceDesignModels },
     transcription: { models: mossTranscriptionModels },
+    understanding: { models: mossUnderstandingModels },
   },
 };

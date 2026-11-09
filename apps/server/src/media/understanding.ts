@@ -1,18 +1,16 @@
 import { Clock, Effect, Fiber, FiberMap, Option, Schema, Semaphore } from "effect";
-import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
-import { prepareMossUnderstanding, understandMossMedia } from "@vibevalley/provider/moss/understanding";
 
 import { type ApiError, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { Provider, type UnderstandingAccount } from "#/provider/provider.ts";
+import { type Account, Provider } from "#/provider/provider.ts";
 import * as q from "#db/media_understanding.sql.ts";
 
 import type { makeInputs } from "./inputs.ts";
@@ -45,7 +43,6 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
   const provider = yield* Provider;
   const channels = yield* Channel;
-  const http = yield* HttpClient.HttpClient;
   const fibers = yield* FiberMap.make<string, void, ApiError>();
   const cleanupSlot = yield* Semaphore.make(1);
   const active = (phase: T.MediaUnderstandingPhase) => phase === "authorized" || phase === "queued" || phase === "uploading" || phase === "generating";
@@ -150,7 +147,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     if (yield* change(id, ["authorized", "queued"], { phase: "canceled", cleanup: "done", problem: t("server.media.authorizationExpired") }))
       yield* ports.inputs.release(id);
   });
-  const enqueue = Effect.fnUntraced(function* (row: q.UnderstandingResult, account: UnderstandingAccount) {
+  const enqueue = Effect.fnUntraced(function* (row: q.UnderstandingResult, account: Account) {
     const input = yield* request(row);
     const references = (yield* view(row)).inputs;
     const work = Effect.gen(function* () {
@@ -168,12 +165,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
         }),
       );
       if (!(yield* change(input.id, ["uploading"], { phase: "generating" }))) return;
-      const { id: _responseId, ...result } = yield* understandMossMedia(account.key, {
-        model: account.model,
-        text: input.prompt,
-        media,
-        maxOutputTokens: input.maxOutputTokens,
-      }).pipe(Effect.provideService(HttpClient.HttpClient, http));
+      const result = yield* account.understanding.ask({ text: input.prompt, media, maxOutputTokens: input.maxOutputTokens });
       if (
         yield* change(input.id, ["generating"], {
           phase: result.status === "completed" ? "ready" : "incomplete",
@@ -184,7 +176,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       )
         yield* clean(input.id);
     }).pipe(
-      Effect.catchTag("MossUnderstandingError", (error) =>
+      Effect.catchTag("UnderstandingFailure", (error) =>
         change(input.id, ["generating"], {
           phase: error.outcome === "Unknown" ? "unknown" : "failed",
           problem: error.outcome === "Unknown" ? t("server.media.understandingUnknown") : t("server.media.understandingRejected"),
@@ -226,12 +218,9 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       const references = yield* Effect.forEach(input.inputs, (id) =>
         ports.inputs.get(id).pipe(Effect.flatMap(Schema.decodeUnknownEffect(S.MediaInputReference)), Effect.mapError(invalid)),
       );
-      yield* prepareMossUnderstanding({
-        model: account.model,
-        text: input.prompt,
-        maxOutputTokens: input.maxOutputTokens,
-        media: references.map((item) => ({ kind: item.kind, fileId: item.id })),
-      }).pipe(Effect.mapError(invalid));
+      yield* account.understanding
+        .check({ text: input.prompt, maxOutputTokens: input.maxOutputTokens, media: references.map((item) => ({ kind: item.kind, fileId: item.id })) })
+        .pipe(Effect.mapError(invalid));
       const now = yield* Clock.currentTimeMillis;
       yield* ports.inputs.pin(
         input.inputs,

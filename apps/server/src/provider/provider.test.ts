@@ -68,8 +68,9 @@ it.effect.each(["moss-transcribe-1.0-2026-07-22", "moss-transcribe-diarize-pro-2
     }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Selecting a snapshot must not invoke the vendor"))))),
 );
 
-it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding %s is independent, private and frozen per call", (model) =>
-  Effect.gen(function* () {
+it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding %s is independent, private and frozen per call", (model) => {
+  const { http, keyOf } = recording();
+  return Effect.gen(function* () {
     const provider = yield* Provider;
     const understandingFailure = yield* Effect.flip(provider.understanding());
     expect(understandingFailure).toMatchObject({ _tag: "Refused" });
@@ -80,7 +81,10 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
     expect(saved.understandingModels).toEqual(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"]);
     yield* notIn(saved, "vision-private-key");
     const frozen = yield* provider.understanding();
-    expect(frozen).toMatchObject({ connection: "vision", revision: 1, model, key: "vision-private-key" });
+    expect(frozen).toMatchObject({ connection: "vision", revision: 1, model });
+    const frozenKey = yield* keyOf(frozen);
+    expect(frozenKey).toBe("Bearer vision-private-key");
+    yield* notIn(frozen, "vision-private-key");
     expect((yield* provider.live()).key).toBe("test-first-key");
     expect((yield* provider.dictation()).key).toBe("test-first-key");
     if (saved.understanding) saved.understanding.model = "changed-by-caller";
@@ -95,13 +99,14 @@ it.effect.each(["moss-vl-1.0", "moss-vl-1.0-2026-07-08"])("understanding binding
       expect(provider.status().revision).toBe(1);
     }
     yield* provider.update({ ...config, revision: 1, connections: [...configured().connections, { ...vision, key: "rotated-vision-key" }] });
-    expect((yield* provider.understanding()).key).toBe("rotated-vision-key");
-    expect(frozen.key).toBe("vision-private-key");
+    const rotated = yield* provider.understanding();
+    const keys = [yield* keyOf(rotated), yield* keyOf(frozen)];
+    expect(keys).toEqual(["Bearer rotated-vision-key", "Bearer vision-private-key"]);
     yield* provider.update({ ...config, revision: 2, understanding: null });
     const understandingFailure2 = yield* Effect.flip(provider.understanding());
     expect(understandingFailure2).toMatchObject({ _tag: "Refused" });
-  }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Binding must not invoke the vendor"))))),
-);
+  }).pipe(Effect.provide(layer(http)));
+});
 
 it.effect("cleanup resolves the original connection rather than the current default binding", () => {
   const { http, keyOf } = recording();
