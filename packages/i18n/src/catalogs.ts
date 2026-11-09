@@ -3668,29 +3668,11 @@ export const catalogs = {
       tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.provider": {
-      speakersSettings: "多人语音生成",
-      voiceDesignSettings: "音色设计",
-      transcriptionSettings: "音频转写",
-      visionSettings: "实时视觉",
-      capabilityConnection: "连接",
-      capabilityModel: "模型 / 版本",
-      capabilityNotice: "选择独立的连接和模型。保存设置不会提交请求，也不会访问麦克风、摄像头或文件。",
-      speechSettings: "单人语音生成",
-      speechConnection: "语音生成连接",
-      speechModel: "语音生成模型",
       speechNotice: "可独立选择 Flash 或 Pro，再到媒体页生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
-      openSpeech: "打开语音生成",
       title: "AI 服务",
       intro: "保存 MOSS 连接，再为听写、生图、媒体理解、语音生成、音色设计、转写和实时音视频分别选择模型。",
       words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 理解 语音 音频 AI",
-      understandingSettings: "媒体理解配置",
-      understandingConnection: "媒体理解连接",
-      understandingModel: "理解模型 / 版本",
       understandingNotice: "配置独立的连接和模型。在媒体页选择文件并明确确认上传；保存配置不会上传文件或发起推理。",
-      imageSettings: "生图配置",
-      imageConnection: "生图连接",
-      imageModel: "生图模型 / 版本",
-      imageModelHint: "稳定名称跟随供应商更新，带日期的快照固定模型版本。账号权限与实际效果仍需真实调用验证。",
       imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
       add: "添加 MOSS 连接",
       reload: "重新加载",
@@ -3705,14 +3687,31 @@ export const catalogs = {
       saveFirst: "先保存修改，再查询账号可用模型。",
       discoveryHint: "只查询目录，不发推理请求；模型可见不代表推理已验证。",
       noModels: "此账号返回的模型目录为空。",
-      bindings: "默认用途",
-      dictation: "听写连接",
-      model: "听写模型",
       modelHint: "这里只列出产品已适配的普通转写模型；账号权限与实际效果仍需真实调用验证。",
       unbound: "不使用",
       liveHint: "MOSS Live 使用独立的连接和模型；更改听写模型不会切换实时协议。",
       bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
       manage: "管理 AI 服务连接",
+      connections: "连接",
+      uses: "用途",
+      usesIntro: "每个用途选一个连接和模型；不选就是不使用。",
+      groupImage: "图像",
+      groupVoice: "语音",
+      groupLive: "实时",
+      use: {
+        dictation: "听写",
+        image: "生图",
+        understanding: "媒体理解",
+        speech: "单人语音",
+        speakers: "多人语音",
+        voiceDesign: "音色设计",
+        transcription: "音频转写",
+        live: "MOSS Live",
+        vision: "实时视觉",
+      },
+      connectionFor: "{use}用的连接",
+      modelFor: "{use}用的模型",
+      openSpeechShort: "去生成",
     },
     "web.repo": {
       title: "仓库",
@@ -8358,34 +8357,14 @@ export const catalogs = {
       tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
     "web.provider": {
-      speakersSettings: "Multi-speaker speech",
-      voiceDesignSettings: "Voice design",
-      transcriptionSettings: "Audio transcription",
-      visionSettings: "Realtime vision",
-      capabilityConnection: "Connection",
-      capabilityModel: "Model / version",
-      capabilityNotice:
-        "Choose an independent connection and model. Saving these settings does not submit a request or access your microphone, camera or files.",
-      speechSettings: "Single-speaker speech",
-      speechConnection: "Speech connection",
-      speechModel: "Speech model",
       speechNotice:
         "Choose a separate Flash or Pro binding, then generate one speaker on the Media page. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
-      openSpeech: "Open speech generation",
       title: "AI services",
       intro:
         "Save MOSS connections, then choose independent models for dictation, images, media understanding, speech, voice design, transcription and realtime audio or vision.",
       words: "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
-      understandingSettings: "Media understanding settings",
-      understandingConnection: "Media understanding connection",
-      understandingModel: "Understanding model / version",
       understandingNotice:
         "Configure the independent connection and model. Select files and explicitly approve uploads on the Media page. Saving this configuration does not upload or run inference.",
-      imageSettings: "Image generation settings",
-      imageConnection: "Image generation connection",
-      imageModel: "Image model / version",
-      imageModelHint:
-        "Stable names follow provider updates; dated snapshots pin the model version. Account access and quality still require a real request to verify.",
       imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
       add: "Add MOSS connection",
       reload: "Reload",
@@ -8400,15 +8379,32 @@ export const catalogs = {
       saveFirst: "Save changes before querying the account's available models.",
       discoveryHint: "Catalog only, no inference. A listed model has not been verified by inference.",
       noModels: "This account returned an empty model catalog.",
-      bindings: "Default uses",
-      dictation: "Dictation connection",
-      model: "Dictation model",
       modelHint: "Only integrated transcription models are offered. Account permission and quality still require a real request to verify.",
       unbound: "Not in use",
       liveHint: "MOSS Live uses its own connection and model. Changing the dictation model does not change the realtime protocol.",
       bindingHint:
         "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
       manage: "Manage AI service connections",
+      connections: "Connections",
+      uses: "Uses",
+      usesIntro: "Pick a connection and model for each use; none leaves it unused.",
+      groupImage: "Images",
+      groupVoice: "Voice",
+      groupLive: "Live",
+      use: {
+        dictation: "Dictation",
+        image: "Image generation",
+        understanding: "Media understanding",
+        speech: "Speech",
+        speakers: "Dialogue",
+        voiceDesign: "Voice design",
+        transcription: "Transcription",
+        live: "MOSS Live",
+        vision: "Live vision",
+      },
+      connectionFor: "Connection for {use}",
+      modelFor: "Model for {use}",
+      openSpeechShort: "Open",
     },
     "web.repo": {
       title: "Repos",
@@ -12857,48 +12853,45 @@ export interface Messages {
   "web.pkm.toolbar.up": undefined;
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
-  "web.provider.bindings": undefined;
-  "web.provider.capabilityConnection": undefined;
-  "web.provider.capabilityModel": undefined;
-  "web.provider.capabilityNotice": undefined;
+  "web.provider.connectionFor": { readonly use: string | number };
+  "web.provider.connections": undefined;
   "web.provider.console": undefined;
-  "web.provider.dictation": undefined;
   "web.provider.discover": undefined;
   "web.provider.discoveryHint": undefined;
   "web.provider.empty": undefined;
   "web.provider.enabled": undefined;
-  "web.provider.imageConnection": undefined;
-  "web.provider.imageModel": undefined;
-  "web.provider.imageModelHint": undefined;
+  "web.provider.groupImage": undefined;
+  "web.provider.groupLive": undefined;
+  "web.provider.groupVoice": undefined;
   "web.provider.imageNotice": undefined;
-  "web.provider.imageSettings": undefined;
   "web.provider.intro": undefined;
   "web.provider.liveHint": undefined;
   "web.provider.manage": undefined;
-  "web.provider.model": undefined;
+  "web.provider.modelFor": { readonly use: string | number };
   "web.provider.modelHint": undefined;
   "web.provider.name": undefined;
   "web.provider.noModels": undefined;
-  "web.provider.openSpeech": undefined;
+  "web.provider.openSpeechShort": undefined;
   "web.provider.reload": undefined;
   "web.provider.reloadAsk": undefined;
   "web.provider.remove": undefined;
   "web.provider.removeAsk": undefined;
   "web.provider.saveFirst": undefined;
-  "web.provider.speakersSettings": undefined;
-  "web.provider.speechConnection": undefined;
-  "web.provider.speechModel": undefined;
   "web.provider.speechNotice": undefined;
-  "web.provider.speechSettings": undefined;
   "web.provider.title": undefined;
-  "web.provider.transcriptionSettings": undefined;
   "web.provider.unbound": undefined;
-  "web.provider.understandingConnection": undefined;
-  "web.provider.understandingModel": undefined;
   "web.provider.understandingNotice": undefined;
-  "web.provider.understandingSettings": undefined;
-  "web.provider.visionSettings": undefined;
-  "web.provider.voiceDesignSettings": undefined;
+  "web.provider.use.dictation": undefined;
+  "web.provider.use.image": undefined;
+  "web.provider.use.live": undefined;
+  "web.provider.use.speakers": undefined;
+  "web.provider.use.speech": undefined;
+  "web.provider.use.transcription": undefined;
+  "web.provider.use.understanding": undefined;
+  "web.provider.use.vision": undefined;
+  "web.provider.use.voiceDesign": undefined;
+  "web.provider.uses": undefined;
+  "web.provider.usesIntro": undefined;
   "web.provider.words": undefined;
   "web.repo.add": undefined;
   "web.repo.all": undefined;

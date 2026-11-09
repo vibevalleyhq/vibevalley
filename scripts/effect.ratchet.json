@@ -124,7 +124,7 @@
     "packages/bridge": 1,
     "packages/testkit": 34,
     "packages/health": 45,
-    "apps/web": 1275,
+    "apps/web": 1270,
     "apps/desktop": 45
   },
   "preferEffectRecord": {
@@ -184,7 +184,7 @@
     "packages/bridge": 2,
     "packages/testkit": 16,
     "packages/health": 7,
-    "apps/web": 1121,
+    "apps/web": 1111,
     "apps/desktop": 34
   },
   "strictEffectProvide": {
