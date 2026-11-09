@@ -1,4 +1,4 @@
-import { Cause, Clock, Deferred, Effect, Equal, Exit, Fiber, FiberSet, Queue, Ref, Schema, Scope, SynchronizedRef } from "effect";
+import { Cause, Clock, Deferred, Effect, Equal, Exit, Fiber, FiberSet, Queue, Schema, Scope, SynchronizedRef } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -217,10 +217,16 @@ interface Generation {
   /** Background writes, in order, taken by the writer. */
   readonly writes: Queue.Queue<Effect.Effect<void>, Cause.Done>;
   readonly writer: Fiber.Fiber<void>;
-  /** Why it was retired, once it is: what an operation it cut short says. */
-  why?: string;
-  retired?: Fiber.Fiber<void>;
+  /** Once retired: why (what an operation it cut short says, so it is set before anything is interrupted), and done
+   * once it has stopped. */
+  retired?: { readonly why: string; readonly done: Deferred.Deferred<void> };
 }
+
+/** What the sources run on: nothing made yet, a generation for the settings it was made for, or stopped for good. */
+type Held =
+  | { readonly _tag: "none" }
+  | { readonly _tag: "on"; readonly configs: readonly MemorySourceConfig[]; readonly gen: Generation }
+  | { readonly _tag: "stopped" };
 
 /** Owns source generations and every accepted operation, including retirement and shutdown. */
 interface Sources {
@@ -252,16 +258,16 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const forkHere = yield* FiberSet.makeRuntime();
     /** Every generation not yet stopped, the current one among them, for the service's end. */
     const generations = new Set<Generation>();
-    /** The current generation and the settings it was made for. none once the service has stopped. */
-    const held = yield* SynchronizedRef.make<{ readonly configs: readonly MemorySourceConfig[]; readonly gen: Generation } | undefined>(undefined);
-    const stopped = yield* Ref.make(false);
+    const held = yield* SynchronizedRef.make<Held>({ _tag: "none" });
 
     const outside = (g: Generation) => g.all.filter((one) => one !== local);
 
-    const retire = (g: Generation, why: string): Fiber.Fiber<void> =>
-      (g.retired ??= forkHere(
+    const retire = (g: Generation, why: string): Deferred.Deferred<void> => {
+      if (g.retired) return g.retired.done;
+      const done = Deferred.makeUnsafe<void>();
+      g.retired = { why, done };
+      forkHere(
         Effect.gen(function* () {
-          g.why = why;
           // Interrupts the writer, the writes still waiting, and every operation going.
           yield* Scope.close(g.scope, Exit.void);
           yield* Effect.forEach(
@@ -274,8 +280,10 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
             { concurrency: "unbounded", discard: true },
           );
           generations.delete(g);
-        }),
-      ));
+        }).pipe(Effect.ensuring(Deferred.succeed(done, undefined))),
+      );
+      return done;
+    };
 
     const generation = Effect.fnUntraced(function* (sources: [Source, ...Source[]], off: T.MemorySourceInfo[]) {
       const scope = yield* Scope.make();
@@ -287,10 +295,10 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
 
     const snapshot: Effect.Effect<Generation | undefined> = SynchronizedRef.modifyEffect(held, (h) =>
       Effect.gen(function* () {
-        if (yield* Ref.get(stopped)) return [undefined, h] as const;
+        if (h._tag === "stopped") return [undefined, h] as const;
         const now = configured();
-        if (h && Equal.equals(h.configs, now)) return [h.gen, h] as const;
-        if (h) retire(h.gen, "memory sources changed; outside operation canceled");
+        if (h._tag === "on" && Equal.equals(h.configs, now)) return [h.gen, h] as const;
+        if (h._tag === "on") retire(h.gen, "memory sources changed; outside operation canceled");
         const all: [Source, ...Source[]] = [local];
         const off: T.MemorySourceInfo[] = [];
         for (const c of now) {
@@ -316,7 +324,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         }
         const gen = yield* generation(all, off);
         generations.add(gen);
-        return [gen, { configs: now, gen }] as const;
+        return [gen, { _tag: "on", configs: now, gen } satisfies Held] as const;
       }),
     );
 
@@ -325,7 +333,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       Effect.flatMap(FiberSet.run(g.operations, operation), (fiber) =>
         Fiber.join(fiber).pipe(
           Effect.onInterrupt(() => Fiber.interrupt(fiber)),
-          Effect.catchCauseIf(Cause.hasInterruptsOnly, () => Effect.fail(SourceError.make({ message: g.why ?? "canceled" }))),
+          Effect.catchCauseIf(Cause.hasInterruptsOnly, () => Effect.fail(SourceError.make({ message: g.retired?.why ?? "canceled" }))),
         ),
       );
 
@@ -388,7 +396,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     // The writes still waiting go first, for a moment; then every generation is retired and the local source stopped.
     yield* Effect.addFinalizer(() =>
       Effect.gen(function* () {
-        yield* Ref.set(stopped, true);
+        yield* SynchronizedRef.set(held, { _tag: "stopped" });
         yield* Effect.forEach(
           [...generations],
           Effect.fnUntraced(function* (g) {
@@ -396,7 +404,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
               yield* Queue.end(g.writes);
               yield* Effect.timeoutOption(Fiber.await(g.writer), prefetchTimeoutMs);
             }
-            yield* Fiber.await(retire(g, "memory sources stopped; outside operation canceled"));
+            yield* Deferred.await(retire(g, "memory sources stopped; outside operation canceled"));
           }),
           { concurrency: "unbounded", discard: true },
         );
