@@ -1,11 +1,9 @@
 import { Clock, Context, Effect, Fiber, FiberHandle, FiberMap, Layer, Option, Schedule, Schema, Semaphore, type Stream } from "effect";
-import { HttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
-import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
 
 import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
@@ -78,7 +76,6 @@ const make = Effect.gen(function* () {
   const core = yield* Core;
   const channel = yield* Channel;
   const provider = yield* Provider;
-  const http = yield* HttpClient.HttpClient;
   const downloads = yield* PublicHttp;
   const lock = yield* Semaphore.make(1);
   const slots = yield* Semaphore.make(1);
@@ -301,22 +298,21 @@ const make = Effect.gen(function* () {
           if ((yield* understanding.has(input.id)) || (yield* speech.has(input.id)) || (yield* audio.has(input.id)))
             return yield* Effect.fail(refused(t("server.media.reusedId")));
           yield* capacity();
-          const connection = yield* provider.image();
           const prompt =
             input.format === "layout"
               ? yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(input.prompt).pipe(Effect.mapError(() => refused(t("server.media.invalid"))))
               : input.prompt;
-          const prepared = yield* prepareMossImage({
-            model: connection.model,
+          const connection = yield* provider.image({
             prompt,
-            size: { width: input.width, height: input.height },
+            width: input.width,
+            height: input.height,
             ...(input.seed !== undefined ? { seed: input.seed } : {}),
             ...(input.steps !== undefined ? { steps: input.steps } : {}),
             ...(input.guidance !== undefined ? { guidance: input.guidance } : {}),
             ...(input.negativePrompt !== undefined ? { negativePrompt: input.negativePrompt } : {}),
             enhance: input.enhance,
             watermark: input.watermark,
-          }).pipe(Effect.mapError(() => refused(t("server.media.invalid"))));
+          });
           yield* db.run(
             q.insertGeneration({
               id: input.id,
@@ -331,25 +327,20 @@ const make = Effect.gen(function* () {
           yield* publish();
           const work = Effect.gen(function* () {
             if (!(yield* change(input.id, ["queued"], { phase: "generating" }))) return;
-            yield* generateMossImage(connection.key, prepared).pipe(
-              Effect.provideService(HttpClient.HttpClient, http),
+            yield* connection.run.pipe(
               Effect.flatMap((result) =>
                 Effect.gen(function* () {
                   if (
                     yield* change(input.id, ["generating"], {
                       phase: "downloading",
                       result_url: result.url,
-                      usage: yield* usageJson({
-                        images: result.usage.generated_images,
-                        width: result.usage.output_width,
-                        height: result.usage.output_height,
-                      }).pipe(Effect.mapError(() => refused(t("server.media.corrupt")))),
+                      usage: yield* usageJson(result.usage).pipe(Effect.mapError(() => refused(t("server.media.corrupt")))),
                     })
                   )
                     yield* download(input.id);
                 }),
               ),
-              Effect.catchTag("MossImageError", (error) =>
+              Effect.catchTag("ImageFailure", (error) =>
                 change(input.id, ["generating"], {
                   phase: error.outcome === "Unknown" ? "unknown" : "failed",
                   problem: error.outcome === "Unknown" ? t("server.media.unknown") : t("server.media.rejected"),

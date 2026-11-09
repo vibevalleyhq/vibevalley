@@ -54,6 +54,7 @@ const configured = Effect.gen(function* () {
 // world already builds Media; a fresh instance must capture these offline clients instead of reusing that service.
 const layer = (http = generated, download = downloaded, config = testConfig()) =>
   Layer.fresh(Media.layer).pipe(
+    Layer.provideMerge(Layer.fresh(Provider.layer)),
     Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http)),
     Layer.provideMerge(Layer.succeed(PublicHttp, download)),
     Layer.provideMerge(world({ config })),

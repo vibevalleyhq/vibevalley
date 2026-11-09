@@ -2,10 +2,11 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（30 篇）
+## proposed（32 篇）
 
 ### feature
 
+- 2026-11-09 [设置按功能分，钥匙放一处，没准备好就指路](.agents/notes/proposed/feature/2026-11-09-settings-by-feature.md)
 - 2026-11-09 [频道里用 /imagegen 生图](.agents/notes/proposed/feature/2026-11-09-imagegen-in-channels.md)
 - 2026-11-04 [网页稿子的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
 - 2026-10-27 [自己的实时模型经本机 WebSocket 接电话，其余照旧走声网](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
@@ -22,6 +23,7 @@
 
 - 2026-11-09 [工单和频道经 Mailbox 一道门找到帮工](.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md)
 - 2026-11-09 [一件事一条路：按调用表收敛服务之间的路径](.agents/notes/proposed/architecture/2026-11-09-converge-paths.md)
+- 2026-11-09 [能力是服务，供应商是适配器](.agents/notes/proposed/architecture/2026-11-09-capabilities-and-vendors.md)
 - 2026-11-09 [把 agent 当人：角色只管职责](.agents/notes/proposed/architecture/2026-11-09-agents-as-people.md)
 - 2026-11-08 [显式状态机分层体系、Effect v4 原语与全链路错误契约](.agents/notes/proposed/architecture/2026-11-08-explicit-state-machines-and-error-contracts.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)

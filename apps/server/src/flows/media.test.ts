@@ -37,6 +37,7 @@ const configured = Effect.gen(function* () {
 
 const farm = (llm: ModelClient) => {
   const media = Layer.fresh(Media.layer).pipe(
+    Layer.provideMerge(Layer.fresh(Provider.layer)),
     Layer.provideMerge(network),
     Layer.provideMerge(world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }) })),
   );

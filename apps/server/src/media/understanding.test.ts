@@ -42,7 +42,11 @@ const reply = (request: HttpClientRequest.HttpClientRequest, response = result) 
   return HttpClientResponse.fromWeb(request, Response.json(response));
 };
 const layer = (http: HttpClient.HttpClient) =>
-  Layer.fresh(Media.layer).pipe(Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http)), Layer.provideMerge(world()));
+  Layer.fresh(Media.layer).pipe(
+    Layer.provideMerge(Layer.fresh(Provider.layer)),
+    Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http)),
+    Layer.provideMerge(world()),
+  );
 const fixture = Effect.gen(function* () {
   const status = yield* (yield* Provider).update({
     revision: 0,

@@ -4,7 +4,7 @@ import { HttpClient } from "effect/http";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import type { Refused } from "@vibevalley/protocol/api";
-import { mossImageModels } from "@vibevalley/provider/moss/image-models";
+import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
 import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
 import { type MossModelError, mossModels } from "@vibevalley/provider/moss/models";
 import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
@@ -16,10 +16,53 @@ import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-mo
 import { listMossVoices } from "@vibevalley/provider/moss/voices";
 import { mossTranscription } from "@vibevalley/provider/transcription";
 
-import { boundConnection } from "#/setting/provider.ts";
+import { bindingOf, boundConnection } from "#/setting/provider.ts";
 import { Setting } from "#/setting/setting.ts";
 
 import { connectionsOver, providerStatus } from "./connections.ts";
+import { type GeneratedImage, ImageFailure, type ImageRequest, vendors } from "./vendors.ts";
+
+/** An account bound to draw, as it was when a task was asked for, and the call that draws. */
+export interface BoundImage {
+  readonly connection: string;
+  readonly revision: number;
+  readonly model: string;
+  readonly run: Effect.Effect<GeneratedImage, ImageFailure>;
+}
+
+/** How a vendor draws: a request checked against one of its models, as the call to make later with the key. */
+type ImageCall = (
+  model: string,
+  request: ImageRequest,
+) => Effect.Effect<(key: string) => Effect.Effect<GeneratedImage, ImageFailure, HttpClient.HttpClient>, "invalid">;
+
+/** MOSS draws: its own answer read as an image, and its own failures as whether one can have been made. */
+const mossDraw = Effect.fnUntraced(
+  function* (key: string, prepared: unknown) {
+    const result = yield* generateMossImage(key, prepared);
+    return { url: result.url, usage: { images: result.usage.generated_images, width: result.usage.output_width, height: result.usage.output_height } };
+  },
+  // Not sent is refused too: nothing was asked of the vendor, so nothing can have been made or paid for.
+  Effect.catchTag("MossImageError", (error) => Effect.fail(ImageFailure.make({ outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected" }))),
+);
+
+const mossImage: ImageCall = Effect.fnUntraced(function* (model, request) {
+  const prepared = yield* prepareMossImage({
+    model,
+    prompt: request.prompt,
+    size: { width: request.width, height: request.height },
+    ...(request.seed !== undefined ? { seed: request.seed } : {}),
+    ...(request.steps !== undefined ? { steps: request.steps } : {}),
+    ...(request.guidance !== undefined ? { guidance: request.guidance } : {}),
+    ...(request.negativePrompt !== undefined ? { negativePrompt: request.negativePrompt } : {}),
+    enhance: request.enhance,
+    watermark: request.watermark,
+  }).pipe(Effect.mapError((): "invalid" => "invalid"));
+  return (key: string) => mossDraw(key, prepared);
+});
+
+/** How each vendor draws, by adapter; one with no image use has none. */
+const imageCalls: Record<keyof typeof vendors, ImageCall | undefined> = { moss: mossImage };
 
 const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMossVoices>>): Refused => {
   const reason = () => {
@@ -79,15 +122,9 @@ export class Provider extends Context.Service<
     >;
     readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, Refused>;
     readonly dictation: () => Effect.Effect<{ readonly url: string; readonly model: string; readonly key: string }, Refused>;
-    readonly image: () => Effect.Effect<
-      {
-        readonly connection: string;
-        readonly revision: number;
-        readonly model: (typeof mossImageModels)[number];
-        readonly key: string;
-      },
-      Refused
-    >;
+    /** Image generation, whichever vendor the bound account is of: the request checked against the bound model, and
+     * the account as it is now (a queued task keeps it), with the call to run later. */
+    readonly image: (request: ImageRequest) => Effect.Effect<BoundImage, Refused>;
     readonly understanding: () => Effect.Effect<UnderstandingAccount, Refused>;
     readonly speakers: () => Effect.Effect<ProviderAccount, Refused>;
     readonly voiceDesign: () => Effect.Effect<ProviderAccount, Refused>;
@@ -183,14 +220,22 @@ const make = Effect.gen(function* () {
       if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.unbound") });
       return { url: mossTranscription.url, model: binding.model, key: connection.key };
     }),
-    image: Effect.fn("Provider.image")(function* () {
+    image: Effect.fn("Provider.image")(function* (request: ImageRequest) {
       const config = settings.providers();
-      const binding = config.image;
-      const connection = boundConnection(config, binding?.connection ?? null);
-      if (!binding || !connection) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.imageUnbound") });
-      const model = mossImageModels.find((id) => id === binding.model);
-      if (!model) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.imageModel") });
-      return { connection: connection.id, revision: config.revision, model, key: connection.key };
+      const bound = bindingOf("image")(config);
+      if (!bound.ready) return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.imageUnbound") });
+      const adapter = bound.connection.adapter;
+      const call = imageCalls[adapter];
+      if (call === undefined || vendors[adapter].image?.models.includes(bound.model) !== true)
+        return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.imageModel") });
+      const run = yield* call(bound.model, request).pipe(Effect.mapError((): Refused => ({ _tag: "Refused", reason: t("server.media.invalid") })));
+      // The key as it is now: a task queued with it keeps it, whatever the account has later.
+      return {
+        connection: bound.connection.id,
+        revision: config.revision,
+        model: bound.model,
+        run: run(bound.connection.key).pipe(Effect.provideService(HttpClient.HttpClient, http)),
+      };
     }),
     understanding: Effect.fn("Provider.understanding")(function* () {
       const config = settings.providers();

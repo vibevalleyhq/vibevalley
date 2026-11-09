@@ -34,6 +34,7 @@ const configured = Effect.gen(function* () {
 });
 const layer = (http: HttpClient.HttpClient) =>
   Layer.fresh(Media.layer).pipe(
+    Layer.provideMerge(Layer.fresh(Provider.layer)),
     Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http)),
     Layer.provideMerge(
       Layer.succeed(

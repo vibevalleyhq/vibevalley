@@ -1,8 +1,6 @@
-import { Array as Arr, Option } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 
-import type { ProviderSettings } from "./provider.ts";
+import { bindingOf, type ProviderSettings, type Use } from "./provider.ts";
 
 /** What the readiness of each feature is read from: the MOSS settings, and the keys and choices kept elsewhere. */
 export interface ReadinessInput {
@@ -17,21 +15,15 @@ export interface ReadinessInput {
 const ready: T.Readiness = { ready: true };
 const lacks = (missing: T.Missing): T.Readiness => ({ ready: false, missing });
 
-type MossUse = "image" | "understanding" | "speech" | "speakers" | "voiceDesign" | "transcription" | "dictation" | "live" | "vision";
-
-/** A MOSS use is ready with a bound connection that is turned on and has its key; what it lacks first is said first. */
-const mossUse = (providers: ProviderSettings, use: MossUse): T.Readiness => {
-  if (providers.connections.length === 0) return lacks("mossAccount");
-  const binding = providers[use];
-  const connection = binding === null ? Option.none() : Arr.findFirst(providers.connections, (c) => c.id === binding.connection);
-  if (Option.isNone(connection)) return lacks("binding");
-  if (!connection.value.enabled) return lacks("mossOff");
-  return connection.value.key === "" ? lacks("mossKey") : ready;
+/** A MOSS use is ready as setting/provider.ts bindingOf says. */
+const mossUse = (providers: ProviderSettings, use: Use): T.Readiness => {
+  const bound = bindingOf(use)(providers);
+  return bound.ready ? ready : lacks(bound.missing);
 };
 
 /** Whether each feature has what it needs set up. It does not ask the remote services. */
 export const readinessOf = (input: ReadinessInput): Record<T.Feature, T.Readiness> => {
-  const moss = (use: MossUse) => mossUse(input.providers, use);
+  const moss = (use: Use) => mossUse(input.providers, use);
   const live = moss("live");
   return {
     orchestrator: input.deepseekKey ? ready : lacks("deepseekKey"),
