@@ -155,3 +155,24 @@ test("a refused command is told and keeps its line; while the state stream is lo
     s.dispose();
   }
 });
+
+test("Escape shuts the menu for the trigger it was at: typing on in it keeps it shut, a new one opens it", () => {
+  const s = setup();
+  try {
+    const escape = () => {
+      s.box.onKey({ key: "Escape", isComposing: false, shiftKey: false, preventDefault: () => {}, stopPropagation: () => {} });
+      flush();
+    };
+    s.type("/i");
+    expect(s.box.offered().length).toBeGreaterThan(0);
+    escape();
+    expect(s.box.offered()).toEqual([]);
+    s.type("/im");
+    expect(s.box.offered()).toEqual([]);
+    s.type("");
+    s.type("/");
+    expect(s.box.offered().length).toBeGreaterThan(0);
+  } finally {
+    s.dispose();
+  }
+});

@@ -77,11 +77,21 @@ export interface ComposerWays {
  * someone. */
 export const chatMarks: readonly Mark[] = ["/", "@"];
 
+/** Where a menu was asked for: a command (/ first in the box) or a name (@), by where it starts. */
+interface Trigger {
+  readonly kind: "command" | "name";
+  readonly start: number;
+}
+
 export function createComposer(core: () => SpaceView | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
   const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
-  const [closed, setClosed] = createSignal(false);
+  /** The menu: open; away while the box has not the focus; or shut by Escape at one trigger (a command or a name, where it
+   * starts), which it stays for while the caret is in that trigger. */
+  const [menu, setMenu] = createSignal<{ readonly _tag: "open" } | { readonly _tag: "away" } | { readonly _tag: "shut"; readonly at: Trigger }>({
+    _tag: "open",
+  });
   const [sending, setSending] = createSignal(false);
   let disposed = false;
   onSettled(() => () => {
@@ -105,8 +115,27 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   /** The orchestrator in the place the next line goes to. */
   const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
   // A command (/ first in the box) is offered anywhere; no one else is in a direct channel to be named.
-  const commandTyping = createMemo(() => (closed() ? undefined : typedCommand(text(), caret())));
-  const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
+  const hidden = (kind: Trigger["kind"], found: { readonly start: number } | undefined) => {
+    const m = menu();
+    return m._tag === "away" || (m._tag === "shut" && found !== undefined && m.at.kind === kind && m.at.start === found.start);
+  };
+  const commandTyping = createMemo(() => {
+    const c = typedCommand(text(), caret());
+    return hidden("command", c) ? undefined : c;
+  });
+  const typing = createMemo(() => {
+    if (channelOf(ways.target().id)?.type === "direct") return undefined;
+    const n = typedName(text(), caret());
+    return hidden("name", n) ? undefined : n;
+  });
+  /** Read from what was typed, not the signals just set: a menu shut at a trigger the caret has left is forgotten. */
+  const moved = (value: string, at: number) =>
+    setMenu((m) => {
+      if (m._tag === "open") return m;
+      if (m._tag === "away") return { _tag: "open" };
+      const now = m.at.kind === "command" ? typedCommand(value, at) : typedName(value, at);
+      return now?.start === m.at.start ? m : { _tag: "open" };
+    });
   const offered = createMemo(() => {
     const c = commandTyping();
     if (c) return offeredFor(commandNameables(readiness()), c.query);
@@ -118,7 +147,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     setText(value);
     setCaret(at);
     setActive(0);
-    setClosed(false);
+    moved(value, at);
     ways.edited?.(value, at);
   };
 
@@ -162,7 +191,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     if (!disposed && end?.phase === "failed") ways.failed(end.fault.reason);
   };
 
-  const onKey = (e: KeyboardEvent) => {
+  const onKey = (e: Pick<KeyboardEvent, "key" | "isComposing" | "shiftKey" | "preventDefault" | "stopPropagation">) => {
     // Enter that picks a word in an input method neither sends nor names.
     if (e.isComposing) return;
     const list = offered();
@@ -182,7 +211,10 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
         // The menu closes, not the window around it.
         e.preventDefault();
         e.stopPropagation();
-        setClosed(true);
+        const c = commandTyping();
+        const n = typing();
+        if (c !== undefined) setMenu({ _tag: "shut", at: { kind: "command", start: c.start } });
+        else if (n !== undefined) setMenu({ _tag: "shut", at: { kind: "name", start: n.start } });
         return;
       }
     }
@@ -203,10 +235,14 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     send,
     onKey,
     /** The caret moves without typing too (arrow keys, a click): the @ menu follows it. */
-    follow: (e: Event) => e.currentTarget instanceof HTMLTextAreaElement && setCaret(e.currentTarget.selectionStart),
+    follow: (e: Event) => {
+      if (!(e.currentTarget instanceof HTMLTextAreaElement)) return;
+      setCaret(e.currentTarget.selectionStart);
+      moved(e.currentTarget.value, e.currentTarget.selectionStart);
+    },
     /** The menu closes when the box loses the focus and comes back with it. */
-    blur: () => setClosed(true),
-    focus: () => setClosed(false),
+    blur: () => setMenu({ _tag: "away" }),
+    focus: () => setMenu((m) => (m._tag === "away" ? { _tag: "open" } : m)),
     canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     here,
     /** The place's orchestrator is in a round the owner may stop. */

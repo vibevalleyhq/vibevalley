@@ -38,7 +38,7 @@
   "uninterruptible-wait": {},
   "layer-built-twice": {},
   "loose-flags": {
-    "apps/web": 1,
+    "apps/web": 2,
     "scripts": 1
   }
 }

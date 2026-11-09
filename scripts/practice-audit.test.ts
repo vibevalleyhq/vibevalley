@@ -156,6 +156,9 @@ describe("effect practices in source", () => {
     expect(audit([{ path: "Page.tsx", text: flags }]).filter((f) => f.rule === "loose-flags")).toHaveLength(1);
     expect(inSource("loose-flags", 'function start() {\n  let phase = "idle";\n  let open = false;\n}')).toEqual([]);
     expect(audit([{ path: "a.test.ts", text: flags }]).filter((f) => f.rule === "loose-flags")).toEqual([]);
+    const signals =
+      "function Page() {\n  const [open, setOpen] = createSignal(false);\n  const [busy, setBusy] = createSignal<boolean>(false);\n  let shown = true;\n}";
+    expect(audit([{ path: "Page.tsx", text: signals }]).filter((f) => f.rule === "loose-flags")).toHaveLength(1);
   });
 
   test("option-get-or-throw and die-with-plain-error", () => {

@@ -345,8 +345,8 @@ function Chat() {
   const thread = createMemo(() => (shown()?.type === "thread" ? shown() : undefined));
   const threadWidth = usePaneWidth("thread", 416, 320, 720);
   const [drawer, setDrawer] = createSignal(false);
-  const [creating, setCreating] = createSignal(false);
-  const [searching, setSearching] = createSignal(false);
+  /** The one dialog over the page: a new channel or the search; opening one closes the other. */
+  const [dialog, setDialog] = createSignal<"none" | "new" | "search">("none");
   // A message's address (?m=) lights it up in the pane it is in: the thread's, or the channel's.
   const point = () => pointedAt(router.path());
   // An artifact opened beside the talk that made it (?artifact=), and the block the owner is about to speak about.
@@ -373,7 +373,7 @@ function Chat() {
   const unquote = (blockId: string) => setQuoted((had) => had.filter((q) => q.ref.blockId !== blockId));
 
   const sidebar = () => (
-    <Sidebar channel={channel()} thread={thread()} onNew={() => setCreating(true)} onSearch={() => setSearching(true)} onPick={() => setDrawer(false)} />
+    <Sidebar channel={channel()} thread={thread()} onNew={() => setDialog("new")} onSearch={() => setDialog("search")} onPick={() => setDrawer(false)} />
   );
   return (
     <div {...stylex.attrs(viewStyles.chatDiv)}>
@@ -416,8 +416,12 @@ function Chat() {
           </div>
         )}
       </Show>
-      <NewChannelDialog open={creating()} onClose={() => setCreating(false)} onCreated={(newId) => router.navigate(`/chat/${newId}`)} />
-      <FarmSearch open={searching()} onClose={() => setSearching(false)} />
+      <NewChannelDialog
+        open={dialog() === "new"}
+        onClose={() => setDialog((d) => (d === "new" ? "none" : d))}
+        onCreated={(newId) => router.navigate(`/chat/${newId}`)}
+      />
+      <FarmSearch open={dialog() === "search"} onClose={() => setDialog((d) => (d === "search" ? "none" : d))} />
     </div>
   );
 }

@@ -139,7 +139,7 @@ const why: Record<Rule, string> = {
     "Fix: keep it in a constant and use that one value. " +
     "See .agents/skills/vv-effect/references/cases.md (35.)",
   "loose-flags":
-    "several flags kept loose in one function (let x = false…): when they move together they are one state machine whose impossible combinations nothing stops. " +
+    "several flags kept loose in one function (let x = false…, createSignal(false)…): when they move together they are one state machine whose impossible combinations nothing stops. " +
     "Fix: one union, a tag per state with what that state holds, in one let, signal or Ref; keep a flag apart only when it is a dimension of its own (it can be true in any of the states). " +
     "See docs/style/module-design.md (显式状态)",
 };
@@ -176,21 +176,26 @@ const unwrap = (n: Node | undefined): Node | undefined => {
 const isFunction = (n: Node) => n.type === "ArrowFunctionExpression" || n.type === "FunctionExpression" || n.type === "FunctionDeclaration";
 
 const isBooleanLiteral = (n: Node | undefined) => n?.type === "Literal" && typeof n.value === "boolean";
-/** Three or more `let x = true/false` in one function body. Fields of a type are left alone: most are a shape's data or a
+/** Three or more `let x = true/false` or boolean signals (`createSignal(false)`) in one function body. Fields of a type are left alone: most are a shape's data or a
  * component's props, not state. */
 function looseFlags(n: Node, report: (at: Node, what: string) => void) {
   if (isFunction(n)) {
     const body = field(n, "body");
     if (body?.type !== "BlockStatement") return;
     const flags = list(body, "body")
-      .filter((s) => s.type === "VariableDeclaration" && s.kind === "let")
-      .flatMap((s) => list(s, "declarations"))
-      .filter((d) => isBooleanLiteral(field(d, "init")))
-      .flatMap((d) => {
+      .filter((s) => s.type === "VariableDeclaration")
+      .flatMap((s) => list(s, "declarations").map((d) => ({ d, kind: s.kind })))
+      .flatMap(({ d, kind }) => {
         const id = field(d, "id");
-        return isIdent(id) && typeof id.name === "string" ? [id.name] : [];
+        const init = field(d, "init");
+        if (kind === "let" && isBooleanLiteral(init) && isIdent(id) && typeof id.name === "string") return [id.name];
+        // A Solid signal of a boolean: const [open, setOpen] = createSignal(false).
+        const first = id?.type === "ArrayPattern" ? list(id, "elements")[0] : undefined;
+        if (init?.type === "CallExpression" && isIdent(field(init, "callee"), "createSignal") && isBooleanLiteral(list(init, "arguments")[0]))
+          return isIdent(first) && typeof first.name === "string" ? [first.name] : [];
+        return [];
       });
-    if (flags.length >= 3) report(n, `let ${flags.join(", ")}`);
+    if (flags.length >= 3) report(n, `flags ${flags.join(", ")}`);
   }
 }
 
