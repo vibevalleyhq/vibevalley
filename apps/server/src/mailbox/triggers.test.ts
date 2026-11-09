@@ -63,10 +63,23 @@ it.effect("regression: duplicate source and channel records keep the first trigg
     expect((yield* mailbox.readTrigger(first.id))?.payload).toEqual({ text: event.text, data: event.data });
     const knownGitHubEvents2 = yield* mailbox.knownGitHubEvents("repo", 7);
     expect(knownGitHubEvents2).toEqual([{ key: event.key, routed: false, botRound: 1, botRoundKey: "round-1" }]);
-    const channel = triggerOf({ ...event, source: "channel", key: "message" });
-    const channelTriggerRecorded = yield* mailbox.recordChannelTrigger(channel, "first", "room");
+    const message = {
+      ...event,
+      id: "message",
+      source: "channel" as const,
+      key: "message",
+      text: "first",
+      data: { kind: "channel_message", message: "message", channel: "room" },
+    };
+    const channel = triggerOf(message);
+    const channelTriggerRecorded = yield* mailbox.recordTrigger(message);
     expect(channelTriggerRecorded).toEqual(channel);
-    const channelTriggerRecorded2 = yield* mailbox.recordChannelTrigger({ ...channel, at: 20 }, "changed", "other");
+    const channelTriggerRecorded2 = yield* mailbox.recordTrigger({
+      ...message,
+      at: 20,
+      text: "changed",
+      data: { kind: "channel_message", message: "message", channel: "other" },
+    });
     expect(channelTriggerRecorded2).toEqual(channel);
     expect((yield* mailbox.readTrigger(channel.id))?.payload).toEqual({
       text: "first",

@@ -156,10 +156,15 @@ const channelLayer = (x: FakeSessions) =>
         launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
         inputsConsumed: Effect.map(PubSub.subscribe(x.inputsConsumedHub), Stream.fromSubscription),
         inputsReturned: Effect.map(PubSub.subscribe(x.inputsReturnedHub), Stream.fromSubscription),
-        register: (session: Parameters<Session["Service"]["register"]>[0]) =>
+        registerOrchestrator: (profile: T.Agent) =>
           db.run(
             qsession.keepSession({
-              ...session,
+              id: profile.id,
+              agent: profile.id,
+              role: profile.role,
+              name: profile.name,
+              runtime: profile.runtime,
+              brief: profile.duty,
               repo: null,
               issue: null,
               channel: null,

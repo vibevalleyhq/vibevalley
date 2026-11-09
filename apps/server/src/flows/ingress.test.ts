@@ -10,9 +10,10 @@ import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Mailbox, type InsertDelivery } from "#/mailbox/mailbox.ts";
 import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
+import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
@@ -61,14 +62,7 @@ it.live("regression: chat triggers keep their original payload through edits and
     const mailbox = yield* Mailbox;
     const sql = yield* SqlClient.SqlClient;
     const profile = (yield* Agent).agent(defaultOrchestrator)!;
-    yield* (yield* Session).register({
-      id: profile.id,
-      agent: profile.id,
-      role: profile.role,
-      name: profile.name,
-      runtime: profile.runtime,
-      brief: profile.duty,
-    });
+    yield* (yield* Session).registerOrchestrator(profile);
     const before = yield* chat.say("previous message", undefined, "before");
     const current = yield* ingress.owner({ source: "voice", text: "original voice input", envelope: "voice-source" });
     yield* chat.say("next message", undefined, "after");
@@ -129,7 +123,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
       replyChannel: thread,
       at: 1,
     }))!;
-    const delivery: Parameters<Mailbox["Service"]["insert"]>[0] = {
+    const delivery: InsertDelivery = {
       session,
       row: {
         envelope_id: trigger.id,
@@ -147,7 +141,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
         payload: { trigger, context: { number: 0, target: trigger.card.readUri }, channelType: "thread" },
       },
     };
-    yield* mailbox.insert(delivery);
+    yield* committedDelivery(delivery);
     yield* mailbox.restore;
     expect(mailbox.deliveriesOf(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
     yield* mailbox.start;
@@ -164,7 +158,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     });
     yield* until(() => inputs.some((input) => input.includes(trigger.card.readUri)), "the machine card delivered");
     yield* until(() => mailbox.deliveriesOf(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
-    yield* mailbox.insert(delivery);
+    yield* committedDelivery(delivery);
     expect(mailbox.deliveriesOf(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
     const messages = yield* await_(
       () => chat.history(thread),

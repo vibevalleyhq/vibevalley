@@ -90,10 +90,7 @@ export const channelHub = Effect.gen(function* () {
   const seat = Effect.fnUntraced(function* (id: string) {
     const agent = agents.agent(id);
     const name = agent?.name.trim() || t("server.channel.name.orchestrator");
-    if (agent?.role === "orchestrator")
-      yield* sessions
-        .register({ id: agent.id, role: agent.role, agent: agent.id, name, runtime: agent.runtime, brief: agent.duty })
-        .pipe(Effect.mapError((error) => refused(error.message)));
+    if (agent !== undefined) yield* sessions.registerOrchestrator(agent).pipe(Effect.mapError((error) => refused(error.message)));
     if (model.participant(id)?.name === name && model.participant(id)?.kind === "orchestrator") return;
     const joined: qp.UpsertParticipantParams = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
     yield* db.run(qp.upsertParticipant(joined));

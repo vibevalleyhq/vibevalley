@@ -117,11 +117,11 @@ export const channelWriting = (r: ChannelHub) =>
 
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
       };
-      const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
+      const { input, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
       const routed = yield* Effect.gen(function* () {
-        const original = yield* mailbox.recordChannelTrigger(trigger, fact.row.body, fact.row.channel_id);
+        const original = yield* mailbox.recordTrigger(input);
         return yield* mailbox.receive({ _tag: "Trigger", trigger: original, to: mail });
-      }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${trigger.id}`, error), { heldNotice: "" })));
+      }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${fact.row.envelope_id}`, error), { heldNotice: "" })));
       const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
       if (routed.heldNotice && (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0) written.heldNotice = routed.heldNotice;
       written.absent = named.filter((m) => m.how !== "delivered").map((m) => m.id);

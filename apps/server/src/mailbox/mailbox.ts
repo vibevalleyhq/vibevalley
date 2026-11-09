@@ -1,5 +1,4 @@
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
-import type { SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
@@ -113,7 +112,6 @@ export class Mailbox extends Context.Service<
   Mailbox,
   {
     readonly recordTrigger: (input: TriggerInput) => Effect.Effect<T.Trigger, ApiError>;
-    readonly recordChannelTrigger: (trigger: T.Trigger, text: string, channel: string) => Effect.Effect<T.Trigger, ApiError>;
     readonly readTrigger: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
     readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
     readonly replayCronTriggers: (consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
@@ -132,7 +130,6 @@ export class Mailbox extends Context.Service<
     readonly start: Effect.Effect<void>;
     readonly restore: Effect.Effect<void>;
     readonly replay: Effect.Effect<void>;
-    readonly insert: (input: InsertDelivery) => Effect.Effect<void, SqlError.SqlError | Schema.SchemaError>;
     readonly news: Effect.Effect<Stream.Stream<DeliveryNews>, never, Scope.Scope>;
     readonly handBack: (session: string, envelope: string) => Effect.Effect<void>;
     readonly withdraw: (what: Withdrawal) => Effect.Effect<void>;
@@ -363,7 +360,6 @@ export class Mailbox extends Context.Service<
             after = last.seq;
           }
         }),
-        insert: work.insert,
         news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
         handBack: Effect.fn("Mailbox.handBack")(function* (session, envelope) {
           yield* db.run(qd.rollbackOne({ session_id: session, envelope_id: envelope }));

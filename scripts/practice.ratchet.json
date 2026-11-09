@@ -4,7 +4,7 @@
   },
   "unreleased-gate": {},
   "duplicated-setup": {
-    "apps/server": 6
+    "apps/server": 5
   },
   "expect-in-unjoined-fiber": {},
   "failure-without-reason": {

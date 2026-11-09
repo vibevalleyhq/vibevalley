@@ -150,6 +150,7 @@
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
+| `committedDelivery` | `deliveries.ts` | A delivery written and routed as Mailbox commits one, and nothing after: what a stop between commit and hand-off |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |

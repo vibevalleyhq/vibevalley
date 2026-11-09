@@ -148,9 +148,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       if (!sessions.sessionOf(agent)) {
         const profile = store.agent(agent);
         if (!profile) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
-        yield* sessions
-          .register({ id: profile.id, agent: profile.id, name: profile.name, role: profile.role, runtime: profile.runtime, brief: profile.duty })
-          .pipe(Effect.mapError((error) => refused(error.message)));
+        yield* sessions.registerOrchestrator(profile).pipe(Effect.mapError((error) => refused(error.message)));
       }
       yield* recordOrchestratorStart(issue, agent, channel, input);
     });

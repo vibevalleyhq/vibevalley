@@ -10,6 +10,7 @@ import { Ingress, type SourceEvent } from "#/ingress/ingress.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
+import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { farm, lab, until } from "./farm.ts";
@@ -30,21 +31,14 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
     const profile = (yield* Agent).agent(defaultOrchestrator)!;
-    yield* (yield* Session).register({
-      id: profile.id,
-      agent: profile.id,
-      role: profile.role,
-      name: profile.name,
-      runtime: profile.runtime,
-      brief: profile.duty,
-    });
+    yield* (yield* Session).registerOrchestrator(profile);
     const channel = (yield* Channel).defaultChannel();
     const inputs = (yield* Effect.forEach(
       Array.from({ length: 12 }, (_, n) => n),
       (n) => ingress.record(signal(`concurrent-${n}`)),
     )).filter((input) => input !== undefined);
     const writes = inputs.map((trigger) =>
-      mailbox.insert({
+      committedDelivery({
         session: profile.id,
         row: {
           envelope_id: trigger.id,

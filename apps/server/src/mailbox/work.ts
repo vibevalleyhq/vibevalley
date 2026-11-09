@@ -93,10 +93,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         Effect.gen(function* () {
           const { trigger } = input;
           const profile = agents.agent(input.session);
-          if (profile?.role === "orchestrator" && !sessions.sessionOf(input.session))
-            yield* sessions
-              .register({ id: profile.id, agent: profile.id, name: profile.name, role: profile.role, runtime: profile.runtime, brief: profile.duty })
-              .pipe(Effect.mapError((error) => refused(error.message)));
+          if (profile !== undefined) yield* sessions.registerOrchestrator(profile).pipe(Effect.mapError((error) => refused(error.message)));
           const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? (yield* defaultChannel);
           const scope = deliveryScope(destination, input.issue);
           const urgency =
@@ -172,18 +169,6 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         if (entry.input.trigger.actor.kind === "owner" && entry.row.wakes) breaker.reset(entry.input.session);
       }
       return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "" };
-    }, writtenLocked);
-
-    const insert = Effect.fn("Mailbox.insert")(function* (input: InsertDelivery) {
-      const inserted = yield* db.attemptTx(
-        Effect.gen(function* () {
-          const rows = yield* writeDelivery(input);
-          const receipt = yield* markRoute(input);
-          return { rows, receipt };
-        }),
-      );
-      received(inserted.receipt);
-      for (const row of inserted.rows) stored(input.session, { ...input.row, position: row.position });
     }, writtenLocked);
 
     const registerInitialInputs = Effect.fn("Mailbox.registerInitialInputs")(function* (session: T.Session, launch: string, inputs: readonly T.Trigger[]) {
@@ -488,7 +473,6 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       issueInputs,
       retireDispatches,
       forward,
-      insert,
       registerInitialInputs,
       registerTalk,
       hand,

@@ -26,6 +26,8 @@ const Payload: Schema.Codec<DeliveryPayload, S.Wire<DeliveryPayload>> = Schema.S
 export const readPayload = Schema.decodeUnknownSync(Schema.fromJsonString(Payload));
 
 export interface TriggerInput {
+  /** A channel message's own id, so its trigger and its deliveries share it; otherwise made from source and key. */
+  readonly id?: string;
   readonly source: T.TriggerSource;
   /** What makes this occurrence unique within its source: the same key is the same trigger. */
   readonly key: string;
@@ -42,9 +44,11 @@ export interface TriggerInput {
 }
 
 export const triggerOf = (input: TriggerInput): T.Trigger => {
-  const id = createHash("sha256")
-    .update(Formatter.formatJson([input.source, input.key]))
-    .digest("hex");
+  const id =
+    input.id ??
+    createHash("sha256")
+      .update(Formatter.formatJson([input.source, input.key]))
+      .digest("hex");
   const { issue, ...restMeta } = input.meta ?? {};
   return {
     id,

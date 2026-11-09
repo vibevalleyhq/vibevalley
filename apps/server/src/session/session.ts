@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream, String as Str } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -25,7 +25,7 @@ import { sourceBrief } from "./prompts.ts";
 import { handsToOwner, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
-import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./signals.ts";
+import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionNews } from "./signals.ts";
 
 export type { SessionNews };
 export type { RunFinished, RunStore };
@@ -131,8 +131,9 @@ export class Session extends Context.Service<
     readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
     readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
     readonly inputsReturned: Effect.Effect<Stream.Stream<InputReturned>, never, Scope.Scope>;
-    /** Persists an Agent's Session identity before anything can record a Run or address its mailbox. */
-    readonly register: (session: SessionIdentity) => Effect.Effect<void, NotRecorded>;
+    /** An orchestrator profile's session, kept before anything can record a Run or address its mailbox: written when
+     * there is none or its name changed. A profile that is not an orchestrator is left alone. */
+    readonly registerOrchestrator: (profile: T.Agent) => Effect.Effect<void, NotRecorded>;
     /** Whose token it is; "" when nobody's. */
     readonly who: (token: string) => string;
     /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
@@ -660,7 +661,12 @@ const make = Effect.gen(function* () {
     finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
     inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
     inputsReturned: Effect.map(PubSub.subscribe(returnedHub), Stream.fromSubscription),
-    register,
+    registerOrchestrator: Effect.fn("Session.registerOrchestrator")(function* (profile: T.Agent) {
+      if (profile.role !== "orchestrator") return;
+      const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
+      if (core.session(profile.id)?.name === name) return;
+      yield* register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
+    }),
     who,
     setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
     host: Effect.fn("Session.host")(function* <R>(o: HostOptions<R>) {
