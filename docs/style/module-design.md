@@ -97,6 +97,19 @@
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
+### 显式状态
+
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let`、信号或 `Ref` 里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、[语音](apps/server/src/voice/voice.ts)的 `GrantPhase` 与 `MossPhase`、[记性源](apps/server/src/memory/sources.ts)的 `Held`、帮工招人时的 `reached`（[帮工](apps/server/src/session/session.ts)）。
+
+- **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/web/src/infra/form/form.ts)）；MOSS 回答的音频发完、回答结束和被切断（[MOSS](packages/ai/src/realtime/moss.ts)）。硬并只会得到它们的乘积。
+- **永远同值的删掉副本。** 读源头：通话的「在结束」就是它 `life` 的 abort。
+- **共享对象靠同一性比较时，留着对象、换它的状态。** 通话和实时线路共用一个 `MossLine`，判断靠 `activeMoss === target`，所以只换它的 `phase`。
+- **会被别处读原因的，先记原因再中断。** 记性源退役时同步记下原因和一个完成信号，再分出纤程去停：被中断的操作无论何时醒来都读得到原因。
+- **闭包里改的状态放进有类型的属性。** TypeScript 按初值收窄闭包外对 `let` 的读，看不到闭包里的赋值；放进标好类型的对象属性或有名字的类型（[闪播](apps/web/src/features/media/flash-stream.ts)）。
+- **页面的帧不拆。** 帧是 Solid 的 store，按 id 逐个 reconcile（[帧](apps/web/src/infra/frame.ts)）；为了联合改成按状态整个替换，会让每次换态重建整份画面。
+
+`practice:check` 的 `loose-flags` 拦一个函数里三个以上的 `let` 布尔：多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。
+
 ### 从测试困难诊断设计，避免先补工具
 
 | 信号 | 先检查 | 设计方向 |

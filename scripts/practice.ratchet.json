@@ -36,5 +36,9 @@
   },
   "cause-as-string": {},
   "uninterruptible-wait": {},
-  "layer-built-twice": {}
+  "layer-built-twice": {},
+  "loose-flags": {
+    "apps/web": 1,
+    "scripts": 1
+  }
 }

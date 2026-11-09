@@ -52,6 +52,7 @@ const sourceRules = [
   "cause-as-string",
   "uninterruptible-wait",
   "layer-built-twice",
+  "loose-flags",
 ] as const;
 export type Rule = (typeof testRules)[number] | (typeof sourceRules)[number];
 export const rules: readonly Rule[] = [...testRules, ...sourceRules];
@@ -137,6 +138,10 @@ const why: Record<Rule, string> = {
     "the same layer constructor is called twice with the same arguments: two layers, built twice (two databases on one file). " +
     "Fix: keep it in a constant and use that one value. " +
     "See .agents/skills/vv-effect/references/cases.md (35.)",
+  "loose-flags":
+    "several flags kept loose in one function (let x = false…): when they move together they are one state machine whose impossible combinations nothing stops. " +
+    "Fix: one union, a tag per state with what that state holds, in one let, signal or Ref; keep a flag apart only when it is a dimension of its own (it can be true in any of the states). " +
+    "See docs/style/module-design.md (显式状态)",
 };
 
 const lineAt = (text: string) => {
@@ -169,6 +174,25 @@ const unwrap = (n: Node | undefined): Node | undefined => {
   return n;
 };
 const isFunction = (n: Node) => n.type === "ArrowFunctionExpression" || n.type === "FunctionExpression" || n.type === "FunctionDeclaration";
+
+const isBooleanLiteral = (n: Node | undefined) => n?.type === "Literal" && typeof n.value === "boolean";
+/** Three or more `let x = true/false` in one function body. Fields of a type are left alone: most are a shape's data or a
+ * component's props, not state. */
+function looseFlags(n: Node, report: (at: Node, what: string) => void) {
+  if (isFunction(n)) {
+    const body = field(n, "body");
+    if (body?.type !== "BlockStatement") return;
+    const flags = list(body, "body")
+      .filter((s) => s.type === "VariableDeclaration" && s.kind === "let")
+      .flatMap((s) => list(s, "declarations"))
+      .filter((d) => isBooleanLiteral(field(d, "init")))
+      .flatMap((d) => {
+        const id = field(d, "id");
+        return isIdent(id) && typeof id.name === "string" ? [id.name] : [];
+      });
+    if (flags.length >= 3) report(n, `let ${flags.join(", ")}`);
+  }
+}
 
 const turnWaits = new Set(["aTurn", "nextTurn"]);
 function isOneTurn(statement: Node): boolean {
@@ -705,10 +729,18 @@ export function audit(files: ReadonlyArray<{ readonly path: string; readonly tex
     if (!isNode(program)) continue;
     const isTest = testFile.test(path);
     const effect = usesEffect(program);
-    if (!isTest && !effect) continue;
     const line = lineAt(text);
     const add = (rule: Rule) => (n: Node, what?: string) =>
       findings.push({ rule, file: path, line: line(n.start ?? 0), message: `${what ?? textOf(text, n).replace(/\s+/gu, " ").slice(0, 80)}: ${why[rule]}` });
+    if (!isTest) {
+      // Components hold state without Effect too, so this one reads every source file.
+      const flagsIn = (n: Node) => {
+        looseFlags(n, add("loose-flags"));
+        for (const c of childrenOf(n)) flagsIn(c);
+      };
+      flagsIn(program);
+    }
+    if (!isTest && !effect) continue;
     const consts = new Map<string, Node>();
     const parents: Node[] = [];
     const visit = (n: Node) => {

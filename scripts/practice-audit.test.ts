@@ -150,6 +150,14 @@ describe("effect practices in source", () => {
     expect(inSource("logic-in-pipe", "const x = read.pipe(Effect.map((a) => a + 1), Effect.retry(policy), Effect.timeout(1000));")).toEqual([]);
   });
 
+  test("loose-flags: three let flags in one function, in any source file, Effect or not", () => {
+    const flags = "function start() {\n  let starting = false;\n  let ending = false;\n  let gone = false;\n}";
+    expect(inSource("loose-flags", flags)).toEqual([1]);
+    expect(audit([{ path: "Page.tsx", text: flags }]).filter((f) => f.rule === "loose-flags")).toHaveLength(1);
+    expect(inSource("loose-flags", 'function start() {\n  let phase = "idle";\n  let open = false;\n}')).toEqual([]);
+    expect(audit([{ path: "a.test.ts", text: flags }]).filter((f) => f.rule === "loose-flags")).toEqual([]);
+  });
+
   test("option-get-or-throw and die-with-plain-error", () => {
     expect(inSource("option-get-or-throw", "const v = Option.getOrThrow(found);")).toEqual([1]);
     expect(inSource("option-get-or-throw", "const v = Option.getOrElse(found, () => 0);")).toEqual([]);

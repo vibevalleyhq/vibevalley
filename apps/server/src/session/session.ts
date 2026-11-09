@@ -372,9 +372,9 @@ const make = Effect.gen(function* () {
       if (!openedPlace.ok) return { refused: openedPlace.refused };
       const place = openedPlace.place;
       const releasePlace = place.repo ? repos.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
-      let committed = false;
-      let released = false;
-      let registeredRow = false;
+      /** How far hiring got, for what a failure leaves to undo: opening (nothing kept yet), recorded (its row kept), committed,
+       * or released (refuseStart already let its place go). */
+      let reached: "opening" | "recorded" | "committed" | "released" = "opening";
       const recalled = new Set<string>();
       const journal = yield* trajectories.openLog(id);
       const initial = opt.inputs ?? [];
@@ -427,7 +427,7 @@ const make = Effect.gen(function* () {
             if (retained) return { refused: why, retainedWork: true };
             yield* l.revokeAccess(h);
             const result = yield* releasePlace;
-            released = true;
+            reached = "released";
             if (result.kept) yield* core.notice("warn", result.reason);
             return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
           });
@@ -460,14 +460,14 @@ const make = Effect.gen(function* () {
                 .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
             }),
           );
-          registeredRow = true;
+          reached = "recorded";
           if (opt.hiring) yield* opt.hiring(session, launch);
           yield* Effect.uninterruptible(
             Effect.gen(function* () {
               hands.set(id, h);
               yield* core.apply({ type: "sessionChanged", session });
               attach(h, opened.execution, agent.runtime, launch);
-              committed = true;
+              reached = "committed";
             }),
           );
           return { session };
@@ -477,7 +477,7 @@ const make = Effect.gen(function* () {
               const failed = yield* failedOpening(id, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(error) }));
               if (!failed.retained) {
                 yield* forget(id);
-                registeredRow = false;
+                reached = "opening";
               }
               return yield* refuseStart(failed.refused, failed.retained);
             }),
@@ -486,7 +486,7 @@ const make = Effect.gen(function* () {
       });
       return yield* starting.pipe(
         Effect.onExit((exit) => {
-          if (exit._tag === "Success" || committed || released) return Effect.void;
+          if (exit._tag === "Success" || reached === "committed" || reached === "released") return Effect.void;
           return Effect.gen(function* () {
             yield* trajectories.finish(id);
             const allocation = executor.find(id);
@@ -498,7 +498,7 @@ const make = Effect.gen(function* () {
               );
               if (stopFailed) return;
             }
-            if (registeredRow) yield* forget(id);
+            if (reached === "recorded") yield* forget(id);
             yield* l.revokeAccess(h);
             const result = yield* releasePlace;
             if (result.kept) yield* core.notice("warn", result.reason);
