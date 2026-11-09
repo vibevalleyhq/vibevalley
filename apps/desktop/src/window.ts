@@ -1,10 +1,10 @@
 import { join } from "node:path";
 
-import { app, BrowserWindow, nativeTheme, screen, shell, systemPreferences } from "electron";
+import { app, BrowserWindow, nativeTheme, screen, shell, systemPreferences, WebContentsView } from "electron";
 
 import { filledNear } from "@vibevalley/engine/framing";
 import { currentLocale } from "@vibevalley/i18n";
-import { farmFraming } from "@vibevalley/protocol/host";
+import { farmFraming, type Opening } from "@vibevalley/protocol/host";
 
 import { ground, navigationOf, pagePermission, pageWebPreferences, trafficLights } from "./boundary";
 
@@ -17,6 +17,14 @@ const loaded = (load: Promise<void>) =>
     if (!(typeof e === "object" && e !== null && "errno" in e && e.errno === -3)) console.error("vibevalley: the window could not load its page:", e);
   });
 
+interface OpeningView {
+  readonly owner: BrowserWindow;
+  readonly view: WebContentsView;
+  readonly ready: Promise<void>;
+  progress: number;
+  ending?: Promise<void>;
+}
+
 export function mainWindow(o: {
   /** apps/web/dist, where opening.html is. */
   readonly web: string;
@@ -24,8 +32,57 @@ export function mainWindow(o: {
   readonly server: () => string | undefined;
 }) {
   let window: BrowserWindow | undefined;
-  /** The bar's load. */
-  let bar: Promise<void> = Promise.resolve();
+  let cover: OpeningView | undefined;
+  let accepting = false;
+  let shown = false;
+
+  const dispose = (old: OpeningView) => {
+    if (cover === old) cover = undefined;
+    if (!old.owner.isDestroyed()) {
+      old.owner.contentView.removeChildView(old.view);
+      if (old.owner.isFocused()) old.owner.webContents.focus();
+    }
+    if (!old.view.webContents.isDestroyed()) old.view.webContents.close({ waitForBeforeUnload: false });
+  };
+  const fit = (current: OpeningView) => {
+    const { width, height } = current.owner.getContentBounds();
+    current.view.setBounds({ x: 0, y: 0, width, height });
+  };
+  const opening = (owner: BrowserWindow): OpeningView => {
+    if (cover?.owner === owner) return cover;
+    const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    view.setBackgroundColor("#00000000");
+    view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    view.webContents.on("will-frame-navigate", (event) => event.preventDefault());
+    view.webContents.on("will-redirect", (event) => event.preventDefault());
+    owner.contentView.addChildView(view);
+    const ready = view.webContents.loadFile(join(o.web, "opening.html"), { query: { locale: currentLocale() } }).then(async () => {
+      if (view.webContents.isDestroyed()) return;
+      await view.webContents.executeJavaScript("document.fonts.ready.then(() => undefined)");
+      if (!shown && window === owner && !owner.isDestroyed()) {
+        shown = true;
+        owner.show();
+      }
+    });
+    const made: OpeningView = { owner, view, ready, progress: 0 };
+    cover = made;
+    fit(made);
+    void loaded(
+      ready.catch((error: unknown) => {
+        if (cover === made) throw error;
+      }),
+    );
+    return made;
+  };
+  const paint = async (current: OpeningView, update: Opening, problem?: string) => {
+    await current.ready;
+    if (cover !== current || current.view.webContents.isDestroyed()) return;
+    await current.view.webContents.executeJavaScript(`{
+      const cover = document.getElementById("opening");
+      Object.assign(cover.dataset, ${JSON.stringify({ ...update, ...(problem === undefined ? {} : { problem }) })});
+      cover.dispatchEvent(new Event("opening-update"));
+    }`);
+  };
 
   const make = (): BrowserWindow => {
     const made = new BrowserWindow({
@@ -91,9 +148,28 @@ export function mainWindow(o: {
       event.preventDefault();
       if (where === "browser") void shell.openExternal(to);
     });
-    made.once("ready-to-show", () => made.show());
-    made.on("closed", () => (window = undefined));
+    let navigated = false;
+    made.webContents.on("did-start-navigation", (event) => {
+      if (!event.isMainFrame || event.isSameDocument) return;
+      accepting = false;
+      if (navigated && cover?.owner === made) dispose(cover);
+      opening(made);
+      navigated = true;
+    });
+    made.webContents.on("did-navigate", () => (accepting = true));
+    made.on("resize", () => {
+      if (cover?.owner === made) fit(cover);
+    });
+    made.on("closed", () => {
+      if (cover?.owner === made) dispose(cover);
+      if (window === made) {
+        window = undefined;
+        accepting = false;
+      }
+    });
     window = made;
+    shown = false;
+    opening(made);
     return made;
   };
   const now = () => window ?? make();
@@ -103,8 +179,35 @@ export function mainWindow(o: {
     current: () => window,
     /** The bar while the server comes up, or why it did not. */
     opening: (problem?: string) => {
-      const load = () => loaded(now().loadFile(join(o.web, "opening.html"), { query: { locale: currentLocale(), ...(problem ? { problem } : {}) } }));
-      bar = problem ? bar.then(load) : load();
+      const current = opening(now());
+      if (problem !== undefined) void loaded(paint(current, { phase: "failed", progress: current.progress }, problem));
+    },
+    progress: (update: Opening): Promise<void> => {
+      const current = cover;
+      if (!current || !accepting) return Promise.resolve();
+      if (current.ending) return current.ending;
+      const terminal = update.phase === "ready" || update.phase === "waiting" || update.phase === "failed";
+      current.progress = update.phase === "ready" ? 100 : Math.max(current.progress, Math.min(99, update.progress));
+      const advance = paint(current, { phase: update.phase, progress: current.progress }).catch((error: unknown) => {
+        if (cover === current) throw error;
+      });
+      if (!terminal) return advance;
+      current.ending = advance
+        .then(async () => {
+          if (cover !== current || current.view.webContents.isDestroyed()) return;
+          try {
+            await current.view.webContents.executeJavaScript(`document.getElementById("opening").animate(
+            [{ opacity: 1 }, { opacity: 0 }],
+            { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 240, fill: "forwards" }
+          ).finished.then(() => undefined)`);
+          } catch (error) {
+            if (cover === current) throw error;
+          }
+        })
+        .finally(() => {
+          if (cover === current) dispose(current);
+        });
+      return current.ending;
     },
     /** A place on the server's page: "" is its start. */
     open: (path = "") => {
@@ -117,10 +220,15 @@ export function mainWindow(o: {
       const w = now();
       const server = o.server();
       if (fresh && server !== undefined) void loaded(w.loadURL(server));
-      if (w.isMinimized()) w.restore();
-      w.show();
-      w.focus();
-      if (steal) app.focus({ steal: true });
+      const reveal = () => {
+        if (w.isDestroyed()) return;
+        if (w.isMinimized()) w.restore();
+        w.show();
+        w.focus();
+        if (steal) app.focus({ steal: true });
+      };
+      if (cover?.owner === w) void loaded(cover.ready.then(reveal));
+      else reveal();
     },
     /** The ground follows the theme the page chose (host.ts). */
     repaint: () => window?.setBackgroundColor(ground(nativeTheme.shouldUseDarkColors)),

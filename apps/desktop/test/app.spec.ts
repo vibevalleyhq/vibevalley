@@ -3,7 +3,7 @@ import { connect as dial } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { _electron as electron, expect, test } from "@playwright/test";
+import { _electron as electron, type ElectronApplication, expect, type Page, test } from "@playwright/test";
 
 import { connect } from "@vibevalley/bridge";
 import { socketLink } from "@vibevalley/bridge/socket";
@@ -26,6 +26,12 @@ const cleanEnv = () => ({
   VIBEVALLEY_LAN_PORT: "0",
 });
 
+const mainPage = (app: ElectronApplication) => {
+  const serverPage = (page: Page) => /^http:\/\/127\.0\.0\.1:\d+\//u.test(page.url());
+  const page = app.windows().find(serverPage);
+  return page ? Promise.resolve(page) : app.waitForEvent("window", { predicate: serverPage, timeout: 45_000 });
+};
+
 test("the desktop app shows the live board and sends a notice", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   const userData = join(dir, "electron");
@@ -37,7 +43,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
   let server = "";
   try {
     expect(await app.evaluate(({ app }) => app.getPath("userData"))).toBe(userData);
-    const page = await app.firstWindow();
+    const page = await mainPage(app);
     // The window opens on the workbench once the server is up; the board is a place of its own.
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/u, { timeout: 45_000 });
     server = new URL(page.url()).origin;
@@ -124,7 +130,7 @@ test("regression: desktop media permissions allow virtual devices and release a 
   });
   let server = "";
   try {
-    const page = await app.firstWindow();
+    const page = await mainPage(app);
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/u, { timeout: 45_000 });
     server = new URL(page.url()).origin;
     expect(await page.evaluate(() => window.vibevalleyHost?.name)).toBe("desktop");
@@ -171,6 +177,147 @@ test("regression: desktop media permissions allow virtual devices and release a 
   await expect(fetch(server + pathOf("server.health.get"), { method: "POST" })).rejects.toThrow();
 });
 
+test("regression: one native opening survives the server handoff and each document releases it only when ready", async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
+  const app = await electron.launch({
+    args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
+    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work") },
+  });
+  try {
+    const trace = await app.evaluateHandle(async ({ app, BrowserWindow, WebContentsView }) => {
+      await app.whenReady();
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("The app window is missing");
+      const initial = window.contentView.children.find((child) => child instanceof WebContentsView);
+      if (!(initial instanceof WebContentsView)) throw new Error("The initial native cover is missing");
+      let entry: (() => void) | undefined;
+      let map: (() => void) | undefined;
+      const state: { entryHeld: boolean; mapHeld: boolean; loads: number[]; destroyed: number[]; samples: string[] } = {
+        entryHeld: false,
+        mapHeld: false,
+        loads: [],
+        destroyed: [],
+        samples: [],
+      };
+      let entered = false;
+      window.webContents.session.webRequest.onBeforeRequest({ urls: ["http://127.0.0.1/*"] }, (details, callback) => {
+        if (details.resourceType === "mainFrame" && !entered) {
+          state.entryHeld = true;
+          entry = () => callback({ redirectURL: new URL("/farm/", details.url).href });
+        } else if (new URL(details.url).pathname === "/village.ldtk") {
+          state.mapHeld = true;
+          map = () => callback({});
+        } else callback({});
+      });
+      const watch = (contents: typeof initial.webContents) => {
+        const id = contents.id;
+        contents.on("console-message", (event) => {
+          if (event.message.startsWith("opening-trace|")) state.samples.push(event.message);
+        });
+        contents.once("destroyed", () => state.destroyed.push(id));
+        const loaded = () => {
+          if (!contents.getURL().includes("/opening.html")) return;
+          state.loads.push(contents.id);
+          void contents.executeJavaScript(`{
+            const cover = document.getElementById("opening");
+            const sample = () => console.debug("opening-trace|${contents.id}|" + cover.dataset.phase + "|" + (cover.dataset.progress ?? 0));
+            cover.addEventListener("opening-update", sample);
+            sample();
+          }`);
+        };
+        contents.on("did-finish-load", loaded);
+        if (!contents.isLoadingMainFrame()) loaded();
+      };
+      watch(initial.webContents);
+      app.on("web-contents-created", (_event, contents) => watch(contents));
+      return {
+        state,
+        initial: initial.webContents.id,
+        releaseEntry: () => {
+          entered = true;
+          if (!entry) throw new Error("The initial document request has not arrived");
+          entry();
+        },
+        releaseMap: () => {
+          if (!map) throw new Error("The map request has not arrived");
+          map();
+        },
+        refresh: async () => {
+          await window.webContents.session.clearCache();
+          map = undefined;
+          state.mapHeld = false;
+        },
+      };
+    });
+    const native = () =>
+      app.evaluate(({ BrowserWindow, WebContentsView }) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        return (
+          window?.contentView.children
+            .filter((child) => child instanceof WebContentsView)
+            .map((view) => ({
+              id: view.webContents.id,
+              bounds: view.getBounds(),
+            })) ?? []
+        );
+      });
+    await expect.poll(() => trace.evaluate((trace) => trace.state.entryHeld), { timeout: 45_000 }).toBe(true);
+    const initial = await trace.evaluate((trace) => trace.initial);
+    expect((await native()).map((view) => view.id)).toEqual([initial]);
+    await expect.poll(() => trace.evaluate((trace) => trace.state.loads)).toEqual([initial]);
+    await trace.evaluate((trace) => trace.releaseEntry());
+    const page = await mainPage(app);
+    await page.waitForURL(/\/farm\/$/u);
+    await expect.poll(() => trace.evaluate((trace) => trace.state.mapHeld)).toBe(true);
+    await expect(page.locator('[data-opening="pending"]')).toBeAttached();
+    expect((await native()).map((view) => view.id)).toEqual([initial]);
+    await expect(page.locator("#opening")).toBeHidden();
+    await page.evaluate(async () => {
+      await window.vibevalleyHost?.opening?.({ phase: "loading", progress: 80 });
+      await window.vibevalleyHost?.opening?.({ phase: "reading", progress: 20 });
+    });
+    const held = await trace.evaluate((trace) => trace.state.samples);
+    const progress = held.map((sample) => Number(sample.split("|")[3]));
+    expect(progress.at(-1)).toBeGreaterThanOrEqual(80);
+    expect(progress).toEqual(progress.toSorted((a, b) => a - b));
+    expect(progress.every((value) => value < 100)).toBe(true);
+    expect(await trace.evaluate((trace) => trace.state.destroyed)).not.toContain(initial);
+    await trace.evaluate((trace) => trace.releaseMap());
+    await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+    await expect.poll(native).toEqual([]);
+    await expect.poll(() => trace.evaluate((trace) => trace.state.destroyed)).toContain(initial);
+    expect(await trace.evaluate((trace) => trace.state.samples)).toContain(`opening-trace|${initial}|ready|100`);
+
+    await page.evaluate(() => history.pushState(null, "", "#opening-regression"));
+    expect(await native()).toEqual([]);
+    expect(await trace.evaluate((trace) => trace.state.loads)).toEqual([initial]);
+    await trace.evaluate((trace) => trace.refresh());
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect.poll(() => trace.evaluate((trace) => trace.state.mapHeld)).toBe(true);
+    const refreshed = await native();
+    expect(refreshed).toHaveLength(1);
+    const next = refreshed[0]?.id;
+    if (next === undefined) throw new Error("The refreshed native cover is missing");
+    expect(next).not.toBe(initial);
+    await expect.poll(() => trace.evaluate((trace) => trace.state.loads)).toEqual([initial, next]);
+    expect(await trace.evaluate((trace) => trace.state.destroyed)).not.toContain(next);
+    await trace.evaluate((trace) => trace.releaseMap());
+    await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+    await expect.poll(native).toEqual([]);
+    await expect.poll(() => trace.evaluate((trace) => trace.state.destroyed)).toEqual([initial, next]);
+    await expect(page.getByTestId("rail")).toBeVisible();
+    const observed = await trace.evaluate((trace) => trace.state);
+    for (const id of [initial, next]) {
+      const progress = observed.samples.filter((sample) => sample.startsWith(`opening-trace|${id}|`)).map((sample) => Number(sample.split("|")[3]));
+      expect(progress).toEqual(progress.toSorted((a, b) => a - b));
+      expect(progress.at(-1)).toBe(100);
+    }
+    writeFileSync(test.info().outputPath("native-opening.json"), JSON.stringify(observed, null, 2));
+  } finally {
+    await app.close();
+  }
+});
+
 test("the window opens on the bar at once, and says there why the server could not start", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   // A file where the farm's home should be: the server cannot start in it.
@@ -184,14 +331,36 @@ test("the window opens on the bar at once, and says there why the server could n
   const said: string[] = [];
   for (const out of [app.process().stdout, app.process().stderr]) out?.on("data", (d) => said.push(String(d)));
   try {
-    const page = await app.firstWindow();
-    await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/u);
-    await expect(page.getByRole("alert")).toBeVisible();
-    await expect(page.getByRole("progressbar")).toHaveCount(0);
-    await expect(page.locator("#opening .scene")).toHaveJSProperty("naturalWidth", 1672);
-    await page.screenshot({ path: test.info().outputPath("opening-failure.png") });
-    // The window shows on its first ready-to-show, which may come after the page is drawn hidden: wait for it.
-    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
+    await app.firstWindow();
+    const opening = () =>
+      app.evaluate(async ({ BrowserWindow, WebContentsView }) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        const view = window?.contentView.children.find((child) => child instanceof WebContentsView);
+        if (!(view instanceof WebContentsView)) return null;
+        return {
+          id: view.webContents.id,
+          url: view.webContents.getURL(),
+          main: window?.webContents.getURL(),
+          visible: window?.isVisible(),
+          ...(await view.webContents.executeJavaScript(`({
+          problem: document.querySelector("#opening")?.dataset.problem,
+          alert: !!document.querySelector('[role="alert"]'),
+          bars: document.querySelectorAll('[role="progressbar"]').length,
+          scene: document.querySelector("#opening .scene")?.naturalWidth
+        })`)),
+        };
+      });
+    await expect.poll(opening).toMatchObject({ alert: true, bars: 0, scene: 1672, visible: true });
+    const failed = await opening();
+    expect(failed?.problem).toBeTruthy();
+    expect(failed?.url).toMatch(/\/opening\.html\?locale=/u);
+    expect(failed?.main).not.toContain("opening.html");
+    const image = await app.evaluate(async ({ BrowserWindow, WebContentsView }) => {
+      const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((child) => child instanceof WebContentsView);
+      if (!(view instanceof WebContentsView)) throw new Error("The native failure cover is missing");
+      return (await view.webContents.capturePage()).toPNG().toString("base64");
+    });
+    writeFileSync(test.info().outputPath("opening-failure.png"), Buffer.from(image, "base64"));
   } finally {
     writeFileSync(test.info().outputPath("electron.log"), said.join(""));
     await app.close();
@@ -216,7 +385,7 @@ test("the island follows the issues in flight and opens one", async () => {
   });
   const probe = (): Promise<DesktopProbe["island"]> => app.evaluate(() => globalThis.vibevalleyProbe?.island);
   try {
-    const page = await app.firstWindow();
+    const page = await mainPage(app);
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//u, { timeout: 45_000 });
     const api = new VibeValleyApi(new URL(page.url()).origin);
     await expect.poll(async () => (await probe())?.glance).toEqual({ working: 0, waiting: 0, strip: { working: "没在干", waiting: "0 等你" }, rows: [] });

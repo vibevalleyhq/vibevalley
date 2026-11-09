@@ -25,6 +25,9 @@ environment it started with. On iOS it also takes the pair link as a launch argu
 `simctl openurl` stops at the system's "Open in VibeValley?"; the simulator build is signed ad hoc, or it cannot load
 Agora's frameworks.
 
+The end-to-end script installs the app before opening API connections and starting pairing: synchronous installation
+can outlast HTTP keep-alive and leave the first pairing-status request using a stale connection.
+
 The entry loads `src/intl.ts` before `App`: the shared formatter constructs English cardinal and ordinal rules at
 import time. The [FormatJS polyfills](https://formatjs.github.io/docs/polyfills/intl-pluralrules/) provide the same
 rules when Hermes lacks them; only English rule data is needed, independently of the selected catalog language.

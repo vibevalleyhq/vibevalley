@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { Radio, RadioGroup } from "@vibevalley/base-ui";
@@ -14,8 +15,166 @@ import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { FromTemplate } from "./FromTemplate";
+
+const profileStyles = stylex.create({
+  lookChoices: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(3,minmax(0,1fr))",
+      "@media (width>=40rem)": "repeat(6,minmax(0,1fr))",
+    },
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  orchestratorProfileA: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  orchestratorProfileA2: {
+    textDecorationLine: "underline",
+  },
+  orchestratorProfileRadioRoot: {
+    display: "flex",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":is([data-checked])": "var(--color-leaf)",
+    },
+    padding: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+      ":is([data-checked])": "var(--color-selected)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  orchestratorProfileSpan: {
+    flexShrink: "0",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  orchestratorProfileSpanVariant: {
+    backgroundColor: "var(--color-hat)",
+    color: "var(--color-bark-900)",
+  },
+  orchestratorProfileSpanVariant2: {
+    backgroundColor: "var(--color-hover)",
+    color: "var(--color-muted)",
+  },
+});
+
+const viewStyles = stylex.create({
+  orchestratorProfileDiv: {
+    height: "100%",
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 8)",
+  },
+  orchestratorProfileDiv2: {
+    display: "flex",
+    maxWidth: "var(--container-3xl)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+  },
+  profileBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "calc(var(--spacing) * 2)",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingBlock: "calc(var(--spacing) * 3)",
+  },
+  orchestratorProfileSpan: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-faint)",
+  },
+  orchestratorProfileSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  orchestratorProfileSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  orchestratorProfileSpan4: {
+    flexShrink: "0",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hover)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  orchestratorProfileSpan5: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  orchestratorProfileP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  orchestratorProfileDiv3: {
+    display: "grid",
+    gap: "calc(var(--spacing) * 4)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
+    },
+  },
+  orchestratorProfileDiv4: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  orchestratorProfileSpan6: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-muted)",
+  },
+});
 
 export function newOrchestrator(): Agent {
   return {
@@ -76,25 +235,26 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   };
 
   return (
-    <div class="h-full overflow-y-auto px-4 pb-8">
-      <div class="flex max-w-3xl flex-col gap-4">
-        <div
-          data-testid="profile-bar"
-          data-state={isNew ? "new" : dirty() ? "dirty" : "saved"}
-          class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3"
-        >
-          <A href="/agents" data-testid="back" class="text-sm text-muted hover:underline">
+    <div {...stylex.attrs(viewStyles.orchestratorProfileDiv)}>
+      <div {...stylex.attrs(viewStyles.orchestratorProfileDiv2)}>
+        <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(viewStyles.profileBar)}>
+          <A href="/agents" data-testid="back" {...stylex.attrs(variantStyles2.orchestratorProfileA)}>
             {t("web.agent.all")}
           </A>
-          <span class="text-sm text-faint">/</span>
-          <span class="flex min-w-0 flex-1 items-center gap-3">
-            <span class="truncate text-lg font-semibold">{draft().name || t("web.agent.unnamed")}</span>
-            <span class="shrink-0 rounded bg-hover px-1.5 text-xs text-muted">{t("web.agent.role.orchestrator")}</span>
-            <span class={["shrink-0 rounded px-1.5 text-xs", dirty() ? "bg-hat text-bark-900" : "bg-hover text-muted"]}>
+          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan)}>/</span>
+          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan2)}>
+            <span {...stylex.attrs(viewStyles.orchestratorProfileSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
+            <span {...stylex.attrs(viewStyles.orchestratorProfileSpan4)}>{t("web.agent.role.orchestrator")}</span>
+            <span
+              {...stylex.attrs(
+                variantStyles.orchestratorProfileSpan,
+                dirty() ? variantStyles.orchestratorProfileSpanVariant : variantStyles.orchestratorProfileSpanVariant2,
+              )}
+            >
               {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
             </span>
           </span>
-          <span class="flex flex-wrap items-center gap-2">
+          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan5)}>
             <Show when={props.saved}>
               {(saved) => (
                 <>
@@ -123,17 +283,17 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
           </span>
         </div>
         <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
-        <p class="text-sm text-muted">
+        <p {...stylex.attrs(viewStyles.orchestratorProfileP)}>
           {t("web.agent.orchestrator.intro")}{" "}
           <Show when={props.saved}>
             {(saved) => (
-              <A href={orchestratorHref(saved().id)} class="underline">
+              <A href={orchestratorHref(saved().id)} {...stylex.attrs(variantStyles2.orchestratorProfileA2)}>
                 {t("web.agent.orchestrator.page")}
               </A>
             )}
           </Show>
         </p>
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div {...stylex.attrs(viewStyles.orchestratorProfileDiv3)}>
           <Field label={t("web.agent.name")} hint={nameTaken() ? t("web.agent.nameTaken") : t("web.agent.orchestrator.nameTip")}>
             <TextInput data-testid="agent-name" aria-label={t("web.agent.name")} value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
           </Field>
@@ -158,8 +318,8 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
             onInput={(e) => patch({ persona: e.currentTarget.value })}
           />
         </Field>
-        <div class="flex flex-col gap-2">
-          <span class="text-xs font-medium text-muted">{t("web.agent.orchestrator.look")}</span>
+        <div {...stylex.attrs(viewStyles.orchestratorProfileDiv4)}>
+          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan6)}>{t("web.agent.orchestrator.look")}</span>
           <RadioGroup
             aria-label={t("web.agent.orchestrator.look")}
             value={draft().look.orchestrator ?? "farmer"}
@@ -167,16 +327,11 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
               const look = OrchestratorLookValues.find((l) => l === v);
               if (look) setLook(look);
             }}
-            class="grid grid-cols-3 gap-2 sm:grid-cols-6"
+            {...styleProps(profileStyles.lookChoices)}
           >
             <For each={orchestratorLooks}>
               {(look) => (
-                <Radio.Root
-                  value={look.id}
-                  data-key={look.id}
-                  title={look.blurb}
-                  class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-line p-2 text-xs hover:bg-hover data-checked:border-leaf data-checked:bg-selected"
-                >
+                <Radio.Root value={look.id} data-key={look.id} title={look.blurb} {...stylex.attrs(variantStyles2.orchestratorProfileRadioRoot)}>
                   <OrchestratorFace size={48} look={look.id} />
                   {look.name}
                 </Radio.Root>

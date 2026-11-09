@@ -60,11 +60,69 @@ tester.run("no-cjk-literal", rule("no-cjk-literal"), {
   ],
 });
 
+const stylexImport = "import * as sx from '@stylexjs/stylex';";
+
 tester.run("no-hex-color", rule("no-hex-color"), {
-  valid: ['const c = "bg-ok-soft text-warn-ink"', 'const c = "shadow-[inset_0_2px_0_var(--color-accent)]"'],
+  valid: [
+    `${stylexImport} sx.create({card: {color: 'var(--color-ink)', boxShadow: 'inset 0 2px 0 var(--color-accent)'}})`,
+    `${stylexImport} sx.create({card: {content: '"#abc"', backgroundImage: 'url(/art.svg#abc)'}})`,
+    `${stylexImport} const data = {color: '#abc'}; const note = 'bg-[#abc]';`,
+    `${stylexImport} function other(sx) { return sx.create({card: {color: '#abc'}}) }`,
+    `${stylexImport} const f = (sx) => sx.create({card: {color: '#abc'}});`,
+    "import {create} from 'another-library'; create({card: {color: '#abc'}})",
+    `${stylexImport} sx.create({card: (kind) => ({color: kind === '#abc' ? 'var(--color-ink)' : 'var(--color-muted)'})})`,
+    `${stylexImport} sx.createTheme(tokens, {ink: 'var(--color-ink)'})`,
+  ],
   invalid: [
-    { code: 'const c = "bg-[#e3efd2]"', errors: [{ messageId: "hex" }] },
-    { code: "const c = `p-2 shadow-[0_1px_2px_#2f1f1326]`", errors: [{ messageId: "hex" }] },
+    { code: `${stylexImport} sx.create({card: {color: '#e3efd2'}})`, errors: [{ messageId: "hex" }] },
+    {
+      code: "import {create as css} from '@stylexjs/stylex'; css({card: {backgroundColor: {default: null, '@media (hover: hover)': {default: null, ':hover': '#abc'}}}})",
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: "import sx from '@stylexjs/stylex'; const css = sx.create; const paint = '#abcd'; css({card: {color: paint}})",
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} const {create: css} = sx; css({card: {borderColor: '#abc'}})`,
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} const base = {color: '#abc'}; sx.create({card: {...base}})`,
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: (active) => { if (active) return {color: '#abc'}; return {color: 'var(--color-ink)'}; }})`,
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {boxShadow: \`0 \${offset}px 2px #2f1f1326\`}})`,
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {color: sx.firstThatWorks('var(--color-ink)', '#abc')}})`,
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} sx.keyframes({from: {color: '#abc'}, to: {color: 'var(--color-ink)'}})`,
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} sx.createTheme(tokens, {ink: {default: 'var(--color-ink)', '@media (prefers-color-scheme: dark)': '#abc'}})`,
+      errors: [{ messageId: "hex" }],
+    },
+    { code: `${stylexImport} sx.defineVars({ink: '#abc'})`, errors: [{ messageId: "hex" }] },
+    { code: `${stylexImport} sx.defineConsts({ink: '#abc'})`, errors: [{ messageId: "hex" }] },
+    { code: `${stylexImport} sx.defineVars({ink: sx.types.color('#abc')})`, errors: [{ messageId: "hex" }] },
+    { code: `${stylexImport} sx.create({card: {'--accent': '#abc'}})`, errors: [{ messageId: "hex" }] },
+    {
+      code: "import {default as sx} from '@stylexjs/stylex'; sx['create']({card: {color: '#abc'}})",
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {'::before': {color: '#abc', content: '"#abc"'}}})`,
+      errors: [{ messageId: "hex" }],
+    },
   ],
 });
 
@@ -79,10 +137,62 @@ tester.run("no-copy-selector", rule("no-copy-selector"), {
 });
 
 tester.run("design-tokens", rule("design-tokens"), {
-  valid: ['const c = "rounded-lg text-sm duration-180 z-30"'],
+  valid: [
+    `${stylexImport} sx.create({card: {borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-sm)', transitionDuration: '180ms', zIndex: 30}})`,
+    `${stylexImport} sx.create({card: {opacity: {default: 0.4, ':disabled': 0.5}}})`,
+    `${stylexImport} sx.create({card: (width) => ({width, height: 37, top: -13, translate: \`\${width}px 0\`})})`,
+    `${stylexImport} sx.keyframes({from: {translate: '0 37px', opacity: 0}, to: {translate: '0 0', opacity: 1}})`,
+    `${stylexImport} const data = {fontSize: 37}; const note = 'rounded-[7px]';`,
+    `${stylexImport} function other(sx) { return sx.create({card: {fontSize: 37}}) }`,
+    `${stylexImport} sx.positionTry({top: 37, left: 19, width: 143})`,
+    `${stylexImport} sx.create({card: {opacity: {default: 1, ':not(:disabled)': 0.4}}})`,
+    "import {create as css} from 'another-library'; css({card: {fontSize: 37}})",
+    `${stylexImport} sx.create({card: {'::before': {content: '"rounded-[7px]"', fontSize: 'inherit'}}})`,
+  ],
   invalid: [
-    { code: 'const c = "rounded-[7px]"', errors: [{ messageId: "radius" }] },
-    { code: 'const c = "z-[999]"', errors: [{ messageId: "layer" }] },
+    { code: `${stylexImport} sx.create({card: {borderRadius: '7px'}})`, errors: [{ messageId: "radius" }] },
+    { code: `${stylexImport} sx.create({card: {zIndex: -999}})`, errors: [{ messageId: "layer" }] },
+    {
+      code: "import {create as css} from '@stylexjs/stylex'; css({card: {fontSize: {default: 'var(--text-sm)', '@media (min-width: 40rem)': '17px'}}})",
+      errors: [{ messageId: "type" }],
+    },
+    {
+      code: `${stylexImport} const css = sx.create; const corners = {borderRadius: 7}; css({card: {...corners}})`,
+      errors: [{ messageId: "radius" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: (active) => ({transitionDuration: active ? '150ms' : '120ms'})})`,
+      errors: [{ messageId: "motion" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {opacity: {default: 1, ':disabled': {'default': 0.5, '@media (hover: hover)': 0.4}}}})`,
+      errors: [{ messageId: "disabled" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {'::placeholder': {fontSize: 17}}})`,
+      errors: [{ messageId: "type" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {boxShadow: '0 1px 2px black'}})`,
+      errors: [{ messageId: "shadow" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {transitionTimingFunction: sx.firstThatWorks('var(--ease-out)', 'linear')}})`,
+      errors: [{ messageId: "motion" }],
+    },
+    {
+      code: `${stylexImport} sx.keyframes({from: {zIndex: 999}, to: {zIndex: 30}})`,
+      errors: [{ messageId: "layer" }],
+    },
+    {
+      code: `${stylexImport} sx.viewTransitionClass({old: {borderRadius: '7px'}})`,
+      errors: [{ messageId: "radius" }],
+    },
+    {
+      code: `${stylexImport} sx.create({card: {fontSize: ('17px' as const)}})`,
+      filename: "tokens.ts",
+      errors: [{ messageId: "type" }],
+    },
   ],
 });
 

@@ -1,8 +1,11 @@
+import type { Opening } from "@vibevalley/protocol/host";
+
 import { frames } from "./frame";
+import { currentHost } from "./host";
 import type { QueryClient } from "./query";
 import { waitForReads } from "./query/activity";
 
-type Phase = "connecting" | "reading" | "loading" | "ready" | "waiting" | "failed";
+type Phase = Opening["phase"];
 type Report = (phase: Phase, progress?: number) => void;
 
 function until(check: () => boolean, subscribe: (check: () => void) => () => void, signal: AbortSignal): Promise<boolean> {
@@ -117,10 +120,16 @@ async function contentReady(report: Report, signal: AbortSignal) {
 export async function reveal(client: QueryClient, signal: AbortSignal) {
   const cover = document.getElementById("opening");
   if (!cover || signal.aborted) return;
+  const hosted = currentHost().opening;
+  let reported = Promise.resolve();
   const report: Report = (phase, progress) => {
     cover.dataset.phase = phase;
     if (progress !== undefined) cover.dataset.progress = String(Math.round(Math.max(Number(cover.dataset.progress ?? 0), progress)));
     cover.dispatchEvent(new Event("opening-update"));
+    if (hosted) {
+      reported = hosted({ phase, progress: Number(cover.dataset.progress ?? 0) });
+      void reported.catch((error: unknown) => console.error("vibevalley: opening progress could not reach its host:", error));
+    }
   };
   const page = await limited(2000, signal, (waiting) => pageReady(client, report, waiting));
   if (signal.aborted) return;
@@ -128,12 +137,17 @@ export async function reveal(client: QueryClient, signal: AbortSignal) {
   if (signal.aborted) return;
   const failed = document.querySelector('[data-opening="failed"]') !== null || client.hasActiveErrors();
   const phase = failed ? "failed" : page && content ? "ready" : "waiting";
-  report(phase, phase === "ready" ? 100 : undefined);
   // Finish entrance animations underneath before uncovering the mounted page.
   for (const animation of document.getAnimations()) {
     const target = animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
     if (target && cover.contains(target)) continue;
     if (Number.isFinite(animation.effect?.getComputedTiming().endTime ?? Infinity)) animation.finish();
+  }
+  report(phase, phase === "ready" ? 100 : undefined);
+  if (hosted) {
+    await reported;
+    cover.remove();
+    return;
   }
   cover.style.pointerEvents = "none";
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

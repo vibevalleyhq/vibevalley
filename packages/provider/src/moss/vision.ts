@@ -57,6 +57,7 @@ export class VisionSession {
   private final = false;
   private timestamp = -Infinity;
   private pending: Pending | undefined = undefined;
+  private queuedPrompt: { readonly text: string; readonly final: boolean } | undefined = undefined;
   private textBytes = 0;
   private readonly callbacks: VisionCallbacks;
 
@@ -65,7 +66,13 @@ export class VisionSession {
   }
 
   get readyForInput(): boolean {
-    return this.phase === "ready" && !this.pending && !this.final && this.callbacks.bufferedAmount() <= visionBufferedBytes;
+    return !this.pending && this.readyForPrompt;
+  }
+
+  get readyForPrompt(): boolean {
+    return (
+      this.phase === "ready" && this.pending?.kind !== "prompt" && !this.queuedPrompt && !this.final && this.callbacks.bufferedAmount() <= visionBufferedBytes
+    );
   }
 
   begin(): void {
@@ -82,6 +89,7 @@ export class VisionSession {
     this.final = false;
     this.timestamp = -Infinity;
     this.pending = undefined;
+    this.queuedPrompt = undefined;
     this.textBytes = 0;
     this.callbacks.onChange();
   }
@@ -105,10 +113,9 @@ export class VisionSession {
 
   prompt(text: string, final = false): boolean {
     const prompt = text.trim();
-    if (!this.readyForInput || !prompt || prompt.length > 8000) return false;
-    this.pending = { kind: "prompt" };
-    this.final = final;
-    this.send({ type: "input.prompt", seq_no: this.seq, prompt, final });
+    if (!this.readyForPrompt || !prompt || prompt.length > 8000) return false;
+    if (this.pending) this.queuedPrompt = { text: prompt, final };
+    else this.sendPrompt(prompt, final);
     return true;
   }
 
@@ -152,6 +159,11 @@ export class VisionSession {
         if (this.pending.kind === "frame") this.timestamp = this.pending.timestamp;
         this.pending = undefined;
         this.seq++;
+        if (this.queuedPrompt) {
+          const prompt = this.queuedPrompt;
+          this.queuedPrompt = undefined;
+          this.sendPrompt(prompt.text, prompt.final);
+        }
         break;
       case "input.frame.rejected":
         return this.fail("invalid_request");
@@ -208,6 +220,12 @@ export class VisionSession {
     if (this.phase === "ready" || this.phase === "connecting") this.fail("disconnected");
   }
 
+  private sendPrompt(prompt: string, final: boolean): void {
+    this.pending = { kind: "prompt" };
+    this.final = final;
+    this.send({ type: "input.prompt", seq_no: this.seq, prompt, final });
+  }
+
   private send(event: object): void {
     this.callbacks.sendText(JSON.stringify(event));
   }
@@ -220,6 +238,7 @@ export class VisionSession {
   private finish(phase: "ended" | "error" = "ended"): void {
     this.phase = phase;
     this.pending = undefined;
+    this.queuedPrompt = undefined;
     this.responses = this.responses.map((response) => (response.state === "streaming" ? { ...response, state: "interrupted" } : response));
     this.callbacks.onChange();
     this.callbacks.onEnd();

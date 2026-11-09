@@ -1,0 +1,77 @@
+@layer components {
+  .markdown .mention {
+    border-radius: 0.25rem;
+    background-color: var(--color-accent);
+    padding-inline: calc(var(--spacing) * 0.5);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-accent);
+  }
+  @supports (color: color-mix(in lab, red, red)) {
+    .markdown .mention {
+      background-color: color-mix(in oklab, var(--color-accent) 12%, transparent);
+    }
+  }
+  .markdown a {
+    color: var(--color-water);
+    text-decoration-line: underline;
+  }
+  .markdown blockquote {
+    border-left-style: solid;
+    border-left-width: 2px;
+    border-color: var(--color-line);
+    padding-left: calc(var(--spacing) * 3);
+    color: var(--color-muted);
+  }
+  .markdown code {
+    border-radius: 0.25rem;
+    background-color: var(--color-hover);
+    padding-inline: var(--spacing);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+  .markdown h1 {
+    font-size: var(--text-lg);
+    line-height: var(--text-lg--line-height);
+    font-weight: var(--font-weight-semibold);
+  }
+  .markdown h2,
+  .markdown h3 {
+    font-weight: var(--font-weight-semibold);
+  }
+  .markdown li {
+    margin-block: calc(var(--spacing) * 0.5);
+  }
+  .markdown ol {
+    list-style-type: decimal;
+    padding-left: calc(var(--spacing) * 5);
+  }
+  .markdown p {
+    margin-block: var(--spacing);
+  }
+  .markdown pre {
+    margin-block: calc(var(--spacing) * 2);
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    background-color: var(--color-hover);
+    padding: calc(var(--spacing) * 3);
+  }
+  .markdown pre code {
+    background-color: #0000;
+    padding: 0;
+  }
+  .markdown table {
+    margin-block: calc(var(--spacing) * 2);
+  }
+  .markdown td,
+  .markdown th {
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--color-line);
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .markdown ul {
+    list-style-type: disc;
+    padding-left: calc(var(--spacing) * 5);
+  }
+}

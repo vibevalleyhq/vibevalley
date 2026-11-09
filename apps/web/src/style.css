@@ -1,11 +1,15 @@
-@import "tailwindcss";
+@layer theme, base, components, stylex, utilities;
+@import "./reset.css";
+@import "./ui/Markdown.css";
+@import "./ui/pixel/PxMarkdown.css";
+@import "./ui/settings.css";
 
 /* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets
    <html data-theme>). Paper and ink are near neutral, so that colour is left for what means something: green to go,
    wheat for waiting, berry for wrong, water for a link. Three steps of words (ink, muted, faint) each pass AA on the
    page, the side and the rail, and stay apart. The farm and the pixel skin (the memory tree, ui/pixel) are drawn in
-   their own colours: their root sets data-theme="light" again. A colour written into a class instead (bg-[#…]) would
-   not follow: vibevalley/no-hex-color refuses it. */
+   their own colours: their root sets data-theme="light" again. Literal component colours would not follow;
+   vibevalley/no-hex-color keeps those values in this palette. */
 :root,
 [data-theme="light"] {
   color-scheme: light;
@@ -92,7 +96,7 @@
 
 /* Declared again on each themed element: a custom property that names another is worked out where it is declared, so
    one declared only on the root would hand its theme down into a part in the other theme (the pixel skin in a dark
-   workbench, a story's dark frame). The palette's names (@theme below) are restated here for the same reason. */
+   workbench, a story's dark frame). */
 :root,
 [data-theme] {
   --color-page: var(--wb-page);
@@ -121,6 +125,8 @@
   --color-idle: var(--wb-idle);
   --color-code-bg: var(--wb-code-bg);
   --color-code-ink: var(--wb-code-ink);
+  --shadow-float: 0 8px 24px var(--wb-float);
+  --shadow-raise: 0 1px 2px var(--wb-raise);
   --shiki-foreground: var(--wb-ink);
   --shiki-background: transparent;
   --shiki-token-parameter: var(--wb-ink);
@@ -129,7 +135,31 @@
   --shiki-token-link: var(--wb-water);
 }
 
-@theme inline static {
+:root,
+:host {
+  --spacing: 0.25rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --leading-snug: 1.375;
+  --leading-relaxed: 1.625;
+  --tracking-wide: 0.025em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: calc(2 / 1.5);
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: calc(2.25 / 1.875);
+  --tracking-normal: 0em;
+  --blur-sm: 8px;
+  --default-font-family: var(--font-sans);
+  --default-mono-font-family: var(--font-mono);
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  --container-2xl: 42rem;
+  --container-3xl: 48rem;
+  --container-4xl: 56rem;
+  --color-white: #fff;
   --color-page: var(--wb-page);
   --color-side: var(--wb-side);
   --color-ink: var(--wb-ink);
@@ -156,12 +186,14 @@
   --color-idle: var(--wb-idle);
   --color-code-bg: var(--wb-code-bg);
   --color-code-ink: var(--wb-code-ink);
+  --shadow-toggle-thumb: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;
   /* Two heights only (docs/style/design.md): raise lies on its surface, float is over the page (menus, dialogs, toasts). */
   --shadow-raise: 0 1px 2px var(--wb-raise);
   --shadow-float: 0 8px 24px var(--wb-float);
 }
 
-@theme {
+:root,
+:host {
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --font-mono: Menlo, ui-monospace, monospace;
 
@@ -199,7 +231,7 @@
   --animate-pop-in: pop-in 280ms var(--ease-out) both;
   --animate-fade-in: fade-in 180ms var(--ease-out) both;
 
-  /* The farm's pixel skin: bg-cream-100, border-bark-900, text-leaf-600, font-pixel… */
+  /* The farm's pixel skin. */
   --font-pixel: "FusionPixel", "PingFang SC", sans-serif;
   --color-ink-950: #14110e;
   --color-ink-900: #1c1916;
@@ -242,6 +274,20 @@
   --color-px-shade: #3a2a1899;
   --color-px-dent: #2f1f1340;
   --color-px-scrim: #1e140a73;
+  /* Pre-color-mix fallbacks retain the original 8-bit alpha, not rounded percentages. */
+  --color-px-leaf-wash: #b4cb7c99;
+  --color-px-leaf-strong: #b4cb7cb3;
+  --color-px-leaf-hover: #b4cb7c66;
+  --color-px-leaf-soft: #b4cb7c80;
+  --color-px-paper-glass: #f7e8c4cc;
+  --color-px-debug-surface: #14110ef5;
+  --color-lcd-panel: #c9dc9acc;
+  --color-px-canvas-shade: #2f1f1399;
+  --color-px-choice-well: #c8a46eb3;
+  --color-avatar-paper: #fffaf0eb;
+  --color-avatar-soft-paper: #fffaf0bf;
+  --color-catalog-shade: #2f1f13b3;
+  --color-px-dialog-backdrop: #2f1f134d;
   --color-water-500: #4f8fbd;
   --color-wheat-700: #b8682a;
   --color-berry-500: #c84a3a;
@@ -251,6 +297,16 @@
   --color-bark-950: #1e140b;
   --color-bark-850: #3a2a18;
   --color-peach: #f3b07a;
+  --color-px-toast-warn: #f3b07a4d;
+  --color-px-map-paper: #ebd9ae;
+  --color-px-map-grid: #c8a46e73;
+  --color-agent-stage-center: #c7dd9a;
+  --color-agent-stage-middle: #9cc069;
+  --color-agent-stage-edge: #7ea64f;
+  --color-catalog-grass: #7a9a4a;
+  --color-catalog-night: #22283a;
+  --color-catalog-paper: #f3e9d2;
+  --color-catalog-check: #e4d6b6;
   /* The phone's screen, an old handheld's green LCD: the same greens farm/phone/lcd.ts draws the canvas with. */
   --color-lcd-paper: #c9dc9a;
   --color-lcd-light: #b9cf8c;
@@ -285,8 +341,7 @@ body {
   /* Digits all one width: counts, times, quotas and money line up and do not jitter as they change. */
   font-variant-numeric: tabular-nums;
 }
-/* In the base layer, so a utility wins over it: a field drawn in a box that shows the focus itself (outline-none,
-   focus-within on the box) gets no second ring inside. */
+/* Component styles override the base focus ring when their container owns focus indication. */
 @layer base {
   :focus-visible {
     outline: 2px solid var(--wb-focus);
@@ -325,13 +380,6 @@ body {
   ::backdrop {
     transition-duration: 0.01ms !important;
   }
-  .animate-pulse,
-  .animate-bounce,
-  .animate-spin,
-  .animate-pop-in,
-  .animate-fade-in {
-    animation: none !important;
-  }
 }
 
 /* A list that scrolls fades out at the edge it can still scroll toward, by 16px, and not at an end it has reached: the
@@ -362,11 +410,6 @@ body {
     --fade-bottom: 0px;
   }
 }
-@utility scroll-fade-y {
-  mask-image: linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent);
-  animation: scroll-fade-y linear both;
-  animation-timeline: scroll(self y);
-}
 
 /* The same sideways, for a row that scrolls across (chips, suggestions). */
 @property --fade-left {
@@ -393,15 +436,6 @@ body {
     --fade-left: 16px;
     --fade-right: 0px;
   }
-}
-@utility scroll-fade-x {
-  mask-image: linear-gradient(to right, transparent, black var(--fade-left), black calc(100% - var(--fade-right)), transparent);
-  animation: scroll-fade-x linear both;
-  animation-timeline: scroll(self x);
-}
-/* Text folded to its first lines: its last third fades, so it reads as going on. */
-@utility fold-fade {
-  mask-image: linear-gradient(to bottom, black 70%, transparent);
 }
 
 /* The yard's signs hop a pixel now and then: one beat in nine of 350 ms. */
@@ -435,134 +469,6 @@ body {
   100% {
     opacity: 0;
     transform: translateY(-10px) scale(1);
-  }
-}
-
-/* The phone: a ringing thing shakes a pixel each way over 500 ms; a prompt blinks once a second. */
-@keyframes phone-shake {
-  0%,
-  24.99% {
-    transform: translate(-1px, 0);
-  }
-  25%,
-  49.99% {
-    transform: translate(1px, 0);
-  }
-  50%,
-  74.99% {
-    transform: translate(-1px, -1px);
-  }
-  75%,
-  100% {
-    transform: translate(1px, 0);
-  }
-}
-@keyframes phone-blink {
-  0%,
-  49.99% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0.3;
-  }
-}
-.phone-shake {
-  animation: phone-shake 500ms infinite;
-}
-.phone-blink {
-  animation: phone-blink 1s infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .phone-shake,
-  .phone-blink {
-    animation: none;
-  }
-}
-
-/* A helper's poses, anchored at its feet. */
-.pose {
-  transform-origin: 50% 100%;
-  animation-iteration-count: infinite;
-}
-.pose-idle {
-  animation: pose-idle 2.6s ease-in-out infinite;
-}
-.pose-walk {
-  animation: pose-walk 0.28s ease-in-out infinite;
-}
-.pose-work {
-  animation: pose-work 0.9s ease-in-out infinite;
-}
-.pose-think {
-  animation: pose-think 3.2s ease-in-out infinite;
-}
-.pose-cheer {
-  animation: pose-cheer 2.2s linear infinite;
-}
-.pose-worry {
-  animation: pose-worry 1.6s ease-in-out infinite;
-}
-@keyframes pose-idle {
-  50% {
-    transform: scale(1.012, 0.985);
-  }
-}
-@keyframes pose-walk {
-  50% {
-    transform: translateY(-3px);
-  }
-}
-@keyframes pose-work {
-  0%,
-  100% {
-    transform: rotate(-2.5deg);
-  }
-  50% {
-    transform: translateY(-3px) rotate(2.5deg);
-  }
-}
-@keyframes pose-think {
-  0%,
-  100% {
-    transform: rotate(-1.5deg);
-  }
-  50% {
-    transform: rotate(1.5deg);
-  }
-}
-@keyframes pose-cheer {
-  0% {
-    transform: none;
-    animation-timing-function: ease-out;
-  }
-  20% {
-    transform: translateY(-16px);
-    animation-timing-function: ease-in;
-  }
-  40% {
-    transform: scale(1.03, 0.97);
-  }
-  60%,
-  100% {
-    transform: none;
-  }
-}
-@keyframes pose-worry {
-  0%,
-  100% {
-    transform: none;
-  }
-  25% {
-    transform: rotate(-3deg);
-  }
-  75% {
-    transform: rotate(3deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pose {
-    animation: none;
   }
 }
 
@@ -623,7 +529,7 @@ select,
   font-size: var(--text-xs);
   opacity: 0.75;
 }
-/* Folded: the first lines, fading out (the same mask as fold-fade). */
+/* Folded code keeps a visible continuation without adding content. */
 .code-block[data-folded] pre {
   max-height: 18rem;
   overflow: hidden !important;

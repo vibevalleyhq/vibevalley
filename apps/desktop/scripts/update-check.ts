@@ -52,7 +52,9 @@ async function run(feedUrl: string) {
     env: { ...process.env, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_UPDATE_FEED: feedUrl },
   });
   try {
-    const page = await app.firstWindow();
+    const page =
+      app.windows().find((page) => /^http:\/\/127\.0\.0\.1:\d+\//u.test(page.url())) ??
+      (await app.waitForEvent("window", { predicate: (page) => /^http:\/\/127\.0\.0\.1:\d+\//u.test(page.url()), timeout: 90_000 }));
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//u, { timeout: 90_000 });
     await page.goto(new URL(page.url()).origin + "/settings/about");
     const state = page.getByTestId("update-state");

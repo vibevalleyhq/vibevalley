@@ -103,6 +103,16 @@ export interface CommandLine {
   readonly remove: () => Promise<CommandLineState>;
 }
 
+export interface Opening {
+  readonly phase: "connecting" | "reading" | "loading" | "ready" | "waiting" | "failed";
+  readonly progress: number;
+}
+
+export const Opening: Schema.Codec<Opening> = Schema.Struct({
+  phase: Schema.Literals(["connecting", "reading", "loading", "ready", "waiting", "failed"]),
+  progress: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+});
+
 export interface Host {
   /** For logs and the about box only. */
   readonly name: "desktop" | "mobile" | "browser";
@@ -124,6 +134,8 @@ export interface Host {
   /** Told the theme the page chose, so the host's own parts (menus, scroll bars, the title strip) follow; absent where the
    * host draws nothing of its own. */
   readonly theme?: (theme: ThemeChoice) => void;
+  /** Keeps the host's opening visible across page navigation; terminal phases uncover the page. */
+  readonly opening?: (opening: Opening) => Promise<void>;
   /** The app's own updates; absent where the host is not updated from here (a browser tab, the phone's store app). */
   readonly update?: Updates;
   /** Installing the app's command line; absent where there is none to install (a browser tab, the app from the
@@ -162,6 +174,7 @@ export const desktopBridge = {
   locale: call({ input: LocaleSchema, output: Schema.Void }),
   reveal: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
   theme: call({ input: ThemeChoice, output: Schema.Void }),
+  opening: call({ input: Opening, output: Schema.Void }),
   updateState: call({ input: Schema.Void, output: UpdateState }),
   // Both wait for a download.
   updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
@@ -200,6 +213,7 @@ export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control"
   locale: "page",
   reveal: "page",
   theme: "page",
+  opening: "page",
   updateState: "control",
   updateCheck: "control",
   updateInstall: "control",

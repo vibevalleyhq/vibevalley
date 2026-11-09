@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -34,6 +35,173 @@ import { issueSearch } from "./navigation";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
+
+const recipeStyles = stylex.create({
+  issueViewButton: {
+    marginBottom: "calc(var(--spacing) * 3)",
+    display: "inline-flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  toolbarDiv: {
+    display: "flex",
+    flexDirection: {
+      default: "column-reverse",
+      "@container (width>=760px)": "row",
+    },
+    gap: "calc(var(--spacing) * 2)",
+    alignItems: {
+      default: null,
+      "@container (width>=760px)": "center",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  issuesPage: {
+    position: "relative",
+    display: "flex",
+    height: "100%",
+    flexDirection: "column",
+  },
+  issuesPageP: {
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingTop: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  detailP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  detailH1: {
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  detailP2: {
+    marginTop: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  detailH12: {
+    fontSize: "var(--text-xl)",
+    lineHeight: "var(--text-xl--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  detailP3: {
+    marginTop: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  issueViewDiv: {
+    minHeight: "0",
+    flex: "1",
+    overflowY: "auto",
+  },
+  issue: {
+    marginInline: "auto",
+    width: "100%",
+    maxWidth: "1200px",
+    paddingInline: "calc(var(--spacing) * 6)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 10)",
+  },
+  toolbarDiv: {
+    containerType: "inline-size",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 2.5)",
+  },
+  toolbarDiv2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  toolbarLabel: {
+    display: "flex",
+    height: "calc(var(--spacing) * 7)",
+    width: "calc(var(--spacing) * 60)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
+    },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  issueSearch: {
+    minWidth: "0",
+    flex: "1",
+    backgroundColor: "transparent",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--color-faint)",
+    },
+  },
+  toolbarSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  filterClear: {
+    cursor: "pointer",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  toolbarDiv3: {
+    marginLeft: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+});
+
+const selectStyles = stylex.create({ filter: { maxWidth: "calc(var(--spacing) * 48)" } });
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 
@@ -135,14 +303,14 @@ export function IssuesPage(props: { rest: string }) {
 
   // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
-    <div data-testid="issues-page" class="relative flex h-full flex-col">
+    <div data-testid="issues-page" {...stylex.attrs(viewStyles.issuesPage)}>
       <Show
         when={id()}
         keyed
         fallback={
           <>
             <Show when={history.error()}>
-              <p class="px-3 pt-2 text-sm text-berry">
+              <p {...stylex.attrs(viewStyles.issuesPageP)}>
                 {t("web.issue.page.historyUnread")}
                 {reasonOf(history.error())}
               </p>
@@ -234,13 +402,13 @@ function Detail(props: {
   return (
     <Switch>
       <Match when={!card() && !props.known}>
-        <p class="text-sm text-muted">{t("web.issue.reading")}</p>
+        <p {...stylex.attrs(viewStyles.detailP)}>{t("web.issue.reading")}</p>
       </Match>
       <Match when={!card()}>
         {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
         <div>
-          <h1 class="text-lg font-semibold">{t("web.issue.page.notFound")}</h1>
-          <p class="mt-3 text-sm text-muted">{t("web.issue.page.notFoundLine", { id: props.id })}</p>
+          <h1 {...stylex.attrs(viewStyles.detailH1)}>{t("web.issue.page.notFound")}</h1>
+          <p {...stylex.attrs(viewStyles.detailP2)}>{t("web.issue.page.notFoundLine", { id: props.id })}</p>
         </div>
       </Match>
       <Match when={shows("todo")} keyed>
@@ -263,8 +431,8 @@ function Detail(props: {
       <Match when={shows("missing")} keyed>
         {() => (
           <div>
-            <h1 class="text-xl font-semibold">{cardOf("missing").issue.title}</h1>
-            <p class="mt-3 text-sm">{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
+            <h1 {...stylex.attrs(viewStyles.detailH12)}>{cardOf("missing").issue.title}</h1>
+            <p {...stylex.attrs(viewStyles.detailP3)}>{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
           </div>
         )}
       </Match>
@@ -296,14 +464,9 @@ function IssueView(props: { onBack: () => void; children: JSX.Element }) {
     return () => document.removeEventListener("keydown", esc);
   });
   return (
-    <div class="min-h-0 flex-1 overflow-y-auto">
-      <div data-testid="issue" class="mx-auto w-full max-w-[1200px] px-6 pt-3 pb-10">
-        <button
-          type="button"
-          data-testid="issue-close"
-          onClick={() => props.onBack()}
-          class="mb-3 inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-muted transition-colors duration-120 hover:bg-hover hover:text-ink"
-        >
+    <div {...stylex.attrs(viewStyles.issueViewDiv)}>
+      <div data-testid="issue" {...stylex.attrs(viewStyles.issue)}>
+        <button type="button" data-testid="issue-close" onClick={() => props.onBack()} {...stylex.attrs(recipeStyles.issueViewButton)}>
           <Icon name="back" size={14} />
           {t("web.issue.page.backToBoard")}
         </button>
@@ -326,10 +489,10 @@ function Toolbar(props: {
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
     // Narrow, the views go on their own line above the filters, at the right where the Display panel opens leftwards.
-    <div class="@container px-3 pt-3 pb-2.5">
-      <div class="flex flex-col-reverse gap-2 @min-[760px]:flex-row @min-[760px]:items-center">
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <label class="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
+    <div {...stylex.attrs(viewStyles.toolbarDiv)}>
+      <div {...stylex.attrs(recipeStyles.toolbarDiv)}>
+        <div {...stylex.attrs(viewStyles.toolbarDiv2)}>
+          <label {...stylex.attrs(viewStyles.toolbarLabel)}>
             <Icon name="search" size={14} />
             <input
               data-testid="issue-search"
@@ -337,13 +500,13 @@ function Toolbar(props: {
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
               placeholder={t("web.issue.page.find")}
               aria-label={t("web.issue.page.findLabel")}
-              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+              {...stylex.attrs(viewStyles.issueSearch)}
             />
           </label>
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
           <Select
             size="control"
-            class="max-w-48"
+            styles={selectStyles.filter}
             label={t("web.issue.page.byRepo")}
             testid="filter-repo"
             filter
@@ -354,7 +517,7 @@ function Toolbar(props: {
           />
           <Select
             size="control"
-            class="max-w-48"
+            styles={selectStyles.filter}
             label={t("web.issue.page.byHelper")}
             testid="filter-agent"
             filter
@@ -364,13 +527,13 @@ function Toolbar(props: {
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
           <Show when={filterAny(props.filter)}>
-            <span class="text-xs text-muted">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
-            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
+            <span {...stylex.attrs(viewStyles.toolbarSpan)}>{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
+            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} {...stylex.attrs(viewStyles.filterClear)}>
               {t("web.issue.page.clear")}
             </button>
           </Show>
         </div>
-        <div class="ml-auto flex items-center gap-1.5">
+        <div {...stylex.attrs(viewStyles.toolbarDiv3)}>
           <Segmented
             label={t("web.issue.page.view")}
             testid="issue-view"

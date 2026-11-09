@@ -1,0 +1,9 @@
+@layer components {
+  :where([data-settings-rows] > :not(:last-child)) {
+    border-top-style: solid;
+    border-bottom-style: solid;
+    border-top-width: 0;
+    border-bottom-width: 1px;
+    border-color: var(--color-line);
+  }
+}

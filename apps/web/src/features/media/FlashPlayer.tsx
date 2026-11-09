@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,6 +9,16 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 
 import { playFlashStream, type FlashPlaybackProgress } from "./flash-stream.ts";
+
+const viewStyles = stylex.create({
+  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
+  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-muted)" },
+  text: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
+  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-muted)" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
+  actions: { display: "flex", flexWrap: "wrap", gap: "calc(var(--spacing) * 2)" },
+  errorText: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", color: "var(--color-berry)" },
+});
 
 type PlaybackPhase = "idle" | "connecting" | "playing" | "draining" | "done" | "stopped" | "failed";
 
@@ -152,7 +163,7 @@ export function FlashPlayer(props: {
   };
   return (
     <section
-      class="flex min-w-0 flex-col gap-3"
+      {...stylex.attrs(viewStyles.form)}
       aria-label={t("web.audio.flashTitle")}
       data-testid="flash-player"
       data-phase={phase()}
@@ -161,24 +172,24 @@ export function FlashPlayer(props: {
       data-buffered={progress().bufferedSeconds}
       data-partial={(phase() === "failed" || phase() === "stopped") && progress().receivedSeconds > 0 ? "true" : "false"}
     >
-      <p class="text-sm text-muted">{t("web.audio.flashNotice")}</p>
-      <p role="status" class="text-sm">
+      <p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.flashNotice")}</p>
+      <p role="status" {...stylex.attrs(viewStyles.text)}>
         {phaseText()}
       </p>
       <Show when={progress().receivedSeconds > 0}>
-        <p class="text-xs text-muted">
+        <p {...stylex.attrs(viewStyles.detail)}>
           {t("web.audio.flashProgress", { received: progress().receivedSeconds.toFixed(2), played: progress().playedSeconds.toFixed(2) })}
         </p>
       </Show>
       <Show
         when={typeof AudioContext !== "undefined"}
         fallback={
-          <p role="alert" class="text-sm text-berry">
+          <p role="alert" {...stylex.attrs(viewStyles.error)}>
             {t("web.audio.flashUnsupported")}
           </p>
         }
       >
-        <div class="flex flex-wrap gap-2">
+        <div {...stylex.attrs(viewStyles.actions)}>
           <Button data-testid="flash-start" tone="primary" disabled={act.busy() || Boolean(props.request) || !props.valid} onClick={() => void start()}>
             {t("web.audio.flashStart")}
           </Button>
@@ -189,7 +200,7 @@ export function FlashPlayer(props: {
       </Show>
       <Show when={error()}>
         {(message) => (
-          <p data-testid="flash-error" role="alert" class="text-sm break-words text-berry">
+          <p data-testid="flash-error" role="alert" {...stylex.attrs(viewStyles.errorText)}>
             {message()}
           </p>
         )}

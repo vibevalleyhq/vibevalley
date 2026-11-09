@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -19,6 +20,130 @@ import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
+
+const recipeStyles = stylex.create({
+  settingsPageDiv: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 5)",
+  },
+});
+
+const variantStyles = stylex.create({
+  sectionLinkA: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  sectionLinkAVariant: {
+    backgroundColor: "var(--color-selected)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-ink)",
+  },
+  sectionLinkAVariant2: {
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  settingsPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=48rem)": "row",
+    },
+  },
+  settingsNav: {
+    position: "relative",
+    display: "flex",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 4)",
+    borderColor: "var(--color-line)",
+    padding: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=48rem)": "var(--pane-w)",
+    },
+    maxHeight: {
+      default: "calc(var(--spacing) * 56)",
+      "@media (width>=48rem)": "none",
+    },
+    overflowY: "auto",
+    borderRightStyle: {
+      default: null,
+      "@media (width>=48rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=48rem)": "1px",
+    },
+  },
+  settingsPageDiv2: {
+    display: {
+      default: "none",
+      "@media (width>=48rem)": "block",
+    },
+  },
+  settingsPageDiv3: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  settingsPageSpan: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBottom: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-faint)",
+  },
+  settingsPageDiv4: {
+    display: "flex",
+    flexDirection: "column",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    marginTop: {
+      default: null,
+      "@media (width>=48rem)": "auto",
+    },
+  },
+});
 
 /** The groups listed under their names. */
 type Listed = "options" | "helpers" | "voice" | "connect";
@@ -65,14 +190,14 @@ export function SettingsPage(props: { rest: string }) {
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
         <SettingsSearch value={q}>
-          <div class="flex h-full min-h-0 flex-col md:flex-row">
+          <div {...stylex.attrs(viewStyles.settingsPageDiv)}>
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              class="relative flex max-h-56 shrink-0 flex-col gap-4 overflow-y-auto border-line p-3 md:max-h-none md:w-(--pane-w) md:border-r"
+              {...stylex.attrs(viewStyles.settingsNav)}
               style={{ "--pane-w": `${navWidth()}px` }}
             >
-              <div class="hidden md:block">
+              <div {...stylex.attrs(viewStyles.settingsPageDiv2)}>
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
               </div>
               <TextInput
@@ -86,8 +211,8 @@ export function SettingsPage(props: { rest: string }) {
               <For each={groups}>
                 {(g) => (
                   <Show when={shown(g).length > 0}>
-                    <div class="flex flex-col gap-0.5">
-                      <span class="px-2 pb-1 text-xs font-medium text-faint">{t(`web.setting.groups.${g}`)}</span>
+                    <div {...stylex.attrs(viewStyles.settingsPageDiv3)}>
+                      <span {...stylex.attrs(viewStyles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
                       <For each={shown(g)}>{(s) => <SectionLink section={s} current={s === section()} />}</For>
                     </div>
                   </Show>
@@ -95,13 +220,13 @@ export function SettingsPage(props: { rest: string }) {
               </For>
               <For each={shown("about")}>
                 {(s) => (
-                  <div class="flex flex-col border-t border-line pt-3 md:mt-auto">
+                  <div {...stylex.attrs(viewStyles.settingsPageDiv4)}>
                     <SectionLink section={s} current={s === section()} />
                   </div>
                 )}
               </For>
             </nav>
-            <div class="min-h-0 min-w-0 flex-1 scroll-fade-y overflow-y-auto p-5">
+            <div {...stylex.attrs(recipeStyles.settingsPageDiv)}>
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />
@@ -172,10 +297,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       href={`/settings/${props.section.id}`}
       data-key={props.section.id}
       aria-current={props.current ? "page" : undefined}
-      class={[
-        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
-        props.current ? "bg-selected font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink",
-      ]}
+      {...stylex.attrs(variantStyles.sectionLinkA, props.current ? variantStyles.sectionLinkAVariant : variantStyles.sectionLinkAVariant2)}
     >
       <Icon name={props.section.icon} size={16} />
       {props.section.label}

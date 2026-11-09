@@ -76,7 +76,6 @@ describe("MOSS visual realtime documented protocol", () => {
     expect(f.session.frame(jpeg, 0)).toBe(true);
     expect(f.binary).toEqual([]);
     expect(JSON.parse(f.text[1] ?? "{}")).toEqual({ type: "input.frame", seq_no: 0, timestamp: 0, mime_type: "image/jpeg" });
-    expect(f.session.prompt("What is visible?")).toBe(false);
     f.receive({ type: "input.frame.ready", seq_no: 0 });
     expect(f.binary).toEqual([jpeg]);
     expect(f.session.frame(jpeg, 1)).toBe(false);
@@ -86,6 +85,43 @@ describe("MOSS visual realtime documented protocol", () => {
     f.receive({ type: "input.prompt.accepted", seq_no: 1, final: false, pending_events: 1, interrupts_current_turn: true });
     expect(f.session.frame(jpeg, 1)).toBe(true);
     expect(JSON.parse(f.text[3] ?? "{}").seq_no).toBe(2);
+  });
+
+  it("regression: a final visual question waits behind one frame without accepting another question", () => {
+    const f = fixture();
+    f.ready();
+    f.session.frame(jpeg, 0);
+    expect(f.session.prompt("Summarize", true)).toBe(true);
+    expect(f.session.prompt("Another question")).toBe(false);
+    expect(f.session.frame(jpeg, 1)).toBe(false);
+    expect(f.text.map((text) => JSON.parse(text).type)).toEqual(["session.configure", "input.frame"]);
+    f.receive({ type: "input.frame.ready", seq_no: 0 });
+    expect(f.binary).toEqual([jpeg]);
+    f.receive({ type: "input.frame.accepted", seq_no: 0 });
+    expect(JSON.parse(f.text[2] ?? "{}")).toEqual({ type: "input.prompt", seq_no: 1, prompt: "Summarize", final: true });
+    f.receive({ type: "input.prompt.accepted", seq_no: 1 });
+    expect(f.session.frame(jpeg, 1)).toBe(false);
+    expect(f.session.prompt("Another question")).toBe(false);
+  });
+
+  it.each(["stop", "disconnect"] as const)("regression: %s discards a visual question waiting for a frame", (end) => {
+    const f = fixture();
+    f.ready();
+    f.session.frame(jpeg, 0);
+    expect(f.session.prompt("Do not send after stopping")).toBe(true);
+    f.session[end]();
+    f.receive({ type: "input.frame.ready", seq_no: 0 });
+    f.receive({ type: "input.frame.accepted", seq_no: 0 });
+    f.ready();
+    f.session.frame(jpeg, 0);
+    f.receive({ type: "input.frame.ready", seq_no: 0 });
+    f.receive({ type: "input.frame.accepted", seq_no: 0 });
+    expect(f.text.map((text) => JSON.parse(text).type)).toEqual(
+      end === "stop"
+        ? ["session.configure", "input.frame", "session.abort", "session.configure", "input.frame"]
+        : ["session.configure", "input.frame", "session.configure", "input.frame"],
+    );
+    expect(f.session.readyForInput).toBe(true);
   });
 
   it("regression: processed notifications do not prematurely release an unaccepted input", () => {

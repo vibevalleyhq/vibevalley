@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,161 @@ import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type Row
 import { useIssues, useNameOf } from "./history";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
+
+const recipeStyles = stylex.create({
+  rowSpan: {
+    display: {
+      default: "none",
+      "@container (width>=640px)": "block",
+    },
+    width: "calc(var(--spacing) * 11)",
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  rowSpanVariant1Case1: {
+    display: null,
+  },
+  rowSpanVariant1Case2: {
+    display: {
+      default: "none",
+      "@container (width>=640px)": "inline",
+    },
+  },
+  rowSpan2: {
+    display: {
+      default: "none",
+      "@container (width>=640px)": "block",
+    },
+    width: "120px",
+    flexShrink: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  rowSpan3: {
+    width: {
+      default: "calc(var(--spacing) * 14)",
+      "@container (width>=640px)": "72px",
+    },
+    flexShrink: "0",
+    textAlign: "right",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  issueListIcon: {},
+  issueListIconVariant: {
+    rotate: "90deg",
+  },
+});
+
+const variantStyles = stylex.create({
+  rowDiv: {
+    display: "flex",
+    height: "38px",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+  },
+  rowDivVariant: {
+    backgroundColor: "var(--color-selected)",
+  },
+  rowDivVariant2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  issueListDiv: {
+    containerType: "inline-size",
+    minHeight: "0",
+    flex: "1",
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 3)",
+  },
+  issueGroup: {
+    marginBottom: "var(--spacing)",
+  },
+  issueListHeader: {
+    position: "sticky",
+    top: "0",
+    zIndex: "10",
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    height: "34px",
+    alignItems: "center",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    paddingRight: "var(--spacing)",
+  },
+  issueListButton: {
+    display: "flex",
+    height: "100%",
+    minWidth: "0",
+    flex: "1",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    textAlign: "left",
+  },
+  issueListSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  issueListSpan2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  rowSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 3.5)",
+    flexShrink: "0",
+    justifyContent: "center",
+  },
+  rowSpan2: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  rowSpan3: {
+    display: "flex",
+    width: "18px",
+    flexShrink: "0",
+    justifyContent: "center",
+  },
+});
 
 /** The quick add, with the group's repo or helper when grouped by one. */
 export type ListAdd = (where: NewIssueAt) => void;
@@ -50,7 +206,7 @@ export function IssueList(props: {
 
   return (
     <Show when={!props.loading} fallback={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
-      <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <div {...stylex.attrs(viewStyles.issueListDiv)}>
         <For each={groupRows(props.cards, props.grouping, rowKeys)} keyed={(g) => g.key}>
           {(g) => {
             const groupLane = () => g().lane;
@@ -95,19 +251,23 @@ export function IssueList(props: {
               }
             };
             return (
-              <section aria-label={label()} data-testid="issue-group" data-key={g().key} class="mb-1">
+              <section aria-label={label()} data-testid="issue-group" data-key={g().key} {...stylex.attrs(viewStyles.issueGroup)}>
                 {/* A head of words on the page, not a bar: its line under it sets the group off. */}
-                <header class="sticky top-0 z-10 mt-2 flex h-[34px] items-center border-b border-line bg-page pr-1">
+                <header {...stylex.attrs(viewStyles.issueListHeader)}>
                   <button
                     type="button"
                     onClick={() => fold(g().key)}
                     aria-label={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
-                    class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
+                    {...stylex.attrs(viewStyles.issueListButton)}
                   >
-                    <Icon name="expand" size={10} class={{ "rotate-90": !isFolded() }} />
+                    <Icon
+                      name="expand"
+                      size={10}
+                      styles={[variantStyles2.issueListIcon, !isFolded() ? variantStyles2.issueListIconVariant : variantStyles2.issueListIcon]}
+                    />
                     {icon()}
-                    <span class="truncate text-sm font-semibold">{label()}</span>
-                    <span class="text-xs text-muted">{g().rows.length}</span>
+                    <span {...stylex.attrs(viewStyles.issueListSpan)}>{label()}</span>
+                    <span {...stylex.attrs(viewStyles.issueListSpan2)}>{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
                     <IconButton icon="add" label={t("web.issue.list.writeIn", { group: label() })} onClick={() => add(g())} />
@@ -169,37 +329,37 @@ function Row(props: {
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onOpen(props.card.id);
       }}
-      class={["flex h-[38px] cursor-pointer items-center gap-2.5 rounded-md px-2.5", props.selected ? "bg-selected" : "hover:bg-hover"]}
+      {...stylex.attrs(variantStyles.rowDiv, props.selected ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}
     >
-      <span class="flex w-3.5 shrink-0 justify-center">
+      <span {...stylex.attrs(viewStyles.rowSpan)}>
         <Show when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
           {(pr) => <PriorityMark priority={pr()} size={13} />}
         </Show>
       </span>
-      <span class="hidden w-11 shrink-0 truncate text-xs text-muted @min-[640px]:block">{look().number}</span>
-      <span class="flex w-3.5 shrink-0 justify-center">
+      <span {...stylex.attrs(recipeStyles.rowSpan)}>{look().number}</span>
+      <span {...stylex.attrs(viewStyles.rowSpan)}>
         <Show when={props.groupStatus === undefined || (look().status !== props.groupStatus && !(props.groupStatus === "todo" && look().status === "backlog"))}>
           <StatusMark status={look().status} tone={look().statusTone} size={13} />
         </Show>
       </span>
-      <span class="min-w-0 flex-1 truncate text-sm">{look().title}</span>
+      <span {...stylex.attrs(viewStyles.rowSpan2)}>{look().title}</span>
       <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
       <For each={look().flags}>
         {(f, i) => (
-          <span class={{ "hidden @min-[640px]:inline": i() > 0 }}>
+          <span {...stylex.attrs(i() > 0 ? recipeStyles.rowSpanVariant1Case2 : recipeStyles.rowSpanVariant1Case1)}>
             <FlagChip text={f.text} tone={f.tone} />
           </span>
         )}
       </For>
       <Show when={props.showRepo}>
-        <span class="hidden w-[120px] shrink-0 truncate text-xs text-muted @min-[640px]:block">{repo()}</span>
+        <span {...stylex.attrs(recipeStyles.rowSpan2)}>{repo()}</span>
       </Show>
-      <span class="flex w-[18px] shrink-0 justify-center">
+      <span {...stylex.attrs(viewStyles.rowSpan3)}>
         <Show when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
           <CardFace card={props.card} size={18} />
         </Show>
       </span>
-      <span class="w-14 shrink-0 text-right text-xs text-muted @min-[640px]:w-[72px]">{ago(rowKeys(props.card).updatedAt, now())}</span>
+      <span {...stylex.attrs(recipeStyles.rowSpan3)}>{ago(rowKeys(props.card).updatedAt, now())}</span>
     </div>
   );
 }

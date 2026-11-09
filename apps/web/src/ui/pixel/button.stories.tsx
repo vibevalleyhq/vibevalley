@@ -1,16 +1,42 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { PxButton, type PxSize, type PxTone } from "./button";
+import { storyFrame } from "./story.stylex";
+
+const viewStyles = stylex.create({
+  composed: (width: number) => ({ width, marginLeft: 12 }),
+  buttonStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 const tones: PxTone[] = ["plain", "primary", "accent", "danger"];
 
 export default stories({
   title: "组件/像素/PxButton",
   themes: ["light"],
-  frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
+  frame: storyFrame.pixel,
   stories: {
+    Composition: story({
+      args: { width: 160 },
+      controls: { width: { kind: "number", min: 120, max: 280, step: 40 } },
+      render: (a, set) => (
+        <PxButton
+          data-testid="pixel-button-composition"
+          styles={viewStyles.composed(a.width)}
+          style={{ "margin-top": "8px" }}
+          onClick={() => set({ width: a.width === 160 ? 240 : 160 })}
+        >
+          Resize
+        </PxButton>
+      ),
+    }),
     States: story({
       args: { label: "派活", tone: "primary", disabled: false },
       grid: { rows: ["tone", tones], cols: "pseudo" },
@@ -35,7 +61,7 @@ export default stories({
     }),
     Tones: story({
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
           <For each={tones}>
             {(tone) => (
               <PxButton tone={tone} onClick={() => undefined}>

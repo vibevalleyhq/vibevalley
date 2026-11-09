@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,208 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { HudCard } from "./HudCard";
+
+const recipeStyles = stylex.create({
+  expandArrow: { rotate: "90deg" },
+  collapseArrow: { rotate: "-90deg" },
+  friendButton: {
+    position: "relative",
+    display: "flex",
+    width: "72px",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingBlock: "var(--spacing)",
+  },
+  friendButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-cream-200)",
+      },
+    },
+  },
+  friendButtonVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-px-leaf-wash)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
+    },
+  },
+  friendDiv: {
+    position: "absolute",
+    bottom: "100%",
+    left: "0",
+    zIndex: "10",
+    marginBottom: "calc(var(--spacing) * 2.5)",
+    width: "calc(var(--spacing) * 72)",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 3)",
+    textAlign: "left",
+    boxShadow: "var(--shadow-px)",
+  },
+});
+
+const variantStyles = stylex.create({
+  friendSpan: {
+    marginTop: "calc(var(--spacing) * .5)",
+    maxWidth: "68px",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "12px",
+  },
+  friendSpanVariant: {
+    color: "var(--color-bark-900)",
+  },
+  friendSpanVariant2: {
+    color: "var(--color-bark-400)",
+  },
+});
+
+const viewStyles = stylex.create({
+  staminaSpan: {
+    display: "flex",
+    height: "7px",
+    width: "52px",
+    gap: "1px",
+    backgroundColor: "var(--color-bark-900)",
+    padding: "1px",
+  },
+  staminaSpan2: {
+    flex: "1",
+  },
+  friend: {
+    position: "relative",
+  },
+  friendSpan: {
+    padding: "calc(var(--spacing) * .5)",
+  },
+  friendSpan2: {
+    height: "7px",
+  },
+  friendSpan3: {
+    position: "absolute",
+    top: "0",
+    right: "calc(var(--spacing) * 2.5)",
+    height: "calc(var(--spacing) * 3)",
+    width: "calc(var(--spacing) * 3)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+  },
+  friendDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  friendDiv2: {
+    minWidth: "0",
+  },
+  friendP: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "16px",
+  },
+  friendP2: {
+    fontSize: "12px",
+    color: "var(--color-bark-600)",
+  },
+  friendP3: {
+    fontSize: "12px",
+    color: "var(--color-bark-800)",
+  },
+  friendDiv3: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+  },
+  friendDiv4: {
+    minWidth: "0",
+    fontSize: "12px",
+  },
+  friendP4: {
+    color: "var(--color-bark-800)",
+  },
+  friendP5: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "var(--color-bark-500)",
+  },
+  friendP6: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "13px",
+    color: "var(--color-bark-800)",
+  },
+  friendDiv5: {
+    marginTop: "calc(var(--spacing) * 3)",
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  friendSpan4: {
+    fontSize: "13px",
+    color: "var(--color-bark-600)",
+  },
+  friends: {
+    pointerEvents: "auto",
+    position: "relative",
+  },
+  friendsDiv: {
+    position: "absolute",
+    bottom: "100%",
+    left: "0",
+    marginBottom: "var(--spacing)",
+    width: "max-content",
+    maxWidth: "min(640px,90vw)",
+  },
+  friendsSpan: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+  },
+  friendsToggle: {
+    position: "relative",
+    cursor: "pointer",
+  },
+  friendsSpan2: {
+    position: "relative",
+    height: "22px",
+  },
+  friendsSpan3: {
+    position: "absolute",
+    top: "0",
+  },
+  friendsSpan4: {
+    display: "flex",
+    height: "calc(var(--spacing) * 4)",
+    minWidth: "calc(var(--spacing) * 4)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "var(--color-leaf-500)",
+    paddingInline: "var(--spacing)",
+    fontSize: "10px",
+    lineHeight: "1",
+    color: "var(--color-bark-900)",
+  },
+  friendsSpan5: {
+    position: "absolute",
+    top: "calc(var(--spacing) * -1)",
+    left: "calc(var(--spacing) * -1)",
+    height: "calc(var(--spacing) * 2.5)",
+    width: "calc(var(--spacing) * 2.5)",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-cream-300)",
+  },
+});
 
 type FriendStatus = "bug" | "ripe" | "busy" | "rest" | "away";
 
@@ -40,9 +243,9 @@ function Stamina(props: { fill: number; segments?: number }) {
   const segments = () => props.segments ?? 8;
   const lit = () => (props.fill <= 0 ? 0 : Math.max(1, Math.round(props.fill * segments())));
   return (
-    <span class="flex h-[7px] w-[52px] gap-px bg-bark-900 p-px" aria-hidden="true">
+    <span {...stylex.attrs(viewStyles.staminaSpan)} aria-hidden="true">
       <For each={Array.from({ length: segments() }, (_, i) => i)}>
-        {(i) => <span class="flex-1" style={{ background: i < lit() ? "#7ea64f" : "#46301d" }} />}
+        {(i) => <span {...stylex.attrs(viewStyles.staminaSpan2)} style={{ background: i < lit() ? "#7ea64f" : "#46301d" }} />}
       </For>
     </span>
   );
@@ -60,60 +263,64 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
   const tally = () => core()?.progress?.agents[props.agent.id];
   const box = useClickAway(open, () => setOpen(false));
   return (
-    <div ref={box} class="relative" data-testid="friend" data-key={props.agent.id} data-state={props.st} data-picked={picked() ? "" : undefined}>
+    <div
+      ref={box}
+      {...stylex.attrs(viewStyles.friend)}
+      data-testid="friend"
+      data-key={props.agent.id}
+      data-state={props.st}
+      data-picked={picked() ? "" : undefined}
+    >
       <button
         type="button"
         data-testid="friend-open"
         aria-label={t("shared.join.and", { a: props.agent.name, b: status[props.st].label })}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
-        class={["relative flex w-[72px] cursor-pointer flex-col items-center py-1", picked() ? "bg-leaf-300/60" : "hover:bg-cream-200"]}
+        {...stylex.attrs(recipeStyles.friendButton, picked() ? recipeStyles.friendButtonVariant1Case2 : recipeStyles.friendButtonVariant1Case1)}
       >
-        <span class="p-0.5" style={{ background: picked() ? "#74a046" : "#c8a46e" }}>
+        <span {...stylex.attrs(viewStyles.friendSpan)} style={{ background: picked() ? "#74a046" : "#c8a46e" }}>
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={46} muted={!props.agent.enabled} />
         </span>
-        <span class={["mt-0.5 max-w-[68px] truncate text-[12px]", props.agent.enabled ? "text-bark-900" : "text-bark-400"]}>{props.agent.name}</span>
-        <Show when={quota().level !== "unknown"} fallback={<span class="h-[7px]" />}>
+        <span {...stylex.attrs(variantStyles.friendSpan, props.agent.enabled ? variantStyles.friendSpanVariant : variantStyles.friendSpanVariant2)}>
+          {props.agent.name}
+        </span>
+        <Show when={quota().level !== "unknown"} fallback={<span {...stylex.attrs(viewStyles.friendSpan2)} />}>
           <Stamina fill={quota().fill} />
         </Show>
         <Show when={props.st !== "away"}>
-          <span class="absolute top-0 right-2.5 h-3 w-3 border-2 border-cream-300" style={{ background: status[props.st].dot }} />
+          <span {...stylex.attrs(viewStyles.friendSpan3)} style={{ background: status[props.st].dot }} />
         </Show>
       </button>
       <Show when={open()}>
-        <div
-          data-testid="friend-card"
-          class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px"
-          role="dialog"
-          aria-label={props.agent.name}
-        >
-          <div class="flex items-center gap-3">
+        <div data-testid="friend-card" {...stylex.attrs(recipeStyles.friendDiv)} role="dialog" aria-label={props.agent.name}>
+          <div {...stylex.attrs(viewStyles.friendDiv)}>
             <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={60} muted={!props.agent.enabled} />
-            <div class="min-w-0">
-              <p class="truncate text-[16px]">{props.agent.name}</p>
-              <p class="text-[12px] text-bark-600">
+            <div {...stylex.attrs(viewStyles.friendDiv2)}>
+              <p {...stylex.attrs(viewStyles.friendP)}>{props.agent.name}</p>
+              <p {...stylex.attrs(viewStyles.friendP2)}>
                 {runtime()?.preset.label ?? props.agent.runtime}
                 {props.agent.model ? ` · ${props.agent.model}` : ""}
               </p>
-              <p class="text-[12px] text-bark-800">
+              <p {...stylex.attrs(viewStyles.friendP3)}>
                 {status[props.st].label}
                 {tally() ? t("web.farm.friends.tally", { hired: Math.round(tally()!.hired), harvested: Math.round(tally()!.harvested) }) : ""}
               </p>
             </div>
           </div>
-          <div class="mt-2 flex items-center gap-2 bg-cream-100 px-2 py-1.5">
+          <div {...stylex.attrs(viewStyles.friendDiv3)}>
             <SpriteIcon name={bottleSprite(quota())} size={30} label={quota().text} />
-            <div class="min-w-0 text-[12px]">
-              <p class="text-bark-800">{t("web.farm.friends.energy", { short: quota().short || "—" })}</p>
-              <p class="truncate text-bark-500" title={quota().text}>
+            <div {...stylex.attrs(viewStyles.friendDiv4)}>
+              <p {...stylex.attrs(viewStyles.friendP4)}>{t("web.farm.friends.energy", { short: quota().short || "—" })}</p>
+              <p {...stylex.attrs(viewStyles.friendP5)} title={quota().text}>
                 {t("shared.join.labeled", { label: runtime()?.preset.label ?? props.agent.runtime, text: quota().text })}
               </p>
             </div>
           </div>
-          <p class="mt-2 text-[13px] text-bark-800">{props.agent.duty}</p>
-          <div class="mt-3 flex items-center gap-2">
-            <div class="flex-1">
-              <Show when={props.agent.enabled} fallback={<span class="text-[13px] text-bark-600">{t("web.farm.friends.disabled")}</span>}>
+          <p {...stylex.attrs(viewStyles.friendP6)}>{props.agent.duty}</p>
+          <div {...stylex.attrs(viewStyles.friendDiv5)}>
+            <div {...stylex.attrs(viewStyles.staminaSpan2)}>
+              <Show when={props.agent.enabled} fallback={<span {...stylex.attrs(viewStyles.friendSpan4)}>{t("web.farm.friends.disabled")}</span>}>
                 <PxButton tone={picked() ? "plain" : "primary"} data-testid="friend-pick" onClick={() => setPick(picked() ? "auto" : props.agent.id)}>
                   {picked() ? t("web.farm.friends.unpick") : t("web.farm.friends.pick")}
                 </PxButton>
@@ -159,12 +366,12 @@ export function Friends(props: { height: number }) {
   const stage = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
   const box = useClickAway(open, () => farm.friendsOpen(false));
   return (
-    <div ref={box} class="pointer-events-auto relative" aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
+    <div ref={box} {...stylex.attrs(viewStyles.friends)} aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
       <Show when={open()}>
         {/* As wide as the helpers in a row (the button under it is narrower), wrapping only past the cap. */}
-        <div class="absolute bottom-full left-0 mb-1 w-max max-w-[min(640px,90vw)]">
+        <div {...stylex.attrs(viewStyles.friendsDiv)}>
           <HudCard>
-            <span class="flex flex-wrap gap-1 py-1.5">
+            <span {...stylex.attrs(viewStyles.friendsSpan)}>
               <For each={sorted()} keyed={(a) => a.id}>
                 {(a, i) => <Friend agent={a()} st={statuses()[i()]!} />}
               </For>
@@ -178,13 +385,13 @@ export function Friends(props: { height: number }) {
         aria-label={t("web.farm.friends.helpers")}
         aria-expanded={aria(open())}
         onClick={() => farm.friendsOpen(!open())}
-        class="relative cursor-pointer"
+        {...stylex.attrs(viewStyles.friendsToggle)}
       >
         <HudCard height={props.height}>
-          <span class="relative h-[22px]" style={{ width: `${sorted().length === 0 ? 0 : 22 + (Math.min(3, sorted().length) - 1) * 12}px` }}>
+          <span {...stylex.attrs(viewStyles.friendsSpan2)} style={{ width: `${sorted().length === 0 ? 0 : 22 + (Math.min(3, sorted().length) - 1) * 12}px` }}>
             <For each={sorted().slice(0, 3)} keyed={(a) => a.id}>
               {(a, i) => (
-                <span class="absolute top-0" style={{ left: `${i() * 12}px`, "z-index": 3 - i() }}>
+                <span {...stylex.attrs(viewStyles.friendsSpan3)} style={{ left: `${i() * 12}px`, "z-index": 3 - i() }}>
                   <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={22} />
                 </span>
               )}
@@ -192,13 +399,11 @@ export function Friends(props: { height: number }) {
           </span>
           <span>{t("web.farm.friends.helpers")}</span>
           <Show when={busy() > 0}>
-            <span class="flex h-4 min-w-4 items-center justify-center bg-leaf-500 px-1 text-[10px] leading-none text-bark-900">{busy()}</span>
+            <span {...stylex.attrs(viewStyles.friendsSpan4)}>{busy()}</span>
           </Show>
-          <SpriteIcon name="button-next" size={12} class={open() ? "-rotate-90" : "rotate-90"} />
+          <SpriteIcon name="button-next" size={12} styles={open() ? recipeStyles.collapseArrow : recipeStyles.expandArrow} />
         </HudCard>
-        <Show when={stage()}>
-          {(a) => <span class="absolute -top-1 -left-1 h-2.5 w-2.5 border-2 border-cream-300" style={{ background: status[a()].dot }} />}
-        </Show>
+        <Show when={stage()}>{(a) => <span {...stylex.attrs(viewStyles.friendsSpan5)} style={{ background: status[a()].dot }} />}</Show>
       </button>
     </div>
   );

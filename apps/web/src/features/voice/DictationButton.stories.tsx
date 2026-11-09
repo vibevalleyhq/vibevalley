@@ -1,10 +1,22 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { DictationMark, type DictationState } from "./DictationButton";
 
+const styles = stylex.create({
+  placement: (marginLeft: number) => ({ marginLeft, width: "calc(var(--spacing) * 7)", height: "calc(var(--spacing) * 7)", borderRadius: "var(--radius-md)" }),
+});
+
 export default stories({
   title: "组件/语音/听写",
   stories: {
+    Composition: story({
+      args: { recording: true, surface: true, indent: 4 },
+      render: (a) => (
+        <DictationMark state={a.recording ? "recording" : "idle"} bar surface={a.surface} styles={styles.placement(a.indent)} onClick={() => undefined} />
+      ),
+    }),
     States: story({
       note: "每个输入框边上的听写键：没设好（点了去设置）、能说、在听、在转写；工作台的框在听时，键是「说完了」（bar）。",
       args: { state: "idle", problem: "" },

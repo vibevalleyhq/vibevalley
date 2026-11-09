@@ -1,7 +1,16 @@
+import * as stylex from "@stylexjs/stylex";
+
 import type { AccountUsage, Installation, Look, RuntimeInfo } from "@vibevalley/protocol";
 import { stories, story, type Story } from "@vibevalley/stories";
 
 import { Detail } from "./RuntimesPage";
+
+const viewStyles = stylex.create({
+  sceneDiv: {
+    width: "100%",
+    maxWidth: "var(--container-3xl)",
+  },
+});
 
 const now = Date.now();
 const hour = 3_600_000;
@@ -57,7 +66,7 @@ const scene = (note: string, i: RuntimeInfo): Story =>
     fill: true,
     note,
     render: () => (
-      <div class="w-full max-w-3xl">
+      <div {...stylex.attrs(viewStyles.sceneDiv)}>
         <Detail info={i} agents={[]} />
       </div>
     ),

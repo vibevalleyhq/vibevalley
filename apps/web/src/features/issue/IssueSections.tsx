@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -21,13 +22,259 @@ import { issueMove, issueMoveOf, sendMove } from "./moves";
 import type { CriterionRow } from "./overview";
 import { Property } from "./Sheet";
 
+const recipeStyles2 = stylex.create({
+  workLogSpan: {
+    width: "calc(var(--spacing) * 12)",
+    flexShrink: "0",
+  },
+  workLogSpanState: {
+    color: "var(--wb-muted)",
+  },
+  workLogSpanState2: {
+    color: "var(--wb-water)",
+  },
+  workLogSpanState3: {
+    color: "var(--wb-berry)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  storySpan: {
+    minWidth: "0",
+    flex: "1",
+    overflowWrap: "break-word",
+  },
+  storySpanVariant1Case1: {
+    color: null,
+  },
+  storySpanVariant1Case2: {
+    color: "var(--color-berry)",
+  },
+  storySpanVariant2Case1: {
+    fontWeight: null,
+  },
+  storySpanVariant2Case2: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  criteriaIcon: {
+    marginTop: "calc(var(--spacing) * .5)",
+    flexShrink: "0",
+  },
+});
+
+const variantStyles = stylex.create({
+  criteriaSpan: {},
+  criteriaSpanVariant: {
+    color: "var(--color-muted)",
+  },
+  runsSpan: {
+    marginTop: "calc(var(--spacing) * .5)",
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "block",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  workLogSpan: {
+    WebkitLineClamp: "3",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    minWidth: "0",
+    flex: "1",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    overflowWrap: "break-word",
+    whiteSpace: "pre-wrap",
+  },
+});
+
+const viewStyles = stylex.create({
+  checklistControl: { marginTop: "calc(var(--spacing) * 0.5)" },
+  questionDiv: {
+    marginTop: "calc(var(--spacing) * 2.5)",
+  },
+  questionDiv2: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  criteriaUl: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  criteriaLi: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  criteriaSpan: {
+    marginTop: "var(--spacing)",
+    width: "calc(var(--spacing) * 3)",
+    height: "calc(var(--spacing) * 3)",
+    flexShrink: "0",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+  },
+  criteriaSpan2: {
+    minWidth: "0",
+    flex: "1",
+  },
+  criteriaSpan3: {
+    display: "block",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  milestone: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  storySpan: {
+    width: "calc(var(--spacing) * 16)",
+    flexShrink: "0",
+    color: "var(--color-muted)",
+  },
+  storySpan2: {
+    color: "var(--color-muted)",
+  },
+  runsP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  runsDiv: {
+    marginBottom: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  runsDiv2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 3)",
+    paddingBottom: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  runsSpan: {
+    width: "calc(var(--spacing) * 20)",
+    flexShrink: "0",
+    color: "var(--color-muted)",
+  },
+  workLogOl: {
+    maxHeight: "420px",
+    overflowY: "auto",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  workLogLi: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderBottomStyle: {
+      default: "solid",
+      ":last-child": "solid",
+    },
+    borderBottomWidth: {
+      default: "1px",
+      ":last-child": "0",
+    },
+    borderColor: {
+      default: "var(--color-line)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-line) 60%, transparent)",
+    },
+    paddingBlock: "var(--spacing)",
+  },
+  workLogSpan: {
+    width: "calc(var(--spacing) * 14)",
+    flexShrink: "0",
+    color: "var(--color-faint)",
+  },
+  orchestratorIssueDetailDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+    paddingRight: "calc(var(--spacing) * 10)",
+  },
+  orchestratorIssueDetailH1: {
+    flex: "1",
+    fontSize: "var(--text-xl)",
+    lineHeight: "var(--text-xl--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  orchestratorIssueDetailSpan: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  orchestratorIssueDetailDiv2: {
+    marginTop: "calc(var(--spacing) * 3)",
+  },
+  orchestratorIssueDetailDiv3: {
+    marginTop: "calc(var(--spacing) * 3)",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  orchestratorIssueDetailSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  orchestratorIssueDetailDiv4: {
+    marginTop: "calc(var(--spacing) * 4)",
+  },
+  orchestratorIssueDetailSpan3: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  orchestratorIssueDetailH2: {
+    marginTop: "calc(var(--spacing) * 5)",
+    marginBottom: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  listDiv: {
+    marginTop: "calc(var(--spacing) * 2)",
+  },
+  listDiv2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  listDiv3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+});
+
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
   return (
-    <div class="mt-2.5">
+    <div {...stylex.attrs(viewStyles.questionDiv)}>
       <div>{props.ask.question}</div>
       <Show when={props.ask.options.length}>
-        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
+        <div {...stylex.attrs(viewStyles.questionDiv2)} role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
           <For each={props.ask.options}>
             {(o) => (
               <Button data-testid="answer-option" data-key={o} disabled={props.busy} onClick={() => props.onPick(o)}>
@@ -59,10 +306,10 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
       return n;
     });
   return (
-    <ul class="flex flex-col">
+    <ul {...stylex.attrs(viewStyles.criteriaUl)}>
       <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
-          <li class="flex items-start gap-2.5 rounded-md px-1.5 py-1 text-sm">
+          <li {...stylex.attrs(viewStyles.criteriaLi)}>
             <Show when={props.checking}>
               <Checkbox
                 testid="criterion-tick"
@@ -70,16 +317,18 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
                 label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
-                class="mt-0.5"
+                styles={viewStyles.checklistControl}
               />
             </Show>
-            <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title={t("web.issue.detail.unsaid")} />}>
-              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} class="mt-0.5 shrink-0" />}
+            <Show when={r().result} fallback={<span {...stylex.attrs(viewStyles.criteriaSpan)} title={t("web.issue.detail.unsaid")} />}>
+              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} styles={[variantStyles2.criteriaIcon]} />}
             </Show>
-            <span class="min-w-0 flex-1">
-              <span class={{ "text-muted": ticked().has(i()) }}>{r().text}</span>
+            <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
+              <span {...stylex.attrs(variantStyles.criteriaSpan, ticked().has(i()) ? variantStyles.criteriaSpanVariant : variantStyles.criteriaSpan)}>
+                {r().text}
+              </span>
               <Show when={r().proof}>
-                <span class="block text-xs text-muted">{r().proof}</span>
+                <span {...stylex.attrs(viewStyles.criteriaSpan3)}>{r().proof}</span>
               </Show>
             </span>
           </li>
@@ -92,14 +341,20 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
 /** The milestones, newest first: when, who, what. */
 export function Story(props: { milestones: Milestone[] }) {
   return (
-    <ol class="flex flex-col">
+    <ol {...stylex.attrs(viewStyles.criteriaUl)}>
       <For each={props.milestones}>
         {(m) => (
-          <li data-testid="milestone" data-kind={m.kind} class="flex gap-3 py-1 text-sm">
-            <span class="w-16 shrink-0 text-muted">{wallClockText(m.at)}</span>
-            <span class={["min-w-0 flex-1 break-words", { "text-berry": m.kind === "failed" || m.kind === "rejected", "font-semibold": m.kind === "asked" }]}>
+          <li data-testid="milestone" data-kind={m.kind} {...stylex.attrs(viewStyles.milestone)}>
+            <span {...stylex.attrs(viewStyles.storySpan)}>{wallClockText(m.at)}</span>
+            <span
+              {...stylex.attrs(
+                recipeStyles.storySpan,
+                m.kind === "failed" || m.kind === "rejected" ? recipeStyles.storySpanVariant1Case2 : recipeStyles.storySpanVariant1Case1,
+                m.kind === "asked" ? recipeStyles.storySpanVariant2Case2 : recipeStyles.storySpanVariant2Case1,
+              )}
+            >
               <Show when={m.who}>
-                <span class="text-muted">{m.who} · </span>
+                <span {...stylex.attrs(viewStyles.storySpan2)}>{m.who} · </span>
               </Show>
               {plainText(m.text)}
             </span>
@@ -119,17 +374,17 @@ export function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(query, []);
   const now = () => Date.now();
   return (
-    <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">{t("web.issue.detail.noRuns")}</p>}>
+    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(viewStyles.runsP)}>{t("web.issue.detail.noRuns")}</p>}>
       <div>
-        <div class="mb-2 text-xs text-muted">{t("web.issue.detail.runCount", { n: runs().length })}</div>
+        <div {...stylex.attrs(viewStyles.runsDiv)}>{t("web.issue.detail.runCount", { n: runs().length })}</div>
         <For each={[...runs()].toReversed()}>
           {(r) => (
-            <div class="flex gap-3 pb-2 text-sm">
-              <span class="w-20 shrink-0 text-muted">{wallClockText(r.startedAt)}</span>
-              <span class="min-w-0 flex-1">
+            <div {...stylex.attrs(viewStyles.runsDiv2)}>
+              <span {...stylex.attrs(viewStyles.runsSpan)}>{wallClockText(r.startedAt)}</span>
+              <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
                 {runText(r, now(), tookText)}
                 <Show when={r.summary}>
-                  <span class="mt-0.5 line-clamp-2 block text-xs text-muted">{r.summary}</span>
+                  <span {...stylex.attrs(variantStyles.runsSpan)}>{r.summary}</span>
                 </Show>
               </span>
             </div>
@@ -161,17 +416,24 @@ const stepWord: Partial<Record<SessionEvent["type"], string>> = {
 export function WorkLog(props: { steps: SessionEvent[] }) {
   const shown = () => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240);
   return (
-    <ol class="max-h-[420px] overflow-y-auto font-mono text-xs">
+    <ol {...stylex.attrs(viewStyles.workLogOl)}>
       <For each={shown()}>
         {(e) => (
-          <li class="flex gap-2.5 border-b border-line/60 py-1 last:border-b-0">
-            <span class="w-14 shrink-0 text-faint">{wallClockText(e.time)}</span>
-            <span class={["w-12 shrink-0", e.type === "run/error" ? "text-berry" : e.type === "tool/call" ? "text-water" : "text-muted"]}>
+          <li {...stylex.attrs(viewStyles.workLogLi)}>
+            <span {...stylex.attrs(viewStyles.workLogSpan)}>{wallClockText(e.time)}</span>
+            <span
+              {...stylex.attrs(
+                recipeStyles2.workLogSpan,
+                e.type === "run/error"
+                  ? recipeStyles2.workLogSpanState3
+                  : e.type === "tool/call"
+                    ? recipeStyles2.workLogSpanState2
+                    : recipeStyles2.workLogSpanState,
+              )}
+            >
               {stepWord[e.type]}
             </span>
-            <span class="line-clamp-3 min-w-0 flex-1 font-sans text-sm break-words whitespace-pre-wrap">
-              {e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}
-            </span>
+            <span {...stylex.attrs(variantStyles.workLogSpan)}>{e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}</span>
           </li>
         )}
       </For>
@@ -194,17 +456,17 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   };
   return (
     <div>
-      <div class="flex items-start gap-3 pr-10">
-        <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
-        <span class="mt-1.5 text-xs text-muted">{tagText(props.issue)}</span>
+      <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv)}>
+        <h1 {...stylex.attrs(viewStyles.orchestratorIssueDetailH1)}>{props.issue.title}</h1>
+        <span {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan)}>{tagText(props.issue)}</span>
       </div>
-      <div class="mt-3">
+      <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv2)}>
         <ActLines issue={props.issue.id} />
       </div>
       <Show when={props.issue.stage.acts.length > 0}>
-        <div class="mt-3 flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv3)}>
           <Show when={props.issue.stage.state === "stuck"}>
-            <span class="text-sm text-berry">{t("web.issue.detail.orchestratorStuck")}</span>
+            <span {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan2)}>{t("web.issue.detail.orchestratorStuck")}</span>
           </Show>
           <For each={props.issue.stage.acts}>
             {(a) => (
@@ -215,11 +477,11 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           </For>
         </div>
       </Show>
-      <div class="mt-4">
+      <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv4)}>
         <Property label={t("web.issue.detail.who")}>{t("web.issue.orchestrator")}</Property>
         <Show when={props.issue.description}>
           <Property label={t("web.issue.detail.job")}>
-            <span class="text-base">{props.issue.description}</span>
+            <span {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan3)}>{props.issue.description}</span>
           </Property>
         </Show>
         <Show when={props.issue.cron}>
@@ -229,7 +491,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
         <Property label={t("web.issue.detail.answer")}>{t("web.issue.detail.answered")}</Property>
       </div>
-      <h2 class="mt-5 mb-2 text-sm font-semibold">{t("web.issue.detail.runs")}</h2>
+      <h2 {...stylex.attrs(viewStyles.orchestratorIssueDetailH2)}>{t("web.issue.detail.runs")}</h2>
       <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
     </div>
   );
@@ -239,15 +501,15 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
 export function AnswerView(props: { answer: IssueAnswer }) {
   const list = (head: string, lines: readonly string[]) => (
     <Show when={lines.length > 0}>
-      <div class="mt-2">
-        <div class="text-xs text-muted">{head}</div>
-        <For each={lines}>{(l) => <div class="text-sm">· {l}</div>}</For>
+      <div {...stylex.attrs(viewStyles.listDiv)}>
+        <div {...stylex.attrs(viewStyles.listDiv2)}>{head}</div>
+        <For each={lines}>{(l) => <div {...stylex.attrs(viewStyles.listDiv3)}>· {l}</div>}</For>
       </div>
     </Show>
   );
   return (
     <div>
-      <p class="text-base">{props.answer.conclusion}</p>
+      <p {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan3)}>{props.answer.conclusion}</p>
       {list(t("web.issue.detail.evidence"), props.answer.evidence)}
       {list(t("web.issue.detail.unsure"), props.answer.unsure)}
       {list(t("web.issue.detail.next"), props.answer.next)}

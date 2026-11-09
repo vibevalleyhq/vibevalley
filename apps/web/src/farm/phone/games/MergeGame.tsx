@@ -1,12 +1,85 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
+
+const recipeStyles = stylex.create({
+  mergeGameDiv: {
+    position: "absolute",
+    inset: "0",
+    display: "grid",
+    placeItems: "center",
+    backgroundColor: {
+      default: "var(--color-lcd-panel)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
+    },
+    textAlign: "center",
+  },
+});
+
+const variantStyles = stylex.create({
+  mergeGameDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingTop: "calc(var(--spacing) * 2)",
+  },
+});
+
+const viewStyles = stylex.create({
+  mergeGameDiv: {
+    display: "flex",
+    width: "100%",
+    paddingInline: "var(--spacing)",
+  },
+  mergeGameSpan: {
+    marginLeft: "auto",
+    fontVariantNumeric: "tabular-nums",
+  },
+  mergeGameSpan2: {
+    fontVariantNumeric: "tabular-nums",
+  },
+  mergeGameSpan3: {
+    marginLeft: "auto",
+  },
+  mergeBoard: {
+    position: "relative",
+    display: "grid",
+    flexShrink: "0",
+    touchAction: "none",
+  },
+  mergeGameDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mergeGameSpan4: {
+    lineHeight: "14px",
+  },
+  mergeGameDiv3: {
+    display: "flex",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  mergeGameP: {
+    marginTop: "auto",
+    marginBottom: "var(--spacing)",
+    textAlign: "center",
+    lineHeight: "1.625",
+  },
+});
 
 const game = kept<Merge | undefined>(undefined);
 const best = kept(0);
@@ -283,18 +356,20 @@ export function MergeGame() {
             : undefined;
   };
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center gap-1.5 px-2 pt-2">
-      <div class="flex w-full px-1">
+    <div {...stylex.attrs(variantStyles.mergeGameDiv)}>
+      <div {...stylex.attrs(viewStyles.mergeGameDiv)}>
         <span>{t("web.farm.phone.game.merge")}</span>
-        <span class="ml-auto tabular-nums">
+        <span {...stylex.attrs(viewStyles.mergeGameSpan)}>
           {t("web.farm.phone.blocks.best")} {Math.max(top(), score())}
         </span>
       </div>
-      <div class="flex w-full px-1">
-        <span class="tabular-nums">
+      <div {...stylex.attrs(viewStyles.mergeGameDiv)}>
+        <span {...stylex.attrs(viewStyles.mergeGameSpan2)}>
           {t("web.farm.phone.blocks.score")} {score()}
         </span>
-        <span class="ml-auto">{reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
+        <span {...stylex.attrs(viewStyles.mergeGameSpan3)}>
+          {reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}
+        </span>
       </div>
       <div
         role="img"
@@ -305,7 +380,7 @@ export function MergeGame() {
             ? t("web.farm.phone.merge.field", { n: board().filter((c) => c !== 0).length, top: mergeStageName(Math.max(reached(), 1)) })
             : t("web.farm.phone.game.merge")
         }
-        class="relative grid shrink-0 touch-none"
+        {...stylex.attrs(viewStyles.mergeBoard)}
         style={{
           width: `${side}px`,
           height: `${side}px`,
@@ -321,7 +396,7 @@ export function MergeGame() {
         <For each={board()} keyed={false}>
           {(stage, i) => (
             <div
-              class="flex flex-col items-center justify-center"
+              {...stylex.attrs(viewStyles.mergeGameDiv2)}
               style={{
                 background: stage() !== 0 ? lcd.paper : lcd.light,
                 "box-shadow": g()?.grown.includes(i) === true ? `inset 0 0 0 2px ${lcd.ink}` : undefined,
@@ -329,24 +404,24 @@ export function MergeGame() {
             >
               <Show when={stage() > 0}>
                 <Crop stage={stage()} size={36} />
-                <span class="leading-[14px]">{mergeStageName(stage())}</span>
+                <span {...stylex.attrs(viewStyles.mergeGameSpan4)}>{mergeStageName(stage())}</span>
               </Show>
             </div>
           )}
         </For>
         <Show when={overlay()}>
           {(o) => (
-            <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
+            <div {...stylex.attrs(recipeStyles.mergeGameDiv)}>
               <span>
                 {o()[0]}
                 <br />
-                <span class="phone-blink">{o()[1]}</span>
+                <span {...styleProps(phoneAnimations.blink)}>{o()[1]}</span>
               </span>
             </div>
           )}
         </Show>
       </div>
-      <div class="flex gap-0.5" aria-label={t("web.farm.phone.merge.stages")}>
+      <div {...stylex.attrs(viewStyles.mergeGameDiv3)} aria-label={t("web.farm.phone.merge.stages")}>
         <For each={mergeStages}>
           {(name, i) => (
             <span title={name}>
@@ -355,7 +430,7 @@ export function MergeGame() {
           )}
         </For>
       </div>
-      <p class="mt-auto mb-1 text-center leading-[1.625]" style={{ color: lcd.dark }}>
+      <p {...stylex.attrs(viewStyles.mergeGameP)} style={{ color: lcd.dark }}>
         {t("web.farm.phone.merge.help")}
         <br />
         {t("web.farm.phone.merge.help2")}

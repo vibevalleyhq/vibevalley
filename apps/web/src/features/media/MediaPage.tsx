@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -17,6 +18,36 @@ import { AudioPanel } from "./AudioPanel.tsx";
 import { publicationKey } from "./publication.ts";
 import { SpeechPanel } from "./SpeechPanel.tsx";
 import { UnderstandingPanel } from "./UnderstandingPanel.tsx";
+
+const viewStyles = stylex.create({
+  page: {
+    display: "flex",
+    height: "100%",
+    minWidth: 0,
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 5)",
+    overflowY: "auto",
+    padding: "calc(var(--spacing) * 5)",
+  },
+  header: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "calc(var(--spacing) * 3)" },
+  title: { fontSize: "var(--text-xl)", lineHeight: "var(--text-xl--line-height)", fontWeight: "var(--font-weight-semibold)" },
+  link: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-water)", textDecorationLine: "underline" },
+  actions: { display: "flex", flexWrap: "wrap", gap: "calc(var(--spacing) * 2)" },
+  content: { display: "flex", maxWidth: "var(--container-3xl)", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 4)" },
+  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-muted)" },
+  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
+  dimensions: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "calc(var(--spacing) * 3)" },
+  summary: { cursor: "pointer", fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
+  advanced: { marginTop: "calc(var(--spacing) * 3)", display: "flex", flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
+  label: { display: "flex", alignItems: "center", gap: "calc(var(--spacing) * 2)", fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
+  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-muted)" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
+  heading: { fontSize: "var(--text-base)", lineHeight: "var(--text-base--line-height)", fontWeight: "var(--font-weight-semibold)" },
+  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", wordBreak: "break-all", color: "var(--color-muted)" },
+  source: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", overflowWrap: "break-word", color: "var(--color-muted)" },
+  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
+  image: { maxHeight: "calc(var(--spacing) * 96)", maxWidth: "100%", borderRadius: "var(--radius-md)", objectFit: "contain" },
+});
 
 export function MediaPage() {
   const state = useCore();
@@ -57,14 +88,14 @@ export function MediaPage() {
     return act.run(() => api.media.image.create(input));
   };
   return (
-    <div class="flex h-full min-w-0 flex-col gap-5 overflow-y-auto p-5" data-testid="media-page">
-      <div class="flex flex-wrap items-center gap-3">
-        <h1 class="text-xl font-semibold">{t("web.media.title")}</h1>
-        <Link href="/settings/providers" class="text-sm text-water underline">
+    <div {...stylex.attrs(viewStyles.page)} data-testid="media-page">
+      <div {...stylex.attrs(viewStyles.header)}>
+        <h1 {...stylex.attrs(viewStyles.title)}>{t("web.media.title")}</h1>
+        <Link href="/settings/providers" {...stylex.attrs(viewStyles.link)}>
           {t("web.media.configure")}
         </Link>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div {...stylex.attrs(viewStyles.actions)}>
         <Button
           data-testid="media-mode-image"
           aria-pressed={mode() === "image" ? "true" : "false"}
@@ -98,7 +129,7 @@ export function MediaPage() {
           {t("web.audio.title")}
         </Button>
       </div>
-      <div class="flex max-w-3xl min-w-0 flex-col gap-4">
+      <div {...stylex.attrs(viewStyles.content)}>
         <Show when={mode() === "audio"}>
           <AudioPanel />
         </Show>
@@ -110,8 +141,8 @@ export function MediaPage() {
         </Show>
         <Show when={mode() === "image"}>
           <Card title={t("web.media.generate")}>
-            <p class="text-sm text-muted">{t("web.media.notice")}</p>
-            <fieldset disabled={act.busy() || submitted() !== undefined} class="flex min-w-0 flex-col gap-3" aria-label={t("web.media.prompt")}>
+            <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.notice")}</p>
+            <fieldset disabled={act.busy() || submitted() !== undefined} {...stylex.attrs(viewStyles.form)} aria-label={t("web.media.prompt")}>
               <Field label={t("web.media.format")}>
                 <Select
                   label={t("web.media.format")}
@@ -133,7 +164,7 @@ export function MediaPage() {
                   onInput={(event) => setPrompt(event.currentTarget.value)}
                 />
               </Field>
-              <div class="grid grid-cols-2 gap-3">
+              <div {...stylex.attrs(viewStyles.dimensions)}>
                 <Field label={t("web.media.width")}>
                   <TextInput
                     data-testid="media-width"
@@ -154,8 +185,8 @@ export function MediaPage() {
                 </Field>
               </div>
               <details>
-                <summary class="cursor-pointer text-sm">{t("web.media.advanced")}</summary>
-                <div class="mt-3 flex flex-col gap-3">
+                <summary {...stylex.attrs(viewStyles.summary)}>{t("web.media.advanced")}</summary>
+                <div {...stylex.attrs(viewStyles.advanced)}>
                   <Field label={t("web.media.seed")}>
                     <TextInput aria-label={t("web.media.seed")} type="number" value={seed()} onInput={(e) => setSeed(e.currentTarget.value)} />
                   </Field>
@@ -174,11 +205,11 @@ export function MediaPage() {
                   <Field label={t("web.media.negative")}>
                     <TextArea aria-label={t("web.media.negative")} value={negative()} onInput={(e) => setNegative(e.currentTarget.value)} />
                   </Field>
-                  <label class="flex items-center gap-2 text-sm">
+                  <label {...stylex.attrs(viewStyles.label)}>
                     <Checkbox label={t("web.media.enhance")} checked={enhance()} onChange={setEnhance} />
                     {t("web.media.enhance")}
                   </label>
-                  <label class="flex items-center gap-2 text-sm">
+                  <label {...stylex.attrs(viewStyles.label)}>
                     <Checkbox label={t("web.media.watermark")} checked={watermark()} onChange={setWatermark} />
                     {t("web.media.watermark")}
                   </label>
@@ -186,9 +217,9 @@ export function MediaPage() {
               </details>
             </fieldset>
             <Show when={submitted()}>
-              <p class="text-xs text-muted">{t("web.media.pending")}</p>
+              <p {...stylex.attrs(viewStyles.detail)}>{t("web.media.pending")}</p>
             </Show>
-            <div class="flex flex-wrap gap-2">
+            <div {...stylex.attrs(viewStyles.actions)}>
               <Button data-testid="media-generate" tone="primary" disabled={act.busy() || !prompt().trim()} onClick={() => void submit()}>
                 {submitted() ? t("web.media.resubmit") : t("web.media.generate")}
               </Button>
@@ -208,13 +239,13 @@ export function MediaPage() {
             </div>
             <Show when={error()}>
               {(why) => (
-                <p role="alert" data-testid="media-error" class="text-sm text-berry">
+                <p role="alert" data-testid="media-error" {...stylex.attrs(viewStyles.error)}>
                   {why()}
                 </p>
               )}
             </Show>
           </Card>
-          <h2 class="text-base font-semibold">{t("web.media.history")}</h2>
+          <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.media.history")}</h2>
           <Show when={images().length > 0} fallback={<Quiet>{t("web.media.empty")}</Quiet>}>
             <For each={images()} keyed={(job) => job.id}>
               {(job) => <JobCard job={job()} />}
@@ -252,27 +283,27 @@ function JobCard(props: { job: MediaImageJob }) {
   };
   return (
     <Card title={props.job.phaseText}>
-      <div data-testid="media-job" data-id={props.job.id} data-phase={props.job.phase} class="flex min-w-0 flex-col gap-3">
-        <p class="text-xs break-all text-muted">
+      <div data-testid="media-job" data-id={props.job.id} data-phase={props.job.phase} {...stylex.attrs(viewStyles.form)}>
+        <p {...stylex.attrs(viewStyles.identifierDetail)}>
           {props.job.model} · {props.job.id}
         </p>
-        <p data-testid="media-source" class="text-xs break-words text-muted">
+        <p data-testid="media-source" {...stylex.attrs(viewStyles.source)}>
           {props.job.source.kind === "owner"
             ? t("web.media.sourceOwner")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
-        <p data-testid="media-usage" class="text-xs text-muted">
+        <p data-testid="media-usage" {...stylex.attrs(viewStyles.detail)}>
           {props.job.usage ? t("web.media.usage", props.job.usage) : t("web.media.usageUnknown")}
         </p>
-        <p class="text-sm break-words whitespace-pre-wrap">{props.job.prompt}</p>
+        <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>
         <Show when={props.job.problem}>
-          <p class="text-sm text-muted">{props.job.problem}</p>
+          <p {...stylex.attrs(viewStyles.notice)}>{props.job.problem}</p>
         </Show>
         <Show when={props.job.attachment}>
           {(file) => (
             <>
-              <img data-testid="media-image" src={attachmentPath(file().id)} alt={props.job.prompt} class="max-h-96 max-w-full rounded-md object-contain" />
-              <a data-testid="media-save" href={attachmentPath(file().id)} download={file().name} class="text-sm text-water underline">
+              <img data-testid="media-image" src={attachmentPath(file().id)} alt={props.job.prompt} {...stylex.attrs(viewStyles.image)} />
+              <a data-testid="media-save" href={attachmentPath(file().id)} download={file().name} {...stylex.attrs(viewStyles.link)}>
                 {t("web.media.save")}
               </a>
               <Field label={t("web.media.channel")}>
@@ -300,7 +331,7 @@ function JobCard(props: { job: MediaImageJob }) {
             </>
           )}
         </Show>
-        <div class="flex flex-wrap gap-2">
+        <div {...stylex.attrs(viewStyles.actions)}>
           <Show when={props.job.canCancel}>
             <ConfirmButton
               testid="media-cancel"
@@ -318,7 +349,7 @@ function JobCard(props: { job: MediaImageJob }) {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" class="text-sm text-berry">
+            <p role="alert" {...stylex.attrs(viewStyles.error)}>
               {why()}
             </p>
           )}

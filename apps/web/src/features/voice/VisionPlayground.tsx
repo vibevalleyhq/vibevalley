@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -11,9 +12,73 @@ import { Card } from "#/ui/layout.tsx";
 import { VisionLine } from "./vision-line.ts";
 import { canCapture, type VisualSource } from "./visual-capture.ts";
 
+const styles = stylex.create({
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  controls: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  notice: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  actions: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  problem: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  prompt: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  finalTurn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  transcript: {
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 72)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+  },
+  response: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    whiteSpace: "pre-wrap",
+    color: "var(--color-ink)",
+  },
+  interrupted: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+});
+
 export function VisualSourceField(props: { source: VisualSource; disabled: boolean; onChange(source: VisualSource): void }) {
   return (
-    <label class="flex flex-col gap-1 text-xs text-muted">
+    <label {...stylex.attrs(styles.field)}>
       {t("web.voice.vision.source")}
       <Select<VisualSource>
         testid="visual-source"
@@ -57,16 +122,16 @@ export function VisionPlayground() {
   return (
     <section data-testid="vision-line" data-state={session().phase}>
       <Card title={t("web.voice.vision.title")}>
-        <div class="flex flex-col gap-3 p-4">
-          <p class="text-sm text-muted">{t("web.voice.vision.notice")}</p>
-          <p class="text-sm text-muted">{t("web.voice.vision.hostNotice")}</p>
+        <div {...stylex.attrs(styles.controls)}>
+          <p {...stylex.attrs(styles.notice)}>{t("web.voice.vision.notice")}</p>
+          <p {...stylex.attrs(styles.notice)}>{t("web.voice.vision.hostNotice")}</p>
           <VisualSourceField source={source()} disabled={active()} onChange={setSource} />
           <Show when={!canCapture(source())}>
-            <p role="status" class="text-sm text-muted">
+            <p role="status" {...stylex.attrs(styles.notice)}>
               {t("web.voice.vision.unavailable")}
             </p>
           </Show>
-          <div class="flex flex-wrap items-center gap-3">
+          <div {...stylex.attrs(styles.actions)}>
             <Show
               when={active()}
               fallback={
@@ -79,48 +144,48 @@ export function VisionPlayground() {
                 {t("web.voice.vision.stop")}
               </Button>
             </Show>
-            <p role="status" class="text-sm text-muted">
+            <p role="status" {...stylex.attrs(styles.notice)}>
               {status()}
             </p>
           </div>
           <Show when={problem()}>
             {(value) => (
-              <p role="alert" class="text-sm text-berry">
+              <p role="alert" {...stylex.attrs(styles.problem)}>
                 {value()}
               </p>
             )}
           </Show>
           <form
-            class="flex flex-col gap-2"
+            {...stylex.attrs(styles.prompt)}
             onSubmit={(event) => {
               event.preventDefault();
               if (line.prompt(prompt(), final())) setPrompt("");
             }}
           >
-            <label class="flex flex-col gap-1 text-xs text-muted">
+            <label {...stylex.attrs(styles.field)}>
               {t("web.voice.vision.prompt")}
               <TextArea data-testid="vision-prompt" rows={2} maxlength={8000} value={prompt()} onInput={(event) => void setPrompt(event.currentTarget.value)} />
             </label>
-            <label class="flex items-center gap-2 text-sm text-muted">
+            <label {...stylex.attrs(styles.finalTurn)}>
               <Checkbox testid="vision-final" label={t("web.voice.vision.final")} checked={final()} onChange={setFinal} />
               {t("web.voice.vision.final")}
             </label>
-            <Button data-testid="vision-send" type="submit" disabled={!session().readyForInput || !prompt().trim()}>
+            <Button data-testid="vision-send" type="submit" disabled={!session().readyForPrompt || !prompt().trim()}>
               {t("web.voice.vision.send")}
             </Button>
           </form>
           <Show when={session().lastEvent === "response.turn.silence"}>
-            <p role="status" class="text-sm text-muted">
+            <p role="status" {...stylex.attrs(styles.notice)}>
               {t("web.voice.vision.silence")}
             </p>
           </Show>
-          <div role="log" aria-label={t("web.voice.vision.transcript")} data-testid="vision-transcript" class="flex max-h-72 flex-col gap-2 overflow-y-auto">
+          <div role="log" aria-label={t("web.voice.vision.transcript")} data-testid="vision-transcript" {...stylex.attrs(styles.transcript)}>
             <For each={session().responses}>
               {(response) => (
                 <div data-state={response.state}>
-                  <p class="text-sm whitespace-pre-wrap text-ink">{response.text}</p>
+                  <p {...stylex.attrs(styles.response)}>{response.text}</p>
                   <Show when={response.state === "interrupted"}>
-                    <span class="text-xs text-muted">{t("web.voice.vision.interrupted")}</span>
+                    <span {...stylex.attrs(styles.interrupted)}>{t("web.voice.vision.interrupted")}</span>
                   </Show>
                 </div>
               )}

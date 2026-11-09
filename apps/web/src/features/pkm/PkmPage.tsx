@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,156 @@ import { Opened } from "./PageView";
 import { Sidebar } from "./Sidebar";
 import { refreshVault, usePkmVault } from "./vault";
 
+const variantStyles2 = stylex.create({
+  daysA: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  pkmPageNav: {
+    minHeight: "0",
+    flexShrink: "0",
+    flexDirection: "column",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+    padding: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 64)",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=64rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=64rem)": "1px",
+    },
+  },
+  pkmPageNavVariant: {
+    display: "flex",
+  },
+  pkmPageNavVariant2: {
+    display: {
+      default: "none",
+      "@media (width>=64rem)": "flex",
+    },
+  },
+  pkmPageMain: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  daysDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=80rem)": "row",
+    },
+    overflowY: "auto",
+    alignItems: {
+      default: null,
+      "@media (width>=80rem)": "flex-start",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  pkmPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+  },
+  daysDiv: {
+    marginInline: "auto",
+    display: "flex",
+    width: "100%",
+    maxWidth: "var(--container-3xl)",
+    minWidth: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 6)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+  daysDiv2: {
+    display: {
+      default: null,
+      "@media (width>=64rem)": "none",
+    },
+  },
+  daysAside: {
+    marginInline: {
+      default: "auto",
+      "@media (width>=80rem)": "0",
+    },
+    width: {
+      default: "100%",
+      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+    },
+    maxWidth: "var(--container-3xl)",
+    borderTopStyle: {
+      default: "solid",
+      "@media (width>=80rem)": "solid",
+    },
+    borderTopWidth: {
+      default: "1px",
+      "@media (width>=80rem)": "0",
+    },
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+    position: {
+      default: null,
+      "@media (width>=80rem)": "sticky",
+    },
+    top: {
+      default: null,
+      "@media (width>=80rem)": "0",
+    },
+    flexShrink: {
+      default: null,
+      "@media (width>=80rem)": "0",
+    },
+    borderLeftStyle: {
+      default: null,
+      "@media (width>=80rem)": "solid",
+    },
+    borderLeftWidth: {
+      default: null,
+      "@media (width>=80rem)": "1px",
+    },
+  },
+});
+
 /** `rest` is the path after /pkm/: a page's slug. */
 export function PkmPage(props: { rest: string }) {
   const vault = usePkmVault();
@@ -24,15 +175,15 @@ export function PkmPage(props: { rest: string }) {
   const pages = () => ready(vault, undefined)?.pages ?? [];
   const nav = () => search().has("nav");
   return (
-    <div class="flex h-full min-h-0 flex-col lg:flex-row">
+    <div {...stylex.attrs(viewStyles.pkmPageDiv)}>
       <nav
         aria-label={t("web.pkm.list.label")}
         data-testid="pkm-nav"
-        class={[nav() ? "flex" : "hidden lg:flex", "min-h-0 shrink-0 flex-col border-line bg-side p-3 lg:w-64 lg:border-r"]}
+        {...stylex.attrs(variantStyles.pkmPageNav, nav() ? variantStyles.pkmPageNavVariant : variantStyles.pkmPageNavVariant2)}
       >
         <Sidebar slug={slug()} pages={pages()} error={vault.error} />
       </nav>
-      <main class={[nav() ? "hidden lg:flex" : "flex", "min-h-0 min-w-0 flex-1 flex-col"]}>
+      <main {...stylex.attrs(variantStyles.pkmPageMain, nav() ? variantStyles.pkmPageNavVariant2 : variantStyles.pkmPageNavVariant)}>
         <Show when={slug()} fallback={<Days pages={pages()} />}>
           {(s) => <Keyed key={s()}>{() => <Opened slug={s()} pages={pages()} point={search().get("b") ?? undefined} />}</Keyed>}
         </Show>
@@ -62,10 +213,10 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
       .toSorted((a, b) => (b.day ?? "").localeCompare(a.day ?? ""))
       .slice(0, daysShown);
   return (
-    <div data-testid="pkm-days" class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:items-start">
-      <div class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-6 px-4 py-4">
-        <div class="lg:hidden">
-          <A href="/pkm?nav" class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink">
+    <div data-testid="pkm-days" {...stylex.attrs(variantStyles.daysDiv)}>
+      <div {...stylex.attrs(viewStyles.daysDiv)}>
+        <div {...stylex.attrs(viewStyles.daysDiv2)}>
+          <A href="/pkm?nav" {...stylex.attrs(variantStyles2.daysA)}>
             <Icon name="calendar" size={14} />
             {t("web.pkm.list.label")}
           </A>
@@ -75,10 +226,7 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
           {(p) => <Opened slug={p().slug} pages={props.pages} compact />}
         </For>
       </div>
-      <aside
-        aria-label={t("web.pkm.rail.label")}
-        class="mx-auto w-full max-w-3xl border-t border-line px-4 py-4 xl:sticky xl:top-0 xl:mx-0 xl:w-72 xl:shrink-0 xl:border-t-0 xl:border-l"
-      >
+      <aside aria-label={t("web.pkm.rail.label")} {...stylex.attrs(viewStyles.daysAside)}>
         <Calendar pages={props.pages} open={today} />
       </aside>
     </div>

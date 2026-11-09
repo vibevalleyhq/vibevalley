@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -27,6 +28,140 @@ import { Icon } from "#/ui/Icon.tsx";
 import { Card } from "#/ui/layout.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
 import { Hint } from "#/ui/Tip.tsx";
+
+const variantStyles3 = stylex.create({
+  voiceAgentSectionTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  voiceAgentSectionA: {
+    textDecorationLine: "underline",
+  },
+});
+
+const variantStyles = stylex.create({
+  miniMaxVoicesDiv: {
+    display: "flex",
+    height: "34px",
+    alignItems: "center",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+  },
+  miniMaxVoicesDivVariant: {
+    borderColor: {
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
+    },
+    backgroundColor: "var(--color-selected)",
+  },
+  miniMaxVoicesDivVariant2: {
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+  },
+  miniMaxVoicesButton: {
+    height: "100%",
+    minWidth: "0",
+    flex: "1",
+    cursor: "pointer",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    paddingRight: "calc(var(--spacing) * 2)",
+    paddingLeft: "var(--spacing)",
+    textAlign: "left",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  miniMaxVoicesButtonVariant: {
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  miniMaxVoicesButtonVariant2: {
+    color: {
+      default: "var(--color-bark-800)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  colsDiv: {
+    display: "grid",
+    gap: "calc(var(--spacing) * 4)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
+    },
+  },
+  labeledDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  labeledDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  labeledSpan: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-muted)",
+  },
+  labeledSpan2: {
+    flex: "1",
+  },
+  voiceAgentSectionDiv: {
+    display: "flex",
+    maxWidth: "var(--container-4xl)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  voiceAgentSectionP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  miniMaxVoicesDiv: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(2,minmax(0,1fr))",
+      "@media (width>=40rem)": "repeat(3,minmax(0,1fr))",
+    },
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  miniMaxVoicesButton: {
+    marginLeft: "calc(var(--spacing) * .5)",
+    display: "inline-flex",
+    width: "calc(var(--spacing) * 7)",
+    height: "calc(var(--spacing) * 7)",
+    flexShrink: "0",
+    cursor: {
+      default: "pointer",
+      ":disabled": "default",
+    },
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+    opacity: {
+      default: null,
+      ":disabled": ".5",
+    },
+  },
+});
 
 export const areaLabel: Record<Area, string> = {
   US: t("web.voice.choices.area.US"),
@@ -142,17 +277,17 @@ export const options = <T extends string>(values: readonly T[], labels: Record<T
 export const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
 
 export function Cols(props: { children: JSX.Element }) {
-  return <div class="grid gap-4 md:grid-cols-2">{props.children}</div>;
+  return <div {...stylex.attrs(viewStyles.colsDiv)}>{props.children}</div>;
 }
 
 /** A label, what sits at its right (clear), the control and a hint under it. */
 export function Labeled(props: { label: string; hint?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <div class="flex flex-col gap-1">
-      <div class="flex items-center gap-1.5">
-        <span class="text-xs font-medium text-muted">{props.label}</span>
+    <div {...stylex.attrs(viewStyles.labeledDiv)}>
+      <div {...stylex.attrs(viewStyles.labeledDiv2)}>
+        <span {...stylex.attrs(viewStyles.labeledSpan)}>{props.label}</span>
         <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
-        <span class="flex-1" />
+        <span {...stylex.attrs(viewStyles.labeledSpan2)} />
         {props.aside}
       </div>
       <div>{props.children}</div>
@@ -164,17 +299,23 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
   const tts = () => props.draft.tts;
   const answer = () => props.draft.answer;
   return (
-    <div class="flex max-w-4xl flex-col gap-3">
-      <p class="text-sm text-muted">
+    <div {...stylex.attrs(viewStyles.voiceAgentSectionDiv)}>
+      <p {...stylex.attrs(viewStyles.voiceAgentSectionP)}>
         {t("web.voice.voice.persona.intro")}
-        <A class="underline" href="/settings/call">
+        <A {...stylex.attrs(variantStyles2.voiceAgentSectionA)} href="/settings/call">
           {t("web.voice.voice.section.label")}
         </A>
         {t("web.voice.voice.persona.page")}
       </p>
-      <Card title={t("web.voice.voice.persona.open")} action={<span class="text-sm text-muted">{t("web.voice.voice.persona.openParts")}</span>}>
+      <Card
+        title={t("web.voice.voice.persona.open")}
+        action={<span {...stylex.attrs(viewStyles.voiceAgentSectionP)}>{t("web.voice.voice.persona.openParts")}</span>}
+      >
         {/* The persona is the quick model's only: the orchestrator answering is itself, with its own prompt. */}
-        <Show when={answer().vendor !== "orchestrator"} fallback={<p class="text-sm text-muted">{t("web.voice.voice.persona.ownCall")}</p>}>
+        <Show
+          when={answer().vendor !== "orchestrator"}
+          fallback={<p {...stylex.attrs(viewStyles.voiceAgentSectionP)}>{t("web.voice.voice.persona.ownCall")}</p>}
+        >
           <Labeled label={t("web.voice.voice.persona.persona")} hint={t("web.voice.voice.persona.personaHint")}>
             <TextArea
               aria-label={t("web.voice.voice.persona.persona")}
@@ -202,7 +343,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
           </Labeled>
         </Cols>
       </Card>
-      <Card title={t("web.voice.voice.persona.speak")} action={<span class="text-sm text-muted">{ttsLabel[tts().vendor]}</span>}>
+      <Card title={t("web.voice.voice.persona.speak")} action={<span {...stylex.attrs(viewStyles.voiceAgentSectionP)}>{ttsLabel[tts().vendor]}</span>}>
         <Cols>
           <Labeled label={t("web.voice.voice.persona.tts")} hint={tts().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
             <Segmented
@@ -245,7 +386,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                 <Labeled label={t("web.voice.voice.azureArea")}>
                   <TextInput
                     aria-label={t("web.voice.voice.persona.ttsArea")}
-                    class="font-mono"
+                    styles={variantStyles3.voiceAgentSectionTextInput}
                     value={narrowed().region}
                     onInput={(e) => props.set({ ...props.draft, tts: { ...narrowed(), region: e.currentTarget.value } })}
                   />
@@ -253,7 +394,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                 <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.azureVoice")}>
                   <TextInput
                     aria-label={t("web.voice.voice.persona.microsoftVoice")}
-                    class="font-mono"
+                    styles={variantStyles3.voiceAgentSectionTextInput}
                     list="microsoft-voices"
                     value={narrowed().voiceName}
                     onInput={(e) => props.set({ ...props.draft, tts: { ...narrowed(), voiceName: e.currentTarget.value } })}
@@ -277,7 +418,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                 <Labeled label={t("web.voice.voice.persona.voiceId")}>
                   <TextInput
                     aria-label={t("web.voice.voice.persona.voiceId")}
-                    class="font-mono"
+                    styles={variantStyles3.voiceAgentSectionTextInput}
                     value={narrowed().voiceId}
                     onInput={(e) => props.set({ ...props.draft, tts: { ...narrowed(), voiceId: e.currentTarget.value } })}
                   />
@@ -307,19 +448,19 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
     a.play().catch(() => setPlaying(undefined));
   };
   return (
-    <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+    <div {...stylex.attrs(viewStyles.miniMaxVoicesDiv)}>
       <For each={minimaxVoices}>
         {(v) => {
           const sample = voiceSample(v.id);
           const chosen = () => v.id === props.value;
           return (
-            <div class={["flex h-[34px] items-center rounded-md border", chosen() ? "border-ink/40 bg-selected" : "border-line bg-page"]}>
+            <div {...stylex.attrs(variantStyles.miniMaxVoicesDiv, chosen() ? variantStyles.miniMaxVoicesDivVariant : variantStyles.miniMaxVoicesDivVariant2)}>
               <button
                 type="button"
                 disabled={!sample}
                 title={sample ? t("web.voice.voice.persona.sample", { greeting: t("shared.greeting") }) : t("web.voice.voice.persona.noSample")}
                 aria-label={playing() === v.id ? t("web.voice.voice.persona.stop", { name: v.label }) : t("web.voice.voice.persona.play", { name: v.label })}
-                class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-50"
+                {...stylex.attrs(viewStyles.miniMaxVoicesButton)}
                 onClick={() => sample && play(v.id, sample)}
               >
                 <Icon name={playing() === v.id ? "stop" : "play"} size={16} />
@@ -328,10 +469,10 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
                 type="button"
                 title={v.id}
                 aria-pressed={aria(chosen())}
-                class={[
-                  "h-full min-w-0 flex-1 cursor-pointer truncate pr-2 pl-1 text-left text-sm",
-                  chosen() ? "font-semibold" : "text-bark-800 hover:text-ink",
-                ]}
+                {...stylex.attrs(
+                  variantStyles.miniMaxVoicesButton,
+                  chosen() ? variantStyles.miniMaxVoicesButtonVariant : variantStyles.miniMaxVoicesButtonVariant2,
+                )}
                 onClick={() => props.onChange(v.id)}
               >
                 {v.label}

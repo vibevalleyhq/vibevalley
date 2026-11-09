@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show, snapshot, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -49,6 +50,92 @@ import {
   type VoicePart,
   withPart,
 } from "./VoiceVendorFields";
+
+const variantStyles2 = stylex.create({
+  formTextInput: {
+    fontFamily: "var(--font-mono)",
+  },
+});
+
+const variantStyles = stylex.create({
+  formDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: "auto",
+  },
+  formSpan: {
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  formSpanVariant: {
+    backgroundColor: "var(--color-ok-soft)",
+    color: "var(--color-ok-ink)",
+  },
+  formSpanVariant2: {
+    backgroundColor: "var(--color-bad-soft)",
+    color: "var(--color-berry)",
+  },
+});
+
+const viewStyles = stylex.create({
+  voiceCard: { maxWidth: "var(--container-4xl)" },
+  barP: {
+    color: "var(--color-berry)",
+  },
+  formDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  formDiv2: {
+    display: "flex",
+    maxWidth: "var(--container-4xl)",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    paddingInline: "var(--spacing)",
+  },
+  formSpan: {
+    flex: "1",
+  },
+  formSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  formDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 3)",
+    rowGap: "calc(var(--spacing) * 2)",
+  },
+  providerActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  formP: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  formDiv4: {
+    maxWidth: "var(--container-4xl)",
+  },
+});
 
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
@@ -155,7 +242,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     <Labeled label={numberLabel[k]} hint={t("web.voice.voice.range", { min: voiceLimits[k].min, max: voiceLimits[k].max, fallback: base().voiceDefaults[k] })}>
       <TextInput
         aria-label={numberLabel[k]}
-        class="font-mono"
+        styles={variantStyles2.formTextInput}
         inputmode="numeric"
         value={String(draft()[k])}
         onInput={(e) => set({ ...draft(), [k]: Number(e.currentTarget.value.replace(/\D/gu, "")) })}
@@ -169,7 +256,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       busy={busy() || !!problem()}
       onSave={() => void submit()}
       onUndo={undo}
-      left={<Show when={error() ?? problem()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
+      left={<Show when={error() ?? problem()}>{(e) => <p {...stylex.attrs(viewStyles.barP)}>{e()}</p>}</Show>}
       // Reset to defaults puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
         <Show when={props.part === "agent" || props.view === "call"}>
@@ -204,37 +291,37 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     <Show
       when={props.part === "agent"}
       fallback={
-        <div class="flex h-full min-h-0 flex-col gap-3">
-          <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        <div {...stylex.attrs(viewStyles.formDiv)}>
+          <div {...stylex.attrs(variantStyles.formDiv)}>
             <Show when={props.view === "moss"}>
-              <div class="flex flex-wrap items-center gap-3">
+              <div {...stylex.attrs(viewStyles.providerActions)}>
                 <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
                 <MossVerify />
               </div>
             </Show>
             <Show when={props.view === "call"}>
-              <div class="flex max-w-4xl items-center gap-2 px-1">
-                <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-ok-soft text-ok-ink" : "bg-bad-soft text-berry"]}>
+              <div {...stylex.attrs(viewStyles.formDiv2)}>
+                <span {...stylex.attrs(variantStyles.formSpan, credentialsReady() ? variantStyles.formSpanVariant : variantStyles.formSpanVariant2)}>
                   {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
                 </span>
                 <Hint
                   text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
                 />
-                <span class="flex-1" />
+                <span {...stylex.attrs(viewStyles.formSpan)} />
                 <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
                 <Hint text={t("web.base.form.storedIn", { file: base().file })} />
               </div>
               <Card
                 title={t("web.voice.voice.credentials")}
                 action={<OutLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
-                class="max-w-4xl"
+                styles={viewStyles.voiceCard}
               >
                 <Cols>
                   <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
                     <TextInput
                       data-testid="agora-app-id"
                       aria-label="Agora App ID"
-                      class="font-mono"
+                      styles={variantStyles2.formTextInput}
                       placeholder={t("web.voice.voice.hex")}
                       value={appId()}
                       onInput={(e) => {
@@ -254,7 +341,11 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   </Labeled>
                 </Cols>
               </Card>
-              <Card title={t("web.voice.voice.listen")} action={<span class="text-sm text-muted">{t("web.voice.voice.listenParts")}</span>} class="max-w-4xl">
+              <Card
+                title={t("web.voice.voice.listen")}
+                action={<span {...stylex.attrs(viewStyles.formSpan2)}>{t("web.voice.voice.listenParts")}</span>}
+                styles={viewStyles.voiceCard}
+              >
                 <Cols>
                   <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
                     <Segmented
@@ -292,7 +383,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                         <Labeled label={t("web.voice.voice.azureArea")} hint={t("web.voice.voice.azureAreaHint")}>
                           <TextInput
                             aria-label={t("web.voice.voice.asrArea")}
-                            class="font-mono"
+                            styles={variantStyles2.formTextInput}
                             value={a().region}
                             onInput={(e) => set({ ...draft(), asr: { vendor: "microsoft", region: e.currentTarget.value } })}
                           />
@@ -306,7 +397,11 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   {number("idleSeconds")}
                 </Cols>
               </Card>
-              <Card title={t("web.voice.voice.think")} action={<span class="text-sm text-muted">{answerLabel[answer().vendor]}</span>} class="max-w-4xl">
+              <Card
+                title={t("web.voice.voice.think")}
+                action={<span {...stylex.attrs(viewStyles.formSpan2)}>{answerLabel[answer().vendor]}</span>}
+                styles={viewStyles.voiceCard}
+              >
                 <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
                   <Segmented
                     label={t("web.voice.voice.who")}
@@ -337,7 +432,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.deepseekModel")}>
                       <TextInput
                         aria-label={t("web.voice.voice.deepseekModelLabel")}
-                        class="font-mono"
+                        styles={variantStyles2.formTextInput}
                         value={a().model}
                         onInput={(e) => set({ ...draft(), answer: { vendor: "deepseek", model: e.currentTarget.value } })}
                       />
@@ -350,7 +445,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.llmAddress")}>
                         <TextInput
                           aria-label={t("web.voice.voice.llmAddressLabel")}
-                          class="font-mono"
+                          styles={variantStyles2.formTextInput}
                           value={a().url}
                           onInput={(e) => set({ ...draft(), answer: { ...a(), url: e.currentTarget.value } })}
                         />
@@ -358,7 +453,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <Labeled label={t("web.voice.voice.model")}>
                         <TextInput
                           aria-label={t("web.voice.voice.llmModel")}
-                          class="font-mono"
+                          styles={variantStyles2.formTextInput}
                           value={a().model}
                           onInput={(e) => set({ ...draft(), answer: { ...a(), model: e.currentTarget.value } })}
                         />
@@ -371,8 +466,8 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             </Show>
             <Show when={props.view === "dictation"}>
               {/* The page's title already says Dictation: the card has none of its own. */}
-              <Card class="max-w-4xl">
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Card styles={viewStyles.voiceCard}>
+                <div {...stylex.attrs(viewStyles.formDiv3)}>
                   <Segmented
                     label={t("web.voice.voice.dictationVia")}
                     testid="dictation-via"
@@ -383,7 +478,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     ]}
                     onChange={(via) => setDictation({ ...dictation(), via })}
                   />
-                  <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+                  <p {...stylex.attrs(viewStyles.formP)}>
                     {dictation().via === "moss" ? t("web.voice.voice.dictationMossIntro") : t("web.voice.voice.dictationIntro")}
                     <Show when={dictation().via === "own"}>
                       <OutLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />
@@ -403,7 +498,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <TextInput
                         aria-label={t("web.voice.voice.dictationAddressLabel")}
                         data-testid="dictation-url"
-                        class="font-mono"
+                        styles={variantStyles2.formTextInput}
                         placeholder={t("web.base.form.example", { value: "http://127.0.0.1:8080/v1" })}
                         value={dictation().url}
                         onInput={(e) => {
@@ -415,7 +510,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <TextInput
                         aria-label={t("web.voice.voice.dictationModelLabel")}
                         data-testid="dictation-model"
-                        class="font-mono"
+                        styles={variantStyles2.formTextInput}
                         placeholder={t("web.base.form.example", { value: "qwen3" })}
                         value={dictation().model}
                         onInput={(e) => {
@@ -430,7 +525,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             </Show>
           </div>
           <Show when={props.view !== "moss"}>
-            <div class="max-w-4xl">{bar()}</div>
+            <div {...stylex.attrs(viewStyles.formDiv4)}>{bar()}</div>
           </Show>
         </div>
       }

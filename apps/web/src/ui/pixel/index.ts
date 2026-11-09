@@ -1,4 +1,3 @@
-export { pxText } from "./style";
 export { DashedLine, PxWindow } from "./base";
 export { PxButton } from "./button";
 export { PxPick } from "./choice";

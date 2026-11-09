@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,12 +9,25 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 
+const viewStyles = stylex.create({
+  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 2)" },
+  preview: {
+    listStylePosition: "inside",
+    listStyleType: "disc",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  wrapText: { overflowWrap: "break-word" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
+});
+
 export function ReleaseAssets(props: { id: string }) {
   const [preview, setPreview] = createSignal<Preview>();
   const [error, setError] = createSignal<string>();
   const act = createAct(setError);
   return (
-    <div class="flex min-w-0 flex-col gap-2">
+    <div {...stylex.attrs(viewStyles.stack)}>
       <Button
         data-testid="media-preview-release"
         disabled={act.busy()}
@@ -27,8 +41,8 @@ export function ReleaseAssets(props: { id: string }) {
       <Show when={preview()}>
         {(value) => (
           <>
-            <ul data-testid="media-release-preview" class="list-inside list-disc text-sm text-muted">
-              <For each={value().does}>{(step) => <li class="break-words">{step}</li>}</For>
+            <ul data-testid="media-release-preview" {...stylex.attrs(viewStyles.preview)}>
+              <For each={value().does}>{(step) => <li {...stylex.attrs(viewStyles.wrapText)}>{step}</li>}</For>
             </ul>
             <ConfirmButton
               testid="media-release"
@@ -48,7 +62,7 @@ export function ReleaseAssets(props: { id: string }) {
       </Show>
       <Show when={error()}>
         {(reason) => (
-          <p role="alert" class="text-sm text-berry">
+          <p role="alert" {...stylex.attrs(viewStyles.error)}>
             {reason()}
           </p>
         )}

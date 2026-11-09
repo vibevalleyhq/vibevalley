@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +17,28 @@ import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 
 import { publicationKey } from "./publication.ts";
+
+const viewStyles = stylex.create({
+  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 4)" },
+  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-muted)" },
+  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", wordBreak: "break-all", color: "var(--color-muted)" },
+  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
+  consent: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-muted)" },
+  actions: { display: "flex", flexWrap: "wrap", gap: "calc(var(--spacing) * 2)" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
+  heading: { fontSize: "var(--text-base)", lineHeight: "var(--text-base--line-height)", fontWeight: "var(--font-weight-semibold)" },
+  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
+  source: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", overflowWrap: "break-word", color: "var(--color-muted)" },
+  noticeText: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", color: "var(--color-muted)" },
+  link: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-water)", textDecorationLine: "underline" },
+});
 
 interface Selected {
   file: File;
@@ -99,17 +122,17 @@ export function UnderstandingPanel() {
       .finally(() => controller.abort());
   };
   return (
-    <section class="flex min-w-0 flex-col gap-4" data-testid="understanding-panel" aria-label={t("web.media.understanding.title")}>
+    <section {...stylex.attrs(viewStyles.section)} data-testid="understanding-panel" aria-label={t("web.media.understanding.title")}>
       <Card title={t("web.media.understanding.title")}>
-        <p class="text-sm text-muted">{t("web.media.understanding.notice")}</p>
+        <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.understanding.notice")}</p>
         <Show when={status()?.understanding} fallback={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.media.understanding.configure")}</Quiet>}>
           {(binding) => (
-            <p class="text-xs break-all text-muted" data-testid="understanding-connection">
+            <p {...stylex.attrs(viewStyles.identifierDetail)} data-testid="understanding-connection">
               {binding().connection} · {binding().model}
             </p>
           )}
         </Show>
-        <fieldset disabled={act.busy() || submitted() !== undefined} class="flex min-w-0 flex-col gap-3" aria-label={t("web.media.understanding.title")}>
+        <fieldset disabled={act.busy() || submitted() !== undefined} {...stylex.attrs(viewStyles.form)} aria-label={t("web.media.understanding.title")}>
           <Field label={t("web.media.understanding.files")}>
             <TextInput
               type="file"
@@ -125,7 +148,7 @@ export function UnderstandingPanel() {
           </Field>
           <For each={selected()} keyed={(item) => item.file}>
             {(item) => (
-              <p class="text-xs break-all text-muted">
+              <p {...stylex.attrs(viewStyles.identifierDetail)}>
                 {item().file.name} · {item().input?.phase === "ready" ? t("web.media.understanding.stored") : t("web.media.understanding.selected")}
               </p>
             )}
@@ -165,9 +188,9 @@ export function UnderstandingPanel() {
             />
           </Field>
           <Show when={channel()}>
-            <p class="text-sm text-muted">{t("web.media.understanding.authorizationNotice")}</p>
+            <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.understanding.authorizationNotice")}</p>
           </Show>
-          <label class="flex items-start gap-2 text-sm">
+          <label {...stylex.attrs(viewStyles.consent)}>
             <Checkbox
               testid="understanding-consent"
               label={t("web.media.understanding.consent")}
@@ -181,14 +204,14 @@ export function UnderstandingPanel() {
           </label>
         </fieldset>
         <Show when={submitted()}>
-          <p class="text-xs text-muted">{t("web.media.understanding.pending")}</p>
+          <p {...stylex.attrs(viewStyles.detail)}>{t("web.media.understanding.pending")}</p>
         </Show>
         <Show when={act.busy() && submitted() === undefined}>
-          <p role="status" data-testid="understanding-uploading" class="text-sm text-muted">
+          <p role="status" data-testid="understanding-uploading" {...stylex.attrs(viewStyles.notice)}>
             {t("web.media.understanding.uploading")}
           </p>
         </Show>
-        <div class="flex flex-wrap gap-2">
+        <div {...stylex.attrs(viewStyles.actions)}>
           <Button
             data-testid="understanding-submit"
             tone="primary"
@@ -222,14 +245,14 @@ export function UnderstandingPanel() {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" data-testid="understanding-error" class="text-sm text-berry">
+            <p role="alert" data-testid="understanding-error" {...stylex.attrs(viewStyles.error)}>
               {why()}
             </p>
           )}
         </Show>
       </Card>
       <Show when={jobs().length > 0}>
-        <h2 class="text-base font-semibold">{t("web.media.understanding.history")}</h2>
+        <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.media.understanding.history")}</h2>
       </Show>
       <For each={jobs()} keyed={(job) => job.id}>
         {(job) => <UnderstandingCard job={job()} />}
@@ -256,13 +279,13 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
         data-id={props.job.id}
         data-phase={props.job.phase}
         data-cleanup={props.job.cleanup}
-        class="flex min-w-0 flex-col gap-3"
+        {...stylex.attrs(viewStyles.form)}
       >
-        <p class="text-xs break-all text-muted">
+        <p {...stylex.attrs(viewStyles.identifierDetail)}>
           {props.job.model} · {props.job.connection} · {props.job.id}
         </p>
-        <p class="text-sm break-words whitespace-pre-wrap">{props.job.prompt}</p>
-        <p class="text-xs break-words text-muted" data-testid="understanding-source">
+        <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>
+        <p {...stylex.attrs(viewStyles.source)} data-testid="understanding-source">
           {props.job.source.kind === "owner"
             ? t("web.media.sourceOwner")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
@@ -270,7 +293,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
         <Show when={props.job.phase === "authorized" && props.job.authorization}>
           {(approval) => (
             <>
-              <p class="text-sm break-words text-muted" data-testid="understanding-authorization">
+              <p {...stylex.attrs(viewStyles.noticeText)} data-testid="understanding-authorization">
                 {t("web.media.understanding.authorization", { channel: approval().channel })}
               </p>
               <Button
@@ -294,25 +317,25 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
             </>
           )}
         </Show>
-        <For each={props.job.inputs}>{(input) => <p class="text-xs break-all text-muted">{input.name}</p>}</For>
+        <For each={props.job.inputs}>{(input) => <p {...stylex.attrs(viewStyles.identifierDetail)}>{input.name}</p>}</For>
         <Show when={props.job.problem}>
-          <p class="text-sm text-berry">{props.job.problem}</p>
+          <p {...stylex.attrs(viewStyles.error)}>{props.job.problem}</p>
         </Show>
-        <p class="text-xs text-muted" data-testid="understanding-cleanup-status">
+        <p {...stylex.attrs(viewStyles.detail)} data-testid="understanding-cleanup-status">
           {props.job.cleanupText}
         </p>
         <Show when={props.job.result} fallback={<Quiet>{t("web.media.usageUnknown")}</Quiet>}>
           {(result) => (
             <>
               <Show when={result().status === "incomplete"}>
-                <p data-testid="understanding-truncated" class="text-sm text-berry">
+                <p data-testid="understanding-truncated" {...stylex.attrs(viewStyles.error)}>
                   {t("web.media.understanding.truncated")}
                 </p>
               </Show>
-              <p data-testid="understanding-result" class="text-sm break-words whitespace-pre-wrap">
+              <p data-testid="understanding-result" {...stylex.attrs(viewStyles.prose)}>
                 {result().text}
               </p>
-              <p data-testid="understanding-usage" class="text-xs text-muted">
+              <p data-testid="understanding-usage" {...stylex.attrs(viewStyles.detail)}>
                 {t("web.media.understanding.usage", {
                   input: result().usage.inputTokens,
                   output: result().usage.outputTokens,
@@ -329,7 +352,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
                 }
               >
                 {(id) => (
-                  <Link href={`/artifacts/${id()}`} class="text-sm text-water underline" data-testid="understanding-saved">
+                  <Link href={`/artifacts/${id()}`} {...stylex.attrs(viewStyles.link)} data-testid="understanding-saved">
                     {t("web.media.understanding.open")}
                   </Link>
                 )}
@@ -337,7 +360,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
             </>
           )}
         </Show>
-        <div class="flex flex-wrap gap-2">
+        <div {...stylex.attrs(viewStyles.actions)}>
           <Show when={props.job.canCancel}>
             <ConfirmButton
               testid="understanding-cancel"
@@ -365,7 +388,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" class="text-sm text-berry">
+            <p role="alert" {...stylex.attrs(viewStyles.error)}>
               {why()}
             </p>
           )}

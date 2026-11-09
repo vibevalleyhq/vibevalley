@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -16,6 +17,184 @@ import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+const variantStyles3 = stylex.create({
+  templatesPageTextInput: {
+    minWidth: "0",
+    flex: "1",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  templatesPageA: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  templateCardSpan: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  templateCardSpan2: {
+    WebkitLineClamp: "2",
+    WebkitBoxOrient: "vertical",
+    display: "-webkit-box",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  templateCardSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  templateCardSpanVariant: {
+    color: "var(--color-muted)",
+  },
+  templateCardSpanVariant2: {
+    color: "var(--color-warn-ink)",
+  },
+});
+
+const viewStyles = stylex.create({
+  templatesPageDiv: {
+    height: "100%",
+    overflowY: "auto",
+  },
+  templatesPageDiv2: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 6)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingTop: "calc(var(--spacing) * 4)",
+    paddingBottom: "calc(var(--spacing) * 8)",
+  },
+  templatesPageDiv3: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  templatesPageDiv4: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  templatesPageH1: {
+    fontSize: "var(--text-2xl)",
+    lineHeight: "var(--text-2xl--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  templatesPageForm: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  templatesPageDiv5: {
+    display: "grid",
+    gap: "calc(var(--spacing) * 3)",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
+      "@media (width>=64rem)": "repeat(3,minmax(0,1fr))",
+      "@media (width>=96rem)": "repeat(4,minmax(0,1fr))",
+    },
+  },
+  template: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+    padding: "calc(var(--spacing) * 4)",
+  },
+  templateCardDiv: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  templateCardSpan: {
+    display: "flex",
+    width: "calc(var(--spacing) * 16)",
+    height: "calc(var(--spacing) * 16)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--color-hover)",
+  },
+  templateCardSpan2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  templateCardSpan3: {
+    flexShrink: "0",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hover)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  templatePersona: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--color-hover)",
+    padding: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  templateCardP: {
+    color: "var(--color-muted)",
+  },
+  templateCardP2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--color-muted)",
+  },
+  templateCardP3: {
+    whiteSpace: "pre-wrap",
+  },
+  templateCardDiv2: {
+    marginTop: "auto",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingTop: "calc(var(--spacing) * 3)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  templateCardSpan4: {
+    flex: "1",
+  },
+});
+
 export function TemplatesPage() {
   const templates = useAgentTemplates();
   const runtimes = useRuntimes();
@@ -33,19 +212,19 @@ export function TemplatesPage() {
     });
   };
   return (
-    <div class="h-full overflow-y-auto">
-      <div class="flex flex-col gap-6 px-4 pt-4 pb-8">
-        <div class="flex flex-col gap-1">
-          <A href="/agents" class="text-xs text-muted hover:underline">
+    <div {...stylex.attrs(viewStyles.templatesPageDiv)}>
+      <div {...stylex.attrs(viewStyles.templatesPageDiv2)}>
+        <div {...stylex.attrs(viewStyles.templatesPageDiv3)}>
+          <A href="/agents" {...stylex.attrs(variantStyles2.templatesPageA)}>
             {t("web.agent.all")}
           </A>
-          <div class="flex items-center gap-1.5">
-            <h1 class="text-2xl font-semibold">{t("web.agent.templates.title")}</h1>
+          <div {...stylex.attrs(viewStyles.templatesPageDiv4)}>
+            <h1 {...stylex.attrs(viewStyles.templatesPageH1)}>{t("web.agent.templates.title")}</h1>
             <Hint text={t("web.agent.templates.intro")} />
           </div>
         </div>
         <form
-          class="flex items-center gap-2"
+          {...stylex.attrs(viewStyles.templatesPageForm)}
           onSubmit={(e) => {
             e.preventDefault();
             if (path().trim()) void add();
@@ -57,13 +236,13 @@ export function TemplatesPage() {
             placeholder={t("web.agent.templates.folderHint")}
             value={path()}
             onInput={(e) => setPath(e.currentTarget.value)}
-            class="min-w-0 flex-1"
+            styles={variantStyles3.templatesPageTextInput}
           />
           <Button type="submit" data-testid="template-add" disabled={adding.busy() || !path().trim()}>
             {t("web.agent.templates.add")}
           </Button>
         </form>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div {...stylex.attrs(viewStyles.templatesPageDiv5)}>
           <For each={sorted()} keyed={(template) => template.id}>
             {(template) => (
               <TemplateCard template={template()} runtime={ready(runtimes, []).find((r) => r.id === template().runtime)} runtimes={ready(runtimes, [])} />
@@ -106,21 +285,21 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
       data-key={template().id}
       data-installed={template().installed.length}
       data-source={template().source}
-      class="flex flex-col gap-3 rounded-lg border border-line bg-page p-4"
+      {...stylex.attrs(viewStyles.template)}
     >
-      <div class="flex items-start gap-3">
-        <span class="flex size-16 shrink-0 items-center justify-center rounded-lg bg-hover">
+      <div {...stylex.attrs(viewStyles.templateCardDiv)}>
+        <span {...stylex.attrs(viewStyles.templateCardSpan)}>
           <Show when={orchestrator()} fallback={<AgentFace agentId={template().id} runtime={template().runtime} look={template().look} size={56} />}>
             <OrchestratorFace size={56} look={template().look.orchestrator ?? "farmer"} />
           </Show>
         </span>
-        <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="flex items-center gap-2">
-            <span class="truncate text-base font-semibold">{template().name}</span>
-            <span class="shrink-0 rounded bg-hover px-1.5 text-xs text-muted">{t(`web.agent.role.${template().role}`)}</span>
+        <span {...stylex.attrs(variantStyles.templateCardSpan)}>
+          <span {...stylex.attrs(viewStyles.templatesPageForm)}>
+            <span {...stylex.attrs(viewStyles.templateCardSpan2)}>{template().name}</span>
+            <span {...stylex.attrs(viewStyles.templateCardSpan3)}>{t(`web.agent.role.${template().role}`)}</span>
           </span>
-          <span class="line-clamp-2 text-sm text-muted">{template().duty}</span>
-          <span class={["text-xs", here() ? "text-muted" : "text-warn-ink"]}>
+          <span {...stylex.attrs(variantStyles.templateCardSpan2)}>{template().duty}</span>
+          <span {...stylex.attrs(variantStyles.templateCardSpan3, here() ? variantStyles.templateCardSpanVariant : variantStyles.templateCardSpanVariant2)}>
             {orchestrator()
               ? t("web.agent.templates.onServer")
               : here()
@@ -130,20 +309,20 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         </span>
       </div>
       <Show when={open()}>
-        <div data-testid="template-persona" class="flex flex-col gap-2 rounded-md bg-hover p-3 text-sm">
+        <div data-testid="template-persona" {...stylex.attrs(viewStyles.templatePersona)}>
           <Show when={template().tags.length > 0}>
-            <p class="text-muted">
+            <p {...stylex.attrs(viewStyles.templateCardP)}>
               {t("web.agent.tags")}
               {t("web.agent.colon")}
               {list(template().tags)}
             </p>
           </Show>
-          <p class="text-xs font-medium text-muted">{t("web.agent.personaLabel")}</p>
-          <p class="whitespace-pre-wrap">{template().persona || t("web.agent.templates.noPersona")}</p>
+          <p {...stylex.attrs(viewStyles.templateCardP2)}>{t("web.agent.personaLabel")}</p>
+          <p {...stylex.attrs(viewStyles.templateCardP3)}>{template().persona || t("web.agent.templates.noPersona")}</p>
         </div>
       </Show>
-      <div class="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs text-muted">
-        <span class="flex-1">
+      <div {...stylex.attrs(viewStyles.templateCardDiv2)}>
+        <span {...stylex.attrs(viewStyles.templateCardSpan4)}>
           {template().installed.length > 0 ? t("web.agent.templates.installed", { n: template().installed.length }) : ""}
           {template().source === "added" ? t("web.agent.templates.addedHere") : ""}
         </span>

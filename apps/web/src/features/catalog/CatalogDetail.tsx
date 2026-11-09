@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { Slider } from "@vibevalley/base-ui";
@@ -11,9 +12,263 @@ import { useRouter } from "#/infra/router.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Card, Toggle } from "#/ui/layout.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { framesOf, type Picture, remakeOf } from "./shelves";
+
+const groundStyles = stylex.create({
+  grass: {
+    backgroundColor: "var(--color-catalog-grass)",
+    backgroundImage: "none",
+    backgroundSize: "auto",
+  },
+  night: {
+    backgroundColor: "var(--color-catalog-night)",
+    backgroundImage: "none",
+    backgroundSize: "auto",
+  },
+  check: {
+    backgroundColor: "var(--color-catalog-paper)",
+    backgroundImage: "repeating-conic-gradient(var(--color-catalog-check) 0% 25%, transparent 0% 50%)",
+    backgroundSize: "12px 12px",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  detailSliderRoot: {
+    width: "calc(var(--spacing) * 24)",
+  },
+  detailSliderControl: {
+    position: "relative",
+    display: "flex",
+    height: "calc(var(--spacing) * 4)",
+    cursor: "pointer",
+    alignItems: "center",
+  },
+  detailSliderTrack: {
+    position: "relative",
+    height: "var(--spacing)",
+    width: "100%",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-selected)",
+  },
+  detailSliderIndicator: {
+    height: "100%",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-leaf)",
+  },
+  detailSliderThumb: {
+    top: "50%",
+    width: "calc(var(--spacing) * 3)",
+    height: "calc(var(--spacing) * 3)",
+    translate: "0 calc(calc(1 / 2 * 100%) * -1)",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-leaf)",
+    backgroundColor: "var(--color-page)",
+    boxShadow: "var(--shadow-raise)",
+    outlineStyle: {
+      default: "none",
+      ":focus-visible": "none",
+    },
+    outlineWidth: {
+      default: null,
+      ":focus-visible": "2px",
+    },
+    outlineColor: {
+      default: null,
+      ":focus-visible": "var(--color-focus)",
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  detailButton: {
+    display: "flex",
+    width: "calc(var(--spacing) * 11)",
+    height: "calc(var(--spacing) * 11)",
+    cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+  },
+  detailButtonVariant: {
+    boxShadow: "0 0 0 2px var(--color-focus)",
+  },
+  detailButtonVariant2: {},
+});
+
+const viewStyles = stylex.create({
+  imgImg: {
+    maxWidth: "none",
+    imageRendering: "pixelated",
+  },
+  copyButton: {
+    display: "flex",
+    flexShrink: "0",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-sm)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  rowDiv: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  rowSpan: {
+    width: "calc(var(--spacing) * 16)",
+    flexShrink: "0",
+    color: "var(--color-muted)",
+  },
+  rowSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flex: "1",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+  codeCode: {
+    minWidth: "0",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-hover)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "1px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-2xs)",
+    lineHeight: "var(--text-2xs--line-height)",
+  },
+  detailDiv: {
+    display: "flex",
+    maxHeight: "calc(var(--spacing) * 88)",
+    minHeight: "calc(var(--spacing) * 40)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "auto",
+    borderRadius: "var(--radius-md)",
+    padding: "calc(var(--spacing) * 3)",
+  },
+  detailSpan: {
+    position: "relative",
+  },
+  detailSpan2: {
+    width: 12,
+    height: 12,
+    backgroundImage: "linear-gradient(var(--color-berry-500),var(--color-berry-500)), linear-gradient(var(--color-berry-500),var(--color-berry-500))",
+    backgroundPosition: "center, center",
+    backgroundSize: "100% 2px, 2px 100%",
+    backgroundRepeat: "no-repeat",
+    position: "absolute",
+  },
+  detailSpan3: {
+    width: 10,
+    height: 10,
+    position: "absolute",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-water)",
+  },
+  detailDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  detailDiv3: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-lg)",
+    backgroundColor: "var(--color-hover)",
+    padding: "calc(var(--spacing) * 2)",
+  },
+  detailDiv4: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  detailSpan4: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  detailSpan5: {
+    flex: "1",
+  },
+  detailSpan6: {
+    width: "calc(var(--spacing) * 14)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  detailDiv5: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+  },
+  detailDiv6: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  cursor: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    padding: "var(--spacing)",
+  },
+  cursorTileSpan: {
+    display: "flex",
+    height: "calc(var(--spacing) * 16)",
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-md)",
+  },
+  cursorTileImg: {
+    height: "calc(var(--spacing) * 10)",
+    imageRendering: "pixelated",
+  },
+  cursorTileImg2: {
+    display: "none",
+  },
+  cursorTileSpan2: {
+    position: "absolute",
+    width: "calc(var(--spacing) * 2)",
+    height: "calc(var(--spacing) * 2)",
+    borderRadius: "2147483647px",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-berry)",
+  },
+  cursorTileSpan3: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+});
 
 export type Ground = "check" | "grass" | "night";
 export const grounds: { value: Ground; label: string }[] = [
@@ -22,12 +277,7 @@ export const grounds: { value: Ground; label: string }[] = [
   { value: "night", label: t("web.catalog.ground.night") },
 ];
 
-export const groundStyle = (g: Ground): JSX.CSSProperties =>
-  g === "grass"
-    ? { background: "#7a9a4a" }
-    : g === "night"
-      ? { background: "#22283a" }
-      : { "background-color": "#f3e9d2", "background-image": "repeating-conic-gradient(#e4d6b6 0% 25%, transparent 0% 50%)", "background-size": "12px 12px" };
+export const groundStyle = (g: Ground): stylex.StyleXStyles => groundStyles[g];
 
 /** Whole steps, so its pixels stay square. */
 export const fitScale = (p: Picture, box: number) => {
@@ -41,7 +291,7 @@ export function Img(props: { p: Picture; scale: number }) {
       src={`/pixel/${props.p.name}.png`}
       alt=""
       draggable="false"
-      class="max-w-none [image-rendering:pixelated]"
+      {...stylex.attrs(viewStyles.imgImg)}
       style={{ width: `${Math.round(props.p.w * props.scale)}px`, height: `${Math.round(props.p.h * props.scale)}px` }}
     />
   );
@@ -63,11 +313,7 @@ function Copy(props: { text: string }) {
     }
   };
   return (
-    <button
-      type="button"
-      onClick={() => void copy(props.text)}
-      class="flex shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-hover"
-    >
+    <button type="button" onClick={() => void copy(props.text)} {...stylex.attrs(viewStyles.copyButton)}>
       <Icon name={done() ? "check" : "copy"} size={12} />
       {done() ? t("web.catalog.copied") : t("web.catalog.copy")}
     </button>
@@ -76,9 +322,9 @@ function Copy(props: { text: string }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div class="flex gap-2 text-sm">
-      <span class="w-16 shrink-0 text-muted">{props.label}</span>
-      <span class="flex min-w-0 flex-1 items-center gap-1">{props.children}</span>
+    <div {...stylex.attrs(viewStyles.rowDiv)}>
+      <span {...stylex.attrs(viewStyles.rowSpan)}>{props.label}</span>
+      <span {...stylex.attrs(viewStyles.rowSpan2)}>{props.children}</span>
     </div>
   );
 }
@@ -86,7 +332,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 function Code(props: { text: string }) {
   return (
     <>
-      <code title={props.text} class="min-w-0 truncate rounded bg-hover px-1.5 py-px font-mono text-2xs">
+      <code title={props.text} {...stylex.attrs(viewStyles.codeCode)}>
         {props.text}
       </code>
       <Copy text={props.text} />
@@ -119,34 +365,31 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
   const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
     <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
-      <div class="flex max-h-88 min-h-40 items-center justify-center overflow-auto rounded-md p-3" style={groundStyle(props.ground)}>
-        <span class="relative" style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
+      <div {...styleProps([viewStyles.detailDiv, groundStyle(props.ground)])}>
+        <span {...stylex.attrs(viewStyles.detailSpan)} style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
           <Img p={shown()} scale={scale()} />
           <Show when={marks()}>
             <span
               title={t("web.catalog.anchor")}
-              class="absolute"
+              {...stylex.attrs(viewStyles.detailSpan2)}
               style={{
                 left: `${shown().ax * scale() - 6}px`,
                 top: `${shown().ay * scale() - 6}px`,
-                width: "12px",
-                height: "12px",
-                background: "linear-gradient(#c84a3a,#c84a3a) center/100% 2px no-repeat, linear-gradient(#c84a3a,#c84a3a) center/2px 100% no-repeat",
               }}
             />
             <Show when={headOf(shown())}>
               {(head) => (
                 <span
                   title={t("web.catalog.head")}
-                  class="absolute border-2 border-water"
-                  style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px`, width: "10px", height: "10px" }}
+                  {...stylex.attrs(viewStyles.detailSpan3)}
+                  style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px` }}
                 />
               )}
             </Show>
           </Show>
         </span>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+      <div {...stylex.attrs(viewStyles.detailDiv2)}>
         <Segmented
           label={t("web.catalog.zoom")}
           value={String(scale())}
@@ -157,27 +400,24 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
       </div>
       <Show when={frames()}>
         {(f) => (
-          <div class="flex flex-col gap-1.5 rounded-lg bg-hover p-2">
-            <div class="flex items-center gap-2">
+          <div {...stylex.attrs(viewStyles.detailDiv3)}>
+            <div {...stylex.attrs(viewStyles.detailDiv4)}>
               <Button data-testid="play" aria-pressed={aria(playing())} onClick={() => setPlaying(!playing())}>
                 {playing() ? t("web.catalog.stop") : t("web.catalog.play")}
               </Button>
-              <span class="text-xs text-muted">{t("web.catalog.frames", { n: f().length })}</span>
-              <span class="flex-1" />
-              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} class="w-24">
-                <Slider.Control class="relative flex h-4 cursor-pointer items-center">
-                  <Slider.Track class="relative h-1 w-full rounded-full bg-selected">
-                    <Slider.Indicator class="h-full rounded-full bg-leaf" />
-                    <Slider.Thumb
-                      aria-label={t("web.catalog.fps")}
-                      class="top-1/2 size-3 -translate-y-1/2 rounded-full border border-leaf bg-page shadow-raise outline-none focus-visible:outline-2 focus-visible:outline-focus"
-                    />
+              <span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.catalog.frames", { n: f().length })}</span>
+              <span {...stylex.attrs(viewStyles.detailSpan5)} />
+              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} {...stylex.attrs(variantStyles2.detailSliderRoot)}>
+                <Slider.Control {...stylex.attrs(variantStyles2.detailSliderControl)}>
+                  <Slider.Track {...stylex.attrs(variantStyles2.detailSliderTrack)}>
+                    <Slider.Indicator {...stylex.attrs(variantStyles2.detailSliderIndicator)} />
+                    <Slider.Thumb aria-label={t("web.catalog.fps")} {...stylex.attrs(variantStyles2.detailSliderThumb)} />
                   </Slider.Track>
                 </Slider.Control>
               </Slider.Root>
-              <span class="w-14 text-xs text-muted">{t("web.catalog.perSecond", { n: fps() })}</span>
+              <span {...stylex.attrs(viewStyles.detailSpan6)}>{t("web.catalog.perSecond", { n: fps() })}</span>
             </div>
-            <div class="flex flex-wrap gap-1">
+            <div {...stylex.attrs(viewStyles.detailDiv5)}>
               <For each={f()}>
                 {(name, i) => (
                   <Show when={props.byName.get(name)}>
@@ -187,11 +427,11 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                         title={name}
                         aria-label={name}
                         onClick={() => router.navigate(`/catalog/${encodeURIComponent(name)}`)}
-                        class={[
-                          "flex size-11 cursor-pointer items-center justify-center overflow-hidden rounded",
-                          { "ring-2 ring-focus": playing() && i() === frame() % f().length },
-                        ]}
-                        style={groundStyle(props.ground)}
+                        {...styleProps([
+                          variantStyles.detailButton,
+                          playing() && i() === frame() % f().length ? variantStyles.detailButtonVariant : variantStyles.detailButtonVariant2,
+                          groundStyle(props.ground),
+                        ])}
                       >
                         <Img p={p()} scale={fitScale(p(), 38)} />
                       </button>
@@ -203,12 +443,12 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
           </div>
         )}
       </Show>
-      <div class="flex flex-col gap-1.5">
+      <div {...stylex.attrs(viewStyles.detailDiv6)}>
         <Row label={t("web.catalog.size")}>{t("web.catalog.pixels", { w: numberText(props.picture.w), h: numberText(props.picture.h) })}</Row>
         <Row label={t("web.catalog.anchor")}>{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Row>
         <Show when={headOf(props.picture)}>{(head) => <Row label={t("web.catalog.head")}>{`(${numberText(head().x)}, ${numberText(head().y)})`}</Row>}</Show>
         <Row label={t("web.catalog.from")}>
-          <Show when={props.picture.sheet} fallback={<span class="text-xs text-muted">{t("web.catalog.unrecorded")}</span>}>
+          <Show when={props.picture.sheet} fallback={<span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.catalog.unrecorded")}</span>}>
             {(sheet) => <Code text={sheet()} />}
           </Show>
         </Row>
@@ -242,32 +482,29 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
     return n && ratio != null && ratio !== 0 ? n.w * ratio : height;
   };
   return (
-    <div data-testid="cursor" data-key={props.name} class="flex flex-col items-center gap-1 p-1">
-      <span class="flex h-16 w-full items-center justify-center rounded-md" style={groundStyle(props.ground)}>
-        <span class="relative" style={{ height: `${height}px`, width: `${widthPx()}px` }}>
+    <div data-testid="cursor" data-key={props.name} {...stylex.attrs(viewStyles.cursor)}>
+      <span {...styleProps([viewStyles.cursorTileSpan, groundStyle(props.ground)])}>
+        <span {...stylex.attrs(viewStyles.detailSpan)} style={{ height: `${height}px`, width: `${widthPx()}px` }}>
           <img
             src={`/cursors/${props.name}@2x.png`}
             alt=""
-            class="h-10 [image-rendering:pixelated]"
+            {...stylex.attrs(viewStyles.cursorTileImg)}
             onError={(e) => (e.currentTarget.src = `/cursors/${props.name}.png`)}
           />
           <img
             src={`/cursors/${props.name}.png`}
             alt=""
-            class="hidden"
+            {...stylex.attrs(viewStyles.cursorTileImg2)}
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           />
           <Show when={k()}>
             {(ratio) => (
-              <span
-                class="absolute size-2 rounded-full border border-bark-900 bg-berry"
-                style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }}
-              />
+              <span {...stylex.attrs(viewStyles.cursorTileSpan2)} style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }} />
             )}
           </Show>
         </span>
       </span>
-      <span class="font-mono text-xs text-muted">{props.name}</span>
+      <span {...stylex.attrs(viewStyles.cursorTileSpan3)}>{props.name}</span>
     </div>
   );
 }

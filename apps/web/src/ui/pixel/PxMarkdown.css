@@ -1,0 +1,150 @@
+@layer components {
+  [data-pixel-markdown] blockquote {
+    border-left-style: solid;
+    border-left-width: 2px;
+    border-color: currentColor;
+    padding-left: calc(var(--spacing) * 3);
+    opacity: 0.8;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    [data-pixel-markdown] blockquote {
+      border-color: color-mix(in oklab, currentcolor 30%, transparent);
+    }
+  }
+
+  [data-pixel-markdown] code {
+    background-color: currentColor;
+    padding-inline: var(--spacing);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    [data-pixel-markdown] code {
+      background-color: color-mix(in oklab, currentcolor 10%, transparent);
+    }
+  }
+
+  [data-pixel-markdown] del {
+    text-decoration-line: line-through;
+  }
+
+  [data-pixel-markdown] em {
+    font-style: normal;
+  }
+
+  [data-pixel-markdown] li {
+    margin-block: calc(var(--spacing) * 0.5);
+  }
+
+  [data-pixel-markdown] ol {
+    list-style-type: decimal;
+    padding-left: calc(var(--spacing) * 5);
+  }
+
+  [data-pixel-markdown] p {
+    margin-block: var(--spacing);
+  }
+
+  [data-pixel-markdown] pre {
+    margin-block: calc(var(--spacing) * 2);
+    overflow-x: auto;
+    background-color: currentColor;
+    padding: calc(var(--spacing) * 2);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    [data-pixel-markdown] pre {
+      background-color: color-mix(in oklab, currentcolor 10%, transparent);
+    }
+  }
+
+  [data-pixel-markdown] pre code {
+    background-color: transparent;
+    padding: 0;
+  }
+
+  [data-pixel-markdown] strong {
+    font-weight: var(--font-weight-normal);
+  }
+
+  [data-pixel-markdown] table {
+    margin-block: calc(var(--spacing) * 2);
+  }
+
+  [data-pixel-markdown] td {
+    border-style: solid;
+    border-width: 1px;
+    border-color: currentColor;
+    padding-inline: calc(var(--spacing) * 2);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    [data-pixel-markdown] td {
+      border-color: color-mix(in oklab, currentcolor 25%, transparent);
+    }
+  }
+
+  [data-pixel-markdown] th {
+    border-style: solid;
+    border-width: 1px;
+    border-color: currentColor;
+    padding-inline: calc(var(--spacing) * 2);
+    font-weight: var(--font-weight-normal);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    [data-pixel-markdown] th {
+      border-color: color-mix(in oklab, currentcolor 25%, transparent);
+    }
+  }
+
+  [data-pixel-markdown] ul {
+    list-style-type: disc;
+    padding-left: calc(var(--spacing) * 5);
+  }
+
+  [data-pixel-markdown]:where(:not([data-reading="true"])) code {
+    font-family: var(--font-mono);
+  }
+
+  [data-pixel-markdown]:where(:not([data-reading="true"])) h1,
+  [data-pixel-markdown]:where(:not([data-reading="true"])) h2,
+  [data-pixel-markdown]:where(:not([data-reading="true"])) h3,
+  [data-pixel-markdown]:where(:not([data-reading="true"])) h4 {
+    font-size: 1.05em;
+    line-height: 1.35;
+    margin-block: calc(var(--spacing) * 1.5);
+    font-weight: var(--font-weight-normal);
+  }
+
+  [data-pixel-markdown]:where(:not([data-reading="true"])) h5,
+  [data-pixel-markdown]:where(:not([data-reading="true"])) h6 {
+    margin-block: calc(var(--spacing) * 1.5);
+    font-weight: var(--font-weight-normal);
+  }
+
+  [data-pixel-markdown]:where([data-reading="true"]) code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  [data-pixel-markdown]:where([data-reading="true"]) h1 {
+    font-size: 24px;
+    line-height: 1.3333;
+    margin-block: calc(var(--spacing) * 2);
+    font-family: var(--font-pixel);
+    font-weight: var(--font-weight-normal);
+  }
+
+  [data-pixel-markdown]:where([data-reading="true"]) h2,
+  [data-pixel-markdown]:where([data-reading="true"]) h3,
+  [data-pixel-markdown]:where([data-reading="true"]) h4,
+  [data-pixel-markdown]:where([data-reading="true"]) h5,
+  [data-pixel-markdown]:where([data-reading="true"]) h6 {
+    margin-block: calc(var(--spacing) * 2);
+    font-family: var(--font-pixel);
+    font-weight: var(--font-weight-normal);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}

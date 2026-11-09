@@ -124,6 +124,24 @@ test("visual sessions capture bounded JPEGs and continue after response.done wit
   expect(relay.inputs).toContain("session.abort");
 });
 
+test("regression: a visual question submitted during frame admission is sent after that frame", async ({ page }) => {
+  await virtualCapture(page);
+  const relay = await visionRelay(page, true);
+  await page.goto("/settings/moss");
+  await page.getByTestId("vision-start").click();
+  await expect.poll(() => relay.inputs).toContain("input.frame");
+  await page.getByTestId("vision-prompt").fill("Describe the fixture");
+  await expect(page.getByTestId("vision-send")).toBeEnabled();
+  await page.getByTestId("vision-send").click();
+  await expect(page.getByTestId("vision-prompt")).toHaveValue("");
+  expect(relay.inputs).not.toContain("input.prompt");
+  relay.send({ type: "input.frame.ready", seq_no: 0 });
+  await expect(page.getByTestId("vision-transcript").locator("[data-state=done]")).toHaveCount(1);
+  expect(relay.inputs.filter((type) => type === "input.prompt")).toEqual(["input.prompt"]);
+  await page.getByTestId("vision-stop").click();
+  await expect(page.getByTestId("vision-line")).toHaveAttribute("data-state", "ended");
+});
+
 test("regression: frame.ready gates binary and a pending frame does not accumulate later captures", async ({ page }) => {
   await virtualCapture(page);
   const relay = await visionRelay(page, true);

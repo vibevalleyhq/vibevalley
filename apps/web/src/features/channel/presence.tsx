@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { type ChatMessage, type Phase, type SessionView } from "@vibevalley/protocol";
@@ -8,6 +9,77 @@ import { useCore } from "#/infra/frame.ts";
 import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
 import { Icon, type IconSize } from "#/ui/Icon.tsx";
 import { actionIcon, type IconName } from "#/ui/icons.ts";
+import { styleProps } from "#/ui/positioner.ts";
+
+const thinkingBounce = stylex.keyframes({
+  "0%, 100%": { animationTimingFunction: "cubic-bezier(.8,0,1,1)", transform: "translateY(-25%)" },
+  "50%": { animationTimingFunction: "cubic-bezier(0,0,.2,1)", transform: "none" },
+});
+
+const recipeStyles = stylex.create({
+  thinkingDotsSpan: {
+    width: "calc(var(--spacing) * 1.5)",
+    height: "calc(var(--spacing) * 1.5)",
+    backgroundColor: "var(--wb-faint)",
+    animationName: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": thinkingBounce,
+    },
+    animationDuration: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "1s",
+    },
+    animationDelay: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "0s",
+    },
+    animationTimingFunction: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "ease",
+    },
+    animationIterationCount: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "infinite",
+    },
+    animationDirection: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "normal",
+    },
+    animationFillMode: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "none",
+    },
+    animationPlayState: {
+      default: null,
+      "@media (prefers-reduced-motion:no-preference)": "running",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  glyphSize: (size: number) => ({ width: size, height: size }),
+  thinkingTiming: (delay: number) => ({ animationDelay: `${delay}ms`, animationDuration: "900ms" }),
+  phaseGlyphSpan: {
+    display: "inline-block",
+    flexShrink: "0",
+  },
+  thinkingDotsSpan: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+  },
+  countSpan: {
+    flexShrink: "0",
+    borderRadius: "2147483647px",
+    backgroundColor: "var(--color-accent)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-page)",
+    fontVariantNumeric: "tabular-nums",
+  },
+});
 const span = spanText;
 
 export { Dot } from "#/ui/Tag.tsx";
@@ -59,10 +131,7 @@ export function dutyShort(duty: string) {
 
 export function PhaseGlyph(props: { phase: Phase; size?: IconSize }) {
   return (
-    <Show
-      when={phaseIcon(props.phase)}
-      fallback={<span class="inline-block shrink-0" style={{ width: `${props.size ?? 14}px`, height: `${props.size ?? 14}px` }} />}
-    >
+    <Show when={phaseIcon(props.phase)} fallback={<span {...styleProps([viewStyles.phaseGlyphSpan, viewStyles.glyphSize(props.size ?? 14)])} />}>
       {(icon) => <Icon name={icon()} size={props.size ?? 14} />}
     </Show>
   );
@@ -95,14 +164,12 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
 
 export function ThinkingDots() {
   return (
-    <span class="inline-flex items-center gap-1" aria-hidden="true">
-      <For each={[0, 150, 300]}>
-        {(d) => <span class="size-1.5 bg-faint motion-safe:animate-bounce" style={{ "animation-delay": `${d}ms`, "animation-duration": "900ms" }} />}
-      </For>
+    <span {...stylex.attrs(viewStyles.thinkingDotsSpan)} aria-hidden="true">
+      <For each={[0, 150, 300]}>{(d) => <span {...styleProps([recipeStyles.thinkingDotsSpan, viewStyles.thinkingTiming(d)])} />}</For>
     </span>
   );
 }
 
 export function Count(props: { n: number }) {
-  return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
+  return <span {...stylex.attrs(viewStyles.countSpan)}>{props.n}</span>;
 }

@@ -1,0 +1,70 @@
+{
+  "title": {
+    "cloud-big-1": "/gen/images/cloud-big-1-4bfe88d9ea3c.webp",
+    "cloud-wisp-1": "/gen/images/cloud-wisp-1-e5cf966855e6.webp",
+    "cloud-mid-2": "/gen/images/cloud-mid-2-de4659f2bfd8.webp",
+    "puff-1": "/gen/images/puff-1-85b6dab9f20c.webp",
+    "puff-2": "/gen/images/puff-2-807cfba6e83d.webp",
+    "wisp-1": "/gen/images/wisp-1-3d461d356d1b.webp",
+    "wisp-2": "/gen/images/wisp-2-a45de5099675.webp",
+    "fern": "/gen/images/fern-94b43a28420d.webp",
+    "grass-tall": "/gen/images/grass-tall-4d264d3227f8.webp",
+    "dandelion-3": "/gen/images/dandelion-3-0ff432deba92.webp",
+    "grass-daisy": "/gen/images/grass-daisy-05fdb8723451.webp",
+    "dandelion-2": "/gen/images/dandelion-2-dfd8d79f6495.webp",
+    "grass-yellow": "/gen/images/grass-yellow-22a68b4fda3e.webp",
+    "seed-1": "/gen/images/seed-1-be47188d96eb.webp",
+    "seed-2": "/gen/images/seed-2-63adc3ce859d.webp",
+    "seed-3": "/gen/images/seed-3-e66513b1e6bf.webp",
+    "seed-4": "/gen/images/seed-4-79f9009c0fe6.webp",
+    "manager-morning": "/gen/images/manager-morning-6a300d33faba.webp",
+    "manager-day": "/gen/images/manager-day-a690c75e2b16.webp",
+    "manager-evening": "/gen/images/manager-evening-95dec7e83743.webp",
+    "manager-night": "/gen/images/manager-night-803bb74239a4.webp",
+    "dog-sit": "/gen/images/dog-sit-e82114721a36.webp",
+    "dog-tail": "/gen/images/dog-tail-2ecb0a75a8bb.webp",
+    "dog-look": "/gen/images/dog-look-6f16a761303b.webp",
+    "dog-sleep": "/gen/images/dog-sleep-f83f97d05356.webp",
+    "grass-low": "/gen/images/grass-low-5b5f3b450c42.webp",
+    "dandelion-1": "/gen/images/dandelion-1-e7283e470e46.webp",
+    "grass-dandelion": "/gen/images/grass-dandelion-51f976c88c47.webp"
+  },
+  "backgrounds": {
+    "morning": "/gen/images/title-morning-7cda06672183.webp",
+    "day": "/gen/images/title-day-5163f58eb447.webp",
+    "evening": "/gen/images/title-evening-d7cb30cfd711.webp",
+    "night": "/gen/images/title-night-206a36c7cba9.webp"
+  },
+  "shots": {
+    "farm": {
+      "src": "/gen/images/farm-2f6f2cd44cf6.webp",
+      "width": 1440,
+      "height": 900,
+      "srcset": "/gen/images/farm-92c875794ff7.webp 480w, /gen/images/farm-85c995dd42e6.webp 720w, /gen/images/farm-22b4a99698f1.webp 1080w, /gen/images/farm-2f6f2cd44cf6.webp 1440w"
+    },
+    "title": {
+      "src": "/gen/images/title-9006c9a2f9c3.webp",
+      "width": 1440,
+      "height": 900,
+      "srcset": "/gen/images/title-c5ed7713975b.webp 480w, /gen/images/title-2a2dc497e142.webp 720w, /gen/images/title-69082006444d.webp 1080w, /gen/images/title-9006c9a2f9c3.webp 1440w"
+    },
+    "chat": {
+      "src": "/gen/images/chat-95fefa1dcb38.webp",
+      "width": 1440,
+      "height": 900,
+      "srcset": "/gen/images/chat-c854b15bc048.webp 480w, /gen/images/chat-4dc6f0f59fdc.webp 720w, /gen/images/chat-a2fa3f15e9fa.webp 1080w, /gen/images/chat-95fefa1dcb38.webp 1440w"
+    },
+    "phone-chat": {
+      "src": "/gen/images/phone-chat-b4411e87d1ba.webp",
+      "width": 390,
+      "height": 844,
+      "srcset": "/gen/images/phone-chat-b4411e87d1ba.webp 390w"
+    },
+    "phone-issues": {
+      "src": "/gen/images/phone-issues-6285a7d27fe4.webp",
+      "width": 390,
+      "height": 844,
+      "srcset": "/gen/images/phone-issues-6285a7d27fe4.webp 390w"
+    }
+  }
+}

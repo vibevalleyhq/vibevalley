@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { Schema } from "effect";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
@@ -29,6 +30,513 @@ import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
 import { PageWords } from "./PageWords";
 import { shellPath } from "./shell";
+
+const recipeStyles3 = stylex.create({
+  artifactsPageA: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  artifactsPageAState: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+  },
+  artifactsPageAState2: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+      "@media (width>=64rem)": "var(--wb-selected)",
+    },
+  },
+  artifactsPageAState3: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  shownDiv: {
+    display: "flex",
+    minHeight: "0",
+    flex: "1",
+    flexDirection: {
+      default: "column",
+      "@media (width>=80rem)": "row",
+    },
+    overflowY: {
+      default: "auto",
+      "@media (width>=80rem)": "hidden",
+    },
+    overflowX: {
+      default: null,
+      "@media (width>=80rem)": "hidden",
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  artifactsPageDiv: {
+    marginInline: "calc(var(--spacing) * -2)",
+    display: "flex",
+    minHeight: "0",
+    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
+    animationName: "scroll-fade-y",
+    animationDuration: "0s",
+    animationDelay: "0s",
+    animationTimingFunction: "linear",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    animationTimeline: "scroll(self y)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+    overflowY: "auto",
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  shownDiv: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: ".18s",
+    animationDelay: "0s",
+    animationTimingFunction: "var(--ease-out)",
+    animationIterationCount: "1",
+    animationDirection: "normal",
+    animationFillMode: "both",
+    animationPlayState: "running",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--wb-bad-soft)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+});
+
+const recipeStyles = stylex.create({
+  shownButton: {
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "calc(var(--spacing) * .5)",
+    borderRadius: "var(--radius-md)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+  },
+  shownButtonVariant1Case1: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  shownButtonVariant1Case2: {
+    backgroundColor: "var(--color-selected)",
+  },
+});
+
+const variantStyles3 = stylex.create({
+  artifactsPageIcon: {
+    flexShrink: "0",
+    color: "var(--color-muted)",
+  },
+  artifactsPageIcon2: {
+    marginTop: "calc(var(--spacing) * .5)",
+    flexShrink: "0",
+    color: "var(--color-muted)",
+  },
+});
+
+const variantStyles2 = stylex.create({
+  shownA: {
+    color: "var(--color-water)",
+    textDecorationLine: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "underline",
+      },
+    },
+  },
+  shownA2: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+});
+
+const variantStyles = stylex.create({
+  artifactsPageNav: {
+    minHeight: "0",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-side)",
+    padding: "calc(var(--spacing) * 3)",
+    width: {
+      default: null,
+      "@media (width>=64rem)": "calc(var(--spacing) * 64)",
+    },
+    borderRightStyle: {
+      default: null,
+      "@media (width>=64rem)": "solid",
+    },
+    borderRightWidth: {
+      default: null,
+      "@media (width>=64rem)": "1px",
+    },
+  },
+  artifactsPageNavVariant: {
+    display: {
+      default: "none",
+      "@media (width>=64rem)": "flex",
+    },
+  },
+  artifactsPageNavVariant2: {
+    display: "flex",
+  },
+  artifactsPageSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  artifactsPageSpanVariant: {
+    color: {
+      default: "var(--color-ink)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 75%, transparent)",
+    },
+  },
+  artifactsPageSpanVariant2: {
+    color: "var(--color-muted)",
+  },
+  artifactsPageDiv: {
+    minHeight: "0",
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+  },
+  shownSection: {
+    display: "flex",
+    minHeight: {
+      default: "70vh",
+      "@media (width>=80rem)": "0",
+    },
+    minWidth: "0",
+    flex: "1",
+    flexDirection: "column",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+  },
+  shownDiv: {
+    display: "flex",
+    minHeight: "0",
+    width: "100%",
+    flex: "1",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  shownDivVariant: {},
+  shownDivVariant2: {
+    marginInline: "auto",
+    maxWidth: "var(--container-3xl)",
+  },
+  shownHeader: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  shownHeaderVariant: {
+    paddingLeft: {
+      default: null,
+      "@media (width>=64rem)": "35px",
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  replyAction: { alignSelf: "flex-end" },
+  artifactsPageDiv: {
+    display: "flex",
+    height: "100%",
+    minHeight: "0",
+    flexDirection: {
+      default: "column",
+      "@media (width>=64rem)": "row",
+    },
+  },
+  artifactsPageDiv2: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  artifactsPageLabel: {
+    display: "flex",
+    height: "calc(var(--spacing) * 8)",
+    minWidth: "0",
+    flex: "1",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: {
+      default: "var(--color-line)",
+      ":focus-within": "var(--color-focus)",
+    },
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  artifactSearch: {
+    minWidth: "0",
+    flex: "1",
+    backgroundColor: "transparent",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    outlineStyle: "none",
+    color: {
+      default: null,
+      "::placeholder": "var(--color-faint)",
+    },
+  },
+  artifactsPageP: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-berry)",
+  },
+  artifactsPageP2: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+    display: {
+      default: null,
+      "@media (width>=64rem)": "none",
+    },
+  },
+  artifactsPageP3: {
+    paddingInline: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  artifactGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * .5)",
+  },
+  artifactsPageButton: {
+    display: "flex",
+    cursor: "pointer",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    paddingInline: "var(--spacing)",
+    paddingTop: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: {
+      default: "var(--color-muted)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-ink)",
+      },
+    },
+  },
+  artifactsPageSpan: {
+    fontWeight: "var(--font-weight-normal)",
+    color: "var(--color-faint)",
+  },
+  artifactsPageSpan2: {
+    display: "flex",
+    minWidth: "0",
+    flexDirection: "column",
+  },
+  artifactsPageSpan3: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  artifactTitle: {
+    marginInline: "calc(var(--spacing) * -1)",
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: {
+      default: "transparent",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+      ":focus": "var(--color-hover)",
+    },
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-xl)",
+    lineHeight: "calc(var(--spacing) * 8)",
+    fontWeight: "var(--font-weight-semibold)",
+    outlineStyle: "none",
+  },
+  shownDiv: {
+    display: {
+      default: null,
+      "@media (width>=64rem)": "none",
+    },
+  },
+  shownDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  shownDiv3: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: "calc(var(--spacing) * 2)",
+    rowGap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  shownSpan: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-berry)",
+  },
+  artifactFrame: {
+    minHeight: {
+      default: "60vh",
+      "@media (width>=80rem)": "0",
+    },
+    width: "100%",
+    flex: "1",
+    borderRadius: "var(--radius-lg)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
+  },
+  shownP: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  artifactRail: {
+    display: "flex",
+    flexShrink: "0",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 5)",
+    borderTopStyle: {
+      default: "solid",
+      "@media (width>=80rem)": "solid",
+    },
+    borderTopWidth: {
+      default: "1px",
+      "@media (width>=80rem)": "0",
+    },
+    borderColor: "var(--color-line)",
+    paddingInline: "calc(var(--spacing) * 4)",
+    paddingBlock: "calc(var(--spacing) * 4)",
+    width: {
+      default: null,
+      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+    },
+    overflowY: {
+      default: null,
+      "@media (width>=80rem)": "auto",
+    },
+    borderLeftStyle: {
+      default: null,
+      "@media (width>=80rem)": "solid",
+    },
+    borderLeftWidth: {
+      default: null,
+      "@media (width>=80rem)": "1px",
+    },
+  },
+  shownDiv4: {
+    display: {
+      default: null,
+      ":empty": "none",
+    },
+  },
+  shownDiv5: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  shownH2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  shownSpan2: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    fontWeight: "var(--font-weight-medium)",
+  },
+  shownSpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-normal)",
+    color: "var(--color-muted)",
+  },
+  shownSpan4: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  shownDiv6: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  replyForm: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 const messageHref = (at: { readonly channel: string; readonly number?: number }) =>
   at.number !== undefined ? `/chat/${at.channel}?m=${at.number}` : `/chat/${at.channel}`;
@@ -80,52 +588,52 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
       return next;
     });
   return (
-    <div class="flex h-full min-h-0 flex-col lg:flex-row">
+    <div {...stylex.attrs(viewStyles.artifactsPageDiv)}>
       <nav
         aria-label={t("web.artifact.page.list")}
         data-testid="artifact-list"
-        class={[id() ? "hidden lg:flex" : "flex", "min-h-0 shrink-0 flex-col gap-3 border-line bg-side p-3 lg:w-64 lg:border-r"]}
+        {...stylex.attrs(variantStyles.artifactsPageNav, id() ? variantStyles.artifactsPageNavVariant : variantStyles.artifactsPageNavVariant2)}
       >
-        <div class="flex gap-1.5">
-          <label class="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
-            <Icon name="search" size={14} class="shrink-0 text-muted" />
+        <div {...stylex.attrs(viewStyles.artifactsPageDiv2)}>
+          <label {...stylex.attrs(viewStyles.artifactsPageLabel)}>
+            <Icon name="search" size={14} styles={[variantStyles3.artifactsPageIcon]} />
             <input
               data-testid="artifact-search"
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}
               placeholder={t("web.artifact.page.find")}
               aria-label={t("web.artifact.page.find")}
-              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+              {...stylex.attrs(viewStyles.artifactSearch)}
             />
           </label>
           {/* Beside the search, not a green button over the page being read: a new one is not what this page is for. */}
           <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create()} />
         </div>
         <Show when={all.error()}>
-          <p class="px-2 text-xs text-berry">{reasonOf(all.error())}</p>
+          <p {...stylex.attrs(viewStyles.artifactsPageP)}>{reasonOf(all.error())}</p>
         </Show>
         <Show when={all.status() === "success" && list().length === 0}>
-          <p class="px-2 text-xs text-muted lg:hidden">{t("web.artifact.page.none")}</p>
+          <p {...stylex.attrs(viewStyles.artifactsPageP2)}>{t("web.artifact.page.none")}</p>
         </Show>
         <Show when={list().length > 0 && shown().length === 0}>
-          <p class="px-2 text-xs text-muted">{t("web.artifact.page.nothingFound")}</p>
+          <p {...stylex.attrs(viewStyles.artifactsPageP3)}>{t("web.artifact.page.nothingFound")}</p>
         </Show>
-        <div class="-mx-2 flex min-h-0 scroll-fade-y flex-col gap-2 overflow-y-auto px-2">
+        <div {...stylex.attrs(recipeStyles2.artifactsPageDiv)}>
           <For each={groups().filter((g) => g.rows.length > 0)}>
             {(g) => (
-              <section data-testid="artifact-group" data-key={g.key} class="flex flex-col gap-0.5">
+              <section data-testid="artifact-group" data-key={g.key} {...stylex.attrs(viewStyles.artifactGroup)}>
                 <button
                   type="button"
                   aria-expanded={shut().has(g.key) ? "false" : "true"}
                   onClick={() => toggle(g.key)}
-                  class="flex cursor-pointer items-center gap-1 px-1 pt-1 text-xs font-semibold text-muted hover:text-ink"
+                  {...stylex.attrs(viewStyles.artifactsPageButton)}
                 >
                   <Icon name={shut().has(g.key) ? "expand" : "choose"} size={12} />
                   {t(`web.artifact.page.group.${g.key}`)}
-                  <span class="font-normal text-faint">{g.rows.length}</span>
+                  <span {...stylex.attrs(viewStyles.artifactsPageSpan)}>{g.rows.length}</span>
                 </button>
                 <Show when={!shut().has(g.key)}>
-                  <ul class="flex flex-col gap-0.5">
+                  <ul {...stylex.attrs(viewStyles.artifactGroup)}>
                     <For each={g.rows} keyed={(a) => a.id}>
                       {(a) => (
                         <li>
@@ -135,17 +643,25 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
                             data-key={a().id}
                             data-body={a().body}
                             aria-current={a().id === open() ? "page" : undefined}
-                            class={[
-                              "flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-120",
-                              // With no address, the first is open only where there is room to show it beside the list.
-                              a().id === id() ? "bg-selected" : a().id === open() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
-                            ]}
+                            {...stylex.attrs(
+                              recipeStyles3.artifactsPageA,
+                              a().id === id()
+                                ? recipeStyles3.artifactsPageAState3
+                                : a().id === open()
+                                  ? recipeStyles3.artifactsPageAState2
+                                  : recipeStyles3.artifactsPageAState,
+                            )}
                           >
-                            <Icon name={bodyIcon[a().body]} size={16} class="mt-0.5 shrink-0 text-muted" />
-                            <span class="flex min-w-0 flex-col">
-                              <span class="truncate text-sm font-medium">{a().title}</span>
+                            <Icon name={bodyIcon[a().body]} size={16} styles={[variantStyles3.artifactsPageIcon2]} />
+                            <span {...stylex.attrs(viewStyles.artifactsPageSpan2)}>
+                              <span {...stylex.attrs(viewStyles.artifactsPageSpan3)}>{a().title}</span>
                               {/* On the selected row's darker ground the line takes more ink, to stay readable. */}
-                              <span class={["truncate text-xs", a().id === open() ? "text-ink/75" : "text-muted"]}>
+                              <span
+                                {...stylex.attrs(
+                                  variantStyles.artifactsPageSpan,
+                                  a().id === open() ? variantStyles.artifactsPageSpanVariant : variantStyles.artifactsPageSpanVariant2,
+                                )}
+                              >
                                 {a().byName} · {ago(a().updated, now())}
                               </span>
                             </span>
@@ -160,7 +676,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
           </For>
         </div>
       </nav>
-      <div class={[id() ? "flex" : "hidden lg:flex", "min-h-0 min-w-0 flex-1 flex-col"]}>
+      <div {...stylex.attrs(variantStyles.artifactsPageDiv, id() ? variantStyles.artifactsPageNavVariant2 : variantStyles.artifactsPageNavVariant)}>
         <Show
           when={open()}
           fallback={
@@ -248,7 +764,7 @@ function Title(props: { artifact: Artifact }) {
         }
       }}
       onBlur={() => void save()}
-      class="-mx-1 min-w-0 flex-1 truncate rounded-md bg-transparent px-1 text-xl leading-8 font-semibold outline-none hover:bg-hover focus:bg-hover"
+      {...stylex.attrs(viewStyles.artifactTitle)}
     />
   );
 }
@@ -308,19 +824,19 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
       data-key={props.artifact.id}
       data-body={props.artifact.body}
       data-version={version()?.version}
-      class="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden"
+      {...stylex.attrs(recipeStyles3.shownDiv)}
     >
-      <section class="flex min-h-[70vh] min-w-0 flex-1 flex-col px-4 py-4 xl:min-h-0">
+      <section {...stylex.attrs(variantStyles.shownSection)}>
         {/* A page is shown as wide as there is room; written blocks read in a column. */}
-        <div class={["flex min-h-0 w-full flex-1 flex-col gap-3", html() ? "" : "mx-auto max-w-3xl"]}>
-          <div class="lg:hidden">
+        <div {...stylex.attrs(variantStyles.shownDiv, html() ? variantStyles.shownDivVariant : variantStyles.shownDivVariant2)}>
+          <div {...stylex.attrs(viewStyles.shownDiv)}>
             <Button icon="back" onClick={() => router.navigate("/artifacts")}>
               {t("web.artifact.page.all")}
             </Button>
           </div>
           {/* A blocks one's header lines up with its text, past the gutter of faces and author bars (BlocksView). */}
-          <header class={["flex flex-col gap-1", html() ? "" : "lg:pl-[35px]"]}>
-            <div class="flex items-center gap-2">
+          <header {...stylex.attrs(variantStyles.shownHeader, html() ? variantStyles.shownDivVariant : variantStyles.shownHeaderVariant)}>
+            <div {...stylex.attrs(viewStyles.shownDiv2)}>
               <Title artifact={props.artifact} />
               <IconButton
                 icon="thread"
@@ -331,7 +847,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               />
               <MoreMenu label={t("web.artifact.page.more")} testid="artifact-more" items={more()} />
             </div>
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <div {...stylex.attrs(viewStyles.shownDiv3)}>
               <Show when={html() ? version() : undefined}>
                 {(v) => (
                   <>
@@ -347,7 +863,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                 {(i) => (
                   <>
                     <span aria-hidden="true">·</span>
-                    <A href={`/issues/${i().id}`} data-testid="artifact-issue" class="text-water hover:underline">
+                    <A href={`/issues/${i().id}`} data-testid="artifact-issue" {...stylex.attrs(variantStyles2.shownA)}>
                       {t("web.artifact.page.forIssue", { number: i().number })}
                     </A>
                   </>
@@ -358,10 +874,10 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               <div
                 role="group"
                 data-testid="artifact-delete"
-                class="mt-2 flex animate-fade-in flex-wrap items-center gap-2 rounded-md bg-bad-soft px-3 py-2"
+                {...stylex.attrs(recipeStyles2.shownDiv)}
                 onKeyDown={(e) => e.key === "Escape" && setAsking(false)}
               >
-                <span class="min-w-0 flex-1 text-sm text-berry">{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>
+                <span {...stylex.attrs(viewStyles.shownSpan)}>{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>
                 <Button
                   tone="danger"
                   icon="delete"
@@ -388,11 +904,11 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                   src={shellPath(props.artifact.id, v().version)}
                   sandbox={htmlSandbox}
                   referrerpolicy="no-referrer"
-                  class="min-h-[60vh] w-full flex-1 rounded-lg border border-line bg-page xl:min-h-0"
+                  {...stylex.attrs(viewStyles.artifactFrame)}
                 />
                 {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}
                 <Show when={rail.get() && v().version === props.artifact.version}>
-                  <p class="text-xs text-faint">{t("web.artifact.edit.hint")}</p>
+                  <p {...stylex.attrs(viewStyles.shownP)}>{t("web.artifact.edit.hint")}</p>
                 </Show>
               </>
             )}
@@ -400,21 +916,17 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
         </div>
       </section>
       <Show when={rail.get()}>
-        <aside
-          aria-label={t("web.artifact.page.rail")}
-          data-testid="artifact-rail"
-          class="flex shrink-0 flex-col gap-5 border-t border-line px-4 py-4 xl:w-72 xl:overflow-y-auto xl:border-t-0 xl:border-l"
-        >
+        <aside aria-label={t("web.artifact.page.rail")} data-testid="artifact-rail" {...stylex.attrs(viewStyles.artifactRail)}>
           {/* The written blocks' open suggestions are drawn here (BlocksView). */}
-          <div ref={setSuggestionsAt} class="empty:hidden" />
+          <div ref={setSuggestionsAt} {...stylex.attrs(viewStyles.shownDiv4)} />
           <Show when={framed()}>
             {(p) => <Keyed key={p().version}>{() => <PageWords artifact={props.artifact} version={p().version} frame={p().frame} />}</Keyed>}
           </Show>
           {/* A list of one says nothing the head does not: the versions show once there is a second. */}
           <Show when={html() && props.artifact.versions.length > 1}>
-            <div class="flex flex-col gap-1.5">
-              <h2 class="text-xs font-semibold text-muted">{t("web.artifact.page.versions")}</h2>
-              <ol data-testid="artifact-versions" class="flex flex-col gap-0.5">
+            <div {...stylex.attrs(viewStyles.shownDiv5)}>
+              <h2 {...stylex.attrs(viewStyles.shownH2)}>{t("web.artifact.page.versions")}</h2>
+              <ol data-testid="artifact-versions" {...stylex.attrs(viewStyles.artifactGroup)}>
                 <For each={[...props.artifact.versions].toReversed()} keyed={(v) => v.version}>
                   {(v) => (
                     <li>
@@ -423,18 +935,18 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                         data-key={v().version}
                         aria-pressed={v().version === version()?.version ? "true" : "false"}
                         onClick={() => pick(v().version)}
-                        class={[
-                          "flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left transition-colors duration-120",
-                          v().version === version()?.version ? "bg-selected" : "hover:bg-hover",
-                        ]}
+                        {...stylex.attrs(
+                          recipeStyles.shownButton,
+                          v().version === version()?.version ? recipeStyles.shownButtonVariant1Case2 : recipeStyles.shownButtonVariant1Case1,
+                        )}
                       >
-                        <span class="text-sm font-medium">
+                        <span {...stylex.attrs(viewStyles.shownSpan2)}>
                           {t("web.artifact.card.version", { version: v().version })}{" "}
-                          <span class="text-xs font-normal text-muted">
+                          <span {...stylex.attrs(viewStyles.shownSpan3)}>
                             · {v().byName} · {ago(v().at, now())}
                           </span>
                         </span>
-                        <Show when={v().note}>{(note) => <span class="text-xs text-muted">{note()}</span>}</Show>
+                        <Show when={v().note}>{(note) => <span {...stylex.attrs(viewStyles.shownSpan4)}>{note()}</span>}</Show>
                       </button>
                     </li>
                   )}
@@ -445,16 +957,16 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
           <Show
             when={said()}
             fallback={
-              <p data-testid="artifact-unsaid" class="text-xs text-faint">
+              <p data-testid="artifact-unsaid" {...stylex.attrs(viewStyles.shownP)}>
                 {t("web.artifact.talk.none")}
               </p>
             }
           >
             {(at) => (
-              <div class="flex flex-col gap-1.5">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-xs font-semibold text-muted">{version() ? t("web.artifact.talk.replyVersion") : t("web.artifact.talk.reply")}</h2>
-                  <A href={messageHref(at())} data-testid="artifact-message" class="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
+              <div {...stylex.attrs(viewStyles.shownDiv5)}>
+                <div {...stylex.attrs(viewStyles.shownDiv6)}>
+                  <h2 {...stylex.attrs(viewStyles.shownH2)}>{version() ? t("web.artifact.talk.replyVersion") : t("web.artifact.talk.reply")}</h2>
+                  <A href={messageHref(at())} data-testid="artifact-message" {...stylex.attrs(variantStyles2.shownA2)}>
                     <Icon name="chat" size={12} />
                     {t("web.artifact.talk.atMessage")}
                   </A>
@@ -486,7 +998,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
   };
   return (
     <form
-      class="flex flex-col gap-2"
+      {...stylex.attrs(viewStyles.replyForm)}
       onSubmit={(e) => {
         e.preventDefault();
         void send();
@@ -506,7 +1018,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
           }
         }}
       />
-      <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" class="self-end">
+      <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" styles={viewStyles.replyAction}>
         {t("web.artifact.talk.send")}
       </Button>
     </form>

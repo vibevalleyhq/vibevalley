@@ -22,6 +22,12 @@ for (const name of readdirSync(packages)) {
   if (!readFileSync(join(packages, name, "vite.config.ts"), "utf8").includes("pack:")) continue;
   const { exports } = Schema.decodeUnknownSync(Manifest)(readFileSync(manifest, "utf8"));
   for (const [path, target] of Object.entries(exports ?? {})) {
+    if (path.endsWith(".css") && typeof target === "string") {
+      if (!target.startsWith("./src/") || !target.endsWith(".css") || !existsSync(join(packages, name, target))) {
+        wrong.push(`packages/${name}: "${path}" must point to an existing ./src/… stylesheet`);
+      }
+      continue;
+    }
     if (typeof target === "string" || target.types === undefined || target.default === undefined) {
       wrong.push(`packages/${name}: "${path}" is not { types: ./dist/….d.ts, default: ./src/… }`);
       continue;

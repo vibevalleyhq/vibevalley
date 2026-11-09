@@ -1,6 +1,16 @@
+import * as stylex from "@stylexjs/stylex";
+
 import { stories, story } from "@vibevalley/stories";
 
 import { Field, Select, TextArea, TextInput } from "./Field";
+
+const styles = stylex.create({
+  dynamicWidth: (width: number) => ({ maxWidth: width }),
+  states: { width: "calc(var(--spacing) * 48)" },
+  text: { width: "calc(var(--spacing) * 80)" },
+  longText: { width: "calc(var(--spacing) * 96)" },
+  select: { width: "calc(var(--spacing) * 64)" },
+});
 
 const runtimes = [
   { value: "", label: "选一个" },
@@ -12,12 +22,38 @@ const runtimes = [
 export default stories({
   title: "组件/工作台/Field",
   stories: {
+    "Dynamic controls": story({
+      args: { width: 240, value: "draft" },
+      render: (a, set) => (
+        <div {...stylex.attrs(styles.longText)}>
+          <TextInput
+            data-testid="dynamic-input"
+            aria-label="Input"
+            value={a.value}
+            onInput={(event) => set({ value: event.currentTarget.value })}
+            styles={styles.dynamicWidth(a.width)}
+            style={{ height: "48px" }}
+          />
+          <TextArea
+            data-testid="dynamic-textarea"
+            aria-label="Text area"
+            value={a.value}
+            onInput={(event) => set({ value: event.currentTarget.value })}
+            styles={styles.dynamicWidth(a.width)}
+            style={{ height: "80px" }}
+          />
+          <button type="button" data-testid="resize-controls" onClick={() => set({ width: a.width === 240 ? 320 : 240 })}>
+            Resize
+          </button>
+        </div>
+      ),
+    }),
     States: story({
       note: "输入框和选择框：静止、指针下、聚焦，和不能改的。",
       args: { kind: "text", value: "vibevalley", disabled: false },
       grid: { rows: ["kind", ["text", "select"]], cols: "pseudo" },
       render: (a) => (
-        <div class="w-48">
+        <div {...stylex.attrs(styles.states)}>
           {a.kind === "select" ? (
             <Select label="农机" value="claude" options={runtimes} disabled={a.disabled} onChange={() => undefined} />
           ) : (
@@ -29,7 +65,7 @@ export default stories({
     Text: story({
       args: { label: "仓库名", hint: "工作目录下的文件夹名", placeholder: "vibevalley", disabled: false },
       render: (a) => (
-        <div class="w-80">
+        <div {...stylex.attrs(styles.text)}>
           <Field label={a.label} hint={a.hint || undefined}>
             <TextInput placeholder={a.placeholder} disabled={a.disabled} />
           </Field>
@@ -38,7 +74,7 @@ export default stories({
     }),
     "Long text": story({
       render: () => (
-        <div class="w-96">
+        <div {...stylex.attrs(styles.longText)}>
           <Field label="说明">
             <TextArea rows={4} placeholder="要做什么、做到什么样算完" />
           </Field>
@@ -50,7 +86,7 @@ export default stories({
       args: { value: "", quiet: false, filter: false, disabled: false },
       controls: { value: { kind: "choice", options: runtimes.map((r) => r.value) } },
       render: (a, set) => (
-        <div class="w-64">
+        <div {...stylex.attrs(styles.select)}>
           <Field label="农机">
             <Select
               label="农机"

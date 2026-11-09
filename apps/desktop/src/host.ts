@@ -50,6 +50,7 @@ export function serveHost(o: {
     desktopBridge,
     mainLink(() => o.window.current()?.webContents),
     {
+      opening: (update) => o.window.progress(update),
       notify: (notice) => {
         probe?.notices.push(notice);
         if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();

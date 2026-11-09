@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,6 +15,7 @@ import { Button } from "#/ui/Button.tsx";
 import { highlight, type Tokens } from "#/ui/code/highlight.ts";
 import { Dialog } from "#/ui/Dialog.tsx";
 import { TextArea } from "#/ui/Field.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { actionOf, perform } from "./acts";
 import { type Lane } from "./cards";
@@ -22,6 +24,333 @@ import { useIssueChanges } from "./history";
 import { issueTitle } from "./issue";
 import { issueMove, sendMove } from "./moves";
 import { Note } from "./Sheet";
+
+const changeStyles = stylex.create({
+  files: {
+    overflow: "hidden",
+    borderRadius: "var(--radius-md)",
+    borderStyle: "solid",
+    borderWidth: "1px",
+    borderColor: "var(--wb-line)",
+  },
+  kind: {
+    display: "flex",
+    width: "calc(var(--spacing) * 5)",
+    height: "calc(var(--spacing) * 5)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "var(--radius-sm)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  added: {
+    backgroundColor: {
+      default: "var(--wb-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 20%, transparent)",
+    },
+    color: "var(--wb-accent)",
+  },
+  modified: {
+    backgroundColor: {
+      default: "var(--wb-wheat)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
+    },
+    color: "var(--wb-bark)",
+  },
+  deleted: {
+    backgroundColor: {
+      default: "var(--wb-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 15%, transparent)",
+    },
+    color: "var(--wb-berry)",
+  },
+  unknown: {
+    backgroundColor: "var(--wb-selected)",
+  },
+  file: {
+    borderTopStyle: {
+      default: null,
+      ":not(:last-child)": "solid",
+    },
+    borderBottomStyle: {
+      default: null,
+      ":not(:last-child)": "solid",
+    },
+    borderTopWidth: {
+      default: null,
+      ":not(:last-child)": "0px",
+    },
+    borderBottomWidth: {
+      default: null,
+      ":not(:last-child)": "1px",
+    },
+    borderColor: {
+      default: null,
+      ":not(:last-child)": "var(--color-line)",
+    },
+  },
+});
+
+const recipeStyles2 = stylex.create({
+  fileRowButton: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * 1.5)",
+    textAlign: "left",
+  },
+  fileRowButtonState: {
+    backgroundColor: null,
+    cursor: null,
+  },
+  fileRowButtonState2: {
+    backgroundColor: "var(--wb-hover)",
+    cursor: null,
+  },
+  fileRowButtonState3: {
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    cursor: "pointer",
+  },
+  fileRowButtonState4: {
+    backgroundColor: {
+      default: "var(--wb-hover)",
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--wb-hover)",
+      },
+    },
+    cursor: "pointer",
+  },
+});
+
+const recipeStyles = stylex.create({
+  patchDiv: {
+    paddingInline: "calc(var(--spacing) * 2)",
+  },
+  patchDivVariant1Case1: {
+    backgroundColor: {
+      default: "var(--color-leaf)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 20%, transparent)",
+    },
+    color: "var(--color-accent)",
+  },
+  patchDivVariant1Case2: {
+    backgroundColor: {
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 10%, transparent)",
+    },
+    color: "var(--color-berry)",
+  },
+  patchDivVariant1Case3: {
+    backgroundColor: null,
+    color: "var(--color-water)",
+  },
+  patchDivVariant1Case4: {
+    backgroundColor: null,
+    color: null,
+  },
+});
+const recipeStylesChoices1 = {
+  added: recipeStyles.patchDivVariant1Case1,
+  removed: recipeStyles.patchDivVariant1Case2,
+  hunk: recipeStyles.patchDivVariant1Case3,
+  plain: recipeStyles.patchDivVariant1Case4,
+};
+
+const variantStyles2 = stylex.create({
+  reopenDialogTextArea: {
+    marginTop: "calc(var(--spacing) * 4)",
+  },
+});
+
+const variantStyles = stylex.create({
+  fileRowSpan: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  fileRowSpanVariant: {
+    color: "var(--color-berry)",
+  },
+  fileRowSpanVariant2: {},
+});
+
+const viewStyles = stylex.create({
+  doneAction: { marginTop: "calc(var(--spacing) * 4)" },
+  closeIssueDialogP: {
+    fontSize: "var(--text-base)",
+    lineHeight: "var(--text-base--line-height)",
+  },
+  closeIssueDialogDiv: {
+    marginTop: "calc(var(--spacing) * 5)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  changesReviewP: {
+    paddingBlock: "calc(var(--spacing) * 10)",
+    textAlign: "center",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
+  changesReviewSpan: {
+    color: "var(--color-berry)",
+  },
+  changesReviewDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+  },
+  changesReviewSpan2: {
+    color: "var(--color-muted)",
+  },
+  changesReviewDiv2: {
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-berry)",
+  },
+  changesReviewDiv3: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "var(--spacing)",
+  },
+  changesReviewSpan3: {
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-berry)",
+  },
+  changesReviewDiv4: {
+    marginTop: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  changesReviewP2: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  changesReviewSpan4: {
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-page)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  changesReviewDiv5: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  changesHeadDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  changesHeadSpan: {
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "var(--color-selected)",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  changesHeadSpan2: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+  },
+  changesBodyH3: {
+    marginTop: "calc(var(--spacing) * 2)",
+    marginBottom: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+    color: "var(--color-muted)",
+  },
+  changesBodyDiv: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+  },
+  changesBodySpan: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  changesBodySpan2: {
+    minWidth: "0",
+    flex: "1",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+  },
+  changesBodySpan3: {
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-faint)",
+  },
+  plusMinusSpan: {
+    color: "var(--color-accent)",
+  },
+  fileRowSpan: {
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: {
+      default: "var(--color-berry)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
+    },
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-berry)",
+  },
+  patchPre: {
+    marginInline: "calc(var(--spacing) * 2)",
+    marginBottom: "calc(var(--spacing) * 2)",
+    maxHeight: "calc(var(--spacing) * 80)",
+    overflow: "auto",
+    borderRadius: "var(--radius-md)",
+    backgroundColor: "var(--color-page)",
+    paddingBlock: "var(--spacing)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "1.4",
+  },
+  reopenDialogDiv: {
+    marginTop: "calc(var(--spacing) * 5)",
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
@@ -38,14 +367,14 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
     <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
       <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} lane={props.lane} onDone={props.onClose} />}>
         <div>
-          <p class="text-base">
+          <p {...stylex.attrs(viewStyles.closeIssueDialogP)}>
             {working()
               ? t("web.issue.close.working", { who: props.session?.name ?? props.issue.title })
               : acts().includes("complete")
                 ? t("web.issue.close.completable", { who: props.session?.name ?? props.issue.title })
                 : t("web.issue.close.notCompletable", { who: props.session?.name ?? props.issue.title })}
           </p>
-          <div class="mt-5 flex flex-wrap gap-2">
+          <div {...stylex.attrs(viewStyles.closeIssueDialogDiv)}>
             <Show when={acts().includes("complete")}>
               <Button tone="primary" data-testid="review-changes" onClick={() => setReviewing(true)}>
                 {t("web.issue.close.review")}
@@ -100,18 +429,18 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
   return (
     <Switch>
       <Match when={changes.status() === "pending"}>
-        <p class="py-10 text-center text-sm text-muted">{t("web.issue.changes.reading")}</p>
+        <p {...stylex.attrs(viewStyles.changesReviewP)}>{t("web.issue.changes.reading")}</p>
       </Match>
       <Match when={changes.error()}>
         {(error) => (
           <div>
             <Note tone="berry">
-              <span class="text-berry">
+              <span {...stylex.attrs(viewStyles.changesReviewSpan)}>
                 {t("web.issue.changes.unreadable")}
                 {reasonOf(error())}
               </span>
             </Note>
-            <Button class="mt-4" onClick={() => props.onDone()}>
+            <Button styles={viewStyles.doneAction} onClick={() => props.onDone()}>
               {t("web.issue.later")}
             </Button>
           </div>
@@ -121,36 +450,36 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
         {(c) => {
           const empty = () => nothingChanged(c());
           return (
-            <div class="flex flex-col gap-3">
+            <div {...stylex.attrs(viewStyles.changesReviewDiv)}>
               <ChangesHead changes={c()} />
               <Show
                 when={c().conflicts.length > 0}
                 fallback={
                   <Show when={empty()}>
                     <Note>
-                      <span class="text-muted">{t("web.issue.changes.none")}</span>
+                      <span {...stylex.attrs(viewStyles.changesReviewSpan2)}>{t("web.issue.changes.none")}</span>
                     </Note>
                   </Show>
                 }
               >
                 <Note tone="berry">
-                  <div class="font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</div>
-                  <div class="mt-1.5 flex flex-wrap gap-1">
-                    <For each={c().conflicts}>{(f) => <span class="rounded bg-page px-1.5 font-mono text-xs text-berry">{f}</span>}</For>
+                  <div {...stylex.attrs(viewStyles.changesReviewDiv2)}>{t("web.issue.changes.conflict", { base: c().base })}</div>
+                  <div {...stylex.attrs(viewStyles.changesReviewDiv3)}>
+                    <For each={c().conflicts}>{(f) => <span {...stylex.attrs(viewStyles.changesReviewSpan3)}>{f}</span>}</For>
                   </div>
-                  <div class="mt-1.5 text-xs text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</div>
+                  <div {...stylex.attrs(viewStyles.changesReviewDiv4)}>{t("web.issue.changes.resolveHow", { base: c().base })}</div>
                 </Note>
               </Show>
               <Show when={c().behind > 0 && c().conflicts.length === 0}>
-                <p class="text-xs text-muted">{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</p>
+                <p {...stylex.attrs(viewStyles.changesReviewP2)}>{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</p>
               </Show>
               <Show when={c().uncommitted.length > 0}>
                 <Note tone="wheat">
                   <div>{t("web.issue.changes.uncommitted", { n: c().uncommitted.length })}</div>
-                  <div class="mt-1.5 flex flex-wrap gap-1">
+                  <div {...stylex.attrs(viewStyles.changesReviewDiv3)}>
                     <For each={c().uncommitted}>
                       {(f) => (
-                        <span class="rounded bg-page px-1.5 py-0.5 font-mono text-xs">
+                        <span {...stylex.attrs(viewStyles.changesReviewSpan4)}>
                           {changeKind(f.status).mark} {f.path}
                         </span>
                       )}
@@ -158,7 +487,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
                   </div>
                 </Note>
               </Show>
-              <div class="flex flex-wrap gap-2">
+              <div {...stylex.attrs(viewStyles.changesReviewDiv5)}>
                 <Show when={acts().includes("complete")}>
                   <Button tone="primary" data-act="complete" onClick={() => void take()}>
                     {t("shared.act.complete")}
@@ -172,7 +501,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
                 <Button onClick={() => props.onDone()}>{t("web.issue.later")}</Button>
               </div>
               <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-                <p class="text-xs text-muted">{t("web.issue.changes.moved")}</p>
+                <p {...stylex.attrs(viewStyles.changesReviewP2)}>{t("web.issue.changes.moved")}</p>
               </Show>
               <ChangesBody changes={c()} />
             </div>
@@ -186,16 +515,18 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
 export function ChangesHead(props: { changes: Changes }) {
   const counts = () => lineCounts(props.changes);
   return (
-    <div class="flex flex-wrap items-center gap-2 text-sm">
-      <span class="rounded bg-selected px-1.5 text-xs">
+    <div {...stylex.attrs(viewStyles.changesHeadDiv)}>
+      <span {...stylex.attrs(viewStyles.changesHeadSpan)}>
         {t("web.issue.task.repo")} {props.changes.repo}
       </span>
       <Show when={props.changes.branch}>
-        <span class="font-mono text-xs">
+        <span {...stylex.attrs(viewStyles.changesHeadSpan2)}>
           {props.changes.branch} → {props.changes.base}
         </span>
       </Show>
-      <span class="text-xs text-muted">{t("web.issue.changes.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}</span>
+      <span {...stylex.attrs(viewStyles.changesReviewP2)}>
+        {t("web.issue.changes.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}
+      </span>
       <Show when={props.changes.files.length > 0}>
         <PlusMinus added={counts()[0]} removed={counts()[1]} />
       </Show>
@@ -210,13 +541,13 @@ export function ChangesBody(props: { changes: Changes }) {
     <>
       <Show when={props.changes.commits.length > 0}>
         <section>
-          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{t("web.issue.changes.commits", { n: props.changes.commits.length })}</h3>
+          <h3 {...stylex.attrs(viewStyles.changesBodyH3)}>{t("web.issue.changes.commits", { n: props.changes.commits.length })}</h3>
           <For each={props.changes.commits}>
             {(m) => (
-              <div class="flex items-center gap-2.5 py-0.5">
-                <span class="font-mono text-xs text-muted">{m.hash}</span>
-                <span class="min-w-0 flex-1 truncate text-sm">{m.subject}</span>
-                <span class="text-xs text-faint">{ago(m.at, now)}</span>
+              <div {...stylex.attrs(viewStyles.changesBodyDiv)}>
+                <span {...stylex.attrs(viewStyles.changesBodySpan)}>{m.hash}</span>
+                <span {...stylex.attrs(viewStyles.changesBodySpan2)}>{m.subject}</span>
+                <span {...stylex.attrs(viewStyles.changesBodySpan3)}>{ago(m.at, now)}</span>
               </div>
             )}
           </For>
@@ -224,8 +555,8 @@ export function ChangesBody(props: { changes: Changes }) {
       </Show>
       <Show when={props.changes.files.length > 0}>
         <section>
-          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{t("web.issue.changes.files", { n: props.changes.files.length })}</h3>
-          <div class="divide-y divide-line overflow-hidden rounded-md border border-line">
+          <h3 {...stylex.attrs(viewStyles.changesBodyH3)}>{t("web.issue.changes.files", { n: props.changes.files.length })}</h3>
+          <div {...styleProps(changeStyles.files)}>
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={props.changes.conflicts.includes(f.path)} />}</For>
           </div>
         </section>
@@ -236,20 +567,20 @@ export function ChangesBody(props: { changes: Changes }) {
 
 function PlusMinus(props: { added: number; removed: number }) {
   return (
-    <span class="font-mono text-xs">
-      <span class="text-accent">+{props.added}</span> <span class="text-berry">−{props.removed}</span>
+    <span {...stylex.attrs(viewStyles.changesHeadSpan2)}>
+      <span {...stylex.attrs(viewStyles.plusMinusSpan)}>+{props.added}</span> <span {...stylex.attrs(viewStyles.changesReviewSpan)}>−{props.removed}</span>
     </span>
   );
 }
 
-const kindLook: Record<string, string> = { A: "bg-leaf/20 text-accent", M: "bg-wheat/20 text-bark", D: "bg-berry/15 text-berry" };
+const kindLook: Record<string, stylex.StyleXStyles> = { A: changeStyles.added, M: changeStyles.modified, D: changeStyles.deleted };
 
 function FileRow(props: { file: ChangedFile; conflict: boolean }) {
   const [open, setOpen] = createSignal(false);
   const kind = () => changeKind(props.file.status);
   const hasPatch = () => !!props.file.patch;
   return (
-    <div>
+    <div {...styleProps(changeStyles.file)}>
       <button
         type="button"
         data-testid="changed-file"
@@ -257,21 +588,30 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         disabled={!hasPatch()}
         aria-expanded={hasPatch() ? aria(open()) : undefined}
         onClick={() => setOpen(!open())}
-        class={["flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left", { "cursor-pointer hover:bg-hover": hasPatch(), "bg-hover": open() }]}
+        {...stylex.attrs(
+          recipeStyles2.fileRowButton,
+          hasPatch()
+            ? open()
+              ? recipeStyles2.fileRowButtonState4
+              : recipeStyles2.fileRowButtonState3
+            : open()
+              ? recipeStyles2.fileRowButtonState2
+              : recipeStyles2.fileRowButtonState,
+        )}
       >
-        <span
-          title={kind().label}
-          class={["flex size-5 shrink-0 items-center justify-center rounded text-xs font-semibold", kindLook[props.file.status] ?? "bg-selected"]}
-        >
+        <span title={kind().label} {...styleProps([changeStyles.kind, kindLook[props.file.status] ?? changeStyles.unknown])}>
           {kind().mark}
         </span>
-        <span title={props.file.path} class={["min-w-0 flex-1 truncate font-mono text-xs", { "text-berry": props.conflict }]}>
+        <span
+          title={props.file.path}
+          {...stylex.attrs(variantStyles.fileRowSpan, props.conflict ? variantStyles.fileRowSpanVariant : variantStyles.fileRowSpanVariant2)}
+        >
           {props.file.path}
         </span>
         <Show when={props.conflict}>
-          <span class="rounded bg-berry/15 px-1.5 text-xs text-berry">{t("web.issue.changes.conflictMark")}</span>
+          <span {...stylex.attrs(viewStyles.fileRowSpan)}>{t("web.issue.changes.conflictMark")}</span>
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-xs text-muted">{t("web.issue.changes.binary")}</span>}>
+        <Show when={props.file.added >= 0} fallback={<span {...stylex.attrs(viewStyles.changesBodySpan)}>{t("web.issue.changes.binary")}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>
@@ -279,8 +619,6 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
     </div>
   );
 }
-
-const patchLook = { added: "bg-leaf/20 text-accent", removed: "bg-berry/10 text-berry", hunk: "text-water", plain: "" } as const;
 
 /** A file's patch: each line marked added or removed, its code coloured in the file's language once the colours come (ui/code: off the page's thread. */
 function Patch(props: { text: string; path: string }) {
@@ -308,13 +646,13 @@ function Patch(props: { text: string; path: string }) {
       .slice(0, i)
       .filter((l) => patchMarkOf(l) !== "hunk").length;
   return (
-    <pre class="mx-2 mb-2 max-h-80 overflow-auto rounded-md bg-page py-1 font-mono text-xs leading-[1.4]">
+    <pre {...stylex.attrs(viewStyles.patchPre)}>
       <For each={lines()}>
         {(line, i) => {
           const mark = patchMarkOf(line);
           const coloured = () => (mark === "hunk" ? undefined : tokens()?.[row(i())]);
           return (
-            <div class={["px-2", patchLook[mark]]}>
+            <div {...stylex.attrs(recipeStyles.patchDiv, recipeStylesChoices1[mark])}>
               <Show when={coloured()} fallback={line || " "}>
                 {(toks) => (
                   <>
@@ -345,17 +683,17 @@ export function ReopenDialog(props: { issue: Issue; lane?: Lane | undefined; onC
   };
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.reopen.title")}>
-      <p class="text-base">{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</p>
+      <p {...stylex.attrs(viewStyles.closeIssueDialogP)}>{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</p>
       <TextArea
         ref={autofocus()}
-        class="mt-4"
+        styles={variantStyles2.reopenDialogTextArea}
         rows={3}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
         placeholder={t("web.issue.reopen.what")}
         aria-label={t("web.issue.reopen.whatLabel")}
       />
-      <div class="mt-5 flex justify-end gap-2">
+      <div {...stylex.attrs(viewStyles.reopenDialogDiv)}>
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
         <Button tone="primary" onClick={() => reopen()}>
           {t("web.issue.reopen.reopen")}

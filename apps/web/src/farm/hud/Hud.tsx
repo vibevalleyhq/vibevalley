@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -30,6 +31,283 @@ import { HudCard } from "./HudCard";
 import { Overlay } from "./Overlay";
 import { clockText, thousands } from "./readout";
 
+const recipeStyles = stylex.create({
+  quotaPillDiv: {
+    position: "absolute",
+    top: "100%",
+    right: "0",
+    zIndex: "10",
+    marginTop: "calc(var(--spacing) * 2)",
+    width: "352px",
+    backgroundColor: "var(--color-cream-50)",
+    padding: "calc(var(--spacing) * 3)",
+    boxShadow: "var(--shadow-px)",
+  },
+});
+
+const viewStyles = stylex.create({
+  hudTapButton: {
+    pointerEvents: "auto",
+    cursor: "pointer",
+  },
+  repoSign: {
+    pointerEvents: "auto",
+    position: "absolute",
+    display: "flex",
+    translate: "calc(calc(1 / 2 * 100%) * -1) -100%",
+    cursor: "pointer",
+    flexDirection: "column",
+    alignItems: "center",
+    fontFamily: "var(--font-pixel)",
+    filter: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "brightness(110%)",
+      },
+    },
+  },
+  repoSignSpan: {
+    display: "flex",
+    maxWidth: "calc(var(--spacing) * 40)",
+    flexDirection: "column",
+    alignItems: "center",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-bark-500)",
+    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "var(--spacing)",
+    color: "var(--color-cream-50)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
+  },
+  repoSignSpan2: {
+    fontSize: "10px",
+    lineHeight: "calc(var(--spacing) * 3)",
+    color: "var(--color-cream-200)",
+  },
+  repoSignSpan3: {
+    maxWidth: "100%",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "13px",
+    lineHeight: "calc(var(--spacing) * 4)",
+  },
+  repoSignSpan4: {
+    width: "calc(var(--spacing) * 1.5)",
+    backgroundColor: "var(--color-bark-900)",
+  },
+  hudDiv: {
+    pointerEvents: "none",
+    position: "absolute",
+    inset: "0",
+  },
+  hudDiv2: {
+    position: "absolute",
+    inset: "0",
+  },
+  topLeftDiv: {
+    position: "absolute",
+    display: "flex",
+    alignItems: "flex-start",
+  },
+  topLeftSpan: {
+    display: "inline-block",
+    paddingRight: "calc(var(--spacing) * .5)",
+    paddingBottom: "calc(var(--spacing) * .5)",
+  },
+  topLeftSpan2: {
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
+  },
+  topLeftSpan3: {
+    display: "inline-block",
+    paddingRight: "calc(var(--spacing) * .5)",
+    paddingBottom: "calc(var(--spacing) * .5)",
+    textAlign: "left",
+  },
+  topLeftSpan4: {
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "calc(var(--spacing) * .5)",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
+  },
+  topLeftSpan5: {
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+    fontSize: "12px",
+    lineHeight: "14px",
+  },
+  topLeftSpan6: {
+    marginBlock: "calc(var(--spacing) * .5)",
+    display: "block",
+    height: "calc(var(--spacing) * 1.5)",
+    width: "150px",
+  },
+  topLeftSpan7: {
+    display: "block",
+    height: "100%",
+  },
+  topLeftSpan8: {
+    fontSize: "12px",
+    lineHeight: "14px",
+  },
+  topRightDiv: {
+    position: "absolute",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+  },
+  topRightSpan: {
+    backgroundColor: "var(--color-berry)",
+    paddingInline: "var(--spacing)",
+    fontSize: "10px",
+    color: "var(--color-cream-50)",
+  },
+  bottomLeftDiv: {
+    position: "absolute",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+  },
+  toolBarDiv: {
+    position: "absolute",
+    insetInline: "0",
+    display: "flex",
+    justifyContent: "center",
+  },
+  toolBarSpan: {
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "3px",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
+  },
+  toolBarSpan2: {
+    fontSize: "12px",
+  },
+  usageLinesP: {
+    fontSize: "12px",
+    color: "var(--color-bark-400)",
+  },
+  usageLinesP2: {
+    fontSize: "12px",
+    color: "var(--color-wheat-700)",
+  },
+  usageLinesDiv: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing)",
+  },
+  usageLinesDiv2: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "calc(var(--spacing) * 2)",
+  },
+  usageLinesSpan: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  usageLinesSpan2: {
+    display: "block",
+    height: "calc(var(--spacing) * 1.5)",
+    width: "100%",
+  },
+  usageLinesSpan3: {
+    fontSize: "10px",
+    color: "var(--color-bark-400)",
+  },
+  quotaMachine: {
+    display: "flex",
+    gap: "calc(var(--spacing) * 2.5)",
+    borderStyle: "solid",
+    borderWidth: "1.5px",
+    borderColor: "var(--color-cream-200)",
+    backgroundColor: "var(--color-cream-100)",
+    padding: "calc(var(--spacing) * 2)",
+  },
+  machineDiv: {
+    minWidth: "0",
+    flex: "1",
+  },
+  machineDiv2: {
+    display: "flex",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 1.5)",
+  },
+  machineSpan: {
+    fontSize: "13px",
+  },
+  machineSpan2: {
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    fontSize: "12px",
+    color: "var(--color-bark-500)",
+  },
+  machineP: {
+    marginTop: "calc(var(--spacing) * .5)",
+    fontSize: "12px",
+    color: "var(--color-bark-500)",
+  },
+  machineP2: {
+    marginTop: "calc(var(--spacing) * .5)",
+    fontSize: "12px",
+    color: "var(--color-berry)",
+  },
+  machineDiv3: {
+    display: "flex",
+    width: "calc(var(--spacing) * 12)",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  quotaPillDiv: {
+    pointerEvents: "auto",
+    position: "relative",
+  },
+  quotaPillButton: {
+    cursor: "pointer",
+  },
+  quotaPillDiv2: {
+    display: "flex",
+    alignItems: "center",
+  },
+  quotaPillSpan: {
+    flex: "1",
+    fontSize: "13px",
+  },
+  quotaPillDiv3: {
+    marginTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    maxHeight: "min(512px,70vh)",
+    flexDirection: "column",
+    gap: "calc(var(--spacing) * 3)",
+    overflowY: "auto",
+  },
+  quotaPillP: {
+    marginTop: "calc(var(--spacing) * 2)",
+    fontSize: "12px",
+    color: "var(--color-bark-400)",
+  },
+});
+
 const edge = 8;
 const gap = 4;
 const top = 52;
@@ -45,7 +323,7 @@ function HudTap(props: { label: string; testid?: string; onClick: () => void; se
       aria-label={props.label}
       aria-pressed={props.selected === undefined ? undefined : aria(props.selected)}
       onClick={() => props.onClick()}
-      class="pointer-events-auto cursor-pointer"
+      {...stylex.attrs(viewStyles.hudTapButton)}
     >
       {props.children}
     </button>
@@ -73,14 +351,14 @@ function RepoSign() {
             playSound("open");
             router.navigate("/repos");
           }}
-          class="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-full cursor-pointer flex-col items-center font-pixel hover:brightness-110"
+          {...stylex.attrs(viewStyles.repoSign)}
           style={{ left: `${at().x}px`, top: `${at().y}px` }}
         >
-          <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 shadow-px-shade">
-            <span class="text-[10px] leading-3 text-cream-200">{t("web.farm.sign.repo")}</span>
-            <span class="max-w-full truncate text-[13px] leading-4">{repo() || t("web.farm.sign.noRepo")}</span>
+          <span {...stylex.attrs(viewStyles.repoSignSpan)}>
+            <span {...stylex.attrs(viewStyles.repoSignSpan2)}>{t("web.farm.sign.repo")}</span>
+            <span {...stylex.attrs(viewStyles.repoSignSpan3)}>{repo() || t("web.farm.sign.noRepo")}</span>
           </span>
-          <span class="w-1.5 bg-bark-900" style={{ height: `${Math.round((screen()?.scale ?? 3) * 5)}px` }} />
+          <span {...stylex.attrs(viewStyles.repoSignSpan4)} style={{ height: `${Math.round((screen()?.scale ?? 3) * 5)}px` }} />
         </button>
       )}
     </Show>
@@ -90,13 +368,13 @@ function RepoSign() {
 export function Hud() {
   const shown = useFarm((s) => s.screen?.shown);
   return (
-    <div class="pointer-events-none absolute inset-0" aria-label={t("web.farm.hud.label")}>
+    <div {...stylex.attrs(viewStyles.hudDiv)} aria-label={t("web.farm.hud.label")}>
       <Overlay />
       <RepoSign />
       <Show when={shown()}>
         {(box) => (
           <div
-            class="absolute inset-0"
+            {...stylex.attrs(viewStyles.hudDiv2)}
             style={box().w < 680 ? undefined : { left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px` }}
           >
             <TopLeft />
@@ -129,11 +407,11 @@ function TopLeft() {
     farm.panel(panel);
   };
   return (
-    <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
+    <div {...stylex.attrs(viewStyles.topLeftDiv)} style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
       <HudTap label={t("web.farm.hud.look")} testid="hud-orchestrator" onClick={() => open("orchestrator")}>
-        <span class="inline-block pr-0.5 pb-0.5">
+        <span {...stylex.attrs(viewStyles.topLeftSpan)}>
           <span
-            class="box-border flex items-center justify-center border-2 shadow-px-shade"
+            {...stylex.attrs(viewStyles.topLeftSpan2)}
             style={{ width: `${top + 2}px`, height: `${top}px`, background: CardColors.paper, "border-color": CardColors.ink }}
           >
             <SpriteIcon name={face()} size={top - 8} />
@@ -141,22 +419,22 @@ function TopLeft() {
         </span>
       </HudTap>
       <HudTap label={t("web.farm.panel.graphs")} testid="hud-graphs" onClick={() => open("graphs")}>
-        <span class="inline-block pr-0.5 pb-0.5 text-left">
-          <span
-            class="box-border flex flex-col justify-center border-2 px-1.5 py-0.5 shadow-px-shade"
-            style={{ height: `${top}px`, background: CardColors.paper, "border-color": CardColors.ink }}
-          >
-            <span class="flex items-center gap-[3px] text-[12px] leading-[14px]">
+        <span {...stylex.attrs(viewStyles.topLeftSpan3)}>
+          <span {...stylex.attrs(viewStyles.topLeftSpan4)} style={{ height: `${top}px`, background: CardColors.paper, "border-color": CardColors.ink }}>
+            <span {...stylex.attrs(viewStyles.topLeftSpan5)}>
               <span style={{ color: CardColors.good }}>Lv.{level()}</span>
               <SpriteIcon name="icon-coin" size={12} />
               <span>{thousands(coins())}</span>
               <SpriteIcon name="icon-clock" size={12} />
               <span data-testid="farm-clock">{clockText(tod())}</span>
             </span>
-            <span class="my-0.5 block h-1.5 w-[150px]" style={{ background: CardColors.barTrack }}>
-              <span class="block h-full" style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%`, background: CardColors.barFill }} />
+            <span {...stylex.attrs(viewStyles.topLeftSpan6)} style={{ background: CardColors.barTrack }}>
+              <span
+                {...stylex.attrs(viewStyles.topLeftSpan7)}
+                style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%`, background: CardColors.barFill }}
+              />
             </span>
-            <span class="text-[12px] leading-[14px]" style={{ color: CardColors.muted }}>
+            <span {...stylex.attrs(viewStyles.topLeftSpan8)} style={{ color: CardColors.muted }}>
               {next() !== undefined
                 ? t("web.farm.hud.toLevelNext", { xp: Math.round(lv().xp), need: need(), next: next()! })
                 : t("web.farm.hud.toLevel", { xp: Math.round(lv().xp), need: need() })}
@@ -175,7 +453,7 @@ function TopLeft() {
           playSound("open");
           router.navigate("/issues");
         }}
-        class="pointer-events-auto cursor-pointer"
+        {...stylex.attrs(viewStyles.hudTapButton)}
       >
         <HudCard height={top}>
           <SpriteIcon name="icon-tasks" size={20} />
@@ -196,7 +474,7 @@ function TopRight(props: { compact: boolean }) {
   };
   return (
     <div
-      class="absolute flex flex-wrap items-start"
+      {...stylex.attrs(viewStyles.topRightDiv)}
       style={{
         right: `${edge}px`,
         left: props.compact ? `${edge}px` : undefined,
@@ -227,7 +505,7 @@ function TopRight(props: { compact: boolean }) {
           <SpriteIcon name="icon-board" size={20} />
           {t("web.farm.chat.channels")}
           <Show when={unread() > 0}>
-            <span class="bg-berry px-1 text-[10px] text-cream-50">{unread()}</span>
+            <span {...stylex.attrs(viewStyles.topRightSpan)}>{unread()}</span>
           </Show>
         </HudCard>
       </HudTap>
@@ -260,7 +538,7 @@ function BottomLeft(props: { compact: boolean }) {
   // The phone fits between the top row and the two buttons under it, inside the farm's box.
   const room = () => ({ w: (box()?.w ?? 0) - 2 * edge, h: (box()?.h ?? 0) - 2 * edge - top - 2 * bottom - 4 * gap });
   return (
-    <div class="absolute flex flex-col items-start" style={{ left: `${edge}px`, bottom: `${edge + (props.compact ? bottom + gap : 0)}px`, gap: `${gap}px` }}>
+    <div {...stylex.attrs(viewStyles.bottomLeftDiv)} style={{ left: `${edge}px`, bottom: `${edge + (props.compact ? bottom + gap : 0)}px`, gap: `${gap}px` }}>
       <Show when={phoneOpen()}>
         <Phone room={room()} />
       </Show>
@@ -273,7 +551,7 @@ function BottomLeft(props: { compact: boolean }) {
 function ToolBar(props: { compact: boolean }) {
   const held = useFarm((s) => s.tool);
   return (
-    <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={t("web.farm.hud.tools")}>
+    <div {...stylex.attrs(viewStyles.toolBarDiv)} style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={t("web.farm.hud.tools")}>
       <For each={tools}>
         {(tool, i) => (
           <HudTap
@@ -282,9 +560,9 @@ function ToolBar(props: { compact: boolean }) {
             selected={held() === tool.id}
             onClick={() => farm.hold(tool.id)}
           >
-            <span class="inline-block pr-0.5 pb-0.5">
+            <span {...stylex.attrs(viewStyles.topLeftSpan)}>
               <span
-                class="box-border flex items-center justify-center gap-[3px] border-2 shadow-px-shade"
+                {...stylex.attrs(viewStyles.toolBarSpan)}
                 style={{
                   width: props.compact ? "44px" : "52px",
                   height: `${bottom}px`,
@@ -292,7 +570,7 @@ function ToolBar(props: { compact: boolean }) {
                   "border-color": CardColors.ink,
                 }}
               >
-                <span class="text-[12px]" style={{ color: CardColors.muted }}>
+                <span {...stylex.attrs(viewStyles.toolBarSpan2)} style={{ color: CardColors.muted }}>
                   {i() + 1}
                 </span>
                 <SpriteIcon name={tool.icon} size={24} />
@@ -309,36 +587,39 @@ const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#
 
 function UsageLines(props: { usage: AccountUsage | null }) {
   return (
-    <Switch fallback={<p class="text-[12px] text-bark-400">{t("web.farm.quota.unreported")}</p>}>
+    <Switch fallback={<p {...stylex.attrs(viewStyles.usageLinesP)}>{t("web.farm.quota.unreported")}</p>}>
       <Match when={props.usage?.status === "login_required"}>
-        <p class="text-[12px] text-wheat-700">{t("web.farm.quota.signedOut")}</p>
+        <p {...stylex.attrs(viewStyles.usageLinesP2)}>{t("web.farm.quota.signedOut")}</p>
       </Match>
       <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
-        {(u) => <p class="text-[12px] text-bark-400">{t("web.farm.quota.unreadable", { why: u().reason })}</p>}
+        {(u) => <p {...stylex.attrs(viewStyles.usageLinesP)}>{t("web.farm.quota.unreadable", { why: u().reason })}</p>}
       </Match>
       <Match when={props.usage?.status === "balance" ? props.usage : undefined}>
         {(u) => (
-          <p class="text-[12px]" style={{ color: u().available ? "#2f1f13" : "#c84a3a" }}>
+          <p {...stylex.attrs(viewStyles.toolBarSpan2)} style={{ color: u().available ? "#2f1f13" : "#c84a3a" }}>
             {t("web.farm.quota.balance", { provider: u().provider, enough: u().available })}
           </p>
         )}
       </Match>
       <Match when={props.usage?.status === "ok" ? props.usage : undefined}>
         {(u) => (
-          <div class="mt-1 flex flex-col gap-1">
+          <div {...stylex.attrs(viewStyles.usageLinesDiv)}>
             <For each={u().windows}>
               {(w) => {
                 const left = () => 100 - w.usedPercent;
                 return (
-                  <div class="text-[12px]">
-                    <div class="flex justify-between gap-2">
-                      <span class="truncate">{windowLabel(w.label)}</span>
+                  <div {...stylex.attrs(viewStyles.toolBarSpan2)}>
+                    <div {...stylex.attrs(viewStyles.usageLinesDiv2)}>
+                      <span {...stylex.attrs(viewStyles.usageLinesSpan)}>{windowLabel(w.label)}</span>
                       <span style={{ color: levelInk[quotaLevel(left())] }}>{Math.round(left())}%</span>
                     </div>
-                    <span class="block h-1.5 w-full" style={{ background: CardColors.barTrack }}>
-                      <span class="block h-full" style={{ width: `${Math.max(0, Math.min(100, left()))}%`, background: levelInk[quotaLevel(left())] }} />
+                    <span {...stylex.attrs(viewStyles.usageLinesSpan2)} style={{ background: CardColors.barTrack }}>
+                      <span
+                        {...stylex.attrs(viewStyles.topLeftSpan7)}
+                        style={{ width: `${Math.max(0, Math.min(100, left()))}%`, background: levelInk[quotaLevel(left())] }}
+                      />
                     </span>
-                    <Show when={w.resetsAt}>{(at) => <span class="text-[10px] text-bark-400">{resetText(at())}</span>}</Show>
+                    <Show when={w.resetsAt}>{(at) => <span {...stylex.attrs(viewStyles.usageLinesSpan3)}>{resetText(at())}</span>}</Show>
                   </div>
                 );
               }}
@@ -358,18 +639,18 @@ function Machine(props: { info: RuntimeInfo }) {
     return u?.status === "ok" ? u.subscription : undefined;
   };
   return (
-    <div class="flex gap-2.5 border-[1.5px] border-cream-200 bg-cream-100 p-2" data-testid="quota-machine">
+    <div {...stylex.attrs(viewStyles.quotaMachine)} data-testid="quota-machine">
       <RuntimeIcon runtime={props.info.id} size={34} />
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
-          <span class="text-[13px]">{props.info.preset.label}</span>
-          <Show when={subscription()}>{(sub) => <span class="truncate text-[12px] text-bark-500">{sub()}</span>}</Show>
+      <div {...stylex.attrs(viewStyles.machineDiv)}>
+        <div {...stylex.attrs(viewStyles.machineDiv2)}>
+          <span {...stylex.attrs(viewStyles.machineSpan)}>{props.info.preset.label}</span>
+          <Show when={subscription()}>{(sub) => <span {...stylex.attrs(viewStyles.machineSpan2)}>{sub()}</span>}</Show>
         </div>
         <UsageLines usage={usage()} />
         {/* Spent today may be 0, which is still said. */}
         <Show when={props.info.spentToday !== undefined ? { spent: props.info.spentToday } : undefined}>
           {(today) => (
-            <p class="mt-0.5 text-[12px] text-bark-500">
+            <p {...stylex.attrs(viewStyles.machineP)}>
               {(props.info.settings.dailyBudget ?? 0) > 0
                 ? t("web.farm.quota.spentTodayBudget", { spent: yuan(today().spent), budget: yuan(props.info.settings.dailyBudget ?? 0) })
                 : t("web.farm.quota.spentToday", { spent: yuan(today().spent) })}
@@ -377,12 +658,15 @@ function Machine(props: { info: RuntimeInfo }) {
           )}
         </Show>
         <Show when={props.info.stop}>
-          <p class="mt-0.5 text-[12px] text-berry">{props.info.stop}</p>
+          <p {...stylex.attrs(viewStyles.machineP2)}>{props.info.stop}</p>
         </Show>
       </div>
-      <div class="flex w-12 flex-col items-center">
+      <div {...stylex.attrs(viewStyles.machineDiv3)}>
         <SpriteIcon name={bottleSprite(quota())} size={40} label={quota().text} />
-        <span class="text-[12px]" style={{ color: quota().level === "unknown" ? "#9b7550" : quota().level === "empty" ? "#c84a3a" : "#46301d" }}>
+        <span
+          {...stylex.attrs(viewStyles.toolBarSpan2)}
+          style={{ color: quota().level === "unknown" ? "#9b7550" : quota().level === "empty" ? "#c84a3a" : "#46301d" }}
+        >
           {quota().short || "—"}
         </span>
       </div>
@@ -407,13 +691,13 @@ function QuotaPill(props: { height: number }) {
   };
   return (
     <Show when={runtimes().length > 0}>
-      <div ref={box} class="pointer-events-auto relative">
+      <div ref={box} {...stylex.attrs(viewStyles.quotaPillDiv)}>
         <button
           type="button"
           aria-label={shown() === undefined ? t("web.farm.quota.all") : t("web.farm.quota.lowest", { pct: String(shown()) })}
           aria-expanded={aria(open())}
           onClick={() => setOpen(!open())}
-          class="cursor-pointer"
+          {...stylex.attrs(viewStyles.quotaPillButton)}
         >
           <HudCard height={props.height} bright={open()}>
             <SpriteIcon
@@ -426,9 +710,9 @@ function QuotaPill(props: { height: number }) {
           </HudCard>
         </button>
         <Show when={open()}>
-          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label={t("web.farm.quota.left")}>
-            <div class="flex items-center">
-              <span class="flex-1 text-[13px]">{t("web.farm.quota.left")}</span>
+          <div {...stylex.attrs(recipeStyles.quotaPillDiv)} role="dialog" aria-label={t("web.farm.quota.left")}>
+            <div {...stylex.attrs(viewStyles.quotaPillDiv2)}>
+              <span {...stylex.attrs(viewStyles.quotaPillSpan)}>{t("web.farm.quota.left")}</span>
               <PxButton
                 size="icon"
                 label={t("web.farm.quota.refresh")}
@@ -441,12 +725,12 @@ function QuotaPill(props: { height: number }) {
                 <SpriteIcon name="button-refresh" size={14} />
               </PxButton>
             </div>
-            <div class="mt-2 flex max-h-[min(512px,70vh)] flex-col gap-3 overflow-y-auto">
+            <div {...stylex.attrs(viewStyles.quotaPillDiv3)}>
               <For each={runtimes()} keyed={(r) => r.id}>
                 {(r) => <Machine info={r()} />}
               </For>
             </div>
-            <p class="mt-2 text-[12px] text-bark-400">{t("web.farm.quota.note")}</p>
+            <p {...stylex.attrs(viewStyles.quotaPillP)}>{t("web.farm.quota.note")}</p>
           </div>
         </Show>
       </div>

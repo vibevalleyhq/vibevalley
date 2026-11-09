@@ -130,6 +130,8 @@ function ios(): Device {
 
 let farmUrl = "http";
 const phone = platform === "ios" ? ios() : android();
+// Synchronous installation can outlast HTTP keep-alive; finish it before opening the API connections.
+phone.install();
 const api = new VibeValleyApi(server);
 await api.lan.update({ open: true });
 try {
@@ -138,7 +140,6 @@ try {
   const farm = new URL(pairing.link).origin;
   farmUrl = farm;
   console.log("pairing", pairing.link);
-  phone.install();
   phone.open(`vibevalley://pair?u=${encodeURIComponent(farm)}&c=${encodeURIComponent(pairing.code)}`);
 
   const asking = await until(async () => (await api.lan.get()).pairing?.asking, "the phone asks to pair");

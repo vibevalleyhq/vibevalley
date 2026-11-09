@@ -1,15 +1,46 @@
-import { For } from "solid-js";
+import * as stylex from "@stylexjs/stylex";
+import { createSignal, For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { Button, type Tone } from "./Button";
 import { icons, type IconName } from "./icons";
 
+const viewStyles = stylex.create({
+  dynamic: (width: number) => ({ width, maxWidth: width }),
+  buttonStoriesDiv: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "calc(var(--spacing) * 2)",
+  },
+});
+
 const tones: Tone[] = ["plain", "primary", "quiet", "danger"];
 
 export default stories({
   title: "组件/工作台/Button",
   stories: {
+    "Dynamic styles": story({
+      render: () => {
+        const [wide, setWide] = createSignal(false);
+        return (
+          <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
+            <Button
+              data-testid="button-style-vars"
+              styles={viewStyles.dynamic(wide() ? 280 : 200)}
+              style={{ "margin-left": "12px" }}
+              onClick={() => setWide(!wide())}
+            >
+              Resize
+            </Button>
+            <Button data-testid="button-native-style" style={{ "margin-left": "12px" }}>
+              Native attributes
+            </Button>
+          </div>
+        );
+      },
+    }),
     Playground: story({
       args: { label: "派活", tone: "primary", icon: "add", disabled: false },
       controls: { tone: { kind: "choice", options: tones }, icon: { kind: "choice", options: ["", ...Object.keys(icons)] } },
@@ -32,7 +63,7 @@ export default stories({
     Tones: story({
       note: "主色一页只有一个；危险的动作用 danger，不用红色的主色。",
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
           <For each={tones}>{(tone) => <Button tone={tone}>{tone}</Button>}</For>
           <Button disabled>disabled</Button>
         </div>
@@ -40,7 +71,7 @@ export default stories({
     }),
     "With icon": story({
       render: () => (
-        <div class="flex flex-wrap items-center gap-2">
+        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
           <Button tone="primary" icon="add">
             新工单
           </Button>

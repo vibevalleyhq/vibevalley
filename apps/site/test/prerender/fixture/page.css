@@ -1,0 +1,13 @@
+body {
+  margin: 0;
+}
+main {
+  padding: 24px;
+}
+.below {
+  margin-top: 2000px;
+}
+output {
+  display: inline-block;
+  min-width: 32px;
+}

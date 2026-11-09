@@ -21,11 +21,20 @@ test("the opening tracks the village's loading bar until its pictures arrive", a
   await expect(page.locator("#opening")).toHaveCount(0);
 });
 
-test("the farm links to the workbench, and the workbench back to the farm", async ({ page }) => {
+test("the village becomes ready after workbench navigation and history", async ({ page }) => {
   await page.goto("/farm/");
   await page.getByTestId("to-workbench").click();
   await expect(page).toHaveURL(/\/issues$/u);
   await page.getByTestId("rail").locator('[data-place="farm"]').first().click();
   await expect(page).toHaveURL(/\/farm$/u);
+  const village = page.getByTestId("village");
+  await expect(village).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await expect(page.getByTestId("farm").locator("canvas")).toBeVisible();
+  await page.getByTestId("to-workbench").click();
+  await expect(page).toHaveURL(/\/issues$/u);
+  await expect(page.getByTestId("issue-search")).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/farm$/u);
+  await expect(village).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect(page.getByTestId("farm").locator("canvas")).toBeVisible();
 });

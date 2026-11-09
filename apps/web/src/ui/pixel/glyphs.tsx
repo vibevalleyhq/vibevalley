@@ -1,7 +1,33 @@
+import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import type { SpriteAtlas } from "./atlas";
 import { type Cell, crossCells, tickCells } from "./cells";
+
+const viewStyles = stylex.create({
+  pixelMarkSvg: {
+    display: "inline-block",
+    flexShrink: "0",
+  },
+  earnedMedalSpan: {
+    position: "relative",
+    display: "inline-block",
+    flexShrink: "0",
+  },
+  earnedMedalImg: {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+  earnedMedalImg2: {
+    position: "absolute",
+    objectFit: "contain",
+    imageRendering: "pixelated",
+  },
+});
 
 /** Whole cells on a `grid`×`grid` square; `color` is a CSS colour. */
 function PixelMark(props: { cells: readonly Cell[]; size: number; color: string; grid?: number; label?: string | undefined }) {
@@ -12,7 +38,7 @@ function PixelMark(props: { cells: readonly Cell[]; size: number; color: string;
       height={props.size}
       viewBox={`0 0 ${grid()} ${grid()}`}
       shape-rendering="crispEdges"
-      class="inline-block shrink-0"
+      {...stylex.attrs(viewStyles.pixelMarkSvg)}
       role={props.label ? "img" : undefined}
       aria-label={props.label}
       aria-hidden={props.label ? undefined : "true"}
@@ -37,13 +63,13 @@ export function EarnedMedal(props: { atlas: SpriteAtlas; achievement: string; ti
   const emblem = () => props.atlas.first([`emblem-${props.achievement}`, "emblem-wreath"]);
   const e = () => size() * disc.size;
   return (
-    <span class="relative inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }} aria-hidden="true">
-      <img src={frame().url} alt="" draggable="false" class="absolute inset-0 size-full object-contain [image-rendering:pixelated]" />
+    <span {...stylex.attrs(viewStyles.earnedMedalSpan)} style={{ width: `${size()}px`, height: `${size()}px` }} aria-hidden="true">
+      <img src={frame().url} alt="" draggable="false" {...stylex.attrs(viewStyles.earnedMedalImg)} />
       <img
         src={emblem().url}
         alt=""
         draggable="false"
-        class="absolute object-contain [image-rendering:pixelated]"
+        {...stylex.attrs(viewStyles.earnedMedalImg2)}
         style={{ left: `${(size() - e()) / 2}px`, top: `${size() * disc.centerY - e() / 2}px`, width: `${e()}px`, height: `${e()}px` }}
       />
     </span>

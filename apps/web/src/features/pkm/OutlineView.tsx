@@ -1,3 +1,4 @@
+import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -5,14 +6,81 @@ import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibeval
 
 import { useTimeout } from "#/base/timer.ts";
 import { useQueryClient } from "#/infra/query.ts";
+import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 
 import type { Around, EditAction, Focus } from "./editing";
 import { hasChildren, visibleBlocks } from "./outline";
+import { outlineRoot } from "./outline.stylex";
 import { Editor, indentPx, newId, Row, Toolbar, type Writing } from "./OutlineEditor";
 import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "./selection";
 import { pkmPageQuery, refreshVault } from "./vault";
 import { PageWriter, pageServer } from "./writer";
+
+const outlineStyles = stylex.create({
+  outline: {
+    display: "flex",
+    flexDirection: "column",
+    outlineStyle: "none",
+  },
+  append: {
+    display: "flex",
+    width: "100%",
+    cursor: "text",
+    alignItems: "flex-start",
+    gap: "var(--spacing)",
+    borderRadius: "var(--radius-sm)",
+    paddingBlock: "1px",
+    textAlign: "left",
+    transitionProperty: "opacity",
+    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionDuration: ".12s",
+    opacity: {
+      default: null,
+      ":focus-visible": "1",
+      "@media (pointer:coarse)": "1",
+    },
+  },
+  revealedAppend: {
+    opacity: {
+      default: "0",
+      ":focus-visible": "1",
+      "@media (pointer:coarse)": "1",
+      "@media (hover: hover)": {
+        default: null,
+        [stylex.when.ancestor(":hover", outlineRoot)]: 1,
+      },
+    },
+  },
+});
+
+const viewStyles = stylex.create({
+  outlineSpan: {
+    marginTop: "var(--spacing)",
+    display: "flex",
+    width: "calc(var(--spacing) * 4)",
+    height: "calc(var(--spacing) * 4)",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  outlineSpan2: {
+    width: "calc(var(--spacing) * 1.5)",
+    height: "calc(var(--spacing) * 1.5)",
+    borderRadius: "2147483647px",
+    backgroundColor: {
+      default: "var(--color-faint)",
+      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-faint) 40%, transparent)",
+    },
+  },
+  outlineSpan3: {
+    minHeight: "calc(var(--spacing) * 6)",
+    paddingInline: "var(--spacing)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "calc(var(--spacing) * 6)",
+    color: "var(--color-faint)",
+  },
+});
 
 /** point: a block to show and light up (?b= in the address). */
 export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSummary[]; point?: string | undefined; onEditing: (on: boolean) => void }) {
@@ -201,7 +269,7 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
       onFocusOut={(e) => {
         if (!(e.relatedTarget instanceof Node && outlineEl.contains(e.relatedTarget))) setPicked(undefined);
       }}
-      class="group/outline flex flex-col outline-none"
+      {...styleProps([outlineRoot, outlineStyles.outline])}
     >
       <For each={shown()} keyed={(b) => b.id}>
         {(b) => (
@@ -248,15 +316,12 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
         type="button"
         data-testid="pkm-append"
         onClick={writeOn}
-        class={[
-          "flex w-full cursor-text items-start gap-1 rounded-sm py-px text-left transition-opacity duration-120 focus-visible:opacity-100 pointer-coarse:opacity-100",
-          blocks().length === 0 ? "" : "opacity-0 group-hover/outline:opacity-100",
-        ]}
+        {...styleProps([outlineStyles.append, blocks().length !== 0 && outlineStyles.revealedAppend])}
       >
-        <span aria-hidden="true" class="mt-1 flex size-4 shrink-0 items-center justify-center">
-          <span class="size-1.5 rounded-full bg-faint/40" />
+        <span aria-hidden="true" {...stylex.attrs(viewStyles.outlineSpan)}>
+          <span {...stylex.attrs(viewStyles.outlineSpan2)} />
         </span>
-        <span class="min-h-6 px-1 text-sm leading-6 text-faint">{t("web.pkm.page.append")}</span>
+        <span {...stylex.attrs(viewStyles.outlineSpan3)}>{t("web.pkm.page.append")}</span>
       </button>
       <Show when={writing()}>{(w) => <Toolbar writing={w()} />}</Show>
     </section>
