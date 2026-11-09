@@ -139,6 +139,33 @@ Status: proposed
 4. **第四批（客户端传输与组件交互状态机：F1–F13）**：
    - 收敛 L3（`call.ts`、`moss-worker.ts`、`frame.ts`、`opening.ts`、`form.ts`）与 L4（`composing.ts`、`MessageParts.tsx`、`Messages.tsx`、`ChatPage.tsx`、`VillageCanvas.tsx`、`OutlineEditor.tsx`、`BlocksView.tsx`）。
 
+## 进度
+
+2026-11-10 逐条到代码里核对过（定下的写法已沉淀进 [模块设计](docs/style/module-design.md) 的「显式状态」，`practice:check` 的 `loose-flags` 拦新的散装 `let` 布尔）。
+
+| 编号 | 状态 | 提交 | 做了什么，或为什么不改 |
+|---|---|---|---|
+| 错误契约（第一批） | 完成 | 本分支早先的提交 | `faultOf`、`UiFault`、`createAct` 认全部 `ApiError` |
+| B2、B3 语音 | 完成 | `451722260` | `GrantPhase`（issued、starting、on）、`MossPhase`（waiting 带攒着的话、ready 带连接、closed）；`Call.ending` 永远等于 `life` 的 abort，删掉改读它 |
+| B4、B5、B6、B8 | 完成 | 本分支早先的提交 | 局域网监听与配对、管家宿主的 `Caller`、轨迹草稿、执行器的 `Allocation.phase` |
+| B7 帮工招人 | 完成 | `0db0d66c8` | 错误通道早先已改；`committed`、`released`、`registeredRow` 合成 `reached`（opening、recorded、committed、released） |
+| B9 记性源 | 完成 | `714cdf167` | `stopped` 并进 `Held`（none、on、stopped）；退役合成一条记录，先记原因再中断，测试守着原因 |
+| B12 agent 回答 | 完成 | `1199af053` | 流的失败作为最后一个元素，`Stream.runFoldEffect` 折成 `Answered`；先结束后失败的仍以结束为准 |
+| B10 笔记缓存 | 不改 | — | 读写都在同一把锁里，`loaded` 只说「开机后扫过一遍」，和 `pages` 不会矛盾 |
+| B11 `Brain` | 不改 | — | `stopping`（这一轮）和 `closed`（整个）是两个维度；`core` 是循环与工具互相需要打的结，构造完成前没人调 |
+| B1 连接器 | 未做 | — | 「没连、登录中（进度、验证码、纤程）、已连上（纤程）」可并成一个模式，`account` 另放；600 多行带扫码并发，单独一步 |
+| F3、F4、F6、F9 | 完成 | 本分支早先的提交 | 浮层、菜单、消息折叠一个联合；发送锁 `busy` 含发送中 |
+| F7 大纲补全 | 完成 | `fe349dc5e` | Esc 记下关掉的那处触发（`offered`、`Shut`，在 `@vibevalley/pkm`），不再用光标 `-1`；列表不会在同一处的下一个键又冒出来 |
+| F11 意图 | 完成 | `fe349dc5e` | `Intent` 按 `phase` 分的联合（`IntentAt`），删掉重复它的 `status`、`queued`、`reason`，失败的才有 `fault` |
+| F1 通话客户端 | 不改 | — | `starting`、`ending` 是异步操作的去重，开始跑着时 `phase` 照样前进，不在一条线上 |
+| F10 启动遮罩 | 不改 | — | 阶段已是协议的 `Opening["phase"]`；`data-opening` 是组件与遮罩约好的接口 |
+| F12 帧流 | 不改 | — | 帧是 Solid store 逐 id reconcile，`open` 无帧只在一处构造、构造时不会出现；改成联合会整份重建画面 |
+| F13 表单 | 不改 | — | 校验、提交、`submitted`、组字是独立维度，提交里本就要校验 |
+| F2 MOSS Worker | 未做 | — | Worker 与主线程各一份连接状态，先把共用的迁移抽成纯函数 |
+| F5 农场加载 | 不改 | — | 只有 `useVillage` 一处写、每次只设 `village` 或 `error` 之一，读的五处都只问 `village` 在不在 |
+| F8 稿子块焦点 | 未做 | — | 焦点在稿子引擎 `BlockEditor` 的可变字段上，要改引擎接口，和协同修订并发 |
+| 清单外 | 完成 | `ecc18f83d`、`2c35bc545` | MOSS 引擎的 `stopped`、`cutting` 合成 `stop`；闪播流解析的 `stage`；`FlashPlayer` 一次播放一条 `Playing` 记录 |
+
 ## Alternatives considered
 
 - **引入 XState 或第三方状态机运行时**：XState 带来的配置 DSL 与独立解释器无法与 `Effect` 的 `Scope`、`SynchronizedRef`、`Cause` 通道直接组合，且增加客户端包体积。使用 TypeScript 判别联合加纯函数迁移、服务端 `SynchronizedRef`、客户端 `Atom` / `createSignal` 加 `variant()`，零外部依赖即可获得完整的编译期穷尽保证。
