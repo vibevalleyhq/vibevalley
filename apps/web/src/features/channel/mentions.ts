@@ -15,6 +15,8 @@ export interface Nameable {
   token: string;
   name: string;
   note: string;
+  /** A command's words after it, as its menu row shows them (/issue 标题). */
+  args?: string;
   session?: Session;
   /** An orchestrator's profile id. */
   orchestrator?: string;

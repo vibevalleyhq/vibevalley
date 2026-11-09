@@ -57,7 +57,12 @@ const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<Comma
 
 /** The commands as the menu offers them, like names: /issue, /stop… */
 export const commandNameables = (): Nameable[] =>
-  CommandNames.map((name) => ({ token: `/${name}`, name: t(`web.channel.commands.${name}.name`), note: t(`web.channel.commands.${name}.note`) }));
+  CommandNames.map((name) => ({
+    token: `/${name}`,
+    name: t(`web.channel.commands.${name}.name`),
+    note: t(`web.channel.commands.${name}.note`),
+    args: t(`web.channel.commands.${name}.args`),
+  }));
 
 /** The command being typed: / first in the box, the caret still in its word. */
 export function typedCommand(text: string, caret: number) {

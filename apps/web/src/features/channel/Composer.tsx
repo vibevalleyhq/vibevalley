@@ -1,5 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
+import { String as Str } from "effect";
 import { createSignal, flush, For, Show, untrack } from "solid-js";
 
 import { Progress } from "@vibevalley/base-ui";
@@ -26,8 +27,14 @@ import { followed } from "./follow";
 import { HelperFace } from "./presence";
 
 const recipeStyles2 = stylex.create({
+  // Floats over the messages just above the box: opening it moves nothing on the page.
   composerDiv: {
-    marginBottom: "calc(var(--spacing) * 1.5)",
+    position: "absolute",
+    insetInline: "calc(var(--spacing) * 4)",
+    bottom: "calc(100% - var(--spacing) * 2)",
+    zIndex: 30,
+    maxHeight: "calc(var(--spacing) * 72)",
+    overflowY: "auto",
     display: "flex",
     transformOrigin: "bottom",
     animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
@@ -42,8 +49,8 @@ const recipeStyles2 = stylex.create({
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
+    borderColor: "var(--color-line)",
+    backgroundColor: "var(--color-page)",
     padding: "var(--spacing)",
     boxShadow: "var(--shadow-float)",
   },
@@ -138,6 +145,7 @@ const variantStyles = stylex.create({
 
 const viewStyles = stylex.create({
   composer: {
+    position: "relative",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
@@ -146,8 +154,16 @@ const viewStyles = stylex.create({
     paddingBottom: "calc(var(--spacing) * 4)",
   },
   composerSpan: {
+    display: "inline-flex",
+    flexShrink: 0,
     width: "calc(var(--spacing) * 5)",
     height: "calc(var(--spacing) * 5)",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--color-muted)",
+  },
+  commandArgs: {
+    color: "var(--color-faint)",
   },
   composerSpan2: {
     fontFamily: "var(--font-mono)",
@@ -273,11 +289,6 @@ const viewStyles = stylex.create({
     gap: "var(--spacing)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBottom: "calc(var(--spacing) * 2)",
-  },
-  composerSpan7: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
-    color: "var(--color-faint)",
   },
   composerSpan8: {
     flex: "1",
@@ -408,17 +419,26 @@ export function Composer(props: {
     const id = props.channel?.id;
     if (id && files.length > 0) void attachFiles(id, files, uploadFailed);
   };
-  const insert = (emojiText: string) => {
-    const el = input;
-    const from = el?.selectionStart ?? box.text().length;
-    const to = el?.selectionEnd ?? from;
-    const next = box.text().slice(0, from) + emojiText + box.text().slice(to);
-    box.edit(next, from + emojiText.length);
-    // Written now, so a key typed right after lands after the emoji (composing.ts, choose).
+  /** The box as it is now, with its caret at: written at once, so a key typed right after lands there (composing.ts, choose). */
+  const put = (next: string, at: number) => {
+    box.edit(next, at);
     flush();
-    el?.focus();
-    el?.setSelectionRange(from + emojiText.length, from + emojiText.length);
+    input?.focus();
+    input?.setSelectionRange(at, at);
   };
+  const insert = (emojiText: string) => {
+    const from = input?.selectionStart ?? box.text().length;
+    const to = input?.selectionEnd ?? from;
+    put(box.text().slice(0, from) + emojiText + box.text().slice(to), from + emojiText.length);
+  };
+  /** An @ at the caret, apart from the word before it: the names menu opens. */
+  const startMention = () => {
+    const from = input?.selectionStart ?? box.text().length;
+    const before = Str.slice(0, from)(box.text());
+    insert(before === "" || /\s$/u.test(before) ? "@" : " @");
+  };
+  /** A command is the line's first word: a / at its start opens the commands menu, the words after it kept. */
+  const startCommand = () => put(Str.startsWith("/")(box.text()) ? box.text() : "/" + box.text(), 1);
   // ↑ in an empty box changes the owner's last message here; Esc lets go of the message being answered.
   const dictating = useDictation({ input: () => input, value: () => box.text(), onValue: (v, c) => box.edit(v, c) });
   // While this box listens, its row is the recording's: cancel or done in place of attach and send.
@@ -471,12 +491,27 @@ export function Composer(props: {
               >
                 <Show
                   when={n().session}
-                  fallback={n().orchestrator ? <OrchestratorFace size={20} agent={n().orchestrator} /> : <span {...stylex.attrs(viewStyles.composerSpan)} />}
+                  fallback={
+                    n().orchestrator ? (
+                      <OrchestratorFace size={20} agent={n().orchestrator} />
+                    ) : (
+                      <span {...stylex.attrs(viewStyles.composerSpan)}>
+                        <Show when={n().args !== undefined}>
+                          <Icon name="command" size={14} />
+                        </Show>
+                      </span>
+                    )
+                  }
                 >
                   {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
-                <span {...stylex.attrs(viewStyles.composerSpan2)}>{n().token}</span>
-                <Show when={n().session}>
+                <span {...stylex.attrs(viewStyles.composerSpan2)}>
+                  {n().token}
+                  <Show when={n().args !== undefined && n().args !== ""}>
+                    <span {...stylex.attrs(viewStyles.commandArgs)}> {n().args}</span>
+                  </Show>
+                </span>
+                <Show when={n().session !== undefined || n().args !== undefined}>
                   <span {...stylex.attrs(viewStyles.composerSpan3)}>{n().name}</span>
                 </Show>
                 <span {...stylex.attrs(viewStyles.composerSpan4)}>{n().note}</span>
@@ -584,8 +619,29 @@ export function Composer(props: {
             fallback={
               <>
                 <Show when={props.channel?.type !== "direct"}>
-                  <span {...stylex.attrs(viewStyles.composerSpan7)}>{t("web.channel.composer.mention")}</span>
+                  <button
+                    type="button"
+                    data-testid="mention-open"
+                    onClick={startMention}
+                    disabled={props.channel === undefined}
+                    aria-label={t("web.channel.composer.mention")}
+                    title={t("web.channel.composer.mention")}
+                    {...stylex.attrs(viewStyles.attach)}
+                  >
+                    <Icon name="mention" size={16} />
+                  </button>
                 </Show>
+                <button
+                  type="button"
+                  data-testid="command-open"
+                  onClick={startCommand}
+                  disabled={props.channel === undefined}
+                  aria-label={t("web.channel.composer.command")}
+                  title={t("web.channel.composer.command")}
+                  {...stylex.attrs(viewStyles.attach)}
+                >
+                  <Icon name="command" size={16} />
+                </button>
                 <span {...stylex.attrs(viewStyles.composerSpan8)} />
                 <input
                   ref={(el) => (picker = el)}

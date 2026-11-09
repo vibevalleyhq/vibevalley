@@ -2366,7 +2366,7 @@ export const catalogs = {
       composer: {
         notSent: "没发出去：{why}",
         who: "叫谁",
-        mention: "@ 叫人",
+        mention: "叫人",
         stop: "叫停管家",
         stopHint: "叫管家停下这一轮，派出去的帮工照常干活",
         send: "发送",
@@ -2377,6 +2377,7 @@ export const catalogs = {
         cancelReply: "不回复了",
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
+        command: "命令",
       },
       manage: {
         name: "名称",
@@ -2451,13 +2452,14 @@ export const catalogs = {
       },
       threadWidth: "串的宽窄（拖动，双击回默认）",
       commands: {
-        issue: { name: "记一张工单", note: "/issue 标题：记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
-        remember: { name: "让管家记住", note: "/remember 一句话：记进照看这里的管家的记性", needs: "/remember 后面写要它记住的话" },
-        stop: { name: "叫停管家", note: "照看这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
-        dm: { name: "私聊", note: "/dm 名字：打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
+        issue: { name: "记一张工单", args: "标题", note: "记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
+        remember: { name: "让管家记住", args: "一句话", note: "记进这里管家的记性", needs: "/remember 后面写要它记住的话" },
+        stop: { name: "叫停管家", args: "", note: "这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
+        dm: { name: "私聊", args: "名字", note: "打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
         imagegen: {
           name: "生图",
-          note: "/imagegen 描述：交给这里的管家，用 MOSS 画一张图，画好发回这里",
+          args: "描述",
+          note: "交给这里的管家用 MOSS 画一张，画好发回这里",
           needs: "/imagegen 后面写想要的画面",
           nowhere: "先打开一个频道再生图",
         },
@@ -6940,7 +6942,7 @@ export const catalogs = {
       composer: {
         notSent: "Not sent: {why}",
         who: "Who",
-        mention: "@ to call someone",
+        mention: "Mention someone",
         stop: "Stop the manager",
         stopHint: "Stops the manager's round; helpers already sent keep working",
         send: "Send",
@@ -6951,6 +6953,7 @@ export const catalogs = {
         cancelReply: "Cancel the reply",
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
+        command: "Commands",
       },
       manage: {
         name: "Name",
@@ -7029,17 +7032,19 @@ export const catalogs = {
       },
       threadWidth: "Thread width (drag; double-click for the default)",
       commands: {
-        issue: { name: "Write a ticket", note: "/issue title: into the backlog, in this channel's repo", needs: "Write the ticket's title after /issue" },
+        issue: { name: "Write a ticket", args: "title", note: "Kept as a draft, in this channel's repository", needs: "Write the ticket's title after /issue" },
         remember: {
           name: "Have the manager remember",
-          note: "/remember a sentence: into the memory of the manager looking after this",
+          args: "a line",
+          note: "Kept in the memory of the manager here",
           needs: "Write what it should remember after /remember",
         },
-        stop: { name: "Stop the manager", note: "The manager looking after this stops its round; helpers it sent keep working", needs: "" },
-        dm: { name: "Direct message", note: "/dm name: open the direct channel with that profile", needs: "Write the profile's name or id after /dm" },
+        stop: { name: "Stop the manager", args: "", note: "The manager here stops this turn; helpers it sent keep working", needs: "" },
+        dm: { name: "Direct message", args: "name", note: "Opens the direct channel with this profile", needs: "Write the profile's name or id after /dm" },
         imagegen: {
           name: "Make an image",
-          note: "/imagegen description: the manager here draws it with MOSS and posts it here",
+          args: "description",
+          note: "The manager here draws it with MOSS and posts it here",
           needs: "Write what to draw after /imagegen",
           nowhere: "Open a channel first to make an image",
         },
@@ -11353,6 +11358,7 @@ export interface Messages {
   "web.channel.channels": undefined;
   "web.channel.channelsTitle": undefined;
   "web.channel.closeThread": undefined;
+  "web.channel.commands.dm.args": undefined;
   "web.channel.commands.dm.name": undefined;
   "web.channel.commands.dm.needs": undefined;
   "web.channel.commands.dm.note": undefined;
@@ -11360,22 +11366,27 @@ export interface Messages {
   "web.channel.commands.done.issue": { readonly n: string | number };
   "web.channel.commands.done.remember": undefined;
   "web.channel.commands.done.stop": undefined;
+  "web.channel.commands.imagegen.args": undefined;
   "web.channel.commands.imagegen.name": undefined;
   "web.channel.commands.imagegen.needs": undefined;
   "web.channel.commands.imagegen.note": undefined;
   "web.channel.commands.imagegen.nowhere": undefined;
+  "web.channel.commands.issue.args": undefined;
   "web.channel.commands.issue.name": undefined;
   "web.channel.commands.issue.needs": undefined;
   "web.channel.commands.issue.note": undefined;
+  "web.channel.commands.remember.args": undefined;
   "web.channel.commands.remember.name": undefined;
   "web.channel.commands.remember.needs": undefined;
   "web.channel.commands.remember.note": undefined;
+  "web.channel.commands.stop.args": undefined;
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelQuote": undefined;
   "web.channel.composer.cancelReply": undefined;
+  "web.channel.composer.command": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
   "web.channel.composer.quotedBlock": { readonly text: string | number };

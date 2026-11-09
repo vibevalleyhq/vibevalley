@@ -134,7 +134,7 @@
   "composer": {
     "notSent": "Not sent: {why}",
     "who": "Who",
-    "mention": "@ to call someone",
+    "mention": "Mention someone",
     "stop": "Stop the manager",
     "stopHint": "Stops the manager's round; helpers already sent keep working",
     "send": "Send",
@@ -144,7 +144,8 @@
     "cancelQuote": "Stop pointing at it",
     "cancelReply": "Cancel the reply",
     "attach": "Attach a file",
-    "uploadFailed": "Not uploaded: {why}"
+    "uploadFailed": "Not uploaded: {why}",
+    "command": "Commands"
   },
   "manage": {
     "name": "Name",
@@ -247,27 +248,32 @@
   "commands": {
     "issue": {
       "name": "Write a ticket",
-      "note": "/issue title: into the backlog, in this channel's repo",
+      "args": "title",
+      "note": "Kept as a draft, in this channel's repository",
       "needs": "Write the ticket's title after /issue"
     },
     "remember": {
       "name": "Have the manager remember",
-      "note": "/remember a sentence: into the memory of the manager looking after this",
+      "args": "a line",
+      "note": "Kept in the memory of the manager here",
       "needs": "Write what it should remember after /remember"
     },
     "stop": {
       "name": "Stop the manager",
-      "note": "The manager looking after this stops its round; helpers it sent keep working",
+      "args": "",
+      "note": "The manager here stops this turn; helpers it sent keep working",
       "needs": ""
     },
     "dm": {
       "name": "Direct message",
-      "note": "/dm name: open the direct channel with that profile",
+      "args": "name",
+      "note": "Opens the direct channel with this profile",
       "needs": "Write the profile's name or id after /dm"
     },
     "imagegen": {
       "name": "Make an image",
-      "note": "/imagegen description: the manager here draws it with MOSS and posts it here",
+      "args": "description",
+      "note": "The manager here draws it with MOSS and posts it here",
       "needs": "Write what to draw after /imagegen",
       "nowhere": "Open a channel first to make an image"
     },
