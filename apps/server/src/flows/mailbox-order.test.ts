@@ -66,7 +66,7 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
     yield* Effect.all([...writes, mailbox.restore, mailbox.restore], { concurrency: "unbounded", discard: true });
     expect(
       mailbox
-        .pending(profile.id)
+        .openDeliveries(profile.id)
         .map((row) => row.envelope_id)
         .toSorted(),
     ).toEqual(inputs.map((input) => input.id).toSorted());
@@ -80,7 +80,7 @@ it.live("regression: independent input hops survive restore and only a new owner
     const mailbox = yield* Mailbox;
     const accept = (key: string, kind: "owner" | "session" = "session") => ingress.accept(signal(key, kind));
     for (const n of [1, 2, 3, 4, 5]) yield* accept(`before-owner-${n}`);
-    const rows = () => mailbox.pending(defaultOrchestrator);
+    const rows = () => mailbox.openDeliveries(defaultOrchestrator);
     expect(rows().map((row) => row.held_by)).toEqual([null, null, null, null, "hop_limit"]);
     yield* mailbox.restore;
     const blocked = (yield* accept("after-restore"))!;
@@ -159,14 +159,14 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     const started = yield* issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
     const first = (yield* ingress.accept(signal("first-wake", "session", threads)))!;
-    expect(mailbox.pending(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
+    expect(mailbox.openDeliveries(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
     yield* until(
-      () => steers().some((text) => text.includes("first-wake")) && !mailbox.pending(started.session!).some((row) => row.envelope_id === first.id),
+      () => steers().some((text) => text.includes("first-wake")) && !mailbox.openDeliveries(started.session!).some((row) => row.envelope_id === first.id),
       "the first agent input consumed",
     );
     yield* mailbox.restore;
     const second = (yield* ingress.accept(signal("future-source-clock", "session", threads, 9_000_000_000_000)))!;
-    expect(mailbox.pending(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
+    expect(mailbox.openDeliveries(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
     const queued = (yield* ingress.accept({
       source: "github",
       key: "queued-ci",
@@ -178,10 +178,10 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
       meta: { kind: "ci", failed: true },
     }))!;
     yield* ingress.accept(signal("owner-authorized-wave", "owner", threads));
-    yield* until(() => !mailbox.pending(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with an owner steer");
+    yield* until(() => !mailbox.openDeliveries(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with an owner steer");
     expect(steers().some((text) => text.includes("future-source-clock") && text.includes("owner-authorized-wave"))).toBe(true);
     expect(steers().some((text) => text.includes("queued-ci"))).toBe(false);
-    expect(mailbox.pending(started.session!).find((row) => row.envelope_id === queued.id)?.state).toBe("pending");
+    expect(mailbox.openDeliveries(started.session!).find((row) => row.envelope_id === queued.id)?.state).toBe("pending");
     const sessions = yield* Session;
     gate.resolve();
     yield* until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the original turn ended");

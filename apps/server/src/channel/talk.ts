@@ -64,18 +64,21 @@ export const directTalk = (r: ChannelHub, w: ChannelWriting, th: Pick<SessionThr
       if (!owner) return;
       const target = targetOfChannel(place);
       const received = yield* mailbox.receive({
-        _tag: "Talk",
+        _tag: "Open",
         agent,
-        channel,
         brief: talkBrief(agent.name, inboxLines(ordered.map((m) => inboxOf(m, target)))),
-        letters: ordered.filter(ownerChat).map((message) => {
-          const row = channelEnvelope(message);
-          return { row, context: inputContext(asInbox(row)) };
-        }),
-        answering: owner.id,
-        joining,
+        where: "",
+        options: { context: { kind: "channel", channel }, trigger: { kind: "comment", channel, message: owner.id } },
+        letters: {
+          _tag: "Talk",
+          rows: ordered.filter(ownerChat).map((message) => {
+            const row = channelEnvelope(message);
+            return { row, context: inputContext(asInbox(row)) };
+          }),
+        },
+        joining: (session, _launch, at) => joining(session, at),
       });
-      const opened = received.opened;
+      const opened = received.opened?.id;
       if (opened === undefined) {
         yield* locked(sessionsLeft);
         return yield* notice(channel, t("server.channel.talkFailed", { why: received.refused ?? "" }), "talk_refused");

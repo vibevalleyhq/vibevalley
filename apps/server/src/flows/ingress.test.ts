@@ -149,7 +149,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     };
     yield* mailbox.insert(delivery);
     yield* mailbox.restore;
-    expect(mailbox.pending(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
+    expect(mailbox.openDeliveries(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
     yield* mailbox.start;
     expect(inputs.some((input) => input.includes(trigger.card.readUri))).toBe(false);
     yield* (yield* Ingress).accept({
@@ -163,9 +163,9 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
       at: 2,
     });
     yield* until(() => inputs.some((input) => input.includes(trigger.card.readUri)), "the machine card delivered");
-    yield* until(() => mailbox.pending(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
+    yield* until(() => mailbox.openDeliveries(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
     yield* mailbox.insert(delivery);
-    expect(mailbox.pending(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
+    expect(mailbox.openDeliveries(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
     const messages = yield* await_(
       () => chat.history(thread),
       (items) => items.some((message) => message.kind === "report"),

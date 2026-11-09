@@ -1,4 +1,4 @@
-import { Effect, Option, Semaphore } from "effect";
+import { Array as Arr, Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -11,12 +11,12 @@ import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
 import { causeMessage } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Mailbox, type Received } from "#/mailbox/mailbox.ts";
 import { issueBranch, Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";
 import { askedMax } from "#/session/journal.ts";
-import { type HireOptions, type NotRecorded, Session } from "#/session/session.ts";
+import { type Hired, type HireOptions, Session } from "#/session/session.ts";
 
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
@@ -66,9 +66,6 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
         if (i.level === "error") return { refused: t("server.issue.cannotSend", { name: agent.name, why: i.text }) };
       const where = repo.trim() || agent.workdir.trim();
       if (!where && opt.refining !== true) return { refused: t("server.issue.noRepo") };
-      const room = yield* sessions.makeRoom(agent.runtime, where);
-      if ("refused" in room) return { refused: room.refused };
-      const evicted = room.evicted ?? "";
       let refusal = "";
       const recorded = yield* Effect.option(
         (opt.issue
@@ -101,21 +98,27 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
         issue.constraints,
         acceptanceAncestors(issue, all).flatMap((item) => item.constraints?.frozen ?? []),
       );
-      const hired = yield* sessions.send(agent, [brief, constraints].filter(Boolean).join("\n\n"), where, {
-        ...opt,
-        ...(base ? { base, worktree: true } : {}),
-        context: { kind: "issue", issue },
-        hiring: (w: T.Session, launch: string) =>
-          Effect.gen(function* () {
-            if (opt.refining !== true) yield* recordWorkerStart(issue.id, w);
-            if (opt.hiring) yield* opt.hiring(w, launch);
-          }),
-      });
-      if (!hired.session && !opt.issue && !hired.retainedWork) {
+      const { issue: _issue, hiring: _hiring, ...sending } = opt;
+      const received = yield* mailbox
+        .receive({
+          _tag: "Open",
+          agent,
+          brief: [brief, constraints].filter(Boolean).join("\n\n"),
+          where,
+          options: { ...sending, ...(base ? { base, worktree: true } : {}), context: { kind: "issue", issue } },
+          letters: { _tag: "Queued", triggers: opt.inputs ?? [] },
+          joining: (w) => (opt.refining === true ? Effect.void : recordWorkerStart(issue.id, w)),
+        })
+        .pipe(Effect.catch((error) => Effect.succeed<Received>({ heldNotice: "", refused: reasonOf(error) })));
+      if (!received.opened && !opt.issue && !received.retainedWork) {
         yield* remove(issue.id);
       }
-      if (hired.retainedWork) return { ...hired, refused: t("server.issue.workKept", { refused: hired.refused ?? "", n: issue.number }) };
-      return hired.session && evicted ? { ...hired, evicted } : hired;
+      const hired: Hired = received.retainedWork
+        ? { refused: t("server.issue.workKept", { refused: received.refused ?? "", n: issue.number }), retainedWork: true }
+        : received.opened
+          ? { session: received.opened, ...(received.evicted ? { evicted: received.evicted } : {}) }
+          : { refused: received.refused ?? "" };
+      return hired;
     });
 
     /** Starting it and its dry run ask the same, so neither refuses what the other allows. */
@@ -130,20 +133,9 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
-    const send = (
-      issue: T.Issue,
-      agent: T.Agent,
-      repo: string,
-      channel: string,
-      by?: T.RunTrigger,
-      inputs: readonly T.Trigger[] = [],
-      hiring: ((s: T.Session, launch: string) => Effect.Effect<void, NotRecorded>) | undefined = inputs.length > 0
-        ? (s, launch) => mailbox.registerInitialInputs(s, launch, inputs)
-        : undefined,
-    ) =>
-      Effect.flatMap(
-        hire(agent, issueBrief(issue), repo, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}), ...(hiring ? { hiring } : {}) }),
-        (hired) => (hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")))),
+    const send = (issue: T.Issue, agent: T.Agent, repo: string, channel: string, by?: T.RunTrigger, inputs: readonly T.Trigger[] = []) =>
+      Effect.flatMap(hire(agent, issueBrief(issue), repo, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}) }), (hired) =>
+        hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed"))),
       );
 
     /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
@@ -174,7 +166,8 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       inputs: readonly T.Trigger[] = [],
     ): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
-      const initial = inputs.length > 0 || mine._tag === "None" ? inputs : yield* mailbox.issueInputs(id);
+      const queued = inputs.length > 0 || mine._tag === "None" ? undefined : yield* mailbox.pending({ _tag: "Issue", issue: id });
+      const initial = queued === undefined ? inputs : Arr.map(queued, (waiting) => waiting.trigger);
       if (Option.isSome(mine)) {
         const children = (yield* everyIssue).filter((child) => child.parent === mine.value.id);
         if (children.length > 0) {
@@ -187,7 +180,6 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
               trigger: by,
               inputs: initial,
               worktree: true,
-              ...(initial.length > 0 ? { hiring: (s: T.Session, launch: string) => mailbox.registerInitialInputs(s, launch, initial) } : {}),
             });
             if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
             return { session: hired.session.id };
@@ -224,7 +216,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
 
     /** In the board's order: one that cannot go any more leaves the queue. */
     const refreshQueue = Effect.fn("Issue.refreshQueue")(function* () {
-      const inputs = yield* mailbox.queuedInputs;
+      const inputs = yield* mailbox.pending({ _tag: "Queue" });
       yield* joinChildren().pipe(bestEffort("vibevalley: child issues could not be merged"));
       const all = yield* everyIssue;
       for (const issue of all) {

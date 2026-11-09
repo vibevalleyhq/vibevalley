@@ -76,7 +76,7 @@ flowchart LR
 |---|---|---|
 | `receive` | 把一个触发交给它的受众 | `registerTalk`、`registerInitialInputs`、`deliverDirect`、`kick`，和工单、频道直接用帮工的 `makeRoom`、`send`、`register` |
 | `withdraw` | 撤回一个帮工、一封信或一张工单的待投递 | `dropSession`、`dropEnvelope`、`retireDispatches`、`returnOne`、`returnInput` |
-| `pending` | 一个工单、帮工或一封信现在等着什么 | `queuedInputs`、`issueInputs`、`waitingOn`，和现有的同步 `pending(session)` |
+| `pending` | 工单池里等着的触发：排队的工单的（派活的在前），或一张工单的（按路由的顺序） | `queuedInputs`、`issueInputs` |
 | `changes` | 投递的变化：消费、刹车 | `consumed`、`breakerNotices` |
 
 两件事已定（2026-11-09，主人）：
@@ -89,7 +89,9 @@ flowchart LR
 - 第一步（频道）做完：`withdraw` 取代 `dropSession`、`dropEnvelope`；`changes` 取代 `consumed`、`breakerNotices`；`receive(arrival)` 收下记好的触发（可带频道消息的受众或一个帮工）和私聊开帮工（`Talk`），`registerTalk`、`kick`、`deliverDirect` 从接口上去掉。频道用 Mailbox 的成员从 10 个降到 `recordChannelTrigger`、`recordTrigger`、`receive`、`withdraw`、`changes`、`unreadSummary`。频道不再用帮工的 `makeRoom`、`send`、`register`。
 - 直说的行为变化有测试：没有串的帮工被直说一句，`mailbox_trigger` 记下一条，投递给它、原因是 `addressed`。
 - Mailbox 对外的成员实际是 34 个（服务和泵各有一组），比上表少算了 7 个。
-- 下一步是工单：`pending` 合并 `queuedInputs`、`issueInputs`、`waitingOn` 和同步的 `pending(session)`，派活走 `receive` 的开帮工。
+- 第二步（工单）做完：派活走 `receive` 的 `Open`（私聊的 `Talk` 推广成它：最初的信是私聊最近的话，或工单池里的触发）；`pending` 合并 `queuedInputs`、`issueInputs`，两种查法返回同一种形状；`withdraw` 多了 `Issue`，取代 `retireDispatches`（照旧在工单自己的事务里，不拿 Mailbox 的写锁）；`registerInitialInputs` 从接口上去掉。原来同步的 `pending(session)` 是一个帮工的投递，改名 `openDeliveries`，免得一个名字指两件事；`waitingOn`（一封信还在等的投递数）同理是投递的读，留着。
+- 派活的顺序变了一处：腾位置挪进 Mailbox 后在记下工单之后。依赖未完、父工单的工作区出错而被拒时，不再先请走一个空闲的帮工；新工单遇上农场满了，记下后随即删掉（开帮工被拒时原来就删）。
+- 工单还直接用帮工的：`noRoom`（只问有没有位置，排队用）和管家的 `register`（管家不经 `send` 开）。这两处是读和管家自己的事，不归投递，留在帮工。
 
 ## Alternatives considered
 

@@ -1149,7 +1149,7 @@ describe("the chat", () => {
         expect(rows).toEqual([]);
         const registered2 = yield* f.mailbox.registered(id);
         expect(registered2).toBe(false);
-        expect(f.mailbox.pending("w1").some((row) => row.envelope_id === id)).toBe(false);
+        expect(f.mailbox.openDeliveries("w1").some((row) => row.envelope_id === id)).toBe(false);
         yield* drop(f.sql, "fail_second_recipient", "mailbox_delivery");
         yield* f.chat.start;
         yield* f.chat.start;

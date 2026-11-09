@@ -45,7 +45,7 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     );
     yield* mailbox.returnInput(started.session!, trigger.id, "another work item");
     yield* mailbox.returnInput(started.session!, trigger.id, "duplicate retry");
-    const returned = mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id);
+    const returned = mailbox.openDeliveries(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id);
     expect(returned).toHaveLength(1);
     expect(returned[0]!.envelope_id).not.toBe(trigger.id);
     expect(returned[0]!.payload.note).toContain("another work item");
@@ -58,7 +58,7 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     const rows2 = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
     expect(rows2).toEqual(receipt);
     yield* mailbox.restore;
-    expect(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
+    expect(mailbox.openDeliveries(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
     const ownerEpoch = yield* sql<{ position: number }>`select max(position) as position from mailbox_owner_route where scope = ${returned[0]!.scope}`;
     expect(ownerEpoch[0]!.position).toBe(returned[0]!.position);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -78,12 +78,12 @@ it.live("regression: closing an unassigned issue returns its held owner input wi
     const trigger = (yield* ingress.accept(source))!;
     yield* service.setStatus(issue.id, "canceled", "", "", owner);
     yield* await_(
-      () => Effect.succeed(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
+      () => Effect.succeed(mailbox.openDeliveries(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
       (rows) => rows.length === 1,
       "held input returned on cancel",
     );
     yield* ingress.accept(source);
-    expect(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
+    expect(mailbox.openDeliveries(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
     expect((yield* chat.history(chat.defaultChannel())).some((message) => message.text.includes(source.text))).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(f.layer));

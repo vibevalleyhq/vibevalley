@@ -344,7 +344,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* publish(id);
   });
 
-  const retireDispatches = (id: string, at: number) => mailbox.retireDispatches(id, at);
+  const retireDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
 
   /** The issue already owns its number and workplace before its session starts. */
   const recordWorkerStart = Effect.fn("Issue.recordWorkerStart")(function* (id: string, session: T.Session) {

@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
+import { Array as Arr, Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
 import type { SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -47,7 +47,7 @@ const RoutePosition = Schema.Struct({ scope: Schema.String, position: Schema.Int
 const readRouteReceipt = Schema.decodeUnknownSync(Schema.Struct({ ...RoutePosition.fields, from_owner: Schema.Boolean }));
 const readOwnerRoutes = Schema.decodeUnknownSync(Schema.Array(RoutePosition));
 
-interface QueuedInput {
+export interface QueuedInput {
   readonly issue: string;
   readonly trigger: T.Trigger;
 }
@@ -72,28 +72,40 @@ export interface TalkRow {
 export type Arrival =
   | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelMail | { readonly session: string } }
   | {
-      readonly _tag: "Talk";
+      readonly _tag: "Open";
       readonly agent: T.Agent;
-      readonly channel: string;
       readonly brief: string;
-      /** The conversation's recent messages, owner's words first to last: handed with the first request. */
-      readonly letters: readonly TalkRow[];
-      /** The owner's message this answers. */
-      readonly answering: string;
-      /** Written with the session before anyone can see it (the channel's own participant row). */
-      readonly joining: (session: T.Session, at: number) => Effect.Effect<void, NotRecorded>;
+      /** The repo or workdir it works in; empty for a direct conversation. */
+      readonly where: string;
+      /** How it is sent (its issue or channel, what its first run is for, its branch); the door adds the rest. */
+      readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
+      /** What is handed with its first request: a conversation's recent messages, or an issue's queued triggers. */
+      readonly letters: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly T.Trigger[] };
+      /** The caller's own rows, written with the session before anyone can see it. */
+      readonly joining: (session: T.Session, launch: string, at: number) => Effect.Effect<void, NotRecorded>;
     };
 
-/** What the door did: a held notice for a channel, and for a talk the session opened or why none was. */
+type SendOptions = Parameters<Session["Service"]["send"]>[3];
+
+/** What the door did: a held notice for a channel; for an opening, the session opened or why none was, and who was
+ * sent home to make room. */
 export interface Received extends ChannelRouteResult {
-  readonly opened?: string;
+  readonly opened?: T.Session;
   readonly refused?: string;
+  readonly evicted?: string;
+  /** A refused opening left work behind: its issue identity must be kept. */
+  readonly retainedWork?: true;
 }
 
 /** What can be taken back before it is handed: everything for a session that left, or one deleted message. */
 export type Withdrawal =
   | { readonly _tag: "Session"; readonly session: string; readonly why: string }
-  | { readonly _tag: "Envelope"; readonly envelope: string };
+  | { readonly _tag: "Envelope"; readonly envelope: string }
+  /** An issue's dispatches up to at, once it is closed or handed on: its own transaction, not the write lock. */
+  | { readonly _tag: "Issue"; readonly issue: string; readonly at: number };
+
+/** Which triggers wait in the issues' pool: those of queued issues (dispatches first), or one issue's in routed order. */
+export type Waiting = { readonly _tag: "Queue" } | { readonly _tag: "Issue"; readonly issue: string };
 
 /** What happened to deliveries: a message taken into a model (its 👀), or a session that failed every wake. */
 export type DeliveryChange =
@@ -109,15 +121,12 @@ export class Mailbox extends Context.Service<
     readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
     readonly replayCronTriggers: (consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
     readonly unreadSummary: (participant: string, channel: string) => Effect.Effect<UnreadRow[]>;
-    readonly queuedInputs: Effect.Effect<readonly QueuedInput[]>;
-    readonly issueInputs: (issue: string) => Effect.Effect<readonly T.Trigger[]>;
-    readonly retireDispatches: (issue: string, at: number) => Effect.Effect<void>;
-    readonly registerInitialInputs: (session: T.Session, launch: string, inputs: readonly T.Trigger[]) => Effect.Effect<void, NotRecorded>;
+    readonly pending: (of: Waiting) => Effect.Effect<readonly QueuedInput[]>;
     readonly registered: (trigger: string) => Effect.Effect<boolean>;
     readonly receive: (arrival: Arrival) => Effect.Effect<Received, ApiError>;
     readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
     readonly ownerOf: (trigger: string) => Effect.Effect<string | undefined>;
-    readonly pending: (session: string) => readonly DeliveryRow[];
+    readonly openDeliveries: (session: string) => readonly DeliveryRow[];
     readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
     readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
     readonly start: Effect.Effect<void>;
@@ -273,24 +282,31 @@ export class Mailbox extends Context.Service<
         return result ?? { heldNotice: "" };
       });
 
-      const talk = Effect.fn("Mailbox.talk")(function* (arrival: Extract<Arrival, { readonly _tag: "Talk" }>): Effect.fn.Return<Received> {
-        const room = yield* sessions.makeRoom(arrival.agent.runtime, "");
+      const openSession = Effect.fn("Mailbox.open")(function* (arrival: Extract<Arrival, { readonly _tag: "Open" }>): Effect.fn.Return<Received> {
+        const room = yield* sessions.makeRoom(arrival.agent.runtime, arrival.where);
         if ("refused" in room) return { heldNotice: "", refused: room.refused };
-        const hired = yield* sessions.send(arrival.agent, arrival.brief, "", {
-          context: { kind: "channel", channel: arrival.channel },
-          envelopeIds: arrival.letters.map((letter) => letter.row.envelope_id),
-          trigger: { kind: "comment", channel: arrival.channel, message: arrival.answering },
+        const letters = arrival.letters;
+        const hired = yield* sessions.send(arrival.agent, arrival.brief, arrival.where, {
+          ...arrival.options,
+          ...(letters._tag === "Talk" ? { envelopeIds: letters.rows.map((letter) => letter.row.envelope_id) } : {}),
           hiring: (session, launch) =>
             Effect.gen(function* () {
               const at = yield* Clock.currentTimeMillis;
-              yield* arrival.joining(session, at);
-              yield* work.registerTalk(session.id, launch, at, arrival.letters);
+              yield* arrival.joining(session, launch, at);
+              switch (letters._tag) {
+                case "Talk":
+                  return yield* work.registerTalk(session.id, launch, at, letters.rows);
+                case "Queued":
+                  if (letters.triggers.length > 0) yield* work.registerInitialInputs(session, launch, letters.triggers);
+                  return;
+              }
             }),
         });
-        const opened = hired.session?.id;
-        if (opened === undefined) return { heldNotice: "", refused: hired.refused ?? "" };
-        yield* Effect.sync(() => later(`kick:${opened}`, 0, () => pump.kick(opened)));
-        return { heldNotice: "", opened };
+        const opened = hired.session;
+        if (opened === undefined) return { heldNotice: "", refused: hired.refused ?? "", ...(hired.retainedWork ? { retainedWork: true as const } : {}) };
+        // A conversation's later messages may have come while it opened: the pump looks for them now.
+        if (letters._tag === "Talk") yield* Effect.sync(() => later(`kick:${opened.id}`, 0, () => pump.kick(opened.id)));
+        return { heldNotice: "", opened, ...(room.evicted ? { evicted: room.evicted } : {}) };
       });
 
       const dropSession = (session: string, why: string) =>
@@ -304,24 +320,30 @@ export class Mailbox extends Context.Service<
         ...journal,
         unreadSummary,
         registered: work.registered,
-        queuedInputs: work.queuedInputs,
-        issueInputs: work.issueInputs,
-        retireDispatches: work.retireDispatches,
-        registerInitialInputs: work.registerInitialInputs,
-        // A talk opens a session (a runtime starting): outside the route lock, as it was before it came here.
+        pending: Effect.fnUntraced(function* (of: Waiting) {
+          switch (of._tag) {
+            case "Queue":
+              return yield* work.queuedInputs;
+            case "Issue": {
+              const triggers = yield* work.issueInputs(of.issue);
+              return Arr.map(triggers, (trigger) => ({ issue: of.issue, trigger }));
+            }
+          }
+        }),
+        // An opening starts a runtime: outside the route lock, as it was before it came here.
         receive: Effect.fnUntraced(function* (arrival: Arrival) {
           switch (arrival._tag) {
             case "Trigger":
               return yield* routeLocked(Effect.uninterruptible(route(arrival.trigger, arrival.to)));
-            case "Talk":
-              return yield* talk(arrival);
+            case "Open":
+              return yield* openSession(arrival);
           }
         }),
         subscribe: Effect.fnUntraced(function* (issue: string, threads: readonly string[]) {
           return yield* work.subscribe(issue, threads);
         }),
         ownerOf: work.ownerOf,
-        pending: (session) => open.of(session),
+        openDeliveries: (session) => open.of(session),
         forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
         orchestratorDigest: Effect.fn("Mailbox.orchestratorDigest")((agent) =>
           Effect.sync(() =>
@@ -359,14 +381,18 @@ export class Mailbox extends Context.Service<
         withdraw: Effect.fn("Mailbox.withdraw")(function* (what) {
           switch (what._tag) {
             case "Session":
-              return yield* dropSession(what.session, what.why);
-            case "Envelope": {
-              const rows = yield* db.run(qd.dropOpenOf({ message_id: what.envelope }));
-              for (const row of rows) open.remove(row.session_id, what.envelope);
-              return;
-            }
+              return yield* writtenLocked(dropSession(what.session, what.why));
+            case "Envelope":
+              return yield* writtenLocked(
+                Effect.gen(function* () {
+                  const rows = yield* db.run(qd.dropOpenOf({ message_id: what.envelope }));
+                  for (const row of rows) open.remove(row.session_id, what.envelope);
+                }),
+              );
+            case "Issue":
+              return yield* work.retireDispatches(what.issue, what.at);
           }
-        }, writtenLocked),
+        }),
         waitingOn: Effect.fn("Mailbox.waitingOn")(function* (envelope) {
           return (yield* db.run(qd.waitingOn({ message_id: envelope }))).length;
         }),
@@ -394,7 +420,7 @@ export class Mailbox extends Context.Service<
           });
         });
       const pump = makePump<InboxMessage>(sessions, {
-        pending: api.pending,
+        pending: api.openDeliveries,
         dropSession: (session, why) => writtenLocked(dropSession(session, why)),
         returnOne: api.returnOne,
         hand: work.hand,

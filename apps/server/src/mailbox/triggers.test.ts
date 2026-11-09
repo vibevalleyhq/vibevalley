@@ -49,7 +49,7 @@ it.effect("regression: the source cursor and Mailbox trigger share commit and ro
     expect(registered2).toBe(false);
     const allOpenDeliveries2 = yield* db.run(allOpenDeliveries());
     expect(allOpenDeliveries2).toEqual([]);
-    expect(mailbox.pending(defaultOrchestrator)).toEqual([]);
+    expect(mailbox.openDeliveries(defaultOrchestrator)).toEqual([]);
     expect(core.state()).toBe(state);
   }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
 );
