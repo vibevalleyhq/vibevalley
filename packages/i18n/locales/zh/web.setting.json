@@ -160,5 +160,23 @@
     "binding": "还没选用哪个账号和模型",
     "agora": "还缺声网的凭据",
     "dictationUrl": "还没填听写的地址"
+  },
+  "feature": {
+    "orchestrator": "管家",
+    "image": "生图",
+    "understanding": "媒体理解",
+    "speech": "单人语音",
+    "speakers": "多人语音",
+    "voiceDesign": "音色设计",
+    "transcription": "音频转写",
+    "dictation": "听写",
+    "live": "MOSS Live",
+    "vision": "实时视觉",
+    "call": "通话"
+  },
+  "readiness": {
+    "ready": "{feature}：可以用了",
+    "lacks": "{feature}：{why}",
+    "fix": "去设置"
   }
 }

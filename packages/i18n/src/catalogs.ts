@@ -4136,6 +4136,20 @@ export const catalogs = {
         agora: "还缺声网的凭据",
         dictationUrl: "还没填听写的地址",
       },
+      feature: {
+        orchestrator: "管家",
+        image: "生图",
+        understanding: "媒体理解",
+        speech: "单人语音",
+        speakers: "多人语音",
+        voiceDesign: "音色设计",
+        transcription: "音频转写",
+        dictation: "听写",
+        live: "MOSS Live",
+        vision: "实时视觉",
+        call: "通话",
+      },
+      readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
     },
     "web.tree": {
       kind: { leaf: "叶", fruit: "果", seed: "种子" },
@@ -4427,6 +4441,7 @@ export const catalogs = {
         },
         tryIt: "试音",
         notInChat: "说的话不进田头",
+        debug: "调试：线路质量与线路上的消息",
       },
     },
   },
@@ -8852,6 +8867,20 @@ export const catalogs = {
         agora: "Agora's credentials are missing",
         dictationUrl: "No dictation address yet",
       },
+      feature: {
+        orchestrator: "The manager",
+        image: "Image generation",
+        understanding: "Media understanding",
+        speech: "Speech",
+        speakers: "Dialogue",
+        voiceDesign: "Voice design",
+        transcription: "Transcription",
+        dictation: "Dictation",
+        live: "MOSS Live",
+        vision: "Live vision",
+        call: "Calls",
+      },
+      readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
     },
     "web.tree": {
       kind: { leaf: "Leaf", fruit: "Fruit", seed: "Seed" },
@@ -9158,6 +9187,7 @@ export const catalogs = {
         },
         tryIt: "Try it",
         notInChat: "Nothing goes to the chat",
+        debug: "Debugging: line quality and messages on the line",
       },
     },
   },
@@ -13252,6 +13282,17 @@ export interface Messages {
   "web.setting.appearance.themes.dark": undefined;
   "web.setting.appearance.themes.light": undefined;
   "web.setting.appearance.themes.system": undefined;
+  "web.setting.feature.call": undefined;
+  "web.setting.feature.dictation": undefined;
+  "web.setting.feature.image": undefined;
+  "web.setting.feature.live": undefined;
+  "web.setting.feature.orchestrator": undefined;
+  "web.setting.feature.speakers": undefined;
+  "web.setting.feature.speech": undefined;
+  "web.setting.feature.transcription": undefined;
+  "web.setting.feature.understanding": undefined;
+  "web.setting.feature.vision": undefined;
+  "web.setting.feature.voiceDesign": undefined;
   "web.setting.general.languageHint": undefined;
   "web.setting.general.start": undefined;
   "web.setting.general.startHint": undefined;
@@ -13299,6 +13340,9 @@ export interface Messages {
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
   "web.setting.nav.width": undefined;
+  "web.setting.readiness.fix": undefined;
+  "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
+  "web.setting.readiness.ready": { readonly feature: string | number };
   "web.setting.scope.device": undefined;
   "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };
@@ -13477,6 +13521,7 @@ export interface Messages {
   "web.voice.moss.busy": undefined;
   "web.voice.moss.closed": undefined;
   "web.voice.moss.connecting": undefined;
+  "web.voice.moss.debug": undefined;
   "web.voice.moss.defaultInstructions": undefined;
   "web.voice.moss.down": undefined;
   "web.voice.moss.events": undefined;

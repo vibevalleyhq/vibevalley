@@ -19,6 +19,7 @@ import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
+import { Readiness } from "./Readiness.tsx";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
 const recipeStyles = stylex.create({
@@ -236,6 +237,7 @@ export function SettingsPage(props: { rest: string }) {
                 </Match>
                 <Match when={section().id === "models"}>
                   <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")} action={<SettingsFile />}>
+                    <Readiness features={["orchestrator"]} />
                     <SettingsForm part="deepseek" />
                   </Page>
                 </Match>
@@ -255,17 +257,20 @@ export function SettingsPage(props: { rest: string }) {
                 </Match>
                 <Match when={section().id === "call"}>
                   <Page title={t("web.setting.nav.call")}>
+                    <Readiness features={["call"]} />
                     <VoiceForm part="line" view="call" />
                   </Page>
                 </Match>
                 <Match when={section().id === "moss"}>
                   <Page title="MOSS Live" hint={t("web.voice.moss.intro")}>
+                    <Readiness features={["live", "vision"]} />
                     <VoiceForm part="line" view="moss" />
                     <MossPlayground />
                   </Page>
                 </Match>
                 <Match when={section().id === "dictation"}>
                   <Page title={t("web.setting.nav.dictation")}>
+                    <Readiness features={["dictation"]} />
                     <VoiceForm part="line" view="dictation" />
                   </Page>
                 </Match>

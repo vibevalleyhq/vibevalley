@@ -229,6 +229,7 @@
       "stops": "Stopped"
     },
     "tryIt": "Try it",
-    "notInChat": "Nothing goes to the chat"
+    "notInChat": "Nothing goes to the chat",
+    "debug": "Debugging: line quality and messages on the line"
   }
 }

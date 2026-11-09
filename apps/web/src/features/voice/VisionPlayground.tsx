@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
@@ -76,7 +77,7 @@ const styles = stylex.create({
   },
 });
 
-export function VisualSourceField(props: { source: VisualSource; disabled: boolean; onChange(source: VisualSource): void }) {
+function VisualSourceField(props: { source: VisualSource; disabled: boolean; onChange(source: VisualSource): void }) {
   return (
     <label {...stylex.attrs(styles.field)}>
       {t("web.voice.vision.source")}
@@ -95,11 +96,13 @@ export function VisualSourceField(props: { source: VisualSource; disabled: boole
   );
 }
 
-export function VisionPlayground() {
+/** Asking about a picture on its own, and (where a Live call is) sharing the same picture with the call: one source for
+ * both, chosen once; it holds while either uses it. */
+export function VisionPlayground(props: { source: VisualSource; onSource: (source: VisualSource) => void; sharing?: boolean; liveShare?: JSX.Element }) {
   const line = new VisionLine();
   const version = createExternal(line.subscribe, () => line.version);
   const session = () => (version(), line.session);
-  const [source, setSource] = createSignal<VisualSource>(canCapture("camera") ? "camera" : "screen");
+  const source = () => props.source;
   const [prompt, setPrompt] = createSignal("");
   const [final, setFinal] = createSignal(false);
   const active = () => session().phase === "connecting" || session().phase === "ready";
@@ -125,7 +128,7 @@ export function VisionPlayground() {
         <div {...stylex.attrs(styles.controls)}>
           <p {...stylex.attrs(styles.notice)}>{t("web.voice.vision.notice")}</p>
           <p {...stylex.attrs(styles.notice)}>{t("web.voice.vision.hostNotice")}</p>
-          <VisualSourceField source={source()} disabled={active()} onChange={setSource} />
+          <VisualSourceField source={source()} disabled={active() || props.sharing === true} onChange={(s) => props.onSource(s)} />
           <Show when={!canCapture(source())}>
             <p role="status" {...stylex.attrs(styles.notice)}>
               {t("web.voice.vision.unavailable")}
@@ -191,6 +194,7 @@ export function VisionPlayground() {
               )}
             </For>
           </div>
+          {props.liveShare}
         </div>
       </Card>
     </section>

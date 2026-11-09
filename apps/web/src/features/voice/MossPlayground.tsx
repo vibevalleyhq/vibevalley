@@ -11,7 +11,7 @@ import { Card } from "#/ui/layout.tsx";
 import { Hint, Tip } from "#/ui/Tip.tsx";
 
 import { type MossLine, mossLine, type MossSetup } from "./mossLine";
-import { VisionPlayground, VisualSourceField } from "./VisionPlayground.tsx";
+import { VisionPlayground } from "./VisionPlayground.tsx";
 import { canCapture, localRelayHost, type VisualSource } from "./visual-capture.ts";
 
 const recipeStyles = stylex.create({
@@ -71,6 +71,13 @@ const variantStyles = stylex.create({
 });
 
 const viewStyles = stylex.create({
+  debugSummary: {
+    cursor: "pointer",
+    paddingBlock: "calc(var(--spacing) * 2)",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--text-sm--line-height)",
+    color: "var(--color-muted)",
+  },
   levelSpan: {
     display: "flex",
     alignItems: "center",
@@ -217,7 +224,39 @@ export function MossPlayground() {
           {t("web.voice.moss.localOnly")}
         </p>
       </Show>
-      <VisionPlayground />
+      <VisionPlayground
+        source={source()}
+        onSource={setSource}
+        sharing={line().visualSource !== undefined}
+        liveShare={
+          <div {...stylex.attrs(viewStyles.mossLineViewDiv)} data-testid="live-visual" data-state={line().visualSource ?? "idle"}>
+            <p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.vision.liveTitle")}</p>
+            <Show
+              when={line().visualSource !== undefined}
+              fallback={
+                <Button
+                  data-testid="live-visual-start"
+                  disabled={line().phase !== "live" || !canCapture(source())}
+                  onClick={() => void mossLine.startVisual(source())}
+                >
+                  {t("web.voice.vision.start")}
+                </Button>
+              }
+            >
+              <Button data-testid="live-visual-stop" onClick={() => mossLine.stopVisual()}>
+                {t("web.voice.vision.stop")}
+              </Button>
+            </Show>
+            <Show when={line().visualProblem}>
+              {(problem) => (
+                <p role="alert" {...stylex.attrs(viewStyles.mossLineViewP)}>
+                  {problem()}
+                </p>
+              )}
+            </Show>
+          </div>
+        }
+      />
       <MossLineView
         enabled={localRelayHost(location.hostname)}
         line={line()}
@@ -225,36 +264,6 @@ export function MossPlayground() {
         onEnd={() => mossLine.end()}
         onMute={(on) => mossLine.mute(on)}
       />
-      <Card title={t("web.voice.vision.liveTitle")}>
-        <div {...stylex.attrs(viewStyles.mossLineViewDiv)} data-testid="live-visual" data-state={line().visualSource ?? "idle"}>
-          <p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.vision.notice")}</p>
-          <p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.vision.hostNotice")}</p>
-          <VisualSourceField source={source()} disabled={line().visualSource !== undefined} onChange={setSource} />
-          <Show
-            when={line().visualSource !== undefined}
-            fallback={
-              <Button
-                data-testid="live-visual-start"
-                disabled={line().phase !== "live" || !canCapture(source())}
-                onClick={() => void mossLine.startVisual(source())}
-              >
-                {t("web.voice.vision.start")}
-              </Button>
-            }
-          >
-            <Button data-testid="live-visual-stop" onClick={() => mossLine.stopVisual()}>
-              {t("web.voice.vision.stop")}
-            </Button>
-          </Show>
-          <Show when={line().visualProblem}>
-            {(problem) => (
-              <p role="alert" {...stylex.attrs(viewStyles.mossLineViewP)}>
-                {problem()}
-              </p>
-            )}
-          </Show>
-        </div>
-      </Card>
     </div>
   );
 }
@@ -331,44 +340,6 @@ export function MossLineView(props: {
           </Show>
         </div>
       </Card>
-      <Card title={t("web.voice.moss.qos.title")} action={<Hint text={t("web.voice.moss.qos.hint")} />}>
-        <div {...stylex.attrs(viewStyles.mossQos)} role="group" aria-label={t("web.voice.moss.qos.title")} data-testid="moss-qos">
-          <Stat
-            label={t("web.voice.moss.qos.reply")}
-            value={line().qos.replyMs === undefined ? "—" : t("web.voice.moss.qos.ms", { last: line().qos.replyMs ?? 0, mean: line().qos.replyMeanMs ?? 0 })}
-            tip={t("web.voice.moss.qos.replyTip", { n: line().qos.replies })}
-            bad={(line().qos.replyMs ?? 0) > 2500}
-          />
-          <Stat label={t("web.voice.moss.qos.up")} value={`${line().qos.upKbps} kbps`} tip={t("web.voice.moss.qos.upTip")} />
-          <Stat label={t("web.voice.moss.qos.down")} value={`${line().qos.downKbps} kbps`} tip={t("web.voice.moss.qos.downTip")} />
-          <Stat
-            label={t("web.voice.moss.qos.frames")}
-            value={`${line().qos.framesPerSecond}/s`}
-            tip={t("web.voice.moss.qos.framesTip")}
-            bad={line().phase === "live" && line().qos.framesPerSecond < 45}
-          />
-          <Stat
-            label={t("web.voice.moss.qos.backlog")}
-            value={`${line().qos.backlog} B`}
-            tip={t("web.voice.moss.qos.backlogTip")}
-            bad={line().qos.backlog > 16000}
-          />
-          <Stat label={t("web.voice.moss.qos.ahead")} value={`${line().qos.aheadMs} ms`} tip={t("web.voice.moss.qos.aheadTip")} />
-          <Stat label={t("web.voice.moss.qos.gaps")} value={String(line().qos.gaps)} tip={t("web.voice.moss.qos.gapsTip")} bad={line().qos.gaps > 0} />
-          <Stat
-            label={t("web.voice.moss.qos.stops")}
-            value={String(Object.values(line().qos.stops).reduce((a, b) => a + b, 0))}
-            tip={
-              Object.keys(line().qos.stops).length === 0
-                ? t("web.voice.moss.qos.stopsTip")
-                : Object.entries(line().qos.stops)
-                    .map(([why, n]) => `${why} × ${n}`)
-                    .join("\n")
-            }
-            bad={Object.keys(line().qos.stops).length > 0}
-          />
-        </div>
-      </Card>
       <Card title={t("web.voice.moss.said")}>
         <div {...stylex.attrs(viewStyles.mossSaid)} role="log" aria-label={t("web.voice.moss.said")} data-testid="moss-said">
           <Show when={line().turns.length > 0} fallback={<p {...stylex.attrs(viewStyles.mossLineViewP2)}>{t("web.voice.moss.nothingSaid")}</p>}>
@@ -396,20 +367,68 @@ export function MossLineView(props: {
           </Show>
         </div>
       </Card>
-      <Card title={t("web.voice.moss.events")} action={<Hint text={t("web.voice.moss.eventsHint")} />}>
-        <ol {...stylex.attrs(viewStyles.mossEvents)} aria-label={t("web.voice.moss.events")} data-testid="moss-events">
-          <For each={line().events}>
-            {(e) => (
-              <li {...stylex.attrs(viewStyles.mossLineViewLi)} title={e.text}>
-                <span {...stylex.attrs(variantStyles.mossLineViewSpan, e.up ? variantStyles.mossLineViewSpanVariant : variantStyles.mossLineViewSpanVariant2)}>
-                  {e.up ? t("web.voice.moss.up") : t("web.voice.moss.down")}
-                </span>
-                {e.text}
-              </li>
-            )}
-          </For>
-        </ol>
-      </Card>
+      {/* What the line does underneath, for when a call goes wrong: folded until asked for. */}
+      <details data-testid="moss-debug">
+        <summary {...stylex.attrs(viewStyles.debugSummary)}>{t("web.voice.moss.debug")}</summary>
+        <div {...stylex.attrs(viewStyles.mossLine)}>
+          <Card title={t("web.voice.moss.qos.title")} action={<Hint text={t("web.voice.moss.qos.hint")} />}>
+            <div {...stylex.attrs(viewStyles.mossQos)} role="group" aria-label={t("web.voice.moss.qos.title")} data-testid="moss-qos">
+              <Stat
+                label={t("web.voice.moss.qos.reply")}
+                value={
+                  line().qos.replyMs === undefined ? "—" : t("web.voice.moss.qos.ms", { last: line().qos.replyMs ?? 0, mean: line().qos.replyMeanMs ?? 0 })
+                }
+                tip={t("web.voice.moss.qos.replyTip", { n: line().qos.replies })}
+                bad={(line().qos.replyMs ?? 0) > 2500}
+              />
+              <Stat label={t("web.voice.moss.qos.up")} value={`${line().qos.upKbps} kbps`} tip={t("web.voice.moss.qos.upTip")} />
+              <Stat label={t("web.voice.moss.qos.down")} value={`${line().qos.downKbps} kbps`} tip={t("web.voice.moss.qos.downTip")} />
+              <Stat
+                label={t("web.voice.moss.qos.frames")}
+                value={`${line().qos.framesPerSecond}/s`}
+                tip={t("web.voice.moss.qos.framesTip")}
+                bad={line().phase === "live" && line().qos.framesPerSecond < 45}
+              />
+              <Stat
+                label={t("web.voice.moss.qos.backlog")}
+                value={`${line().qos.backlog} B`}
+                tip={t("web.voice.moss.qos.backlogTip")}
+                bad={line().qos.backlog > 16000}
+              />
+              <Stat label={t("web.voice.moss.qos.ahead")} value={`${line().qos.aheadMs} ms`} tip={t("web.voice.moss.qos.aheadTip")} />
+              <Stat label={t("web.voice.moss.qos.gaps")} value={String(line().qos.gaps)} tip={t("web.voice.moss.qos.gapsTip")} bad={line().qos.gaps > 0} />
+              <Stat
+                label={t("web.voice.moss.qos.stops")}
+                value={String(Object.values(line().qos.stops).reduce((a, b) => a + b, 0))}
+                tip={
+                  Object.keys(line().qos.stops).length === 0
+                    ? t("web.voice.moss.qos.stopsTip")
+                    : Object.entries(line().qos.stops)
+                        .map(([why, n]) => `${why} × ${n}`)
+                        .join("\n")
+                }
+                bad={Object.keys(line().qos.stops).length > 0}
+              />
+            </div>
+          </Card>
+          <Card title={t("web.voice.moss.events")} action={<Hint text={t("web.voice.moss.eventsHint")} />}>
+            <ol {...stylex.attrs(viewStyles.mossEvents)} aria-label={t("web.voice.moss.events")} data-testid="moss-events">
+              <For each={line().events}>
+                {(e) => (
+                  <li {...stylex.attrs(viewStyles.mossLineViewLi)} title={e.text}>
+                    <span
+                      {...stylex.attrs(variantStyles.mossLineViewSpan, e.up ? variantStyles.mossLineViewSpanVariant : variantStyles.mossLineViewSpanVariant2)}
+                    >
+                      {e.up ? t("web.voice.moss.up") : t("web.voice.moss.down")}
+                    </span>
+                    {e.text}
+                  </li>
+                )}
+              </For>
+            </ol>
+          </Card>
+        </div>
+      </details>
     </div>
   );
 }

@@ -160,5 +160,23 @@
     "binding": "No account and model chosen for it yet",
     "agora": "Agora's credentials are missing",
     "dictationUrl": "No dictation address yet"
+  },
+  "feature": {
+    "orchestrator": "The manager",
+    "image": "Image generation",
+    "understanding": "Media understanding",
+    "speech": "Speech",
+    "speakers": "Dialogue",
+    "voiceDesign": "Voice design",
+    "transcription": "Transcription",
+    "dictation": "Dictation",
+    "live": "MOSS Live",
+    "vision": "Live vision",
+    "call": "Calls"
+  },
+  "readiness": {
+    "ready": "{feature}: ready",
+    "lacks": "{feature}: {why}",
+    "fix": "Set it up"
   }
 }

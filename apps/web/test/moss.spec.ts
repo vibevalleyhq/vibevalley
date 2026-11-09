@@ -17,6 +17,9 @@ test("the MOSS Live playground shows the server's refusal while no key is saved"
   await page.goto("/settings/moss");
   const line = page.getByTestId("moss-line");
   await expect(line).toHaveAttribute("data-state", "idle");
+  // The line's quality and messages are folded under 调试 until asked for.
+  await expect(line.getByTestId("moss-qos")).toBeHidden();
+  await line.getByTestId("moss-debug").locator("summary").click();
   await expect(line.getByTestId("moss-qos")).toBeVisible();
   await line.getByTestId("moss-talk").click();
   await expect(line.getByRole("alert")).not.toBeEmpty();
@@ -143,7 +146,7 @@ test.describe("virtual Live lifecycle", () => {
       await expect(page.getByTestId("moss-line")).toHaveAttribute("data-state", "live");
       await expect.poll(() => relay.frames.filter((frame) => frame[0] === 0).length).toBeGreaterThan(0);
       expect(relay.frames.some((frame) => frame[0] !== 0)).toBe(false);
-      await choose(page.getByTestId("live-visual").getByTestId("visual-source"), source);
+      await choose(page.getByTestId("vision-line").getByTestId("visual-source"), source);
       await page.getByTestId("live-visual-start").click();
       await expect.poll(() => relay.frames.filter((frame) => frame[0] === (source === "camera" ? 1 : 2)).length).toBeGreaterThan(0);
       expect(relay.events).toContain("video.state");
