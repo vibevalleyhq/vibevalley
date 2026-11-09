@@ -1,8 +1,8 @@
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueStatus, Run, RunTrigger, Session, SessionView, SpaceView } from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
-/** An orchestrator answers it: no helper works it. */
-export const isForOrchestrator = (issue: Issue, orchestrators: ReadonlySet<string>) => orchestrators.has(assignedAgentOf(issue) ?? "");
+/** Assigned to an agent on duty (the orchestrators today): it answers it, no helper is hired for it. */
+export const assignedOnDuty = (issue: Issue, onDuty: ReadonlySet<string>) => onDuty.has(assignedAgentOf(issue) ?? "");
 
 export const issueIs = (issue: Issue, id: string) => issue.id === id || sessionIdsOf(issue).some((session) => session === id);
 

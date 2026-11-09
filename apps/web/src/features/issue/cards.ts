@@ -5,7 +5,7 @@ import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle,
 import { ago, tookText } from "#/base/format.ts";
 import { matches } from "#/base/search.ts";
 
-import { endedAt, isForOrchestrator, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
+import { endedAt, assignedOnDuty, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -110,7 +110,7 @@ export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, or
     const base = { id: issue.id, lane: laneOf(issue.status), issue };
     const children = families.get(issue.id) ?? [];
     if (children.length > 0) cards.push({ kind: "family", ...base, children });
-    else if (isForOrchestrator(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
+    else if (assignedOnDuty(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
     else {
       if (executionsOf(issue).length === 0) cards.push({ kind: "todo", ...base });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });

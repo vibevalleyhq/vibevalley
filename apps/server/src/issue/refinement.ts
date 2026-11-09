@@ -19,7 +19,7 @@ import type { Hired, HireOptions, Session } from "#/session/session.ts";
 import { splitBrief } from "./brief.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
-import { isForOrchestrator } from "./status.ts";
+import { assignedOnDuty } from "./status.ts";
 
 interface RefinementDeps {
   readonly core: Core["Service"];
@@ -78,7 +78,7 @@ export function refinement(d: RefinementDeps) {
   const draft = Effect.fn("Issue.refine")(
     function* (id: string, word: string, channel: string) {
       const item = yield* unsent(id);
-      if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));
+      if (assignedOnDuty(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));
       if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.refinement.onlyBacklog")));
       if (item.refining) return yield* Effect.fail(refused(t("server.issue.refinement.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);

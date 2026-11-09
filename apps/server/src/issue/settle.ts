@@ -17,7 +17,7 @@ import type { IssueDispatch } from "./dispatch.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { nextSteps, statusMove } from "./moves.ts";
 import { nullText } from "./rows.ts";
-import { isForOrchestrator } from "./status.ts";
+import { assignedOnDuty } from "./status.ts";
 
 export interface StatusOptions {
   /** Moving to todo: the profile that takes it on (a name or an id). */
@@ -131,7 +131,7 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       const n = `#${item.number}`;
       switch (p.move) {
         case "start": {
-          if (isForOrchestrator(item, store.isOrchestrator)) return [t("server.issue.does.toOrchestrator", { n })];
+          if (assignedOnDuty(item, store.isOrchestrator)) return [t("server.issue.does.toOrchestrator", { n })];
           const [, agent, repo] = yield* readyOf(item, p.taker?.id);
           const full = sessions.noRoom(agent.runtime, repo);
           return full

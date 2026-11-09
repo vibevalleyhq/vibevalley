@@ -174,7 +174,7 @@ export function withIssueStatuses(state: T.SpaceState): T.SpaceState {
 /** The findings still open: a failed acceptance's, until the next acceptance passes. */
 export const openFindings = (t: T.Issue) => t.findings.filter((f) => !f.resolved).length;
 
-/** Assigned to an orchestrator (orchestrator: whether a profile id is one's): it answers it, no session works it. */
-export const isForOrchestrator = (t: T.Issue, orchestrator: (id: string) => boolean) => orchestrator(assignedAgentOf(t) ?? "");
+/** Assigned to an agent on duty (onDuty: whether a profile id is one's): its standing session answers it, none is hired for it. */
+export const assignedOnDuty = (t: T.Issue, onDuty: (id: string) => boolean) => onDuty(assignedAgentOf(t) ?? "");
 
 export const isClosed = (s: T.IssueStatus) => s === "done" || s === "canceled";

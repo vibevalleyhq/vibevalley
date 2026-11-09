@@ -28,7 +28,7 @@ import { needsOwner } from "./prompts.ts";
 import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
-import { conflictOf, isClosed, isForOrchestrator, pickIssues } from "./status.ts";
+import { conflictOf, isClosed, assignedOnDuty, pickIssues } from "./status.ts";
 
 export class Issue extends Context.Service<
   Issue,
@@ -457,7 +457,7 @@ const make = Effect.gen(function* () {
     }),
     review: Effect.fn("Issue.review")(function* (id, req) {
       const item = yield* get(id);
-      const why = isForOrchestrator(item, store.isOrchestrator)
+      const why = assignedOnDuty(item, store.isOrchestrator)
         ? t("server.issue.orchestratorAnswers")
         : item.status !== "in_review"
           ? t("server.issue.nothingToAccept")

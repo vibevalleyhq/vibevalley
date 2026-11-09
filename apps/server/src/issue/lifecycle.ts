@@ -347,7 +347,7 @@ export const issueLifecycle = Effect.gen(function* () {
   const withdrawDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
 
   /** The issue already owns its number and workplace before its session starts. */
-  const recordWorkerStart = Effect.fn("Issue.recordWorkerStart")(function* (id: string, session: T.Session) {
+  const recordHiredStart = Effect.fn("Issue.recordHiredStart")(function* (id: string, session: T.Session) {
     const linked = yield* db
       .attemptTx(
         Effect.gen(function* () {
@@ -369,7 +369,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* publish(id);
   });
 
-  const recordOrchestratorStart = Effect.fn("Issue.recordOrchestratorStart")(function* (
+  const recordOnDutyStart = Effect.fn("Issue.recordOnDutyStart")(function* (
     issue: T.Issue,
     agent: string,
     channel: string,
@@ -582,8 +582,8 @@ export const issueLifecycle = Effect.gen(function* () {
     recordReport,
     judged,
     ownerSaid,
-    recordWorkerStart,
-    recordOrchestratorStart,
+    recordHiredStart,
+    recordOnDutyStart,
     setQueued,
     drop,
     place,

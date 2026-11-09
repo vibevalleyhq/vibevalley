@@ -24,7 +24,7 @@ import { acceptanceAncestors, blockedIssues } from "./dependencies.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { workConstraints } from "./prompts.ts";
 import type { IssueSplitting } from "./split.ts";
-import { isClosed, isForOrchestrator } from "./status.ts";
+import { isClosed, assignedOnDuty } from "./status.ts";
 
 /** What starting an issue came to: the session sent, or why it waits in the queue. */
 export interface Dispatched {
@@ -55,7 +55,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
     const sessions = yield* Session;
     const chat = yield* Channel;
     const mailbox = yield* Mailbox;
-    const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordWorkerStart, recordOrchestratorStart, setQueued } = r;
+    const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordHiredStart, recordOnDutyStart, setQueued } = r;
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
@@ -107,7 +107,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
           where,
           options: { ...sending, ...(base ? { base, worktree: true } : {}), context: { kind: "issue", issue } },
           envelopes: { _tag: "Queued", triggers: opt.inputs ?? [] },
-          hiring: (w) => (opt.refining === true ? Effect.void : recordWorkerStart(issue.id, w)),
+          hiring: (w) => (opt.refining === true ? Effect.void : recordHiredStart(issue.id, w)),
         })
         .pipe(Effect.catch((error) => Effect.succeed<Received>({ heldNotice: "", refused: reasonOf(error) })));
       if (!received.hired && !opt.issue && !received.retainedWork) {
@@ -139,17 +139,17 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       );
 
     /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
-    const beginOrchestrator = Effect.fn("Issue.beginOrchestrator")(function* (
+    const beginOnDuty = Effect.fn("Issue.beginOnDuty")(function* (
       issue: T.Issue,
       channel: string,
       input?: { readonly text: string; readonly by: T.RunTrigger },
     ) {
       const agent = assignedAgentOf(issue) || chat.orchestratorIn((yield* chat.topOf(channel)).id);
       if (!sessions.sessionOf(agent)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
-      yield* recordOrchestratorStart(issue, agent, channel, input);
+      yield* recordOnDutyStart(issue, agent, channel, input);
     });
-    const toOrchestrator = Effect.fn("Issue.toOrchestrator")(function* (issue: T.Issue, channel: string, by: T.RunTrigger, said?: string) {
-      yield* beginOrchestrator(issue, channel, { text: [issue.title, issue.description, said ?? ""].filter(Boolean).join("\n\n"), by });
+    const handOnDuty = Effect.fn("Issue.handOnDuty")(function* (issue: T.Issue, channel: string, by: T.RunTrigger, said?: string) {
+      yield* beginOnDuty(issue, channel, { text: [issue.title, issue.description, said ?? ""].filter(Boolean).join("\n\n"), by });
     });
 
     const start = Effect.fn("Issue.start")(function* (
@@ -186,8 +186,8 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
           return {};
         }
       }
-      if (Option.isSome(mine) && isForOrchestrator(mine.value, store.isOrchestrator)) {
-        yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, said);
+      if (Option.isSome(mine) && assignedOnDuty(mine.value, store.isOrchestrator)) {
+        yield* handOnDuty(mine.value, channel, by ?? { kind: "issue" }, said);
         return {};
       }
       const [issue, agent, repo] = yield* ready(id);
@@ -214,7 +214,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       yield* joinChildren().pipe(bestEffort("vibevalley: child issues could not be merged"));
       const all = yield* everyIssue;
       for (const issue of all) {
-        if (issue.status !== "todo" || isForOrchestrator(issue, store.isOrchestrator)) continue;
+        if (issue.status !== "todo" || assignedOnDuty(issue, store.isOrchestrator)) continue;
         if (blockedIssues(issue, all).length > 0) continue;
         const title = cut(issue.title, 40);
         yield* Effect.gen(function* () {
@@ -291,8 +291,8 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
           inferredMandate(input.id),
           s.id,
         ));
-      if (isForOrchestrator(issue, store.isOrchestrator)) {
-        if (!found || isClosed(issue.status) || issue.lastRun === undefined) yield* beginOrchestrator(issue, channel.id);
+      if (assignedOnDuty(issue, store.isOrchestrator)) {
+        if (!found || isClosed(issue.status) || issue.lastRun === undefined) yield* beginOnDuty(issue, channel.id);
       } else {
         const newest = latestSessionIdOf(issue);
         if (!found || issue.status === "backlog" || issue.status === "todo" || (!isClosed(issue.status) && newest === undefined))
@@ -302,7 +302,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       return yield* get(issue.id);
     });
 
-    return { hire, readyOf, ready, send, beginOrchestrator, toOrchestrator, start, refreshQueue, reopen, scheduled, ofCron };
+    return { hire, readyOf, ready, send, beginOnDuty, handOnDuty, start, refreshQueue, reopen, scheduled, ofCron };
   });
 
 export type IssueDispatch = Effect.Success<ReturnType<typeof issueDispatch>>;

@@ -58,8 +58,8 @@ Status: proposed
 |---|---|---|---|
 | 1 当值 | 完成 | `edf285f44` | `isOnDuty`、`isHired` 在 `session/roster.ts` 各定义一次（两个都正着写：黄金数据里有没带 `role` 的会话，取反会把它们算成雇来的）；`keepOnDuty`；`Session.workers` 改叫 `hired` |
 | 2 频道有成员 | 完成 | `6e3bdacff` | 删掉频道负责人；`channel_follow` 改名 `channel_member`，频道和串的成员都记在这里（投递原因 `follower` 改叫 `member`）；`orchestratorIn`；页面勾选成员 |
-| 3 在哪干 | 未做 | — | |
-| 4 名字只说职务的 | 未做 | — | |
+| 3 在哪干 | 完成 | `2dea99530` | `isHosted` 在 `session/roster.ts` 定义一次；泵的端口 `isOrchestrator` 改 `isHosted`（Mailbox 按档案问它），`publishOrchestrator` 改 `handToHost` |
+| 4 名字只说职务的 | 完成 | 本步的提交 | `isForOrchestrator` 改 `assignedOnDuty`（服务端和页面），`beginOrchestrator`、`toOrchestrator` 改 `beginOnDuty`、`handOnDuty`，`recordOrchestratorStart`、`recordWorkerStart` 改 `recordOnDutyStart`、`recordHiredStart`；`stale-names` 拦旧名字。`orchestratorSays` 并进第 5 步的写入口 |
 | 5 话是谁说的 | 未做 | — | |
 
 ## Alternatives considered
