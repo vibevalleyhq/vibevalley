@@ -99,7 +99,7 @@ flowchart LR
 | 工单 | 完成 | `f5f0ce669` | 派活走 `receive` 的 `Hire`；工单池走 `triggersOf`、`queuedTriggers`；撤回一张工单的派活走 `withdraw`（照旧在工单自己的事务里，不拿 Mailbox 的写锁） |
 | Mailbox 用帮工 | 完成，不用另改 | — | 帮工投递和开帮工的成员在帮工模块之外只剩 Mailbox 在用 |
 | 改名 | 完成 | `39ed4f87c` | 照「名词和路径」；旧名字写进 `scripts/stale-names.ts`（Mailbox 自己的文件夹除外，内部步骤怎么叫不限） |
-| 帮工的流 | 完成 | 本提交 | 六条流并成一条 `Session.news`，一次启动的动静从 `kind` 改成 `_tag`；旧名字写进 `scripts/stale-names.ts` |
+| 帮工的流 | 完成 | `b028fc724` | 六条流并成一条 `Session.news`，一次启动的动静从 `kind` 改成 `_tag`；旧名字写进 `scripts/stale-names.ts` |
 | 假 Mailbox 的测试 | 未做 | — | 验收的第三条 |
 
 改之前没有、改之后有的行为：
