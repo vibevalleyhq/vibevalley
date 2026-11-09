@@ -17,7 +17,7 @@ function Root(props: SwitchRootProps) {
   const rest = omit(props, "checked", "defaultChecked", "onCheckedChange", "readOnly", "onClick", "children");
   const [checked, setChecked] = createControllable({
     value: () => props.checked,
-    initial: props.defaultChecked ?? false,
+    initial: () => props.defaultChecked ?? false,
     onChange: (v) => props.onCheckedChange?.(v),
   });
   const disabled = () => Boolean(props.disabled);

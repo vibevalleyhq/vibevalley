@@ -53,6 +53,11 @@ Positioners take `side`, `align`, `sideOffset` and `collisionPadding` ([@floatin
 Initial popup focus is an opening-time snapshot computed after placement, under its reactive owner. Changes to a
 selected value do not move focus again; the effect phase only focuses the captured element.
 
+Defaults seed uncontrolled state once; later default changes do not reset the user's selection. A part snapshots its
+caller ref when binding the element, calls its own ref first, and does not rebind on later parent prop changes.
+Open positioners track side, alignment, offset and collision padding; obsolete asynchronous placement results cannot
+overwrite the current position after options or elements change.
+
 Styling-only pieces that shadcn also ships (Badge, Card, Alert, Skeleton, Kbd, Spinner, Table, Breadcrumb) have no
 behaviour to share and live in `apps/web/src/ui`. Parts never spread a computed object next to their props
 (`{...attrs()}`): Solid would re-read `children` with it and rebuild them, taking the focus; `test/source.test.ts` checks.

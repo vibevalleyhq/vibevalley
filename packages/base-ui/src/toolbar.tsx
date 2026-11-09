@@ -32,7 +32,7 @@ function Root(props: DivProps & { orientation?: Orientation | undefined; loop?: 
       <div
         role="toolbar"
         {...rest}
-        ref={refs(props.ref, (el: HTMLDivElement) => {
+        ref={refs(props, (el: HTMLDivElement) => {
           root = el;
           queueMicrotask(() => setStop(itemsIn(el, `${item}:not([disabled])`)[0]));
         })}
@@ -68,7 +68,7 @@ function Button(props: ButtonProps) {
     <button
       type="button"
       {...omit(props, "ref")}
-      ref={refs(props.ref, i.setEl)}
+      ref={refs(props, i.setEl)}
       tabindex={i.tabindex()}
       data-toolbar-item=""
       data-orientation={i.orientation()}
@@ -79,12 +79,12 @@ function Button(props: ButtonProps) {
 
 function Link(props: JSX.AnchorHTMLAttributes<HTMLAnchorElement>) {
   const i = useItem();
-  return <a {...omit(props, "ref")} ref={refs(props.ref, i.setEl)} tabindex={i.tabindex()} data-toolbar-item="" data-orientation={i.orientation()} />;
+  return <a {...omit(props, "ref")} ref={refs(props, i.setEl)} tabindex={i.tabindex()} data-toolbar-item="" data-orientation={i.orientation()} />;
 }
 
 function Input(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
   const i = useItem();
-  return <input {...omit(props, "ref")} ref={refs(props.ref, i.setEl)} tabindex={i.tabindex()} data-toolbar-item="" data-orientation={i.orientation()} />;
+  return <input {...omit(props, "ref")} ref={refs(props, i.setEl)} tabindex={i.tabindex()} data-toolbar-item="" data-orientation={i.orientation()} />;
 }
 
 function Group(props: DivProps) {

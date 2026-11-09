@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js";
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
@@ -75,6 +76,39 @@ test("a popup with no room below turns to the top", async () => {
   const positioner = $("[data-testid=positioner]");
   expect(positioner.dataset.side).toBe("top");
   expect(positioner.getBoundingClientRect().bottom).toBeLessThanOrEqual(trigger.getBoundingClientRect().top);
+});
+
+test("regression: an open popover follows side and offset changes without remounting", async () => {
+  const [side, setSide] = createSignal<"top" | "bottom">("top");
+  const [sideOffset, setSideOffset] = createSignal(12);
+  mount(() => (
+    <Popover.Root defaultOpen>
+      <Popover.Trigger data-testid="trigger" style={{ position: "fixed", left: "200px", top: "200px", width: "80px", height: "30px" }}>
+        display
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner side={side()} align="start" sideOffset={sideOffset()} data-testid="positioner" style={{ width: "100px", height: "40px" }}>
+          <Popover.Popup data-testid="popup">inside</Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  ));
+  const trigger = $("[data-testid=trigger]");
+  const positioner = $("[data-testid=positioner]");
+  const popup = $("[data-testid=popup]");
+  await settle();
+  await expect.poll(() => trigger.getBoundingClientRect().top - positioner.getBoundingClientRect().bottom).toBeCloseTo(12);
+  expect([positioner.dataset.side, positioner.dataset.align]).toEqual(["top", "start"]);
+
+  setSide("bottom");
+  await settle();
+  await expect.poll(() => positioner.getBoundingClientRect().top - trigger.getBoundingClientRect().bottom).toBeCloseTo(12);
+  expect(positioner.dataset.side).toBe("bottom");
+
+  setSideOffset(28);
+  await settle();
+  await expect.poll(() => positioner.getBoundingClientRect().top - trigger.getBoundingClientRect().bottom).toBeCloseTo(28);
+  expect([$("[data-testid=positioner]"), $("[data-testid=popup]")]).toEqual([positioner, popup]);
 });
 
 test("a controlled popover opens only when its owner says so", async () => {

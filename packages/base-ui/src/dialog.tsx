@@ -33,7 +33,7 @@ const makeRoot = (alert: boolean) =>
     let reason: DialogCloseReason = "trigger";
     const [open, setOpen] = createControllable({
       value: () => props.open,
-      initial: props.defaultOpen ?? false,
+      initial: () => props.defaultOpen ?? false,
       onChange: (v) => props.onOpenChange?.(v, reason),
     });
     const [titles, setTitles] = createSignal(0);
@@ -91,7 +91,7 @@ function Popup(props: DialogPopupProps) {
   return (
     <dialog
       {...rest}
-      ref={refs(props.ref, (el: HTMLDialogElement) => (dialog = el))}
+      ref={refs(props, (el: HTMLDialogElement) => (dialog = el))}
       role={c.alert ? "alertdialog" : undefined}
       aria-modal="true"
       aria-labelledby={c.hasTitle() ? c.titleId : undefined}

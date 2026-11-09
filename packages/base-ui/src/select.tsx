@@ -42,7 +42,7 @@ function Root(props: SelectRootProps) {
   const f = createFloating<SelectOpenChangeReason>(props, "trigger");
   const [value, setValue] = createControllable<string | undefined>({
     value: () => props.value,
-    initial: props.defaultValue,
+    initial: () => props.defaultValue,
     onChange: (v) => v !== undefined && props.onValueChange?.(v),
   });
   const [start, setStart] = createSignal<"chosen" | "last">("chosen");
@@ -82,7 +82,7 @@ function Trigger(props: ButtonProps & Renderable) {
     <El
       type={buttonType(props.render)}
       {...rest}
-      ref={refs(props.ref, c.setTrigger)}
+      ref={refs(props, c.setTrigger)}
       id={c.triggerId}
       role="combobox"
       disabled={c.disabled()}
@@ -142,7 +142,7 @@ function Popup(props: DivProps) {
       role="listbox"
       tabindex={-1}
       {...rest}
-      ref={refs(props.ref, setEl)}
+      ref={refs(props, setEl)}
       id={c.popupId}
       aria-labelledby={c.triggerId}
       data-open={flag(c.open())}

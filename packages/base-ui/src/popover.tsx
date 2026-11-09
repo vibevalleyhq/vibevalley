@@ -46,7 +46,7 @@ function Trigger(props: ButtonProps & Renderable) {
     <El
       type={buttonType(props.render)}
       {...rest}
-      ref={refs(props.ref, c.setTrigger)}
+      ref={refs(props, c.setTrigger)}
       aria-haspopup="dialog"
       aria-expanded={c.open() ? "true" : "false"}
       aria-controls={c.open() ? c.popupId : undefined}
@@ -69,7 +69,7 @@ function Popup(props: DivProps) {
       role="dialog"
       tabindex={-1}
       {...rest}
-      ref={refs(props.ref, setEl)}
+      ref={refs(props, setEl)}
       id={c.popupId}
       aria-labelledby={c.titleId()}
       aria-describedby={c.descriptionId()}

@@ -57,12 +57,12 @@ function Root(props: ComboboxRootProps) {
   );
   const [value, setValue] = createControllable<string | undefined>({
     value: () => props.value,
-    initial: props.defaultValue,
+    initial: () => props.defaultValue,
     onChange: (v) => v !== undefined && props.onValueChange?.(v),
   });
   const [inputValue, setInputValue] = createControllable({
     value: () => props.inputValue,
-    initial: props.defaultInputValue ?? "",
+    initial: () => props.defaultInputValue ?? "",
     onChange: (v) => props.onInputValueChange?.(v),
   });
   const [highlighted, setHighlighted] = createSignal<HTMLElement>();
@@ -132,7 +132,7 @@ function Input(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
       type="text"
       autocomplete="off"
       {...rest}
-      ref={refs(props.ref, c.setTrigger)}
+      ref={refs(props, c.setTrigger)}
       role="combobox"
       value={c.inputValue()}
       aria-autocomplete="list"
@@ -185,7 +185,7 @@ function Popup(props: DivProps) {
     <div
       role="listbox"
       {...rest}
-      ref={refs(props.ref, c.setList)}
+      ref={refs(props, c.setList)}
       id={c.popupId}
       data-open={flag(c.open())}
       data-closed={flag(!c.open())}
@@ -218,7 +218,7 @@ function Item(props: ComboboxItemProps) {
     <div
       role="option"
       {...rest}
-      ref={refs(props.ref, setEl)}
+      ref={refs(props, setEl)}
       id={id}
       aria-selected={selected() ? "true" : "false"}
       aria-disabled={props.disabled === true ? "true" : undefined}

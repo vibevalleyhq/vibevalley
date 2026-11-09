@@ -33,7 +33,7 @@ export function createFloating<R extends string>(props: FloatingRootProps<R>, fi
   let reason = first;
   const [open, setOpen] = createControllable({
     value: () => props.open,
-    initial: props.defaultOpen ?? false,
+    initial: () => props.defaultOpen ?? false,
     onChange: (v) => props.onOpenChange?.(v, reason),
   });
   const [trigger, setTrigger] = createSignal<HTMLElement>();
@@ -108,7 +108,7 @@ export function makePositioner(use: () => FloatingParts, defaults: { side: Side;
     return (
       <div
         {...rest}
-        ref={refs(props.ref, (el: HTMLDivElement) => {
+        ref={refs(props, (el: HTMLDivElement) => {
           setBox(el);
           c.setPositioner(el);
         })}
