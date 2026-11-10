@@ -145,10 +145,10 @@ try {
   const asking = await until(async () => (await api.lan.get()).pairing?.asking, "the phone asks to pair");
   console.log("asking", asking);
   await api.lan.pairing.answer({ allow: true });
-  const paired = await until(async () => (await api.lan.get()).devices.find((d) => d.name === asking), "the phone paired");
+  const paired = await until(async () => (await api.user.device.list()).find((d) => d.name === asking), "the phone paired");
   // Its page's requests through the lan listener carry the key: the farm has heard from it since.
   await until(
-    async () => ((await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > paired.addedAt || undefined,
+    async () => ((await api.user.device.list()).find((d) => d.id === paired.id)?.lastSeen ?? 0) > paired.addedAt || undefined,
     "the phone's page reaching the farm",
   );
   console.log("paired and seen", paired.name);
@@ -187,16 +187,16 @@ try {
   } else console.log("bridge: not checked (not an end-to-end build)");
 
   // Started again with no link: the key from the keychain, straight to the farm, nothing asked.
-  const before = (await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0;
+  const before = (await api.user.device.list()).find((d) => d.id === paired.id)?.lastSeen ?? 0;
   await sleep(1100);
   phone.restart();
   await until(
-    async () => ((await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > before || undefined,
+    async () => ((await api.user.device.list()).find((d) => d.id === paired.id)?.lastSeen ?? 0) > before || undefined,
     "the phone back on the farm after a restart",
   );
   if ((await api.lan.get()).pairing) throw new Error("it asked to pair again");
   console.log("back after a restart");
 } finally {
-  await Promise.all((await api.lan.get()).devices.map((d) => api.lan.device.delete({ id: d.id })));
+  await Promise.all((await api.user.device.list()).map((d) => api.user.device.delete({ id: d.id })));
   await api.lan.update({ open: false });
 }

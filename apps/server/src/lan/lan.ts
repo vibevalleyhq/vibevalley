@@ -3,7 +3,7 @@ import { connect, type Socket } from "node:net";
 import { networkInterfaces } from "node:os";
 
 import { NodeSink, NodeStream } from "@effect/platform-node";
-import { Array as Arr, Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -17,7 +17,6 @@ import {
   livePath,
   type Preview,
   statePath,
-  type UserDevice,
 } from "@vibevalley/protocol";
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
@@ -78,11 +77,6 @@ export class Lan extends Context.Service<
     /** The code is used up either way. */
     readonly answer: (allow: boolean) => Effect.Effect<LanStatus, ApiError>;
     readonly pair: (code: string, name: string) => Effect.Effect<LanPaired, ApiError>;
-    readonly forget: (id: string) => Effect.Effect<LanStatus, ApiError>;
-    /** What forget would do, refused as it would be; nothing changes. */
-    readonly previewForget: (id: string) => Effect.Effect<Preview, ApiError>;
-    /** The device a request through the listener came from; undefined on this machine. */
-    readonly me: (device: string | undefined) => Effect.Effect<UserDevice, ApiError>;
     /** Where the loopback server listens, once it does. */
     readonly setUpstream: (address: string) => void;
   }
@@ -384,7 +378,7 @@ const make = (options: LanOptions = {}) =>
     const status = (): LanStatus => {
       const open = listener._tag !== "closed";
       const problem = listener._tag === "failed" ? listener.problem : "";
-      const s: LanStatus = { open, hostName: hostName(), devices: [], problem };
+      const s: LanStatus = { open, hostName: hostName(), problem };
       const addr = url();
       if (listener._tag === "listening") {
         if (!addr) s.problem = t("server.lan.noAddress");
@@ -398,7 +392,6 @@ const make = (options: LanOptions = {}) =>
           expiresAt: p.expires,
           ...(p._tag === "awaitingApproval" ? { asking: p.asking } : {}),
         };
-      s.devices = Arr.filter(users.devices(), (d) => d.came === "paired");
       return s;
     };
 
@@ -481,20 +474,6 @@ const make = (options: LanOptions = {}) =>
           does: [t("server.lan.dropCode", { code: p.code }), ...(p._tag === "awaitingApproval" ? [t("server.lan.dropAsking", { name: p.asking })] : [])],
         };
       },
-      forget: Effect.fn("Lan.forget")(function* (id) {
-        yield* users.revoke(id);
-        return status();
-      }),
-      previewForget: Effect.fn("Lan.previewForget")(function* (id) {
-        const preview = yield* users.previewRevoke(id);
-        const open = conns.get(id)?.size ?? 0;
-        return { does: [...preview.does, ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
-      }),
-      me: Effect.fn("Lan.me")(function* (device) {
-        const d = device ? users.device(device) : undefined;
-        if (!d) return yield* Effect.fail(refuse(t("server.lan.local")));
-        return d;
-      }),
       setUpstream: (a) => {
         upstream = a;
       },

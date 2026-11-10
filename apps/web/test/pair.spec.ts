@@ -31,8 +31,7 @@ test("a device the user lets in opens the farm through the lan listener", async 
     await page.goto(url + "/issues");
     await expect(page.locator('[data-testid="lane"][data-key="todo"]')).toBeVisible();
     await phone.close();
-    const { devices } = await api.lan.get();
-    for (const d of devices) await api.lan.device.delete({ id: d.id });
+    for (const d of await api.user.device.list()) await api.user.device.delete({ id: d.id });
   } finally {
     await api.lan.update({ open: false });
   }

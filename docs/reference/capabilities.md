@@ -337,16 +337,13 @@ GitHub 的检测：gh 装没装、登没登录
 
 | 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|---|
-| `lan.get` | 看「连接到本机」开没开、有哪些设备 | `/api/v1/lan/get` | ✓ |   |   |   |
+| `lan.get` | 看「连接到本机」开没开、地址和配对码 | `/api/v1/lan/get` | ✓ |   |   |   |
 | `lan.update` | 打开或关上「连接到本机」 | `/api/v1/lan/update` | ✓ |   |   |   |
 | `lan.pairing.start` | 开始配对，给出配对码 | `/api/v1/lan/pairing/start` | ✓ |   |   |   |
 | `lan.pairing.stop` | 停止配对 | `/api/v1/lan/pairing/stop` | ✓ |   |   |   |
 | `lan.pairing.previewStop` | 试停配对：说会怎样，不真停 | `/api/v1/lan/pairing/previewStop` | ✓ |   |   |   |
 | `lan.pairing.answer` | 放行或拒绝来配对的设备 | `/api/v1/lan/pairing/answer` | ✓ |   |   |   |
-| `lan.device.delete` | 移除一台配对过的设备 | `/api/v1/lan/device/delete` | ✓ |   |   |   |
-| `lan.device.previewDelete` | 试移除一台设备：说会怎样，不真移除 | `/api/v1/lan/device/previewDelete` | ✓ |   |   |   |
 | `lan.pair` | 用配对码把这台设备配上 | `/api/v1/lan/pair` | ✓ | ✓ |   |   |
-| `lan.me.get` | 发这个请求的设备是哪台 | `/api/v1/lan/me/get` | ✓ | ✓ |   |   |
 
 ## user
 

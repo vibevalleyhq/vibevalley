@@ -49,7 +49,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 ### 宿主与多端
 
 - **宿主接口封闭，缺省能力为 `null`**：页面通过 `currentHost()` 检测能力是否存在，不分支判断宿主类型。跨进程调用经 `@vibevalley/bridge` 按 Schema 校验。
-- **远端浏览器先配对**：非回环地址访问且无 `vibevalley_device_key` cookie 时跳转 `/pair`；配对后写入 `SameSite=Strict` cookie（[连接到本机](docs/subsystems/lan.md)）。
+- **远端浏览器先拿钥匙**：非回环地址打开页面时先问 `user.get`（钥匙可能在 HttpOnly 的 Cookie 里，页面读不到）；没有钥匙的，设过密码就去 `/login`，没设去 `/pair`（`features/user/entry.ts`）。配对把钥匙写进 `SameSite=Strict` 的 cookie，登录由门写进 HttpOnly 的 cookie（[连接到本机](docs/subsystems/lan.md)）。
 - **手机壳单连接串行切换**：`FarmConnection` 串行管理农场选择与系统钥匙串写入，切农场时取消在途入线；手机通话走原生声网 SDK（`apps/mobile/src/rtc.ts`）保持锁屏不断线。
 
 ### 发布渠道

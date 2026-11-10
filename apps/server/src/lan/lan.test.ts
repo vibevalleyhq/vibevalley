@@ -100,7 +100,7 @@ describe("lan access", () => {
   it.live("is shut until opened", () =>
     Effect.gen(function* () {
       const lan = yield* farm();
-      expect(lan.status()).toMatchObject({ open: false, devices: [] });
+      expect(lan.status()).toMatchObject({ open: false });
       expect(lan.status().url).toBeUndefined();
       const pairingStartedFailure = yield* Effect.flip(lan.startPairing());
       expect(pairingStartedFailure).toMatchObject({ _tag: "LanRefused" });
@@ -142,27 +142,26 @@ describe("lan access", () => {
 
   it.live("lets a paired device use the farm, and only what is remote", () =>
     Effect.gen(function* () {
-      const lan = yield* farm();
+      const { lan, user } = yield* farmAndUser();
       const addr = yield* open(lan);
       const paired = yield* pair(lan, addr, "  小明的\niPhone ");
-      const s = lan.status();
-      expect(s.pairing).toBeUndefined();
-      expect(s.devices.map((d) => d.name)).toEqual(["小明的 iPhone"]);
+      expect(lan.status().pairing).toBeUndefined();
+      expect(user.devices().map((d) => [d.name, d.came])).toEqual([["小明的 iPhone", "paired"]]);
       for (const origin of [addr, "https://evil.example"]) {
         const res = yield* Effect.promise(() => request("POST", addr + healthPath, "", undefined, { origin, cookie: `${deviceKeyCookie}=${paired.key}` }));
         expect(res.status).toBe(origin === addr ? 200 : 403);
       }
       const health = yield* Effect.promise(() => request("POST", addr + healthPath, paired.key));
       expect([health.status, health.body]).toEqual([200, expect.stringContaining(`"ok":true`)]);
-      const me = yield* Effect.promise(() => request("POST", addr + pathOf("lan.me.get"), paired.key));
+      const me = yield* Effect.promise(() => request("POST", addr + pathOf("user.get"), paired.key));
       expect(me.status).toBe(200);
-      const device = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(me.body);
-      expect(device).toMatchObject({ id: paired.device, lastSeen: expect.any(Number) });
+      const device = yield* decodeStatus(me.body);
+      expect(device.device).toMatchObject({ id: paired.device, came: "paired", lastSeen: expect.any(Number) });
       // A paired browser's cookie is a key as the header is.
       const byCookie = yield* Effect.promise(() =>
         // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
         // @effect-diagnostics-next-line globalFetchInEffect:off
-        fetch(addr + pathOf("lan.me.get"), { method: "POST", headers: { cookie: `other=1; ${deviceKeyCookie}=${paired.key}` } }),
+        fetch(addr + pathOf("setting.get"), { method: "POST", headers: { cookie: `other=1; ${deviceKeyCookie}=${paired.key}` } }),
       );
       expect(byCookie.status).toBe(200);
       // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
@@ -175,7 +174,6 @@ describe("lan access", () => {
         "lan.get",
         "lan.update",
         "lan.pairing.start",
-        "lan.device.delete",
         "setting.update",
         "runtime.setting.update",
         "agent.create",
@@ -189,8 +187,6 @@ describe("lan access", () => {
         expect([op, got.status, got.body.includes("LanRefused")]).toEqual([op, 403, true]);
       }
       expect((yield* Effect.promise(() => request("POST", addr + healthPath, paired.key + "x"))).status).toBe(401);
-      const meFailure = yield* Effect.flip(lan.me(undefined));
-      expect(meFailure).toMatchObject({ _tag: "LanRefused" });
     }).pipe(Effect.scoped),
   );
 
@@ -232,7 +228,6 @@ describe("lan access", () => {
       const password = yield* Effect.promise(() => request("POST", addr + pathOf("user.password.set"), login.key, { password: "taken over" }));
       expect(password.status).toBe(403);
       for (const path of ["/mcp", "/mcp/x"]) expect((yield* Effect.promise(() => request("GET", addr + path, login.key))).status).toBe(404);
-      expect(lan.status().devices).toEqual([]);
       expect(user.devices().map((d) => d.came)).toEqual(["login", "login"]);
       const out = yield* Effect.promise(() => request("POST", addr + pathOf("user.logout"), login.key));
       expect([out.status, out.cookie]).toEqual([204, `${deviceKeyCookie}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`]);
@@ -259,7 +254,7 @@ describe("lan access", () => {
 
   it.live("lets the user refuse a device, and holds a second one off", () =>
     Effect.gen(function* () {
-      const lan = yield* farm();
+      const { lan, user } = yield* farmAndUser();
       const addr = yield* open(lan);
       const s = yield* lan.startPairing();
       const got = ask(addr, s.pairing!.code, "陌生人");
@@ -270,7 +265,7 @@ describe("lan access", () => {
       const body = yield* Effect.promise(() => got);
       expect(body).toContain("LanRefused");
       expect(body).toContain("没让");
-      expect(lan.status()).toMatchObject({ devices: [] });
+      expect(user.devices()).toEqual([]);
       expect(lan.status().pairing).toBeUndefined();
     }).pipe(Effect.scoped),
   );
@@ -291,7 +286,7 @@ describe("lan access", () => {
 
   it.live("ends a forgotten device's streams", () =>
     Effect.gen(function* () {
-      const lan = yield* farm();
+      const { lan, user } = yield* farmAndUser();
       const addr = yield* open(lan);
       const paired = yield* pair(lan, addr, "旧手机");
       // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
@@ -308,7 +303,7 @@ describe("lan access", () => {
           return "ended";
         }
       })();
-      yield* lan.forget(paired.device);
+      yield* user.revoke(paired.device);
       const ended2 = yield* Effect.promise(() => ended);
       expect(ended2).toBe("ended");
       expect((yield* Effect.promise(() => request("POST", addr + healthPath, paired.key))).status).toBe(401);
@@ -316,7 +311,7 @@ describe("lan access", () => {
   );
   it.live("hands a paired device's WebSocket to the farm, and forgetting the device ends it", () =>
     Effect.gen(function* () {
-      const lan = yield* farm();
+      const { lan, user } = yield* farmAndUser();
       const addr = yield* open(lan);
       const paired = yield* pair(lan, addr, "手机");
       expect((yield* Effect.promise(() => upgradeAt(addr, {}))).status).toBe(401);
@@ -325,7 +320,7 @@ describe("lan access", () => {
       const { status, socket } = yield* Effect.promise(() => upgradeAt(addr, { ...key, origin: addr }));
       expect(status).toBe(101);
       const ended = new Promise<string>((resolve) => socket!.once("close", () => resolve("ended")));
-      yield* lan.forget(paired.device);
+      yield* user.revoke(paired.device);
       const ended2 = yield* Effect.promise(() => ended);
       expect(ended2).toBe("ended");
     }).pipe(Effect.scoped),

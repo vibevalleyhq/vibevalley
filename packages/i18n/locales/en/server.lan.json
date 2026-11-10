@@ -15,7 +15,5 @@
   "denied": "The owner did not let this device in",
   "noCode": "No pairing code is out: nothing changes",
   "dropCode": "Withdraw the pairing code {code}",
-  "dropAsking": "\"{name}\", waiting for your approval, cannot get in",
-  "cut": "Cut its {n} open connections",
-  "local": "This is the machine running VibeValley, not a connected device"
+  "dropAsking": "\"{name}\", waiting for your approval, cannot get in"
 }

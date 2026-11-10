@@ -72,7 +72,7 @@
     "dictation": "dictation transcription voice input",
     "github": "gh PR login",
     "chat": "WeChat Feishu Lark QQ connectors pairing",
-    "devices": "phone pairing connect to this machine LAN",
+    "devices": "phone pairing connect to this machine LAN name password sign in sign out",
     "accounts": "keys accounts DeepSeek MOSS Agora API key models"
   },
   "scope": {

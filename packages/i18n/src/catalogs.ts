@@ -228,9 +228,7 @@ export const catalogs = {
           conversation: { get: "工单讨论串的位置" },
         },
         lan: {
-          device: { delete: "移除一台配对过的设备", previewDelete: "试移除一台设备：说会怎样，不真移除" },
-          get: "看「连接到本机」开没开、有哪些设备",
-          me: { get: "发这个请求的设备是哪台" },
+          get: "看「连接到本机」开没开、地址和配对码",
           pair: "用配对码把这台设备配上",
           pairing: { answer: "放行或拒绝来配对的设备", previewStop: "试停配对：说会怎样，不真停", start: "开始配对，给出配对码", stop: "停止配对" },
           update: "打开或关上「连接到本机」",
@@ -1111,8 +1109,6 @@ export const catalogs = {
       noCode: "没有在配对的码：什么都不会动",
       dropCode: "收起配对码 {code}",
       dropAsking: "正在等你点头的「{name}」连不进来",
-      cut: "断开它连着的 {n} 条连接",
-      local: "这里就是跑着 VibeValley 的本机，不是连进来的设备",
     },
     "server.mailbox": {
       notOwned: "这条输入不归当前会话处理，不能退回",
@@ -3401,10 +3397,6 @@ export const catalogs = {
         address: "地址",
         add: "添加设备",
         close: "关掉连接",
-        devices: "配对过的设备",
-        deviceCount: "{n} 台",
-        removeWhich: "移除 {name}",
-        remove: "移除",
         copied: "复制好了：在另一台电脑的浏览器里打开它。",
         notCopied: "复制不了：选中链接自己复制吧。",
         qr: "配对二维码",
@@ -3416,16 +3408,13 @@ export const catalogs = {
         asking: "「{name}」想连接到这台电脑。让它进来以后，它能和你一样用这台电脑上的 VibeValley。",
         letIn: "让它进来",
         refuse: "不让",
-        paired: "配对于 {at} · 上次来 {seen}",
-        pairedNever: "配对于 {at} · 还没来过",
         notes: {
-          "0": "帮工能在这台电脑上跑命令，所以只让配对过的设备连进来；配对要你在这里点头。",
-          "1": "配对过的设备和你一样用这台电脑上的 VibeValley。开关和设备只能在这台电脑上管。",
+          "0": "帮工能在这台电脑上跑命令，所以只让有钥匙的设备连进来：配对要你在这里点头，登录要你在这里设的密码。",
+          "1": "配对过的设备和你一样看帮工、派活、说话，开关和设置只能在这台电脑上管；登录来的设备就是你，只有密码只能在这台电脑上设。",
           "2": "连接走的是不加密的 HTTP：同一个网络里的人可能看到传的内容。只在信得过的网络里开，比如家里的 Wi-Fi、自己的热点。",
           "3": "电脑换了地址（换了网络）以后，设备连不上了，在这里添加设备再扫一次就好，不用重新点头。",
         },
       },
-      devices: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
       pair: {
         title: "连进那台电脑",
         intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在频道里说话。配对要那台电脑上的主人点头。",
@@ -4079,7 +4068,7 @@ export const catalogs = {
         dictation: "听写 转写 语音输入",
         github: "gh PR 登录",
         chat: "微信 飞书 QQ 连接器 配对",
-        devices: "手机 配对 连接到本机 局域网",
+        devices: "手机 配对 连接到本机 局域网 名字 密码 登录 退出",
         accounts: "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -4256,6 +4245,46 @@ export const catalogs = {
       optional: "  可选",
       drop: "去掉 {chip}",
       noticeTitle: { info: "提示", warn: "没派成", error: "出错了" },
+    },
+    "web.user": {
+      login: {
+        title: "登录",
+        intro: "用在跑着 VibeValley 的那台电脑上设的密码登录，这台设备就能看帮工、派活、在频道里说话。",
+        noPassword: "那台电脑上还没设密码：先在那台电脑的「设置 › 设备」里设一个，或者用配对码连进来。",
+        password: "密码",
+        device: "这台设备叫",
+        deviceHint: "在设备列表里看到的名字",
+        submit: "登录",
+        signing: "正在登录……",
+        pairInstead: "用配对码连进来",
+      },
+      account: {
+        title: "名字和密码",
+        name: "名字",
+        nameHint: "VibeValley 称呼你用的名字",
+        save: "保存",
+        nameSaved: "名字存好了",
+        password: "密码",
+        passwordHint: "从别的设备登录时用，至少 8 个字",
+        setPassword: "设密码",
+        changePassword: "改密码",
+        passwordSaved: "密码设好了",
+        passwordHere: "密码只能在跑着 VibeValley 的那台电脑上设。",
+        thisDevice: "这台设备：{name}",
+        signOut: "退出",
+      },
+      devices: {
+        title: "你的设备",
+        count: "{n} 台",
+        paired: "配对于 {at} · 上次来 {seen}",
+        pairedNever: "配对于 {at} · 还没来过",
+        login: "登录于 {at} · 上次来 {seen}",
+        loginNever: "登录于 {at} · 还没来过",
+        thisOne: "{name}（这台）",
+        remove: "收回",
+        removeWhich: "收回 {name} 的钥匙",
+      },
+      guess: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
     },
     "web.voice": {
       voice: {
@@ -4711,9 +4740,7 @@ export const catalogs = {
           conversation: { get: "The issue conversation location" },
         },
         lan: {
-          device: { delete: "Remove a paired device", previewDelete: "Preview removing a device: say what would go, without removing it" },
-          get: "Whether connect to this machine is on, and its devices",
-          me: { get: "The device this request comes from" },
+          get: "Whether connect to this machine is on, its address and pairing code",
           pair: "Pair this device with a pairing code",
           pairing: {
             answer: "Allow or refuse the device asking to pair",
@@ -5663,8 +5690,6 @@ export const catalogs = {
       noCode: "No pairing code is out: nothing changes",
       dropCode: "Withdraw the pairing code {code}",
       dropAsking: '"{name}", waiting for your approval, cannot get in',
-      cut: "Cut its {n} open connections",
-      local: "This is the machine running VibeValley, not a connected device",
     },
     "server.mailbox": {
       notOwned: "This input does not belong to the current session and cannot be returned",
@@ -8095,10 +8120,6 @@ export const catalogs = {
         address: "Address",
         add: "Add a device",
         close: "Turn off",
-        devices: "Paired devices",
-        deviceCount: "{n}",
-        removeWhich: "Remove {name}",
-        remove: "Remove",
         copied: "Copied: open it in the other computer's browser.",
         notCopied: "Cannot copy: select the link and copy it yourself.",
         qr: "Pairing QR code",
@@ -8110,16 +8131,13 @@ export const catalogs = {
         asking: '"{name}" wants to connect to this computer. Let in, it can use VibeValley on this computer as you do.',
         letIn: "Let it in",
         refuse: "Refuse",
-        paired: "Paired {at} · last seen {seen}",
-        pairedNever: "Paired {at} · never seen",
         notes: {
-          "0": "Helpers can run commands on this computer, so only paired devices may connect; pairing needs your approval here.",
-          "1": "A paired device uses VibeValley on this computer as you do. The switch and the devices are managed only on this computer.",
+          "0": "Helpers can run commands on this computer, so only devices holding a key may connect: pairing needs your approval here, signing in needs the password set here.",
+          "1": "A paired device sees helpers, sends work and talks as you do, but the switch and the settings are managed only on this computer; a signed-in device is you, and only the password is set on this computer alone.",
           "2": "The connection is plain HTTP: people on the same network may see what goes over it. Turn it on only on networks you trust, such as your home Wi-Fi or your own hotspot.",
           "3": "When the computer's address changes (another network), devices cannot connect; add the device here and scan again, without approving again.",
         },
       },
-      devices: { android: "Android phone", windows: "Windows PC", device: "A device" },
       pair: {
         title: "Connect to that computer",
         intro:
@@ -8830,7 +8848,7 @@ export const catalogs = {
         dictation: "dictation transcription voice input",
         github: "gh PR login",
         chat: "WeChat Feishu Lark QQ connectors pairing",
-        devices: "phone pairing connect to this machine LAN",
+        devices: "phone pairing connect to this machine LAN name password sign in sign out",
         accounts: "keys accounts DeepSeek MOSS Agora API key models",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -9009,6 +9027,46 @@ export const catalogs = {
       optional: "  optional",
       drop: "Remove {chip}",
       noticeTitle: { info: "Notice", warn: "Not sent", error: "Something went wrong" },
+    },
+    "web.user": {
+      login: {
+        title: "Sign in",
+        intro: "Sign in with the password set on the computer running VibeValley, and this device sees helpers, sends work and talks in the channels.",
+        noPassword: "No password is set on that computer yet: set one there under Settings › Devices, or connect with a pairing code.",
+        password: "Password",
+        device: "This device is called",
+        deviceHint: "The name shown in the list of devices",
+        submit: "Sign in",
+        signing: "Signing in…",
+        pairInstead: "Connect with a pairing code",
+      },
+      account: {
+        title: "Name and password",
+        name: "Name",
+        nameHint: "What VibeValley calls you",
+        save: "Save",
+        nameSaved: "Name saved",
+        password: "Password",
+        passwordHint: "For signing in from other devices; at least 8 characters",
+        setPassword: "Set password",
+        changePassword: "Change password",
+        passwordSaved: "Password set",
+        passwordHere: "The password can only be set on the computer running VibeValley.",
+        thisDevice: "This device: {name}",
+        signOut: "Sign out",
+      },
+      devices: {
+        title: "Your devices",
+        count: "{n}",
+        paired: "Paired {at} · last seen {seen}",
+        pairedNever: "Paired {at} · never seen",
+        login: "Signed in {at} · last seen {seen}",
+        loginNever: "Signed in {at} · never seen",
+        thisOne: "{name} (this one)",
+        remove: "Take back",
+        removeWhich: "Take back the key of {name}",
+      },
+      guess: { android: "Android phone", windows: "Windows PC", device: "A device" },
     },
     "web.voice": {
       voice: {
@@ -9584,10 +9642,7 @@ export interface Messages {
   "cli.op.issue.status.update": undefined;
   "cli.op.issue.timeline.get": undefined;
   "cli.op.issue.update": undefined;
-  "cli.op.lan.device.delete": undefined;
-  "cli.op.lan.device.previewDelete": undefined;
   "cli.op.lan.get": undefined;
-  "cli.op.lan.me.get": undefined;
   "cli.op.lan.pair": undefined;
   "cli.op.lan.pairing.answer": undefined;
   "cli.op.lan.pairing.previewStop": undefined;
@@ -10273,11 +10328,9 @@ export interface Messages {
   "server.lan.cannotOpen": { readonly why: string | number };
   "server.lan.closedThere": undefined;
   "server.lan.codeExpired": undefined;
-  "server.lan.cut": { readonly n: string | number };
   "server.lan.denied": undefined;
   "server.lan.dropAsking": { readonly name: string | number };
   "server.lan.dropCode": { readonly code: string | number };
-  "server.lan.local": undefined;
   "server.lan.noAddress": undefined;
   "server.lan.noCode": undefined;
   "server.lan.noneAsking": undefined;
@@ -12619,9 +12672,6 @@ export interface Messages {
   "web.issue.trigger.missed": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
-  "web.lan.devices.android": undefined;
-  "web.lan.devices.device": undefined;
-  "web.lan.devices.windows": undefined;
   "web.lan.lan.add": undefined;
   "web.lan.lan.address": undefined;
   "web.lan.lan.allow": undefined;
@@ -12630,8 +12680,6 @@ export interface Messages {
   "web.lan.lan.closed": undefined;
   "web.lan.lan.copied": undefined;
   "web.lan.lan.copy": undefined;
-  "web.lan.lan.deviceCount": { readonly n: string | number };
-  "web.lan.lan.devices": undefined;
   "web.lan.lan.intro": undefined;
   "web.lan.lan.left": { readonly s: string | number };
   "web.lan.lan.letIn": undefined;
@@ -12642,12 +12690,8 @@ export interface Messages {
   "web.lan.lan.notes.2": undefined;
   "web.lan.lan.notes.3": undefined;
   "web.lan.lan.open": undefined;
-  "web.lan.lan.paired": { readonly at: string | number; readonly seen: string | number };
-  "web.lan.lan.pairedNever": { readonly at: string | number };
   "web.lan.lan.qr": undefined;
   "web.lan.lan.refuse": undefined;
-  "web.lan.lan.remove": undefined;
-  "web.lan.lan.removeWhich": { readonly name: string | number };
   "web.lan.lan.scan": undefined;
   "web.lan.lan.section.label": undefined;
   "web.lan.lan.stop": undefined;
@@ -13522,6 +13566,40 @@ export interface Messages {
   "web.ui.pixel.sound.label.weed": undefined;
   "web.ui.pixel.sound.label.woof": undefined;
   "web.ui.pixel.sound.label.yip": undefined;
+  "web.user.account.changePassword": undefined;
+  "web.user.account.name": undefined;
+  "web.user.account.nameHint": undefined;
+  "web.user.account.nameSaved": undefined;
+  "web.user.account.password": undefined;
+  "web.user.account.passwordHere": undefined;
+  "web.user.account.passwordHint": undefined;
+  "web.user.account.passwordSaved": undefined;
+  "web.user.account.save": undefined;
+  "web.user.account.setPassword": undefined;
+  "web.user.account.signOut": undefined;
+  "web.user.account.thisDevice": { readonly name: string | number };
+  "web.user.account.title": undefined;
+  "web.user.devices.count": { readonly n: string | number };
+  "web.user.devices.login": { readonly at: string | number; readonly seen: string | number };
+  "web.user.devices.loginNever": { readonly at: string | number };
+  "web.user.devices.paired": { readonly at: string | number; readonly seen: string | number };
+  "web.user.devices.pairedNever": { readonly at: string | number };
+  "web.user.devices.remove": undefined;
+  "web.user.devices.removeWhich": { readonly name: string | number };
+  "web.user.devices.thisOne": { readonly name: string | number };
+  "web.user.devices.title": undefined;
+  "web.user.guess.android": undefined;
+  "web.user.guess.device": undefined;
+  "web.user.guess.windows": undefined;
+  "web.user.login.device": undefined;
+  "web.user.login.deviceHint": undefined;
+  "web.user.login.intro": undefined;
+  "web.user.login.noPassword": undefined;
+  "web.user.login.pairInstead": undefined;
+  "web.user.login.password": undefined;
+  "web.user.login.signing": undefined;
+  "web.user.login.submit": undefined;
+  "web.user.login.title": undefined;
   "web.voice.call.agora": { readonly code: string | number; readonly msg: string | number };
   "web.voice.call.cannotHear": { readonly why: string | number };
   "web.voice.call.noMic": undefined;

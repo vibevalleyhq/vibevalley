@@ -8,6 +8,7 @@ import { ConnectorsPage } from "#/features/connector/index.ts";
 import { LanPage } from "#/features/lan/index.ts";
 import { MossAccounts, ProviderPage } from "#/features/provider/index.ts";
 import { SkillsPage } from "#/features/runtime/index.ts";
+import { Account, Devices } from "#/features/user/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
 import { Link as A, Navigate } from "#/infra/router.ts";
 import { TextInput } from "#/ui/Field.tsx";
@@ -286,7 +287,9 @@ export function SettingsPage(props: { rest: string }) {
                 </Match>
                 <Match when={section().id === "devices"}>
                   <Page title={t("web.setting.nav.devices")}>
+                    <Account />
                     <LanPage />
+                    <Devices />
                   </Page>
                 </Match>
               </Switch>

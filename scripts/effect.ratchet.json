@@ -124,7 +124,7 @@
     "packages/bridge": 1,
     "packages/testkit": 34,
     "packages/health": 45,
-    "apps/web": 1270,
+    "apps/web": 1269,
     "apps/desktop": 45
   },
   "preferEffectRecord": {
@@ -153,7 +153,7 @@
     "packages/bridge": 5,
     "packages/testkit": 33,
     "packages/health": 21,
-    "apps/web": 526,
+    "apps/web": 523,
     "apps/desktop": 37
   },
   "preferSchemaOverJson": {
@@ -173,7 +173,7 @@
     "apps/desktop": 3
   },
   "strictBooleanExpressions": {
-    "apps/server": 1675,
+    "apps/server": 1673,
     "apps/cli": 47,
     "packages/agent": 90,
     "packages/ai": 70,

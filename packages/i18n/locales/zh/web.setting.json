@@ -72,7 +72,7 @@
     "dictation": "听写 转写 语音输入",
     "github": "gh PR 登录",
     "chat": "微信 飞书 QQ 连接器 配对",
-    "devices": "手机 配对 连接到本机 局域网",
+    "devices": "手机 配对 连接到本机 局域网 名字 密码 登录 退出",
     "accounts": "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型"
   },
   "scope": {

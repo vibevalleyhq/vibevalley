@@ -15,7 +15,5 @@
   "denied": "主人没让这台设备进来",
   "noCode": "没有在配对的码：什么都不会动",
   "dropCode": "收起配对码 {code}",
-  "dropAsking": "正在等你点头的「{name}」连不进来",
-  "cut": "断开它连着的 {n} 条连接",
-  "local": "这里就是跑着 VibeValley 的本机，不是连进来的设备"
+  "dropAsking": "正在等你点头的「{name}」连不进来"
 }

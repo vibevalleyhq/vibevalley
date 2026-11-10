@@ -1,5 +1,3 @@
-import type { UserDevice } from "../user/shapes";
-
 export interface LanPaired {
   device: string;
   key: string;
@@ -17,8 +15,6 @@ export interface LanStatus {
   url?: string;
   problem: string;
   pairing?: LanPairing;
-  /** The devices paired here; the ones signed in on are in user.device.list. */
-  devices: UserDevice[];
 }
 
 export interface LanPairing {

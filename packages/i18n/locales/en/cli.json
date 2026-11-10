@@ -316,14 +316,7 @@
       }
     },
     "lan": {
-      "device": {
-        "delete": "Remove a paired device",
-        "previewDelete": "Preview removing a device: say what would go, without removing it"
-      },
-      "get": "Whether connect to this machine is on, and its devices",
-      "me": {
-        "get": "The device this request comes from"
-      },
+      "get": "Whether connect to this machine is on, its address and pairing code",
       "pair": "Pair this device with a pairing code",
       "pairing": {
         "answer": "Allow or refuse the device asking to pair",

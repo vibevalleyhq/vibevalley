@@ -6,7 +6,6 @@ import type { LanPairing, LanStatus } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { useNow } from "#/base/dom.tsx";
-import { momentText } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
 import { defineQuery, retryRead, useQueryClient, ready, useQuery } from "#/infra/query.ts";
 import { type Act, createAct } from "#/ui/act.ts";
@@ -30,15 +29,6 @@ const recipeStyles = stylex.create({
     wordBreak: "break-all",
     WebkitUserSelect: "all",
     userSelect: "all",
-  },
-});
-
-const variantStyles = stylex.create({
-  lanPageSpan: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
   },
 });
 
@@ -255,36 +245,6 @@ export function LanPage() {
           )}
         </Show>
       </Card>
-      <Show when={s() && (s()?.devices.length ?? 0) > 0 ? s() : undefined}>
-        {(s) => (
-          <Card
-            title={t("web.lan.lan.devices")}
-            action={<span {...stylex.attrs(viewStyles.lanPageSpan)}>{t("web.lan.lan.deviceCount", { n: s().devices.length })}</span>}
-          >
-            <For each={s().devices}>
-              {(d) => (
-                <div {...stylex.attrs(viewStyles.lanPageDiv4)}>
-                  <span {...stylex.attrs(variantStyles.lanPageSpan)}>
-                    <span {...stylex.attrs(viewStyles.lanPageSpan4)}>{d.name}</span>
-                    <span {...stylex.attrs(viewStyles.lanPageSpan5)}>
-                      {d.lastSeen != null && d.lastSeen !== 0
-                        ? t("web.lan.lan.paired", { at: momentText(d.addedAt), seen: momentText(d.lastSeen) })
-                        : t("web.lan.lan.pairedNever", { at: momentText(d.addedAt) })}
-                    </span>
-                  </span>
-                  <Button
-                    tone="danger"
-                    aria-label={t("web.lan.lan.removeWhich", { name: d.name })}
-                    onClick={() => void act.run(async () => keep(await api.lan.device.delete({ id: d.id })))}
-                  >
-                    {t("web.lan.lan.remove")}
-                  </Button>
-                </div>
-              )}
-            </For>
-          </Card>
-        )}
-      </Show>
     </div>
   );
 }

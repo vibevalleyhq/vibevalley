@@ -48,7 +48,6 @@ export class User extends Context.Service<
     /** A device the user let in at the gate; its key, shown once. */
     readonly pair: (name: string) => Effect.Effect<T.UserLogin>;
     readonly devices: () => T.UserDevice[];
-    readonly device: (id: string) => T.UserDevice | undefined;
     /** The device a key is, noting that it was seen. */
     readonly byKey: (key: string) => T.UserDevice | undefined;
     readonly revoke: (id: string) => Effect.Effect<T.UserDevice[], ApiError>;
@@ -204,10 +203,6 @@ const make = Effect.gen(function* () {
       return yield* addDevice(given, "paired");
     }),
     devices: listed,
-    device: (id) => {
-      const d = devices.get(id);
-      return d !== undefined ? shown(d) : undefined;
-    },
     byKey: (key) => {
       if (key === "") return undefined;
       const matches = sameSecret(keyHash(key));

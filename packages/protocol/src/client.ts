@@ -620,15 +620,6 @@ export class VibeValleyApi {
       answer: (a: T.AnswerPairingRequest, options?: { signal?: AbortSignal }): Promise<T.LanStatus> =>
         this.call<T.LanStatus>("/api/v1/lan/pairing/answer", a, options),
     },
-    device: {
-      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/device/delete", a, options),
-      /** What deleteDevice would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("/api/v1/lan/device/previewDelete", a, options),
-    },
-    me: {
-      get: (options?: { signal?: AbortSignal }): Promise<T.UserDevice> => this.call<T.UserDevice>("/api/v1/lan/me/get", undefined, options),
-    },
   };
 
   readonly user = {

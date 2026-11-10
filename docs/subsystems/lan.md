@@ -16,7 +16,8 @@
 |---|---|
 | `apps/server/src/lan/lan.ts` | 局域网监听管理、配对状态机、请求守卫 `guard`、放行表 `remoteMay`、登录和退出时的 Cookie 与 HTTP/WS 代理转发 |
 | `apps/server/src/user/user.ts`（`user_account`、`user_device` 表） | 用户的名字和密码（scrypt）、每台设备的 `key_hash`、来路 `came`（`paired`、`login`）、`added_at`、`last_seen` |
-| `apps/web/src/features/lan/LanPage.tsx`、`PairPage.tsx` | 工作台「连接到本机」设置页与远端设备 `/pair` 配对页 |
+| `apps/web/src/features/lan/LanPage.tsx`、`PairPage.tsx` | 工作台「连接到本机」设置卡片与远端设备 `/pair` 配对页 |
+| `apps/web/src/features/user/` | 远端设备的 `/login`、设置「设备」页里的名字和密码、全部设备的列表与收回 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`lan.*`、`user.*`）。
 
@@ -62,3 +63,4 @@
 
 - `apps/server/src/lan/lan.test.ts`、`apps/web/src/features/lan/device.test.ts`：配对审批、5 次错码作废、`remote` 权限拦截、密码登录与锁定、登录设备的放行和 Cookie、WebSocket 转发与移除设备断流测试。
 - `apps/web/test/pair.spec.ts`：远端浏览器自动跳转 `/pair`、本机批准后进入工单页端到端测试。
+- `apps/web/test/login.spec.ts`：本机设名字和密码，远端从 `/login` 登录、进设备页、退出的端到端测试。
