@@ -473,13 +473,14 @@ it.effect("restart cancels unsent speech, marks uncertainty and resumes only per
             connection: input.connection,
             revision: input.revision,
             model: "moss-tts-1.5-flash",
-            credential_hash: "",
+            fingerprint: "",
             now: 1,
           }),
         ),
       );
       yield* db.run(
-        q.changeSpeechJob({
+        q.changeMediaJob({
+          ...(yield* db.one(q.mediaJob({ id: phase })).pipe(Effect.flatMap(Effect.fromNullishOr), Effect.orDie)),
           id: phase,
           phase,
           attachment: null,
@@ -608,14 +609,14 @@ it.effect("regression: restart never queries a known asynchronous task with repl
           connection: input.connection,
           revision: input.revision,
           model: "moss-tts-1.5-flash",
-          credential_hash: "different-original-key-fingerprint",
+          fingerprint: "different-original-key-fingerprint",
           now: 1,
         }),
       ),
     );
     const row = yield* db.one(q.mediaJob({ id: input.id }));
     if (!row) return yield* Effect.die("Missing seeded speech");
-    yield* db.run(q.changeSpeechJob({ ...row, phase: "generating", remote_task: "known-before-restart", now: 2 }));
+    yield* db.run(q.changeMediaJob({ ...row, phase: "generating", remote_task: "known-before-restart", now: 2 }));
     const media = yield* Media;
     yield* media.restore();
     const paused = yield* waitFor(media.get(input.id), (job) => job.phase === "unknown", "credential mismatch pauses polling");

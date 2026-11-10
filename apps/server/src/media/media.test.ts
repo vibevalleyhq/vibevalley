@@ -389,7 +389,8 @@ it.effect("restart marks unsent and ambiguous tasks separately and resumes only 
         ),
       );
       yield* db.run(
-        q.changeImageJob({
+        q.changeMediaJob({
+          ...(yield* db.one(q.mediaJob({ id: phase })).pipe(Effect.flatMap(Effect.fromNullishOr), Effect.orDie)),
           id: phase,
           phase,
           attachment: null,

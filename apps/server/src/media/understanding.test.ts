@@ -416,7 +416,8 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
                 ),
               );
               yield* db.run(
-                q.changeUnderstandingJob({
+                q.changeMediaJob({
+                  ...(yield* db.one(q.mediaJob({ id })).pipe(Effect.flatMap(Effect.fromNullishOr), Effect.orDie)),
                   id,
                   phase,
                   source: owned,

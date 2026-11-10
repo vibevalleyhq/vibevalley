@@ -154,8 +154,7 @@ CREATE TABLE media_job (
   result_input TEXT,
   preview_input TEXT,
   assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
-  -- Which key it was asked with (speech), what its inputs were (audio), who allowed it (understanding).
-  credential_hash TEXT NOT NULL DEFAULT '',
+  -- The vendor account it was asked with: polling, resuming and cleanup refuse another key. Who allowed it (understanding).
   fingerprint TEXT NOT NULL DEFAULT '',
   "authorization" TEXT,
   -- The vendor-side cleanup of what it uploaded (understanding); done for every other kind.
@@ -163,7 +162,7 @@ CREATE TABLE media_job (
   created_at double precision NOT NULL,
   updated_at double precision NOT NULL
 );
-CREATE INDEX media_job_recent ON media_job(kind, created_at DESC, id);
+CREATE INDEX media_job_recent ON media_job(created_at DESC, id);
 CREATE INDEX media_job_phase ON media_job(phase, cleanup);
 
 CREATE TABLE attachment (

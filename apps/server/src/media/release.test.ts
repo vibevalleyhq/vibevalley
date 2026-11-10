@@ -248,7 +248,7 @@ it.effect.each(["queued", "generating", "downloading"] as const)("regression: %s
     );
     const row = yield* db.one(q.mediaJob({ id: request.id }));
     if (!row) return yield* Effect.die("Missing seeded job");
-    yield* db.run(q.changeAudioJob({ ...row, phase, now }));
+    yield* db.run(q.changeMediaJob({ ...row, phase, now }));
     const previewReleaseFailure = yield* media.previewRelease(request.id).pipe(Effect.flip);
     expect(previewReleaseFailure).toMatchObject({ _tag: "Refused" });
     const releasedFailure = yield* media.release(request.id).pipe(Effect.flip);
@@ -314,7 +314,7 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
           );
           const row = yield* db.one(q.mediaJob({ id: request.id }));
           if (!row) return yield* Effect.die("Missing design job");
-          yield* db.run(q.changeAudioJob({ ...row, ...patch }));
+          yield* db.run(q.changeMediaJob({ ...row, ...patch }));
         } else {
           yield* db.run(
             q.insertMediaJob(
@@ -327,14 +327,14 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
                 connection: "moss",
                 revision: 1,
                 model: "moss-tts-1.5-flash",
-                credential_hash: "test",
+                fingerprint: "test",
                 now,
               }),
             ),
           );
           const row = yield* db.one(q.mediaJob({ id: request.id }));
           if (!row) return yield* Effect.die("Missing speech job");
-          yield* db.run(q.changeSpeechJob({ ...row, ...patch, remote_task: "paid-task" }));
+          yield* db.run(q.changeMediaJob({ ...row, ...patch, remote_task: "paid-task" }));
         }
         const media2 = yield* media.get(request.id);
         expect(media2).toMatchObject({

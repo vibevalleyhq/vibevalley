@@ -35,7 +35,6 @@ export const MediaJobResult = Schema.Struct({
   ["result_input"]: Schema.NullOr(Schema.String),
   ["preview_input"]: Schema.NullOr(Schema.String),
   ["assets_released"]: Schema.Int,
-  ["credential_hash"]: Schema.String,
   ["fingerprint"]: Schema.String,
   ["authorization"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Words_media_job_cleanup,
@@ -57,7 +56,7 @@ export const mediaJob = Effect.fn("MediaJob")(function* (params: MediaJobParams)
 })
 
 export const RecentMediaJobsParams = Schema.Struct({
-  ["kinds"]: Schema.Array(Schema.String),
+
 })
 export type RecentMediaJobsParams = typeof RecentMediaJobsParams.Type
 
@@ -85,7 +84,6 @@ export const RecentMediaJobsResult = Schema.Struct({
   ["result_input"]: Schema.NullOr(Schema.String),
   ["preview_input"]: Schema.NullOr(Schema.String),
   ["assets_released"]: Schema.Int,
-  ["credential_hash"]: Schema.String,
   ["fingerprint"]: Schema.String,
   ["authorization"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Words_media_job_cleanup,
@@ -95,24 +93,24 @@ export const RecentMediaJobsResult = Schema.Struct({
 export type RecentMediaJobsResult = typeof RecentMediaJobsResult.Type
 
 
-export const RecentMediaJobsSql = "-- name: RecentMediaJobs :many\n-- bound: the latest 100 of these kinds; older jobs stay addressable by id for idempotency.\nselect * from media_job where kind = any($1::text[]) order by created_at desc, id limit 100;"
+export const RecentMediaJobsSql = "-- name: RecentMediaJobs :many\n-- bound: the latest 100 jobs of every kind; older jobs stay addressable by id for idempotency.\nselect * from media_job order by created_at desc, id limit 100;"
 
-export const recentMediaJobs = Effect.fn("RecentMediaJobs")(function* (params: RecentMediaJobsParams) {
+export const recentMediaJobs = Effect.fn("RecentMediaJobs")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
     Request: RecentMediaJobsParams,
     Result: RecentMediaJobsResult,
-    execute: (p) => sql.unsafe(RecentMediaJobsSql, [p["kinds"]]),
-  })(params)
+    execute: () => sql.unsafe(RecentMediaJobsSql, []),
+  })({})
 })
 
-export const PendingMediaJobsParams = Schema.Struct({
-  ["kinds"]: Schema.Array(Schema.String),
+export const ActiveMediaJobsParams = Schema.Struct({
+
 })
-export type PendingMediaJobsParams = typeof PendingMediaJobsParams.Type
+export type ActiveMediaJobsParams = typeof ActiveMediaJobsParams.Type
 
 
-export const PendingMediaJobsResult = Schema.Struct({
+export const ActiveMediaJobsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["kind"]: Words_media_job_kind,
   ["request"]: Schema.String,
@@ -135,25 +133,24 @@ export const PendingMediaJobsResult = Schema.Struct({
   ["result_input"]: Schema.NullOr(Schema.String),
   ["preview_input"]: Schema.NullOr(Schema.String),
   ["assets_released"]: Schema.Int,
-  ["credential_hash"]: Schema.String,
   ["fingerprint"]: Schema.String,
   ["authorization"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Words_media_job_cleanup,
   ["created_at"]: Schema.Number,
   ["updated_at"]: Schema.Number,
 })
-export type PendingMediaJobsResult = typeof PendingMediaJobsResult.Type
+export type ActiveMediaJobsResult = typeof ActiveMediaJobsResult.Type
 
 
-export const PendingMediaJobsSql = "-- name: PendingMediaJobs :many\n-- bound: media admission keeps at most eight jobs active.\nselect * from media_job where kind = any($1::text[]) and phase in ('queued', 'generating', 'downloading');"
+export const ActiveMediaJobsSql = "-- name: ActiveMediaJobs :many\n-- bound: admission keeps at most eight jobs active, waiting, running or cleaning up what they uploaded.\nselect * from media_job where phase in ('authorized', 'queued', 'uploading', 'generating', 'downloading') or cleanup = 'running';"
 
-export const pendingMediaJobs = Effect.fn("PendingMediaJobs")(function* (params: PendingMediaJobsParams) {
+export const activeMediaJobs = Effect.fn("ActiveMediaJobs")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: PendingMediaJobsParams,
-    Result: PendingMediaJobsResult,
-    execute: (p) => sql.unsafe(PendingMediaJobsSql, [p["kinds"]]),
-  })(params)
+    Request: ActiveMediaJobsParams,
+    Result: ActiveMediaJobsResult,
+    execute: () => sql.unsafe(ActiveMediaJobsSql, []),
+  })({})
 })
 
 export const InsertMediaJobParams = Schema.Struct({
@@ -167,7 +164,6 @@ export const InsertMediaJobParams = Schema.Struct({
   ["phase"]: Words_media_job_phase,
   ["input"]: Schema.NullOr(Schema.String),
   ["inputs"]: Schema.NullOr(Schema.String),
-  ["credential_hash"]: Schema.NullOr(Schema.String),
   ["fingerprint"]: Schema.NullOr(Schema.String),
   ["authorization"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Schema.NullOr(Schema.String),
@@ -176,216 +172,62 @@ export const InsertMediaJobParams = Schema.Struct({
 export type InsertMediaJobParams = typeof InsertMediaJobParams.Type
 
 
-export const InsertMediaJobSql = "-- name: InsertMediaJob :exec\ninsert into media_job (id, kind, request, source, connection, revision, model, phase, input, inputs, credential_hash, fingerprint, \"authorization\", cleanup, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6::int, $7, $8,\n  $9, coalesce($10, '[]'), coalesce($11, ''), coalesce($12, ''), $13,\n  coalesce($14, 'done'), $15::float8, $15::float8);"
+export const InsertMediaJobSql = "-- name: InsertMediaJob :exec\ninsert into media_job (id, kind, request, source, connection, revision, model, phase, input, inputs, fingerprint, \"authorization\", cleanup, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6::int, $7, $8,\n  $9, coalesce($10, '[]'), coalesce($11, ''), $12,\n  coalesce($13, 'done'), $14::float8, $14::float8);"
 
 export const insertMediaJob = Effect.fn("InsertMediaJob")(function* (params: InsertMediaJobParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: InsertMediaJobParams,
-    execute: (p) => sql.unsafe(InsertMediaJobSql, [p["id"], p["kind"], p["request"], p["source"], p["connection"], p["revision"], p["model"], p["phase"], p["input"], p["inputs"], p["credential_hash"], p["fingerprint"], p["authorization"], p["cleanup"], p["now"]]),
+    execute: (p) => sql.unsafe(InsertMediaJobSql, [p["id"], p["kind"], p["request"], p["source"], p["connection"], p["revision"], p["model"], p["phase"], p["input"], p["inputs"], p["fingerprint"], p["authorization"], p["cleanup"], p["now"]]),
   })(params)
 })
 
-export const ChangeImageJobParams = Schema.Struct({
-  ["phase"]: Words_media_job_phase,
-  ["result_url"]: Schema.NullOr(Schema.String),
-  ["attachment"]: Schema.NullOr(Schema.String),
-  ["usage"]: Schema.NullOr(Schema.String),
-  ["problem"]: Schema.String,
-  ["now"]: Schema.Number,
-  ["id"]: Schema.String,
-})
-export type ChangeImageJobParams = typeof ChangeImageJobParams.Type
-
-
-export const ChangeImageJobSql = "-- name: ChangeImageJob :exec\nupdate media_job set phase = $1, result_url = $2, attachment = $3, usage = $4,\nproblem = $5, updated_at = $6::float8 where id = $7;"
-
-export const changeImageJob = Effect.fn("ChangeImageJob")(function* (params: ChangeImageJobParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: ChangeImageJobParams,
-    execute: (p) => sql.unsafe(ChangeImageJobSql, [p["phase"], p["result_url"], p["attachment"], p["usage"], p["problem"], p["now"], p["id"]]),
-  })(params)
-})
-
-export const ChangeSpeechJobParams = Schema.Struct({
-  ["phase"]: Words_media_job_phase,
-  ["result_url"]: Schema.NullOr(Schema.String),
-  ["attachment"]: Schema.NullOr(Schema.String),
-  ["remote_task"]: Schema.NullOr(Schema.String),
-  ["result_format"]: Schema.NullOr(Words_media_job_result_format),
-  ["content_type"]: Schema.NullOr(Schema.String),
-  ["metadata"]: Schema.NullOr(Schema.String),
-  ["usage"]: Schema.NullOr(Schema.String),
-  ["result_input"]: Schema.NullOr(Schema.String),
-  ["problem"]: Schema.String,
-  ["now"]: Schema.Number,
-  ["id"]: Schema.String,
-})
-export type ChangeSpeechJobParams = typeof ChangeSpeechJobParams.Type
-
-
-export const ChangeSpeechJobSql = "-- name: ChangeSpeechJob :exec\nupdate media_job set phase = $1, result_url = $2, attachment = $3,\nremote_task = $4, result_format = $5, content_type = $6, metadata = $7, usage = $8,\nresult_input = $9,\nproblem = $10, updated_at = $11::float8 where id = $12;"
-
-export const changeSpeechJob = Effect.fn("ChangeSpeechJob")(function* (params: ChangeSpeechJobParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: ChangeSpeechJobParams,
-    execute: (p) => sql.unsafe(ChangeSpeechJobSql, [p["phase"], p["result_url"], p["attachment"], p["remote_task"], p["result_format"], p["content_type"], p["metadata"], p["usage"], p["result_input"], p["problem"], p["now"], p["id"]]),
-  })(params)
-})
-
-export const ChangeAudioJobParams = Schema.Struct({
-  ["phase"]: Words_media_job_phase,
-  ["remote_task"]: Schema.NullOr(Schema.String),
-  ["result_url"]: Schema.NullOr(Schema.String),
-  ["result"]: Schema.NullOr(Schema.String),
-  ["attachment"]: Schema.NullOr(Schema.String),
-  ["result_input"]: Schema.NullOr(Schema.String),
-  ["preview_input"]: Schema.NullOr(Schema.String),
-  ["result_format"]: Schema.NullOr(Words_media_job_result_format),
-  ["content_type"]: Schema.NullOr(Schema.String),
-  ["metadata"]: Schema.NullOr(Schema.String),
-  ["usage"]: Schema.NullOr(Schema.String),
-  ["problem"]: Schema.String,
-  ["now"]: Schema.Number,
-  ["id"]: Schema.String,
-})
-export type ChangeAudioJobParams = typeof ChangeAudioJobParams.Type
-
-
-export const ChangeAudioJobSql = "-- name: ChangeAudioJob :exec\nupdate media_job set phase = $1, remote_task = $2, result_url = $3,\n  result = $4, attachment = $5, result_input = $6, preview_input = $7,\n  result_format = $8, content_type = $9, metadata = $10,\n  usage = $11,\n  problem = $12, updated_at = $13::float8 where id = $14;"
-
-export const changeAudioJob = Effect.fn("ChangeAudioJob")(function* (params: ChangeAudioJobParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: ChangeAudioJobParams,
-    execute: (p) => sql.unsafe(ChangeAudioJobSql, [p["phase"], p["remote_task"], p["result_url"], p["result"], p["attachment"], p["result_input"], p["preview_input"], p["result_format"], p["content_type"], p["metadata"], p["usage"], p["problem"], p["now"], p["id"]]),
-  })(params)
-})
-
-export const ChangeUnderstandingJobParams = Schema.Struct({
+export const ChangeMediaJobParams = Schema.Struct({
   ["phase"]: Words_media_job_phase,
   ["source"]: Schema.String,
+  ["result_url"]: Schema.NullOr(Schema.String),
+  ["attachment"]: Schema.NullOr(Schema.String),
   ["result"]: Schema.NullOr(Schema.String),
+  ["usage"]: Schema.NullOr(Schema.String),
+  ["remote_task"]: Schema.NullOr(Schema.String),
+  ["result_format"]: Schema.NullOr(Words_media_job_result_format),
+  ["content_type"]: Schema.NullOr(Schema.String),
+  ["metadata"]: Schema.NullOr(Schema.String),
+  ["result_input"]: Schema.NullOr(Schema.String),
+  ["preview_input"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Words_media_job_cleanup,
   ["problem"]: Schema.String,
   ["now"]: Schema.Number,
   ["id"]: Schema.String,
 })
-export type ChangeUnderstandingJobParams = typeof ChangeUnderstandingJobParams.Type
+export type ChangeMediaJobParams = typeof ChangeMediaJobParams.Type
 
 
-export const ChangeUnderstandingJobSql = "-- name: ChangeUnderstandingJob :exec\nupdate media_job set phase = $1, source = $2, result = $3, cleanup = $4, problem = $5,\nupdated_at = $6::float8 where id = $7;"
+export const ChangeMediaJobSql = "-- name: ChangeMediaJob :exec\n-- Every column a job's run changes, written back whole under the machine's lock.\nupdate media_job set phase = $1, source = $2, result_url = $3, attachment = $4,\n  result = $5, usage = $6, remote_task = $7, result_format = $8,\n  content_type = $9, metadata = $10, result_input = $11, preview_input = $12,\n  cleanup = $13, problem = $14, updated_at = $15::float8\nwhere id = $16;"
 
-export const changeUnderstandingJob = Effect.fn("ChangeUnderstandingJob")(function* (params: ChangeUnderstandingJobParams) {
+export const changeMediaJob = Effect.fn("ChangeMediaJob")(function* (params: ChangeMediaJobParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: ChangeUnderstandingJobParams,
-    execute: (p) => sql.unsafe(ChangeUnderstandingJobSql, [p["phase"], p["source"], p["result"], p["cleanup"], p["problem"], p["now"], p["id"]]),
+    Request: ChangeMediaJobParams,
+    execute: (p) => sql.unsafe(ChangeMediaJobSql, [p["phase"], p["source"], p["result_url"], p["attachment"], p["result"], p["usage"], p["remote_task"], p["result_format"], p["content_type"], p["metadata"], p["result_input"], p["preview_input"], p["cleanup"], p["problem"], p["now"], p["id"]]),
   })(params)
 })
 
-export const InterruptImageJobsParams = Schema.Struct({
+export const InterruptMediaJobsParams = Schema.Struct({
   ["problem"]: Schema.String,
   ["now"]: Schema.Number,
 })
-export type InterruptImageJobsParams = typeof InterruptImageJobsParams.Type
+export type InterruptMediaJobsParams = typeof InterruptMediaJobsParams.Type
 
 
-export const InterruptImageJobsSql = "-- name: InterruptImageJobs :exec\n-- A restart: an image job never asked again was canceled; one asked may have been made, so it is unknown.\nupdate media_job set phase = case when phase = 'queued' then 'canceled' else 'unknown' end,\nproblem = $1, updated_at = $2::float8 where kind = 'image' and phase in ('queued', 'generating');"
+export const InterruptMediaJobsSql = "-- name: InterruptMediaJobs :exec\n-- A restart, for every kind: a job that never reached the vendor is canceled; one being asked is unknown, unless the vendor\n-- runs it as a task the job follows (generating, with a remote task, not streamed), which is polled again; a vendor-side\n-- cleanup cut short is blocked; downloads start again.\nupdate media_job set\nphase = case when phase in ('authorized', 'queued') then 'canceled'\n  when phase in ('uploading', 'generating') then 'unknown' else phase end,\ncleanup = case when phase in ('authorized', 'queued') then 'done' when cleanup = 'running' then 'blocked' else cleanup end,\nproblem = case when phase in ('authorized', 'queued', 'uploading', 'generating') then $1::text else problem end,\nupdated_at = $2::float8\nwhere phase in ('authorized', 'queued', 'uploading') or cleanup = 'running'\n  or (phase = 'generating' and (remote_task is null or (request::jsonb -> 'streaming') = 'true'::jsonb));"
 
-export const interruptImageJobs = Effect.fn("InterruptImageJobs")(function* (params: InterruptImageJobsParams) {
+export const interruptMediaJobs = Effect.fn("InterruptMediaJobs")(function* (params: InterruptMediaJobsParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: InterruptImageJobsParams,
-    execute: (p) => sql.unsafe(InterruptImageJobsSql, [p["problem"], p["now"]]),
+    Request: InterruptMediaJobsParams,
+    execute: (p) => sql.unsafe(InterruptMediaJobsSql, [p["problem"], p["now"]]),
   })(params)
-})
-
-export const InterruptRemoteJobsParams = Schema.Struct({
-  ["problem"]: Schema.String,
-  ["now"]: Schema.Number,
-  ["kinds"]: Schema.Array(Schema.String),
-})
-export type InterruptRemoteJobsParams = typeof InterruptRemoteJobsParams.Type
-
-
-export const InterruptRemoteJobsSql = "-- name: InterruptRemoteJobs :exec\n-- A restart for jobs a vendor runs as its own task (speech, audio): one with a remote task (not streamed) is followed up instead.\nupdate media_job set phase = case when phase = 'queued' then 'canceled' else 'unknown' end,\nproblem = $1, updated_at = $2::float8 where kind = any($3::text[]) and (phase = 'queued' or\n  (phase = 'generating' and (remote_task is null or (request::jsonb -> 'streaming') = 'true'::jsonb)));"
-
-export const interruptRemoteJobs = Effect.fn("InterruptRemoteJobs")(function* (params: InterruptRemoteJobsParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: InterruptRemoteJobsParams,
-    execute: (p) => sql.unsafe(InterruptRemoteJobsSql, [p["problem"], p["now"], p["kinds"]]),
-  })(params)
-})
-
-export const InterruptUnderstandingJobsParams = Schema.Struct({
-  ["problem"]: Schema.String,
-  ["now"]: Schema.Number,
-})
-export type InterruptUnderstandingJobsParams = typeof InterruptUnderstandingJobsParams.Type
-
-
-export const InterruptUnderstandingJobsSql = "-- name: InterruptUnderstandingJobs :exec\nupdate media_job set\nphase = case when phase in ('authorized','queued') then 'canceled' when phase in ('uploading','generating') then 'unknown' else phase end,\ncleanup = case when phase in ('authorized','queued') then 'done' when cleanup = 'running' then 'blocked' else cleanup end,\nproblem = case when phase in ('authorized','queued','uploading','generating') then $1::text else problem end,\nupdated_at = $2::float8 where kind = 'understanding' and (phase in ('authorized','queued','uploading','generating') or cleanup = 'running');"
-
-export const interruptUnderstandingJobs = Effect.fn("InterruptUnderstandingJobs")(function* (params: InterruptUnderstandingJobsParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: InterruptUnderstandingJobsParams,
-    execute: (p) => sql.unsafe(InterruptUnderstandingJobsSql, [p["problem"], p["now"]]),
-  })(params)
-})
-
-export const ActiveUnderstandingJobsParams = Schema.Struct({
-
-})
-export type ActiveUnderstandingJobsParams = typeof ActiveUnderstandingJobsParams.Type
-
-
-export const ActiveUnderstandingJobsResult = Schema.Struct({
-  ["id"]: Schema.String,
-  ["kind"]: Words_media_job_kind,
-  ["request"]: Schema.String,
-  ["source"]: Schema.String,
-  ["connection"]: Schema.String,
-  ["revision"]: Schema.Int,
-  ["model"]: Schema.String,
-  ["phase"]: Words_media_job_phase,
-  ["problem"]: Schema.String,
-  ["usage"]: Schema.NullOr(Schema.String),
-  ["result_url"]: Schema.NullOr(Schema.String),
-  ["attachment"]: Schema.NullOr(Schema.String),
-  ["result"]: Schema.NullOr(Schema.String),
-  ["remote_task"]: Schema.NullOr(Schema.String),
-  ["result_format"]: Schema.NullOr(Words_media_job_result_format),
-  ["content_type"]: Schema.NullOr(Schema.String),
-  ["metadata"]: Schema.NullOr(Schema.String),
-  ["input"]: Schema.NullOr(Schema.String),
-  ["inputs"]: Schema.String,
-  ["result_input"]: Schema.NullOr(Schema.String),
-  ["preview_input"]: Schema.NullOr(Schema.String),
-  ["assets_released"]: Schema.Int,
-  ["credential_hash"]: Schema.String,
-  ["fingerprint"]: Schema.String,
-  ["authorization"]: Schema.NullOr(Schema.String),
-  ["cleanup"]: Words_media_job_cleanup,
-  ["created_at"]: Schema.Number,
-  ["updated_at"]: Schema.Number,
-})
-export type ActiveUnderstandingJobsResult = typeof ActiveUnderstandingJobsResult.Type
-
-
-export const ActiveUnderstandingJobsSql = "-- name: ActiveUnderstandingJobs :many\n-- bound: admission shares the limit of eight active jobs.\nselect * from media_job where kind = 'understanding' and (phase in ('authorized','queued','uploading','generating') or cleanup = 'running');"
-
-export const activeUnderstandingJobs = Effect.fn("ActiveUnderstandingJobs")(function* () {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: ActiveUnderstandingJobsParams,
-    Result: ActiveUnderstandingJobsResult,
-    execute: () => sql.unsafe(ActiveUnderstandingJobsSql, []),
-  })({})
 })
 
 export const AudioCleanupParams = Schema.Struct({
@@ -417,7 +259,6 @@ export const AudioCleanupResult = Schema.Struct({
   ["result_input"]: Schema.NullOr(Schema.String),
   ["preview_input"]: Schema.NullOr(Schema.String),
   ["assets_released"]: Schema.Int,
-  ["credential_hash"]: Schema.String,
   ["fingerprint"]: Schema.String,
   ["authorization"]: Schema.NullOr(Schema.String),
   ["cleanup"]: Words_media_job_cleanup,

@@ -135,7 +135,6 @@ const attempting: Readonly<Record<string, string>> = {
   "mailbox/triggers.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
   "mailbox/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
-  "media/audio.ts": "a failed result commit releases its preview pins and retains the vendor receipt for download-only recovery",
   "media/inputs.ts": "a rejected input commit removes its newly published file; failed cleanup retains its tombstone for restart recovery",
   "memory/memory.ts": "a memory read or write that fails is logged and taken as none",
   "session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",

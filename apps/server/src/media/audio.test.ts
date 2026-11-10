@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
 
 import { expect, it } from "@effect/vitest";
-import { Clock, Deferred, Effect, FileSystem, Layer, Schema, Semaphore, Stream } from "effect";
+import { Clock, Deferred, Effect, FileSystem, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
 
-import { refused } from "#/base/errors.ts";
 import { Db } from "#/infra/db.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { Provider } from "#/provider/provider.ts";
@@ -15,9 +14,10 @@ import { waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 import * as q from "#db/media_job.sql.ts";
 
-import { makeAudio } from "./audio.ts";
+import { audioKinds, makeAudio } from "./audio.ts";
 import { makeInputs } from "./inputs.ts";
 import { newJob } from "./job.ts";
+import { makeMachine } from "./machine.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
 import { wav } from "./testdata/audio.ts";
 
@@ -76,19 +76,36 @@ const harness = Effect.gen(function* () {
   const db = yield* Db;
   const inputs = yield* makeInputs;
   const remote = yield* makeRemoteFiles(inputs);
-  const ports = {
-    inputs,
-    remote,
-    lock: yield* Semaphore.make(1),
-    slots: yield* Semaphore.make(1),
-    publish: () => Effect.void,
-    capacity: () =>
-      db
-        .run(q.pendingMediaJobs({ kinds: ["speakers", "voiceDesign", "clone", "transcription"] }))
-        .pipe(Effect.flatMap((rows) => (rows.length >= 8 ? Effect.fail(refused("capacity")) : Effect.void))),
-    otherExists: (id: string) => Effect.succeed(id === "image-id"),
+  const machine = yield* makeMachine;
+  const made = yield* makeAudio({ inputs, remote, machine });
+  // Another kind's job holds this id: an audio job asked with it is refused.
+  if ((yield* db.one(q.mediaJob({ id: "image-id" }))) === undefined)
+    yield* db.run(
+      q.insertMediaJob(
+        newJob({
+          id: "image-id",
+          kind: "image",
+          phase: "ready",
+          request: "{}",
+          source: '{"kind":"user"}',
+          connection: "moss",
+          revision: 1,
+          model: "moss-image",
+          now: 0,
+        }),
+      ),
+    );
+  /** What the machine does for the audio kinds, answered as audio jobs. */
+  const audio = {
+    ...made,
+    has: (id: string) => Effect.map(machine.read(id), (row) => row !== undefined && audioKinds.includes(row.kind)),
+    pending: () => machine.pending(audioKinds),
+    cancel: (id: string) => Effect.andThen(machine.cancel(id), made.get(id)),
+    retryDownload: (id: string) => Effect.andThen(machine.retryDownload(id), made.get(id)),
+    resume: (id: string) => Effect.andThen(machine.resume(id, audioKinds), made.get(id)),
+    restore: () => Effect.andThen(machine.interrupt(), machine.pickUp()),
   };
-  return { audio: yield* makeAudio(ports), inputs, ports };
+  return { audio, inputs };
 });
 const layer = (http: HttpClient.HttpClient, downloads = download) =>
   // world already builds a Provider; a fresh one must capture this offline client for the account's calls.
@@ -284,7 +301,7 @@ it.effect("regression: restored known tasks poll the original account while queu
       if (id !== "queued") {
         const row = yield* db.one(q.mediaJob({ id }));
         if (!row) return yield* Effect.die("Missing seeded task");
-        yield* db.run(q.changeAudioJob({ ...row, phase: "generating", remote_task: id === "known" ? "task-one" : null, now: yield* Clock.currentTimeMillis }));
+        yield* db.run(q.changeMediaJob({ ...row, phase: "generating", remote_task: id === "known" ? "task-one" : null, now: yield* Clock.currentTimeMillis }));
       }
     }
     const { audio } = yield* harness;
@@ -791,7 +808,7 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
       expect(submissions).toBe(1);
       const row = yield* (yield* Db).one(q.mediaJob({ id: request.id }));
       if (!row) return yield* Effect.die("Expected streamed task");
-      yield* (yield* Db).run(q.changeAudioJob({ ...row, phase: "generating", now: yield* Clock.currentTimeMillis }));
+      yield* (yield* Db).run(q.changeMediaJob({ ...row, phase: "generating", now: yield* Clock.currentTimeMillis }));
       yield* audio.restore();
       const audio2 = yield* audio.get(request.id);
       expect(audio2).toMatchObject({ phase: "unknown", canResume: false, result: final.result });
