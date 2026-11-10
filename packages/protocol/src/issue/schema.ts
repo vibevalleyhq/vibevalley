@@ -7,7 +7,7 @@ import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/sch
 import * as T from "./shapes";
 import { IssueReportMemoryScopeValues } from "./shapes";
 
-export const Delivery: Codec<T.Delivery> = Schema.Literals(T.DeliveryValues);
+export const Landing: Codec<T.Landing> = Schema.Literals(T.LandingValues);
 export const IssueCanceled: Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanceledValues);
 
 export const Priority: Codec<T.Priority> = Schema.Literals(T.PriorityValues);
@@ -141,7 +141,7 @@ const issueFields = {
   createdAt: Schema.Finite,
   queuedAt: Schema.optionalKey(Schema.Finite),
   closedAt: Schema.optionalKey(Schema.Finite),
-  delivered: Schema.optionalKey(Delivery),
+  delivered: Schema.optionalKey(Landing),
   canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(IssueId),
   blockedBy: Schema.mutable(Schema.Array(IssueId)),

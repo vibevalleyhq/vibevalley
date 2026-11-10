@@ -271,7 +271,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
-      /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|IssueStageKind|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
+      /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|IssueStageKind|IssueAct|Landing|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
     says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/rules\//u,
   },
@@ -414,6 +414,11 @@ const RULES: readonly Rule[] = [
       /["'`](?:\.\.?\/|#\/)(?:storage|executor|resource|ingress)\/|\b(Storage|Executor|Resource|Ingress|worldBelowIngress|ingress_github)\b/u,
     says: "Attachment owns attachment/storage.ts, Machine owns machine/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Mailbox.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
     dirs: ["apps/server/src"],
+  },
+  {
+    name: "an issue's landing under the delivery type name",
+    pattern: /\b(DeliveryValues|T\.Delivery)\b|\bexport\s+(?:const|type)\s+Delivery\b/u,
+    says: "an issue's completion landing is Landing (LandingValues, T.Landing; Issue.delivered keeps its wire field name); delivery is Mailbox's mailbox_delivery",
   },
   {
     name: "a module under its retired grab-bag or metaphor filename",

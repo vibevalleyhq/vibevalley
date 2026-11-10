@@ -76,7 +76,7 @@ export interface Issue {
   createdAt: number;
   queuedAt?: number;
   closedAt?: number;
-  delivered?: Delivery;
+  delivered?: Landing;
   canceled?: IssueCanceled;
   parent?: IssueId;
   blockedBy: IssueId[];
@@ -227,8 +227,8 @@ export interface IssueRequest {
 export const DeliverableValues = ["change", "branch", "answer", "pull_request"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
-export type Delivery = (typeof DeliveryValues)[number];
+export const LandingValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
+export type Landing = (typeof LandingValues)[number];
 
 export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];

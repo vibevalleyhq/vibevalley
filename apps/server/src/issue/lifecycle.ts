@@ -29,7 +29,7 @@ import { issueRows, jsonOrNull, nullText } from "./rows.ts";
 import { isClosed, issueOrder, keepClosedIssues } from "./status.ts";
 
 /** Only while the issue is still open: a completion the user chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
-const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Delivery } | { canceled: T.IssueCanceled } =>
+const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Landing } | { canceled: T.IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
 export const issueLifecycle = Effect.gen(function* () {
@@ -244,7 +244,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* publish(id);
   });
 
-  const complete = (id: string, delivered: T.Delivery) =>
+  const complete = (id: string, delivered: T.Landing) =>
     Effect.andThen(db.run(q.completeIssue({ closed_at: clock.currentTimeMillisUnsafe(), delivered, id })), publish(id));
   const cancelAs = (id: string, canceled: T.IssueCanceled) =>
     Effect.andThen(db.run(q.cancelIssue({ closed_at: clock.currentTimeMillisUnsafe(), canceled, id })), publish(id));
