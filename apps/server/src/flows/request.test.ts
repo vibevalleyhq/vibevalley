@@ -10,6 +10,7 @@ import { Core } from "#/core/core.ts";
 import { handlers } from "#/http/handlers.ts";
 import { Lan } from "#/lan/lan.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { User } from "#/user/user.ts";
 import { Voice } from "#/voice/voice.ts";
 
 import { farm, lab } from "./farm.ts";
@@ -24,6 +25,7 @@ const withDoors = (f: ReturnType<typeof farm>) =>
   Layer.mergeAll(
     Layer.mock(Orchestrator)({ answerer: unused }),
     Layer.mock(Lan)({ status: unused, stopPairing: unused, previewStopPairing: unused, setUpstream: unused }),
+    Layer.mock(User)({ status: unused, devices: unused, device: unused, byKey: unused }),
     Layer.mock(Voice)({ lines: unused }),
     Layer.mock(Connector)({}),
   ).pipe(Layer.provideMerge(f.layer));

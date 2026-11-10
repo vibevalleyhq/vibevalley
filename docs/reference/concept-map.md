@@ -34,7 +34,7 @@
 | 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `RepoTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/repo/template/list` |
 | 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/inbox/items.ts` 从核心状态现算） | |
 | 连接器 | 连接器 | `/settings/chat`（`features/connector/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connector/…` |
-| （不画） | 连接到本机 | `/settings/devices`（`features/lan/LanPage.tsx`）、连进来的设备的 `/pair`（`features/lan/PairPage.tsx`） | `LanStatus`、`LanDevice` | `/api/v1/lan/…` |
+| （不画） | 连接到本机 | `/settings/devices`（`features/lan/LanPage.tsx`）、连进来的设备的 `/pair`（`features/lan/PairPage.tsx`） | `LanStatus`、`UserDevice` | `/api/v1/lan/…` |
 | 语音 | 麦克风 | `/settings/call`、`/settings/moss`、`/settings/dictation`（`features/voice/VoiceForm.tsx`）、`features/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/panels/Achievements.tsx` | `Progress`、`LedgerEntry`、`SpaceState.progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievement.list` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.level` | |
@@ -66,7 +66,8 @@
 | 巡查 | `Inbox`（`inbox/inbox.ts`；规则在 `inbox/patrol.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Inbox`（`inbox/inbox.ts`、`inbox/items.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |
 | 连接器 | `Connector`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
-| 「连接到本机」 | `Lan` | `lan`、`lan_device` 表 | |
+| 「连接到本机」 | `Lan` | `lan` 表 | |
+| 用户 | `User` | `user_account`、`user_device` 表 | |
 | 语音 | `Voice`（`voice/voice.ts`；声网的令牌和语音 agent 用 npm 的 `agora-token`、`agora-agents`） | `settings.json` | |
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
 | 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |

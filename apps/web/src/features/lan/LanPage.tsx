@@ -268,8 +268,8 @@ export function LanPage() {
                     <span {...stylex.attrs(viewStyles.lanPageSpan4)}>{d.name}</span>
                     <span {...stylex.attrs(viewStyles.lanPageSpan5)}>
                       {d.lastSeen != null && d.lastSeen !== 0
-                        ? t("web.lan.lan.paired", { at: momentText(d.pairedAt), seen: momentText(d.lastSeen) })
-                        : t("web.lan.lan.pairedNever", { at: momentText(d.pairedAt) })}
+                        ? t("web.lan.lan.paired", { at: momentText(d.addedAt), seen: momentText(d.lastSeen) })
+                        : t("web.lan.lan.pairedNever", { at: momentText(d.addedAt) })}
                     </span>
                   </span>
                   <Button

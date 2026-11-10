@@ -144,6 +144,20 @@
     "chatFlag": "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's"
   },
   "op": {
+    "user": {
+      "get": "The user's name, whether a password is set, and which device this request comes from",
+      "update": "Change the user's name",
+      "password": {
+        "set": "Set the password (only on the computer running VibeValley)"
+      },
+      "login": "Sign in with the password and get this device a key",
+      "logout": "Sign out: take back this device's key",
+      "device": {
+        "list": "List the user's devices, paired and signed in",
+        "delete": "Take back a device's key",
+        "previewDelete": "Preview taking back a device's key: say what would happen, without doing it"
+      }
+    },
     "agent": {
       "create": "Create a profile",
       "delete": "Delete a profile",

@@ -61,7 +61,7 @@ flowchart LR
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
 - **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 13 个有序模块（见 `apps/server/src/modules.ts`）：
-  1. `Platform`（`base`、`infra`、`core`、`setting`、`provider`）
+  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`provider`）
   2. `Agents`（`agent`、`runtime`、`memory`；模型和循环在 `packages/ai`、`packages/agent`）
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`executor`、`session`）

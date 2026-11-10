@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { lanKeyCookie } from "@vibevalley/protocol";
+import { deviceKeyCookie } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
 
@@ -9,10 +9,11 @@ const loopback = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 export const isRemote = (hostname: string) => !loopback.has(hostname);
 
 /** document.cookie holds a key. */
-export const isPaired = (cookie: string) => cookie.split(";").some((c) => c.trim().startsWith(lanKeyCookie + "=") && c.trim().length > lanKeyCookie.length + 1);
+export const isPaired = (cookie: string) =>
+  cookie.split(";").some((c) => c.trim().startsWith(deviceKeyCookie + "=") && c.trim().length > deviceKeyCookie.length + 1);
 
 /** The cookie to keep a paired key in, for ten years; only this origin's own requests carry it. */
-export const keyCookie = (key: string) => `${lanKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Strict`;
+export const keyCookie = (key: string) => `${deviceKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Strict`;
 
 /** What the device is called on the user's list, until they rename it there: a guess from the browser. */
 export function deviceGuess(userAgent: string): string {

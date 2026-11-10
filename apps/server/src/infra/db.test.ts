@@ -9,7 +9,7 @@ import { tempDir } from "@vibevalley/testkit/temp";
 
 import { testDatabase } from "#/testing/layers.ts";
 import { lanOpen, setLanOpen } from "#db/lan.sql.ts";
-import { lanDevices, addLanDevice, seenLanDevice } from "#db/lan_device.sql.ts";
+import { addUserDevice, seenUserDevice, userDevices } from "#db/user_device.sql.ts";
 
 import { Db, setAsideStale } from "./db.ts";
 
@@ -18,10 +18,10 @@ describe("the database", () => {
     Effect.gen(function* () {
       yield* setLanOpen({ open: true });
       expect((yield* lanOpen()).open).toBe(true);
-      yield* addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123 });
-      yield* seenLanDevice({ last_seen: 1_700_000_000_456, id: "d1" });
-      const lanDevices2 = yield* lanDevices();
-      expect(lanDevices2).toEqual([{ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 }]);
+      yield* addUserDevice({ id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1_700_000_000_123 });
+      yield* seenUserDevice({ last_seen: 1_700_000_000_456, id: "d1" });
+      const devices = yield* userDevices();
+      expect(devices).toEqual([{ id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 }]);
     }).pipe(Effect.provide(testDatabase())),
   );
 
@@ -44,14 +44,14 @@ describe("the database", () => {
       const db = yield* Db;
       yield* db.inTx(
         Effect.gen(function* () {
-          yield* db.run(addLanDevice({ id: "outer", name: "外层", key_hash: "a", paired_at: 1 }));
+          yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
           const inner = yield* Effect.exit(
-            db.attemptTx(Effect.andThen(db.run(addLanDevice({ id: "inner", name: "内层", key_hash: "b", paired_at: 2 })), Effect.fail("no"))),
+            db.attemptTx(Effect.andThen(db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "b", added_at: 2 })), Effect.fail("no"))),
           );
           expect(Exit.isFailure(inner)).toBe(true);
         }),
       );
-      expect((yield* db.run(lanDevices())).map((d) => d.id)).toEqual(["outer"]);
+      expect((yield* db.run(userDevices())).map((d) => d.id)).toEqual(["outer"]);
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
@@ -61,14 +61,14 @@ describe("the database", () => {
       yield* Effect.exit(
         db.inTx(
           Effect.gen(function* () {
-            yield* db.run(addLanDevice({ id: "outer", name: "外层", key_hash: "a", paired_at: 1 }));
-            yield* db.inTx(Effect.andThen(db.run(addLanDevice({ id: "inner", name: "内层", key_hash: "b", paired_at: 2 })), Effect.void));
+            yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
+            yield* db.inTx(Effect.andThen(db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "b", added_at: 2 })), Effect.void));
             return yield* Effect.fail("no");
           }),
         ),
       );
-      const lanDevices2 = yield* db.run(lanDevices());
-      expect(lanDevices2).toEqual([]);
+      const devices = yield* db.run(userDevices());
+      expect(devices).toEqual([]);
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
@@ -103,10 +103,10 @@ describe("the database", () => {
     const where = join(tempDir("vibevalley-db-"), "db");
     const open = <A, E>(f: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
     return Effect.gen(function* () {
-      yield* open(addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1 }));
+      yield* open(addUserDevice({ id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1 }));
       expect(readFileSync(where + ".schema", "utf8").trim()).not.toBe("");
       expect(readdirSync(where)).toContain("PG_VERSION");
-      const opened = yield* open(lanDevices());
+      const opened = yield* open(userDevices());
       expect(opened).toMatchObject([{ id: "d1", name: "手机" }]);
     });
   });

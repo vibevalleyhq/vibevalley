@@ -627,7 +627,28 @@ export class VibeValleyApi {
         this.call<T.Preview>("/api/v1/lan/device/previewDelete", a, options),
     },
     me: {
-      get: (options?: { signal?: AbortSignal }): Promise<T.LanDevice> => this.call<T.LanDevice>("/api/v1/lan/me/get", undefined, options),
+      get: (options?: { signal?: AbortSignal }): Promise<T.UserDevice> => this.call<T.UserDevice>("/api/v1/lan/me/get", undefined, options),
+    },
+  };
+
+  readonly user = {
+    get: (options?: { signal?: AbortSignal }): Promise<T.UserStatus> => this.call<T.UserStatus>("/api/v1/user/get", undefined, options),
+    update: (a: T.UserUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.UserStatus> => this.call<T.UserStatus>("/api/v1/user/update", a, options),
+    login: (a: T.UserLoginRequest, options?: { signal?: AbortSignal }): Promise<T.UserLogin> => this.call<T.UserLogin>("/api/v1/user/login", a, options),
+    /** Takes back the key the request came with. */
+    logout: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/user/logout", undefined, options),
+    password: {
+      /** Only on this machine: never through the gate. */
+      set: (a: T.UserPasswordRequest, options?: { signal?: AbortSignal }): Promise<T.UserStatus> =>
+        this.call<T.UserStatus>("/api/v1/user/password/set", a, options),
+    },
+    device: {
+      list: (options?: { signal?: AbortSignal }): Promise<T.UserDevice[]> => this.call<T.UserDevice[]>("/api/v1/user/device/list", undefined, options),
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.UserDevice[]> =>
+        this.call<T.UserDevice[]>("/api/v1/user/device/delete", a, options),
+      /** What deleting the device would do, refused as it would be; nothing changes. */
+      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/user/device/previewDelete", a, options),
     },
   };
 

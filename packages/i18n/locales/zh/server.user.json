@@ -1,0 +1,11 @@
+{
+  "aDevice": "一台设备",
+  "noDevice": "没有 {id} 这台设备",
+  "passwordHere": "密码只能在跑着 VibeValley 的那台电脑上设",
+  "passwordShort": "密码至少要 {n} 个字",
+  "noPassword": "还没设密码：先在跑着 VibeValley 的那台电脑上设一个",
+  "locked": "密码错了太多次：{s} 秒后再试",
+  "wrongPassword": "密码不对",
+  "notADevice": "这里就是跑着 VibeValley 的本机，没有要退出的设备",
+  "revoke": "收回设备「{name}」的钥匙：它要再连得重新配对或登录"
+}

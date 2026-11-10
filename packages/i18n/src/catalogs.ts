@@ -116,6 +116,14 @@ export const catalogs = {
         chatFlag: "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的",
       },
       op: {
+        user: {
+          get: "看用户叫什么、设没设密码、这个请求是从哪台设备来的",
+          update: "改用户的名字",
+          password: { set: "设密码（只能在跑着 VibeValley 的那台电脑上）" },
+          login: "用密码登录，给这台设备一把钥匙",
+          logout: "退出：收回这台设备的钥匙",
+          device: { list: "列出用户的设备：配对来的和登录来的", delete: "收回一台设备的钥匙", previewDelete: "试收回一台设备：说会怎样，不真收回" },
+        },
         agent: {
           create: "新建一份档案",
           delete: "删掉一份档案",
@@ -1086,8 +1094,6 @@ export const catalogs = {
       confirmedRequirements: "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}",
     },
     "server.lan": {
-      aDevice: "一台设备",
-      noDevice: "没有 {id} 这台设备",
       notUp: "VibeValley 还没起来",
       unpaired: "这台设备没配对，或者已经被主人移除了：回那台电脑上扫码配对",
       notRemote: "连进来的设备不能做这个：只能在跑着 VibeValley 的那台电脑上做",
@@ -1105,7 +1111,6 @@ export const catalogs = {
       noCode: "没有在配对的码：什么都不会动",
       dropCode: "收起配对码 {code}",
       dropAsking: "正在等你点头的「{name}」连不进来",
-      forget: "忘掉设备「{name}」：它的钥匙作废，要再连得重新配对",
       cut: "断开它连着的 {n} 条连接",
       local: "这里就是跑着 VibeValley 的本机，不是连进来的设备",
     },
@@ -1564,6 +1569,17 @@ export const catalogs = {
         artifact_block_delete: "删稿子的一块",
       },
       about: "{label}：{about}",
+    },
+    "server.user": {
+      aDevice: "一台设备",
+      noDevice: "没有 {id} 这台设备",
+      passwordHere: "密码只能在跑着 VibeValley 的那台电脑上设",
+      passwordShort: "密码至少要 {n} 个字",
+      noPassword: "还没设密码：先在跑着 VibeValley 的那台电脑上设一个",
+      locked: "密码错了太多次：{s} 秒后再试",
+      wrongPassword: "密码不对",
+      notADevice: "这里就是跑着 VibeValley 的本机，没有要退出的设备",
+      revoke: "收回设备「{name}」的钥匙：它要再连得重新配对或登录",
     },
     "server.voice": {
       misheard: "嗯？我没听清，你再说一遍？",
@@ -4576,6 +4592,18 @@ export const catalogs = {
         chatFlag: "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's",
       },
       op: {
+        user: {
+          get: "The user's name, whether a password is set, and which device this request comes from",
+          update: "Change the user's name",
+          password: { set: "Set the password (only on the computer running VibeValley)" },
+          login: "Sign in with the password and get this device a key",
+          logout: "Sign out: take back this device's key",
+          device: {
+            list: "List the user's devices, paired and signed in",
+            delete: "Take back a device's key",
+            previewDelete: "Preview taking back a device's key: say what would happen, without doing it",
+          },
+        },
         agent: {
           create: "Create a profile",
           delete: "Delete a profile",
@@ -5618,8 +5646,6 @@ export const catalogs = {
       confirmedRequirements: "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}",
     },
     "server.lan": {
-      aDevice: "A device",
-      noDevice: "There is no device {id}",
       notUp: "VibeValley is not up yet",
       unpaired: "This device is not paired, or the owner removed it: pair it again by scanning on that computer",
       notRemote: "A connected device cannot do this: only the computer running VibeValley can",
@@ -5637,7 +5663,6 @@ export const catalogs = {
       noCode: "No pairing code is out: nothing changes",
       dropCode: "Withdraw the pairing code {code}",
       dropAsking: '"{name}", waiting for your approval, cannot get in',
-      forget: 'Forget the device "{name}": its key stops working, and it must pair again to connect',
       cut: "Cut its {n} open connections",
       local: "This is the machine running VibeValley, not a connected device",
     },
@@ -6119,6 +6144,17 @@ export const catalogs = {
         artifact_block_delete: "Delete an artifact's block",
       },
       about: "{label}: {about}",
+    },
+    "server.user": {
+      aDevice: "A device",
+      noDevice: "No device {id}",
+      passwordHere: "The password can only be set on the computer running VibeValley",
+      passwordShort: "The password needs at least {n} characters",
+      noPassword: "No password yet: set one on the computer running VibeValley first",
+      locked: "Too many wrong passwords: try again in {s} seconds",
+      wrongPassword: "Wrong password",
+      notADevice: "This is the computer running VibeValley itself: there is no device to sign out",
+      revoke: "Take back the key of “{name}”: it has to pair or sign in again to connect",
     },
     "server.voice": {
       misheard: "Hm? I didn't catch that. Could you say it again?",
@@ -9642,6 +9678,14 @@ export interface Messages {
   "cli.op.skill.list": undefined;
   "cli.op.skill.previewDelete": undefined;
   "cli.op.skill.update": undefined;
+  "cli.op.user.device.delete": undefined;
+  "cli.op.user.device.list": undefined;
+  "cli.op.user.device.previewDelete": undefined;
+  "cli.op.user.get": undefined;
+  "cli.op.user.login": undefined;
+  "cli.op.user.logout": undefined;
+  "cli.op.user.password.set": undefined;
+  "cli.op.user.update": undefined;
   "cli.op.voice.call.hear": undefined;
   "cli.op.voice.call.say": undefined;
   "cli.op.voice.call.start": undefined;
@@ -10224,7 +10268,6 @@ export interface Messages {
   "server.issue.verification.frozen": { readonly files: string | number };
   "server.issue.waitingDispatch": undefined;
   "server.issue.workKept": { readonly n: string | number; readonly refused: string | number };
-  "server.lan.aDevice": undefined;
   "server.lan.anotherAsking": undefined;
   "server.lan.badGateway": undefined;
   "server.lan.cannotOpen": { readonly why: string | number };
@@ -10234,11 +10277,9 @@ export interface Messages {
   "server.lan.denied": undefined;
   "server.lan.dropAsking": { readonly name: string | number };
   "server.lan.dropCode": { readonly code: string | number };
-  "server.lan.forget": { readonly name: string | number };
   "server.lan.local": undefined;
   "server.lan.noAddress": undefined;
   "server.lan.noCode": undefined;
-  "server.lan.noDevice": { readonly id: string | number };
   "server.lan.noneAsking": undefined;
   "server.lan.notOpen": undefined;
   "server.lan.notRemote": undefined;
@@ -10684,6 +10725,15 @@ export interface Messages {
   "server.tool.labels.search_archive": undefined;
   "server.tool.labels.session_list": undefined;
   "server.tool.labels.session_stop": undefined;
+  "server.user.aDevice": undefined;
+  "server.user.locked": { readonly s: string | number };
+  "server.user.noDevice": { readonly id: string | number };
+  "server.user.noPassword": undefined;
+  "server.user.notADevice": undefined;
+  "server.user.passwordHere": undefined;
+  "server.user.passwordShort": { readonly n: string | number };
+  "server.user.revoke": { readonly name: string | number };
+  "server.user.wrongPassword": undefined;
   "server.voice.connecting": undefined;
   "server.voice.dictation.cut": { readonly why: string | number };
   "server.voice.dictation.empty": undefined;

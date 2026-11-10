@@ -20,6 +20,7 @@ import { repoHandlers } from "./handlers/repo.ts";
 import { runtimeHandlers } from "./handlers/runtime.ts";
 import { sessionHandlers } from "./handlers/session.ts";
 import { settingHandlers } from "./handlers/setting.ts";
+import { userHandlers } from "./handlers/user.ts";
 import { voiceHandlers } from "./handlers/voice.ts";
 
 /** Every endpoint's answer, put together from each concept's (http/handlers/<concept>.ts). */
@@ -31,6 +32,7 @@ export const handlers = Effect.gen(function* () {
     ...(yield* voiceHandlers),
     ...(yield* connectorHandlers),
     ...(yield* lanHandlers),
+    ...(yield* userHandlers),
     ...(yield* repoHandlers),
     ...(yield* channelHandlers),
     ...(yield* settingHandlers),

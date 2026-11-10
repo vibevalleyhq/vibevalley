@@ -126,3 +126,6 @@ export type Words_session_role = typeof Words_session_role.Type
 
 export const Words_session_run_outcome = Schema.Literals(["completed","failed","interrupted"])
 export type Words_session_run_outcome = typeof Words_session_run_outcome.Type
+
+export const Words_user_device_came = Schema.Literals(["paired","login"])
+export type Words_user_device_came = typeof Words_user_device_came.Type

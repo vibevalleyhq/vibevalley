@@ -15,6 +15,7 @@ export * from "./inbox/shapes";
 export * from "./orchestrator/shapes";
 export * from "./game/shapes";
 export * from "./lan/shapes";
+export * from "./user/shapes";
 export * from "./connector/shapes";
 export * from "./machine/shapes";
 export * from "./voice/shapes";

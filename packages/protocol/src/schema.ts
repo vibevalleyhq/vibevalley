@@ -16,6 +16,7 @@ export * from "./inbox/schema";
 export * from "./orchestrator/schema";
 export * from "./game/schema";
 export * from "./lan/schema";
+export * from "./user/schema";
 export * from "./connector/schema";
 export * from "./machine/schema";
 export * from "./voice/schema";

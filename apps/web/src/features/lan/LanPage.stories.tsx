@@ -1,4 +1,4 @@
-import type { LanDevice, LanStatus } from "@vibevalley/protocol";
+import type { UserDevice, LanStatus } from "@vibevalley/protocol";
 import { stories, story, type Story } from "@vibevalley/stories";
 
 import { answer } from "#/infra/storyApi.ts";
@@ -8,9 +8,9 @@ import { LanPage } from "./LanPage";
 const now = Date.now();
 const min = 60_000;
 
-const devices: LanDevice[] = [
-  { id: "d1", name: "主人的 iPhone", pairedAt: now - 9 * 24 * 60 * min, lastSeen: now - 3 * min },
-  { id: "d2", name: "书房的 iPad", pairedAt: now - 30 * 24 * 60 * min },
+const devices: UserDevice[] = [
+  { id: "d1", name: "我的 iPhone", came: "paired", addedAt: now - 9 * 24 * 60 * min, lastSeen: now - 3 * min },
+  { id: "d2", name: "书房的 iPad", came: "paired", addedAt: now - 30 * 24 * 60 * min },
 ];
 
 const base: LanStatus = { open: false, hostName: "studio-mac", devices: [], problem: "" };

@@ -144,6 +144,20 @@
     "chatFlag": "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的"
   },
   "op": {
+    "user": {
+      "get": "看用户叫什么、设没设密码、这个请求是从哪台设备来的",
+      "update": "改用户的名字",
+      "password": {
+        "set": "设密码（只能在跑着 VibeValley 的那台电脑上）"
+      },
+      "login": "用密码登录，给这台设备一把钥匙",
+      "logout": "退出：收回这台设备的钥匙",
+      "device": {
+        "list": "列出用户的设备：配对来的和登录来的",
+        "delete": "收回一台设备的钥匙",
+        "previewDelete": "试收回一台设备：说会怎样，不真收回"
+      }
+    },
     "agent": {
       "create": "新建一份档案",
       "delete": "删掉一份档案",

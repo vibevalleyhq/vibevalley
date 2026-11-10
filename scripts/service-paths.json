@@ -194,5 +194,12 @@
   "Tool.orchestrator": ["orchestrator"],
   "Tool.session": ["mcp"],
   "Tool.sessionLine": ["orchestrator"],
-  "Tool.start": ["orchestrator"]
+  "Tool.start": ["orchestrator"],
+  "User.byKey": ["lan"],
+  "User.device": ["lan"],
+  "User.devices": ["lan"],
+  "User.pair": ["lan"],
+  "User.previewRevoke": ["lan"],
+  "User.revoke": ["lan"],
+  "User.revoked": ["lan"]
 }

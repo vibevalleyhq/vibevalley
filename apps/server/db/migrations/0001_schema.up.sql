@@ -511,11 +511,20 @@ CREATE TABLE lan (
   id    integer primary key check (id = 1),
   open  boolean not null
 );
-CREATE TABLE lan_device (
+CREATE TABLE user_account (
+  id              integer primary key check (id = 1),
+  name            text not null,
+  -- scrypt:<N>:<r>:<p>:<salt>:<hash>, base64url; null until a password is set.
+  password_hash   text,
+  password_set_at double precision
+);
+CREATE TABLE user_device (
   id         text primary key,
   name       text not null,
+  -- paired: let in at the gate by the user's nod; login: signed in with the password.
+  came       text not null check (came in ('paired', 'login')),
   key_hash   text not null unique,
-  paired_at  double precision not null,
+  added_at   double precision not null,
   last_seen  double precision
 );
 CREATE INDEX issue_assignment_by_issue on issue_assignment (issue, assigned_at, id);

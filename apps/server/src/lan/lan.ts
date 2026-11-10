@@ -1,43 +1,44 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
 import { networkInterfaces } from "node:os";
 
 import { NodeSink, NodeStream } from "@effect/platform-node";
-import { Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
+import { Array as Arr, Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import {
   artifactPrefix,
   attachmentPath,
+  deviceKeyCookie,
   eventsPath,
-  type LanDevice,
-  lanKeyCookie,
   type LanPaired,
   type LanStatus,
   livePath,
   type Preview,
   statePath,
+  type UserDevice,
 } from "@vibevalley/protocol";
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
+import * as S from "@vibevalley/protocol/schema";
 
-import { lookIn, messageOf, missing } from "#/base/errors.ts";
-import { code as newCode, newId } from "#/base/ids.ts";
+import { messageOf } from "#/base/errors.ts";
+import { code as newCode } from "#/base/ids.ts";
 import { hostName, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { callbackLog } from "#/infra/log.ts";
+import { sameSecret, tidyName, User } from "#/user/user.ts";
 import * as lanQ from "#db/lan.sql.ts";
-import * as q from "#db/lan_device.sql.ts";
 
 /** A device's asking gets as long again for the user to answer. */
 const pairingForMs = 2 * 60_000;
 const wrongTries = 5;
-const seenEveryMs = 60_000;
 
 /** The header the listener says a device by, to the loopback server; never taken from the device. */
 export const deviceHeader = "x-vibevalley-lan-device";
+/** Set on everything the listener hands on, keyed or not: the loopback server's sign that a request came from outside. */
+export const outsideHeader = "x-vibevalley-outside";
 
 const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
 
@@ -48,11 +49,6 @@ class ForwardFailed extends Schema.TaggedError<ForwardFailed, { readonly brand: 
 }) {}
 
 const forwardFailed = (cause: unknown) => ForwardFailed.make({ message: messageOf(cause), cause });
-
-interface Device extends LanDevice {
-  readonly keyHash: string;
-  written: number;
-}
 
 type ListenerState =
   | { readonly _tag: "closed" }
@@ -86,16 +82,13 @@ export class Lan extends Context.Service<
     /** What forget would do, refused as it would be; nothing changes. */
     readonly previewForget: (id: string) => Effect.Effect<Preview, ApiError>;
     /** The device a request through the listener came from; undefined on this machine. */
-    readonly me: (device: string | undefined) => Effect.Effect<LanDevice, ApiError>;
+    readonly me: (device: string | undefined) => Effect.Effect<UserDevice, ApiError>;
     /** Where the loopback server listens, once it does. */
     readonly setUpstream: (address: string) => void;
   }
 >()("@vibevalley/server/lan/lan") {
   static readonly layer = (options?: LanOptions) => Layer.effect(Lan, make(options));
 }
-
-const hash = (key: string) => createHash("sha256").update(key).digest("hex");
-const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 /** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
 function lanAddress(): string {
@@ -113,8 +106,6 @@ function lanAddress(): string {
   return best;
 }
 
-const deviceName = (name: string) => [...name.split(/\s+/u).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
-
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
 const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
 
@@ -123,13 +114,13 @@ const keyOf = (req: IncomingMessage) => {
   if (auth?.startsWith("Bearer ") === true) return auth.slice("Bearer ".length);
   for (const part of (req.headers.cookie ?? "").split(";")) {
     const [name, ...value] = part.trim().split("=");
-    if (name === lanKeyCookie) return decodeURIComponent(value.join("="));
+    if (name === deviceKeyCookie) return decodeURIComponent(value.join("="));
   }
   return "";
 };
 
 /** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
-const dropped = new Set(["host", "connection", "cookie", "authorization", "origin", "sec-fetch-site", deviceHeader]);
+const dropped = new Set(["host", "connection", "cookie", "authorization", "origin", "sec-fetch-site", deviceHeader, outsideHeader]);
 
 export const sameOrigin = (headers: Readonly<Record<string, string | string[] | undefined>> & { readonly host?: string | undefined }) =>
   (headers.origin === undefined || headers.origin === `http://${headers.host ?? ""}`) &&
@@ -144,6 +135,16 @@ const remote = new Set([
 export const remoteMay = (method: string, path: string) =>
   remote.has(method + " " + path) || (method === "GET" && (path.startsWith(attachmentPath("")) || path.startsWith(artifactPrefix)));
 
+const loginPath = pathOf("user.login");
+const logoutPath = pathOf("user.logout");
+const passwordPath = pathOf("user.password.set");
+
+/** Let through with no key: pairing, signing in, and whether there is anything to sign in to. */
+const keyless = new Set(["POST " + pathOf("lan.pair"), "POST " + loginPath, "POST " + pathOf("user.get")]);
+
+/** A signed-in device is the user everywhere but the password, which is set only at the machine. */
+const loginMay = (method: string, path: string) => !(method === "POST" && path === passwordPath);
+
 export interface LanOptions {
   readonly address?: () => string;
   /** The host the listener binds; every interface when absent. */
@@ -157,23 +158,13 @@ const make = (options: LanOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
     const db = yield* Db;
+    const users = yield* User;
     const http = yield* HttpClient.HttpClient;
     const address = options.address ?? lanAddress;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     const now = () => clock.currentTimeMillisUnsafe();
 
-    const devices = new Map<string, Device>();
-    for (const row of yield* db.run(q.lanDevices())) {
-      devices.set(row.id, {
-        id: row.id,
-        name: row.name,
-        pairedAt: row.paired_at,
-        keyHash: row.key_hash,
-        written: row.last_seen ?? 0,
-        ...(row.last_seen !== null ? { lastSeen: row.last_seen } : {}),
-      });
-    }
     const lanOpen2 = yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen()));
     // No row yet is shut.
     const initialOpen = Option.match(lanOpen2, {
@@ -193,11 +184,15 @@ const make = (options: LanOptions = {}) =>
       return mine;
     };
 
-    // forget and its dry run judge by this.
-    const known = (id: string) => {
-      const d = devices.get(id);
-      return d ? Effect.succeed(d) : Effect.fail(missing(t("server.lan.noDevice", { id }), [lookIn.device]));
-    };
+    // A device revoked anywhere (here, or by user.device.delete) loses what it has open at once.
+    yield* Effect.forkScoped(
+      Stream.runForEach(users.revoked, (id) =>
+        Effect.sync(() => {
+          for (const cut of conns.get(id) ?? []) cut();
+          conns.delete(id);
+        }),
+      ),
+    );
     const dropPairing = () => {
       if (pairing._tag === "awaitingApproval") pairing.answer?.(false);
       pairing = { _tag: "idle" };
@@ -216,45 +211,59 @@ const make = (options: LanOptions = {}) =>
       return host ? `http://${host}:${listener.port}` : "";
     };
 
-    const deviceOf = (req: IncomingMessage) => {
-      const key = keyOf(req);
-      if (!key) return "";
-      const h = hash(key);
-      const found = [...devices.values()].find((d) => same(d.keyHash, h));
-      if (!found) return "";
-      const at = now();
-      found.lastSeen = at;
-      if (at - found.written >= seenEveryMs) {
-        found.written = at;
-        forkHere(
-          db
-            .run(q.seenLanDevice({ last_seen: at, id: found.id }))
-            .pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: lan access: ${Cause.pretty(c)}`))),
-        );
-      }
-      return found.id;
-    };
+    const deviceOf = (req: IncomingMessage) => users.byKey(keyOf(req));
 
     const refuseHttp = (res: ServerResponse, status: number, reason: string) => {
       res.writeHead(status, { "content-type": "application/json" });
       res.end(Formatter.formatJson({ _tag: "LanRefused", reason }));
     };
 
+    /** The request handed to the loopback server as it came, the device said; undefined for a method it cannot carry. */
+    const send = (req: IncomingMessage, device: string) => {
+      const method = req.method;
+      if (!HttpMethod.isHttpMethod(method)) return undefined;
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers[k] = Array.isArray(v) ? v.join(", ") : v;
+      headers[outsideHeader] = "1";
+      if (device) headers[deviceHeader] = device;
+      const body =
+        method === "GET" || method === "HEAD"
+          ? HttpBody.empty
+          : HttpBody.stream(NodeStream.fromReadable({ evaluate: () => req, onError: forwardFailed }), req.headers["content-type"]);
+      return http.execute(HttpClientRequest.make(method)(`http://${upstream}${req.url ?? "/"}`, { headers, body })).pipe(Effect.mapError(forwardFailed));
+    };
+
+    // HttpOnly, so a script on the page never reads it; Secure when a TLS proxy in front says the device came over https.
+    const keyCookie = (req: IncomingMessage, key: string, maxAge: number) =>
+      `${deviceKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict` +
+      (req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "");
+
+    /** Signing in or out, answered whole: the key a sign-in gets goes into the cookie as well, and signing out clears it. */
+    const signedAnswer = (req: IncomingMessage, res: ServerResponse, device: string, cookieOf: (status: number, body: string) => string | undefined) =>
+      Effect.gen(function* () {
+        const sent = send(req, device);
+        if (sent === undefined) return refuseHttp(res, 405, t("server.lan.notRemote"));
+        const answer = yield* sent;
+        const body = yield* answer.text.pipe(Effect.mapError(forwardFailed));
+        const cookie = cookieOf(answer.status, body);
+        res.writeHead(answer.status, { ...answer.headers, ...(cookie !== undefined ? { "set-cookie": cookie } : {}) });
+        res.end(body);
+      });
+
+    const decodeLogin = Schema.decodeOption(Schema.fromJsonString(S.UserLogin));
+    const signIn = (req: IncomingMessage, res: ServerResponse, device: string) =>
+      signedAnswer(req, res, device, (status, body) =>
+        status === 200 ? Option.getOrUndefined(Option.map(decodeLogin(body), (got) => keyCookie(req, got.key, 10 * 365 * 24 * 3600))) : undefined,
+      );
+    const signOut = (req: IncomingMessage, res: ServerResponse, device: string) =>
+      signedAnswer(req, res, device, (status) => (status < 300 ? keyCookie(req, "", 0) : undefined));
+
     /** Handed to the loopback server as it came, the device said; the answer streams back. */
     const forward = (req: IncomingMessage, res: ServerResponse, device: string) =>
       Effect.gen(function* () {
-        const method = req.method;
-        if (!HttpMethod.isHttpMethod(method)) return refuseHttp(res, 405, t("server.lan.notRemote"));
-        const headers: Record<string, string> = {};
-        for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers[k] = Array.isArray(v) ? v.join(", ") : v;
-        if (device) headers[deviceHeader] = device;
-        const body =
-          method === "GET" || method === "HEAD"
-            ? HttpBody.empty
-            : HttpBody.stream(NodeStream.fromReadable({ evaluate: () => req, onError: forwardFailed }), req.headers["content-type"]);
-        const answer = yield* http
-          .execute(HttpClientRequest.make(method)(`http://${upstream}${req.url ?? "/"}`, { headers, body }))
-          .pipe(Effect.mapError(forwardFailed));
+        const sent = send(req, device);
+        if (sent === undefined) return refuseHttp(res, 405, t("server.lan.notRemote"));
+        const answer = yield* sent;
         res.writeHead(answer.status, answer.headers);
         yield* Stream.run(answer.stream, NodeSink.fromWritable({ evaluate: () => res, onError: forwardFailed })).pipe(
           // A HEAD, a 204 or a 304 has no body to stream.
@@ -271,15 +280,22 @@ const make = (options: LanOptions = {}) =>
       const handled = Effect.gen(function* () {
         if (!upstream) return refuseHttp(res, 503, t("server.lan.notUp"));
         if (path.startsWith("/api/v1/") && !sameOrigin(req.headers)) return refuseHttp(res, 403, t("server.lan.notRemote"));
-        if (req.method === "POST" && path === pathOf("lan.pair")) return yield* forward(req, res, "");
+        if (keyless.has(req.method + " " + path)) {
+          const d = deviceOf(req)?.id ?? "";
+          return yield* path === loginPath ? signIn(req, res, d) : forward(req, res, d);
+        }
         if (!path.startsWith("/api/v1/")) {
           if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return yield* forward(req, res, "");
           res.writeHead(404, { "content-type": "text/plain" });
           return void res.end("404 page not found\n");
         }
-        const d = deviceOf(req);
-        if (!d) return refuseHttp(res, 401, t("server.lan.unpaired"));
-        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, t("server.lan.notRemote"));
+        const device = deviceOf(req);
+        if (device === undefined) return refuseHttp(res, 401, t("server.lan.unpaired"));
+        const may = device.came === "login" ? loginMay : remoteMay;
+        if (!may(req.method ?? "GET", path)) return refuseHttp(res, 403, t("server.lan.notRemote"));
+        const d = device.id;
+        // Not held with the device's connections: signing out revokes the device, and that cuts what is held.
+        if (path === logoutPath) return yield* signOut(req, res, d);
         const mine = held(d);
         return yield* Effect.withFiber((fiber) => {
           const cut = () => fiber.interruptUnsafe();
@@ -307,12 +323,12 @@ const make = (options: LanOptions = {}) =>
       const refuse = (status: string) => void client.end(`HTTP/1.1 ${status}\r\nconnection: close\r\n\r\n`);
       if (!upstream) return refuse("503 Service Unavailable");
       if (new URL(req.url ?? "/", "http://lan").pathname !== rpcPath) return refuse("404 Not Found");
-      const d = deviceOf(req);
+      const d = deviceOf(req)?.id;
       if (!d) return refuse("401 Unauthorized");
       // Forwarding removes the browser origin: only this listener can check it.
       if (!sameOrigin(req.headers)) return refuse("403 Forbidden");
       const [host, port] = [upstream.slice(0, upstream.lastIndexOf(":")), Number(upstream.slice(upstream.lastIndexOf(":") + 1))];
-      const lines = [`GET ${req.url ?? rpcPath} HTTP/1.1`, `host: ${upstream}`, "connection: Upgrade", `${deviceHeader}: ${d}`];
+      const lines = [`GET ${req.url ?? rpcPath} HTTP/1.1`, `host: ${upstream}`, "connection: Upgrade", `${outsideHeader}: 1`, `${deviceHeader}: ${d}`];
       for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) for (const one of [v].flat()) lines.push(`${k}: ${one}`);
       const mine = held(d);
       const up = connect(port, host, () => {
@@ -382,7 +398,7 @@ const make = (options: LanOptions = {}) =>
           expiresAt: p.expires,
           ...(p._tag === "awaitingApproval" ? { asking: p.asking } : {}),
         };
-      s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).toSorted((a, b) => a.pairedAt - b.pairedAt);
+      s.devices = Arr.filter(users.devices(), (d) => d.came === "paired");
       return s;
     };
 
@@ -390,12 +406,8 @@ const make = (options: LanOptions = {}) =>
     yield* Effect.addFinalizer(() => shut);
 
     const addDevice = Effect.fn("Lan.addDevice")(function* (name: string) {
-      const key = randomBytes(32).toString("base64url");
-      const d: Device = { id: newId(), name, pairedAt: now(), keyHash: hash(key), written: 0 };
-      yield* db.run(q.addLanDevice({ id: d.id, name: d.name, key_hash: d.keyHash, paired_at: d.pairedAt }));
-      devices.set(d.id, d);
-      logs.info(`vibevalley: lan access: "${name}" paired`);
-      return { device: d.id, key, hostName: hostName() };
+      const added = yield* users.pair(name);
+      return { ...added, hostName: hostName() };
     });
 
     return Lan.of({
@@ -426,11 +438,12 @@ const make = (options: LanOptions = {}) =>
         return status();
       }),
       pair: Effect.fn("Lan.pair")(function* (code, given) {
-        const name = deviceName(given);
+        const tidy = tidyName(given);
+        const name = tidy === "" ? t("server.user.aDevice") : tidy;
         const p = livePairing();
         if (listener._tag === "closed") return yield* Effect.fail(refuse(t("server.lan.closedThere")));
         if (!p) return yield* Effect.fail(refuse(t("server.lan.codeExpired")));
-        if (!same(code.trim().toUpperCase(), p.code)) {
+        if (!sameSecret(p.code)(code.trim().toUpperCase())) {
           if (p._tag === "awaitingCode") {
             p.wrong++;
             if (p.wrong >= wrongTries) dropPairing();
@@ -469,23 +482,18 @@ const make = (options: LanOptions = {}) =>
         };
       },
       forget: Effect.fn("Lan.forget")(function* (id) {
-        yield* known(id);
-        yield* db.run(q.removeLanDevice({ id }));
-        devices.delete(id);
-        for (const cut of conns.get(id) ?? []) cut();
-        conns.delete(id);
+        yield* users.revoke(id);
         return status();
       }),
       previewForget: Effect.fn("Lan.previewForget")(function* (id) {
-        const d = yield* known(id);
+        const preview = yield* users.previewRevoke(id);
         const open = conns.get(id)?.size ?? 0;
-        return { does: [t("server.lan.forget", { name: d.name }), ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
+        return { does: [...preview.does, ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
       }),
       me: Effect.fn("Lan.me")(function* (device) {
-        const d = device ? devices.get(device) : undefined;
+        const d = device ? users.device(device) : undefined;
         if (!d) return yield* Effect.fail(refuse(t("server.lan.local")));
-        const { keyHash: _, written: __, ...shown } = d;
-        return shown;
+        return d;
       }),
       setUpstream: (a) => {
         upstream = a;

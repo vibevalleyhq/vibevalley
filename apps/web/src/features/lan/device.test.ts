@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { lanKeyCookie } from "@vibevalley/protocol";
+import { deviceKeyCookie } from "@vibevalley/protocol";
 
 import { deviceGuess, isPaired, isRemote, keyCookie } from "./device";
 
@@ -11,10 +11,10 @@ test("only this computer's own addresses are not remote", () => {
 
 test("a kept key is a pairing; an empty one is not", () => {
   expect(isPaired("")).toBe(false);
-  expect(isPaired(`theme=dark; ${lanKeyCookie}=abc`)).toBe(true);
-  expect(isPaired(`${lanKeyCookie}=`)).toBe(false);
-  expect(isPaired(`x${lanKeyCookie}=abc`)).toBe(false);
-  expect(keyCookie("a+b").startsWith(`${lanKeyCookie}=a%2Bb; Path=/;`)).toBe(true);
+  expect(isPaired(`theme=dark; ${deviceKeyCookie}=abc`)).toBe(true);
+  expect(isPaired(`${deviceKeyCookie}=`)).toBe(false);
+  expect(isPaired(`x${deviceKeyCookie}=abc`)).toBe(false);
+  expect(keyCookie("a+b").startsWith(`${deviceKeyCookie}=a%2Bb; Path=/;`)).toBe(true);
 });
 
 test("a device is guessed from its browser", () => {

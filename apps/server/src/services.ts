@@ -32,6 +32,7 @@ import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
 import { Session, ready as sessionReady } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
 import { Tool } from "./tool/tool.ts";
+import { User } from "./user/user.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
 
 /** Builds layer on what is below it, keeping what is below. */
@@ -60,6 +61,7 @@ export const platform = (config: ServerConfig["Service"]) =>
     on(projection),
     on(Core.layer),
     on(Setting.layer),
+    on(User.layer),
     on(Provider.layer),
     on(Llm.layer),
   );

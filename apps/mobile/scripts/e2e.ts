@@ -148,7 +148,7 @@ try {
   const paired = await until(async () => (await api.lan.get()).devices.find((d) => d.name === asking), "the phone paired");
   // Its page's requests through the lan listener carry the key: the farm has heard from it since.
   await until(
-    async () => ((await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > paired.pairedAt || undefined,
+    async () => ((await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > paired.addedAt || undefined,
     "the phone's page reaching the farm",
   );
   console.log("paired and seen", paired.name);

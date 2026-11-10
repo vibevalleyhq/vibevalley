@@ -1,0 +1,11 @@
+{
+  "aDevice": "A device",
+  "noDevice": "No device {id}",
+  "passwordHere": "The password can only be set on the computer running VibeValley",
+  "passwordShort": "The password needs at least {n} characters",
+  "noPassword": "No password yet: set one on the computer running VibeValley first",
+  "locked": "Too many wrong passwords: try again in {s} seconds",
+  "wrongPassword": "Wrong password",
+  "notADevice": "This is the computer running VibeValley itself: there is no device to sign out",
+  "revoke": "Take back the key of “{name}”: it has to pair or sign in again to connect"
+}

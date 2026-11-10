@@ -18,7 +18,7 @@ export interface LanHandlers<R = never> {
   /** What deleteDevice would do, refused as it would be; nothing changes. */
   readonly "lan.device.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "lan.pair": (a: T.LanPairRequest) => Effect.Effect<T.LanPaired, ApiError, R>;
-  readonly "lan.me.get": () => Effect.Effect<T.LanDevice, ApiError, R>;
+  readonly "lan.me.get": () => Effect.Effect<T.UserDevice, ApiError, R>;
 }
 
 export const lanEndpoints: readonly Endpoint[] = [
@@ -91,7 +91,7 @@ export const lanEndpoints: readonly Endpoint[] = [
     op: "lan.me.get",
     about: [],
     input: undefined,
-    result: S.LanDevice,
+    result: S.UserDevice,
     can: ["user", "remote"],
   },
 ];

@@ -347,3 +347,18 @@ GitHub 的检测：gh 装没装、登没登录
 | `lan.device.previewDelete` | 试移除一台设备：说会怎样，不真移除 | `/api/v1/lan/device/previewDelete` | ✓ |   |   |   |
 | `lan.pair` | 用配对码把这台设备配上 | `/api/v1/lan/pair` | ✓ | ✓ |   |   |
 | `lan.me.get` | 发这个请求的设备是哪台 | `/api/v1/lan/me/get` | ✓ | ✓ |   |   |
+
+## user
+
+
+
+| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|---|
+| `user.get` | 看用户叫什么、设没设密码、这个请求是从哪台设备来的 | `/api/v1/user/get` | ✓ | ✓ |   |   |
+| `user.update` | 改用户的名字 | `/api/v1/user/update` | ✓ |   |   |   |
+| `user.password.set` | 设密码（只能在跑着 VibeValley 的那台电脑上） | `/api/v1/user/password/set` | ✓ |   |   |   |
+| `user.login` | 用密码登录，给这台设备一把钥匙 | `/api/v1/user/login` | ✓ | ✓ |   |   |
+| `user.logout` | 退出：收回这台设备的钥匙 | `/api/v1/user/logout` | ✓ | ✓ |   |   |
+| `user.device.list` | 列出用户的设备：配对来的和登录来的 | `/api/v1/user/device/list` | ✓ |   |   |   |
+| `user.device.delete` | 收回一台设备的钥匙 | `/api/v1/user/device/delete` | ✓ |   |   |   |
+| `user.device.previewDelete` | 试收回一台设备：说会怎样，不真收回 | `/api/v1/user/device/previewDelete` | ✓ |   |   |   |
