@@ -132,6 +132,8 @@
     "noPersona": "没写人设。",
     "installed": "装了 {n} 份",
     "addedHere": " · 本机加进来的",
+    "skills": "带着技能：{skills}",
+    "skill": "技能「{name}」：{description}",
     "look": "看看",
     "fold": "收起",
     "removeSure": "真的删掉模板",

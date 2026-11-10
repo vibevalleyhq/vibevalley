@@ -51,6 +51,10 @@
       "types": "./dist/session.d.ts",
       "default": "./src/session.ts"
     },
+    "./skills": {
+      "types": "./dist/skills.d.ts",
+      "default": "./src/skills.ts"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"

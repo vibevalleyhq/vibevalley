@@ -1,14 +1,16 @@
 import { join } from "node:path";
 
-import { Context, Effect, FileSystem, Layer, Predicate, Redacted, Schema } from "effect";
+import { Array as Arr, Context, Effect, FileSystem, Layer, Option, Order, Predicate, Redacted, Schema } from "effect";
 
+import { frontMatter, skillBody } from "@vibevalley/agent/skills";
 import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
 import type { Llm } from "@vibevalley/ai/llm";
-import { list, t } from "@vibevalley/i18n";
+import { currentLocale, list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import { serverFile } from "#/base/assets.ts";
 import { type ApiError, Inconsistent, lookIn, missing, refused } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
 import { ServerConfig } from "#/infra/config.ts";
@@ -141,6 +143,28 @@ const installed = (template: T.AgentTemplate, beside: readonly T.Agent[], id?: s
     ),
   );
 
+/** VibeValley's own skills, one folder each (<id>/SKILL.md, SKILL.en.md beside it in English), by folder name. They ship
+ * inside the server (base/assets.ts): one that does not read is a broken build (agent.test.ts reads them all), not a
+ * user's error. */
+const builtInSkillsDir = serverFile("src/agent/skills");
+const readBuiltInSkills = (fs: FileSystem.FileSystem) =>
+  Effect.orDie(
+    Effect.gen(function* () {
+      const folders = yield* fs.readDirectory(builtInSkillsDir);
+      const ids = Arr.sort(folders, Order.String);
+      const en = currentLocale() === "en";
+      return yield* Effect.forEach(ids, (id) =>
+        Effect.gen(function* () {
+          const english = join(builtInSkillsDir, id, "SKILL.en.md");
+          const inEnglish = en && (yield* fs.exists(english));
+          const text = yield* fs.readFileString(inEnglish ? english : join(builtInSkillsDir, id, "SKILL.md"));
+          const head = frontMatter(text);
+          return { id, name: head.name ?? id, description: head.description ?? "", body: skillBody(text), builtIn: true } satisfies T.Skill;
+        }),
+      );
+    }),
+  );
+
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
@@ -152,6 +176,12 @@ const make = Effect.gen(function* () {
   const disk = yield* keptFile(file);
   const builtIn = yield* builtInTemplates;
   const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
+  const ownSkills = yield* readBuiltInSkills(fs);
+  const builtInSkillOf = (id: string) => Arr.findFirst(ownSkills, (k) => k.id === id);
+  const isBuiltInSkill = (id: string) => Option.isSome(builtInSkillOf(id));
+  for (const item of builtIn)
+    for (const id of item.skills)
+      if (!isBuiltInSkill(id)) return yield* Effect.die(Inconsistent.make({ message: `the built-in template ${item.id} names ${id}, not in agent/skills` }));
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
   const starters: T.Agent[] = [];
   yield* Effect.forEach(
@@ -208,7 +238,16 @@ const make = Effect.gen(function* () {
     const a = s.agents.find((x) => x.id === id);
     return a ? Effect.succeed(a) : Effect.fail(missing(t("server.agent.noAgent", { id }), [lookIn.agent]));
   };
+  /** VibeValley's own skills change only with VibeValley: none of skill.* writes one. */
+  const builtInRefusal = (id: string) =>
+    Option.getOrUndefined(Option.map(builtInSkillOf(id), (k) => refused(t("server.agent.builtInSkill", { name: k.name }))));
+  const notBuiltIn = (id: string) => {
+    const no = builtInRefusal(id);
+    return no === undefined ? Effect.void : Effect.fail(no);
+  };
   const deletableSkill = (id: string) => {
+    const no = builtInRefusal(id);
+    if (no !== undefined) return Effect.fail(no);
     const k = s.skills.find((x) => x.id === id);
     return k ? Effect.succeed(k) : Effect.fail(missing(t("server.agent.noSkill", { id }), [lookIn.skill]));
   };
@@ -237,7 +276,8 @@ const make = Effect.gen(function* () {
       const k = key.trim();
       return sendable().find((a) => a.id === k) ?? sendable().find((a) => a.name === k);
     },
-    skills: () => structuredClone([...s.skills]),
+    // The built-in ones first; a skill of the user's under a built-in id (kept before it shipped) is the built-in one now.
+    skills: () => structuredClone([...ownSkills, ...Arr.filter(s.skills, (k) => !isBuiltInSkill(k.id))]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
     isOrchestrator,
@@ -268,8 +308,10 @@ const make = Effect.gen(function* () {
       return { does: [t("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })] };
     }),
     saveSkill: Effect.fn("Agent.saveSkill")(function* (skill) {
-      yield* change((x) => ({ ...x, skills: upsert(x.skills, skill) }));
-      return skill;
+      yield* notBuiltIn(skill.id);
+      const { builtIn: _, ...kept } = skill;
+      yield* change((x) => ({ ...x, skills: upsert(x.skills, kept) }));
+      return kept;
     }),
     createSkill: Effect.fn("Agent.createSkill")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(t("server.agent.newSkillId")));
@@ -279,8 +321,10 @@ const make = Effect.gen(function* () {
           .replace(/[^a-z0-9]+/gu, "-")
           .replace(/^-+|-+$/gu, "") || "skill";
       let id = stem;
-      for (let n = 2; s.skills.some((k) => k.id === id); n++) id = `${stem}-${n}`;
-      const created = { ...draft, id };
+      const taken = (x: string) => isBuiltInSkill(x) || Arr.some(s.skills, (k) => k.id === x);
+      for (let n = 2; taken(id); n++) id = `${stem}-${n}`;
+      const { builtIn: _, ...words } = draft;
+      const created = { ...words, id };
       yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
       return created;
     }),

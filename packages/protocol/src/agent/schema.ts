@@ -89,6 +89,7 @@ export const AgentTemplate: Codec<T.AgentTemplate> = Schema.Struct({
   look: Look,
   persona: Schema.String,
   source: Schema.Literals(T.AgentTemplateSourceValues),
+  skills: Schema.mutable(Schema.Array(Schema.String)),
   installed: Schema.mutable(Schema.Array(Schema.String)),
 });
 
@@ -106,4 +107,5 @@ export const Skill: Codec<T.Skill> = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
   body: Schema.String,
+  builtIn: Schema.optionalKey(Schema.Boolean),
 });

@@ -113,7 +113,7 @@
     "apps/desktop": 48
   },
   "preferEffectArray": {
-    "apps/server": 1841,
+    "apps/server": 1840,
     "apps/cli": 119,
     "packages/agent": 181,
     "packages/ai": 90,

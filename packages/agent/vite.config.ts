@@ -19,6 +19,7 @@ export default defineConfig({
       "src/messages.ts",
       "src/self.ts",
       "src/session.ts",
+      "src/skills.ts",
       "src/testing.ts",
       "src/todo.ts",
       "src/todoStore.ts",

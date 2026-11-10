@@ -14,6 +14,7 @@
     "deleteKept": "删掉模板「{name}」：从它装的 {installed} 份档案留着"
   },
   "notSaved": "没存下来：{file} 写不进去（{why}）",
+  "builtInSkill": "「{name}」是 VibeValley 自带的技能，跟着 VibeValley 更新，不能在这里改或删；要换一种做法，新建一个你自己的技能",
   "orchestratorStays": "默认助手删不了：至少要有一个助手",
   "defaultStaysOrchestrator": "默认助手只能是助手：至少要有一个助手",
   "noAgent": "没有 {id} 这个档案",

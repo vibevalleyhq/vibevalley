@@ -132,6 +132,8 @@
     "noPersona": "No persona.",
     "installed": "{n} installed",
     "addedHere": " · added on this machine",
+    "skills": "Comes with skills: {skills}",
+    "skill": "Skill \"{name}\": {description}",
     "look": "Look",
     "fold": "Fold",
     "removeSure": "Really delete the template",

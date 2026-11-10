@@ -21,6 +21,8 @@ export interface Skill {
   name: string;
   description: string;
   body: string;
+  /** Shipped with VibeValley (apps/server/src/agent/skills): read-only, changed only by updating VibeValley. */
+  builtIn?: boolean;
 }
 
 /** What a profile is: an orchestrator (the orchestrator) stays and coordinates; a worker (worker) is sent on an issue. */
@@ -79,6 +81,8 @@ export interface AgentTemplate {
   look: Look;
   persona: string;
   source: AgentTemplateSource;
+  /** The built-in skills a profile installed from it has ticked, by id. */
+  skills: string[];
   /** The profiles installed from it, by id. */
   installed: string[];
 }

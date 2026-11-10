@@ -3,13 +3,16 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Formatter, Layer } from "effect";
+import { Array as Arr, Cause, Effect, Exit, Formatter, Layer, Option } from "effect";
 
+import { setLocale } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 
+import { serverFile, serverFiles } from "#/base/assets.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { defaultSettings } from "#/runtime/presets.ts";
+import { instructions } from "#/session/briefing.ts";
 import { testConfig, starter } from "#/testing/layers.ts";
 
 import { Agent, withCast } from "./agent.ts";
@@ -125,7 +128,7 @@ describe("profiles", () => {
       Effect.gen(function* () {
         const agents = yield* Agent;
         expect(agents.agent("mine")?.look).toMatchObject({ build: "biped", head: "rounded" });
-        expect(agents.skills().map((k) => k.id)).toEqual(["s1"]);
+        expect(agents.skills().flatMap((k) => (k.builtIn === true ? [] : [k.id]))).toEqual(["s1"]);
         expect(agents.settings("pi").defaultModel).toBe("deepseek-chat");
         expect(readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"))).toEqual([]);
       }),
@@ -307,4 +310,72 @@ describe("profiles", () => {
       }),
     ),
   );
+});
+
+describe("the built-in skills", () => {
+  const dir = serverFile("src/agent/skills");
+  const han = /\p{Script=Han}/u;
+  const skillOf = (all: readonly T.Skill[], id: string) => Option.getOrUndefined(Arr.findFirst(all, (k) => k.id === id));
+
+  it("ship with the server, each folder a SKILL.md and its English twin, the twin in English", () => {
+    expect(serverFiles).toContain("src/agent/skills");
+    const folders = readdirSync(dir);
+    expect(folders.length).toBeGreaterThan(0);
+    for (const id of folders) {
+      expect(readdirSync(join(dir, id))).toEqual(expect.arrayContaining(["SKILL.md", "SKILL.en.md"]));
+      expect(readFileSync(join(dir, id, "SKILL.en.md"), "utf8")).not.toMatch(han);
+    }
+  });
+
+  it.effect("are listed first and read-only: no skill.* changes or deletes one, and a new skill doesn't take its id", () =>
+    run(
+      testConfig(),
+      Effect.gen(function* () {
+        const s = yield* Agent;
+        const reviewer = skillOf(s.skills(), "reviewer")!;
+        expect([reviewer.builtIn, s.skills()[0]?.builtIn, reviewer.name === reviewer.id, reviewer.body === ""]).toEqual([true, true, false, false]);
+        expect((yield* Effect.flip(s.saveSkill({ ...reviewer, body: "改掉" })))._tag).toBe("Refused");
+        expect((yield* Effect.flip(s.removeSkill("reviewer")))._tag).toBe("Refused");
+        expect((yield* Effect.flip(s.previewRemoveSkill("reviewer")))._tag).toBe("Refused");
+        const mine = yield* s.createSkill({ id: "", name: "reviewer", description: "", body: "我的", builtIn: true });
+        expect([mine.id, mine.builtIn]).toEqual(["reviewer-2", undefined]);
+        expect(skillOf(s.skills(), "reviewer")?.body).toBe(reviewer.body);
+      }),
+    ),
+  );
+
+  it.effect("say themselves in English when the farm does", () => {
+    setLocale("en");
+    return run(
+      testConfig(),
+      Effect.gen(function* () {
+        const s = yield* Agent;
+        for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
+      }),
+    ).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))));
+  });
+
+  it.effect("a template ticks the ones it names, a helper's prompt carries a ticked one, and the user's own ticks stay", () => {
+    const config = testConfig();
+    const folder = join(config.home, "picked");
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(
+      join(folder, "agent.json"),
+      Formatter.formatJson({ id: "checker", version: 1, role: "worker", name: "审查", runtime: "pi", skills: ["reviewer"] }),
+    );
+    return run(
+      config,
+      Effect.gen(function* () {
+        const s = yield* Agent;
+        expect((yield* s.addTemplate(folder)).skills).toEqual(["reviewer"]);
+        const made = yield* s.installTemplate("checker");
+        expect(made.skills).toEqual(["reviewer"]);
+        expect(instructions(made, s.skills())).toContain(skillOf(s.skills(), "reviewer")!.body);
+        const again = yield* s.updateFromTemplate((yield* s.save({ ...made, skills: ["slides"] })).id);
+        expect(again.skills).toEqual(["slides", "reviewer"]);
+        const hand = yield* s.create(draft({ skills: ["pages"] }));
+        expect(instructions(hand, s.skills())).toContain(skillOf(s.skills(), "pages")!.body);
+      }),
+    );
+  });
 });

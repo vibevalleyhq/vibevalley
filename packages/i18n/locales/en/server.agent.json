@@ -14,6 +14,7 @@
     "deleteKept": "Delete the template \"{name}\": the {installed} profiles installed from it stay"
   },
   "notSaved": "Not saved: could not write {file} ({why})",
+  "builtInSkill": "\"{name}\" ships with VibeValley and is updated with it: it can't be changed or deleted here. To work another way, make a skill of your own",
   "orchestratorStays": "The default assistant cannot be deleted: there is always at least one assistant",
   "defaultStaysOrchestrator": "The default assistant stays an assistant: there is always at least one",
   "noAgent": "There is no profile {id}",

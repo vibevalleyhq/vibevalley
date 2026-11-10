@@ -647,6 +647,7 @@ export const catalogs = {
         deleteKept: "删掉模板「{name}」：从它装的 {installed} 份档案留着",
       },
       notSaved: "没存下来：{file} 写不进去（{why}）",
+      builtInSkill: "「{name}」是 VibeValley 自带的技能，跟着 VibeValley 更新，不能在这里改或删；要换一种做法，新建一个你自己的技能",
       orchestratorStays: "默认助手删不了：至少要有一个助手",
       defaultStaysOrchestrator: "默认助手只能是助手：至少要有一个助手",
       noAgent: "没有 {id} 这个档案",
@@ -1874,6 +1875,8 @@ export const catalogs = {
         noPersona: "没写人设。",
         installed: "装了 {n} 份",
         addedHere: " · 本机加进来的",
+        skills: "带着技能：{skills}",
+        skill: "技能「{name}」：{description}",
         look: "看看",
         fold: "收起",
         removeSure: "真的删掉模板",
@@ -4030,9 +4033,13 @@ export const catalogs = {
         installed: "这台电脑上装的 · {count}",
         noneReported: "农机还没报告装了哪些技能（或者还在读）。",
         noMatch: "没有对得上的。",
-        own: "VibeValley 自己的 · {count}",
+        own: "你写的 · {count}",
         newSkill: "新技能",
         noSkills: "还没有技能：写一个 VibeValley 自己的，或者在农机上装好再回来看。",
+        builtIn: "VibeValley 自带 · {count}",
+        builtInNote:
+          "VibeValley 自带的技能：跟着 VibeValley 更新，不能在这里改或删。在 agent 的「技能」页签里勾上它，帮工的提示里就带着它；想换一种做法，新建一个你自己的技能。",
+        builtInTag: "自带",
         installedNote: "装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。",
         where: "哪些农机有它",
         inUse: "{n} 个 agent 在用，删掉会从它们身上去掉。",
@@ -5379,6 +5386,8 @@ export const catalogs = {
         deleteKept: 'Delete the template "{name}": the {installed} profiles installed from it stay',
       },
       notSaved: "Not saved: could not write {file} ({why})",
+      builtInSkill:
+        '"{name}" ships with VibeValley and is updated with it: it can\'t be changed or deleted here. To work another way, make a skill of your own',
       orchestratorStays: "The default assistant cannot be deleted: there is always at least one assistant",
       defaultStaysOrchestrator: "The default assistant stays an assistant: there is always at least one",
       noAgent: "There is no profile {id}",
@@ -6662,6 +6671,8 @@ export const catalogs = {
         noPersona: "No persona.",
         installed: "{n} installed",
         addedHere: " · added on this machine",
+        skills: "Comes with skills: {skills}",
+        skill: 'Skill "{name}": {description}',
         look: "Look",
         fold: "Fold",
         removeSure: "Really delete the template",
@@ -8955,9 +8966,13 @@ export const catalogs = {
         installed: "Installed on this computer · {count}",
         noneReported: "The machines have not reported their skills yet (or are still being read).",
         noMatch: "Nothing matches.",
-        own: "VibeValley's own · {count}",
+        own: "Written by you · {count}",
         newSkill: "New skill",
         noSkills: "No skills yet: write one of VibeValley's own, or install some on a runtime and come back.",
+        builtIn: "Ships with VibeValley · {count}",
+        builtInNote:
+          "A skill that ships with VibeValley: it is updated with VibeValley and can't be changed or deleted here. Tick it on a profile's Skills tab and the helper's prompt carries it; to work another way, make a skill of your own.",
+        builtInTag: "Built in",
         installedNote:
           "A skill installed on the machines: helpers using these machines load it when needed, no need to tick it in a profile. To change it, edit its file.",
         where: "Machines that have it",
@@ -10177,6 +10192,7 @@ export interface Messages {
   "mobile.title": undefined;
   "mobile.unreachable": undefined;
   "mobile.waiting": undefined;
+  "server.agent.builtInSkill": { readonly name: string | number };
   "server.agent.defaultStaysOrchestrator": undefined;
   "server.agent.efforts": { readonly asked: string | number; readonly efforts: string | number; readonly runtime: string | number };
   "server.agent.effortsAnd": undefined;
@@ -11412,6 +11428,8 @@ export interface Messages {
   "web.agent.templates.openLine": undefined;
   "web.agent.templates.removeSure": undefined;
   "web.agent.templates.runsOn": { readonly runtime: string | number };
+  "web.agent.templates.skill": { readonly description: string | number; readonly name: string | number };
+  "web.agent.templates.skills": { readonly skills: string | number };
   "web.agent.templates.title": undefined;
   "web.agent.templates.update": { readonly version: string | number };
   "web.agent.templates.updateHint": undefined;
@@ -13610,6 +13628,9 @@ export interface Messages {
   "web.runtime.library.bodyExample": undefined;
   "web.runtime.library.bodyHint": undefined;
   "web.runtime.library.book": undefined;
+  "web.runtime.library.builtIn": { readonly count: string | number };
+  "web.runtime.library.builtInNote": undefined;
+  "web.runtime.library.builtInTag": undefined;
   "web.runtime.library.description": undefined;
   "web.runtime.library.descriptionHint": undefined;
   "web.runtime.library.inUse": { readonly n: string | number };

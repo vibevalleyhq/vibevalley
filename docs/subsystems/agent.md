@@ -18,6 +18,7 @@
 |---|---|
 | `apps/server/src/agent/agent.ts` | 读写 `$VIBEVALLEY_HOME/config.json`、副本事务 `change`、外观补齐 `withCast`、角色校验 `roleProblem` |
 | `apps/server/src/agent/template.ts`、`templates/` | 内置模板与本机导入模板（`agent-templates/<id>/`）的读取、安装与更新 |
+| `apps/server/src/agent/skill.ts`、`skills/<id>/SKILL.md`（`SKILL.en.md` 是英文） | VibeValley 自带的技能：随服务端打包（`base/assets.ts` 的 `serverFiles`），开机读一次 |
 | `apps/server/src/runtime/runtime.ts` | 农机注册表、探测缓存、额度轮询、`assess` 与 `resolve` |
 | `apps/server/src/runtime/presets.ts`、`presets.json` | 农机预设、支持项 `supportOf`、可派性校验 `agentProblems` 与挑人算法 `chooseAgent` |
 | `apps/server/src/runtime/quota.ts`、`price.ts`、`dsh.ts`、`pi.ts` | 额度文案、模型单价表、DeepSeek Harness 与 pi 配置读取 |
@@ -32,6 +33,7 @@
 - **角色固定为 `orchestrator` 与 `worker`**：默认助手 `orchestrator` 不可删除或改为帮工；所有助手档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
 - **角色只管职责，别的各问一处**：档案是农场里的一个人，`role` 只决定他能做什么（工具、权限、能不能派去改代码）。他怎么上班、在哪干活、话算谁说的，各由一处回答：当值（会话 id 就是档案 id、开机就在）问 `isOnDuty`，按活雇来的问 `isHired`（`session/roster.ts`）；在服务端进程里干活、由 `Session.host` 收消息的问 `Agent.isHosted`；交给当值的人的工单问 `assignedOnDuty`。今天这几处都由角色推出来，以后有不当值的助手或在进程里干活的帮工，只改这几处。话是谁说的（`ActorKind`）只有 `owner`、`agent`、`system`，agent 另带 `role`（消息的 `fromRole`、触发的 `actor.role`、服务端的 `Actor`）；库里存的说话的人和定时任务、记忆的作者都只记这三种。
 - **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组，`chooseAgent` 按工单文字命中的关键词数挑选帮工档案。
+- **自带的技能只读，按 id 引用**：`Agent.skills()` 先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型。
 - **外观确定性补齐（`withCast`）**：缺省外观按档案 `id` 哈希取模补齐，前后端 `castOf` 算法一致。
 - **十台注册农机与能力合并（`RuntimeSupport`）**：固定顺序为 `claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`support` 合并 oar `refusedSessionOptions` 与 `presets.json` 限制。
@@ -79,6 +81,7 @@
 - **派活针对档案而非直接针对农机**：同一台农机配不同人设、模型、技能和 `worktree` 策略即构成不同工种，且同一档案可并发派出多个 `Session`。
 - **模板按需安装，更新需用户确认**：不在首次开机强灌全部帮工，避免未装农机报错；更新模板只覆盖职责与人设，不覆盖用户的模型与环境设置。
 - **本机已装技能只读展示，不复制进 `config.json`**：各农机自带技能由农机按需加载，避免双份副本失步。
+- **VibeValley 自带的技能不复制进技能库**：复制进去就和 VibeValley 的新版本失步，用户改过的又分不清该不该覆盖；按 id 引用，跟着 VibeValley 走，想换做法就自己写一个。助手的 skill（`orchestrator/skills/`）是 VibeValley 自己的 agent 按需加载的另一条路，不在技能库里。
 - **农机观察走 `/api/v1/live` 窄流，不进 `SpaceState`**：避免每次 token 花费变动都触发全局状态折叠与广播。
 
 ## 还没做的
@@ -88,6 +91,7 @@
 
 ## 怎么验证
 
+- `apps/server/src/agent/skill.test.ts`：自带技能随服务端打包、有英文、只读、模板安装时勾上、勾了的进帮工的提示。
 - `apps/server/src/agent/template.test.ts`、`agent.test.ts`：内置模板、副本事务、损坏配置保护、角色约束与外观补齐测试。
 - `apps/server/src/runtime/runtime.test.ts`、`presets.test.ts`：探测代数、支持项合并、挑档案与 `resolve` 测试。
 - `apps/web/test/agents.spec.ts`、`runtimes.spec.ts`、`runtime-avatars.spec.ts`：档案增删改、模板安装、农机设置与头像角标端到端测试。

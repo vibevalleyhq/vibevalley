@@ -43,6 +43,8 @@ const TemplateFile = Schema.Struct({
   personaMode: Schema.optionalKey(S.PersonaMode),
   worktree: Schema.optionalKey(Schema.Boolean),
   look: Schema.optionalKey(LookFile),
+  /** Built-in skills (agent/skills/<id>) a profile from it has ticked. */
+  skills: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
 const WordsFile = Schema.Struct({
@@ -122,6 +124,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
       },
       persona,
       source,
+      skills: [...(item.skills ?? [])],
       installed: [],
     } satisfies T.AgentTemplate;
   });
@@ -177,7 +180,7 @@ export const profileOf = (item: T.AgentTemplate, id: string, name: string): T.Ag
   effort: item.effort,
   persona: item.persona,
   personaMode: item.personaMode,
-  skills: [],
+  skills: [...item.skills],
   mcpServers: [],
   disallowedTools: [],
   env: {},
@@ -196,5 +199,7 @@ export const updatedFrom = (item: T.AgentTemplate, a: T.Agent): T.Agent => ({
   persona: item.persona,
   personaMode: item.personaMode,
   worktree: item.worktree,
+  // The template's skills are ticked again; the ones the user ticked besides stay.
+  skills: [...new Set([...a.skills, ...item.skills])],
   from: { template: item.id, version: item.version },
 });

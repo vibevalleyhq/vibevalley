@@ -1,9 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
+import { Array as Arr, Option, Schema } from "effect";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { list as listed, t } from "@vibevalley/i18n";
-import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
+import type { Agent, RuntimeInfo, Skill } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Keyed } from "#/base/dom.tsx";
@@ -19,6 +19,7 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { TextArea, TextInput } from "#/ui/Field.tsx";
 import { Form, FormField, formControl, formMessages } from "#/ui/Form.tsx";
 import { Card, Empty } from "#/ui/layout.tsx";
+import { Markdown } from "#/ui/Markdown.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 
@@ -288,19 +289,31 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const runtimes = useRuntimes();
   const catalog = () => ready(runtimes, []);
   const installed = () => installedSkills(catalog());
-  const own = () => ready(skills, []);
+  const all = (): readonly Skill[] => ready(skills, []);
+  const own = () => Arr.filter(all(), (s) => s.builtIn !== true);
+  const builtIns = () => Arr.filter(all(), (s) => s.builtIn === true);
   const creating = () => props.id === "new";
   const shownInstalled = () => {
     const id = props.id;
     return id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === id.slice(installedPrefix.length)) : undefined;
   };
+  const shownBuiltIn = () => {
+    const id = props.id;
+    return creating() || shownInstalled() !== undefined ? undefined : Option.getOrUndefined(Arr.findFirst(builtIns(), (s) => s.id === id));
+  };
   const selected = () =>
-    creating() || shownInstalled() ? undefined : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0]));
+    creating() || shownInstalled() || shownBuiltIn() !== undefined
+      ? undefined
+      : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0]));
   const first = () => (props.id === undefined ? installed()[0] : undefined);
   const q = () => query().trim();
   const list = () =>
     q() ? installed().filter((s) => matches(q(), [s.name, s.description, ...s.runtimes.map((x) => runtimeName(catalog(), x.runtime))])) : installed();
   const ownShown = () => (q() ? own().filter((s) => matches(q(), [s.name, s.description, s.body])) : own());
+  const builtInShown = () => {
+    const text = q();
+    return text === "" ? builtIns() : Arr.filter(builtIns(), (s) => matches(text, [s.name, s.description, s.body]));
+  };
   const count = (shown: number, all: number) => (q() ? `${shown} / ${all}` : `${all}`);
   const open = () => shownInstalled() ?? first();
 
@@ -340,6 +353,10 @@ export function SkillsPage(props: { id?: string | undefined }) {
             )}
           </For>
         </ul>
+        <h3 {...stylex.attrs(viewStyles.skillsPageH3)}>{t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}</h3>
+        <ul {...stylex.attrs(viewStyles.skillsPageUl)} data-testid="built-in-skills">
+          <For each={builtInShown()}>{(s) => <Entry to={skillPath(s.id)} on={shownBuiltIn()?.id === s.id} title={s.name} detail={s.description} />}</For>
+        </ul>
         <div {...stylex.attrs(viewStyles.skillsPageDiv)}>
           <h3 {...stylex.attrs(viewStyles.skillsPageH32)}>{t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}</h3>
           <A href={skillPath("new")} data-testid="new-skill" {...stylex.attrs(variantStyles.skillsPageA)}>
@@ -368,6 +385,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
           <Match when={creating()}>
             <Keyed key="new">{() => <SkillEditor />}</Keyed>
           </Match>
+          <Match when={shownBuiltIn()}>{(s) => <BuiltInCard skill={s()} />}</Match>
           <Match when={open()}>{(s) => <InstalledCard skill={s()} catalog={catalog()} />}</Match>
           <Match when={selected()}>{(s) => <Keyed key={s().id}>{() => <SkillEditor skill={s()} />}</Keyed>}</Match>
         </Switch>
@@ -391,6 +409,47 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
         </Show>
       </A>
     </li>
+  );
+}
+
+/** Read-only: it ships with VibeValley and changes with it. */
+function BuiltInCard(props: { skill: Skill }) {
+  const allAgents = useAgents();
+  const agents = () => {
+    const id = props.skill.id;
+    return Arr.filter(ready(allAgents, []), (a) => a.skills.includes(id));
+  };
+  return (
+    <Card title={props.skill.name} styles={viewStyles.skillCard}>
+      <div data-testid="built-in-skill" {...stylex.attrs(viewStyles.installedCardDiv)}>
+        <p {...stylex.attrs(viewStyles.installedCardP)}>{t("web.runtime.library.builtInNote")}</p>
+        <Show when={props.skill.description !== ""}>
+          <p {...stylex.attrs(viewStyles.installedCardP2)}>{props.skill.description}</p>
+        </Show>
+        <Markdown text={props.skill.body} />
+        <SkillUsers agents={agents()} />
+      </div>
+    </Card>
+  );
+}
+
+function SkillUsers(props: { agents: readonly Agent[] }) {
+  return (
+    <div data-testid="skill-users" data-count={props.agents.length} {...stylex.attrs(viewStyles.installedCardDiv)}>
+      <span {...stylex.attrs(viewStyles.skillEditorSpan)}>{t("web.runtime.library.who")}</span>
+      <Show when={props.agents.length > 0} fallback={<p {...stylex.attrs(viewStyles.installedCardP)}>{t("web.runtime.library.nobody")}</p>}>
+        <div {...stylex.attrs(viewStyles.skillEditorDiv2)}>
+          <For each={props.agents}>
+            {(a) => (
+              <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(variantStyles.skillEditorA)}>
+                <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
+                <span {...stylex.attrs(viewStyles.skillEditorSpan2)}>{a.name}</span>
+              </A>
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -517,21 +576,7 @@ function SkillEditor(props: { skill?: Skill }) {
             onInput={(e) => body.setValue(e.currentTarget.value)}
           />
         </FormField>
-        <div data-testid="skill-users" data-count={agents().length} {...stylex.attrs(viewStyles.installedCardDiv)}>
-          <span {...stylex.attrs(viewStyles.skillEditorSpan)}>{t("web.runtime.library.who")}</span>
-          <Show when={agents().length > 0} fallback={<p {...stylex.attrs(viewStyles.installedCardP)}>{t("web.runtime.library.nobody")}</p>}>
-            <div {...stylex.attrs(viewStyles.skillEditorDiv2)}>
-              <For each={agents()}>
-                {(a) => (
-                  <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(variantStyles.skillEditorA)}>
-                    <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
-                    <span {...stylex.attrs(viewStyles.skillEditorSpan2)}>{a.name}</span>
-                  </A>
-                )}
-              </For>
-            </div>
-          </Show>
-        </div>
+        <SkillUsers agents={agents()} />
       </Card>
     </Form>
   );
