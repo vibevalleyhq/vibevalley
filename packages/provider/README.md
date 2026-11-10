@@ -44,4 +44,4 @@ DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具
 
 浏览器只导入纯协议子路径，不导入服务端工厂。`ask_orchestrator`、页面中继、设置到厂商配置的组装及 RTC 设备由应用负责。实时内核的保留边界见 [语音](docs/subsystems/voice.md#为什么这样)。
 
-检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build`、`server:check` 和 `effect:check`。AI 的黄金数据继续检查完整请求与响应；服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。
+检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build`、`server:check` 和 `effect:check`。服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。

@@ -192,7 +192,7 @@
   "packages/testkit": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 4,
+    "cast": 1,
     "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
@@ -520,6 +520,16 @@
     "resultBranch": 0
   },
   "web: features/setting": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
+  "web: features/user": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,

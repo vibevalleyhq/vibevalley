@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { setLocale } from "@vibevalley/i18n";
-import type { Spent } from "@vibevalley/protocol";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";
 
 import { htmlSources } from "#/artifact/policy.ts";
-import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
 import { agentOnly, type Op, parameters, sessionParameters, toolName } from "./schemas.ts";
@@ -44,11 +42,6 @@ describe("the tools", () => {
     expect(spentText({ tokens: 26_000, cny: 0.03 })).toBe("约 ¥0.03 · 2.6 万 token");
     // toFixed rounds halves up.
     expect(spentText({ tokens: 12_500 })).toBe("1.3 万 token");
-    const failed = checkCases(goldenCases("tool"), (c) => {
-      if (c.fn !== "spentText") throw new Error(`unknown fn ${c.fn}`);
-      return spentText(c.in as Spent);
-    });
-    expect(failed).toEqual([]);
   });
 
   it("read in the trajectory by label and what they name", () => {

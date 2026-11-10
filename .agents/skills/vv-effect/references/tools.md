@@ -32,7 +32,6 @@
 | 时间 | `TestClock`（`import { TestClock } from "effect/testing"`）：`TestClock.adjust("1 minute")`、`setTime` |
 | 等一个条件成立 | `@vibevalley/testkit/until`，不用 `sleep` |
 | 一个整农场 | `apps/server/src/testing/world.ts`；帮工是 oar 的 `scriptedRuntime`，模型是照脚本回答的 `Llm`（`@vibevalley/ai/testing`） |
-| 规则的黄金数据 | `@vibevalley/testkit/golden`，有意改了规则 `vp run golden:update <模块>` |
 | 贵的资源跨测试共享 | `it.layer(…)`，只给真贵的（数据库、整个服务），说清共享了什么 |
 
 ## 观测

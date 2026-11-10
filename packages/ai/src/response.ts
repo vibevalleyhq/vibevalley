@@ -1,8 +1,7 @@
-import { Option, Predicate } from "effect";
+import { Predicate } from "effect";
 
-import { type DeepSeekChunk, decodeDeepSeekChunk, SseData } from "@vibevalley/provider/deepseek/response";
+import { type DeepSeekChunk } from "@vibevalley/provider/deepseek/response";
 
-import { parsedJson } from "./json.ts";
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -285,20 +284,4 @@ function streamingArguments(partial: string, last: Readonly<Record<string, unkno
   } catch {
     return last;
   }
-}
-
-/** A whole stream's text read at once: the message the events end with. */
-export function responseOf(model: Model, sse: string, timestamp = 0): AssistantMessage {
-  const fold = new Fold(model, timestamp);
-  const data = new SseData();
-  for (const line of sse.split("\n")) {
-    const d = data.line(line);
-    if (d === undefined) continue;
-    const parsed = parsedJson(d);
-    if (Option.isNone(parsed)) throw new Error(`Not JSON in the stream: ${d.slice(0, 200)}`);
-    fold.chunk(decodeDeepSeekChunk(parsed.value));
-  }
-  const last = fold.end().at(-1);
-  if (!last) return fold.message();
-  return last.type === "done" ? last.message : last.type === "error" ? last.error : fold.message();
 }

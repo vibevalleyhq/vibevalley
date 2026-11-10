@@ -70,5 +70,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/game/progress.test.ts`、`game.test.ts`、`apps/server/src/core/golden.test.ts`：账本折叠、金币倍率、成就解锁与等级黄金数据测试。
+- `apps/server/src/game/progress.test.ts`、`game.test.ts`：账本折叠、金币倍率、成就解锁与等级测试。
 - `apps/web/test/farm-hud.spec.ts`：任务与成就面板、称号佩戴与仓库展示测试。

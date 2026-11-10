@@ -89,5 +89,5 @@
 ## 怎么验证
 
 - `apps/server/src/agent/template.test.ts`、`agent.test.ts`：内置模板、副本事务、损坏配置保护、角色约束与外观补齐测试。
-- `apps/server/src/runtime/runtime.test.ts`、`recorded.test.ts`：探测代数、支持项合并、`agentProblems` 与 `resolve` 测试。
+- `apps/server/src/runtime/runtime.test.ts`、`presets.test.ts`：探测代数、支持项合并、挑档案与 `resolve` 测试。
 - `apps/web/test/agents.spec.ts`、`runtimes.spec.ts`、`runtime-avatars.spec.ts`：档案增删改、模板安装、农机设置与头像角标端到端测试。

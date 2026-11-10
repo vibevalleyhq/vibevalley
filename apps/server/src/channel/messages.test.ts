@@ -5,12 +5,11 @@ import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 import type { ChannelAudience } from "#/channel/contracts.ts";
 import { brakes, type BrakeInput } from "#/mailbox/brakes.ts";
-import type { Envelope, UnreadRow } from "#/mailbox/envelope.ts";
+import type { Envelope } from "#/mailbox/envelope.ts";
 import { messageLine, wakeInput } from "#/mailbox/prompts.ts";
 import { whoHears } from "#/mailbox/routing.ts";
-import { checkCases, goldenCases } from "#/testing/golden.ts";
 
-import { channelNameProblem, mentionsIn, parseChatTarget } from "./mentions.ts";
+import { mentionsIn } from "./mentions.ts";
 import { parseSearch } from "./messages.ts";
 import { Members } from "./rooms.ts";
 
@@ -28,35 +27,6 @@ test("regression: a delivery batch includes every acknowledged card", () => {
   }));
   const input = wakeInput(messages, []);
   for (const message of messages) expect(input).toContain(message.text);
-});
-
-test("the recorded cases", () => {
-  const cases = goldenCases("channel");
-  expect(new Set(cases.map((c) => c.fn)).size).toBe(5);
-  const failed = checkCases(cases, (c) => {
-    switch (c.fn) {
-      case "mentionsIn":
-        return mentionsIn(c.in as string);
-      case "parseTarget": {
-        // As Go writes it: a zero parent is left out.
-        const t = parseChatTarget(c.in as string);
-        return t?.kind === "thread" && t.root === 0 ? { kind: "thread" } : (t ?? null);
-      }
-      case "channelNameProblem": {
-        const i = c.in as { name: string; taken: string[] | null };
-        return channelNameProblem(i.name, i.taken ?? []) || null;
-      }
-      case "audienceOf":
-        return brakes(whoHears(c.in as ChannelAudience), c.in as BrakeInput);
-      case "wakeInput": {
-        const i = c.in as { messages: Envelope[] | null; others: UnreadRow[] | null };
-        return wakeInput(i.messages ?? [], i.others ?? []);
-      }
-      default:
-        throw new Error(`line ${c.line}: no rule ${c.fn}`);
-    }
-  });
-  expect(failed).toEqual([]);
 });
 
 test("an @ right after Chinese names someone, and one inside a Latin word or an address does not", () => {

@@ -10,7 +10,7 @@
 | 服务端 13 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
 | `packages/protocol` 的概念目录、Schema 与客户端生成 | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
 | Postgres 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
-| 测试金字塔、虚拟时钟、黄金数据与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
+| 测试金字塔、虚拟时钟与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
 | 词典（`packages/i18n`）与模型提示（`prompts.ts`）分工 | 界面用词标准（[用语表](docs/README.md#用语)） |
 
 ## 在哪
@@ -27,7 +27,7 @@
 | `packages/protocol/src/client.ts` | 由 `scripts/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
 | `apps/server/db/migrations/0001_schema.up.sql` | 唯一的 Postgres 表结构基线 |
 | `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `scripts/pg-generate.ts` 生成代码 |
-| `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待、黄金数据与测试金字塔分级 |
+| `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待与测试金字塔分级 |
 | `packages/i18n/`、`scripts/i18n.ts` | 中英双语词典 JSON、生成的 `src/catalogs.ts` 与词条检查工具 |
 
 共用原语清单见生成的 [primitives.md](docs/reference/primitives.md)。
@@ -124,10 +124,10 @@
 2. 在 `apps/server/src/http/handlers/<概念>.ts` 实现接口。
 3. 运行 `vp run api:client` 和 `vp run capabilities` 更新生成的客户端与能力表。
 
-**修改纯函数规则与黄金数据**
+**修改纯函数规则**
 
 1. 修改模块内或 `packages/protocol/src/rules/` 中的纯函数。
-2. 运行 `vp run golden:update <模块>` 更新 `testdata/*.jsonl.gz`，检查 `git diff`。
+2. 在它旁边的 `*.test.ts` 里用手写的例子写出改了的行为。
 
 ## 和谁打交道
 
@@ -141,6 +141,7 @@
 - **契约按概念分目录，不拆多包**：消除单大文件合并冲突，同时避免拆成十几个子包的构建开销。
 - **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。
+- **规则用手写的例子测，不录黄金数据**：录下的 `*.jsonl.gz` 有几十 MB，改了只看得到二进制，规则一改就整份重写，说不出哪里变对了、哪里变错了；拿不出它抓到过真问题的证据，就去掉了。
 - **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
 
 ## 怎么验证

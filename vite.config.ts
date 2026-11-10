@@ -52,7 +52,7 @@ export default defineConfig({
   // vp dev, build and preview at the root mean the page.
   defaultPackage: "./apps/web",
   // Checks are tasks here and in each package's vite.config.ts: cached, so a run with nothing changed replays its
-  // result. What writes files or keeps running (golden:update, api:client, desktop:dev…) stays a package.json script.
+  // result. What writes files or keeps running (api:client, desktop:dev…) stays a package.json script.
   run: {
     tasks: {
       "scripts:test": "vp test run",

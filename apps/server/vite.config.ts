@@ -26,14 +26,14 @@ export default defineConfig({
     tsconfig: "tsconfig.json",
     deps: { alwaysBundle: [/^@vibevalley\//u] },
   },
-  // The cache sees the files a run reads but not its environment: these change what the tests do (golden.ts writes the golden data on update.
+  // The cache sees the files a run reads but not its environment: these change what the tests do.
   run: {
     tasks: {
       // The packaged app's server (the pack block above), into dist/.
       build: { command: "vp pack", cache: { input: [{ auto: true }, "!node_modules", "!dist/**"] } },
       test: {
         command: "vp test run",
-        cache: { env: ["VIBEVALLEY_GOLDEN", "VIBEVALLEY_EVALS_LIVE", "VIBEVALLEY_EVAL_N", "VIBEVALLEY_EVAL_MODEL", "VIBEVALLEY_EVALS"] },
+        cache: { env: ["VIBEVALLEY_EVALS_LIVE", "VIBEVALLEY_EVAL_N", "VIBEVALLEY_EVAL_MODEL", "VIBEVALLEY_EVALS"] },
       },
     },
   },

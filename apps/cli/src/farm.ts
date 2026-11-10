@@ -40,7 +40,7 @@ export const ServerFlag = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(
     Flag.withFallbackConfig(Config.String("VIBEVALLEY_SERVER")),
     Flag.withDefault(defaultServer),
-    // The rule, not this machine's address: help reads the same everywhere, and so does its golden data.
+    // The rule, not this machine's address: help reads the same everywhere.
     Flag.withDescription(t("cli.flag.server", { fallback: fallbackServer })),
   ),
 });

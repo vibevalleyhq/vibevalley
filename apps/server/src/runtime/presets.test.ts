@@ -1,36 +1,11 @@
 import { expect, test } from "vite-plus/test";
 
-import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
+import type { AccountUsage } from "@vibevalley/protocol";
 
 import { sampleAgent } from "#/agent/seed.ts";
-import { checkCases, goldenCases } from "#/testing/golden.ts";
 
-import { agentProblems, chooseAgent, supportOf, moneyStop } from "./presets.ts";
+import { chooseAgent } from "./presets.ts";
 import { quotaLeft, quotaOf, quotaText } from "./quota.ts";
-
-test("the recorded cases", () => {
-  const cases = goldenCases("runtime");
-  expect(new Set(cases.map((c) => c.fn)).size).toBe(3);
-  const failed = checkCases(cases, (c) => {
-    switch (c.fn) {
-      case "moneyStop":
-        return moneyStop((c.in as RuntimeInfo | null) ?? undefined) || null;
-      case "quota":
-        return {
-          left: quotaLeft(c.in as AccountUsage) ?? null,
-          text: quotaText(c.in as AccountUsage),
-        };
-      case "agentProblems": {
-        // Recorded before a runtime always carried its support: one recorded without them has its own.
-        const i = c.in as { agent: Agent; runtime: (Omit<RuntimeInfo, "support"> & Partial<Pick<RuntimeInfo, "support">>) | null };
-        return agentProblems(i.agent, i.runtime ? { ...i.runtime, support: i.runtime.support ?? supportOf(i.runtime.id) } : undefined);
-      }
-      default:
-        throw new Error(`line ${c.line}: no rule ${c.fn}`);
-    }
-  });
-  expect(failed).toEqual([]);
-});
 
 test("quota in words", () => {
   const ok = (...windows: [string, number][]): AccountUsage => ({

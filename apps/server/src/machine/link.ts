@@ -7,7 +7,7 @@ import type { Executor } from "#/executor/executor.ts";
 // object is shared by both sides.
 
 /** value as it arrives on the other side of the link: a copy, none of its objects the sender's. */
-export const across = <A>(value: A): A => structuredClone(value);
+const across = <A>(value: A): A => structuredClone(value);
 
 /** A machine's executions as the server reaches them: the calls Session makes on the helpers' runs there. */
 export type Executions = Executor["Service"];

@@ -123,7 +123,7 @@
 
 - `apps/server/src/session/report.test.ts`、`journal.test.ts`、`inProcessRun.test.ts`：汇报解析、轨迹版本追加与进程内 `Run` 测试。
 - `apps/server/src/session/session.test.ts`、`apps/server/src/flows/work.test.ts`：派工、带话、静默告警、容量上限、合并交接与重启恢复测试。
-- `apps/server/src/runtime/runtime.test.ts`、`recorded.test.ts`：农机探测缓存、额度计算与每日花费测试。
+- `apps/server/src/runtime/runtime.test.ts`、`presets.test.ts`：农机探测缓存、额度计算与每日花费测试。
 
 ### Worker access observations
 

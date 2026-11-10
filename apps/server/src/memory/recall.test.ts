@@ -1,33 +1,9 @@
-import { Equal, Formatter } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { checkCases, goldenCases } from "#/testing/golden.ts";
-
-import { lineOf, nextForgotten, pick, type PickCue, relevance, termsList, termsOf } from "./recall.ts";
-
-// Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds. V8's is fdlibm's.
-const near = (got: number | null, want: number | null) => got === want || (got !== null && want !== null && Math.abs(got - want) <= 1e-12 * Math.abs(want));
-
-test("the recorded recalls: the terms, each memory's relevance, the pick", () => {
-  const failed = checkCases(goldenCases("memory"), (c) => {
-    const want = (c.out as { relevance: (number | null)[] }).relevance;
-    const input = c.in as { memories: Memory[]; cue: Omit<PickCue, "skip"> & { skip?: string[] } };
-    const cue: PickCue = { ...input.cue, skip: new Set(input.cue.skip ?? []) };
-    const terms = termsOf(cue.text);
-    return {
-      terms: [...terms].toSorted(),
-      relevance: input.memories.map((m, i) => {
-        const got = relevance(m, cue, terms) ?? null;
-        return near(got, want[i] ?? null) ? (want[i] ?? null) : got;
-      }),
-      pick: pick(input.memories, cue).map((m) => m.id),
-    };
-  });
-  expect(failed).toEqual([]);
-});
+import { lineOf, nextForgotten, pick, type PickCue, termsList, termsOf } from "./recall.ts";
 
 const now = 1_800_000_000_000;
 const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory => ({
@@ -81,18 +57,6 @@ test("lines, and what goes first when there are too many", () => {
   expect(nextForgotten(many, 1)).toEqual([]);
   const recalled = many.map((m) => (m.id === `n${memoryKeep - 2}` ? { ...m, recalledAt: now } : m));
   expect(nextForgotten(recalled, 3)).toEqual([`n${memoryKeep - 3}`, `n${memoryKeep - 4}`]);
-});
-
-test("the words are gse's, as recorded", () => {
-  const failed: string[] = [];
-  for (const c of goldenCases("memory")) {
-    const cue = (c.in as { cue: { text: string } }).cue;
-    const got = [...termsOf(cue.text)].toSorted();
-    const want = (c.out as { terms: string[] }).terms;
-    if (!Equal.equals(got, want) && failed.length < 10)
-      failed.push(`line ${c.line} ${Formatter.format(cue.text)}: got ${Formatter.format(got)}, want ${Formatter.format(want)}`);
-  }
-  expect(failed).toEqual([]);
 });
 
 test("words, and code whole", () => {

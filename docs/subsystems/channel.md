@@ -104,7 +104,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/channel/channel.test.ts`、`mentions.test.ts`、`recorded.test.ts`：路由、修订号补齐、新鲜度拦截与 `userMentions` 测试。
+- `apps/server/src/channel/channel.test.ts`、`mentions.test.ts`、`messages.test.ts`：路由、修订号补齐、新鲜度拦截与 `userMentions` 测试。
 - `apps/server/src/flows/thread.test.ts`、`talk.test.ts`：工单串跨重开复用與私聊休眠恢复测试。
 - `apps/server/src/connector/connector.test.ts`、`digest.test.ts`：微信/飞书/QQ 收发去重、退避与配对测试。
 - `apps/web/test/chat.spec.ts`、`chat-messages.spec.ts`、`chat-rest.spec.ts`、`channel-follow.spec.ts`：聊天界面与实时订阅端到端测试。

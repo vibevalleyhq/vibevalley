@@ -16,7 +16,7 @@ src/infra/         what deals with the process and the machine: configuration, d
 src/<module>/      one service each (modules.ts): core setting user provider agent runtime memory repo executor session mailbox channel media artifact pkm
                    issue cron ingress resource inbox orchestrator tool game, and http mcp lan connector voice at the top
 src/flows/         tests that go through several services: a whole farm and a helper that works by the words of its job
-src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories, golden data
+src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories
 db/                migrations/0001_schema.up.sql (the one schema), queries/<table>.sql, generated/ (scripts/pg-generate.ts)
 ```
 

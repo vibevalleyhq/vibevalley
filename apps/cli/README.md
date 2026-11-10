@@ -21,7 +21,6 @@ src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes,
 src/chat.ts        `chat [runtime]`: the server's conversation program, handed this terminal (VIBEVALLEY_CHAT); bare `vibevalley` is the help
 src/output.ts      stdout for the result, the failure as one JSON line on stderr, exit codes by kind
 src/testing.ts     a run in the process against a whole farm (@vibevalley/server/testing)
-src/testdata/      the golden answers: help, typical mistakes, refusals and dry runs (vp run golden:update cli)
 ```
 
 ## Rules

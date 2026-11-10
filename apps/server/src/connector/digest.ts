@@ -8,7 +8,7 @@ export const maxChars: Record<T.ConnectorID, number> = { weixin: 1800, feishu: 4
 
 export const digestOver = 3;
 
-export function plainText(markdown: string): string {
+function plainText(markdown: string): string {
   return markdown
     .replace(/```[^\n]*\n([\s\S]*?)```/gu, (_, code: string) => code.trimEnd())
     .replace(/`([^`\n]+)`/gu, "$1")

@@ -67,5 +67,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/core/golden.test.ts`、`apps/server/src/inbox/*.test.ts`：8 种事项派生、宽限期计算、已读撤回与黄金数据测试。
+- `apps/server/src/inbox/*.test.ts`：8 种事项派生、宽限期计算与已读撤回测试。
 - `apps/web/src/farm/phone/calls.test.ts`、`features/inbox/tray.test.ts`、`apps/web/test/farm-phone.spec.ts`：来电去重、托盘摘要与接听测试。

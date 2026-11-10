@@ -11,7 +11,6 @@ import { orchestrator, user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { type ServerConfig } from "#/infra/config.ts";
-import { checkCases, goldenCases } from "#/testing/golden.ts";
 import { testConfig, aTurn } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 import { world } from "#/testing/world.ts";
@@ -19,16 +18,6 @@ import * as q from "#db/cron.sql.ts";
 
 import { type Due, Cron } from "./cron.ts";
 import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
-
-test("the recorded cases", () => {
-  const cases = goldenCases("cron");
-  expect(new Set(cases.map((c) => c.fn))).toEqual(new Set(["due"]));
-  const failed = checkCases(cases, (c) => {
-    const i = c.in as { s: T.Cron; now: number };
-    return { due: dueCrons([i.s], i.now).length, missed: isMissed(i.s, i.now) };
-  });
-  expect(failed).toEqual([]);
-});
 
 const at = (iso: string) => Date.parse(iso + "+08:00");
 

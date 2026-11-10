@@ -96,6 +96,6 @@
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts`、`apps/server/src/core/golden.test.ts`：事实去重、`seq` 递增、批次原子提交、低调度预算下的同步回调与黄金数据测试。
+- `apps/server/src/core/core.test.ts`：事实去重、`seq` 递增、批次原子提交与低调度预算下的同步回调测试。
 - `packages/protocol/src/api.test.ts`、`apps/server/src/http/api.test.ts`、`apps/server/src/flows/request.test.ts`：接口命名规范、`requestKey` 幂等与帧 `seq` 同步测试。
-- `apps/cli/src/main.test.ts`、`apps/cli/src/golden.test.ts`：CLI 全接口覆盖、试跑与错误 `next` 测试。
+- `apps/cli/src/main.test.ts`：CLI 全接口覆盖、试跑与错误 `next` 测试。

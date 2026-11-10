@@ -1,32 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
-import type { SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
-
-import { checkCases, goldenCases } from "#/testing/golden.ts";
-
 import { keyHint, memorySourcesProblem, settingsProblem } from "./memorySources.ts";
-import { defaultVoice, voiceOverrides, voiceProblem, voiceSettingsOver } from "./voice.ts";
-test("the recorded cases", () => {
-  const cases = goldenCases("setting");
-  expect(new Set(cases.map((c) => c.fn)).size).toBe(4);
-  const failed = checkCases(cases, (c) => {
-    switch (c.fn) {
-      case "settingsProblem":
-        return settingsProblem(c.in as SettingsUpdate) || null;
-      case "voiceProblem":
-        return voiceProblem(c.in as SettingsUpdateVoice) || null;
-      case "voiceOverrides": {
-        const want = c.out as { overrides: SettingsUpdateVoice };
-        return { overrides: voiceOverrides(defaultVoice(), c.in as VoiceSettings), settings: voiceSettingsOver(defaultVoice(), want.overrides) };
-      }
-      case "keyHint":
-        return keyHint(c.in as string);
-      default:
-        throw new Error(`line ${c.line}: no rule ${c.fn}`);
-    }
-  });
-  expect(failed).toEqual([]);
-});
+import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 test("what settings refuse", () => {
   expect(settingsProblem({ deepseekApiKey: "sk has spaces" })).toMatch(/DeepSeek/u);

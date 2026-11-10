@@ -8,7 +8,7 @@
     "apps/web": 26
   },
   "asyncFunction": {
-    "apps/server": 266,
+    "apps/server": 260,
     "packages/agent": 48,
     "packages/ai": 9,
     "packages/artifact": 4,
@@ -50,7 +50,7 @@
     "apps/desktop": 5
   },
   "globalJson": {
-    "apps/server": 14,
+    "apps/server": 8,
     "packages/agent": 6,
     "packages/ai": 2,
     "packages/provider": 3,
@@ -76,17 +76,17 @@
     "apps/desktop": 6
   },
   "missingPipeableSignature": {
-    "apps/server": 206,
+    "apps/server": 204,
     "apps/cli": 7,
     "packages/agent": 35,
-    "packages/ai": 20,
+    "packages/ai": 19,
     "packages/provider": 8,
     "packages/pkm": 42,
     "packages/artifact": 8,
     "packages/protocol": 17,
     "packages/home": 2,
     "packages/bridge": 2,
-    "packages/testkit": 15,
+    "packages/testkit": 13,
     "packages/health": 5,
     "apps/web": 228,
     "apps/desktop": 20
@@ -101,28 +101,28 @@
     "apps/desktop": 11
   },
   "nodeBuiltinImport": {
-    "apps/server": 163,
+    "apps/server": 160,
     "packages/agent": 23,
     "packages/pkm": 1,
     "packages/protocol": 3,
     "packages/home": 4,
     "packages/bridge": 2,
-    "packages/testkit": 11,
+    "packages/testkit": 8,
     "packages/health": 5,
     "apps/web": 47,
     "apps/desktop": 48
   },
   "preferEffectArray": {
-    "apps/server": 1868,
+    "apps/server": 1843,
     "apps/cli": 119,
     "packages/agent": 181,
-    "packages/ai": 94,
+    "packages/ai": 90,
     "packages/provider": 70,
     "packages/pkm": 84,
     "packages/artifact": 56,
     "packages/protocol": 75,
     "packages/bridge": 1,
-    "packages/testkit": 34,
+    "packages/testkit": 23,
     "packages/health": 45,
     "apps/web": 1269,
     "apps/desktop": 45
@@ -131,27 +131,27 @@
     "apps/server": 74,
     "apps/cli": 3,
     "packages/agent": 8,
-    "packages/ai": 10,
+    "packages/ai": 9,
     "packages/pkm": 9,
     "packages/artifact": 2,
     "packages/protocol": 6,
     "packages/bridge": 4,
-    "packages/testkit": 7,
+    "packages/testkit": 5,
     "packages/health": 11,
     "apps/web": 57,
     "apps/desktop": 4
   },
   "preferEffectString": {
-    "apps/server": 1104,
-    "apps/cli": 50,
+    "apps/server": 1099,
+    "apps/cli": 48,
     "packages/agent": 112,
-    "packages/ai": 29,
+    "packages/ai": 27,
     "packages/provider": 82,
     "packages/pkm": 153,
     "packages/artifact": 89,
     "packages/protocol": 65,
     "packages/bridge": 5,
-    "packages/testkit": 33,
+    "packages/testkit": 25,
     "packages/health": 21,
     "apps/web": 523,
     "apps/desktop": 37
@@ -160,29 +160,29 @@
     "packages/agent": 11
   },
   "processEnv": {
-    "apps/server": 12,
+    "apps/server": 11,
     "packages/agent": 1,
-    "packages/testkit": 4,
+    "packages/testkit": 1,
     "apps/web": 19,
     "apps/desktop": 5
   },
   "schemaSync": {
-    "apps/server": 15,
+    "apps/server": 11,
     "packages/provider": 1,
     "apps/web": 8,
     "apps/desktop": 3
   },
   "strictBooleanExpressions": {
-    "apps/server": 1673,
+    "apps/server": 1667,
     "apps/cli": 47,
     "packages/agent": 90,
-    "packages/ai": 70,
+    "packages/ai": 63,
     "packages/provider": 26,
     "packages/pkm": 59,
     "packages/artifact": 60,
     "packages/protocol": 44,
     "packages/bridge": 2,
-    "packages/testkit": 16,
+    "packages/testkit": 11,
     "packages/health": 7,
     "apps/web": 1109,
     "apps/desktop": 34

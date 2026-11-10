@@ -170,7 +170,6 @@
 | `reposDir` | `git.ts` |  |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
-| `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |
 | `app` | `http.ts` |  |
 | `starter` | `layers.ts` | A built-in template as a farm whose agent.starters names it has it: under the template's own id. |
 | `testConfig` | `layers.ts` |  |
@@ -381,13 +380,10 @@
 
 ## `packages/testkit/src`
 
-测试共用：等待、黄金数据、金字塔、语法树
+测试共用：等待、金字塔、语法树
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `goldenCasesAt` | `golden.ts` | The cases of one file. |
-| `jsonDiff` | `golden.ts` | Where got and want differ, as JSON (a key holding undefined is no key); undefined when they agree. |
-| `checkCases` | `golden.ts` | Runs every case through rule and collects the first disagreements. |
 | `layers` | `pyramid.ts` |  |
 | `budgetMs` | `pyramid.ts` | What a test of each layer may take, in ms. |
 | `pyramid` | `pyramid.ts` | The layers of the files under root (a package's folder). |

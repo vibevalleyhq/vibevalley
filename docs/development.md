@@ -39,7 +39,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 优先运行与改动相关的最窄检查（命令总表见 [AGENTS.md](AGENTS.md#命令)）：
 
 - `vp check`：全仓格式（oxfmt）、lint（oxlint，带类型）与类型检查；`vp check --fix` 自动格式化。
-- `vp run server:check`：`vp check`、`packages/protocol` 规则、`apps/server` SQL 生成检查与 vitest（黄金数据在 `apps/server/src/core/testdata`）。
+- `vp run server:check`：`vp check`、`packages/protocol` 规则、`apps/server` SQL 生成检查与 vitest。
 - `vp run web:check`：`vp check`、前端规则 vitest 与页面构建；浏览器改动先跑对应的 `e2e:component`、`e2e:integration` 或 `e2e:audit`，交付节点用 `vp run --filter @vibevalley/web e2e` 做全量自动检查。各入口只构建需要的产物，真实集成用隔离服务端与临时家目录；纯截图另跑 `e2e:visual` 并看图，见 [页面命令](apps/web/README.md#commands)。
 - `vp run desktop:test`：Playwright 启动完整 Electron 应用。
 - `vp run docs:verify`：校验 Note、skill、文档链接与旧名字。
@@ -60,7 +60,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 ## 改形状、规则和表
 
 - **形状**：改 `packages/protocol/src/<概念>/shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`；改接口后运行 `vp run api:client` 和 `vp run capabilities`。
-- **规则**：改所属包内的纯函数（跨端共用的放 `packages/protocol/src/rules`），运行 `vp run golden:update [模块]` 更新黄金数据并检查 diff（[客户端问服务端](docs/subsystems/app.md)）。
+- **规则**：改所属包内的纯函数（跨端共用的放 `packages/protocol/src/rules`），在旁边的测试里用手写的例子写出改了的行为（[客户端问服务端](docs/subsystems/app.md)）。
 - **表和查询**：改 `apps/server/db/migrations/0001_schema.up.sql` 与 `apps/server/db/queries/<表>.sql`，运行 `vp run --filter @vibevalley/server db:generate`（`src/infra/schema.test.ts` 校验表名与索引）。
 - **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/stale-names.ts`。
 

@@ -17,7 +17,7 @@ export default defineConfig({
   run: {
     tasks: {
       build: { command: "vp pack", cache: { input: [{ auto: true }, "!node_modules", "!dist/**"] } },
-      test: { command: "vp test run", cache: { env: ["VIBEVALLEY_GOLDEN"] } },
+      test: { command: "vp test run" },
     },
   },
 });

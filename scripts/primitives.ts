@@ -15,7 +15,7 @@ export const folders: readonly { readonly dir: string; readonly what: string }[]
   { dir: "apps/web/src/base", what: "页面的纯地基" },
   { dir: "apps/web/src/infra", what: "页面对外的地基：服务端、宿主、浏览器" },
   { dir: "apps/web/src/state", what: "页面的中间层：意图、存下的选择、原子" },
-  { dir: "packages/testkit/src", what: "测试共用：等待、黄金数据、金字塔、语法树" },
+  { dir: "packages/testkit/src", what: "测试共用：等待、金字塔、语法树" },
 ];
 
 export interface Primitive {

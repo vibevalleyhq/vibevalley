@@ -36,7 +36,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 | 绕开约束 | 有没有 `as`、`!`、关 lint 的注释、`Effect.orDie`、`Effect.ignore`、空的 `catch`？测试的断言是不是改松了？ | `vp run health:verify`（逃生口的棘轮）；diff 里的测试改动；`regression: ` 开头的测试被动了要在 `## Regression` 里点名 |
 | 温室假设 | 循环里有没有逐个查库、逐个起 git？流是不是假设一次到一整行？写盘是不是每来一点就写一次？ | 读循环体；`docs/subsystems/foundation.md`「贵的东西归拥有它的模块管」；测试里有没有大一点的数据 |
 | 架构漂移 | 有没有新加依赖？有没有跨层、跨模块、穿过别人 `index.ts` 的 import？ | `pnpm-workspace.yaml` 的 catalog 的 diff；`vp check`（`page-layers`、`import/no-cycle`、`no-restricted-imports`）；`apps/server/src/modules.test.ts` |
-| 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、`db/`、服务接口、黄金数据）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一个 PR 讲一件事（[vv-pr](.agents/skills/vv-pr/SKILL.md)） |
+| 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、`db/`、服务接口）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一个 PR 讲一件事（[vv-pr](.agents/skills/vv-pr/SKILL.md)） |
 
 查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列给用户：每处带证据（文件和行号、命令的输出）、怎么改、靠哪个测试证明没变坏。只列不改，用户点了再改。
 
@@ -57,7 +57,7 @@ agent 加功能时只在局部补，不会顺手提炼；提炼要单独一道�
 
 1. 靶子来自读数，不来自印象：`vp run health` 的热点、`vp run deadcode`、[vv-simplify](.agents/skills/vv-simplify/SKILL.md) 找到的重复。凭印象挑的常常不是最该清的。
 2. 分开不变的和变的：几处一样的控制流（截断、退避、重试、失败时发什么）收进一个地方（拥有它的模块的服务，或一个骨架函数），各处只留自己不同的那一点（报文怎么拼、怎么签名），作为参数或窄接口传进去。
-3. 分支用 `refactor/`，不和功能放在一个 PR。行为不变：测试只因改名、挪地方而变，断言不减；`regression: ` 开头的测试不动；黄金数据不变（变了就不是纯重构）。
+3. 分支用 `refactor/`，不和功能放在一个 PR。行为不变：测试只因改名、挪地方而变，断言不减；`regression: ` 开头的测试不动。
 4. 结果要可量：删了多少行、调用方少知道了什么、哪个测试证明行为没变，写进 PR 的 `## What changed`。行数不设门槛（会被刷），但一张重构单没有让代码变少或变简单，就不该合。
 
 ## 5. 一次改很多文件

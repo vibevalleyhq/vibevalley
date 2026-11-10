@@ -65,5 +65,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/memory/*.test.ts`：分词与召回黄金数据、重合去重、容量淘汰、多来源超时隔离与出站脱敏测试。
+- `apps/server/src/memory/*.test.ts`：分词与召回、重合去重、容量淘汰、多来源超时隔离与出站脱敏测试。
 - `apps/server/src/flows/memory.test.ts`：跨会话、跨仓库、跨重启的记忆写入与不重复召回流程测试。

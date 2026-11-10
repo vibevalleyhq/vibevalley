@@ -109,7 +109,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - **工单是核心实体，帮工挂在工单下**：重开或换人复用同一工单 ID、同一分支与同一工单串，历史不散落。
 - **大活拆成原生父子工单，不设独立 `TaskGraph` 服务**：子工单直接复用普通工单的看板、提问与修复动作，通过检查后合入父分支，省去平行的计划服务、表和面板。
 - **验收子工单只冻结自身改动文件，违规直接退回**：冻结整个测试目录会阻碍后续步骤新增测试，悄悄恢复文件会让帮工莫名编译失败；显式退回并仅在依赖链末端跑全量祖先验收，兼顾防作弊与效率。
-- **状态只存用户意图，展示阶段与按钮由纯函数派生**：`in_progress`、`in_review`、`stage` 和 `acts` 实时算出并由黄金数据锁死，帮工崩溃不会导致库状态卡死。
+- **状态只存用户意图，展示阶段与按钮由纯函数派生**：`in_progress`、`in_review`、`stage` 和 `acts` 实时算出，帮工崩溃不会导致库状态卡死。
 - **完成结论与交付去向解耦**：将 `done`/`canceled` 与 `delivered` 分为两个正交字段，使调研结论单、留分支单和合并单共用一套状态机。
 
 ## 还没做的
@@ -119,7 +119,6 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 怎么验证
 
-- `apps/server/src/issue/recorded.test.ts`、`apps/server/src/core/golden.test.ts`：状态派生、合法挪动、时间线与模板填充黄金数据。
 - `apps/server/src/issue/issue.test.ts`、`apps/server/src/flows/issue.test.ts`、`apps/server/src/flows/refinement.test.ts`、`apps/server/src/flows/pull_request.test.ts`：派活、起草、父子拆单、检查与 PR 流程。
 - `apps/web/test/issues.spec.ts`、`apps/web/test/farm-actions.spec.ts`：工作台看板与农场工单操作端到端测试。
 

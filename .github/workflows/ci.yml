@@ -59,7 +59,7 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: vpx scripts/commit-msg.ts --body "$BODY" && vpx scripts/commit-msg.ts --branch "$BRANCH"
       - name: the contract this change touches
-        # For the reviewer: the protocol, schema, service interface and golden data lines it changes, in the summary.
+        # For the reviewer: the protocol, schema, and service interface lines it changes, in the summary.
         if: github.event_name == 'pull_request'
         run: vpx scripts/contract-diff.ts --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"
       - name: regression tests

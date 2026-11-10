@@ -13,7 +13,6 @@ state's fold and the frame (`apps/server/src/projection`). No files, no network.
 | `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `desktopBridge` and `mobileBridge`, the contracts each host's calls go over (`@vibevalley/bridge`), and `mobileHost`, the page's end of the phone's |
 | `@vibevalley/protocol/rules` | pure rules both the server and the page run: phase and action words (`phase.ts`), issue titles and stage helpers (`issues.ts`, `stage.ts`), channel lookup (`channel.ts`), block order keys (`order.ts`), PKM outline operations (`pkm.ts`), sandbox attributes (`display.ts`), repo name validation (`repo.ts`) |
 
-The golden cases of the fold and the frame are the server's (`apps/server/src/core/testdata`, `core/golden.test.ts`).
 
 ## The host
 
