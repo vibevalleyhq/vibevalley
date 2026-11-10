@@ -55,6 +55,9 @@ export type Words_issue_mandate_strength = typeof Words_issue_mandate_strength.T
 export const Words_issue_priority = Schema.Literals(["urgent","high","medium","low"])
 export type Words_issue_priority = typeof Words_issue_priority.Type
 
+export const Words_library_item_kind = Schema.Literals(["generated","uploaded","fetched"])
+export type Words_library_item_kind = typeof Words_library_item_kind.Type
+
 export const Words_mailbox_delivery_held_by = Schema.Literals(["hop_limit","cooldown","wake_breaker"])
 export type Words_mailbox_delivery_held_by = typeof Words_mailbox_delivery_held_by.Type
 

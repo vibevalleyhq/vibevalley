@@ -23,6 +23,7 @@ type LookIn =
   | "graph"
   | "memories"
   | "artifact"
+  | "library"
   | "pkm";
 
 /** Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). */
@@ -50,6 +51,7 @@ export const lookIn = {
   archive: listed("archive"),
   channel: listed("channel", ["channel", "list"]),
   artifact: listed("artifact", ["artifact", "list"]),
+  library: listed("library", ["library", "item", "list"]),
   pkm: listed("pkm", ["pkm", "page", "list"]),
 } satisfies Record<string, Next>;
 

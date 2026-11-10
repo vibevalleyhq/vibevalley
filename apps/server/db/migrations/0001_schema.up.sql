@@ -224,6 +224,16 @@ CREATE TABLE channel_attachment (
   size        integer not null,
   created_at  double precision not null
 );
+CREATE TABLE library_item (
+  -- A file in the library is a kept attachment: one item per file, however often it comes back.
+  attachment_id text primary key references channel_attachment (id),
+  kind          text not null check (kind in ('generated', 'uploaded', 'fetched')),
+  -- Where it first came from (LibraryOrigin as JSON); a later arrival only moves last_at.
+  origin        text not null,
+  added_at      double precision not null,
+  last_at       double precision not null
+);
+CREATE INDEX library_item_recent on library_item (last_at desc, attachment_id);
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
   target_id   text not null,

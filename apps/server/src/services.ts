@@ -17,6 +17,7 @@ import { Database, Db } from "./infra/db.ts";
 import { Ingress, start as ingressStart } from "./ingress/ingress.ts";
 import { Issue, start as issueStart } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
+import { Library } from "./library/library.ts";
 import { Machine } from "./machine/machine.ts";
 import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
@@ -82,7 +83,8 @@ export const sourceControl =
 export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Machine.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents, the user's notes; the sessions register as its helpers. */
-export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Media.layer), on(Artifact.layer), on(Pkm.layer));
+export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) =>
+  below.pipe(on(Channel.layer), on(Media.layer), on(Library.layer), on(Artifact.layer), on(Pkm.layer));
 
 /** Mailbox: delivery priority, durable per-Session input and the execution pump. */
 export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));

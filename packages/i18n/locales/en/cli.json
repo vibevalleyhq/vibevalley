@@ -170,6 +170,14 @@
         "previewDelete": "Preview taking back a device's key: say what would happen, without doing it"
       }
     },
+    "library": {
+      "item": {
+        "list": "List the library: generated files, your uploads, and what helpers fetched; filter by origin and type",
+        "add": "Put a file in the library: your uploaded attachment, or a url or working-directory file from an assistant or helper",
+        "delete": "Take a file out of the library (messages that have it still open it)",
+        "previewDelete": "Try taking it out: say what would happen, change nothing"
+      }
+    },
     "agent": {
       "create": "Create a profile",
       "delete": "Delete a profile",

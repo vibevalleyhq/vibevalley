@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream } from "effect";
+import { Array as Arr, Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Schema, Scope, Semaphore, Stream, String as Str } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -102,6 +102,8 @@ export class Session extends Context.Service<
     readonly lastTextOf: (id: string) => string;
     /** Its host-local working directory, kept out of the protocol shape. */
     readonly cwdOf: (id: string) => string | undefined;
+    /** A file in its working directory, read whole when it is at most max bytes: neither .. nor a link may lead out of it. */
+    readonly workFile: (id: string, path: string, max: number) => Effect.Effect<{ readonly name: string; readonly bytes: Uint8Array }, NotWorkFile>;
     /** The run it is in now; undefined between runs. */
     readonly runOf: (id: string) => string | undefined;
     /** Its report, from what it last said in full. */
@@ -165,6 +167,12 @@ import { NotTakenIn, reasonText, sessionLaunch } from "./launch.ts";
 import { type Hand, type RunStore, sessionRegistry } from "./registry.ts";
 import { sessionWatch } from "./watch.ts";
 export { runOf } from "./history.ts";
+/** Why a file a session names in its working directory is not read. */
+export class NotWorkFile extends Schema.TaggedError<NotWorkFile, { readonly brand: unique symbol }>()("NotWorkFile", {
+  reason: Schema.Literals(["noPlace", "notFile", "outside", "tooBig", "unreadable"]),
+  message: Schema.String,
+}) {}
+
 const make = Effect.gen(function* () {
   const r = yield* sessionRegistry;
   const wt = yield* sessionWatch(r);
@@ -326,6 +334,21 @@ const make = Effect.gen(function* () {
     }
     if (hands.size > 0) yield* Effect.logInfo(`vibevalley: brought back ${hands.size} helpers`);
   });
+  const workFile = Effect.fn("Session.workFile")(function* (id: string, path: string, max: number) {
+    const cwd = hands.get(id)?.place.cwd;
+    if (cwd === undefined) return yield* NotWorkFile.make({ reason: "noPlace", message: path });
+    const unreadable = (e: { readonly message: string }) => NotWorkFile.make({ reason: "unreadable", message: e.message });
+    const root = yield* Effect.mapError(fs.realPath(cwd), unreadable);
+    // realPath settles .. and every link, so what it answers is where the bytes really are.
+    const full = yield* Effect.mapError(fs.realPath(root + "/" + path), () => NotWorkFile.make({ reason: "notFile", message: path }));
+    if (full !== root && !Str.startsWith(root + "/")(full)) return yield* NotWorkFile.make({ reason: "outside", message: path });
+    const info = yield* Effect.mapError(fs.stat(full), unreadable);
+    if (info.type !== "File") return yield* NotWorkFile.make({ reason: "notFile", message: path });
+    if (Number(info.size) > max) return yield* NotWorkFile.make({ reason: "tooBig", message: path });
+    const bytes = yield* Effect.mapError(fs.readFile(full), unreadable);
+    return { name: Arr.lastNonEmpty(Str.split("/")(full)), bytes };
+  });
+
   const shape = Session.of({
     noRoom: roomFor,
     makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, repo): Effect.fn.Return<{ readonly refused: string } | { readonly evicted?: string }> {
@@ -620,6 +643,7 @@ const make = Effect.gen(function* () {
     isReachable: (id) => hands.has(id),
     lastTextOf: (id) => hands.get(id)?.lastText ?? "",
     cwdOf: (id) => hands.get(id)?.place.cwd,
+    workFile,
     runOf: (id) => {
       const run = hands.get(id)?.run ?? executions.get(id)?.() ?? "";
       return run === "" ? undefined : run;

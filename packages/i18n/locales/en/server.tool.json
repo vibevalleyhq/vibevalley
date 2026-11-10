@@ -1,5 +1,7 @@
 {
   "labels": {
+    "library_item_list": "Library",
+    "library_item_add": "Put in the library",
     "media_image_create": "Submit image generation",
     "media_understanding_start": "Execute authorized understanding",
     "media_speech_create": "Generate single-speaker speech",

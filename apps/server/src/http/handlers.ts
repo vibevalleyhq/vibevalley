@@ -11,6 +11,7 @@ import { cronHandlers } from "./handlers/cron.ts";
 import { gameHandlers } from "./handlers/game.ts";
 import { issueHandlers } from "./handlers/issue.ts";
 import { lanHandlers } from "./handlers/lan.ts";
+import { libraryHandlers } from "./handlers/library.ts";
 import { mediaHandlers } from "./handlers/media.ts";
 import { memoryHandlers } from "./handlers/memory.ts";
 import { orchestratorHandlers } from "./handlers/orchestrator.ts";
@@ -43,6 +44,7 @@ export const handlers = Effect.gen(function* () {
     ...(yield* runtimeHandlers),
     ...(yield* sessionHandlers),
     ...(yield* artifactHandlers),
+    ...(yield* libraryHandlers),
     ...(yield* pkmHandlers),
     ...(yield* cronHandlers),
     ...(yield* issueHandlers),

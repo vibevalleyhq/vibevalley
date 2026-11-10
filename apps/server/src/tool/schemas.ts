@@ -3,7 +3,7 @@ import { Effect, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
+import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, LibraryFileKindValues, LibraryOriginKindValues, PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -35,6 +35,12 @@ export const agentOnly: Partial<Record<Op, readonly string[]>> = {
   "artifact.create": ["file"],
   "artifact.version.create": ["file"],
 };
+
+const libraryList = Schema.Struct({
+  origin: Schema.optionalKey(Schema.Literals(LibraryOriginKindValues).annotate({ description: params.library.origin })),
+  type: Schema.optionalKey(Schema.Literals(LibraryFileKindValues).annotate({ description: params.library.type })),
+});
+const libraryName = Schema.optionalKey(Schema.String.annotate({ description: params.library.name }));
 
 const artifactText = {
   content: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.content })),
@@ -141,6 +147,8 @@ export const parameters = {
   "media.job.cancel": S.MediaJobRequest,
   "media.job.download": S.MediaJobRequest,
   "media.job.list": Schema.Struct({}),
+  "library.item.list": libraryList,
+  "library.item.add": Schema.Struct({ name: libraryName, url: Schema.String.annotate({ description: params.library.url }) }),
   "artifact.content.get": artifactRead,
   "artifact.create": Schema.Struct({
     ...artifactText,
@@ -322,6 +330,12 @@ export const sessionParameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "session.list": Schema.Struct({}),
+  "library.item.list": libraryList,
+  "library.item.add": Schema.Struct({
+    name: libraryName,
+    path: Schema.optionalKey(Schema.String.annotate({ description: params.library.path })),
+    url: Schema.optionalKey(Schema.String.annotate({ description: params.library.url })),
+  }),
   ...pkmParameters,
 };
 

@@ -10,7 +10,7 @@ export const modules: readonly Module[] = [
   { name: "Source Control", parts: ["repo"] },
   { name: "Agent Sessions", parts: ["executor", "machine", "session"] },
   { name: "Mailbox", parts: ["mailbox"] },
-  { name: "Collaboration", parts: ["channel", "media", "artifact", "pkm"] },
+  { name: "Collaboration", parts: ["channel", "media", "library", "artifact", "pkm"] },
   { name: "Issues", parts: ["issue", "cron"] },
   { name: "Ingress", parts: ["ingress"] },
   { name: "Resource", parts: ["resource"] },

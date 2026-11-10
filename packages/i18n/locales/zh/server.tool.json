@@ -1,5 +1,7 @@
 {
   "labels": {
+    "library_item_list": "素材库",
+    "library_item_add": "放进素材库",
     "media_image_create": "提交生图",
     "media_understanding_start": "执行已授权理解",
     "media_speech_create": "生成单人语音",

@@ -657,6 +657,20 @@ export class VibeValleyApi {
     },
   };
 
+  readonly library = {
+    item: {
+      /** Newest first. */
+      list: (a: T.LibraryListRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem[]> =>
+        this.call<T.LibraryItem[]>("/api/v1/library/item/list", a, options),
+      add: (a: T.LibraryAddRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem> =>
+        this.call<T.LibraryItem>("/api/v1/library/item/add", a, options),
+      /** Only the item goes: a message that has the file still opens it. */
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/library/item/delete", a, options),
+      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/library/item/previewDelete", a, options),
+    },
+  };
+
   /** R is the answer api.ts gives the path; each method above names it. */
   private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
     const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };

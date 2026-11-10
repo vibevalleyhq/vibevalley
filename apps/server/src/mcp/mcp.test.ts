@@ -15,6 +15,7 @@ import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
+import { Library } from "#/library/library.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Pkm } from "#/pkm/pkm.ts";
@@ -138,6 +139,8 @@ describe("mcp", () => {
         "issue_pr_submit",
         "issue_report",
         "issue_split",
+        "library_item_add",
+        "library_item_list",
         "memory_create",
         "memory_search",
         "pkm_capture",
@@ -241,6 +244,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const sessions = yield* Session;
       const artifacts = yield* Artifact;
+      const library = yield* Library;
       const got = yield* issues.hire(lab(), "画两种详情", "chat-j");
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
@@ -282,6 +286,15 @@ describe("mcp", () => {
       const tool7 = yield* Effect.promise(() => c.tool("artifact_create", { title: "两个都给", kind: "html", file: "out/two.html", content: "x" }));
       expect(tool7).toContain("没成");
       expect((yield* artifacts.list({ issue })).length).toBe(1);
+      // The library reads the same working directory, by the same rule.
+      const kept = yield* Effect.promise(() => c.tool("library_item_add", { path: "out/two.html", name: "两种详情.html" }));
+      expect(kept).toContain("两种详情.html");
+      for (const path of ["../secret.html", "out/link.html"]) {
+        const reply = yield* Effect.promise(() => c.tool("library_item_add", { path }));
+        expect(reply).toContain("没成");
+      }
+      const fetched = yield* library.list({ origin: "fetched" });
+      expect(fetched).toEqual([expect.objectContaining({ origin: { kind: "fetched", agent: "lab", session: id, from: { path: "out/two.html" } } })]);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
 

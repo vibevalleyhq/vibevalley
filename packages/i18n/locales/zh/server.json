@@ -14,6 +14,7 @@
     "graph": "列出计划，找它的 id",
     "memories": "列出它的记性，找那一条的 id",
     "artifact": "列出 Artifact，找它的 id",
+    "library": "列出素材库，找它的 id",
     "pkm": "列出笔记页，找它的名字"
   },
   "repoRef": "仓库 {id}",

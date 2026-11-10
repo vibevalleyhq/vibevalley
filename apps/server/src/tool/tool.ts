@@ -11,6 +11,7 @@ import { artifactTools } from "./artifact.ts";
 import { channelTools } from "./channel.ts";
 import { cronTools } from "./cron.ts";
 import { issueTools } from "./issue.ts";
+import { libraryTools } from "./library.ts";
 import { mediaTools } from "./media.ts";
 import { memoryTools } from "./memory.ts";
 import { pkmTools } from "./pkm.ts";
@@ -98,6 +99,7 @@ const make = Effect.gen(function* () {
   const { memorySearch, memoryCreate } = yield* memoryTools;
   const notes = yield* pkmTools;
   const media = yield* mediaTools;
+  const library = yield* libraryTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
   const resourceRead = yield* resourceTools;
   const repoList = yield* repoTools;
@@ -127,6 +129,7 @@ const make = Effect.gen(function* () {
       memoryCreate(who, true),
       ...notes.orchestrator(who),
       ...media(who),
+      ...library.orchestrator(who),
       artifactList(who),
       artifactGet("orchestrator")(who),
       artifactContent("orchestrator")(who),
@@ -157,6 +160,7 @@ const make = Effect.gen(function* () {
       artifactContent("session")(who),
       sessionArtifactCreate(who),
       artifactVersion("session")(who),
+      ...library.session(who),
     ],
     start: toolStart,
     sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),

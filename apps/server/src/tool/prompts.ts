@@ -169,6 +169,13 @@ export const params = {
     id: "Artifact 的 id：卡片上、artifact_list 的回答里有",
     version: "第几稿；不填是最新的",
   },
+  library: {
+    url: "一个公网的 https 地址，服务端去下载；和 path 二选一",
+    path: "你工作目录里的一个文件（相对路径），服务端去读；和 url 二选一",
+    name: "放进去叫什么名字；不填用文件自己的名字",
+    origin: "只列哪一种来路：generated 生成的、uploaded 用户上传的、fetched 帮工和助手拿回来的；不填列全部",
+    type: "只列哪一类文件：image、audio、video、other；不填列全部",
+  },
   issueOrAgent,
   issueNumber,
   repoFolder,
@@ -395,6 +402,10 @@ export const descriptions = {
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本。",
   "artifact.block.delete": "删一块（子块一起删），置成墓碑；用户要删掉哪一段、或你写的某一块不要了时用。",
+  "library.item.list":
+    "列出素材库：生成的图和声音、用户上传的文件、帮工和助手拿回来的文件，最近的在前。每行是 id、名字、类型、大小、来路。要用户以前给过的图或文件，先在这里找。",
+  "library.item.add":
+    "把一个值得留的文件放进素材库，用户在素材库页能看到、下载、发到频道：用户要你找的图和文件，或者干活时找到、以后还用得上的。给公网的 https 网址（url）。不要放中间产物、临时文件和代码。回答是它的 id，在消息里提到它用这个 id。",
 } satisfies Partial<Record<Op, string>>;
 
 /** A session's tools' descriptions; channel_message_list is the orchestrator's. */
@@ -420,6 +431,9 @@ export const sessionDescriptions = {
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
   "artifact.block.delete": "删一块（子块一起删），置成墓碑；用户要删掉哪一段、或你写的某一块不要了时用。",
+  "library.item.list": descriptions["library.item.list"],
+  "library.item.add":
+    "把一个值得留的文件放进素材库，用户在素材库页能看到、下载、发到频道：用户要你找的图和文件，或者干活时找到、以后还用得上的。给公网的 https 网址（url），或你工作目录里的一个文件（path）。不要放中间产物、临时文件和代码。回答是它的 id，在消息里提到它用这个 id。",
   "artifact.list":
     "列出 Artifact：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几稿、谁做的、最新这一稿改了什么。",
   "artifact.get": "看一份 Artifact：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
@@ -435,6 +449,14 @@ export const sessionDescriptions = {
 /** The answers and refusals the orchestrator's and the session's tools give (tool.ts). */
 export const answers = {
   failed: (why: string) => "没成：" + why,
+  library: {
+    none: "素材库里没有这样的文件。",
+    line: (i: T.LibraryItem) =>
+      `- ${i.attachment.id} · ${i.attachment.name} · ${i.attachment.type} · ${Math.max(1, Math.round(i.attachment.size / 1024))} KB · ${
+        i.origin.kind === "generated" ? `生成的（${i.origin.jobKind}）` : i.origin.kind === "uploaded" ? "用户上传的" : `${i.origin.agent} 拿回来的`
+      }`,
+    added: (i: T.LibraryItem) => `放进素材库了：「${i.attachment.name}」，id=${i.attachment.id}。`,
+  },
   artifact: {
     made: (a: T.Artifact) =>
       a.body === "html"

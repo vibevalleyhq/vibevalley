@@ -136,6 +136,14 @@ export const catalogs = {
           logout: "退出：收回这台设备的钥匙",
           device: { list: "列出用户的设备：配对来的和登录来的", delete: "收回一台设备的钥匙", previewDelete: "试收回一台设备：说会怎样，不真收回" },
         },
+        library: {
+          item: {
+            list: "列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛",
+            add: "把文件放进素材库：你上传好的附件，或助手、帮工给的网址或工作目录里的文件",
+            delete: "从素材库拿掉一个文件（发过它的消息仍能打开）",
+            previewDelete: "试拿掉：说会怎样，不真拿掉",
+          },
+        },
         agent: {
           create: "新建一份档案",
           delete: "删掉一份档案",
@@ -615,6 +623,7 @@ export const catalogs = {
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
         artifact: "列出 Artifact，找它的 id",
+        library: "列出素材库，找它的 id",
         pkm: "列出笔记页，找它的名字",
       },
       repoRef: "仓库 {id}",
@@ -1137,6 +1146,21 @@ export const catalogs = {
       dropCode: "收起配对码 {code}",
       dropAsking: "正在等你点头的「{name}」连不进来",
     },
+    "server.library": {
+      noItem: "素材库里没有 {id}",
+      oneSource: "给且只给一样：附件（attachment）、网址（url）或工作目录里的文件（path）",
+      agentAttachment: "附件是用户上传的；帮工和助手放东西进素材库，给网址（url）或工作目录里的文件（path）",
+      userFetch: "你放进素材库的是上传好的附件（attachment）；从网址或文件拿东西进来，交给助手或帮工",
+      badUrl: "{url} 不是一个公网的 https 地址：素材库只从公网的 https 地址下载",
+      notFetched: "没能从 {url} 下载：{why}",
+      slow: "下载超过 60 秒还没完，放弃了",
+      tooBig: "文件超过 {mb} MB，素材库放不下",
+      noPlace: "你没有工作目录：给一个网址（url）",
+      outside: "{path} 不在你的工作目录里：只能放工作目录里的文件",
+      notFile: "{path} 不是工作目录里的一个文件",
+      unreadable: "读不了 {path}：{why}",
+      preview: { remove: "从素材库拿掉「{name}」；发过它的消息仍能打开它" },
+    },
     "server.mailbox": {
       notOwned: "这条输入不归当前会话处理，不能退回",
       subscriptionTaken: "话题 {thread} 已归属于另一张工单",
@@ -1554,6 +1578,8 @@ export const catalogs = {
     },
     "server.tool": {
       labels: {
+        library_item_list: "素材库",
+        library_item_add: "放进素材库",
         media_image_create: "提交生图",
         media_understanding_start: "执行已授权理解",
         media_speech_create: "生成单人语音",
@@ -4692,6 +4718,14 @@ export const catalogs = {
             previewDelete: "Preview taking back a device's key: say what would happen, without doing it",
           },
         },
+        library: {
+          item: {
+            list: "List the library: generated files, your uploads, and what helpers fetched; filter by origin and type",
+            add: "Put a file in the library: your uploaded attachment, or a url or working-directory file from an assistant or helper",
+            delete: "Take a file out of the library (messages that have it still open it)",
+            previewDelete: "Try taking it out: say what would happen, change nothing",
+          },
+        },
         agent: {
           create: "Create a profile",
           delete: "Delete a profile",
@@ -5233,6 +5267,7 @@ export const catalogs = {
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
         artifact: "List the artifacts to find its id",
+        library: "List the library and find its id",
         pkm: "List the notes’ pages to find its name",
       },
       repoRef: "repo {id}",
@@ -5765,6 +5800,21 @@ export const catalogs = {
       dropCode: "Withdraw the pairing code {code}",
       dropAsking: '"{name}", waiting for your approval, cannot get in',
     },
+    "server.library": {
+      noItem: "The library has no {id}",
+      oneSource: "Give exactly one of: an attachment, a url, or a path to a file in your working directory",
+      agentAttachment: "Attachments are the user's uploads; helpers and assistants put things in the library by url or by a path in their working directory",
+      userFetch: "You put uploaded attachments in the library; to bring something in from an address or a file, ask an assistant or a helper",
+      badUrl: "{url} is not a public https address: the library downloads only from public https addresses",
+      notFetched: "Could not download {url}: {why}",
+      slow: "The download took more than 60 seconds and was given up",
+      tooBig: "The file is larger than {mb} MB, more than the library keeps",
+      noPlace: "You have no working directory: give a url",
+      outside: "{path} is outside your working directory: only files in it can go in",
+      notFile: "{path} is not a file in your working directory",
+      unreadable: "Cannot read {path}: {why}",
+      preview: { remove: 'Take "{name}" out of the library; messages that have it still open it' },
+    },
     "server.mailbox": {
       notOwned: "This input does not belong to the current session and cannot be returned",
       subscriptionTaken: "Thread {thread} already belongs to another issue",
@@ -6205,6 +6255,8 @@ export const catalogs = {
     },
     "server.tool": {
       labels: {
+        library_item_list: "Library",
+        library_item_add: "Put in the library",
         media_image_create: "Submit image generation",
         media_understanding_start: "Execute authorized understanding",
         media_speech_create: "Generate single-speaker speech",
@@ -9756,6 +9808,10 @@ export interface Messages {
   "cli.op.lan.pairing.start": undefined;
   "cli.op.lan.pairing.stop": undefined;
   "cli.op.lan.update": undefined;
+  "cli.op.library.item.add": undefined;
+  "cli.op.library.item.delete": undefined;
+  "cli.op.library.item.list": undefined;
+  "cli.op.library.item.previewDelete": undefined;
   "cli.op.media.audio.cleanup": undefined;
   "cli.op.media.audio.previewCleanup": undefined;
   "cli.op.media.audio.resume": undefined;
@@ -10451,6 +10507,19 @@ export interface Messages {
   "server.lan.unpaired": undefined;
   "server.lan.userLate": undefined;
   "server.lan.wrongCode": undefined;
+  "server.library.agentAttachment": undefined;
+  "server.library.badUrl": { readonly url: string | number };
+  "server.library.noItem": { readonly id: string | number };
+  "server.library.noPlace": undefined;
+  "server.library.notFetched": { readonly url: string | number; readonly why: string | number };
+  "server.library.notFile": { readonly path: string | number };
+  "server.library.oneSource": undefined;
+  "server.library.outside": { readonly path: string | number };
+  "server.library.preview.remove": { readonly name: string | number };
+  "server.library.slow": undefined;
+  "server.library.tooBig": { readonly mb: string | number };
+  "server.library.unreadable": { readonly path: string | number; readonly why: string | number };
+  "server.library.userFetch": undefined;
   "server.lookIn.agent": undefined;
   "server.lookIn.archive": undefined;
   "server.lookIn.artifact": undefined;
@@ -10459,6 +10528,7 @@ export interface Messages {
   "server.lookIn.device": undefined;
   "server.lookIn.graph": undefined;
   "server.lookIn.issue": undefined;
+  "server.lookIn.library": undefined;
   "server.lookIn.memories": undefined;
   "server.lookIn.pkm": undefined;
   "server.lookIn.repo": undefined;
@@ -10874,6 +10944,8 @@ export interface Messages {
   "server.tool.labels.issue_split": undefined;
   "server.tool.labels.issue_status_update": undefined;
   "server.tool.labels.issue_update": undefined;
+  "server.tool.labels.library_item_add": undefined;
+  "server.tool.labels.library_item_list": undefined;
   "server.tool.labels.media_image_create": undefined;
   "server.tool.labels.media_job_cancel": undefined;
   "server.tool.labels.media_job_download": undefined;

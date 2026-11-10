@@ -14,6 +14,7 @@
     "graph": "List the plans and find its id",
     "memories": "List its memories and find that one's id",
     "artifact": "List the artifacts to find its id",
+    "library": "List the library and find its id",
     "pkm": "List the notes’ pages to find its name"
   },
   "repoRef": "repo {id}",
