@@ -27,7 +27,7 @@
 
 ## 模型和不变量
 
-- **助手是 `role: "orchestrator"` 的档案，固定用 `vibevalley` 农机与 DeepSeek 模型**：默认助手 `orchestrator` 不可删除或改为帮工；可建多个助手档案，各自拥有独立的 `Session`、`AgentHost` 与对话文件。
+- **助手是 `role: "orchestrator"` 的档案，固定用 `vibevalley` 农机与 DeepSeek 模型**：默认助手 `orchestrator` 不可删除或改为帮工，名字默认叫「管家」，在它的档案页能改；可建多个助手档案，各自拥有独立的 `Session`、`AgentHost` 与对话文件。
 - **路由归属规则**：
   - 频道内未 `@` 他人的发言、频道巡查、未指定执行人的定时任务：归该频道的 `Channel.orchestrator`（未设则归默认助手）。
   - 显式 `@助手` 或 `@<助手档案 id>`、与某助手的私聊、指派给某助手的工单：归对应助手。

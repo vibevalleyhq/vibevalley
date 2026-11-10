@@ -12,6 +12,7 @@ import { channelOf, defaultOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import builtIn from "#/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { head } from "#/base/clip.ts";
 import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
@@ -440,7 +441,7 @@ describe("the chat", () => {
           Effect.gen(function* () {
             yield* hireAndRun(f, x, "w3", "写 hello", "chat-d");
             const [direct, ...more] = directs(f);
-            expect([direct?.peer, direct?.title, more.length]).toEqual([defaultOrchestrator, "助手", 0]);
+            expect([direct?.peer, direct?.title, more.length]).toEqual([defaultOrchestrator, builtIn.name, 0]);
             const heard = yield* news(f);
             const before = x.runsOf("w3").length;
             const { message: said } = yield* f.chat.post({ _tag: "User", text: "@w3 你先别动，我们单独说", channel: direct!.id, sendKey: "" });

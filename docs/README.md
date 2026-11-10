@@ -69,7 +69,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 叫法 | English | 代码里 | 意思 | 不用 |
 |---|---|---|---|---|
-| 助手 | assistant | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认助手 | 管家、manager、工头（指助手时）、主 agent |
+| 助手 | assistant | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认助手，默认名字叫「管家」，能改 | 管家（指这个角色时）、manager、工头（指助手时）、主 agent |
 | 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案工作的执行上下文；工单里的画成帮工，私聊的关联频道，跨多轮保留身份 | 工人、子 agent、worker、执行（指帮工时） |
 | 在场 | here | `Session.hired`（核心状态里雇来的会话） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
 | 一轮 | a round of work | `Run`（`session_run` 表） | 一次触发到一次汇报：派出去、带话、计划、定时任务、农机自己 | 一次干活、turn（指一轮时） |

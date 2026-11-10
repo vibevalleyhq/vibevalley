@@ -44,8 +44,9 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "管家 for the assistant",
-    pattern: /管家/u,
-    says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); the code name stays orchestrator (docs/README.md 用语)",
+    // 管家 is the built-in assistant's default name (templates/orchestrator/agent.json) and a look's (机器人管家), not the role.
+    pattern: /(?<!机器人)管家/u,
+    says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); 管家 is only the default assistant's name, which the user can change; the code name stays orchestrator (docs/README.md 用语)",
   },
   {
     name: "产出 for an artifact",

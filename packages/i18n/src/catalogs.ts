@@ -3629,7 +3629,7 @@ export const catalogs = {
         auntie: { name: "农场大婶", blurb: "头巾围裙，小本子上记着每块地的活。" },
         grandpa: { name: "老把式", blurb: "白胡子，种了一辈子地，不慌不忙。" },
         gardener: { name: "园艺师", blurb: "宽檐草帽别朵小花，剪刀揣在围裙兜里。" },
-        robot: { name: "机器人助手", blurb: "圆滚滚的农场机器人，脸上的屏会笑。" },
+        robot: { name: "机器人管家", blurb: "圆滚滚的农场机器人，脸上的屏会笑。" },
       },
       pet: { dog: "小狗", ragdoll: "重点色布偶猫", bluecat: "蓝猫" },
       orchestrator: {
@@ -8409,7 +8409,7 @@ export const catalogs = {
         auntie: { name: "Farm auntie", blurb: "Headscarf and apron, every plot's work in her notebook." },
         grandpa: { name: "Old hand", blurb: "White beard, a lifetime of farming, never in a hurry." },
         gardener: { name: "Gardener", blurb: "A flower in a wide straw hat, shears in the apron pocket." },
-        robot: { name: "Robot assistant", blurb: "A round farm robot whose face screen smiles." },
+        robot: { name: "Robot butler", blurb: "A round farm robot whose face screen smiles." },
       },
       pet: { dog: "Puppy", ragdoll: "Colorpoint ragdoll", bluecat: "Blue cat" },
       orchestrator: {

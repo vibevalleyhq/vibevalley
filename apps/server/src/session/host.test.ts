@@ -7,6 +7,7 @@ import { Deferred, Effect, Fiber, Stream } from "effect";
 import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 
+import builtIn from "#/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
@@ -130,7 +131,7 @@ describe("AgentHost", () => {
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
       });
       const kept = yield* (yield* Db).one(qs.sessionByID({ id: "orchestrator" }));
-      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", ended_at: null });
+      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: builtIn.name, ended_at: null });
       const caller = new Caller();
       const heard: string[] = [];
       const reading = yield* Effect.forkChild(Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))));
