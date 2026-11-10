@@ -18,7 +18,7 @@
 |---|---|
 | `apps/server/src/agent/agent.ts` | 读写 `$VIBEVALLEY_HOME/config.json`、副本事务 `change`、外观补齐 `withCast`、角色校验 `roleProblem` |
 | `apps/server/src/agent/template.ts`、`templates/` | 内置模板与本机导入模板（`agent-templates/<id>/`）的读取、安装与更新 |
-| `apps/server/src/agent/skill.ts`、`skills/<id>/SKILL.md`（`SKILL.en.md` 是英文） | VibeValley 自带的技能：随服务端打包（`base/assets.ts` 的 `serverFiles`），开机读一次 |
+| `apps/server/src/agent/agent.ts`（`readBuiltInSkills`）、`skills/<id>/SKILL.md`（`SKILL.en.md` 是英文） | VibeValley 自带的技能：随服务端打包（`base/assets.ts` 的 `serverFiles`），开机读一次 |
 | `apps/server/src/runtime/runtime.ts` | 农机注册表、探测缓存、额度轮询、`assess` 与 `resolve` |
 | `apps/server/src/runtime/presets.ts`、`presets.json` | 农机预设、支持项 `supportOf`、可派性校验 `agentProblems` 与挑人算法 `chooseAgent` |
 | `apps/server/src/runtime/quota.ts`、`price.ts`、`dsh.ts`、`pi.ts` | 额度文案、模型单价表、DeepSeek Harness 与 pi 配置读取 |
@@ -95,7 +95,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/agent/skill.test.ts`：自带技能随服务端打包、有英文、只读、模板安装时勾上、勾了的进帮工的提示。
+- `apps/server/src/agent/agent.test.ts`、`template.test.ts`：自带技能随服务端打包、有英文、只读、模板安装时勾上、勾了的进帮工的提示。
 - `apps/server/src/agent/template.test.ts`、`agent.test.ts`：内置模板、副本事务、损坏配置保护、角色约束与外观补齐测试。
 - `apps/server/src/runtime/runtime.test.ts`、`presets.test.ts`：探测代数、支持项合并、挑档案与 `resolve` 测试。
 - `apps/web/test/agents.spec.ts`、`runtimes.spec.ts`、`runtime-avatars.spec.ts`：档案增删改、模板安装、农机设置与头像角标端到端测试。
