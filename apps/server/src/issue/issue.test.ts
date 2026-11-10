@@ -23,6 +23,7 @@ import { gitRuns } from "#/repo/git.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
+import { allow, refuse } from "#/testing/refuse.ts";
 import { testIssues, world } from "#/testing/world.ts";
 
 import { Issue } from "./issue.ts";
@@ -129,9 +130,7 @@ describe("issues", () => {
       const issue = yield* issues.add({ title: "atomic responsibility", agent: "lab" });
       const before = (yield* issues.get(issue.id)).assignments;
       const db = yield* Db;
-      yield* db.run(
-        sql.unsafe("create trigger reject_assignment before insert on issue_assignment for each row begin select raise(abort, 'assignment refused'); end"),
-      );
+      yield* db.run(refuse(sql, "reject_assignment", "before insert on issue_assignment", "", "assignment refused"));
       expect((yield* Effect.exit(issues.edit(issue.id, { agent: "lab2" }, owner)))._tag).toBe("Failure");
       const issue3 = yield* issues.get(issue.id);
       expect(assignedAgentOf(issue3)).toBe("lab");
@@ -303,16 +302,14 @@ describe("issues", () => {
       const issues = testIssues(issue2);
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
-      yield* sql
-        .unsafe("create trigger reject_link before insert on issue_assignment_execution for each row begin select raise(abort, 'link refused'); end")
-        .pipe(Effect.orDie);
+      yield* refuse(sql, "reject_link", "before insert on issue_assignment_execution", "", "link refused").pipe(Effect.orDie);
       const agent = { ...lab(), worktree: true };
       expect((yield* issues.hire(agent, "first work", "demo")).refused).toContain("did not stop");
       const issue = (yield* issues.list())[0]!;
       expect(issue).toBeDefined();
       expect((yield* Effect.result(issues.remove(issue.id)))._tag).toBe("Failure");
       expect(existsSync(join(f.config.workRoot, "worktrees", "demo.1", "still-owned.txt"))).toBe(true);
-      yield* sql.unsafe("drop trigger reject_link").pipe(Effect.orDie);
+      yield* allow(sql, "reject_link").pipe(Effect.orDie);
       const again = yield* issues.hire(agent, "do not overlap", "demo", { issue: issue.id });
       expect(again.session).toBeUndefined();
       expect(again.refused).toBeTruthy();
@@ -358,9 +355,7 @@ describe("issues", () => {
       const issue = yield* Issue;
       const issues = testIssues(issue);
       const sql = yield* SqlClient.SqlClient;
-      yield* sql
-        .unsafe("create trigger reject_link before insert on issue_assignment_execution for each row begin select raise(abort, 'link refused'); end")
-        .pipe(Effect.orDie);
+      yield* refuse(sql, "reject_link", "before insert on issue_assignment_execution", "", "link refused").pipe(Effect.orDie);
       const agent = { ...lab(), worktree: true };
       expect((yield* issues.hire(agent, "first work", "demo")).refused).toContain("link refused");
       const kept = yield* issues.list();
@@ -370,7 +365,7 @@ describe("issues", () => {
       expect((yield* issues.get(kept[0]!.id)).repo).toBe("demo");
       expect((yield* Effect.result(issues.remove(kept[0]!.id)))._tag).toBe("Failure");
       expect((yield* issues.list()).map((i) => i.id)).toEqual([kept[0]!.id]);
-      yield* sql.unsafe("drop trigger reject_link").pipe(Effect.orDie);
+      yield* allow(sql, "reject_link").pipe(Effect.orDie);
       const next = yield* issues.hire(agent, "unrelated work", "demo");
       expect(next.session?.branch).toBe("vibevalley/issue-2");
       yield* until(() => turns === 2, "the unrelated dispatch");
@@ -561,9 +556,7 @@ describe("issues", () => {
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
       yield* sql.unsafe(`select 1`).pipe(Effect.orDie);
-      yield* sql
-        .unsafe(`create trigger reject_issue before insert on issue for each row begin select raise(abort, 'test write failure'); end`)
-        .pipe(Effect.orDie);
+      yield* refuse(sql, "reject_issue", "before insert on issue", "", "test write failure").pipe(Effect.orDie);
       const got = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo");
       expect(got.refused).toContain("test write failure");
       expect(got.session).toBeUndefined();
@@ -670,7 +663,7 @@ describe("issues", () => {
       for (const channel of [first.id, second.id]) expect((yield* issues.start(issue.id, channel)).queued).toBeDefined();
       yield* (yield* Issue).refreshQueue;
       expect(
-        (yield* sql<{ channel: string }>`select t.trigger_json->>'replyChannel' as channel
+        (yield* sql<{ channel: string }>`select t.trigger_json::jsonb->>'replyChannel' as channel
         from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id where m.issue_id = ${issue.id} and m.state = 'held'`).map((r) => r.channel),
       ).toEqual([first.id]);
       yield* core.apply({ type: "sessionLeft", id: sessionId("occupied") });

@@ -13,17 +13,17 @@ select trigger_json, payload_json from mailbox_trigger where id = sqlc.arg(id);
 select t.id, t.seq, t.trigger_json from mailbox_trigger t
 where t.seq > sqlc.arg(after)
   and t.source <> 'cron'
-  and t.payload_json -> 'data' ->> 'kind' is not 'channel_message'
+  and t.payload_json::jsonb -> 'data' ->> 'kind' is distinct from 'channel_message'
   and t.routed_at is null
 order by t.seq limit 1000;
 
 -- name: KnownGitHubEvents :many
 -- bound: accepted event identities for one pull request.
-select source_key, (trigger_json -> 'meta' ->> 'botRoundKey')::text? as bot_round_key,
+select source_key, (trigger_json::jsonb -> 'meta' ->> 'botRoundKey')::text? as bot_round_key,
        (routed_at is not null)::bool as routed,
-       (trigger_json -> 'meta' ->> 'botRound')::int? as bot_round
-from mailbox_trigger where source = 'github' and trigger_json -> 'meta' ->> 'repo' = sqlc.arg(repo)::text
-  and trigger_json -> 'meta' ->> 'pr' = sqlc.arg(pr_number)::int;
+       (trigger_json::jsonb -> 'meta' ->> 'botRound')::int? as bot_round
+from mailbox_trigger where source = 'github' and trigger_json::jsonb -> 'meta' ->> 'repo' = sqlc.arg(repo)::text
+  and (trigger_json::jsonb -> 'meta' ->> 'pr')::int = sqlc.arg(pr_number)::int;
 
 -- name: MarkRouted :one
 update mailbox_trigger set
@@ -32,7 +32,7 @@ update mailbox_trigger set
   routed_at = coalesce(routed_at, sqlc.arg(routed_at))
 where id = sqlc.arg(envelope_id)
 returning routing_position as position, routing_scope as scope,
-  (trigger_json -> 'actor' ->> 'kind' = 'owner')::bool? as from_owner;
+  (trigger_json::jsonb -> 'actor' ->> 'kind' = 'owner')::bool? as from_owner;
 
 -- name: IsRouted :one
 select exists (select 1 from mailbox_trigger where id = sqlc.arg(envelope_id) and routed_at is not null)::bool as routed;
@@ -44,8 +44,8 @@ update mailbox_trigger set
   routing_scope = coalesce(routing_scope, 'issue:' || sqlc.arg(issue_id)::text),
   routed_at = coalesce(routed_at, sqlc.arg(at))
 where routed_at is null
-  and trigger_json -> 'meta' -> 'dispatch' = 'true'
-  and trigger_json -> 'meta' ->> 'issue' = sqlc.arg(issue_id);
+  and trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'
+  and trigger_json::jsonb -> 'meta' ->> 'issue' = sqlc.arg(issue_id);
 
 
 -- name: UnroutedCronTriggers :many

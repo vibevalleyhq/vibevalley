@@ -11,7 +11,7 @@ import { testDatabase } from "#/testing/layers.ts";
 import { lanOpen, setLanOpen } from "#db/lan.sql.ts";
 import { lanDevices, addLanDevice, seenLanDevice } from "#db/lan_device.sql.ts";
 
-import { Db, dbFile, setAsideStale } from "./db.ts";
+import { Db, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
   it.effect("has the schema, and the generated queries run on it", () =>
@@ -105,7 +105,7 @@ describe("the database", () => {
     return Effect.gen(function* () {
       yield* open(addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1 }));
       expect(readFileSync(where + ".schema", "utf8").trim()).not.toBe("");
-      expect(readdirSync(where)).toContain(dbFile);
+      expect(readdirSync(where)).toContain("PG_VERSION");
       const opened = yield* open(lanDevices());
       expect(opened).toMatchObject([{ id: "d1", name: "手机" }]);
     });

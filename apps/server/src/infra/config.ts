@@ -17,8 +17,10 @@ export class ServerConfig extends Context.Service<
     readonly version: string;
     /** The space's own folder: repos/<name> are its repositories, worktrees/ the issues' worktrees, pkm/ the notes. */
     readonly workRoot: string;
-    /** Empty: home/db. "memory" keeps it in memory. */
+    /** PGlite's folder when database.url is empty. Empty: home/db. "memory" keeps it in memory. */
     readonly db: string;
+    /** A Postgres to keep the farm in (postgres://…); empty: PGlite in db. It may hold a password, so it is a secret. */
+    readonly database: { readonly url: Redacted.Redacted };
     readonly port: number;
     /** The built page (apps/web/dist), served at / beside the API. Empty: no page. */
     readonly web: string;
@@ -59,6 +61,7 @@ export function defaults(home = homedir()): ServerConfig["Service"] {
     version: "0.1.0",
     workRoot: join(home, "vibevalley-dev"),
     db: "",
+    database: { url: Redacted.make("") },
     port: 8787,
     web: "",
     agent: { model: "", starters: [] },
@@ -103,6 +106,7 @@ const keys = (d: ServerConfig["Service"]) =>
   Keys.all({
     workRoot: text("work_root", d.workRoot),
     db: text("db", d.db),
+    database: Keys.nested(Keys.all({ url: secret("url", d.database.url) }), "database"),
     port: port("port", d.port),
     web: text("web", d.web),
     agent: Keys.nested(Keys.all({ model: text("model", d.agent.model), starters: list("starters") }), "agent"),

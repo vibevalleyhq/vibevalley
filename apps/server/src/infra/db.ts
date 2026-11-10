@@ -1,13 +1,14 @@
 import { existsSync, mkdirSync, renameSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
-import { SqliteClient } from "@effect/sql-sqlite-node";
-import { type Cause, Clock, Context, Duration, Effect, Layer, Metric, Option } from "effect";
+import { PgClient } from "@effect/sql-pg";
+import { PgliteClient } from "@effect/sql-pglite";
+import { PGlite } from "@electric-sql/pglite";
+import { type Cause, Clock, Context, Duration, Effect, Layer, Metric, Option, Redacted, Schema } from "effect";
 import { SqlClient, type SqlError } from "effect/sql";
 
 import { messageOf } from "#/base/errors.ts";
 
-import { baselineHash, baselineStatements } from "./baseline.ts";
+import { baselineHash, baselineSql, baselineStatements } from "./baseline.ts";
 import { dbDir, ServerConfig } from "./config.ts";
 
 /** Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. */
@@ -15,9 +16,6 @@ export const dbQueries = Metric.counter("vibevalley.db.queries", { description: 
 
 /** Longer than this, a transaction is said in the log: everything else waited for it. */
 const txLongMs = 500;
-
-/** The database's file in its folder. */
-export const dbFile = "vibevalley.db";
 
 /** A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>. The baseline it was made from is in <folder>.schema. */
 export function setAsideStale(where: string, hash: string, now: number): string | undefined {
@@ -31,31 +29,87 @@ export function setAsideStale(where: string, hash: string, now: number): string 
   return aside;
 }
 
-/** The database as an SqlClient, with the schema in place and foreign keys on. */
+/** The database could not be opened or given its schema: the farm does not start. */
+export class Unopened extends Schema.TaggedError<Unopened, { readonly brand: unique symbol }>()("Unopened", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
+
+/** The baseline a Postgres of the owner's was made from, kept in it: that database is never moved aside or emptied here. */
+const baselineTable = "vibevalley_baseline";
+
+const made = (sql: SqlClient.SqlClient) => Effect.forEach(baselineStatements(), (statement) => sql.unsafe(statement), { discard: true });
+
+/** A Postgres at database.url: an empty one is given the schema; one made from another baseline is refused, not changed. */
+const external = (url: Redacted.Redacted) =>
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const hash = baselineHash();
+      const kept = yield* sql<{ readonly hash: string }>`select hash from ${sql(baselineTable)}`.pipe(Effect.catchTag("SqlError", () => Effect.undefined));
+      const was = kept?.[0]?.hash;
+      if (was === hash) return;
+      if (was !== undefined)
+        return yield* Unopened.make({
+          message: `the database at database.url was made from another schema (${was}, this is ${hash}); point database.url at an empty database`,
+        });
+      const tables = yield* sql<{ readonly n: number }>`select count(*)::int as n from information_schema.tables where table_schema = 'public'`;
+      if ((tables[0]?.n ?? 0) > 0)
+        return yield* Unopened.make({ message: "the database at database.url has tables of its own; point database.url at an empty database" });
+      yield* sql.withTransaction(
+        Effect.gen(function* () {
+          yield* made(sql);
+          yield* sql`create table ${sql(baselineTable)} (hash text not null)`;
+          yield* sql`insert into ${sql(baselineTable)} values (${hash})`;
+        }),
+      );
+    }),
+  ).pipe(Layer.provideMerge(PgClient.layer({ url, maxConnections: 1 })));
+
+/** A database in memory made once with the schema, copied for each one asked for: a new PGlite starts a whole Postgres
+ * (most of a second), a copy of one loads in a tenth of that. Two asking at once may each make it; both copies serve. */
+let template: Blob | undefined;
+const schemaCopy = Effect.suspend(() =>
+  template !== undefined
+    ? Effect.succeed(template)
+    : Effect.gen(function* () {
+        const made = yield* Effect.acquireRelease(
+          Effect.sync(() => new PGlite()),
+          (pg) => Effect.promise(() => pg.close()),
+        );
+        const unmade = (cause: unknown) => Unopened.make({ message: "the schema could not be made in memory", cause });
+        yield* Effect.tryPromise({ try: () => made.exec(baselineSql()), catch: unmade });
+        const dump = yield* Effect.tryPromise({ try: () => made.dumpDataDir("none"), catch: unmade });
+        template = dump;
+        return dump;
+      }).pipe(Effect.scoped),
+);
+
+/** The database as an SqlClient, with the schema in place: Postgres at database.url, or else PGlite in the home (in
+ * memory for "memory"). One connection either way: the services write one at a time. */
 export const Database = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
+    if (Redacted.value(config.database.url) !== "") return external(config.database.url);
     const where = dbDir(config);
-    const memory = where === "memory";
-    const hash = baselineHash();
-    let fresh = memory;
-    if (!memory) {
-      const now = yield* Clock.currentTimeMillis;
-      const aside = setAsideStale(where, hash, now);
-      if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
-      fresh = !existsSync(join(where, dbFile));
-      mkdirSync(where, { recursive: true });
+    if (where === "memory") {
+      const copy = yield* schemaCopy;
+      return PgliteClient.layer({ loadDataDir: copy });
     }
+    const hash = baselineHash();
+    const now = yield* Clock.currentTimeMillis;
+    const aside = setAsideStale(where, hash, now);
+    if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
+    const fresh = !existsSync(where);
+    mkdirSync(where, { recursive: true });
     const ready = Layer.effectDiscard(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient;
-        // Off by default in SQLite, and only settable outside a transaction.
-        yield* sql.unsafe("PRAGMA foreign_keys = ON");
-        if (fresh) yield* sql.withTransaction(Effect.forEach(baselineStatements(), (statement) => sql.unsafe(statement), { discard: true }));
-        if (!memory) writeFileSync(where + ".schema", hash + "\n");
+        if (fresh) yield* sql.withTransaction(made(sql));
+        writeFileSync(where + ".schema", hash + "\n");
       }),
     );
-    return ready.pipe(Layer.provideMerge(SqliteClient.layer({ filename: memory ? ":memory:" : join(where, dbFile), disableWAL: memory })));
+    return ready.pipe(Layer.provideMerge(PgliteClient.layer({ dataDir: where })));
   }),
 ).pipe(Layer.orDie);
 

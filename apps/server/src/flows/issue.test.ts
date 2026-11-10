@@ -313,7 +313,9 @@ describe("an issue", () => {
       const runs2 = yield* runs();
       expect(runs2).toHaveLength(1);
       const sql = yield* SqlClient.SqlClient;
-      const held = yield* sql.unsafe<{ state: string }>("select state from mailbox_issue where issue_id = ? and state = 'held'", [first.id]).pipe(Effect.orDie);
+      const held = yield* sql
+        .unsafe<{ state: string }>("select state from mailbox_issue where issue_id = $1 and state = 'held'", [first.id])
+        .pipe(Effect.orDie);
       expect(held).toHaveLength(1);
 
       yield* issues.setStatus(first.id, "done", "", "", owner);

@@ -101,8 +101,9 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `baselineSql` | `baseline.ts` |  |
 | `baselineHash` | `baseline.ts` |  |
-| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: SQLite prepares one at a time. A trigger's body (BEGIN … END;) stays one statement. |
+| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: a driver prepares one at a time. A function's body ($$ … $$) and a |
 | `ServerConfig` | `config.ts` |  |
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
@@ -114,9 +115,8 @@
 | `worktreesDir` | `config.ts` | Where the issues' worktrees are: <repo>.<issue number> under it. |
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
-| `dbFile` | `db.ts` | The database's file in its folder. |
 | `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>. The baseline it was made from is in <folder>.schema. |
-| `Database` | `db.ts` | The database as an SqlClient, with the schema in place and foreign keys on. |
+| `Database` | `db.ts` | The database as an SqlClient, with the schema in place: Postgres at database.url, or else PGlite in the home (in |
 | `causeMessage` | `db.ts` | What the database said, from under the SqlError around it. |
 | `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. |
 | `fileBlob` | `files.ts` |  |
@@ -179,8 +179,8 @@
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
 | `network` | `network.ts` |  |
 | `realtimeFixture` | `realtime.ts` |  |
-| `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds. |
-| `allow` | `refuse.ts` |  |
+| `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds |
+| `allow` | `refuse.ts` | The write refuse stopped goes through again. |
 | `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |
 | `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |

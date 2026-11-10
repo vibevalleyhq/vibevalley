@@ -2,7 +2,7 @@
 
 每个档案（含管家与帮工）拥有一份持久记忆（`Memory`），跨会话、跨仓库、跨重启共享：
 - 新回合开始前按当前任务召回相关记忆；回合结束时记下本轮经验与工单摘要。
-- 记忆默认存在本地 SQLite，可双向同步 Nowledge Mem 与 EverOS。
+- 记忆默认存在本地的库里，可双向同步 Nowledge Mem 与 EverOS。
 
 ## 管什么，不管什么
 
@@ -10,14 +10,14 @@
 |---|---|
 | 档案记忆的增删查、去重、300 条容量淘汰与中英文分词（`gse` + FTS5） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
 | 开工前相关性召回（`pick`）及页面「下回想起什么」预览（`memory.recall`） | 单个 `Session` 已召回记忆 ID 的记录（`session.recalled` 列，[帮工](docs/subsystems/session.md)） |
-| 本地 SQLite 与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在 `settings.json` 中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
+| 本地的库与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在 `settings.json` 中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
 | 管家与帮工共用的 `MemoryPort` 及管家压缩归档（`archive/`）读取 | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/memory/memory.ts` | `Memory` 服务、`MemoryPort` 实现、SQLite `memory` 表与 `memory_term` FTS5 读写 |
+| `apps/server/src/memory/memory.ts` | `Memory` 服务、`MemoryPort` 实现、`memory` 表与它的全文索引（`term_vector`）读写 |
 | `apps/server/src/memory/recall.ts` | 纯函数评分挑选（`pick`）与检索排序 |
 | `apps/server/src/memory/gse.ts` | 简体中文分词与英文整词提取（`termsList`） |
 | `apps/server/src/memory/sources.ts` | 多记忆来源聚合、2 秒读超时与后台异步写队列 |
@@ -56,7 +56,7 @@
 
 ## 为什么这样
 
-- **显式字段提交 + 纯函数分词召回，不调额外模型**：结构化提交省去回合后调模型总结的延迟；`gse` + SQLite FTS5 毫秒级完成且可确定性回归。
+- **显式字段提交 + 纯函数分词召回，不调额外模型**：结构化提交省去回合后调模型总结的延迟；`gse` 分词加 Postgres 全文索引毫秒级完成且可确定性回归。
 - **多来源按名次轮流合并，慢来源不挡干活**：本地评分与外部向量量纲不同，按名次交错最稳妥；2 秒读超时与异步写队列隔离外部故障。
 
 ## 还没做的

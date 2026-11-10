@@ -277,20 +277,20 @@ describe("a pull request", () => {
           yield* ingress.refreshGitHub;
           const sql = yield* SqlClient.SqlClient;
           const inputs = yield* sql<{ key: string; kind: string; reason: string | null }>`
-            select t.source_key as key, t.trigger_json->'meta'->>'kind' as kind, m.reason
+            select t.source_key as key, t.trigger_json::jsonb->'meta'->>'kind' as kind, m.reason
             from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id
             where m.issue_id = ${restored.id} and t.source = 'github'
-            order by (t.trigger_json->'meta'->>'botRound') nulls last`;
+            order by (t.trigger_json::jsonb->'meta'->>'botRound')::int nulls last`;
           expect(inputs.filter((input) => input.kind === "ci")).toHaveLength(1);
           expect(inputs.filter((input) => input.kind === "review").map((input) => input.reason)).toEqual(["human", "human", "human", "budget"]);
           expect(inputs.some((input) => input.key.includes("SELF"))).toBe(false);
           expect((yield* sql<{ n: number }>`select count(*) as n from channel_message where body like '%round 1%'`)[0]?.n).toBe(0);
           const inline = yield* sql<{ data: string }>`
-            select payload_json->'data' as data from mailbox_trigger where source_key = 'clock#7:comment:PRRC_9'`;
+            select (payload_json::jsonb->'data')::text as data from mailbox_trigger where source_key = 'clock#7:comment:PRRC_9'`;
           const inlineData = yield* parsed(inline[0]?.data ?? "null");
           expect(inlineData).toMatchObject({ path: "src/a.ts", line: 12, diffHunk: "@@\n-old\n+new", threadId: "PRRT_9" });
-          const rounds = yield* sql<{ round: number; reason: string }>`select (t.trigger_json->'meta'->>'botRound') as round, m.reason
-            from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id where t.trigger_json->'meta'->>'kind' = 'comment'`;
+          const rounds = yield* sql<{ round: number; reason: string }>`select (t.trigger_json::jsonb->'meta'->>'botRound')::int as round, m.reason
+            from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id where t.trigger_json::jsonb->'meta'->>'kind' = 'comment'`;
           expect(rounds).toHaveLength(6);
           expect(rounds.every((row) => row.round === 1 && row.reason === "human")).toBe(true);
           const resource = yield* (yield* Resource).read(id, { uri: "vv://github/clock/pulls/7/thread/9", limit: 16_000 });
@@ -303,14 +303,14 @@ describe("a pull request", () => {
           yield* ingress.refreshGitHub;
           const late = yield* sql<{
             round: number;
-          }>`select (trigger_json->'meta'->>'botRound') as round from mailbox_trigger where source_key = 'clock#7:comment:PRRC_15'`;
+          }>`select (trigger_json::jsonb->'meta'->>'botRound')::int as round from mailbox_trigger where source_key = 'clock#7:comment:PRRC_15'`;
           expect(late[0]?.round).toBe(1);
           expect(resolvedThreads).toEqual([]);
           conclusion = "SUCCESS";
           yield* ingress.refreshGitHub;
           conclusion = "FAILURE";
           yield* ingress.refreshGitHub;
-          expect((yield* sql<{ n: number }>`select count(*) as n from mailbox_trigger where trigger_json->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
+          expect((yield* sql<{ n: number }>`select count(*) as n from mailbox_trigger where trigger_json::jsonb->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
           expect(resolvedThreads).toEqual([]);
           const released = (yield* ingress.accept({
             source: "connector",
@@ -323,7 +323,7 @@ describe("a pull request", () => {
           }))!;
           expect(
             (yield* sql<{ state: string }>`select m.state from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id
-            where m.issue_id = ${restored.id} and t.trigger_json->'meta'->>'kind' = 'review'`).every((row) => row.state === "forwarded"),
+            where m.issue_id = ${restored.id} and t.trigger_json::jsonb->'meta'->>'kind' = 'review'`).every((row) => row.state === "forwarded"),
           ).toBe(true);
           yield* await_(
             () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${id} and envelope_id = ${released.id}`,

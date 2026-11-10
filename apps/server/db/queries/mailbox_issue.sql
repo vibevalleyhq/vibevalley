@@ -19,7 +19,7 @@ from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id
 left join mailbox_delivery d on d.session_id = m.session_id and d.envelope_id = m.trigger_id
 where m.issue_id = sqlc.arg(issue_id) and m.state <> 'returned'
   and (
-    (sqlc.arg(closing)::boolean and (t.trigger_json -> 'actor' ->> 'kind' <> 'owner' or d.state is not 'consumed'))
+    (sqlc.arg(closing)::boolean and (t.trigger_json::jsonb -> 'actor' ->> 'kind' <> 'owner' or d.state is distinct from 'consumed'))
     or (not sqlc.arg(closing)::boolean and (
       m.state = 'held' or m.session_id is null
       or (sqlc.narg(recipient)::text is not null and m.session_id <> sqlc.narg(recipient)
@@ -46,17 +46,17 @@ select m.issue_id, t.trigger_json
 from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id
 join issue i on i.id = m.issue_id
 where i.queued_at is not null and i.closed_at is null and m.state <> 'returned'
-order by m.issue_id, (t.trigger_json -> 'meta' -> 'dispatch' = 'true') desc nulls last, t.routing_position;
+order by m.issue_id, (t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true') desc nulls last, t.routing_position;
 
 -- name: SupersedeDispatch :exec
 update mailbox_issue as m set state = 'returned', reason = 'superseded'
 from mailbox_trigger as t
 where m.trigger_id = t.id and m.issue_id = sqlc.arg(issue_id) and m.trigger_id <> sqlc.arg(trigger_id)
-  and t.trigger_json -> 'meta' -> 'dispatch' = 'true' and m.state <> 'returned';
+  and t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true' and m.state <> 'returned';
 
 -- name: RetireQueuedDispatches :exec
 update mailbox_issue as m set state = 'returned', reason = 'unqueued'
 from mailbox_trigger as t
 where m.trigger_id = t.id and m.issue_id = sqlc.arg(issue_id) and m.state = 'held'
-  and t.trigger_json -> 'meta' -> 'dispatch' = 'true';
+  and t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true';
 

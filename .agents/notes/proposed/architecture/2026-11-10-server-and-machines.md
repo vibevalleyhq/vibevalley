@@ -39,6 +39,12 @@ Status: proposed
 4. **注册与钥匙。** `vibevalley machine join`、页面上的批准与收回、三种钥匙、服务端对外时的鉴权；帮工的命令行和 `/mcp` 改连本机的 machine。
 5. **分开跑。** `vibevalley server`（纯服务端，读 `database.url`）和 `vibevalley machine`（一台机器）各自能起；桌面版默认两者都起，也能只当一台机器；文档、官网的说法跟着改。
 
+## 进度
+
+| 步 | 状态 | 提交 | 做了什么 |
+|---|---|---|---|
+| 1 Postgres | 完成 | 本步的提交 | 表结构与查询改成 Postgres 方言：时间 `double precision`（不用 `bigint`，Postgres 的驱动把它当字符串交回）、触发器改 plpgsql、全文搜索换成 `term_vector`/`term_query` 加 GIN 索引、JSON 文本列在查询里 `::jsonb`、`authorization` 加引号（保留字）、`channel.root_id` 的外键建完表再加。`scripts/pg-generate.ts` 让 PGlite 对每条查询做 Parse 和 Describe，参数与结果列的类型是 Postgres 说的，结果列来自哪张表哪一列也是它说的（`tableID`、`columnID`），只剩「算出来的列会不会为空」和取值集合靠查询里的记号。驱动二选一：`database.url`（`@effect/sql-pg`，按密钥读，空库才建表、记下哈希，别的一律拒绝启动），否则 PGlite 在 `db` 目录；内存库从每个进程建一次的模板拷一份（新起一个约 0.7 秒，拷一份约 0.1 秒）。服务端测试只开一半的核：PGlite 吃 CPU，开满时最重的几个媒体测试会等过超时。测试里手写的 SQLite 触发器都换成共用的 `refuse`/`allow`（plpgsql）；几个测试原来靠 SQLite 下碰巧的先后（外发消息的顺序、消费后才挂的 👀），改成等那件事本身 |
+
 ## Alternatives considered
 
 - **只把 SQLite 换成 Postgres，不拆。** 换库本身不解决多台机器：农机、仓库、worktree 都绑在服务端所在的那台电脑上。Postgres 是拆开以后服务端需要的（多台机器同时写、服务端放在服务器上），所以排在第一步，但不是全部。

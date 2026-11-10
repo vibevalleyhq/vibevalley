@@ -8,7 +8,7 @@ values (sqlc.arg(id), sqlc.arg(artifact_id), sqlc.arg(block_id), sqlc.arg(author
 select * from artifact_suggestion where id = sqlc.arg(id);
 
 -- name: ArtifactSuggestions :many
-select * from artifact_suggestion where artifact_id = sqlc.arg(artifact_id) order by created_at, id limit sqlc.arg(n);
+select * from artifact_suggestion where artifact_id = sqlc.arg(artifact_id) order by created_at, id limit sqlc.arg(n)::int;
 
 -- name: ResolveArtifactSuggestion :exec
 update artifact_suggestion set status = sqlc.arg(status), resolved_at = sqlc.arg(resolved_at), resolved_by = sqlc.arg(resolved_by)

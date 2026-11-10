@@ -75,7 +75,7 @@
 
 **主人发送消息**
 
-1. `Channel.say` 在单写锁内将消息、提及、关注和 `Trigger` 写入 SQLite，推进主人已读游标。
+1. `Channel.say` 在单写锁内将消息、提及、关注和 `Trigger` 写入库，推进主人已读游标。
 2. 调用 `Mailbox.receive` 在事务内写投递行与路由回执（中途崩溃由启动重放恢复）。
 3. 施加 `messageChanged`、`channelChanged`、`ownerMentionsChanged` 事实，并向 WebSocket 订阅者推送。
 

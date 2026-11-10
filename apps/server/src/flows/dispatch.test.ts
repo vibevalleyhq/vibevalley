@@ -27,7 +27,7 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
       yield* testIssues(issues).start(item.id, (yield* Channel).defaultChannel());
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql<{ id: string }>`select id from mailbox_trigger
-        where trigger_json->'meta'->>'issue' = ${item.id} and trigger_json->'meta'->'dispatch' = 'true'
+        where trigger_json::jsonb->'meta'->>'issue' = ${item.id} and trigger_json::jsonb->'meta'->'dispatch' = 'true'
         order by seq desc limit 1`;
       triggerId = rows[0]?.id ?? "";
       issueId = item.id;

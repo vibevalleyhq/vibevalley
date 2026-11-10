@@ -354,7 +354,7 @@ describe("the orchestrator", () => {
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql`select id from channel_message where body like '%【要告诉主人】%'`;
       expect(rows).toHaveLength(0);
-      const rows2 = yield* sql`select id from mailbox_trigger where payload_json->>'text' = '【要告诉主人】
+      const rows2 = yield* sql`select id from mailbox_trigger where payload_json::jsonb ->> 'text' = '【要告诉主人】
 - #41 交回来了'`;
       expect(rows2).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

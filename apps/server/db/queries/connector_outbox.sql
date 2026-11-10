@@ -25,7 +25,7 @@ update connector_outbox set state = 'dropped', error = sqlc.narg(error) where co
 
 -- name: MessageOfExt :many
 -- The farm's message an app's id stands for: one this farm sent, or one it heard.
-select message_id from connector_outbox where connector_outbox.connector = sqlc.arg(connector) and connector_outbox.ext_id = sqlc.arg(ext_id)
+select message_id::text? as message_id from connector_outbox where connector_outbox.connector = sqlc.arg(connector) and connector_outbox.ext_id = sqlc.arg(ext_id)
 union all
 select message_id from connector_inbound where connector_inbound.connector = sqlc.arg(connector) and connector_inbound.ext_id = sqlc.arg(ext_id) and message_id is not null
 limit 1;

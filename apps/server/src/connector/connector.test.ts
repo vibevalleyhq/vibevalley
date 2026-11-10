@@ -9,6 +9,7 @@ import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrc
 import { Channel } from "#/channel/channel.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { testConfig, gate, untilGot as until, waitFor, whenState } from "#/testing/layers.ts";
+import { allow, refuse } from "#/testing/refuse.ts";
 import { world } from "#/testing/world.ts";
 import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
@@ -594,13 +595,15 @@ describe("the chat apps", () => {
   it.effect("route quoted replies to an old thread before and after a restart", () => {
     const config = { ...testConfig(), db: "" };
     let thread = "";
+    // The app's id the old answer went out under: which send was first depends on when the orchestrator's other reply went.
+    let answered = "";
     const reply = (script: Script, text: string, sent: number) =>
       Effect.gen(function* () {
         const chat = yield* Channel;
         const inbound = wx(owner, text);
         script.weixinIn.push({
           ...inbound,
-          item_list: [...inbound.item_list!, { ref_msg: { svr_id: "wx1" } }],
+          item_list: [...inbound.item_list!, { ref_msg: { svr_id: answered } }],
         });
         yield* nth(script, "weixin", sent, "the quoted reply answered");
         yield* waitFor(saidIn(thread), (messages) => messages.includes(text), "the quoted reply kept in its thread");
@@ -620,6 +623,15 @@ describe("the chat apps", () => {
         yield* nth(first, "weixin", 0, "the original answer sent");
         const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
         yield* status((s) => s.pending === 0, "the external identity saved");
+        const sql = yield* SqlClient.SqlClient;
+        const sent = yield* waitFor(
+          sql<{ readonly ext_id: string }>`select ext_id from connector_outbox where message_id = ${written.message!.id} and ext_id is not null`.pipe(
+            Effect.orDie,
+          ),
+          (rows) => rows.length > 0,
+          "the old answer sent",
+        );
+        answered = sent[0]?.ext_id ?? "";
         for (let i = 0; i < 301; i++) yield* chat.post({ _tag: "Notice", channel: chat.defaultChannel(), text: `动静 ${i}`, code: "history" });
         yield* reply(first, "继续这个话题", 1);
       }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
@@ -701,9 +713,7 @@ describe("the chat apps", () => {
       const sql = yield* SqlClient.SqlClient;
       yield* weixinConnected(script);
       yield* sql.unsafe(`select 1`).pipe(Effect.orDie);
-      yield* sql
-        .unsafe(`create trigger fail_pause before update of paused_until on connector_account for each row begin select raise(abort, 'pause failure'); end`)
-        .pipe(Effect.orDie);
+      yield* refuse(sql, "fail_pause", "before update of paused_until on connector_account", "", "pause failure").pipe(Effect.orDie);
       script.updates = () =>
         Effect.sync(() => {
           polls++;
@@ -713,7 +723,7 @@ describe("the chat apps", () => {
       yield* until(() => polls === 1, "the first stale poll");
       yield* TestClock.adjust(29_999);
       expect(polls).toBe(1);
-      yield* sql.unsafe("drop trigger fail_pause").pipe(Effect.orDie);
+      yield* allow(sql, "fail_pause").pipe(Effect.orDie);
       yield* TestClock.adjust(1);
       yield* until(() => polls >= 2, "polling after the backoff");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
@@ -730,12 +740,10 @@ describe("the chat apps", () => {
       yield* c.login("qq", { appId: "102", secret: "right" });
       yield* reaches("qq", "pairing");
       yield* Effect.orDie(sql.unsafe(`select 1`));
-      yield* Effect.orDie(
-        sql.unsafe(`create trigger fail_outbox before update on connector_outbox for each row begin select raise(abort, 'disk failure'); end`),
-      );
+      yield* Effect.orDie(refuse(sql, "fail_outbox", "before update on connector_outbox", "", "disk failure"));
       const { message } = yield* chat.post({ _tag: "Owner", text: "pending", sendKey: "" });
       yield* Effect.orDie(
-        sql.unsafe(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', ?, 'pending', 1)`, [message.id]),
+        sql.unsafe(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', $1, 'pending', 1)`, [message.id]),
       );
       const status: ConnectorStatus = yield* c.logout("qq");
       expect(status.state).toBe("pairing");

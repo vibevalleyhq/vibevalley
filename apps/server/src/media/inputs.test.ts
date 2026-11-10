@@ -8,6 +8,7 @@ import { refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { allow, refuse } from "#/testing/refuse.ts";
 import * as q from "#db/media_input.sql.ts";
 
 import { makeInputs } from "./inputs.ts";
@@ -277,9 +278,7 @@ it.effect.each([false, true])("regression: a rejected database commit remains ac
     });
     const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
     const input = yield* inputs.create(metadata);
-    yield* sql.unsafe(
-      "CREATE TRIGGER media_input_test_fail BEFORE UPDATE OF phase ON media_input WHEN NEW.phase = 'ready' BEGIN SELECT RAISE(ABORT, 'injected database failure'); END",
-    );
+    yield* refuse(sql, "media_input_test_fail", "BEFORE UPDATE OF phase ON media_input", "NEW.phase = 'ready'", "injected database failure");
     const error = yield* Effect.flip(inputs.upload(input.id, Stream.make(bytes)));
     expect(error).toMatchObject({ _tag: "Refused" });
     yield* notIn(error, "injected database failure");
@@ -291,7 +290,7 @@ it.effect.each([false, true])("regression: a rejected database commit remains ac
     const directory2 = yield* fs.readDirectory(join(root, "staging"));
     expect(directory2).toEqual([]);
     blocked = false;
-    yield* sql.unsafe("DROP TRIGGER media_input_test_fail");
+    yield* allow(sql, "media_input_test_fail");
     expect((yield* inputs.upload(input.id, Stream.make(bytes))).phase).toBe("ready");
   }).pipe(Effect.provide(layer())),
 );

@@ -11,12 +11,12 @@ select * from media_generation where phase in ('queued', 'generating', 'download
 
 -- name: InsertGeneration :exec
 insert into media_generation (id, request, source, connection, revision, model, phase, created_at, updated_at)
-values (sqlc.arg(id), sqlc.arg(request), sqlc.arg(source), sqlc.arg(connection), sqlc.arg(revision), sqlc.arg(model), 'queued', sqlc.arg(now)::int, sqlc.arg(now)::int);
+values (sqlc.arg(id), sqlc.arg(request), sqlc.arg(source), sqlc.arg(connection), sqlc.arg(revision), sqlc.arg(model), 'queued', sqlc.arg(now)::float8, sqlc.arg(now)::float8);
 
 -- name: ChangeGeneration :exec
 update media_generation set phase = sqlc.arg(phase), result_url = sqlc.narg(result_url), attachment = sqlc.narg(attachment), usage = sqlc.narg(usage),
-problem = sqlc.arg(problem), updated_at = sqlc.arg(now)::int where id = sqlc.arg(id);
+problem = sqlc.arg(problem), updated_at = sqlc.arg(now)::float8 where id = sqlc.arg(id);
 
 -- name: InterruptGenerations :exec
 update media_generation set phase = case when phase = 'queued' then 'canceled' else 'unknown' end,
-problem = sqlc.arg(problem), updated_at = sqlc.arg(now)::int where phase in ('queued', 'generating');
+problem = sqlc.arg(problem), updated_at = sqlc.arg(now)::float8 where phase in ('queued', 'generating');

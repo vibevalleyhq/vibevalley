@@ -7,6 +7,9 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     testTimeout: 20_000,
+    // Each farm runs its own Postgres (PGlite, in WASM): a worker on every core leaves the heaviest tests (media's
+    // disk-backed audio) waiting for CPU past their timeout, and half as many finish the run as soon.
+    maxWorkers: "50%",
     env: { TZ: "Asia/Shanghai" },
     isolate: false,
     reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"],

@@ -13,6 +13,7 @@ import { Core } from "#/core/core.ts";
 import { type ServerConfig } from "#/infra/config.ts";
 import { checkCases, goldenCases } from "#/testing/golden.ts";
 import { testConfig, aTurn } from "#/testing/layers.ts";
+import { allow, refuse } from "#/testing/refuse.ts";
 import { world } from "#/testing/world.ts";
 import * as q from "#db/cron.sql.ts";
 
@@ -261,16 +262,14 @@ it.effect("regression: a cron occurrence and its schedule advance commit togethe
       const crons = yield* Cron;
       const sql = yield* SqlClient.SqlClient;
       const item = yield* crons.add(req("atomic", "work", { kind: "once", at: now + 1 }), owner);
-      yield* sql.unsafe(
-        "create trigger reject_cron_input before insert on mailbox_trigger for each row when (new.source = 'cron') begin select raise(abort, 'rejected input'); end",
-      );
+      yield* refuse(sql, "reject_cron_input", "before insert on mailbox_trigger", "new.source = 'cron'", "rejected input");
       yield* TestClock.adjust(2);
       yield* crons.tick;
       const rows = yield* sql`select enabled, last_run from cron where id = ${item.id}`;
-      expect(rows).toEqual([{ enabled: 1, last_run: null }]);
+      expect(rows).toEqual([{ enabled: true, last_run: null }]);
       const rows2 = yield* sql`select id from mailbox_trigger where source = 'cron'`;
       expect(rows2).toEqual([]);
-      yield* sql.unsafe("drop trigger reject_cron_input");
+      yield* allow(sql, "reject_cron_input");
       yield* crons.tick;
       expect((yield* sql`select id from mailbox_trigger where source = 'cron'`).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
@@ -286,14 +285,14 @@ it.effect("regression: a one-off cron resumes committed input after restart with
       const crons = yield* Cron;
       const sql = yield* SqlClient.SqlClient;
       yield* crons.add(req("restart-once", "work", { kind: "once", at: now + 1 }), owner);
-      yield* sql.unsafe("create trigger reject_cron_issue before insert on issue for each row begin select raise(abort, 'rejected issue'); end");
+      yield* refuse(sql, "reject_cron_issue", "before insert on issue", "", "rejected issue");
       yield* TestClock.adjust(2);
       yield* crons.tick;
       const rows = yield* sql`select enabled from cron`;
-      expect(rows).toEqual([{ enabled: 0 }]);
+      expect(rows).toEqual([{ enabled: false }]);
       const rows2 = yield* sql`select routed_at from mailbox_trigger where source = 'cron'`;
       expect(rows2).toEqual([{ routed_at: null }]);
-      yield* sql.unsafe("drop trigger reject_cron_issue");
+      yield* allow(sql, "reject_cron_issue");
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
     yield* Effect.gen(function* () {
       const crons = yield* Cron;
@@ -303,7 +302,7 @@ it.effect("regression: a one-off cron resumes committed input after restart with
       const rows = yield* sql`select title from issue`;
       expect(rows).toEqual([{ title: "restart-once" }]);
       const rows2 = yield* sql`select routed_at is not null as routed from mailbox_trigger where source = 'cron'`;
-      expect(rows2).toEqual([{ routed: 1 }]);
+      expect(rows2).toEqual([{ routed: true }]);
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 });

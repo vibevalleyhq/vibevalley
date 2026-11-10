@@ -342,9 +342,13 @@ describe("the chat", () => {
         expect((yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, message.id)))?.state).toBe("handed");
         x.consumed({ session: defaultOrchestrator, envelopeIds: [message.id] });
         yield* until(async () => (await f.deliveryOf(defaultOrchestrator, message.id))?.state === "consumed", "the model consumption receipt");
-        expect((yield* f.chat.history(f.chat.defaultChannel())).find((item) => item.id === message.id)?.reactions).toEqual([
-          { emoji: "👀", by: [defaultOrchestrator] },
-        ]);
+        // The 👀 follows the consumption on the delivery changes' own fiber.
+        const reacted = yield* waitFor(
+          Effect.map(f.chat.history(f.chat.defaultChannel()), (items) => items.find((item) => item.id === message.id)?.reactions ?? []),
+          (reactions) => reactions.length > 0,
+          "the 👀 on the consumed message",
+        );
+        expect(reacted).toEqual([{ emoji: "👀", by: [defaultOrchestrator] }]);
       }),
     ),
   );
@@ -419,7 +423,7 @@ describe("the chat", () => {
         // Who is handed what is settled before say returns: a session not woken by now is not woken by it.
         expect(x.runsOf("w3")).toHaveLength(before);
         const deliveryOf2 = yield* Effect.promise(() => f.deliveryOf("w3", said.id));
-        expect(deliveryOf2).toMatchObject({ reason: "channel", wakes: 0 });
+        expect(deliveryOf2).toMatchObject({ reason: "channel", wakes: false });
         const deliveryOf3 = yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, said.id));
         expect(deliveryOf3).toMatchObject({ state: "handed" });
       }),
@@ -442,7 +446,7 @@ describe("the chat", () => {
             const n = yield* heard.of(said.id);
             expect([n.channel, n.type, n.target]).toEqual([direct!.id, "direct", "@owner"]);
             const deliveryOf2 = yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, said.id));
-            expect(deliveryOf2).toMatchObject({ reason: "direct", wakes: 1 });
+            expect(deliveryOf2).toMatchObject({ reason: "direct", wakes: true });
             const deliveryOf3 = yield* Effect.promise(() => f.deliveryOf("w3", said.id));
             expect(deliveryOf3).toBeUndefined();
             expect(x.runsOf("w3")).toHaveLength(before);

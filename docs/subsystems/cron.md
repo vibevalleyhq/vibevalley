@@ -40,7 +40,7 @@
 ## 怎么走
 
 1. **扫描与补跑（`tick`）**：启动后及每 `cron.tick_ms` 在单锁内重放未路由 Trigger，并筛出 `nextRun <= now` 的已启用任务（错过多次只合并补跑一次）。
-2. **原子记录与投递**：在同一 SQLite 事务内更新 `cron.last_run` 并写入 `mailbox_trigger`，随后调用 `Issue.scheduled` 准备工单并交 `Mailbox.receive` 投递。
+2. **原子记录与投递**：在同一数据库事务内更新 `cron.last_run` 并写入 `mailbox_trigger`，随后调用 `Issue.scheduled` 准备工单并交 `Mailbox.receive` 投递。
 
 ## 和谁打交道
 

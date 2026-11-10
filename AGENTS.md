@@ -13,8 +13,8 @@ apps/server/               服务端（Effect v4，Node 24；仓库里用 vpx �
                            （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
                            handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat/main.ts 是终端里的对话（和农机直接聊、
                            自己的 agent），由命令行交出终端来跑
-apps/server/db/            库（SQLite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
-                           generated/ 是 scripts/sqlite-generate.ts 从它们写出的
+apps/server/db/            库（Postgres：database.url，或家目录里的 PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
+                           generated/ 是 scripts/pg-generate.ts 从它们写出的
 apps/server/src/*/testdata 规则的黄金数据（*.jsonl.gz）和样例
 apps/cli/                  命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端，不载入服务端；api list|call 够得着每个接口，
                            guide 是给 agent 的用法，帮助和典型的答复录在黄金数据里（apps/cli/README.md）
@@ -125,7 +125,7 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、帮工、仓库、频道……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
 - **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/<概念>/shapes.ts` 里加字段、在 `core/shapes.ts` 加事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
 - **`packages/protocol` 只放契约**：一个概念一个文件夹 `src/<概念>/`：线上的形状写在它的 `shapes.ts`，每个形状在同一个文件夹的 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在它的 `api.ts`，`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `vp run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
-- **生成的不手改**：`apps/server/db/generated` 由 `scripts/sqlite-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
+- **生成的不手改**：`apps/server/db/generated` 由 `scripts/pg-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
 - **包之间只经包名**：用别的包写它的名字、经它 `package.json` 的 `exports`，不写穿出包的相对路径（lint 的 `no-cross-package-path` 查）；自己的文件出了文件夹写 `#/…`（`imports`）；库给别人的是 `dist/` 里打好的声明，代码照源码跑（[地基](docs/subsystems/foundation.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/infra/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到主人的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。

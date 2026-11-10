@@ -10,15 +10,15 @@ select * from media_understanding order by created_at desc, id limit 100;
 select * from media_understanding where phase in ('authorized','queued','uploading','generating') or cleanup = 'running';
 
 -- name: InsertUnderstanding :exec
-insert into media_understanding (id, request, inputs, source, authorization, connection, revision, model, phase, cleanup, created_at, updated_at)
-values (sqlc.arg(id), sqlc.arg(request), sqlc.arg(inputs), sqlc.arg(source), sqlc.narg(authorization), sqlc.arg(connection), sqlc.arg(revision)::int, sqlc.arg(model), sqlc.arg(phase), 'pending', sqlc.arg(now)::int, sqlc.arg(now)::int);
+insert into media_understanding (id, request, inputs, source, "authorization", connection, revision, model, phase, cleanup, created_at, updated_at)
+values (sqlc.arg(id), sqlc.arg(request), sqlc.arg(inputs), sqlc.arg(source), sqlc.narg(authorization), sqlc.arg(connection), sqlc.arg(revision)::int, sqlc.arg(model), sqlc.arg(phase), 'pending', sqlc.arg(now)::float8, sqlc.arg(now)::float8);
 
 -- name: ChangeUnderstanding :exec
-update media_understanding set phase = sqlc.arg(phase), source = sqlc.arg(source), result = sqlc.narg(result), cleanup = sqlc.arg(cleanup), problem = sqlc.arg(problem), updated_at = sqlc.arg(now)::int where id = sqlc.arg(id);
+update media_understanding set phase = sqlc.arg(phase), source = sqlc.arg(source), result = sqlc.narg(result), cleanup = sqlc.arg(cleanup), problem = sqlc.arg(problem), updated_at = sqlc.arg(now)::float8 where id = sqlc.arg(id);
 
 -- name: InterruptUnderstanding :exec
 update media_understanding set
 phase = case when phase in ('authorized','queued') then 'canceled' when phase in ('uploading','generating') then 'unknown' else phase end,
 cleanup = case when phase in ('authorized','queued') then 'done' when cleanup = 'running' then 'blocked' else cleanup end,
 problem = case when phase in ('authorized','queued','uploading','generating') then sqlc.arg(problem)::text else problem end,
-updated_at = sqlc.arg(now)::int where phase in ('authorized','queued','uploading','generating') or cleanup = 'running';
+updated_at = sqlc.arg(now)::float8 where phase in ('authorized','queued','uploading','generating') or cleanup = 'running';

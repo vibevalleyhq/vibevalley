@@ -13,6 +13,7 @@ import { agentHome, ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Setting } from "#/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { allow, refuse } from "#/testing/refuse.ts";
 import * as q from "#db/memory.sql.ts";
 
 import { Memory, make } from "./memory.ts";
@@ -224,13 +225,11 @@ describe("memory", () => {
       const m = yield* Memory;
       const sql = yield* SqlClient.SqlClient;
       yield* sql.unsafe(`select 1`);
-      yield* sql.unsafe(
-        `create trigger fail_write before insert on memory for each row when (new.kind = 'issue') begin select raise(abort, 'write failed'); end`,
-      );
+      yield* refuse(sql, "fail_write", "before insert on memory", "new.kind = 'issue'", "write failed");
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
       const ms = yield* m.list("lab");
       expect(ms).toEqual([]);
-      yield* sql.unsafe(`drop trigger fail_write`);
+      yield* allow(sql, "fail_write");
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
       const ms2 = yield* m.list("lab");
       expect(ms2).toHaveLength(1);

@@ -25,7 +25,7 @@ where a.issue = sqlc.arg(issue) order by a.updated_at desc, a.id;
 -- name: Artifacts :many
 select a.*, m.channel_id as said_channel, m.number as said_number
 from artifact a left join channel_message m on m.id = a.message_id
-order by a.updated_at desc, a.id limit sqlc.arg(limit_n);
+order by a.updated_at desc, a.id limit sqlc.arg(limit_n)::int;
 
 -- name: ArtifactVersioned :exec
 update artifact set version = sqlc.arg(version), updated_at = sqlc.arg(updated_at) where id = sqlc.arg(id);

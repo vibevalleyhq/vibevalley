@@ -930,7 +930,7 @@ describe("voice", () => {
       const spoken = yield* voice.speak("41 号工单做完了。");
       expect(spoken).toBe(true);
 
-      const rows = yield* sql<{ body: string }>`select body from channel_message order by rowid`;
+      const rows = yield* sql<{ body: string }>`select body from channel_message order by id`;
       expect(rows.map((r) => r.body)).toContain("帮我看一下工单");
       expect(rows.map((r) => r.body)).toContain("好，我这就去查。");
       expect(rows.map((r) => r.body)).not.toContain("41 号工单做完了。");

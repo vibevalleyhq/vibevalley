@@ -17,15 +17,17 @@
   "scripts": {
     "start": "vpx src/main.ts",
     "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/orchestrator/evals.live.test.ts",
-    "db:generate": "vpx scripts/sqlite-generate.ts",
-    "db:check": "vpx scripts/sqlite-generate.ts --check",
+    "db:generate": "vpx scripts/pg-generate.ts",
+    "db:check": "vpx scripts/pg-generate.ts --check",
     "chat": "vpx src/chat/main.ts"
   },
   "dependencies": {
     "@botiverse/oar": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@effect/sql-sqlite-node": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "@effect/sql-pglite": "catalog:",
+    "@electric-sql/pglite": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/agent": "workspace:*",

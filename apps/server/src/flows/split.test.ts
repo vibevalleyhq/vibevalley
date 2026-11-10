@@ -16,6 +16,7 @@ import { Issue } from "#/issue/issue.ts";
 import { Repo } from "#/repo/repo.ts";
 import { Session } from "#/session/session.ts";
 import { gitSync } from "#/testing/git.ts";
+import { refuse } from "#/testing/refuse.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
@@ -143,11 +144,7 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
     const sql = yield* SqlClient.SqlClient;
     yield* (yield* Agent).save(lab());
     const parent = yield* issues.add({ title: "parent", agent: "lab", repo: "split-failure" });
-    yield* sql
-      .unsafe(
-        "create trigger reject_child before insert on issue for each row when (NEW.title = 'second') begin select raise(abort, 'child write failed'); end",
-      )
-      .pipe(Effect.orDie);
+    yield* refuse(sql, "reject_child", "before insert on issue", "NEW.title = 'second'", "child write failed").pipe(Effect.orDie);
     const result = yield* Effect.flip(
       service.split(
         parent.id,
@@ -163,7 +160,7 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
     expect((yield* issues.list()).map((item) => [item.id, item.title])).toEqual([[parent.id, "parent"]]);
     expect((yield* Core).state().issues.map((item) => item.id)).toEqual([parent.id]);
     expect((yield* Session).hired()).toEqual([]);
-    const unsafe2 = yield* sql.unsafe("select * from mailbox_trigger where trigger_json->'meta'->'dispatch' = 'true'").pipe(Effect.orDie);
+    const unsafe2 = yield* sql.unsafe("select * from mailbox_trigger where trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'::jsonb").pipe(Effect.orDie);
     expect(unsafe2).toHaveLength(0);
     const unsafe3 = yield* sql.unsafe("select * from mailbox_issue").pipe(Effect.orDie);
     expect(unsafe3).toHaveLength(0);

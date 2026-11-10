@@ -36,7 +36,7 @@ update session set pending_report = null where id = sqlc.arg(id);
 
 -- name: HighestSessionNumber :one
 -- The highest n of the ids w<n>, 0 for none.
-select coalesce(max(case when id glob 'w[0-9]*' and substr(id, 2) not glob '*[^0-9]*' then cast(substr(id, 2) as integer) end), 0)::int as n
+select coalesce(max(case when id ~ '^w[0-9]+$' then substr(id, 2)::int end), 0)::int as n
 from session;
 
 -- name: ActiveSessions :many

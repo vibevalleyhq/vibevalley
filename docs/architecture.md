@@ -14,7 +14,7 @@ flowchart LR
     API[handlers<br/>VibeValleyApi、三条 SSE]
     SITE[Core<br/>核心状态 SpaceState]
     FM[管家<br/>VibeValley agent + 派活工具]
-    CHAT[频道<br/>群聊 · SQLite]
+    CHAT[频道<br/>群聊 · Postgres]
     MB[Mailbox<br/>路由、刹车、投递]
     TK[工单<br/>派活、排队、父子依赖、合并]
     CREW[帮工<br/>oar 子 agent]
@@ -76,7 +76,7 @@ flowchart LR
   13. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`）
   模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走 `Stream` 或窄端口。`apps/server/src/services.ts` 分两阶段组装：先构建所有服务并注册订阅，再按模块顺序执行启动任务。
 - **网关（`apps/server/src/http`、`mcp`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts` 提供三条 SSE 流；`src/mcp/` 为帮工提供 `/mcp`（[核心状态](docs/subsystems/core.md)）。
-- **存储（SQLite + 文件）**：进程内 `node:sqlite`，表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `scripts/sqlite-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
+- **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
 - **客户端（`apps/web`、`apps/desktop`、`apps/mobile`、`apps/cli`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。桌面壳（Electron）、浏览器和手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
 
 ## 核心状态
@@ -119,7 +119,7 @@ Host：
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/vibevalley.db` | SQLite 数据库：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、稿子、游戏账本、记忆、定时任务、连接器、配对设备、笔记批注与撤销 |
+| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、稿子、游戏账本、记忆、定时任务、连接器、配对设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
 | `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
 | `agent/<档案 id>/` | 管家对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |

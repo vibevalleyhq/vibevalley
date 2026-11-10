@@ -38,7 +38,8 @@
 | 配置键 | 用途 | 默认值 |
 |---|---|---|
 | `work_root` | 空间：仓库（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
-| `db` | SQLite 数据库目录（设为 `memory` 则使用内存库） | `$VIBEVALLEY_HOME/db` |
+| `db` | PGlite 的数据目录（设为 `memory` 则使用内存库；配了 `database.url` 时不用） | `$VIBEVALLEY_HOME/db` |
+| `database.url` | 一个 Postgres（`postgres://…`）：库放在那里；可能带密码，按密钥读 | 空：用 PGlite |
 | `port` | 主 HTTP 与 `/mcp` 监听端口（仅绑定 `127.0.0.1`，`0` 为随机端口） | `8787` |
 | `web` | 在 `/` 托管的前端静态产物目录（也可由 `--web` 指定） | 无 |
 | `agent.model` / `agent.starters` | CLI 对话默认模型、新农场自动安装的内置模板 ID 列表 | 空 / 空 |
