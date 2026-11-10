@@ -1,4 +1,4 @@
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 
 import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Redacted, Schema } from "effect";
@@ -200,6 +200,9 @@ export const loadConfig = Effect.fnUntraced(function* (
 });
 
 export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.workRoot, "pkm");
+
+/** This computer's name as people say it: its host name without .local. */
+export const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** The database's folder, or "memory". */
 export function dbDir(c: ServerConfig["Service"]): string {

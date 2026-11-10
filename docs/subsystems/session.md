@@ -39,6 +39,7 @@
 | `Session` | `T.Session`、`session` 表 | 档案的持续工作上下文（工单现场或私聊上下文），编号 `w<n>` 单调递增 |
 | `Run` | `T.Run`、`session_run` 表 | 一次触发到一次结束汇报（从 `sessionPhaseChanged(working)` 到 `sessionReported`） |
 | oar 会话 | `oarSessionId`、`Subagent` | 底层编码代理的记录流；重启或失联时可在同一 `Session` 下更换 |
+| 机器 | `T.Machine`、`machine` 表、`machine/machine.ts` | 帮工干活的那台电脑；今天只有服务端自己这台（开机时没有就记下，主机名为名），雇来的帮工记着它（`Session.machine`），服务端进程里的管家没有。别的机器经命令行加入在后面几步（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)） |
 
 - **管家与帮工统一在 `sessions` 中**：以 `Session.role`（`orchestrator` 或 `worker`）区分，共用 `phase` 与 `session_run`；仅 `worker` 参与并发槽位、地块分配与目录恢复。
 - **管家的会话由帮工模块自己登记**：开机时登记每个管家档案，之后经 `Agent.whenKept` 在档案存下（新建、改、装模板、按模板更新）的那次写返回之前登记或改名；登记失败那次写就失败。工单、频道、Mailbox 用到管家的会话时它已经在了，不再自己补。

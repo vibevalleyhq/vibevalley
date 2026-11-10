@@ -147,5 +147,19 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
       else all.push(f.status);
       return [{ ...state, connectors: all }, true];
     }
+    case "machineChanged": {
+      const all: T.Machine[] = [];
+      let replaced = false;
+      for (const m of state.machines) {
+        if (m.id !== f.machine.id) all.push(m);
+        else if (same(m, f.machine)) return [state, false];
+        else {
+          all.push(f.machine);
+          replaced = true;
+        }
+      }
+      if (!replaced) all.push(f.machine);
+      return [{ ...state, machines: all }, true];
+    }
   }
 }

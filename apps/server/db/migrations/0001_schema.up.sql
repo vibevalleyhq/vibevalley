@@ -310,6 +310,14 @@ CREATE TABLE issue_assignment (
   assigned_at     double precision not null,
   ended_at        double precision
 );
+-- The computers helpers work on (machine/machine.ts): the server's own, and in time those let in from the command line.
+CREATE TABLE machine (
+  id         text primary key,
+  name       text not null,
+  here       boolean not null default false,
+  joined_at  double precision not null
+);
+CREATE UNIQUE INDEX machine_one_here ON machine (here) WHERE here;
 CREATE TABLE session (
   id          text primary key,
   role        text not null check (role in ('orchestrator', 'worker')),
@@ -332,8 +340,11 @@ CREATE TABLE session (
   refining boolean not null default false,
   runs integer not null default 0,
   last_run text,
-  spent text
+  spent text,
+  -- The machine it works on; none for an agent hosted in the server's process.
+  machine text references machine (id)
 );
+CREATE INDEX session_by_machine on session (machine) where machine is not null;
 CREATE TABLE issue_assignment_execution (
   assignment text not null references issue_assignment(id) on delete cascade,
   executor text not null references session(id),

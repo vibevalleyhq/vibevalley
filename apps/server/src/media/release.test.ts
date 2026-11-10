@@ -47,104 +47,109 @@ const layer = (http: HttpClient.HttpClient) =>
   );
 const terminal = (media: Media["Service"], id: string) => waitFor(media.get(id), (job) => !job.canCancel, "audio reached a terminal phase");
 
-it.effect("regression: releasing one transcript preserves another job's pins, then frees quota without replaying either generation", () => {
-  let uploads = 0;
-  let submissions = 0;
-  let deletes = 0;
-  const http = HttpClient.make((request) => {
-    if (request.method === "DELETE") {
-      deletes++;
-      return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ id: request.url.split("/").at(-1), object: "file", deleted: true })));
-    }
-    if (request.url.endsWith("/files")) {
-      uploads++;
+// Real disk work on whole audio files: the slowest of the server tests when every core is busy.
+it.effect(
+  "regression: releasing one transcript preserves another job's pins, then frees quota without replaying either generation",
+  () => {
+    let uploads = 0;
+    let submissions = 0;
+    let deletes = 0;
+    const http = HttpClient.make((request) => {
+      if (request.method === "DELETE") {
+        deletes++;
+        return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ id: request.url.split("/").at(-1), object: "file", deleted: true })));
+      }
+      if (request.url.endsWith("/files")) {
+        uploads++;
+        return Effect.succeed(
+          HttpClientResponse.fromWeb(
+            request,
+            Response.json({
+              id: `file-${uploads}`,
+              object: "file",
+              bytes: wav().length,
+              created_at: 1,
+              filename: "sample.wav",
+              purpose: "audio",
+              status: "processed",
+            }),
+          ),
+        );
+      }
+      if (request.method === "POST") {
+        submissions++;
+        return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ task_id: `task-${submissions}` }, { status: 202 })));
+      }
       return Effect.succeed(
         HttpClientResponse.fromWeb(
           request,
           Response.json({
-            id: `file-${uploads}`,
-            object: "file",
-            bytes: wav().length,
+            id: request.url.split("/").at(-1),
+            object: "audio.transcription",
+            status: "SUCCESS",
             created_at: 1,
-            filename: "sample.wav",
-            purpose: "audio",
-            status: "processed",
+            updated_at: 2,
+            text: "Retain this transcript.",
+            segments: [{ speaker: "one", text: "Retain this transcript.", start: 0, end: 0.1 }],
           }),
         ),
       );
-    }
-    if (request.method === "POST") {
-      submissions++;
-      return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ task_id: `task-${submissions}` }, { status: 202 })));
-    }
-    return Effect.succeed(
-      HttpClientResponse.fromWeb(
-        request,
-        Response.json({
-          id: request.url.split("/").at(-1),
-          object: "audio.transcription",
-          status: "SUCCESS",
-          created_at: 1,
-          updated_at: 2,
-          text: "Retain this transcript.",
-          segments: [{ speaker: "one", text: "Retain this transcript.", start: 0, end: 0.1 }],
-        }),
-      ),
-    );
-  });
-  return Effect.gen(function* () {
-    yield* configured;
-    const media = yield* Media;
-    const db = yield* Db;
-    const bytes = wav();
-    const local = yield* media.inputs.create({ kind: "audio", name: "shared.wav", mime: "audio/wav", size: bytes.length });
-    yield* media.inputs.upload(local.id, Stream.make(bytes));
-    const first: T.MediaTranscriptionRequest = { id: "transcript-a", connection: "moss", revision: 1, input: local.id, allowUpload: true };
-    const second = { ...first, id: "transcript-b" };
-    for (const request of [first, second]) {
-      yield* media.createTranscription(request);
-      const job = yield* terminal(media, request.id);
-      expect(job.phase, job.problem).toBe("ready");
-      yield* waitFor(media.get(request.id), (value) => "canCleanup" in value && !value.canCleanup, "remote file cleaned");
-    }
-    yield* TestClock.adjust("25 hours");
-    yield* media.restore();
-    expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
-    const before = yield* media.get(first.id);
-    const row = yield* db.one(audio.audio({ id: first.id }));
-    expect((yield* media.previewRelease(first.id)).does).toHaveLength(3);
-    const media2 = yield* media.get(first.id);
-    expect(media2).toEqual(before);
-    const sql = yield* SqlClient.SqlClient;
-    yield* refuse(sql, "media_input_pin_test_release", "BEFORE DELETE ON media_input_pin", "", "release blocked");
-    const releasedFailure = yield* media.release(first.id).pipe(Effect.flip);
-    expect(releasedFailure).toMatchObject({ _tag: "Refused" });
-    const media3 = yield* media.get(first.id);
-    expect(media3).toEqual(before);
-    expect((yield* media.inputs.get(local.id)).canDelete).toBe(false);
-    yield* allow(sql, "media_input_pin_test_release");
-    const released = yield* media.release(first.id);
-    expect(released).toMatchObject({ input: null, resultInput: null, previewInput: null, canRelease: false, result: { text: "Retain this transcript." } });
-    const media4 = yield* media.get(second.id);
-    expect(media4).toMatchObject({ input: { id: local.id }, canRelease: true });
-    expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
-    const inputCapacity2 = yield* db.run(input.inputCapacity());
-    expect(inputCapacity2).toEqual({ bytes: bytes.length, count: 1 });
-    const after = yield* db.one(audio.audio({ id: first.id }));
-    expect(after).toMatchObject({ request: row?.request, remote_task_id: row?.remote_task_id, result: row?.result });
-    yield* media.release(second.id);
-    const inputCapacity3 = yield* db.run(input.inputCapacity());
-    expect(inputCapacity3).toEqual({ bytes: 0, count: 0 });
-    const inputFailure = yield* media.inputs.get(local.id).pipe(Effect.flip);
-    expect(inputFailure).toMatchObject({ _tag: "Refused" });
-    yield* media.restore();
-    const transcriptionCreated = yield* media.createTranscription(first);
-    expect(transcriptionCreated).toMatchObject({ id: first.id, input: null, result: { text: "Retain this transcript." } });
-    const transcriptionCreated2 = yield* media.createTranscription(second);
-    expect(transcriptionCreated2).toMatchObject({ id: second.id, input: null });
-    expect([uploads, submissions, deletes]).toEqual([2, 2, 2]);
-  }).pipe(Effect.provide(layer(http)));
-});
+    });
+    return Effect.gen(function* () {
+      yield* configured;
+      const media = yield* Media;
+      const db = yield* Db;
+      const bytes = wav();
+      const local = yield* media.inputs.create({ kind: "audio", name: "shared.wav", mime: "audio/wav", size: bytes.length });
+      yield* media.inputs.upload(local.id, Stream.make(bytes));
+      const first: T.MediaTranscriptionRequest = { id: "transcript-a", connection: "moss", revision: 1, input: local.id, allowUpload: true };
+      const second = { ...first, id: "transcript-b" };
+      for (const request of [first, second]) {
+        yield* media.createTranscription(request);
+        const job = yield* terminal(media, request.id);
+        expect(job.phase, job.problem).toBe("ready");
+        yield* waitFor(media.get(request.id), (value) => "canCleanup" in value && !value.canCleanup, "remote file cleaned");
+      }
+      yield* TestClock.adjust("25 hours");
+      yield* media.restore();
+      expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
+      const before = yield* media.get(first.id);
+      const row = yield* db.one(audio.audio({ id: first.id }));
+      expect((yield* media.previewRelease(first.id)).does).toHaveLength(3);
+      const media2 = yield* media.get(first.id);
+      expect(media2).toEqual(before);
+      const sql = yield* SqlClient.SqlClient;
+      yield* refuse(sql, "media_input_pin_test_release", "BEFORE DELETE ON media_input_pin", "", "release blocked");
+      const releasedFailure = yield* media.release(first.id).pipe(Effect.flip);
+      expect(releasedFailure).toMatchObject({ _tag: "Refused" });
+      const media3 = yield* media.get(first.id);
+      expect(media3).toEqual(before);
+      expect((yield* media.inputs.get(local.id)).canDelete).toBe(false);
+      yield* allow(sql, "media_input_pin_test_release");
+      const released = yield* media.release(first.id);
+      expect(released).toMatchObject({ input: null, resultInput: null, previewInput: null, canRelease: false, result: { text: "Retain this transcript." } });
+      const media4 = yield* media.get(second.id);
+      expect(media4).toMatchObject({ input: { id: local.id }, canRelease: true });
+      expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
+      const inputCapacity2 = yield* db.run(input.inputCapacity());
+      expect(inputCapacity2).toEqual({ bytes: bytes.length, count: 1 });
+      const after = yield* db.one(audio.audio({ id: first.id }));
+      expect(after).toMatchObject({ request: row?.request, remote_task_id: row?.remote_task_id, result: row?.result });
+      yield* media.release(second.id);
+      const inputCapacity3 = yield* db.run(input.inputCapacity());
+      expect(inputCapacity3).toEqual({ bytes: 0, count: 0 });
+      const inputFailure = yield* media.inputs.get(local.id).pipe(Effect.flip);
+      expect(inputFailure).toMatchObject({ _tag: "Refused" });
+      yield* media.restore();
+      const transcriptionCreated = yield* media.createTranscription(first);
+      expect(transcriptionCreated).toMatchObject({ id: first.id, input: null, result: { text: "Retain this transcript." } });
+      const transcriptionCreated2 = yield* media.createTranscription(second);
+      expect(transcriptionCreated2).toMatchObject({ id: second.id, input: null });
+      expect([uploads, submissions, deletes]).toEqual([2, 2, 2]);
+    }).pipe(Effect.provide(layer(http)));
+  },
+  60_000,
+);
 
 it.effect("regression: releasing a design preview keeps its channel attachment and a clone's saved voice and shared source", () => {
   let generations = 0;

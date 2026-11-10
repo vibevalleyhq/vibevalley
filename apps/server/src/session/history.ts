@@ -54,6 +54,7 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
     phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
     refining: false,
     ...(r.repo !== null ? { repo: r.repo } : {}),
+    ...(r.machine !== null ? { machine: r.machine } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
     ...(r.channel !== null ? { channel: r.channel } : {}),
   };
@@ -110,6 +111,7 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
     runs: row.runs,
     phase: isOnDuty(row) ? { _tag: "resting" } : phase,
     ...(row.repo === null ? {} : { repo: row.repo }),
+    ...(row.machine === null ? {} : { machine: row.machine }),
     ...(row.issue === null ? {} : { issue: issueId(row.issue) }),
     ...(row.channel === null ? {} : { channel: row.channel }),
     ...(place?.branch ? { branch: place.branch, worktree: place.cwd } : {}),

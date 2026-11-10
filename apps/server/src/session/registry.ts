@@ -179,6 +179,7 @@ export const sessionRegistry = Effect.gen(function* () {
       issue: null,
       channel: null,
       hired_at: hiredAt,
+      machine: null,
     });
     const kept = core.session(session.id);
     // An orchestrator renamed is the same session under its new name.
@@ -216,6 +217,7 @@ export const sessionRegistry = Effect.gen(function* () {
       issue: s.issue ?? null,
       channel: s.channel ?? null,
       hired_at: s.hiredAt,
+      machine: s.machine ?? null,
     });
 
   const ended = (id: string, closed: T.SessionClose) =>

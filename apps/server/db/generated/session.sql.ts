@@ -17,17 +17,18 @@ export const KeepSessionParams = Schema.Struct({
   ["issue"]: Schema.NullOr(Schema.String),
   ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
+  ["machine"]: Schema.NullOr(Schema.String),
 })
 export type KeepSessionParams = typeof KeepSessionParams.Type
 
 
-export const KeepSessionSql = "-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\non conflict (id) do nothing;"
+export const KeepSessionSql = "-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at, machine)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\non conflict (id) do nothing;"
 
 export const keepSession = Effect.fn("KeepSession")(function* (params: KeepSessionParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: KeepSessionParams,
-    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["role"], p["agent"], p["name"], p["runtime"], p["brief"], p["repo"], p["issue"], p["channel"], p["hired_at"]]),
+    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["role"], p["agent"], p["name"], p["runtime"], p["brief"], p["repo"], p["issue"], p["channel"], p["hired_at"], p["machine"]]),
   })(params)
 })
 
@@ -94,6 +95,7 @@ export const SessionByIDResult = Schema.Struct({
   ["runs"]: Schema.Int,
   ["last_run"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
+  ["machine"]: Schema.NullOr(Schema.String),
 })
 export type SessionByIDResult = typeof SessionByIDResult.Type
 
@@ -139,6 +141,7 @@ export const EndedSessionsResult = Schema.Struct({
   ["runs"]: Schema.Int,
   ["last_run"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
+  ["machine"]: Schema.NullOr(Schema.String),
 })
 export type EndedSessionsResult = typeof EndedSessionsResult.Type
 
@@ -282,6 +285,7 @@ export const ActiveSessionsResult = Schema.Struct({
   ["runs"]: Schema.Int,
   ["last_run"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
+  ["machine"]: Schema.NullOr(Schema.String),
 })
 export type ActiveSessionsResult = typeof ActiveSessionsResult.Type
 

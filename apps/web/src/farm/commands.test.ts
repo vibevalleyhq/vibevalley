@@ -72,7 +72,7 @@ function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
   };
   return {
     seq: 0,
-    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], crons: [], connectors: [] },
+    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], crons: [], connectors: [], machines: [] },
     inbox: [],
     effects: [],
     view: {

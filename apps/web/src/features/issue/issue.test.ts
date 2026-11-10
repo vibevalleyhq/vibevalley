@@ -106,6 +106,7 @@ describe("rows", () => {
     issues: [],
     crons: [],
     connectors: [],
+    machines: [],
     ...over,
   });
 

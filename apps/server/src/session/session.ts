@@ -14,6 +14,7 @@ import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Repo } from "#/repo/repo.ts";
 import { type Merged, type MergeFailure, type RepoError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/repo/workplace.ts";
@@ -199,6 +200,7 @@ const make = Effect.gen(function* () {
   const memories = yield* Memory;
   const repos = yield* Repo;
   const executor = yield* Executor;
+  const machines = yield* Machine;
   const db = yield* Db;
   yield* Effect.forkScoped(
     Stream.runForEach(moves, ({ fact, after }) => {
@@ -420,6 +422,7 @@ const make = Effect.gen(function* () {
           refining: issue ? (opt.refining ?? false) : false,
           ...(issue ? { issue: issue.id } : {}),
           ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
+          machine: machines.here().id,
         };
         const refuseStart = (why: string, retained: boolean): Effect.Effect<Hired> =>
           Effect.gen(function* () {

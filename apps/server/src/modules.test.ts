@@ -27,6 +27,7 @@ const owners: Readonly<Record<string, string>> = {
   progress: "Gamification",
   commits: "Gamification",
   connectors: "Gateway",
+  machines: "Agent Sessions",
 };
 const reads: Readonly<Record<string, string>> = {
   "mailbox/mailbox.ts -> issues": "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",

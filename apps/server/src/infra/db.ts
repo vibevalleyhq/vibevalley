@@ -30,7 +30,7 @@ export function setAsideStale(where: string, hash: string, now: number): string 
 }
 
 /** The database could not be opened or given its schema: the farm does not start. */
-export class Unopened extends Schema.TaggedError<Unopened, { readonly brand: unique symbol }>()("Unopened", {
+class Unopened extends Schema.TaggedError<Unopened, { readonly brand: unique symbol }>()("Unopened", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}

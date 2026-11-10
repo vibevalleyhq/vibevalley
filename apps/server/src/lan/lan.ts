@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
-import { hostname, networkInterfaces } from "node:os";
+import { networkInterfaces } from "node:os";
 
 import { NodeSink, NodeStream } from "@effect/platform-node";
 import { Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
@@ -25,7 +25,7 @@ import { rpcPath } from "@vibevalley/protocol/rpc";
 
 import { lookIn, messageOf, missing } from "#/base/errors.ts";
 import { code as newCode, newId } from "#/base/ids.ts";
-import { ServerConfig } from "#/infra/config.ts";
+import { hostName, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { callbackLog } from "#/infra/log.ts";
 import * as lanQ from "#db/lan.sql.ts";
@@ -96,8 +96,6 @@ export class Lan extends Context.Service<
 
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-
-const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
 function lanAddress(): string {

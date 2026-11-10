@@ -36,6 +36,7 @@ const state = (...sessions: Session[]): SpaceState => ({
   crons: [],
   issues: [],
   connectors: [],
+  machines: [],
 });
 
 test("the orchestrator's dots show only in the channel its session works in", () => {

@@ -137,6 +137,7 @@ const channelLayer = (x: FakeSessions) =>
           issue: null,
           channel: null,
           hired_at: 0,
+          machine: null,
         }),
       );
       x.news = yield* PubSub.unbounded<SessionNews>();

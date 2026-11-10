@@ -12,6 +12,7 @@ export const emptySpaceState = (): T.SpaceState => ({
   crons: [],
   issues: [],
   connectors: [],
+  machines: [],
 });
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core

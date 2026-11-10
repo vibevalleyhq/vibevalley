@@ -17,6 +17,7 @@ import { Database, Db } from "./infra/db.ts";
 import { Ingress, start as ingressStart } from "./ingress/ingress.ts";
 import { Issue, start as issueStart } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
+import { Machine } from "./machine/machine.ts";
 import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Media, start as mediaStart } from "./media/media.ts";
@@ -76,7 +77,7 @@ export const sourceControl =
     below.pipe(on(Repo.layer(o.repo)));
 
 /** Agent Sessions: an agent at work on an issue in a workplace. */
-export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Session.layer));
+export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Machine.layer), on(Executor.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents, the owner's notes; the sessions register as its helpers. */
 export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Media.layer), on(Artifact.layer), on(Pkm.layer));

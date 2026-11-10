@@ -65,6 +65,8 @@ export interface Session {
   issue?: IssueId;
   refining: boolean;
   toolConnections?: ToolConnection[];
+  /** The machine it works on; none for an agent hosted in the server's process. */
+  machine?: string;
 }
 
 /** reduce never sees these: the words are the frame's (projection/frame.ts). */

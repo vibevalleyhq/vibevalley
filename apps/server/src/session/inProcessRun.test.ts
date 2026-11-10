@@ -50,6 +50,7 @@ const records = Effect.gen(function* () {
       issue: null,
       channel: null,
       hired_at: 0,
+      machine: null,
     }),
   );
   const trajectories = yield* makeTrajectories(config.home, () => {});

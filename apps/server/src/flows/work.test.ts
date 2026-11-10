@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Formatter, Stream } from "effect";
+import { Effect, Formatter, Layer, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
@@ -154,6 +154,33 @@ describe("a session's work", () => {
         expect(sessions.sessionOf(session!.id)).toBeUndefined();
         expect(core.state().sessions.some((s) => s.id === session!.id)).toBe(false);
       }).pipe(Effect.scoped, Effect.provide(after.layer));
+    });
+  });
+
+  it.live("works on the server's own machine, the same one after a restart", () => {
+    const base = testConfig();
+    const config = { ...base, db: join(base.home, "db") };
+    let first: T.Machine | undefined;
+    // A farm on the same database, started for body and stopped after it.
+    const started = <A, E, R>(body: Effect.Effect<A, E, R>) =>
+      Effect.scoped(Effect.flatMap(Layer.build(farm({ config }).layer), (context) => Effect.provideContext(body, context)));
+    return Effect.gen(function* () {
+      yield* started(
+        Effect.gen(function* () {
+          const w = yield* watch;
+          first = (yield* Core).state().machines[0];
+          expect(first).toMatchObject({ here: true, online: true });
+          const hired = yield* (yield* Issue).hire(lab(), "先写一点并提交", "on-here");
+          const session = mustHire(hired);
+          expect(session.machine).toBe(first?.id);
+          yield* w.nextReport;
+        }),
+      );
+      yield* started(
+        Effect.gen(function* () {
+          expect((yield* Core).state().machines).toEqual([first]);
+        }),
+      );
     });
   });
 

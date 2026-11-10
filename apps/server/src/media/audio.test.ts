@@ -329,67 +329,80 @@ it.effect("regression: shared capacity and IDs apply across audio kinds and auto
   }),
 );
 
-it.effect("regression: long transcription uploads disk-backed audio once and retains speaker timestamps and playback input", () => {
-  const operations: string[] = [];
-  const http = HttpClient.make((request) => {
-    operations.push(`${request.method} ${request.url}`);
-    if (request.url.endsWith("/files") && request.method === "POST") {
-      expect(request.body._tag).toBe("FormData");
+// Real disk work on whole audio files: the slowest of the server tests when every core is busy.
+it.effect(
+  "regression: long transcription uploads disk-backed audio once and retains speaker timestamps and playback input",
+  () => {
+    const operations: string[] = [];
+    const http = HttpClient.make((request) => {
+      operations.push(`${request.method} ${request.url}`);
+      if (request.url.endsWith("/files") && request.method === "POST") {
+        expect(request.body._tag).toBe("FormData");
+        return Effect.succeed(
+          HttpClientResponse.fromWeb(
+            request,
+            Response.json({
+              id: "file-one",
+              object: "file",
+              bytes: wav().length,
+              created_at: 1,
+              filename: "sample.wav",
+              purpose: "audio",
+              status: "processed",
+            }),
+          ),
+        );
+      }
+      if (request.method === "DELETE")
+        return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ id: "file-one", object: "file", deleted: true })));
+      if (request.method === "POST") return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ task_id: "task-one" }, { status: 202 })));
       return Effect.succeed(
         HttpClientResponse.fromWeb(
           request,
-          Response.json({ id: "file-one", object: "file", bytes: wav().length, created_at: 1, filename: "sample.wav", purpose: "audio", status: "processed" }),
+          Response.json({
+            id: "task-one",
+            object: "audio.transcription",
+            status: "SUCCESS",
+            created_at: 1,
+            updated_at: 2,
+            text: "Hello.",
+            segments: [{ speaker: "speaker_0", text: "Hello.", start: 0, end: 0.12 }],
+          }),
         ),
       );
-    }
-    if (request.method === "DELETE")
-      return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ id: "file-one", object: "file", deleted: true })));
-    if (request.method === "POST") return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ task_id: "task-one" }, { status: 202 })));
-    return Effect.succeed(
-      HttpClientResponse.fromWeb(
-        request,
-        Response.json({
-          id: "task-one",
-          object: "audio.transcription",
-          status: "SUCCESS",
-          created_at: 1,
-          updated_at: 2,
-          text: "Hello.",
-          segments: [{ speaker: "speaker_0", text: "Hello.", start: 0, end: 0.12 }],
-        }),
-      ),
-    );
-  });
-  return Effect.gen(function* () {
-    yield* configured();
-    const { audio, inputs } = yield* harness;
-    const bytes = wav();
-    const reserved = yield* inputs.create({ kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length });
-    yield* inputs.upload(reserved.id, Stream.make(bytes.subarray(0, 11), bytes.subarray(11)));
-    const request: T.MediaTranscriptionRequest = {
-      id: "transcription-test",
-      input: reserved.id,
-      connection: "moss",
-      revision: 1,
-      allowUpload: true,
-      diarize: true,
-    };
-    yield* audio.createTranscription(request, { kind: "owner" });
-    const ready = yield* waitFor(audio.get(request.id), (job) => job.phase === "ready", "transcription saved");
-    expect(ready.result).toEqual({ kind: "transcription", text: "Hello.", segments: [{ speaker: "speaker_0", text: "Hello.", start: 0, end: 0.12 }] });
-    yield* audio.createTranscription(request, { kind: "owner" });
-    yield* waitFor(
-      Effect.sync(() => operations.filter((op) => op.startsWith("DELETE")).length),
-      (count) => count === 1,
-      "remote audio cleaned",
-    );
-    expect(operations.filter((op) => op === "POST https://api.mosi.cn/v1/audio/transcriptions")).toHaveLength(1);
-    yield* TestClock.adjust("25 hours");
-    yield* inputs.sweep();
-    expect((yield* inputs.get(reserved.id)).canDelete).toBe(false);
-    expect((yield* inputs.content(reserved.id)).size).toBe(bytes.length);
-  }).pipe(Effect.scoped, Effect.provide(layer(http)));
-});
+    });
+    return Effect.gen(function* () {
+      yield* configured();
+      const { audio, inputs } = yield* harness;
+      const bytes = wav();
+      const reserved = yield* inputs.create({ kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length });
+      yield* inputs.upload(reserved.id, Stream.make(bytes.subarray(0, 11), bytes.subarray(11)));
+      const request: T.MediaTranscriptionRequest = {
+        id: "transcription-test",
+        input: reserved.id,
+        connection: "moss",
+        revision: 1,
+        allowUpload: true,
+        diarize: true,
+      };
+      yield* audio.createTranscription(request, { kind: "owner" });
+      const ready = yield* waitFor(audio.get(request.id), (job) => job.phase === "ready", "transcription saved");
+      expect(ready.result).toEqual({ kind: "transcription", text: "Hello.", segments: [{ speaker: "speaker_0", text: "Hello.", start: 0, end: 0.12 }] });
+      yield* audio.createTranscription(request, { kind: "owner" });
+      yield* waitFor(
+        Effect.sync(() => operations.filter((op) => op.startsWith("DELETE")).length),
+        (count) => count === 1,
+        "remote audio cleaned",
+      );
+      expect(operations.filter((op) => op === "POST https://api.mosi.cn/v1/audio/transcriptions")).toHaveLength(1);
+      yield* TestClock.adjust("25 hours");
+      yield* inputs.sweep();
+      expect((yield* inputs.get(reserved.id)).canDelete).toBe(false);
+      expect((yield* inputs.content(reserved.id)).size).toBe(bytes.length);
+    }).pipe(Effect.scoped, Effect.provide(layer(http)));
+  },
+  60_000,
+);
 
 it.effect("regression: oversized-duration clone samples are rejected from actual audio without contacting the vendor", () =>
   Effect.gen(function* () {
@@ -627,63 +640,68 @@ it.effect("regression: unknown audio jobs refuse destructive cleanup even when a
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
 });
 
-it.effect("regression: large generated WAV is pinned, playable, and retained without a channel attachment", () => {
-  const dataSize = 26 * 1024 * 1024;
-  const header = wav(0);
-  header.writeUInt32LE(dataSize + 36, 4);
-  header.writeUInt32LE(dataSize, 40);
-  const chunk = new Uint8Array(64 * 1024);
-  const downloads = HttpClient.make((request) => {
-    let sent = -1;
-    return Effect.succeed(
-      HttpClientResponse.fromWeb(
-        request,
-        new Response(
-          new ReadableStream<Uint8Array>({
-            pull(controller) {
-              if (sent < 0) {
-                controller.enqueue(header);
-                sent = 0;
-              } else if (sent < dataSize) {
-                controller.enqueue(chunk);
-                sent += chunk.byteLength;
-              } else controller.close();
-            },
-          }),
-          { headers: { "content-type": "audio/wav" } },
+// Real disk work on whole audio files: the slowest of the server tests when every core is busy.
+it.effect(
+  "regression: large generated WAV is pinned, playable, and retained without a channel attachment",
+  () => {
+    const dataSize = 26 * 1024 * 1024;
+    const header = wav(0);
+    header.writeUInt32LE(dataSize + 36, 4);
+    header.writeUInt32LE(dataSize, 40);
+    const chunk = new Uint8Array(64 * 1024);
+    const downloads = HttpClient.make((request) => {
+      let sent = -1;
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(
+            new ReadableStream<Uint8Array>({
+              pull(controller) {
+                if (sent < 0) {
+                  controller.enqueue(header);
+                  sent = 0;
+                } else if (sent < dataSize) {
+                  controller.enqueue(chunk);
+                  sent += chunk.byteLength;
+                } else controller.close();
+              },
+            }),
+            { headers: { "content-type": "audio/wav" } },
+          ),
         ),
+      );
+    });
+    const http = HttpClient.make((request) =>
+      Effect.succeed(
+        HttpClientResponse.fromWeb(request, request.method === "POST" ? Response.json({ task_id: "task-one" }, { status: 202 }) : Response.json(success)),
       ),
     );
-  });
-  const http = HttpClient.make((request) =>
-    Effect.succeed(
-      HttpClientResponse.fromWeb(request, request.method === "POST" ? Response.json({ task_id: "task-one" }, { status: 202 }) : Response.json(success)),
-    ),
-  );
-  return Effect.gen(function* () {
-    yield* configured();
-    const { audio, inputs } = yield* harness;
-    yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "owner" });
-    const ready = yield* waitFor(audio.get(speakers.id), (job) => !job.canCancel, "large WAV saved");
-    expect(ready.phase, ready.problem).toBe("ready");
-    expect(ready.attachment).toBeUndefined();
-    expect(ready.usage).toBeUndefined();
-    expect(ready).toMatchObject({
-      format: "wav",
-      metadata: { source: "file", sampleRate: 24000, channels: 1, duration: dataSize / 48000 },
-      resultInput: { kind: "audio", mime: "audio/wav", size: dataSize + 44 },
-    });
-    if (!ready.resultInput) return yield* Effect.die("Expected large result input");
-    const content = yield* inputs.content(ready.resultInput.id);
-    expect(Number((yield* (yield* FileSystem.FileSystem).stat(content.path)).size)).toBe(dataSize + 44);
-    expect((yield* inputs.get(ready.resultInput.id)).canDelete).toBe(false);
-    yield* TestClock.adjust("25 hours");
-    const restarted = yield* makeInputs;
-    yield* restarted.restore();
-    yield* restarted.sweep();
-    expect((yield* restarted.content(ready.resultInput.id)).size).toBe(dataSize + 44);
-  }).pipe(Effect.scoped, Effect.provide(layer(http, downloads)));
-});
+    return Effect.gen(function* () {
+      yield* configured();
+      const { audio, inputs } = yield* harness;
+      yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "owner" });
+      const ready = yield* waitFor(audio.get(speakers.id), (job) => !job.canCancel, "large WAV saved");
+      expect(ready.phase, ready.problem).toBe("ready");
+      expect(ready.attachment).toBeUndefined();
+      expect(ready.usage).toBeUndefined();
+      expect(ready).toMatchObject({
+        format: "wav",
+        metadata: { source: "file", sampleRate: 24000, channels: 1, duration: dataSize / 48000 },
+        resultInput: { kind: "audio", mime: "audio/wav", size: dataSize + 44 },
+      });
+      if (!ready.resultInput) return yield* Effect.die("Expected large result input");
+      const content = yield* inputs.content(ready.resultInput.id);
+      expect(Number((yield* (yield* FileSystem.FileSystem).stat(content.path)).size)).toBe(dataSize + 44);
+      expect((yield* inputs.get(ready.resultInput.id)).canDelete).toBe(false);
+      yield* TestClock.adjust("25 hours");
+      const restarted = yield* makeInputs;
+      yield* restarted.restore();
+      yield* restarted.sweep();
+      expect((yield* restarted.content(ready.resultInput.id)).size).toBe(dataSize + 44);
+    }).pipe(Effect.scoped, Effect.provide(layer(http, downloads)));
+  },
+  60_000,
+);
 
 it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpoints before %s and never resumes a lost stream", (mode) =>
   Effect.gen(function* () {
