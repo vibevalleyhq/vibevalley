@@ -108,7 +108,9 @@
   },
   "body": {
     "blocks": "一起写的",
-    "html": "网页"
+    "html": "网页",
+    "slides": "幻灯片",
+    "motion": "动画"
   },
   "edit": {
     "title": "改字",

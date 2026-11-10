@@ -16,6 +16,12 @@ test("a template is looked at, installed again, added from a folder, and its new
   await expect(backend).toHaveAttribute("data-installed", "1");
   await backend.getByTestId("template-look").click();
   await expect(backend.getByTestId("template-persona")).not.toBeEmpty();
+  // A template that comes with a built-in skill says so, and installing it ticks the skill.
+  const slides = page.locator('[data-testid="template"][data-key="slides"]');
+  await expect(slides.getByTestId("template-skills")).toBeVisible();
+  await slides.getByTestId("template-look").click();
+  await expect(slides.getByTestId("template-skill")).toHaveCount(1);
+  expect(await api.agent.list()).toContainEqual(expect.objectContaining({ id: "slides", skills: ["slides"] }));
   await backend.getByTestId("template-install").click();
   await expect(page).toHaveURL(/\/agents\/backend-2$/u);
   const from = page.getByTestId("from-template");

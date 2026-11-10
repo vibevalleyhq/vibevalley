@@ -378,4 +378,19 @@ describe("the built-in skills", () => {
       }),
     );
   });
+
+  it.effect("the slides, collector, pages and reviewer templates each come with their skill, ticked when installed", () =>
+    run(
+      testConfig(),
+      Effect.gen(function* () {
+        const s = yield* Agent;
+        const templates = yield* s.templates();
+        for (const id of ["slides", "collector", "pages", "reviewer"]) {
+          const template = Option.getOrUndefined(Arr.findFirst(templates, (t) => t.id === id));
+          expect([template?.role, template?.skills]).toEqual(["worker", [id]]);
+          expect((yield* s.installTemplate(id)).skills).toEqual([id]);
+        }
+      }),
+    ),
+  );
 });

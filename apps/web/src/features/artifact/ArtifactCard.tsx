@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactBody, ArtifactCard as Card, ArtifactListRequest } from "@vibevalley/protocol";
+import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -95,7 +95,14 @@ export const useArtifacts = (q: () => ArtifactListRequest) => useQuery(() => art
 /** Where an artifact is looked at; a version other than the latest is in the query string. */
 export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version != null && version !== 0 ? `?v=${version}` : ""}`;
 
-export const bodyLabel: Record<ArtifactBody, string> = { blocks: t("web.artifact.body.blocks"), html: t("web.artifact.body.html") };
+const displayLabel: Record<ArtifactDisplay, string> = {
+  page: t("web.artifact.body.html"),
+  slides: t("web.artifact.body.slides"),
+  motion: t("web.artifact.body.motion"),
+};
+/** What it is, as a card or a header says it: an html one by how it is shown. */
+export const kindLabel = (a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined }) =>
+  a.body === "blocks" ? t("web.artifact.body.blocks") : displayLabel[a.display ?? "page"];
 export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web" };
 
 /** The card a message announces an artifact with: the whole card opens that version. */
@@ -124,7 +131,7 @@ export function ArtifactCard(props: { card: Card }) {
       <span {...stylex.attrs(viewStyles.artifactCardSpan2)}>
         <span {...stylex.attrs(viewStyles.artifactCardSpan3)}>{props.card.title}</span>
         <span {...stylex.attrs(viewStyles.artifactCardSpan4)}>
-          {bodyLabel[props.card.body]}
+          {kindLabel(props.card)}
           <Show when={props.card.body === "html"}> · {t("web.artifact.card.version", { version: props.card.version })}</Show>
           <Show when={props.card.note}>{(note) => <> · {note()}</>}</Show>
         </span>

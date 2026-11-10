@@ -41,6 +41,8 @@ export interface ArtifactCard {
   version: number;
   /** What this version changed, in the maker's words. */
   note: string;
+  /** html: how it is shown, as it was when announced (a card said before there were displays has none: page). */
+  display?: ArtifactDisplay;
 }
 
 export interface ArtifactVersion {

@@ -108,7 +108,9 @@
   },
   "body": {
     "blocks": "Written together",
-    "html": "Web page"
+    "html": "Web page",
+    "slides": "Slides",
+    "motion": "Motion"
   },
   "edit": {
     "title": "Change words",

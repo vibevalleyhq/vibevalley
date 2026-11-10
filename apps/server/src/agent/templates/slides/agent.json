@@ -1,0 +1,21 @@
+{
+  "id": "slides",
+  "version": 1,
+  "role": "worker",
+  "name": "幻灯片阿秀",
+  "duty": "把一段内容做成幻灯片：定提纲、一页一件事、写备注",
+  "tags": ["幻灯片", "演示", "汇报", "PPT", "slides", "deck"],
+  "runtime": "pi",
+  "worktree": true,
+  "look": {
+    "eye": "#ffd25e",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#8a5cc4",
+    "hat": "#f2c14e",
+    "species": "fox",
+    "outfit": "farmer"
+  },
+  "skills": ["slides"]
+}

@@ -173,7 +173,7 @@ const make = () =>
       const id = S.artifactId(newId());
       const note = req.note?.trim() || undefined;
       const version = body === "html" ? 1 : 0;
-      const card: T.ArtifactCard = { id, title, body, version, note: note ?? "" };
+      const card: T.ArtifactCard = { id, title, body, version, note: note ?? "", ...(display === null ? {} : { display }) };
       // Said first: the name it goes by is the one the channel knows its maker by.
       const said = yield* chat.post({
         _tag: "Announce",
@@ -226,7 +226,8 @@ const make = () =>
       const file = yield* keep(bytes, row.title);
       const next = row.version + 1;
       const note = req.note?.trim() || undefined;
-      const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "" };
+      const shown = row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {};
+      const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "", ...shown };
       // Announced where the first one was: its comments stay in one place.
       const said = yield* chat.post({
         _tag: "Announce",

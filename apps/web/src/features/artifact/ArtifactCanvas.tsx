@@ -7,7 +7,7 @@ import { reasonOf } from "#/infra/api.ts";
 import { ready } from "#/infra/query.ts";
 import { Icon } from "#/ui/Icon.tsx";
 
-import { bodyIcon, bodyLabel, useArtifact } from "./ArtifactCard";
+import { bodyIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
 import { HtmlFrame } from "./HtmlFrame";
 
@@ -162,7 +162,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
               <span {...stylex.attrs(variantStyles.artifactCanvasSpan)}>
                 <span {...stylex.attrs(viewStyles.artifactCanvasSpan2)}>{a().title}</span>
                 <span {...stylex.attrs(viewStyles.artifactCanvasSpan3)}>
-                  {bodyLabel[a().body]}
+                  {kindLabel(a())}
                   <Show when={a().body === "html"}> · {t("web.artifact.card.version", { version: props.version ?? a().version })}</Show>
                 </span>
               </span>

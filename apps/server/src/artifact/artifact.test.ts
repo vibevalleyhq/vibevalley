@@ -28,7 +28,7 @@ describe("an artifact", () => {
       expect(made).toMatchObject({ title: "详情：抽屉还是整页", body: "html", channel: general, by: userId, version: 1 });
       expect(made.versions).toEqual([expect.objectContaining({ version: 1, note: "两种", channel: general, number: expect.any(Number) })]);
       const said = (yield* chat.history(general)).at(-1)!;
-      expect(said.artifact).toEqual({ id: made.id, title: "详情：抽屉还是整页", body: "html", version: 1, note: "两种" });
+      expect(said.artifact).toEqual({ id: made.id, title: "详情：抽屉还是整页", body: "html", version: 1, note: "两种", display: "page" });
       expect(said.number).toBe(made.versions[0]!.number);
 
       const next = yield* artifacts.version(user, { id: made.id, content: page("整页"), note: "加了整页" });

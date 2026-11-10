@@ -42,7 +42,7 @@
 
 ## 内置的模板
 
-内置模板位于 `apps/server/src/agent/templates/`（顺序见 `templates/index.json`），除默认助手 `orchestrator` 外含 9 个帮工模板：
+内置模板位于 `apps/server/src/agent/templates/`（顺序见 `templates/index.json`），除默认助手 `orchestrator` 外含 13 个帮工模板；最后四个各勾着一个 VibeValley 自带的技能（`skills/<id>/`）：
 
 | 档案名称 | 默认农机 | 动物外观 | 职责（`duty`） |
 |---|---|---|---|
@@ -55,6 +55,10 @@
 | Claude 师傅 | `claude` | 熊 | 读大代码库、重构、查难缠的 bug |
 | Codex 老匠 | `codex` | 小狐狸 | 照工单把功能做出来，改到测试通过 |
 | Pi 实验员 | `pi` | 刺猬 | 写原型、试新做法 |
+| 幻灯片阿秀 | `pi` | 小狐狸 | 把一段内容做成幻灯片（技能 `slides`） |
+| 素材小陈 | `pi` | 兔子 | 去网上找图、找参考，放进素材库（技能 `collector`） |
+| 报表老钱 | `pi` | 熊 | 一页式的报表、看板、调研页（技能 `pages`） |
+| 审查老严 | `pi` | 浣熊 | 审一个分支或一张工单的改动，只读不改（技能 `reviewer`） |
 
 ## 怎么走
 

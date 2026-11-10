@@ -1,0 +1,21 @@
+{
+  "id": "collector",
+  "version": 1,
+  "role": "worker",
+  "name": "素材小陈",
+  "duty": "去网上找图、找参考，挑过的放进素材库，写清来源和授权",
+  "tags": ["素材", "找图", "参考", "收集", "图片", "素材库"],
+  "runtime": "pi",
+  "worktree": true,
+  "look": {
+    "eye": "#9dffb0",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#4f86d9",
+    "hat": "#7bc96f",
+    "species": "rabbit",
+    "outfit": "winter"
+  },
+  "skills": ["collector"]
+}

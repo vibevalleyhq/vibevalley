@@ -2014,7 +2014,7 @@ export const catalogs = {
         attrLanguage: "语言",
         attrs: "改属性：{attrs}",
       },
-      body: { blocks: "一起写的", html: "网页" },
+      body: { blocks: "一起写的", html: "网页", slides: "幻灯片", motion: "动画" },
       edit: {
         title: "改字",
         hint: "选中页面里的字，就能在右边直接改掉它",
@@ -6810,7 +6810,7 @@ export const catalogs = {
         attrLanguage: "language",
         attrs: "Change attrs: {attrs}",
       },
-      body: { blocks: "Written together", html: "Web page" },
+      body: { blocks: "Written together", html: "Web page", slides: "Slides", motion: "Motion" },
       edit: {
         title: "Change words",
         hint: "Select words in the page to change them on the right",
@@ -11469,6 +11469,8 @@ export interface Messages {
   "web.artifact.blocks.wrote": { readonly who: string | number };
   "web.artifact.body.blocks": undefined;
   "web.artifact.body.html": undefined;
+  "web.artifact.body.motion": undefined;
+  "web.artifact.body.slides": undefined;
   "web.artifact.canvas.close": undefined;
   "web.artifact.canvas.label": undefined;
   "web.artifact.canvas.openPage": undefined;

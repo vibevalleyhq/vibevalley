@@ -16,6 +16,7 @@ export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
   body: ArtifactBody,
   version: Schema.Finite,
   note: Schema.String,
+  display: Schema.optionalKey(ArtifactDisplay),
 });
 
 export const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
