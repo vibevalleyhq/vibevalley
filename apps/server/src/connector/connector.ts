@@ -85,10 +85,10 @@ const make = (options: ConnectorOptions = {}) =>
     );
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
-    const toOwner2 = yield* inbox.toOwner;
-    // What the owner hears off the farm (the inbox says what) goes out on every app the owner has, each checking it is
-    // its owner's channel.
-    yield* Effect.forkScoped(Stream.runForEach(toOwner2, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })));
+    const toUser2 = yield* inbox.toUser;
+    // What the user hears off the farm (the inbox says what) goes out on every app the user has, each checking it is
+    // its user's channel.
+    yield* Effect.forkScoped(Stream.runForEach(toUser2, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })));
     for (const b of bridges) if (b.hasAccount()) forkHere(b.resume);
     // What came in and went out is kept for a while for replies to point at, then dropped, once at start and daily.
     const prune = Effect.gen(function* () {

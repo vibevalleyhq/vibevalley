@@ -17,20 +17,20 @@ export const settingEndpoints: readonly Endpoint[] = [
     about: [],
     input: undefined,
     result: S.SettingsStatus,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "setting.validate",
     about: [],
     input: S.SettingsUpdate,
     result: S.Validation,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "setting.update",
     about: [],
     input: S.SettingsUpdate,
     result: S.SettingsStatus,
-    can: ["owner"],
+    can: ["user"],
   },
 ];

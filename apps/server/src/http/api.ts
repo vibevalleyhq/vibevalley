@@ -130,7 +130,7 @@ export const artifactContent = HttpRouter.add(
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 
-// Both protocols freeze their own provider binding before upgrading the owner's page.
+// Both protocols freeze their own provider binding before upgrading the user's page.
 export const mossLine = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const voice = yield* Voice;

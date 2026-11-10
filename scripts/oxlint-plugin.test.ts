@@ -603,14 +603,14 @@ tester.run("singular-service", rule("singular-service"), {
 tester.run("protocol-namespace", rule("protocol-namespace"), {
   valid: [
     { code: 'import type * as T from "@vibevalley/protocol";', filename: server },
-    { code: 'import { type IssueStatus, ownerId } from "@vibevalley/protocol";', filename: server },
+    { code: 'import { type IssueStatus, userId } from "@vibevalley/protocol";', filename: server },
     { code: 'import { Issue } from "#/issue/issue.ts";', filename: server },
     { code: 'import * as S from "@vibevalley/protocol/schema";', filename: server },
   ],
   invalid: [
     { code: 'import type { Issue } from "@vibevalley/protocol";', filename: server, errors: [{ messageId: "named", data: { name: "Issue" } }] },
     {
-      code: 'import { type Session as Run, ownerId, type Channel } from "@vibevalley/protocol";',
+      code: 'import { type Session as Run, userId, type Channel } from "@vibevalley/protocol";',
       filename: server,
       errors: [
         { messageId: "named", data: { name: "Session" } },

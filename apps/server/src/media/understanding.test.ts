@@ -62,7 +62,7 @@ const fixture = Effect.gen(function* () {
     vision: null,
   });
   const media = yield* Media;
-  const input = yield* media.inputs.create({ kind: "image", mime: "image/png", name: "private-owner-image.png", size: bytes.length });
+  const input = yield* media.inputs.create({ kind: "image", mime: "image/png", name: "private-user-image.png", size: bytes.length });
   yield* media.inputs.upload(input.id, Stream.make(bytes));
   const request: MediaUnderstandingRequest = {
     id: "understanding-one",
@@ -86,7 +86,7 @@ it.effect.each(["completed", "incomplete"])("understanding persists %s text and 
         if (request.body._tag !== "FormData") return yield* Effect.die("Expected multipart");
         const file = request.body.formData.get("file");
         if (!(file instanceof File)) return yield* Effect.die("Expected file");
-        expect(file.name).not.toContain("private-owner");
+        expect(file.name).not.toContain("private-user");
         const arrayBuffer2 = yield* Effect.promise(() => file.arrayBuffer());
         expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
       }
@@ -152,7 +152,7 @@ it.effect("regression: stale consent and an image task ID cannot submit an under
     const understandingCreatedFailure = yield* media.createUnderstanding({ ...request, revision: 0 }).pipe(Effect.flip);
     expect(understandingCreatedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(0);
-    yield* media.createImage({ id: request.id, prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true }, { kind: "owner" });
+    yield* media.createImage({ id: request.id, prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true }, { kind: "user" });
     const understandingCreatedFailure2 = yield* media.createUnderstanding(request).pipe(Effect.flip);
     expect(understandingCreatedFailure2).toMatchObject({ _tag: "Refused" });
     yield* media.cancel(request.id);
@@ -164,7 +164,7 @@ it.effect("regression: shared history uses the same binary ID order as SQLite fo
     const { media, request } = yield* fixture;
     const image = yield* media.createImage(
       { id: "a-image", prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true },
-      { kind: "owner" },
+      { kind: "user" },
     );
     const understanding = yield* media.createUnderstanding({ ...request, id: "Z-understanding" });
     expect(image.createdAt).toBe(understanding.createdAt);
@@ -298,11 +298,11 @@ it.effect("image and understanding tasks share capacity, IDs and cancellation wi
       yield* media.createUnderstanding(request);
       yield* Deferred.await(started);
       const image = { id: request.id, prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true } as const;
-      const imageCreatedFailure = yield* media.createImage(image, { kind: "owner" }).pipe(Effect.flip);
+      const imageCreatedFailure = yield* media.createImage(image, { kind: "user" }).pipe(Effect.flip);
       expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
       yield* Effect.forEach(
         Array.from({ length: 7 }, (_, n) => `queued-${n}`),
-        (id) => media.createImage({ ...image, id }, { kind: "owner" }),
+        (id) => media.createImage({ ...image, id }, { kind: "user" }),
         { discard: true },
       );
       const understandingCreatedFailure = yield* media.createUnderstanding({ ...request, id: "overflow" }).pipe(Effect.flip);
@@ -391,7 +391,7 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
           const id = `restart-${phase}`;
           const asked = yield* json({ ...request, id });
           const pinned = yield* json([reference]);
-          const owned = yield* json({ kind: "owner" });
+          const owned = yield* json({ kind: "user" });
           const kept = phase === "ready" ? yield* json(saved) : null;
           yield* inputs.pin(
             [input.id],
@@ -443,7 +443,7 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
   }).pipe(Effect.provide(layer(http)));
 });
 
-it.effect("owner approval freezes inputs and authorizes only one trusted channel execution", () => {
+it.effect("user approval freezes inputs and authorizes only one trusted channel execution", () => {
   const calls: string[] = [];
   const http = HttpClient.make((request) => {
     calls.push(`${request.method} ${request.url}`);
@@ -452,13 +452,13 @@ it.effect("owner approval freezes inputs and authorizes only one trusted channel
   return Effect.gen(function* () {
     const { media, input, request } = yield* fixture;
     const channel = (yield* Channel).defaultChannel();
-    const caller = { kind: "orchestrator", agent: "authorized-agent", channel, forOwner: true } as const;
+    const caller = { kind: "orchestrator", agent: "authorized-agent", channel, forUser: true } as const;
     const granted = yield* media.authorizeUnderstanding({ ...request, channel });
     expect(granted.phase).toBe("authorized");
     expect(granted.authorization?.channel).toBe(channel);
     expect((yield* media.inputs.get(input.id)).canDelete).toBe(false);
     expect(calls).toEqual([]);
-    for (const other of [{ kind: "owner" } as const, { ...caller, forOwner: false }, { ...caller, channel: "wrong-channel" }]) {
+    for (const other of [{ kind: "user" } as const, { ...caller, forUser: false }, { ...caller, channel: "wrong-channel" }]) {
       const startFailure = yield* media.startUnderstanding(request.id, other).pipe(Effect.flip);
       expect(startFailure).toMatchObject({ _tag: "Refused" });
     }
@@ -485,7 +485,7 @@ it.effect.each(["cancel", "restart", "expire", "account"] as const)("unused appr
   Effect.gen(function* () {
     const { media, input, request } = yield* fixture;
     const channel = (yield* Channel).defaultChannel();
-    const caller = { kind: "orchestrator", agent: "authorized-agent", channel, forOwner: true } as const;
+    const caller = { kind: "orchestrator", agent: "authorized-agent", channel, forUser: true } as const;
     yield* media.authorizeUnderstanding({ ...request, channel });
     switch (action) {
       case "cancel":
@@ -518,11 +518,11 @@ it.effect.each(["cancel", "restart", "expire", "account"] as const)("unused appr
 it.effect("regression: queued delegated understanding rechecks account before uploading", () =>
   Effect.gen(function* () {
     const { media, input, request } = yield* fixture;
-    yield* media.createImage({ id: "hold-slot", prompt: "Hold", format: "text", width: 256, height: 256, enhance: false, watermark: true }, { kind: "owner" });
+    yield* media.createImage({ id: "hold-slot", prompt: "Hold", format: "text", width: 256, height: 256, enhance: false, watermark: true }, { kind: "user" });
     yield* waitFor(media.get("hold-slot"), (job) => job.phase === "generating", "shared execution slot occupied");
     const channel = (yield* Channel).defaultChannel();
     yield* media.authorizeUnderstanding({ ...request, channel });
-    yield* media.startUnderstanding(request.id, { kind: "orchestrator", agent: "authorized-agent", channel, forOwner: true });
+    yield* media.startUnderstanding(request.id, { kind: "orchestrator", agent: "authorized-agent", channel, forUser: true });
     const provider = yield* Provider;
     const status = provider.status();
     yield* provider.update({ ...status, connections: status.connections.map((item) => ({ ...item, key: "changed-before-upload" })) });

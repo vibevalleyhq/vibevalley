@@ -197,7 +197,7 @@ export function NoFaceMark(props: { size?: number }) {
   );
 }
 
-/** A small flag on a card or row: only the things the owner should notice. */
+/** A small flag on a card or row: only the things the user should notice. */
 export function FlagChip(props: { text: string; tone: Tone }) {
   return <span {...styleProps([viewStyles.flagChipSpan, viewStyles.flagTone(toneVar(props.tone))])}>{props.text}</span>;
 }

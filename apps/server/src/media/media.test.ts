@@ -77,9 +77,9 @@ it.effect("image tasks persist a result, keep bytes as an attachment, project sa
   return Effect.gen(function* () {
     yield* configured;
     const media = yield* Media;
-    const first = yield* media.createImage(input, { kind: "owner" });
+    const first = yield* media.createImage(input, { kind: "user" });
     expect(first.phase).toBe("queued");
-    expect(first.source).toEqual({ kind: "owner" });
+    expect(first.source).toEqual({ kind: "user" });
     expect(first.usage).toBeUndefined();
     const ready = yield* waitFor(media.get(input.id), (job) => job.phase === "ready", "image saved");
     if (ready.kind !== "image") return yield* Effect.die("Expected image task");
@@ -89,8 +89,8 @@ it.effect("image tasks persist a result, keep bytes as an attachment, project sa
     const attachment2 = yield* (yield* Channel).attachment(ready.attachment?.id ?? "");
     expect(attachment2).toBeDefined();
     const { watermark, ...rest } = input;
-    expect((yield* media.createImage({ watermark, ...rest }, { kind: "owner" })).id).toBe(input.id);
-    const imageCreatedFailure = yield* media.createImage({ ...input, prompt: "different" }, { kind: "owner" }).pipe(Effect.flip);
+    expect((yield* media.createImage({ watermark, ...rest }, { kind: "user" })).id).toBe(input.id);
+    const imageCreatedFailure = yield* media.createImage({ ...input, prompt: "different" }, { kind: "user" }).pipe(Effect.flip);
     expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(1);
     const row = yield* (yield* Db).one(q.generation({ id: input.id }));
@@ -121,7 +121,7 @@ it.effect("download failures retry only downloads and refuse unsafe regeneration
   return Effect.gen(function* () {
     yield* configured;
     const media = yield* Media;
-    yield* media.createImage(input, { kind: "owner" });
+    yield* media.createImage(input, { kind: "user" });
     const failed = yield* waitFor(media.get(input.id), (job) => job.phase === "download_failed", "failed download");
     if (failed.kind !== "image") return yield* Effect.die("Expected image task");
     expect(failed.canRetryDownload).toBe(true);
@@ -148,7 +148,7 @@ it.effect("regression: an attachment disk failure preserves usage and retries on
     const blocked = yield* pathOf(config.home, "attachments");
     yield* fs.writeFileString(blocked, "not a directory");
     const media = yield* Media;
-    yield* media.createImage(input, { kind: "owner" });
+    yield* media.createImage(input, { kind: "user" });
     const failed = yield* waitFor(media.get(input.id), (row) => row.phase === "download_failed", "disk failure recorded");
     if (failed.kind !== "image") return yield* Effect.die("Expected image task");
     expect(failed.usage).toEqual({ images: 1, width: 256, height: 256 });
@@ -180,9 +180,9 @@ it.effect("regression: queued generations keep their account snapshot after key 
       yield* configured;
       const media = yield* Media;
       const provider = yield* Provider;
-      yield* media.createImage(input, { kind: "owner" });
+      yield* media.createImage(input, { kind: "user" });
       yield* Deferred.await(started);
-      yield* media.createImage({ ...input, id: "queued-snapshot" }, { kind: "owner" });
+      yield* media.createImage({ ...input, id: "queued-snapshot" }, { kind: "user" });
       const before = provider.status();
       yield* provider.update({
         ...before,
@@ -190,7 +190,7 @@ it.effect("regression: queued generations keep their account snapshot after key 
       });
       yield* Deferred.succeed(release, undefined);
       yield* waitFor(media.get("queued-snapshot"), (row) => row.phase === "ready", "queued snapshot completed");
-      yield* media.createImage({ ...input, id: "new-snapshot" }, { kind: "owner" });
+      yield* media.createImage({ ...input, id: "new-snapshot" }, { kind: "user" });
       yield* waitFor(media.get("new-snapshot"), (row) => row.phase === "ready", "new snapshot completed");
       expect(keys).toEqual(["Bearer test-private-key", "Bearer test-private-key", "Bearer rotated-test-key"]);
     }).pipe(Effect.provide(layer(http)));
@@ -218,7 +218,7 @@ it.effect("regression: disconnecting the submitter after persistence cannot stra
     });
     const built = yield* Layer.build(Layer.fresh(Media.layer).pipe(Layer.provide(Layer.succeed(Core, delayed))));
     const media = Context.get(built, Media);
-    const request = yield* media.createImage(input, { kind: "owner" }).pipe(Effect.forkChild);
+    const request = yield* media.createImage(input, { kind: "user" }).pipe(Effect.forkChild);
     yield* Deferred.await(admitted);
     const interrupt = yield* Fiber.interrupt(request).pipe(Effect.forkChild);
     yield* Effect.yieldNow;
@@ -247,7 +247,7 @@ it.effect("regression: canceling an old download cannot interrupt its explicitly
     yield* Effect.gen(function* () {
       yield* configured;
       const media = yield* Media;
-      yield* media.createImage(input, { kind: "owner" });
+      yield* media.createImage(input, { kind: "user" });
       yield* Deferred.await(started);
       const cancel = yield* media.cancel(input.id).pipe(Effect.forkChild);
       yield* waitFor(media.get(input.id), (row) => row.phase === "canceled", "old download canceled");
@@ -271,14 +271,14 @@ it.effect("queued cancellation, capacity and in-flight cancellation do not creat
     yield* Effect.gen(function* () {
       yield* configured;
       const media = yield* Media;
-      yield* media.createImage(input, { kind: "owner" });
+      yield* media.createImage(input, { kind: "user" });
       yield* Deferred.await(started);
       yield* Effect.forEach(
         Array.from({ length: 7 }, (_, n) => ({ ...input, id: `queued-${n}` })),
-        (request) => media.createImage(request, { kind: "owner" }),
+        (request) => media.createImage(request, { kind: "user" }),
         { discard: true },
       );
-      const imageCreatedFailure = yield* media.createImage({ ...input, id: "overflow" }, { kind: "owner" }).pipe(Effect.flip);
+      const imageCreatedFailure = yield* media.createImage({ ...input, id: "overflow" }, { kind: "user" }).pipe(Effect.flip);
       expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
       yield* Effect.forEach(
         Array.from({ length: 7 }, (_, n) => `queued-${n}`),
@@ -287,7 +287,7 @@ it.effect("queued cancellation, capacity and in-flight cancellation do not creat
       );
       expect((yield* media.cancel(input.id)).phase).toBe("canceled");
       expect(calls).toBe(1);
-      expect((yield* media.createImage(input, { kind: "owner" })).phase).toBe("canceled");
+      expect((yield* media.createImage(input, { kind: "user" })).phase).toBe("canceled");
       expect(calls).toBe(1);
     }).pipe(Effect.provide(layer(http)));
   }),
@@ -302,21 +302,21 @@ it.effect("ambiguous vendor failures are not retried and cannot use download ret
   return Effect.gen(function* () {
     yield* configured;
     const media = yield* Media;
-    yield* media.createImage(input, { kind: "owner" });
+    yield* media.createImage(input, { kind: "user" });
     const job = yield* waitFor(media.get(input.id), (row) => row.phase === "unknown", "unknown outcome");
     if (job.kind !== "image") return yield* Effect.die("Expected image task");
     yield* notIn(job, "private upstream error");
     expect(job.usage).toBeUndefined();
     const downloadRetriedFailure = yield* media.retryDownload(input.id).pipe(Effect.flip);
     expect(downloadRetriedFailure).toMatchObject({ _tag: "Refused" });
-    yield* media.createImage(input, { kind: "owner" });
+    yield* media.createImage(input, { kind: "user" });
     expect(calls).toBe(1);
   }).pipe(Effect.provide(layer(http)));
 });
 
 it.effect("generation source and reported usage survive restart without accepting a different caller", () => {
   const config = testConfig({ db: "" });
-  const caller: MediaCaller = { kind: "orchestrator", agent: "image-agent", channel: "image-channel", forOwner: true };
+  const caller: MediaCaller = { kind: "orchestrator", agent: "image-agent", channel: "image-channel", forUser: true };
   const source = { kind: "orchestrator", agent: "image-agent", channel: "image-channel" };
   return Effect.gen(function* () {
     const saved = yield* Effect.gen(function* () {
@@ -340,7 +340,7 @@ it.effect("generation source and reported usage survive restart without acceptin
       expect(media2).toEqual(saved);
       const imageCreated = yield* media.createImage(input, caller);
       expect(imageCreated).toEqual(saved);
-      const imageCreatedFailure = yield* media.createImage(input, { kind: "owner" }).pipe(Effect.flip);
+      const imageCreatedFailure = yield* media.createImage(input, { kind: "user" }).pipe(Effect.flip);
       expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
       const imageCreatedFailure2 = yield* media.createImage(input, { ...caller, agent: "another-agent" }).pipe(Effect.flip);
       expect(imageCreatedFailure2).toMatchObject({ _tag: "Refused" });
@@ -353,7 +353,7 @@ it.effect("regression: autonomous patrols cannot admit a billable generation", (
   Effect.gen(function* () {
     yield* configured;
     const media = yield* Media;
-    const imageCreatedFailure = yield* media.createImage(input, { kind: "orchestrator", agent: "image-agent", channel: "", forOwner: false }).pipe(Effect.flip);
+    const imageCreatedFailure = yield* media.createImage(input, { kind: "orchestrator", agent: "image-agent", channel: "", forUser: false }).pipe(Effect.flip);
     expect(imageCreatedFailure).toMatchObject({
       _tag: "Refused",
     });
@@ -375,7 +375,7 @@ it.effect("restart marks unsent and ambiguous tasks separately and resumes only 
         q.insertGeneration({
           id: phase,
           request: yield* json({ ...input, id: phase }),
-          source: yield* json({ kind: "owner" }),
+          source: yield* json({ kind: "user" }),
           connection: "moss",
           revision: 1,
           model: "moss-image-sft-1.0",
@@ -404,7 +404,7 @@ it.effect("restart marks unsent and ambiguous tasks separately and resumes only 
 });
 
 withLayer(layer())("images asked for in a channel", (it) => {
-  it.effect("an image an orchestrator was asked for in a channel is posted back there under its name, once; the owner's own stays", () =>
+  it.effect("an image an orchestrator was asked for in a channel is posted back there under its name, once; the user's own stays", () =>
     Effect.gen(function* () {
       yield* configured;
       const media = yield* Media;
@@ -416,16 +416,16 @@ withLayer(layer())("images asked for in a channel", (it) => {
           sql<{ sender_id: string; meta: string }>`select sender_id, meta from channel_message where send_key = ${`media:${id}`}`.pipe(Effect.orDie),
           (rows) => [...rows],
         );
-      // One execution slot runs the tasks in turn: once the orchestrator's image is posted, the owner's task is through too.
-      yield* media.createImage({ ...input, id: "owners-own" }, { kind: "owner" });
-      yield* media.createImage({ ...input, id: "asked-in-channel" }, { kind: "orchestrator", agent: defaultOrchestrator, channel, forOwner: true });
+      // One execution slot runs the tasks in turn: once the orchestrator's image is posted, the user's task is through too.
+      yield* media.createImage({ ...input, id: "users-own" }, { kind: "user" });
+      yield* media.createImage({ ...input, id: "asked-in-channel" }, { kind: "orchestrator", agent: defaultOrchestrator, channel, forUser: true });
       const posted = yield* waitFor(postsOf("asked-in-channel"), (rows) => rows.length > 0, "the image posted back");
       const ready = yield* media.get("asked-in-channel");
       if (ready.kind !== "image") return yield* Effect.die("Expected image task");
       expect(posted).toMatchObject([{ sender_id: defaultOrchestrator }]);
       expect(posted[0]?.meta).toContain(ready.attachment?.id ?? "missing");
-      const ownersPosts = yield* postsOf("owners-own");
-      expect(ownersPosts).toEqual([]);
+      const usersPosts = yield* postsOf("users-own");
+      expect(usersPosts).toEqual([]);
       // A restart posts what is ready again; the send key keeps it once.
       yield* media.restore();
       const afterRestart = yield* postsOf("asked-in-channel");

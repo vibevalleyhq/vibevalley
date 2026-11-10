@@ -22,7 +22,7 @@ import * as q from "#db/memory.sql.ts";
 import { everos } from "./everos.ts";
 import { loadSegmenter } from "./gse.ts";
 import { nowledge } from "./nowledge.ts";
-import { carriedMemory, fromOwner } from "./prompts.ts";
+import { carriedMemory, fromUser } from "./prompts.ts";
 import {
   foundText,
   type Found,
@@ -142,17 +142,17 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
               local.list(agent).pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memory of ${agent} could not be read: ${String(e)}`), []))),
               (all) => {
                 const notes = all.filter((note) => note.kind === "note").toReversed();
-                const lines = notes.map((note) => (note.author === "owner" ? fromOwner : "") + note.text);
+                const lines = notes.map((note) => (note.author === "user" ? fromUser : "") + note.text);
                 return { lines, prompt: carriedMemory(lines) };
               },
             ),
           remember: (text) => Effect.asVoid(local.write({ agent, text, repo: "", by }).pipe(Effect.mapError(agentFailed))),
           rewrite: (text) =>
             Effect.gen(function* () {
-              const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
+              const users = new Set((yield* local.list(agent)).filter((note) => note.author === "user").map((note) => note.text));
               const notes = parseMemoryLines(text)
                 .map((line) => line.text)
-                .filter((line) => !owners.has(line) && !(line.startsWith(fromOwner) && owners.has(line.slice(fromOwner.length).trim())));
+                .filter((line) => !users.has(line) && !(line.startsWith(fromUser) && users.has(line.slice(fromUser.length).trim())));
               return yield* local.rewrite(agent, notes, by);
             }).pipe(Effect.mapError(agentFailed)),
         };
@@ -245,7 +245,7 @@ export interface RecallCue {
   readonly peek?: boolean;
 }
 
-/** A memory written outside a run: the owner's, from the Memory tab, the orchestrator's for a profile, or a session's own. */
+/** A memory written outside a run: the user's, from the Memory tab, the orchestrator's for a profile, or a session's own. */
 export interface Note {
   readonly agent: string;
   readonly text: string;

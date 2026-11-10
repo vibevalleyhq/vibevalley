@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactOwnerMentionsChanged } from "../channel/schema";
+import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
 import type { Codec } from "../codec";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
@@ -70,7 +70,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactSessionPhaseChanged,
   FactMessageChanged,
   FactChannelChanged,
-  FactOwnerMentionsChanged,
+  FactUserMentionsChanged,
   FactSessionChanged,
   FactSessionReported,
   FactSessionLeft,
@@ -118,7 +118,7 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactSessionPhaseChanged,
   FactMessageChanged,
   FactChannelChanged,
-  FactOwnerMentionsChanged,
+  FactUserMentionsChanged,
   FactSessionChanged,
   FactSessionReported,
   FactSessionLeft,

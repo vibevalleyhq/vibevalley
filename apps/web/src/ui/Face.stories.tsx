@@ -4,7 +4,7 @@ import { For } from "solid-js";
 import { type Look, type Species, SpeciesValues } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
-import { AgentFace, OrchestratorFace, OwnerFace } from "./Face";
+import { AgentFace, OrchestratorFace, UserFace } from "./Face";
 
 const viewStyles = stylex.create({
   faceStoriesDiv: {
@@ -47,12 +47,12 @@ export default stories({
         </div>
       ),
     }),
-    "Owner and orchestrator": story({
+    "User and orchestrator": story({
       args: { size: 32 },
       controls: { size: { kind: "number", min: 16, max: 96, step: 8 } },
       render: (a) => (
         <div {...stylex.attrs(viewStyles.faceStoriesDiv2)}>
-          <OwnerFace size={a.size} />
+          <UserFace size={a.size} />
           <For each={looks}>{(look) => <OrchestratorFace size={a.size} look={look} />}</For>
         </div>
       ),

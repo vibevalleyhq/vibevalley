@@ -45,7 +45,7 @@ const make = () =>
             body: "blocks",
             channel_id: null,
             issue: null,
-            by_id: "owner",
+            by_id: "user",
             by_name: "主人",
             version: 0,
             created_at: 0,
@@ -65,7 +65,7 @@ const make = () =>
 
 type Service = Effect.Success<ReturnType<typeof make>>;
 
-const submit = (s: Service, doc: ArtifactId, batchId: string, ...ops: Wire<BlockOp>[]) => s.submit(doc, "owner", { batchId, ops: ops as BlockOp[] });
+const submit = (s: Service, doc: ArtifactId, batchId: string, ...ops: Wire<BlockOp>[]) => s.submit(doc, "user", { batchId, ops: ops as BlockOp[] });
 
 const texts = (blocks: { text: { t: string }[] }[]) => blocks.map((b) => plain(b.text as never)).join("|");
 
@@ -99,7 +99,7 @@ describe("a blocks artifact", () => {
           const snap = yield* s.get(id);
           expect([texts(snap.blocks), snap.artifact.seq, snap.artifact.title]).toEqual(["你好|世界🌾", 3, "周报"]);
           const b = snap.blocks[1]!;
-          expect([b.rev, b.text[0]!.marks.bold, b.updatedBy, b.artifactId]).toEqual([2, true, "owner", id]);
+          expect([b.rev, b.text[0]!.marks.bold, b.updatedBy, b.artifactId]).toEqual([2, true, "user", id]);
           expect((yield* s.list()).map((d) => d.id)).toEqual([id]);
           expect((yield* s.suggestions(id)).map((x) => [x.blockId, x.status, x.change.text?.[0]?.t])).toEqual([["b", "open", "留到重启以后"]]);
         }),
@@ -222,27 +222,27 @@ describe("a blocks artifact", () => {
     ).pipe(Effect.provide(on())),
   );
 
-  // The owner writing in a paragraph the demo is growing keeps it: the demo's next piece is a conflict and it moves on.
-  it.effect("the demo leaves the owner's block", () =>
+  // The user writing in a paragraph the demo is growing keeps it: the demo's next piece is a conflict and it moves on.
+  it.effect("the demo leaves the user's block", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("演示")).artifact.id;
         yield* s.demo(id, helpers(["backend", true]));
-        // The owner takes the second block over once the demo has written it twice: asked again until it holds.
+        // The user takes the second block over once the demo has written it twice: asked again until it holds.
         const tryTaking = Effect.gen(function* () {
           const snap = yield* s.get(id);
           const b = snap.blocks[1];
           if (snap.blocks.length !== 2 || !b || b.rev < 2) return "";
-          const ack = yield* submit(s, id, "owner", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
+          const ack = yield* submit(s, id, "user", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
           return ack.results[0]!.status === "applied" ? b.id : "";
         });
-        const taken = yield* waitFor(Effect.andThen(TestClock.adjust(500), tryTaking), (item) => item !== "", "the owner taking the block over");
+        const taken = yield* waitFor(Effect.andThen(TestClock.adjust(500), tryTaking), (item) => item !== "", "the user taking the block over");
         expect(taken).not.toBe("");
         yield* finished(s);
         const snap = yield* s.get(id);
         const mine = snap.blocks.find((b) => b.id === taken)!;
-        expect([plain(mine.text), mine.updatedBy]).toEqual(["主人接手了", "owner"]);
+        expect([plain(mine.text), mine.updatedBy]).toEqual(["主人接手了", "user"]);
         expect(snap.blocks).toHaveLength(4);
       }),
     ).pipe(Effect.provide(on())),
@@ -252,21 +252,21 @@ describe("a blocks artifact", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("块")).artifact.id;
-        const a = yield* s.insertBlock(id, "owner", { text: "A" });
-        const c = yield* s.insertBlock(id, "owner", { text: "C" });
-        const b = yield* s.insertBlock(id, "owner", { text: "B", afterBlock: a.blockId });
-        yield* s.insertBlock(id, "owner", { text: "首", afterBlock: blockId("") });
-        const heading = yield* s.insertBlock(id, "owner", { text: "节", type: "heading", level: 1 });
-        const child = yield* s.insertBlock(id, "owner", { text: "子", parentId: heading.blockId });
+        const a = yield* s.insertBlock(id, "user", { text: "A" });
+        const c = yield* s.insertBlock(id, "user", { text: "C" });
+        const b = yield* s.insertBlock(id, "user", { text: "B", afterBlock: a.blockId });
+        yield* s.insertBlock(id, "user", { text: "首", afterBlock: blockId("") });
+        const heading = yield* s.insertBlock(id, "user", { text: "节", type: "heading", level: 1 });
+        const child = yield* s.insertBlock(id, "user", { text: "子", parentId: heading.blockId });
         const snap = yield* s.get(id);
         expect(texts(snap.blocks)).toBe("首|A|B|C|节|子");
         expect(snap.blocks.find((x) => x.id === child.blockId)!.parentId).toBe(heading.blockId);
-        const changed = yield* s.updateBlock(id, "owner", { block: b.blockId, baseRev: b.rev!, type: "todo", checked: true, text: "B2" });
+        const changed = yield* s.updateBlock(id, "user", { block: b.blockId, baseRev: b.rev!, type: "todo", checked: true, text: "B2" });
         expect(changed.status).toBe("applied");
         const todo = (yield* s.get(id)).blocks.find((x) => x.id === b.blockId)!;
         expect([todo.type, todo.attrs.checked, plain(todo.text)]).toEqual(["todo", true, "B2"]);
-        expect((yield* s.deleteBlock(id, "owner", { block: c.blockId })).status).toBe("applied");
-        expect((yield* s.deleteBlock(id, "owner", { block: c.blockId })).status).toBe("noop");
+        expect((yield* s.deleteBlock(id, "user", { block: c.blockId })).status).toBe("applied");
+        expect((yield* s.deleteBlock(id, "user", { block: c.blockId })).status).toBe("noop");
         expect((yield* s.get(id)).blocks.some((x) => x.id === c.blockId)).toBe(false);
       }),
     ).pipe(Effect.provide(on())),
@@ -277,14 +277,14 @@ describe("a blocks artifact", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("跟进")).artifact.id;
-        yield* s.insertBlock(id, "owner", { text: "一" });
-        yield* s.insertBlock(id, "owner", { text: "二" });
+        yield* s.insertBlock(id, "user", { text: "一" });
+        yield* s.insertBlock(id, "user", { text: "二" });
         const caught = yield* Stream.runCollect(Stream.take(s.follow(id, 0), 2));
         expect(caught.map((e) => (e._tag === "Blocks" ? e.seq : "Reset"))).toEqual([1, 2]);
         expect(caught.flatMap((e) => (e._tag === "Blocks" ? e.blocks.map((b) => plain(b.text)) : []))).toEqual(["一", "二"]);
         const live = yield* Effect.forkChild(Stream.runCollect(Stream.take(s.follow(id, 2), 1)));
         yield* TestClock.adjust(1);
-        yield* s.insertBlock(id, "owner", { text: "三" });
+        yield* s.insertBlock(id, "user", { text: "三" });
         const [event] = yield* Fiber.join(live);
         expect(event!._tag).toBe("Blocks");
         if (event!._tag === "Blocks") expect([event!.seq, event!.blocks.map((b) => plain(b.text))]).toEqual([3, ["三"]]);
@@ -298,7 +298,7 @@ describe("a blocks artifact", () => {
         const id = (yield* s.create("压力")).artifact.id;
         yield* Effect.forEach(
           Array.from({ length: 100 }, (_, i) => i),
-          (i) => s.insertBlock(id, "owner", { text: `第 ${i} 块` }),
+          (i) => s.insertBlock(id, "user", { text: `第 ${i} 块` }),
           {
             concurrency: 2,
             discard: true,
@@ -309,7 +309,7 @@ describe("a blocks artifact", () => {
         for (let i = 0; i < 20; i++) {
           const live = yield* Effect.forkChild(Stream.runCollect(Stream.take(s.follow(id, 100 + i), 1)));
           yield* TestClock.adjust(1);
-          yield* s.insertBlock(id, "owner", { text: `重连 ${i}` });
+          yield* s.insertBlock(id, "user", { text: `重连 ${i}` });
           const [event] = yield* Fiber.join(live);
           expect(event!._tag).toBe("Blocks");
           if (event!._tag === "Blocks") expect(event!.seq).toBe(101 + i);
@@ -317,15 +317,15 @@ describe("a blocks artifact", () => {
       }),
     ).pipe(Effect.provide(on())),
   );
-  it.effect("suggestions wait for the owner, apply once, and go stale when the block moved", () =>
+  it.effect("suggestions wait for the user, apply once, and go stale when the block moved", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("建议")).artifact.id;
-        const a = yield* s.insertBlock(id, "owner", { text: "主人写的" });
+        const a = yield* s.insertBlock(id, "user", { text: "主人写的" });
         const made = yield* s.suggest(id, "lab", { block: a.blockId, baseRev: a.rev!, change: { text: [span("帮工改的")] } });
         expect([made.status, made.author, made.baseRev]).toEqual(["open", "lab", a.rev]);
-        const accepted = yield* s.acceptSuggestion(id, made.id, "owner");
+        const accepted = yield* s.acceptSuggestion(id, made.id, "user");
         expect(accepted.status).toBe("accepted");
         expect(
           (yield* s.get(id)).blocks
@@ -333,31 +333,31 @@ describe("a blocks artifact", () => {
             .text.map((x) => x.t)
             .join(""),
         ).toBe("帮工改的");
-        expect((yield* s.acceptSuggestion(id, made.id, "owner")).status).toBe("accepted");
+        expect((yield* s.acceptSuggestion(id, made.id, "user")).status).toBe("accepted");
 
-        const b = yield* s.insertBlock(id, "owner", { text: "再写一块" });
+        const b = yield* s.insertBlock(id, "user", { text: "再写一块" });
         const stale = yield* s.suggest(id, "lab", { block: b.blockId, baseRev: b.rev!, change: { text: [span("晚到的")] } });
-        yield* s.updateBlock(id, "owner", { block: b.blockId, baseRev: b.rev!, text: "主人先改了" });
-        expect((yield* Effect.flip(s.acceptSuggestion(id, stale.id, "owner")))._tag).toBe("Refused");
+        yield* s.updateBlock(id, "user", { block: b.blockId, baseRev: b.rev!, text: "主人先改了" });
+        expect((yield* Effect.flip(s.acceptSuggestion(id, stale.id, "user")))._tag).toBe("Refused");
         expect((yield* s.suggestions(id)).find((x) => x.id === stale.id)!.status).toBe("open");
-        expect((yield* s.rejectSuggestion(id, stale.id, "owner")).status).toBe("rejected");
-        expect((yield* s.rejectSuggestion(id, stale.id, "owner")).status).toBe("rejected");
+        expect((yield* s.rejectSuggestion(id, stale.id, "user")).status).toBe("rejected");
+        expect((yield* s.rejectSuggestion(id, stale.id, "user")).status).toBe("rejected");
 
-        const c = yield* s.insertBlock(id, "owner", { text: "两块建议" });
+        const c = yield* s.insertBlock(id, "user", { text: "两块建议" });
         const first = yield* s.suggest(id, "lab", { block: c.blockId, baseRev: c.rev!, change: { text: [span("第一份")] } });
         const second = yield* s.suggest(id, "lab", { block: c.blockId, baseRev: c.rev!, change: { text: [span("第二份")] } });
-        yield* s.acceptSuggestion(id, first.id, "owner");
-        expect((yield* Effect.flip(s.acceptSuggestion(id, second.id, "owner")))._tag).toBe("Refused");
+        yield* s.acceptSuggestion(id, first.id, "user");
+        expect((yield* Effect.flip(s.acceptSuggestion(id, second.id, "user")))._tag).toBe("Refused");
       }),
     ).pipe(Effect.provide(on())),
   );
 
-  it.effect("an agent's edit of the owner's block becomes a suggestion, and a suggestion stream brings the list", () =>
+  it.effect("an agent's edit of the user's block becomes a suggestion, and a suggestion stream brings the list", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("自动建议")).artifact.id;
-        const a = yield* s.insertBlock(id, "owner", { text: "主人的字" });
+        const a = yield* s.insertBlock(id, "user", { text: "主人的字" });
         const made = yield* s.updateBlock(id, "lab", { block: a.blockId, baseRev: a.rev!, text: "帮工想改" });
         expect([made.status, made.suggestion !== undefined]).toEqual(["rejected", true]);
         expect(
@@ -374,12 +374,12 @@ describe("a blocks artifact", () => {
       }),
     ).pipe(Effect.provide(on())),
   );
-  it.effect("an agent's edit of the owner's block becomes a suggestion for every operation", () =>
+  it.effect("an agent's edit of the user's block becomes a suggestion for every operation", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("授权矩阵")).artifact.id;
-        const text = yield* s.insertBlock(id, "owner", { text: "主人的字" });
+        const text = yield* s.insertBlock(id, "user", { text: "主人的字" });
         const changed = [
           yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, text: "建议改字" }),
           yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, type: "heading", level: 2 }),
@@ -394,7 +394,7 @@ describe("a blocks artifact", () => {
           [false, undefined, true, false],
           [false, undefined, undefined, true],
         ]);
-        expect((yield* s.updateBlock(id, "owner", { block: text.blockId, baseRev: text.rev!, text: "主人自己改" })).status).toBe("applied");
+        expect((yield* s.updateBlock(id, "user", { block: text.blockId, baseRev: text.rev!, text: "主人自己改" })).status).toBe("applied");
         const own = yield* s.insertBlock(id, "lab", { text: "帮工自己的" });
         expect((yield* s.updateBlock(id, "lab", { block: own.blockId, baseRev: own.rev!, text: "帮工改自己的" })).status).toBe("applied");
       }),
@@ -408,7 +408,7 @@ describe("a blocks artifact", () => {
         Effect.gen(function* () {
           const s = yield* make();
           const id = (yield* s.create("并发建议")).artifact.id;
-          const b = yield* s.insertBlock(id, "owner", { text: "同一块" });
+          const b = yield* s.insertBlock(id, "user", { text: "同一块" });
           yield* Effect.forEach(
             ["lab", "qa", "ops"],
             (actor, i) =>
@@ -441,11 +441,11 @@ describe("a blocks artifact", () => {
         Effect.gen(function* () {
           const s = yield* make();
           const [one] = yield* s.suggestions(id);
-          for (let n = 0; n < 20; n++) expect((yield* s.acceptSuggestion(id, one!.id, "owner")).status).toBe("accepted");
-          for (let n = 0; n < 20; n++) expect((yield* s.rejectSuggestion(id, one!.id, "owner")).status).toBe("accepted");
+          for (let n = 0; n < 20; n++) expect((yield* s.acceptSuggestion(id, one!.id, "user")).status).toBe("accepted");
+          for (let n = 0; n < 20; n++) expect((yield* s.rejectSuggestion(id, one!.id, "user")).status).toBe("accepted");
           const other = (yield* s.suggestions(id))[1]!;
-          for (let n = 0; n < 20; n++) expect((yield* s.rejectSuggestion(id, other.id, "owner")).status).toBe("rejected");
-          expect((yield* s.acceptSuggestion(id, other.id, "owner")).status).toBe("rejected");
+          for (let n = 0; n < 20; n++) expect((yield* s.rejectSuggestion(id, other.id, "user")).status).toBe("rejected");
+          expect((yield* s.acceptSuggestion(id, other.id, "user")).status).toBe("rejected");
           expect(
             (yield* s.get(id)).blocks
               .find((b) => b.id === block)!

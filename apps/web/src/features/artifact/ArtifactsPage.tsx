@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactVersion, artifactPath, ownerId, type SayRequest } from "@vibevalley/protocol";
+import { type Artifact, type ArtifactVersion, artifactPath, userId, type SayRequest } from "@vibevalley/protocol";
 import { htmlSandbox } from "@vibevalley/protocol/rules";
 
 import { Keyed, useNow } from "#/base/dom.tsx";
@@ -547,7 +547,7 @@ const rail = defineStored("artifact.rail", Schema.Boolean, true);
 const justMade = defineAtom<string | undefined>(undefined);
 
 /** `rest` is the path after /artifacts/. */
-/** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
+/** The user's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
  * one does not import it back. */
 type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
 
@@ -575,8 +575,8 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const groups = () => {
     const list = shown();
     return [
-      { key: "delivered", rows: list.filter((a) => a.by !== ownerId) },
-      { key: "mine", rows: list.filter((a) => a.by === ownerId) },
+      { key: "delivered", rows: list.filter((a) => a.by !== userId) },
+      { key: "mine", rows: list.filter((a) => a.by === userId) },
     ] as const;
   };
   const [shut, setShut] = createSignal<ReadonlySet<string>>(new Set());

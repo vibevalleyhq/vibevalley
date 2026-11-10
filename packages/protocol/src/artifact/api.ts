@@ -19,15 +19,15 @@ export interface ArtifactHandlers<R = never> {
   readonly "artifact.create": (a: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError, R>;
   /** An html one's new version over the latest. the old ones stay. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
-  /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
+  /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
   readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError, R>;
-  /** Its title, as the owner renames it. */
+  /** Its title, as the user renames it. */
   readonly "artifact.update": (a: { readonly id: T.ArtifactId; readonly title: string }) => Effect.Effect<T.Artifact, ApiError, R>;
   readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<void, ApiError, R>;
   readonly "artifact.previewDelete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Preview, ApiError, R>;
   /** A blocks artifact and every live block (no tombstones), in order. */
   readonly "artifact.block.list": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.BlockSnapshot, ApiError, R>;
-  /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
+  /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
   readonly "artifact.submit": (a: { readonly id: T.ArtifactId } & T.BlockSubmit) => Effect.Effect<T.BlockAck, ApiError, R>;
   /** One block inserted, as one batch of one op. */
   readonly "artifact.block.create": (a: { readonly id: T.ArtifactId } & T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError, R>;
@@ -38,9 +38,9 @@ export interface ArtifactHandlers<R = never> {
   readonly "artifact.block.previewDelete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Effect.Effect<T.Preview, ApiError, R>;
   /** The open and resolved suggestions on an artifact, oldest first. */
   readonly "artifact.suggestion.list": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Suggestion[], ApiError, R>;
-  /** A change an agent proposes to a block the owner wrote. */
+  /** A change an agent proposes to a block the user wrote. */
   readonly "artifact.suggestion.create": (a: { readonly id: T.ArtifactId } & T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError, R>;
-  /** The owner takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+  /** The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
   readonly "artifact.suggestion.accept": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Effect.Effect<T.Suggestion, ApiError, R>;
   readonly "artifact.suggestion.reject": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Effect.Effect<T.Suggestion, ApiError, R>;
   /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
@@ -56,56 +56,56 @@ export const artifactEndpoints: readonly Endpoint[] = [
     about: [],
     input: S.ArtifactListRequest,
     result: Schema.mutable(Schema.Array(S.Artifact)),
-    can: ["owner", "remote", "orchestrator", "session"],
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.get",
     about: ["id"],
     input: input({ id: S.ArtifactId }),
     result: S.Artifact,
-    can: ["owner", "remote", "orchestrator", "session"],
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.content.get",
     about: ["id"],
     input: S.ArtifactReadRequest,
     result: S.ArtifactContent,
-    can: ["owner", "remote", "orchestrator", "session"],
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.create",
     about: [],
     input: S.ArtifactRequest,
     result: S.Artifact,
-    can: ["owner", "remote", "orchestrator", "session"],
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.version.create",
     about: ["id"],
     input: S.ArtifactVersionRequest,
     result: S.Artifact,
-    can: ["owner", "remote", "orchestrator", "session"],
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.html.edit",
     about: ["id"],
     input: S.ArtifactHtmlEdit,
     result: S.Artifact,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.update",
     about: ["id"],
     input: input({ id: S.ArtifactId, title: Schema.String }),
     result: S.Artifact,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.delete",
     about: ["id"],
     input: artifactDeleteInput,
     result: undefined,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
     dryRun: "artifact.previewDelete",
   },
   {
@@ -113,42 +113,42 @@ export const artifactEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: artifactDeleteInput,
     result: S.Preview,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.block.list",
     about: ["id"],
     input: input({ id: S.ArtifactId }),
     result: S.BlockSnapshot,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.submit",
     about: ["id"],
     input: input({ id: S.ArtifactId }, S.BlockSubmit),
     result: S.BlockAck,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.block.create",
     about: ["id"],
     input: input({ id: S.ArtifactId }, S.BlockCreate),
     result: S.BlockOpResult,
-    can: ["owner", "remote", "session", "orchestrator"],
+    can: ["user", "remote", "session", "orchestrator"],
   },
   {
     op: "artifact.block.update",
     about: ["id"],
     input: input({ id: S.ArtifactId }, S.BlockUpdate),
     result: S.BlockOpResult,
-    can: ["owner", "remote", "session", "orchestrator"],
+    can: ["user", "remote", "session", "orchestrator"],
   },
   {
     op: "artifact.block.delete",
     about: ["id"],
     input: artifactBlockDeleteInput,
     result: S.BlockOpResult,
-    can: ["owner", "remote", "session", "orchestrator"],
+    can: ["user", "remote", "session", "orchestrator"],
     dryRun: "artifact.block.previewDelete",
   },
   {
@@ -156,48 +156,48 @@ export const artifactEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: artifactBlockDeleteInput,
     result: S.Preview,
-    can: ["owner", "remote", "session", "orchestrator"],
+    can: ["user", "remote", "session", "orchestrator"],
   },
   {
     op: "artifact.suggestion.list",
     about: ["id"],
     input: input({ id: S.ArtifactId }),
     result: Schema.mutable(Schema.Array(S.Suggestion)),
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.suggestion.create",
     about: ["id"],
     input: input({ id: S.ArtifactId }, S.SuggestionCreate),
     result: S.Suggestion,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.suggestion.accept",
     about: ["id"],
     input: artifactSuggestionInput,
     result: S.Suggestion,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.suggestion.reject",
     about: ["id"],
     input: artifactSuggestionInput,
     result: S.Suggestion,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.markdown.get",
     about: ["id"],
     input: input({ id: S.ArtifactId }),
     result: S.ArtifactMarkdown,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "artifact.demo",
     about: ["id"],
     input: input({ id: S.ArtifactId }),
     result: undefined,
-    can: ["owner"],
+    can: ["user"],
   },
 ];

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { everyone, ownerId } from "@vibevalley/protocol";
+import { everyone, userId } from "@vibevalley/protocol";
 
 import type { ChannelAudience } from "#/mailbox/envelope.ts";
 
@@ -9,7 +9,7 @@ import type { Recipient, DeliveryReason } from "./brakes.ts";
 import type { ChannelHearers } from "./envelope.ts";
 import type { OutboundDelivery } from "./work.ts";
 
-/** The issue holds its mailbox until the owner answers: it asks, is stuck, or waits for the owner's verdict. */
+/** The issue holds its mailbox until the user answers: it asks, is stuck, or waits for the user's verdict. */
 export const waitsForHuman = (issue: Pick<T.Issue, "stage">) =>
   issue.stage.state === "asking" || issue.stage.state === "stuck" || issue.stage.state === "reviewing";
 
@@ -27,7 +27,7 @@ export function whoHears(input: ChannelAudience): Recipient[] {
   if (input.channel.type === "direct") {
     const peer = input.channel.peer ?? "";
     const recipient = input.orchestrators.includes(peer) ? peer : (input.threadOwner ?? "");
-    if (input.fromKind === "owner" && recipient) add(recipient, "direct", true);
+    if (input.fromKind === "user" && recipient) add(recipient, "direct", true);
     return deliveries;
   }
   if (input.kind === "report") {
@@ -36,16 +36,16 @@ export function whoHears(input: ChannelAudience): Recipient[] {
   }
   for (const mention of input.mentions) {
     if (mention === everyone) {
-      if (input.fromKind === "owner") for (const session of input.sessions) add(session, "everyone", true);
-    } else if (mention !== ownerId) add(mention, "mention", true);
+      if (input.fromKind === "user") for (const session of input.sessions) add(session, "everyone", true);
+    } else if (mention !== userId) add(mention, "mention", true);
   }
   const thread = input.channel.type === "thread";
   const threadOwner = thread ? (input.threadOwner ?? "") : "";
-  if (input.fromKind === "owner") {
+  if (input.fromKind === "user") {
     if (threadOwner) add(threadOwner, "own_thread", true);
     if (thread) for (const member of input.members) add(member, "member", true);
     else {
-      if (!input.mentions.some((mention) => mention !== ownerId)) for (const member of input.channelMembers) add(member, "addressed", true);
+      if (!input.mentions.some((mention) => mention !== userId)) for (const member of input.channelMembers) add(member, "addressed", true);
       for (const session of input.sessions) add(session, "channel", false);
     }
   } else if (threadOwner) add(threadOwner, "own_thread", true);
@@ -65,7 +65,7 @@ export function channelRecipients(trigger: T.Trigger, input: ChannelHearers): Ou
         ? input.outcome === "failed" || input.outcome === "interrupted"
           ? "report_attention"
           : "report_progress"
-        : input.row.sender_kind === "owner"
+        : input.row.sender_kind === "user"
           ? "conversation"
           : delivery.reason === "mention" || delivery.reason === "everyone"
             ? "mention"
@@ -79,7 +79,7 @@ export type Urgency = (typeof UrgencyValues)[number];
 export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" | "review" | "ci_failed" | "report_attention" | "report_progress" | "ambient";
 
 export function triggerEvent(trigger: Pick<T.Trigger, "actor" | "source" | "meta" | "addressed">): DeliveryEvent {
-  if (trigger.actor.kind === "owner") return "conversation";
+  if (trigger.actor.kind === "user") return "conversation";
   switch (trigger.source) {
     case "github":
       if (trigger.meta.kind !== "ci") return "review";

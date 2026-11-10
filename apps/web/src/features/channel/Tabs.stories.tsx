@@ -23,7 +23,7 @@ const cron = (more: Partial<CronView>): CronView => ({
   enabled: true,
   created: now - 7 * 86_400_000,
   lastRun: now - 86_400_000,
-  by: "owner",
+  by: "user",
   pending: false,
   whenText: "每天 09:30",
   nextText: "明天 09:30",

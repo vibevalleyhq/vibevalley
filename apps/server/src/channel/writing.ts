@@ -2,7 +2,7 @@ import { Clock, Effect, FiberSet } from "effect";
 import { HttpClient } from "effect/http";
 
 import type * as T from "@vibevalley/protocol";
-import { everyone, ownerId } from "@vibevalley/protocol";
+import { everyone, userId } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
 import { Inconsistent } from "#/base/errors.ts";
@@ -38,7 +38,7 @@ export const channelWriting = (r: ChannelHub) =>
       channelOfSession,
       hired,
       publishChannel,
-      publishOwnerMentions,
+      publishUserMentions,
       publishMessage,
       ownerOf,
       threadFor,
@@ -60,7 +60,7 @@ export const channelWriting = (r: ChannelHub) =>
       // No one else is in a direct channel to be named.
       const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
       const sessionsNow = hired();
-      // Participants are sessions, agents and the owner alike: a mention is any of them.
+      // Participants are sessions, agents and the user alike: a mention is any of them.
       const present: readonly string[] = sessionsNow.map((h) => h.id);
       const known = new Set(model.participants().map((p) => p.id));
       const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
@@ -68,7 +68,7 @@ export const channelWriting = (r: ChannelHub) =>
         mentions,
         (m) =>
           Effect.gen(function* () {
-            const how = orchestrators.includes(m) || m === ownerId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
+            const how = orchestrators.includes(m) || m === userId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
             named.push({ id: m, how });
             yield* db.run(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
           }),
@@ -183,7 +183,7 @@ export const channelWriting = (r: ChannelHub) =>
           };
           const out: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
           if (w.readBy) yield* readUpTo(w.readBy, w.channel, number);
-          if (w.member) yield* addMember(w.channel, w.member, "owner", number);
+          if (w.member) yield* addMember(w.channel, w.member, "user", number);
           if (w.thread) out.thread = yield* threadFor({ id, number, channel: w.channel }, w.thread);
           return out;
         }),
@@ -230,7 +230,7 @@ export const channelWriting = (r: ChannelHub) =>
       embedLater(written.row);
       yield* publishChannel(channel);
       const meta = metaOf(written.row.meta);
-      if (written.row.sender_id === ownerId || meta.mentions?.includes(ownerId) === true) yield* publishOwnerMentions;
+      if (written.row.sender_id === userId || meta.mentions?.includes(userId) === true) yield* publishUserMentions;
       if (written.thread) yield* publishChannel(written.thread);
       if (written.heldNotice) yield* write({ channel, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
     });

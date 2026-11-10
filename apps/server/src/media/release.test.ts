@@ -183,13 +183,13 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     yield* configured;
     const media = yield* Media;
     const request: T.MediaVoiceDesignRequest = { id: "design", connection: "moss", revision: 1, text: "Hello.", instruction: "Warm voice.", format: "wav" };
-    yield* media.createVoiceDesign(request, { kind: "owner" });
+    yield* media.createVoiceDesign(request, { kind: "user" });
     const design = yield* terminal(media, request.id);
     expect(design.phase, design.problem).toBe("ready");
     if (design.kind !== "voiceDesign" || !design.previewInput || !design.attachment) return yield* Effect.die("Missing saved voice preview");
     const channel = yield* Channel;
     const published = yield* channel.post({
-      _tag: "Owner",
+      _tag: "User",
       text: "Published preview",
       sendKey: "release-preview-published",
       attachments: [design.attachment.id],
@@ -205,7 +205,7 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     if (!file) return yield* Effect.die("Release deleted an independently owned channel attachment");
     const file2 = yield* (yield* FileSystem.FileSystem).readFile(file.path);
     expect(Buffer.from(file2)).toEqual(wav());
-    const said = yield* channel.post({ _tag: "Owner", text: "Published preview", sendKey: "release-preview-published", attachments: [design.attachment.id] });
+    const said = yield* channel.post({ _tag: "User", text: "Published preview", sendKey: "release-preview-published", attachments: [design.attachment.id] });
     expect(said).toMatchObject({
       again: true,
       message: published.message,
@@ -214,7 +214,7 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     expect(releasedVoice).toMatchObject({ input: null, result: { kind: "clone", voice: { id: "saved-voice" } } });
     const inputFailure = yield* media.inputs.get(design.previewInput).pipe(Effect.flip);
     expect(inputFailure).toMatchObject({ _tag: "Refused" });
-    const voiceDesignCreated = yield* media.createVoiceDesign(request, { kind: "owner" });
+    const voiceDesignCreated = yield* media.createVoiceDesign(request, { kind: "user" });
     expect(voiceDesignCreated).toMatchObject({ previewInput: null });
     const cloneCreated = yield* media.createClone(clone);
     expect(cloneCreated).toEqual(releasedVoice);
@@ -233,7 +233,7 @@ it.effect.each(["queued", "generating", "downloading"] as const)("regression: %s
         id: request.id,
         kind: "voiceDesign",
         request: yield* json({ ...request, kind: "voiceDesign" }),
-        source: yield* json({ kind: "owner" }),
+        source: yield* json({ kind: "user" }),
         input: null,
         connection: "moss",
         revision: 1,
@@ -251,7 +251,7 @@ it.effect.each(["queued", "generating", "downloading"] as const)("regression: %s
     expect(releasedFailure).toMatchObject({ _tag: "Refused" });
     const media2 = yield* media.get(request.id);
     expect(media2).toMatchObject({ phase, canRelease: false });
-    for (const op of ["media.job.previewRelease", "media.job.release"]) expect(endpoints.find((endpoint) => endpoint.op === op)?.can).toEqual(["owner"]);
+    for (const op of ["media.job.previewRelease", "media.job.release"]) expect(endpoints.find((endpoint) => endpoint.op === op)?.can).toEqual(["user"]);
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Release cannot contact a provider"))))),
 );
 
@@ -296,7 +296,7 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
               id: request.id,
               kind: "voiceDesign",
               request: yield* json({ ...request, kind: "voiceDesign" }),
-              source: yield* json({ kind: "owner" }),
+              source: yield* json({ kind: "user" }),
               input: null,
               connection: "moss",
               revision: 1,
@@ -313,7 +313,7 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
             speech.insertSpeech({
               id: request.id,
               request: yield* json(request),
-              source: yield* json({ kind: "owner" }),
+              source: yield* json({ kind: "user" }),
               connection: "moss",
               revision: 1,
               model: "moss-tts-1.5-flash",
@@ -351,9 +351,9 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
         expect(inputFailure).toMatchObject({ _tag: "Refused" });
       }
       yield* media.restore();
-      const voiceDesignCreated = yield* media.createVoiceDesign(design, { kind: "owner" });
+      const voiceDesignCreated = yield* media.createVoiceDesign(design, { kind: "user" });
       expect(voiceDesignCreated).toMatchObject({ phase, resultInput: null, canRelease: false });
-      const speechCreated = yield* media.createSpeech(spoken, { kind: "owner" });
+      const speechCreated = yield* media.createSpeech(spoken, { kind: "user" });
       expect(speechCreated).toMatchObject({ phase, resultInput: null, canRelease: false });
       const inputCapacity2 = yield* db.run(input.inputCapacity());
       expect(inputCapacity2).toEqual({ bytes: 0, count: 0 });

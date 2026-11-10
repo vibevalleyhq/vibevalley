@@ -29,7 +29,7 @@ describe("the orchestrator's rules", () => {
     for (const [name, now, want] of cases) expect({ name, got: situationDelta(before, now) }).toEqual({ name, got: want });
   });
 
-  it("cut what others said long, never the owner's words", () => {
+  it("cut what others said long, never the user's words", () => {
     const line = (text: string) =>
       orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "agent", fromRole: "worker", name: "测试小吴", text }]);
     const head = "[target=#general:3 msg=4 from=w1 测试小吴] ";
@@ -41,8 +41,8 @@ describe("the orchestrator's rules", () => {
       ["spaces around do not count", "  " + "a".repeat(800) + "\n", "a".repeat(800)],
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });
-    const owner = orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#ops", from: "owner", fromKind: "owner", name: "主人", text: "字".repeat(900) }]);
-    expect(owner).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
+    const user = orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#ops", from: "user", fromKind: "user", name: "主人", text: "字".repeat(900) }]);
+    expect(user).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
   });
 
   it("give every source its head", () => {

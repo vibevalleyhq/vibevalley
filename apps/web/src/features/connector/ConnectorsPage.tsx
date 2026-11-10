@@ -336,7 +336,7 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
           {disconnect()}
         </Match>
         <Match when={state() === "connected" || state() === "paused"}>
-          <Row label={t("web.connector.connectors.owner")}>{props.status.owner ?? ""}</Row>
+          <Row label={t("web.connector.connectors.user")}>{props.status.user ?? ""}</Row>
           <Row label={t("web.connector.connectors.channel")}>
             <ChannelPick id={props.id} current={props.status.channel ?? defaultOf(core()?.chat)?.name ?? ""} />
           </Row>

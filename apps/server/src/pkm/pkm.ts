@@ -2,7 +2,7 @@ import { Clock, Context, Effect, FileSystem, Layer, Option, Path, Ref, Schema, S
 import type { PlatformError } from "effect/PlatformError";
 
 import { list, t } from "@vibevalley/i18n";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
 
@@ -59,7 +59,7 @@ export class Pkm extends Context.Service<
     readonly journal: (day: string) => Effect.Effect<T.PkmPage, ApiError>;
     readonly radar: (staleDays: number | undefined) => Effect.Effect<T.PkmRadar>;
     readonly comments: (page: string | undefined) => Effect.Effect<T.PkmComment[], ApiError>;
-    /** by: who proposes it, the owner or an agent's id. */
+    /** by: who proposes it, the user or an agent's id. */
     readonly suggest: (req: T.PkmProposalRequest, by: string) => Effect.Effect<T.PkmProposal, ApiError>;
     readonly resolve: (req: T.PkmResolveRequest) => Effect.Effect<T.PkmPage, ApiError>;
     readonly clip: (req: T.PkmClipRequest) => Effect.Effect<T.PkmClip, ApiError>;
@@ -127,7 +127,7 @@ export const make = Effect.gen(function* () {
     );
   const vault = (): Effect.Effect<Vault> => Ref.get(pages);
 
-  /** The remarks the owner wrote in a page's file, kept so their status outlives a reading. */
+  /** The remarks the user wrote in a page's file, kept so their status outlives a reading. */
   const keepRemarks = (page: Page) =>
     Effect.gen(function* () {
       const at = yield* now;
@@ -139,12 +139,12 @@ export const make = Effect.gen(function* () {
             page: page.slug,
             block: node.id,
             span: span.text,
-            author: ownerId,
+            author: userId,
             body: span.remark,
             created_at: at,
           });
         if (node.props.comment)
-          remarks.push({ id: `prop:${node.id}`, page: page.slug, block: node.id, span: null, author: ownerId, body: node.props.comment, created_at: at });
+          remarks.push({ id: `prop:${node.id}`, page: page.slug, block: node.id, span: null, author: userId, body: node.props.comment, created_at: at });
       }
       yield* Effect.forEach(remarks, (r) => db.run(q.keepRemark(r)), { discard: true });
     });

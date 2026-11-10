@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues, statePath } from "@vibevalley/protocol";
 import { actCommand } from "@vibevalley/protocol/api";
-import { latestSessionIdOf, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
@@ -56,7 +56,7 @@ const listCommand = Command.make(
     status: Flag.Literals("status", IssueStatusValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.issueStatus"))),
     repo: optionalText("repo", "cli.flag.repo"),
     text: optionalText("text", "cli.flag.text"),
-    wantsOwner: Flag.Boolean("wants-owner").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.wantsOwner"))),
+    wantsUser: Flag.Boolean("wants-user").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.wantsUser"))),
     closed: Flag.Boolean("closed").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.closed"))),
     limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))),
   },
@@ -71,7 +71,7 @@ const listCommand = Command.make(
           ...(status ? { status } : {}),
           ...(repo ? { repo } : {}),
           ...(text ? { text } : {}),
-          ...(o.wantsOwner ? { wantsOwner: true } : {}),
+          ...(o.wantsUser ? { wantsUser: true } : {}),
           ...(o.closed ? { closed: true } : {}),
         }),
       );
@@ -85,7 +85,7 @@ const listCommand = Command.make(
   Command.withDescription(t("cli.command.issue.list")),
   Command.withExamples([
     { command: "vibevalley issue list", description: t("cli.example.issueList.about") },
-    { command: "vibevalley issue list --wants-owner", description: t("cli.example.issueWantsOwner.about") },
+    { command: "vibevalley issue list --wants-user", description: t("cli.example.issueWantsUser.about") },
   ]),
 );
 
@@ -273,10 +273,10 @@ const IssuesOfFrame = Schema.fromJsonString(
     }),
   }),
 );
-/** Where it waits on the owner or is over: what --watch waits for. */
+/** Where it waits on the user or is over: what --watch waits for. */
 const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
 
-/** Follows the issue in the core state until it waits on the owner or is over, each status on stderr; one that already
+/** Follows the issue in the core state until it waits on the user or is over, each status on stderr; one that already
  * does is not waited for. */
 const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: number | undefined) {
   const base = yield* ServerFlag;
@@ -290,7 +290,7 @@ const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: n
     }),
     Stream.changesWith((a, b) => a.status === b.status && a.stage.state === b.stage.state),
     Stream.tap((now) => Effect.flatMap(jsonText({ issue: issue.number, status: now.status, stage: now.stage.state }), err)),
-    Stream.takeUntil((now) => settled.has(now.status) || stageWantsOwner(now.stage.state)),
+    Stream.takeUntil((now) => settled.has(now.status) || stageWantsUser(now.stage.state)),
     Stream.runDrain,
   );
   yield* timeout === undefined
@@ -303,7 +303,7 @@ const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: n
       );
 });
 
-/** `issue show 12`: the issue; --watch follows it first, until it waits on the owner or is over (as `kubectl get -w`). */
+/** `issue show 12`: the issue; --watch follows it first, until it waits on the user or is over (as `kubectl get -w`). */
 const showCommand = Command.make(
   "show",
   {

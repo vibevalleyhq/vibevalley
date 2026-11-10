@@ -2,7 +2,7 @@ import { Effect, Semaphore, Predicate } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
@@ -38,15 +38,15 @@ export function merging(d: MergeDeps) {
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
     const issue = sessions.sessionOf(id)?.issue;
     if (issue && n.failure.kind === "conflict") yield* d.setConflict(issue, { base: n.failure.base, files: [...n.failure.files] });
-    let [owner, line] = [n.owner, n.notice];
+    let [user, line] = [n.user, n.notice];
     if (n.fix) {
       const untold = yield* chat
-        .post({ _tag: "Tell", from: ownerId, session: id, text: n.fix, sendKey: "" })
+        .post({ _tag: "Tell", from: userId, session: id, text: n.fix, sendKey: "" })
         .pipe(Effect.match({ onSuccess: () => "", onFailure: (e) => t("server.issue.merge.tellFailed", { why: reasonOf(e) }) }));
-      [owner, line] = [owner + untold, line + untold];
+      [user, line] = [user + untold, line + untold];
     }
     yield* core.notice("warn", line);
-    return refused(owner);
+    return refused(user);
   });
   const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, MergeFailure | RepoError>) =>
     sessions

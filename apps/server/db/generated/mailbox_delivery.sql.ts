@@ -229,7 +229,7 @@ export const AgentWakesByScopeResult = Schema.Struct({
 export type AgentWakesByScopeResult = typeof AgentWakesByScopeResult.Type
 
 
-export const AgentWakesByScopeSql = "-- name: AgentWakesByScope :many\n-- bound: a row per routing scope.\nwith owners as (\n  select scope, max(position) as position from mailbox_owner_route group by scope\n)\nselect d.scope, count(*)::int as n from mailbox_delivery d\nleft join owners o on o.scope = d.scope\nwhere d.position > coalesce(o.position, 0)\n  and d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null\ngroup by d.scope;"
+export const AgentWakesByScopeSql = "-- name: AgentWakesByScope :many\n-- bound: a row per routing scope.\nwith users as (\n  select scope, max(position) as position from mailbox_user_route group by scope\n)\nselect d.scope, count(*)::int as n from mailbox_delivery d\nleft join users o on o.scope = d.scope\nwhere d.position > coalesce(o.position, 0)\n  and d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null\ngroup by d.scope;"
 
 export const agentWakesByScope = Effect.fn("AgentWakesByScope")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -347,26 +347,26 @@ export const waitingOn = Effect.fn("WaitingOn")(function* (params: WaitingOnPara
   })(params)
 })
 
-export const LastOwnerRoutesParams = Schema.Struct({
+export const LastUserRoutesParams = Schema.Struct({
 
 })
-export type LastOwnerRoutesParams = typeof LastOwnerRoutesParams.Type
+export type LastUserRoutesParams = typeof LastUserRoutesParams.Type
 
 
-export const LastOwnerRoutesResult = Schema.Struct({
+export const LastUserRoutesResult = Schema.Struct({
   ["scope"]: Schema.NullOr(Schema.String),
   ["position"]: Schema.Int,
 })
-export type LastOwnerRoutesResult = typeof LastOwnerRoutesResult.Type
+export type LastUserRoutesResult = typeof LastUserRoutesResult.Type
 
 
-export const LastOwnerRoutesSql = "-- name: LastOwnerRoutes :many\n-- bound: one owner epoch per routing scope, including returned deliveries.\nselect scope, max(position)::int as position from mailbox_owner_route group by scope;"
+export const LastUserRoutesSql = "-- name: LastUserRoutes :many\n-- bound: one user epoch per routing scope, including returned deliveries.\nselect scope, max(position)::int as position from mailbox_user_route group by scope;"
 
-export const lastOwnerRoutes = Effect.fn("LastOwnerRoutes")(function* () {
+export const lastUserRoutes = Effect.fn("LastUserRoutes")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: LastOwnerRoutesParams,
-    Result: LastOwnerRoutesResult,
-    execute: () => sql.unsafe(LastOwnerRoutesSql, []),
+    Request: LastUserRoutesParams,
+    Result: LastUserRoutesResult,
+    execute: () => sql.unsafe(LastUserRoutesSql, []),
   })({})
 })

@@ -30,7 +30,7 @@ let text = head;
 for (const [g, list] of groups) {
   text += `\n## ${g}\n\n${maybe(`cli.group.${g}.about`) ?? ""}\n\n| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |\n|---|---|---|---|---|---|---|\n`;
   for (const e of list)
-    text += `| \`${e.op}\` | ${t(`cli.op.${e.op}`)} | \`${pathOf(e.op)}\` | ${mark(e.can.includes("owner"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
+    text += `| \`${e.op}\` | ${t(`cli.op.${e.op}`)} | \`${pathOf(e.op)}\` | ${mark(e.can.includes("user"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
 }
 
 if (process.argv.includes("--check")) {

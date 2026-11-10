@@ -113,7 +113,7 @@ for (const submittedReport of [false, true]) {
         (rows) => rows[0]?.state === "consumed",
         "CI entered the model",
       );
-      yield* sessions.report(id, { summary: "ready for the owner", questions: [], checks: [], remember: [], prSubmit: false });
+      yield* sessions.report(id, { summary: "ready for the user", questions: [], checks: [], remember: [], prSubmit: false });
       reviewed.resolve();
       yield* until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
       expect((yield* issues.get(issue.id)).stage.state).toBe("reviewing");

@@ -2,7 +2,7 @@ import { Clock, Effect, PubSub, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -63,7 +63,7 @@ export const channelHub = Effect.gen(function* () {
   const reload = Effect.gen(function* () {
     const channels = yield* db.run(qc.allChannels());
     const participants2 = yield* db.run(qp.participants());
-    const cursorsOf = yield* db.run(qr.readCursorsOf({ participant_id: ownerId }));
+    const cursorsOf = yield* db.run(qr.readCursorsOf({ participant_id: userId }));
     const follows = yield* db.run(qmb.allMembers());
     model.load(channels, participants2, cursorsOf, follows);
   });
@@ -74,11 +74,11 @@ export const channelHub = Effect.gen(function* () {
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
   const said = yield* scopedPubSub<T.ChatMessage>();
-  const ownerReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
+  const userReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
 
   yield* Effect.forEach(
     [
-      [ownerId, "owner", t("server.channel.name.owner")],
+      [userId, "user", t("server.channel.name.user")],
       ["system", "system", "VibeValley"],
     ] as const,
     ([id, kind, name]) =>
@@ -123,7 +123,7 @@ export const channelHub = Effect.gen(function* () {
   };
   const orchestratorInRow = (row: ChannelRow | undefined): string =>
     orchestratorIn({ top: topOfRow(row), members: membersOfRow(row), isOrchestrator: agents.isOrchestrator });
-  /** In a channel from its start: the default orchestrator, so what is said there reaches someone until the owner changes who is in it. */
+  /** In a channel from its start: the default orchestrator, so what is said there reaches someone until the user changes who is in it. */
   const joinDefault = (channel: string) => addMember(channel, defaultOrchestrator, "manual", 0);
 
   /** A channel's name; none for a thread or what is not there. */
@@ -144,9 +144,9 @@ export const channelHub = Effect.gen(function* () {
   const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
   const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : model.defaultId());
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
-  /** Where the owner talks with peer alone, from either side. */
+  /** Where the user talks with peer alone, from either side. */
   const directWith = (who: string, other: string) => {
-    const peer = who === ownerId ? other : other === ownerId ? who : "";
+    const peer = who === userId ? other : other === userId ? who : "";
     return model.channels("direct").find((c) => c.peer_id === peer);
   };
   const sessionOf = (id: string) => sessions.sessionOf(id);
@@ -165,7 +165,7 @@ export const channelHub = Effect.gen(function* () {
   const targetOfChannel = (row: ChannelRow) => targetOfRow(row.type, row.root_number, row.name, row.parent_id, null);
 
   const toChannel = (row: ChannelRow, unread = 0, title = "", last?: MsgRow): T.Channel => {
-    const read = model.ownerReadIn(row.id);
+    const read = model.userReadIn(row.id);
     const sk = subjectKind(row.subject_kind);
     return {
       id: row.id,
@@ -196,16 +196,16 @@ export const channelHub = Effect.gen(function* () {
     };
   };
 
-  /** What a page lists a channel with: the owner's unread there, and a thread's title when its subject does not
+  /** What a page lists a channel with: the user's unread there, and a thread's title when its subject does not
    * name it (a page keeps no messages to name it by). */
   const counted = Effect.fnUntraced(function* (row: ChannelRow) {
-    // Set to none it counts nothing; to mentions, only what names the owner and is not handled yet.
+    // Set to none it counts nothing; to mentions, only what names the user and is not handled yet.
     const n =
       row.notify === "none"
         ? 0
         : row.notify === "mentions"
-          ? (yield* db.run(qm.ownerMentions())).filter((m) => m.channel_id === row.id).length
-          : (yield* db.run(qm.ownerUnread({ channel_id: row.id, read_number: model.ownerReadIn(row.id) ?? 0 }))).n;
+          ? (yield* db.run(qm.userMentions())).filter((m) => m.channel_id === row.id).length
+          : (yield* db.run(qm.userUnread({ channel_id: row.id, read_number: model.userReadIn(row.id) ?? 0 }))).n;
     const sk = subjectKind(row.subject_kind);
     let title = "";
     if (row.type === "thread" && row.name) title = row.name;
@@ -229,12 +229,12 @@ export const channelHub = Effect.gen(function* () {
     }
   });
 
-  const publishOwnerMentions = Effect.gen(function* () {
-    // A place set to none tells the owner of nothing, its mentions included.
+  const publishUserMentions = Effect.gen(function* () {
+    // A place set to none tells the user of nothing, its mentions included.
     const quiet = (id: string | null) => id !== null && model.channel(id)?.notify === "none";
-    const rows = (yield* db.run(qm.ownerMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
+    const rows = (yield* db.run(qm.userMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
     yield* core.apply({
-      type: "ownerMentionsChanged",
+      type: "userMentionsChanged",
       mentions: rows.map((r) => ({
         message: toMessage(r),
         channel: r.top_id ?? model.defaultId(),
@@ -300,7 +300,7 @@ export const channelHub = Effect.gen(function* () {
       archived_at: null,
       notify: "all",
     });
-    if (subject.owner) yield* addMember(id, subject.owner, "owner", root.number);
+    if (subject.owner) yield* addMember(id, subject.owner, "user", root.number);
     return id;
   });
 
@@ -308,7 +308,7 @@ export const channelHub = Effect.gen(function* () {
     Effect.andThen(
       db.run(qr.setReadCursor({ participant_id: who, channel_id: channel, read_number: upto, updated_at: now })),
       Effect.sync(() => {
-        if (who === ownerId) model.ownerReadTo(channel, upto);
+        if (who === userId) model.userReadTo(channel, upto);
       }),
     );
 
@@ -319,9 +319,9 @@ export const channelHub = Effect.gen(function* () {
   });
   const readThrough = Effect.fnUntraced(function* (who: string, channel: string, upto: number) {
     yield* tx(readUpTo(who, channel, upto));
-    if (who === ownerId) {
-      PubSub.publishUnsafe(ownerReadHub, { channel, number: upto, at: yield* Clock.currentTimeMillis });
-      yield* publishOwnerMentions;
+    if (who === userId) {
+      PubSub.publishUnsafe(userReadHub, { channel, number: upto, at: yield* Clock.currentTimeMillis });
+      yield* publishUserMentions;
     }
   });
 
@@ -397,7 +397,7 @@ export const channelHub = Effect.gen(function* () {
       yield* Effect.forEach([...recent].toReversed(), (c) => Effect.flatMap(counted(c), (channel) => core.apply({ type: "channelChanged", channel })), {
         discard: true,
       });
-      yield* publishOwnerMentions;
+      yield* publishUserMentions;
     }),
   );
 
@@ -418,7 +418,7 @@ export const channelHub = Effect.gen(function* () {
     tx,
     locked,
     said,
-    ownerReadHub,
+    userReadHub,
     seat,
     orchestratorIds,
     orchestratorInRow,
@@ -437,7 +437,7 @@ export const channelHub = Effect.gen(function* () {
     toChannel,
     counted,
     publishChannel,
-    publishOwnerMentions,
+    publishUserMentions,
     publishMessage,
     threadOf,
     threadOfSession,

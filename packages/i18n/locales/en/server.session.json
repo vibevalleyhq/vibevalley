@@ -31,11 +31,11 @@
     "repo": "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files"
   },
   "notTaken": {
-    "conflictOwner": "Not merged: merging into {base} would conflict ({files}). {name} is still here, with its branch and worktree. To have it resolve this, tell it: {brief}",
+    "conflictUser": "Not merged: merging into {base} would conflict ({files}). {name} is still here, with its branch and worktree. To have it resolve this, tell it: {brief}",
     "conflictNotice": "{name}'s branch would conflict with {base} ({files}), so it was not merged. It can resolve the conflict itself",
     "conflictShort": "Merging into {base} would conflict: {files}",
     "checkFix": "{reason}\nFix the check and hand it back.",
-    "owner": "Not merged: {why}. {name} is still here",
+    "user": "Not merged: {why}. {name} is still here",
     "notice": "{name}'s work was not merged: {why}",
     "checkShort": "the repo's check failed"
   },
@@ -44,7 +44,7 @@
     "image": "[image]",
     "exitedNotice": "{name}: {why}",
     "staleRun": "The last round stopped halfway too long ago, and was not carried on",
-    "stoppedByOwner": "You stopped it",
+    "stoppedByUser": "You stopped it",
     "folded": "Folded the conversation, {usage}",
     "clipped": "… {n} characters left out …",
     "quiet": "Quiet for {span}{last}. It may be running a long command, or it may be stuck",

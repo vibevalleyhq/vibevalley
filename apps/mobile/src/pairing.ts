@@ -35,7 +35,7 @@ function parseFarm(text: string): string | undefined {
   }
 }
 
-/** What the owner's list calls this phone until they rename it there. */
+/** What the user's list calls this phone until they rename it there. */
 export function deviceName(os: string, model: string | undefined): string {
   if (model) return model;
   return os === "ios" ? "iPhone" : os === "android" ? t("mobile.android") : t("mobile.phone");

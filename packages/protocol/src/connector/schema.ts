@@ -13,7 +13,7 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
   qr: Schema.String,
   pairCode: Schema.String,
   channel: Schema.optionalKey(Schema.String),
-  owner: Schema.optionalKey(Schema.String),
+  user: Schema.optionalKey(Schema.String),
   since: Schema.optionalKey(Schema.Finite),
   lastInbound: Schema.optionalKey(Schema.Finite),
   pausedUntil: Schema.optionalKey(Schema.Finite),

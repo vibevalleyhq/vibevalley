@@ -63,7 +63,7 @@ export function faultOf(e: unknown): UiFault {
 /** A client's key for one send: a retry with the same key is the same message, said once. */
 export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
-/** The request key of one thing the owner may send again (a form's create, a button's). a new one after. */
+/** The request key of one thing the user may send again (a form's create, a button's). a new one after. */
 export function createRequestKey() {
   let key = newSendKey();
   return {

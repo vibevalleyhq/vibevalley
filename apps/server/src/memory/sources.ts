@@ -85,7 +85,7 @@ export const sourceLife = (name: string) => {
   };
 };
 
-/** How long a source outside the farm may take to answer a read: a run waiting on it is the owner waiting. */
+/** How long a source outside the farm may take to answer a read: a run waiting on it is the user waiting. */
 export const prefetchTimeoutMs = 2_000;
 /** A write goes in the background, so it may take longer; one that hangs still must not hold the queue for ever. */
 const writeTimeoutMs = 30_000;
@@ -142,7 +142,7 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
 const idOf = (one: Source, id: string) => (one.name === localName || id === "" ? id : `${one.name}:${id}`);
 
 /** Which source an id is from, and the id as that source knows it. */
-function owner(all: readonly [Source, ...Source[]], id: string): [Source, string] {
+function user(all: readonly [Source, ...Source[]], id: string): [Source, string] {
   const colon = id.indexOf(":");
   if (colon >= 0) {
     const named = all.find((s) => s.name === id.slice(0, colon));
@@ -389,7 +389,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const forgetProblem = (id: string) =>
       Effect.map(snapshot, (g): string | undefined => {
         if (!g) return t("server.memory.stopped");
-        const [one] = owner(g.all, id);
+        const [one] = user(g.all, id);
         return one.can.forget ? undefined : t("server.memory.forgetThere", { source: sourceLabel(one.name) });
       });
 
@@ -456,7 +456,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
           const problem = yield* forgetProblem(id);
           const g = yield* snapshot;
           if (problem || !g) return yield* SourceError.make({ message: problem ?? t("server.memory.stopped") });
-          const [one, own] = owner(g.all, id);
+          const [one, own] = user(g.all, id);
           return yield* one === local ? one.forget(agent, own) : leased(g, within(one.forget(agent, own), writeTimeoutMs));
         }),
       add: (note) => enqueue(`a note for ${note.agent} did not reach its source`, (one) => one.add(note)),

@@ -51,7 +51,7 @@
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
-- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `agent` 带 `role: "orchestrator"` 与 `forOwner`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
+- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `agent` 带 `role: "orchestrator"` 与 `forUser`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
 - **模块之间的路径记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员，存在 `scripts/service-paths.json`；`vp run paths:check` 在提交前的钩子里跑，多一条路就失败：要么走已有的门，要么 `vp run paths:write` 写下来并在 PR 里说明；少了的路由 `paths:write` 去掉，不能悄悄回来。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
@@ -107,7 +107,7 @@
 
 - **对主人的话进词典，对模型的话进 `prompts.ts`**：
   - 界面与通知文案写在 `packages/i18n/locales/{zh,en}/<命名空间>.json`，代码调 `t("key")`（`vibevalley/no-cjk-literal` 拦截硬编码中文）。
-  - 模型提示写在各模块 `prompts.ts`（中文编写，要求模型按 `ownersLanguage` 回答）。
+  - 模型提示写在各模块 `prompts.ts`（中文编写，要求模型按 `usersLanguage` 回答）。
 - **语言按进程生效**：语言存于 `settings.json` 的 `locale`，服务端启动和保存时调 `setLocale`；页面从 `index.html` 的 `data-locale` 读取并通过 `host.locale` 同步给桌面壳。
 
 ## 怎么走

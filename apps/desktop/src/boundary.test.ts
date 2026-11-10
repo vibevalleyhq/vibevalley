@@ -18,7 +18,7 @@ describe("what the page may do to this machine", () => {
     expect(navigationOf("http://127.0.0.1:8787/", undefined)).toBe("browser");
   });
 
-  it("grants media only to the owner's main frame, not display capture or embedded content", () => {
+  it("grants media only to the user's main frame, not display capture or embedded content", () => {
     const server = "http://127.0.0.1:8787";
     expect(pagePermission("media", `${server}/settings/moss`, server, true, ["video"])).toBe(true);
     expect(pagePermission("media", server, server, true, ["audio", "video"])).toBe(true);

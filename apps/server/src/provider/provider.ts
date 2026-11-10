@@ -417,7 +417,7 @@ export class Provider extends Context.Service<
     /** The account bound to speak, as it is now. */
     readonly speech: () => Effect.Effect<Account, Refused>;
     readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, Refused>;
-    /** The dictation the owner set: a model of an account's, or their own compatible endpoint. */
+    /** The dictation the user set: a model of an account's, or their own compatible endpoint. */
     readonly dictation: () => Effect.Effect<Dictation, Refused>;
     /** Image generation, whichever vendor the bound account is of: the request checked against the bound model, and
      * the account as it is now (a queued task keeps it), with the call to run later. */

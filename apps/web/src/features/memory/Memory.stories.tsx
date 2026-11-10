@@ -24,7 +24,7 @@ const memory = (text: string, more: Partial<Memory> = {}): Memory => ({
   recalledAt: now - day,
   fading: false,
   ...more,
-  author: more.author ?? "owner",
+  author: more.author ?? "user",
 });
 
 export default stories({

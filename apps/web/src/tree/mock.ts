@@ -25,7 +25,7 @@ export interface MemoryItem {
   /** One of the next to be forgotten (the memory's `fading`). */
   readonly fading: boolean;
   readonly case?: MemoryCase;
-  /** A seed the owner has sown into the skill book. */
+  /** A seed the user has sown into the skill book. */
   readonly sown?: boolean;
 }
 
@@ -129,7 +129,7 @@ const reposEn = ["vibevalley", "subtitle-panel", "site", "billing"] as const;
 const notesEn: readonly [string, ...string[]] = [
   "Table names are singular: issue, issue_assignment",
   "After changing db/queries, run vp run db:generate",
-  "The owner wants no compatibility layers; old data is dropped",
+  "The user wants no compatibility layers; old data is dropped",
   "The page folds no facts; new data is a protocol field",
   "A commit subject says the behavior after the change",
   "No next dev: lint and typecheck, then build",
@@ -204,7 +204,7 @@ function random(seed: number) {
 
 const day = 86_400_000;
 
-/** The made-up tree; `stage` from the address (`/tree?stage=3`) lets the owner see each stage. */
+/** The made-up tree; `stage` from the address (`/tree?stage=3`) lets the user see each stage. */
 export function mockTree(now: number, stage?: TreeStage): MemoryTree {
   const en = currentLocale() === "en";
   const [agents, repos, notes, cases, skills] = en ? [agentsEn, reposEn, notesEn, casesEn, skillsEn] : [agentsZh, reposZh, notesZh, casesZh, skillsZh];

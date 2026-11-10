@@ -437,7 +437,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
                     onRetry={p().onRetry}
                     onPutBack={p().onPutBack}
                     drag={props.drag}
-                    // Anything but manual hides the owner's order of todo, so a card cannot be dropped between two there.
+                    // Anything but manual hides the user's order of todo, so a card cannot be dropped between two there.
                     onPlace={c().kind === "todo" && p().ordering === "manual" ? (moved) => p().onPlace(moved, c().id) : undefined}
                   />
                 )}

@@ -159,14 +159,14 @@ describe("pkm", () => {
     }).pipe(Effect.provide(farm())),
   );
 
-  it.effect("a rewrite keeps the block's links, waits for the owner and comes off once accepted", () =>
+  it.effect("a rewrite keeps the block's links, waits for the user and comes off once accepted", () =>
     Effect.gen(function* () {
       const pkm = yield* Pkm;
       const page = yield* pkm.save({ title: "Draft", markdown: "- this ==is rough==^[make it read better] about [[Engine]]\n" });
       const block = page.blocks[0]!;
       const remarks = yield* pkm.comments("draft");
       expect(remarks.map((c) => [c.span, c.body, c.status])).toEqual([["is rough", "make it read better", "open"]]);
-      const proposal = yield* pkm.suggest({ block: block.id, suggested: "a clean sentence" }, "owner");
+      const proposal = yield* pkm.suggest({ block: block.id, suggested: "a clean sentence" }, "user");
       expect(proposal.restored).toEqual(["[[Engine]]"]);
       expect(proposal.comment).toMatchObject({ id: remarks[0]!.id, status: "suggested", suggested: "a clean sentence [[Engine]]" });
       const accepted = yield* pkm.resolve({ id: proposal.comment.id, accept: true });

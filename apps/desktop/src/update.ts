@@ -157,7 +157,7 @@ export function updater(o: {
     stop: () => clearInterval(timer),
     /** Restarts into the new version: the caller has stopped the server and quits right after. */
     installNow: () => swap(true),
-    /** On the way out: put in place what is ready, unless it starts a new farm, which waits for the owner. */
+    /** On the way out: put in place what is ready, unless it starts a new farm, which waits for the user. */
     installOnQuit: () => staged !== undefined && !staged.newFarm && swap(false),
   };
 }

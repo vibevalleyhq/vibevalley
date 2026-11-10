@@ -1,7 +1,7 @@
 import { Effect, Equal, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { sessionIdsOf, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { sessionIdsOf, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { bounded, type Core } from "#/core/core.ts";
 import type { Session } from "#/session/session.ts";
@@ -26,7 +26,7 @@ export const watchIssue = (
             if (!issue) return [{ kind: "missing", issue: initial.id } satisfies T.IssueWatch];
             const all = sessionIdsOf(issue);
             const selected = all.slice(-8);
-            const settled = stageWantsOwner(issue.stage.state) || issue.stage.state === "done" || issue.stage.state === "canceled";
+            const settled = stageWantsUser(issue.stage.state) || issue.stage.state === "done" || issue.stage.state === "canceled";
             const state: T.IssueWatch = {
               kind: "state",
               issue,

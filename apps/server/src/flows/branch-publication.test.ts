@@ -12,7 +12,7 @@ import { app } from "#/testing/http.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { quietApp } from "#/testing/world.ts";
 
-it.live("the owner previews an external checkout over HTTP and bearer callers are refused", () =>
+it.live("the user previews an external checkout over HTTP and bearer callers are refused", () =>
   Effect.gen(function* () {
     const cwd = join(tempDir("publish-http-"), "external");
     repo(cwd, 1, 0);

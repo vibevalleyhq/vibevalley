@@ -3,7 +3,7 @@ import { Clock, Context, Effect, Layer, PubSub, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
@@ -62,7 +62,7 @@ const make = Effect.gen(function* () {
     locked,
     seat,
     said,
-    ownerReadHub,
+    userReadHub,
     channelTags,
     channelIdOf,
     directWith,
@@ -96,7 +96,7 @@ const make = Effect.gen(function* () {
   /** A target as who would mean it: empty is a session's own thread (or the default channel), a channel by name, or a thread by its parent's number. */
   const resolveTarget = Effect.fnUntraced(function* (who: string, target: string): Effect.fn.Return<string, ApiError> {
     if (!target.trim()) {
-      if (!agents.isOrchestrator(who) && who !== ownerId) {
+      if (!agents.isOrchestrator(who) && who !== userId) {
         const own = yield* threadOfSession(who);
         if (own) return own;
       }
@@ -129,7 +129,7 @@ const make = Effect.gen(function* () {
     if (!(yield* db.one(qm.messageByNumber({ channel_id: channel, number })))) return yield* Effect.fail(refused(t("server.channel.noMessage", { n: number })));
   });
 
-  const ownerSays = Effect.fnUntraced(function* (
+  const userSays = Effect.fnUntraced(function* (
     text: string,
     channel: string | undefined,
     sendKey: string,
@@ -142,17 +142,17 @@ const make = Effect.gen(function* () {
     if (!text.trim() && files.length === 0) return yield* Effect.fail(refused(t("server.channel.empty")));
     if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
     if (more.to !== undefined && !agents.isOrchestrator(more.to)) return yield* Effect.fail(refused(t("server.channel.notOrchestrator", { id: more.to })));
-    // A channel as the owner names it (general, #general, @fox) as well as by id; none is the default one.
-    const where = channel === undefined || model.channel(channel) ? (channel ?? model.defaultId()) : yield* resolveTarget(ownerId, channel);
+    // A channel as the user names it (general, #general, @fox) as well as by id; none is the default one.
+    const where = channel === undefined || model.channel(channel) ? (channel ?? model.defaultId()) : yield* resolveTarget(userId, channel);
     if (!model.channel(where)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]));
     yield* answered(where, more.replyTo);
     const written = yield* write({
       channel: where,
-      from: ownerId,
+      from: userId,
       kind: "chat",
       text: text.trim(),
       sendKey,
-      readBy: ownerId,
+      readBy: userId,
       ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
       ...(files.length > 0 || more.picked || (more.blocks?.length ?? 0) > 0 || source || responsePort || voiceMode || more.to !== undefined
         ? {
@@ -184,8 +184,8 @@ const make = Effect.gen(function* () {
     const target = targetOfChannel(row);
     return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => envelopeOf(m, target));
   });
-  const postOwner = Effect.fn("Channel.post", { attributes: { post: "Owner" } })(
-    (p: PostOf<"Owner">) => ownerSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode),
+  const postUser = Effect.fn("Channel.post", { attributes: { post: "User" } })(
+    (p: PostOf<"User">) => userSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode),
     locked,
   );
 
@@ -201,8 +201,8 @@ const make = Effect.gen(function* () {
         source: "channel",
         key: sendKey || newId(at),
         actor:
-          from === ownerId
-            ? { kind: "owner", id: ownerId }
+          from === userId
+            ? { kind: "user", id: userId }
             : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
         text: text.trim(),
         threads: [],
@@ -221,7 +221,7 @@ const make = Effect.gen(function* () {
       text: text.trim(),
       meta: run ? { run } : {},
       sendKey,
-      ...(from === ownerId ? { readBy: ownerId } : {}),
+      ...(from === userId ? { readBy: userId } : {}),
     });
     return toMessage(written.row);
   }, locked);
@@ -301,9 +301,9 @@ const make = Effect.gen(function* () {
       text: text.trim(),
       meta: { ...(run ? { run } : {}), ...shown },
       sendKey,
-      ...(from === ownerId ? { readBy: ownerId } : {}),
+      ...(from === userId ? { readBy: userId } : {}),
     });
-    if (from !== ownerId) {
+    if (from !== userId) {
       const now = yield* Clock.currentTimeMillis;
       yield* setRead(from, where, written.row.number, now);
     }
@@ -321,7 +321,7 @@ const make = Effect.gen(function* () {
         text: text.trim(),
         meta: { spoken: true },
         sendKey,
-        ...(from === ownerId ? { readBy: ownerId } : {}),
+        ...(from === userId ? { readBy: userId } : {}),
       });
       return written.again;
     },
@@ -343,7 +343,7 @@ const make = Effect.gen(function* () {
   );
 
   // One door; each kind keeps its own checks and answer, and the overloads tie the answer to the kind.
-  function post(p: PostOf<"Owner">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+  function post(p: PostOf<"User">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
   function post(p: PostOf<"Tell">): Effect.Effect<T.ChatMessage | undefined, ApiError>;
   function post(p: PostOf<"Agent">): Effect.Effect<Spoken, ApiError>;
   function post(p: PostOf<"Announce">): Effect.Effect<T.ChatMessage, ApiError>;
@@ -351,8 +351,8 @@ const make = Effect.gen(function* () {
   function post(p: PostOf<"Run"> | PostOf<"Notice">): Effect.Effect<void>;
   function post(p: Post): Effect.Effect<{ message: T.ChatMessage; again: boolean } | T.ChatMessage | Spoken | boolean | undefined | void, ApiError> {
     switch (p._tag) {
-      case "Owner":
-        return postOwner(p);
+      case "User":
+        return postUser(p);
       case "Tell":
         return postTell(p);
       case "Agent":
@@ -370,7 +370,7 @@ const make = Effect.gen(function* () {
 
   const shape = Channel.of({
     post,
-    ownerReads: Effect.map(PubSub.subscribe(ownerReadHub), Stream.fromSubscription),
+    userReads: Effect.map(PubSub.subscribe(userReadHub), Stream.fromSubscription),
     now: () => core.state().chat,
     ...channelStreams(db, model, said),
     defaultChannel: () => model.defaultId(),
@@ -396,7 +396,7 @@ const make = Effect.gen(function* () {
     }),
     edit: Effect.fn("Channel.edit")(function* (id, text, keep) {
       const row = yield* messageOf(id);
-      if (row.sender_id !== ownerId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.notYours")));
+      if (row.sender_id !== userId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.notYours")));
       const meta = metaOf(row.meta);
       const files = keep === undefined ? (meta.attachments ?? []) : (meta.attachments ?? []).filter((a) => keep.includes(a.id));
       const words = text.trim();
@@ -520,7 +520,7 @@ const make = Effect.gen(function* () {
       const newest = rows.at(-1);
       if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
       for (const participant of model.lastRead.keys())
-        if (participant !== ownerId && !agents.isOrchestrator(participant) && !sessions.isReachable(participant)) model.lastRead.delete(participant);
+        if (participant !== userId && !agents.isOrchestrator(participant) && !sessions.isReachable(participant)) model.lastRead.delete(participant);
       model.lastRead.set(who, target);
       const oldest = rows[0];
       const older = oldest !== undefined && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: oldest.number, n: 1 }))).length > 0;
@@ -538,21 +538,21 @@ const make = Effect.gen(function* () {
       return yield* Effect.forEach([...model.channels("channel"), ...model.channels("direct")], counted);
     }),
     history: Effect.fn("Channel.history")(function* (channel, before, limit) {
-      // A channel as the owner names it (general, #general, @fox) as well as by id.
-      const at = model.channel(channel) ? channel : yield* resolveTarget(ownerId, channel);
+      // A channel as the user names it (general, #general, @fox) as well as by id.
+      const at = model.channel(channel) ? channel : yield* resolveTarget(userId, channel);
       const rows = yield* db.run(qm.messagesBefore({ channel_id: at, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) }));
       return [...rows].toReversed().map(toMessage);
     }),
     markRead: Effect.fn("Channel.markRead")(function* (channel, seq) {
       if (!model.channel(channel)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]));
-      yield* readThrough(ownerId, channel, seq);
+      yield* readThrough(userId, channel, seq);
       yield* publishChannel(channel);
     }, locked),
     threadOfSession,
-    ownerInThread: Effect.map(
+    userInThread: Effect.map(
       core.subscribe,
       Stream.flatMap((e) =>
-        e.type === "messageChanged" && e.thread && e.message.fromKind === "owner" && e.message.kind === "chat"
+        e.type === "messageChanged" && e.thread && e.message.fromKind === "user" && e.message.kind === "chat"
           ? Stream.make({ thread: e.thread, message: e.message })
           : Stream.empty,
       ),

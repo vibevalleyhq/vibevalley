@@ -53,7 +53,7 @@ test("the orchestrator's dots show only in the channel its session works in", ()
 
 test("the sidebar lists the default first, then by place, grouped in the order the groups first come", () => {
   const chat = {
-    ownerMentions: [],
+    userMentions: [],
     channels: [
       { ...at("b"), position: 2, category: "work" },
       { ...at("a"), position: 1 },
@@ -82,7 +82,7 @@ test("a message's address names its number, which the page reads back", () => {
 
 test("Ctrl+K lists places by what is typed: a name starting with it first, then the unread, then the newest", () => {
   const chat = {
-    ownerMentions: [],
+    userMentions: [],
     channels: [
       { ...at("g"), default: true, name: "general", at: 1 },
       { ...at("f"), name: "frontend", category: "dev", at: 5 },
@@ -105,7 +105,7 @@ test("Ctrl+K lists places by what is typed: a name starting with it first, then 
 });
 
 test("a message's links to farm messages are read from any host for a known channel, the default's only from this one", () => {
-  const chat = { channels: [{ ...at("01a17e65-9647-7222-9a7d-06132e9d4dae") }, { ...at("g"), default: true }], ownerMentions: [] };
+  const chat = { channels: [{ ...at("01a17e65-9647-7222-9a7d-06132e9d4dae") }, { ...at("g"), default: true }], userMentions: [] };
   const known = "01a17e65-9647-7222-9a7d-06132e9d4dae";
   const text = `看这条 http://127.0.0.1:8787/chat/${known}?m=7 还有 http://192.168.1.5:8787/chat/${known}?m=7 和 http://127.0.0.1:8787/chat?m=3、http://other:1/chat?m=4 http://x/chat/01a17e65-0000-7222-9a7d-06132e9d4dae?m=1`;
   expect(linkedMessages(text, chat, "127.0.0.1:8787")).toEqual([

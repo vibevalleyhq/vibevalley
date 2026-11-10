@@ -49,7 +49,7 @@ const bound = Effect.gen(function* () {
 const bytes = png();
 const fixture = Effect.gen(function* () {
   const inputs = yield* makeInputs;
-  const input = yield* inputs.create({ kind: "image", mime: "image/png", name: "private-owner-filename.png", size: bytes.length });
+  const input = yield* inputs.create({ kind: "image", mime: "image/png", name: "private-user-filename.png", size: bytes.length });
   yield* inputs.upload(input.id, Stream.make(bytes));
   yield* inputs.pin([input.id], "task-a", Effect.void);
   return { inputs, input, remote: yield* makeRemoteFiles(inputs) };
@@ -67,7 +67,7 @@ it.effect("a real disk-backed input is uploaded once, recorded without its key, 
         const file = request.body.formData.get("file");
         if (!(file instanceof File)) return yield* Effect.die("Expected disk-backed file");
         expect(file.name).toMatch(/^vv-[0-9a-f-]+\.png$/u);
-        expect(file.name).not.toContain("private-owner");
+        expect(file.name).not.toContain("private-user");
         const arrayBuffer2 = yield* Effect.promise(() => file.arrayBuffer());
         expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
         return HttpClientResponse.fromWeb(request, Response.json({ ...uploaded, filename: file.name }));

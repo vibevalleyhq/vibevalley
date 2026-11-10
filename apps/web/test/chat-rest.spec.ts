@@ -84,7 +84,7 @@ test("a thread is listed under its channel, renamed and archived there", async (
 test("a message's address scrolls to it and lights it up, from the pins, a reply's quote and the farm's search", async ({ page, api }) => {
   const id = await api.channel.create({ name: "long" });
   for (let i = 1; i <= 70; i++) await api.channel.message.send({ id, text: `line ${i}` });
-  // The orchestrator answers too (it has no key): the owner's lines are not numbered 1 to 70.
+  // The orchestrator answers too (it has no key): the user's lines are not numbered 1 to 70.
   const all = [...(await api.channel.message.list({ id, before: 1000, limit: 100 })), ...(await api.channel.message.list({ id, before: 40, limit: 100 }))];
   const find = (text: string) => all.find((m) => m.text === text)!;
   const first = find("line 1");
@@ -205,7 +205,7 @@ test("regression: a profile's direct chat uses a session without a hidden issue"
   const box = await composerOn(page, direct);
   await box.fill("what is in the repository?");
   await box.press("Enter");
-  const answer = page.getByTestId("messages").locator('[data-testid="message"]:not([data-from-kind="owner"])').last();
+  const answer = page.getByTestId("messages").locator('[data-testid="message"]:not([data-from-kind="user"])').last();
   await expect(answer).toBeVisible({ timeout: 20_000 });
   await expect(channelRow(page, direct)).toBeVisible();
   expect((await api.issue.list({})).map((issue) => issue.id)).toEqual(before);

@@ -1,7 +1,7 @@
 import { Array as Arr, Formatter, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, ownerId, VoiceModeValues } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId, VoiceModeValues } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -69,8 +69,8 @@ export const metaText = (m: Meta | undefined) =>
 /** Who said it, read from the kind its participant is stored as; an agent comes with its role. */
 export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind; readonly fromRole?: T.AgentRole } => {
   switch (participant) {
-    case "owner":
-      return { fromKind: "owner" };
+    case "user":
+      return { fromKind: "user" };
     case "orchestrator":
       return { fromKind: "agent", fromRole: "orchestrator" };
     case "session":
@@ -83,7 +83,7 @@ export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind
 /** Who started a trigger, as a message's speaker: a collaborator, a bot or CI outside the farm is the farm's own doing. */
 export const actorKindOf = (kind: T.TriggerActorKind): T.ActorKind => {
   switch (kind) {
-    case "owner":
+    case "user":
     case "agent":
     case "system":
       return kind;
@@ -117,14 +117,14 @@ export const envelopeMore = (
 };
 
 /** Where a message is: a channel by #name, a thread by its channel's name and the number of its root message, the
- * owner's direct channel as @owner. */
+ * user's direct channel as @user. */
 export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
-  if (c.type === "direct") return "@" + ownerId;
+  if (c.type === "direct") return "@" + userId;
   if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
   return "#" + (c.name ?? channelName);
 }
 
-/** What the owner picked beside a message in the farm's form: the profile and the repo the work is for. */
+/** What the user picked beside a message in the farm's form: the profile and the repo the work is for. */
 export interface Picked {
   readonly agent?: string;
   readonly repo?: string;
@@ -156,7 +156,7 @@ export const heldShown = 3;
 
 /** The chat's stored message as the mailbox reads it: who said it, where, and when. */
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
-type StoredSenderKind = "owner" | "orchestrator" | "session" | "profile" | "system";
+type StoredSenderKind = "user" | "orchestrator" | "session" | "profile" | "system";
 
 export interface ChannelEnvelopeRow {
   readonly envelope_id: string;
@@ -207,7 +207,7 @@ export interface ChannelAudience {
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
   readonly present?: readonly string[] | null;
-  /** A thread's members: what the owner says there goes to them. Empty outside a thread. */
+  /** A thread's members: what the user says there goes to them. Empty outside a thread. */
   readonly members: readonly string[];
   readonly outcome?: T.Outcome;
   readonly spoken?: boolean;

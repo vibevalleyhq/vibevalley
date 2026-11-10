@@ -5,7 +5,7 @@ import type { VoiceTurn } from "./contract.ts";
 
 interface Line {
   phase: "idle" | "live";
-  turns: VoiceTurn<"owner" | "moss">[];
+  turns: VoiceTurn<"user" | "moss">[];
   changed: () => void;
   end: () => void;
 }
@@ -26,7 +26,7 @@ vi.mock("#/state/prefs.ts", () => ({ prefsNow: () => ({}) }));
 vi.mock("./moss-line.ts", () => ({
   MossLine: class implements Line {
     phase: "idle" | "live" = "idle";
-    turns: VoiceTurn<"owner" | "moss">[] = [];
+    turns: VoiceTurn<"user" | "moss">[] = [];
     micLevel = 0;
     mossLevel = 0;
     readonly listeners = new Set<() => void>();
@@ -62,9 +62,9 @@ it("regression: evicting old Live transcripts does not reuse completed caption i
   try {
     await call.start();
     const line = lines[0]!;
-    line.turns = Array.from({ length: 200 }, (_, i) => ({ who: "owner", key: String(i), text: `Request ${i}`, done: true }));
+    line.turns = Array.from({ length: 200 }, (_, i) => ({ who: "user", key: String(i), text: `Request ${i}`, done: true }));
     line.changed();
-    line.turns = [...line.turns.slice(1), { who: "owner", key: "200", text: "Request 200", done: true }];
+    line.turns = [...line.turns.slice(1), { who: "user", key: "200", text: "Request 200", done: true }];
     line.changed();
     line.turns = [...line.turns.slice(1), { who: "moss", key: "200", text: "Answer 200", done: true }];
     line.changed();
@@ -81,9 +81,9 @@ it("regression: assigning a Live turn key preserves its unfinished caption", asy
   try {
     await call.start();
     const line = lines[0]!;
-    line.turns = [{ who: "owner", key: "", text: "A partial", done: false }];
+    line.turns = [{ who: "user", key: "", text: "A partial", done: false }];
     line.changed();
-    line.turns = [{ who: "owner", key: "named", text: "A complete request", done: true }];
+    line.turns = [{ who: "user", key: "named", text: "A complete request", done: true }];
     line.changed();
     expect(call.turns.map(({ text, done }) => ({ text, done }))).toEqual([{ text: "A complete request", done: true }]);
     expect(service.hear.mock.calls.map(([input]) => input.text)).toEqual(["A complete request"]);

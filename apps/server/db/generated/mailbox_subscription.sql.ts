@@ -40,7 +40,7 @@ export const SubscribedIssuesResult = Schema.Struct({
 export type SubscribedIssuesResult = typeof SubscribedIssuesResult.Type
 
 
-export const SubscribedIssuesSql = "-- name: SubscribedIssues :many\n-- bound: one owner per supplied thread key.\nselect distinct issue_id from mailbox_subscription where thread_key in (select unnest($1::text[]));"
+export const SubscribedIssuesSql = "-- name: SubscribedIssues :many\n-- bound: one user per supplied thread key.\nselect distinct issue_id from mailbox_subscription where thread_key in (select unnest($1::text[]));"
 
 export const subscribedIssues = Effect.fn("SubscribedIssues")(function* (params: SubscribedIssuesParams) {
   const sql = yield* SqlClient.SqlClient

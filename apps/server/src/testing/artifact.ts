@@ -11,7 +11,7 @@ export const para = (id: string, key: string, text: string): Block => ({
   attrs: {},
   text: [span(text)],
   rev: 1,
-  updatedBy: "owner",
+  updatedBy: "user",
   updated: 0,
 });
 

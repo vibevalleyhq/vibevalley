@@ -23,7 +23,7 @@ export interface ChatMessage {
   outcome: Outcome | null;
   spent?: Spent;
   spoken: boolean;
-  /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
+  /** The key the user's send carried, on the user's own messages: a page knows its line by it. */
   sendKey?: string;
   at: number;
   /** Its channel's revision when it was last written or changed: of two copies, the higher one is now. */
@@ -87,7 +87,7 @@ export interface Channel {
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
   default: boolean;
-  /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
+  /** A direct channel's other participant: an orchestrator, or a helper profile. The user talks with it there alone. */
   peer?: string;
   /** The orchestrator in the place, by its profile id, as the server resolves it: a direct channel's other one, else one
    * of the members of the channel it is in, else the default one. What names no orchestrator in particular there (a
@@ -102,7 +102,7 @@ export interface Channel {
   /** Its place in the sidebar, lowest first; none comes after the placed. */
   position?: number;
   archived?: number;
-  /** What of it counts for the owner; absent is all. */
+  /** What of it counts for the user; absent is all. */
   notify: Notify;
   /** The message a thread hangs under, and its number there. */
   root?: MessageId;
@@ -115,7 +115,7 @@ export interface Channel {
   lastNumber?: number;
   replies: number;
   read?: number;
-  /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
+  /** What the user has not read here: others' messages past read, notices left out; absent when none. */
   unread?: number;
   /** A thread not on an issue, by the server: a talk thread's session, else the head of the message it hangs under. */
   title: string;
@@ -126,7 +126,7 @@ export interface Channel {
 
 /** A place a participant has not read all of, as channel.unread.list gives it to its caller. */
 export interface ChannelUnread {
-  /** Its address: #channel, #channel:n for a thread, @owner for the orchestrator's direct channel. */
+  /** Its address: #channel, #channel:n for a thread, @user for the orchestrator's direct channel. */
   channel: string;
   unread: number;
   /** Something there names the caller. */
@@ -143,7 +143,7 @@ export interface ChannelLast {
   at: number;
 }
 
-export interface OwnerMention {
+export interface UserMention {
   message: ChatMessage;
   channel: string;
   address: string;
@@ -152,7 +152,7 @@ export interface OwnerMention {
 /** The channels, not what is said in them: a page follows a channel for that (rpc.ts). */
 export interface Chat {
   channels: Channel[];
-  ownerMentions: OwnerMention[];
+  userMentions: UserMention[];
 }
 
 /** What a channel's follower gets: each message said there, by its number; Reset when it is too far behind to catch up. */
@@ -220,7 +220,7 @@ export interface NotifyRequest {
   notify: Notify;
 }
 
-/** The owner's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
+/** The user's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
 export interface ReactionSet {
   id: MessageId;
   emoji: string;
@@ -276,8 +276,8 @@ export interface FactChannelRemoved {
   id: string;
 }
 
-export interface FactOwnerMentionsChanged {
-  type: "ownerMentionsChanged";
+export interface FactUserMentionsChanged {
+  type: "userMentionsChanged";
   at: number;
-  mentions: OwnerMention[];
+  mentions: UserMention[];
 }

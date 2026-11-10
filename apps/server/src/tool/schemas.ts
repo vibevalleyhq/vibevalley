@@ -204,7 +204,7 @@ export const parameters = {
     repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.repo })),
     status: Schema.optionalKey(statusField(params.issueList.status)),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.text })),
-    wantsOwner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsOwner })),
+    wantsUser: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsUser })),
   }),
   "issue.review": Schema.Struct({
     findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueReview.findings })),
@@ -389,7 +389,7 @@ export interface Caller {
   readonly repo: string;
   /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
-  /** The profile the owner picked for this input, if any: dispatch prefers it. */
+  /** The profile the user picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
   /** The ingress envelope currently being handled; empty when this run was not opened by one. */
   readonly envelope: string;

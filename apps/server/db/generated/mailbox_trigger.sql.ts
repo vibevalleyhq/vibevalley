@@ -112,12 +112,12 @@ export type MarkRoutedParams = typeof MarkRoutedParams.Type
 export const MarkRoutedResult = Schema.Struct({
   ["position"]: Schema.NullOr(Schema.Int),
   ["scope"]: Schema.NullOr(Schema.String),
-  ["from_owner"]: Schema.NullOr(Schema.Boolean),
+  ["from_user"]: Schema.NullOr(Schema.Boolean),
 })
 export type MarkRoutedResult = typeof MarkRoutedResult.Type
 
 
-export const MarkRoutedSql = "-- name: MarkRouted :one\nupdate mailbox_trigger set\n  routing_position = case when routed_at is null then (select coalesce(max(id), 0) + 1 from mailbox_order) else routing_position end,\n  routing_scope = coalesce(routing_scope, $1),\n  routed_at = coalesce(routed_at, $2)\nwhere id = $3\nreturning routing_position as position, routing_scope as scope,\n  (trigger_json::jsonb -> 'actor' ->> 'kind' = 'owner')::bool as from_owner;"
+export const MarkRoutedSql = "-- name: MarkRouted :one\nupdate mailbox_trigger set\n  routing_position = case when routed_at is null then (select coalesce(max(id), 0) + 1 from mailbox_order) else routing_position end,\n  routing_scope = coalesce(routing_scope, $1),\n  routed_at = coalesce(routed_at, $2)\nwhere id = $3\nreturning routing_position as position, routing_scope as scope,\n  (trigger_json::jsonb -> 'actor' ->> 'kind' = 'user')::bool as from_user;"
 
 export const markRouted = Effect.fn("MarkRouted")(function* (params: MarkRoutedParams) {
   const sql = yield* SqlClient.SqlClient

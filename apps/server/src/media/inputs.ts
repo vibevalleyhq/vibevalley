@@ -237,7 +237,7 @@ export const makeInputs = Effect.gen(function* () {
                   if (row.hash !== null && staged.hash !== row.hash) return yield* Effect.fail(refused(t("server.media.inputChanged")));
                   yield* fs.makeDirectory(content, { recursive: true, mode: 0o700 });
                   const target = join(content, staged.hash);
-                  // Record the intended hash before publishing, so failed rollback still has an owner and consumes quota.
+                  // Record the intended hash before publishing, so failed rollback still has a user and consumes quota.
                   yield* change(row, "uploading", staged.hash);
                   const linked = yield* fs.link(staged.path, target).pipe(
                     Effect.as(true),

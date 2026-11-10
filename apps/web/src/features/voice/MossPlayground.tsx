@@ -348,13 +348,13 @@ export function MossLineView(props: {
                 <div
                   {...stylex.attrs(
                     variantStyles.mossLineViewDiv,
-                    turn.who === "owner" ? variantStyles.mossLineViewDivVariant : variantStyles.mossLineViewDivVariant2,
+                    turn.who === "user" ? variantStyles.mossLineViewDivVariant : variantStyles.mossLineViewDivVariant2,
                   )}
                 >
                   <p
                     {...stylex.attrs(
                       recipeStyles.mossLineViewP,
-                      turn.who === "owner" ? recipeStyles.mossLineViewPVariant1Case2 : recipeStyles.mossLineViewPVariant1Case1,
+                      turn.who === "user" ? recipeStyles.mossLineViewPVariant1Case2 : recipeStyles.mossLineViewPVariant1Case1,
                       !turn.done ? recipeStyles.mossLineViewPVariant2Case2 : recipeStyles.mossLineViewPVariant2Case1,
                     )}
                     data-done={turn.done ? "" : undefined}

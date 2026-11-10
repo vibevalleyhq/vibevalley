@@ -44,7 +44,7 @@ const listen = Effect.fnUntraced(function* (mcp: Mcp["Service"]) {
   return HttpServer.formatAddress(server.address) + "/mcp";
 });
 
-it.live("regression: worker CLI preserves returned tool errors and ignores unavailable owner discovery", () =>
+it.live("regression: worker CLI preserves returned tool errors and ignores unavailable user discovery", () =>
   Effect.gen(function* () {
     let isError = false;
     let calls = 0;

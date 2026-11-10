@@ -140,7 +140,7 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.Session
       return { crop: "dry", badge: badgeQuestions() };
     case "reviewing":
       if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe() };
-      // One its parent issue acts on asks nothing of the owner here.
+      // One its parent issue acts on asks nothing of the user here.
       return a.acts.length > 0 ? { crop: "flowering", badge: badgeReview() } : { crop: "flowering" };
     case "stuck":
       switch (a.stuck) {

@@ -6,7 +6,7 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Memory } from "#/memory/memory.ts";
@@ -20,7 +20,7 @@ import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";
 
 const scribe = (): T.Agent => ({ ...lab(), id: "scribe", name: "记录员" });
 const refiner = (): T.Agent => ({ ...lab(), id: "refiner", name: "起草员" });
-const delivery = (trigger: T.RunTrigger): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });
+const delivery = (trigger: T.RunTrigger): DeliveryInput => ({ trigger, envelopeIds: [], byUserComment: false });
 
 /** Each turn's input in order, as its session was prompted. */
 const prompts = (f: Farm) => {
@@ -134,7 +134,7 @@ describe("memory", () => {
         agent: "scribe",
         text: "下班打卡也要有测试",
         repo: "memo",
-        by: owner,
+        by: user,
       });
       expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
       const commentPrompt = yield* nextPrompt(f, next, 2);

@@ -2,9 +2,9 @@ import { Formatter } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
-// What the issues say to models: the rules a helper's brief ends with, and the refusal the orchestrator gets for changing an issue the owner did not ask for.
-/** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself. */
-export const needsOwner = "改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
+// What the issues say to models: the rules a helper's brief ends with, and the refusal the orchestrator gets for changing an issue the user did not ask for.
+/** Changing an issue or moving it is the user's call: the orchestrator asks for what it saw itself. */
+export const needsUser = "改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 export function workConstraints(constraints: T.IssueConstraints | undefined, frozen: readonly string[]): string {
   const lines: string[] = [];
@@ -44,7 +44,7 @@ export const answerFormat = [
 export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
-/** The draft so far goes in when there is one: the owner may have edited it. */
+/** The draft so far goes in when there is one: the user may have edited it. */
 export function refinementBrief(
   t: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly T.Question[] },
   word: string,

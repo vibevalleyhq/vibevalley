@@ -124,7 +124,7 @@ export const ClearManagedNotesParams = Schema.Struct({
 export type ClearManagedNotesParams = typeof ClearManagedNotesParams.Type
 
 
-export const ClearManagedNotesSql = "-- name: ClearManagedNotes :exec\ndelete from memory where agent = $1 and kind = 'note' and author <> 'owner';"
+export const ClearManagedNotesSql = "-- name: ClearManagedNotes :exec\ndelete from memory where agent = $1 and kind = 'note' and author <> 'user';"
 
 export const clearManagedNotes = Effect.fn("ClearManagedNotes")(function* (params: ClearManagedNotesParams) {
   const sql = yield* SqlClient.SqlClient

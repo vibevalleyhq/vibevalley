@@ -2,7 +2,7 @@ import { Effect, FiberMap } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
@@ -36,7 +36,7 @@ export const directTalk = (
     const { settle } = w;
     const talkStarts = yield* FiberMap.make<string>();
 
-    const ownerChat = (message: MsgRow) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null;
+    const userChat = (message: MsgRow) => message.sender_id === userId && message.kind === "chat" && message.deleted_at === null;
 
     const joining = (session: T.Session, at: number) =>
       locked(
@@ -65,18 +65,18 @@ export const directTalk = (
       const snapshot = yield* locked(db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n: talkContext })));
       const ordered = snapshot.toReversed();
       const last = ordered.at(-1);
-      const owner = ordered.findLast(ownerChat);
-      if (!owner) return;
+      const user = ordered.findLast(userChat);
+      if (!user) return;
       const target = targetOfChannel(place);
       const received = yield* mailbox.receive({
         _tag: "Hire",
         agent,
         brief: talkBrief(agent.name, envelopeLines(ordered.map((m) => envelopeOf(m, target)))),
         where: "",
-        options: { context: { kind: "channel", channel }, trigger: { kind: "comment", channel, message: owner.id } },
+        options: { context: { kind: "channel", channel }, trigger: { kind: "comment", channel, message: user.id } },
         envelopes: {
           _tag: "Talk",
-          rows: ordered.filter(ownerChat).map((message) => {
+          rows: ordered.filter(userChat).map((message) => {
             const row = channelEnvelope(message);
             return { row, context: inputContext(asEnvelope(row)) };
           }),
@@ -97,7 +97,7 @@ export const directTalk = (
     });
 
     const onDirectMessage = Effect.fnUntraced(function* (message: T.ChatMessage) {
-      if (message.fromKind !== "owner" || message.kind !== "chat") return;
+      if (message.fromKind !== "user" || message.kind !== "chat") return;
       const channel = model.channel(message.channel);
       const peer = channel?.peer_id ? model.participant(channel.peer_id) : undefined;
       if (channel?.type !== "direct" || peer?.kind !== "profile" || !peer.agent_id) return;

@@ -290,11 +290,11 @@ describe("reminders", () => {
       yield* TestClock.setTime(epoch);
       const dir = home();
       const woke: string[] = [];
-      const owner = yield* Scope.make();
-      yield* Effect.addFinalizer(() => Scope.close(owner, Exit.void));
+      const user = yield* Scope.make();
+      yield* Effect.addFinalizer(() => Scope.close(user, Exit.void));
       const s = yield* Scope.provide(
         makeReminders(dir, (due) => Effect.sync(() => void woke.push(...due))),
-        owner,
+        user,
       );
       yield* call(s.tools, "reminder", { name: "cancel", message: "", at: new Date(epoch + 60_000).toISOString() });
       yield* call(s.tools, "reminder", { name: "keep", message: "", at: new Date(epoch + 120_000).toISOString() });
@@ -312,7 +312,7 @@ describe("reminders", () => {
       );
       expect(woke).toEqual([expect.stringContaining("「keep」")]);
       yield* call(s.tools, "reminder", { name: "closed", message: "", at: new Date(epoch + 180_000).toISOString() });
-      yield* Scope.close(owner, Exit.void);
+      yield* Scope.close(user, Exit.void);
       yield* TestClock.adjust(60_000);
       expect(woke).toEqual([expect.stringContaining("「keep」")]);
       expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ name: "closed" }]);

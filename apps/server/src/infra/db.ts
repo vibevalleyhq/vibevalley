@@ -35,7 +35,7 @@ class Unopened extends Schema.TaggedError<Unopened, { readonly brand: unique sym
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** The baseline a Postgres of the owner's was made from, kept in it: that database is never moved aside or emptied here. */
+/** The baseline a Postgres of the user's was made from, kept in it: that database is never moved aside or emptied here. */
 const baselineTable = "vibevalley_baseline";
 
 const made = (sql: SqlClient.SqlClient) => Effect.forEach(baselineStatements(), (statement) => sql.unsafe(statement), { discard: true });

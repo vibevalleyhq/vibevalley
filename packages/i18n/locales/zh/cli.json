@@ -39,7 +39,7 @@
     "reviewComment": "验收的话",
     "statusComment": "一起说的话：再来一轮时说要改什么",
     "title": "新的标题",
-    "wantsOwner": "只看在等主人的，等得最久的在前",
+    "wantsUser": "只看在等主人的，等得最久的在前",
     "issueWatch": "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr",
     "tier": "PARA 分层",
     "marker": "待办标记",
@@ -742,7 +742,7 @@
     "issueTimeline": {
       "about": "12 号的时间线和花费"
     },
-    "issueWantsOwner": {
+    "issueWantsUser": {
       "about": "在等主人的工单，等得最久的在前"
     },
     "issueWatch": {

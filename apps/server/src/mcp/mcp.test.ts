@@ -6,12 +6,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Formatter } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { blockId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { Artifact } from "#/artifact/artifact.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
@@ -147,7 +147,7 @@ describe("mcp", () => {
         "resource_read",
         "session_list",
       ]);
-      const extra = (yield* chat.post({ _tag: "Owner", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
+      const extra = (yield* chat.post({ _tag: "User", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
       const mailbox = yield* Mailbox;
       yield* waitFor(
         Effect.succeed(mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id),
@@ -190,7 +190,7 @@ describe("mcp", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
 
-  it.live("lets a session find and read the owner's notes, note a line in today's journal and propose a rewrite, never change a block", () => {
+  it.live("lets a session find and read the user's notes, note a line in today's journal and propose a rewrite, never change a block", () => {
     const tokens: string[] = [];
     const pi = scriptedRuntime({
       id: "pi",
@@ -302,7 +302,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       yield* agents.save(lab());
       const outside = yield* artifacts.create(
-        { from: ownerId, by: ownerId },
+        { from: userId, by: userId },
         {
           title: "别处的稿子",
           kind: "html",
@@ -311,7 +311,7 @@ describe("mcp", () => {
         },
       );
       const direct = yield* chat.direct("lab");
-      yield* chat.post({ _tag: "Owner", text: "在这里做一份", channel: direct, sendKey: "" });
+      yield* chat.post({ _tag: "User", text: "在这里做一份", channel: direct, sendKey: "" });
       yield* until(() => tokens.length > 0, "the channel context's token");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
@@ -355,7 +355,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const memory = yield* Memory;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", repo: "demo" });
-      yield* memory.write({ agent: "scout", text: "这个仓库测试用 make check", repo: "demo", by: owner });
+      yield* memory.write({ agent: "scout", text: "这个仓库测试用 make check", repo: "demo", by: user });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       const tool2 = yield* tool("memory_create", { text: "这个仓库测试用 pnpm test" });
@@ -365,7 +365,7 @@ describe("mcp", () => {
       // There is no profile to name: what it writes is its own, whatever it says.
       yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
-      // What it wrote is its own, not the owner's: the Memory tab says which helper wrote it.
+      // What it wrote is its own, not the user's: the Memory tab says which helper wrote it.
       for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["agent", "w1"]);
       const found = yield* tool("memory_search", { text: "测试" });
       expect(found).toContain("pnpm test");
@@ -376,14 +376,14 @@ describe("mcp", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 
-  // A helper writes a blocks artifact through its tools: the same ops as the owner's editor, written as its profile.
+  // A helper writes a blocks artifact through its tools: the same ops as the user's editor, written as its profile.
   it.live("lets a helper write in a blocks artifact", () =>
     Effect.gen(function* () {
       const core = yield* Core;
       const mcp = yield* Mcp;
       const artifacts = yield* Artifact;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab" });
-      const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报", kind: "markdown" });
+      const d = yield* artifacts.create({ from: userId, by: userId }, { title: "周报", kind: "markdown" });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       const added = yield* tool("artifact_block_create", { id: d.id, text: "这周做完了**第一步**" });
@@ -397,18 +397,18 @@ describe("mcp", () => {
       expect(read).toContain("〔" + block + " · 第 1 版 · paragraph〕这周做完了第一步");
       const tool4 = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 1, text: "这周做完了第一步和第二步" });
       expect(tool4).toContain("现在是第 2 版");
-      // The owner changes it in the editor; the helper's next rewrite was made against rev 2.
-      yield* artifacts.submit(d.id, "owner", {
-        batchId: "owner",
+      // The user changes it in the editor; the helper's next rewrite was made against rev 2.
+      yield* artifacts.submit(d.id, "user", {
+        batchId: "user",
         ops: [{ op: "update_text", blockId: blockId(block), baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
       });
       const suggested = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 3, text: "帮工建议的字" });
       expect(suggested).toContain("提了建议");
       const open = (yield* artifacts.suggestions(d.id)).filter((s) => s.status === "open");
       expect(open.map((s) => [s.blockId, s.baseRev, s.author])).toEqual([[block, 3, "lab"]]);
-      yield* artifacts.acceptSuggestion(d.id, open[0]!.id, "owner");
+      yield* artifacts.acceptSuggestion(d.id, open[0]!.id, "user");
       const snap = yield* artifacts.blocks(d.id);
-      expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["帮工建议的字", "owner", "lab"]);
+      expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["帮工建议的字", "user", "lab"]);
       const markdown2 = yield* artifacts.markdown(d.id);
       expect(markdown2).toBe("帮工建议的字\n\n# 下周\n");
       const tool5 = yield* tool("artifact_content_get", { id: "nope" });

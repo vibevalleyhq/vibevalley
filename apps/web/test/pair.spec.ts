@@ -9,7 +9,7 @@ test("a device names itself, asks, and is told why not", async ({ page }) => {
   await expect(page).toHaveURL(/\/pair/u);
 });
 
-test("a device the owner lets in opens the farm through the lan listener", async ({ browser, api }) => {
+test("a device the user lets in opens the farm through the lan listener", async ({ browser, api }) => {
   await api.lan.update({ open: true });
   try {
     const { pairing, url } = await api.lan.pairing.start();

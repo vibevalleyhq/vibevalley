@@ -183,7 +183,7 @@ describe("lan access", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.live("lets the owner refuse a device, and holds a second one off", () =>
+  it.live("lets the user refuse a device, and holds a second one off", () =>
     Effect.gen(function* () {
       const lan = yield* farm();
       const addr = yield* open(lan);

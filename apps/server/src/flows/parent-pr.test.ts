@@ -7,7 +7,7 @@ import { Effect, Formatter } from "effect";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Repo } from "#/repo/repo.ts";
@@ -54,13 +54,13 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
       git(path, "remote", "add", "origin", "https://github.com/test/family-pr.git");
       yield* repos.refreshGitHub();
       const parent = yield* issues.add({ title: "parent", repo: "family-pr", agent: "lab" }, explicitMandate());
-      yield* issues.split(parent.id, "", [{ id: "clock", brief: "写打卡并提交" }], owner);
+      yield* issues.split(parent.id, "", [{ id: "clock", brief: "写打卡并提交" }], user);
       yield* await_(
         () => issues.get(parent.id),
         (issue) => issue.status === "in_review",
         "the parent ready for review",
       );
-      const submitted = yield* issues.setStatus(parent.id, "done", "", "", owner);
+      const submitted = yield* issues.setStatus(parent.id, "done", "", "", user);
       expect(latestSessionIdOf(submitted)).toBeUndefined();
       expect(submitted.pullRequest?.state).toBe("open");
       const place = yield* repos.workplace("family-pr", parent.number, true, "");

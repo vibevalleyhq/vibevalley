@@ -136,13 +136,13 @@ export const messageBySendKey = Effect.fn("MessageBySendKey")(function* (params:
   })(params)
 })
 
-export const OwnerMentionsParams = Schema.Struct({
+export const UserMentionsParams = Schema.Struct({
 
 })
-export type OwnerMentionsParams = typeof OwnerMentionsParams.Type
+export type UserMentionsParams = typeof UserMentionsParams.Type
 
 
-export const OwnerMentionsResult = Schema.Struct({
+export const UserMentionsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int,
@@ -166,17 +166,17 @@ export const OwnerMentionsResult = Schema.Struct({
   ["top_id"]: Schema.String,
   ["channel_name"]: Schema.String,
 })
-export type OwnerMentionsResult = typeof OwnerMentionsResult.Type
+export type UserMentionsResult = typeof UserMentionsResult.Type
 
 
-export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- bound: only the owner's unread mentions; reading or replying in the channel completes them.\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.channel_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
+export const UserMentionsSql = "-- name: UserMentions :many\n-- bound: only the user's unread mentions; reading or replying in the channel completes them.\n-- The user's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.channel_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
 
-export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
+export const userMentions = Effect.fn("UserMentions")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: OwnerMentionsParams,
-    Result: OwnerMentionsResult,
-    execute: () => sql.unsafe(OwnerMentionsSql, []),
+    Request: UserMentionsParams,
+    Result: UserMentionsResult,
+    execute: () => sql.unsafe(UserMentionsSql, []),
   })({})
 })
 
@@ -295,7 +295,7 @@ export const MissingDirectDeliveriesResult = Schema.Struct({
 export type MissingDirectDeliveriesResult = typeof MissingDirectDeliveriesResult.Type
 
 
-export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: owner messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'owner' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
+export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: user messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
 
 export const missingDirectDeliveries = Effect.fn("MissingDirectDeliveries")(function* (params: MissingDirectDeliveriesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -436,27 +436,27 @@ export const dispatchesIn = Effect.fn("DispatchesIn")(function* (params: Dispatc
   })(params)
 })
 
-export const OwnerUnreadParams = Schema.Struct({
+export const UserUnreadParams = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["read_number"]: Schema.Int,
 })
-export type OwnerUnreadParams = typeof OwnerUnreadParams.Type
+export type UserUnreadParams = typeof UserUnreadParams.Type
 
 
-export const OwnerUnreadResult = Schema.Struct({
+export const UserUnreadResult = Schema.Struct({
   ["n"]: Schema.Int,
 })
-export type OwnerUnreadResult = typeof OwnerUnreadResult.Type
+export type UserUnreadResult = typeof UserUnreadResult.Type
 
 
-export const OwnerUnreadSql = "-- name: OwnerUnread :one\n-- What the owner has not read in a channel: others' words past its read number, the farm's notices left out.\nselect count(*)::int as n from channel_message\nwhere channel_id = $1 and number > $2 and sender_id <> 'owner' and kind <> 'notice' and deleted_at is null;"
+export const UserUnreadSql = "-- name: UserUnread :one\n-- What the user has not read in a channel: others' words past its read number, the farm's notices left out.\nselect count(*)::int as n from channel_message\nwhere channel_id = $1 and number > $2 and sender_id <> 'user' and kind <> 'notice' and deleted_at is null;"
 
-export const ownerUnread = Effect.fn("OwnerUnread")(function* (params: OwnerUnreadParams) {
+export const userUnread = Effect.fn("UserUnread")(function* (params: UserUnreadParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
-    Request: OwnerUnreadParams,
-    Result: OwnerUnreadResult,
-    execute: (p) => sql.unsafe(OwnerUnreadSql, [p["channel_id"], p["read_number"]]),
+    Request: UserUnreadParams,
+    Result: UserUnreadResult,
+    execute: (p) => sql.unsafe(UserUnreadSql, [p["channel_id"], p["read_number"]]),
   })(params)
 })
 
@@ -544,7 +544,7 @@ export const HoldNoticeSinceUserResult = Schema.Struct({
 export type HoldNoticeSinceUserResult = typeof HoldNoticeSinceUserResult.Type
 
 
-export const HoldNoticeSinceUserSql = "-- name: HoldNoticeSinceUser :one\nselect count(*)::int as n from channel_message m\nwhere m.channel_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'\n  and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = $1 and u.sender_id = 'owner'), '');"
+export const HoldNoticeSinceUserSql = "-- name: HoldNoticeSinceUser :one\nselect count(*)::int as n from channel_message m\nwhere m.channel_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'\n  and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = $1 and u.sender_id = 'user'), '');"
 
 export const holdNoticeSinceUser = Effect.fn("HoldNoticeSinceUser")(function* (params: HoldNoticeSinceUserParams) {
   const sql = yield* SqlClient.SqlClient
@@ -866,7 +866,7 @@ export const NotificationReceiptResult = Schema.Struct({
 export type NotificationReceiptResult = typeof NotificationReceiptResult.Type
 
 
-export const NotificationReceiptSql = "-- name: NotificationReceipt :one\nselect r.updated_at as read_at,\n  exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.number > m.number\n    and n.deleted_at is null and (n.sender_id = 'owner' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id)))::bool as superseded\nfrom channel_message m\nleft join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number\nwhere m.id = $1;"
+export const NotificationReceiptSql = "-- name: NotificationReceipt :one\nselect r.updated_at as read_at,\n  exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.number > m.number\n    and n.deleted_at is null and (n.sender_id = 'user' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id)))::bool as superseded\nfrom channel_message m\nleft join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'user' and r.read_number >= m.number\nwhere m.id = $1;"
 
 export const notificationReceipt = Effect.fn("NotificationReceipt")(function* (params: NotificationReceiptParams) {
   const sql = yield* SqlClient.SqlClient
@@ -877,28 +877,28 @@ export const notificationReceipt = Effect.fn("NotificationReceipt")(function* (p
   })(params)
 })
 
-export const OwnerReadReportsParams = Schema.Struct({
+export const UserReadReportsParams = Schema.Struct({
 
 })
-export type OwnerReadReportsParams = typeof OwnerReadReportsParams.Type
+export type UserReadReportsParams = typeof UserReadReportsParams.Type
 
 
-export const OwnerReadReportsResult = Schema.Struct({
+export const UserReadReportsResult = Schema.Struct({
   ["sender_id"]: Schema.String,
   ["created_at"]: Schema.Number,
   ["updated_at"]: Schema.Number,
 })
-export type OwnerReadReportsResult = typeof OwnerReadReportsResult.Type
+export type UserReadReportsResult = typeof UserReadReportsResult.Type
 
 
-export const OwnerReadReportsSql = "-- name: OwnerReadReports :many\n-- bound: the latest report per session.\nselect m.sender_id, m.created_at, r.updated_at\nfrom channel_message m\njoin channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number\nwhere m.kind = 'report' and m.deleted_at is null\n  and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number);"
+export const UserReadReportsSql = "-- name: UserReadReports :many\n-- bound: the latest report per session.\nselect m.sender_id, m.created_at, r.updated_at\nfrom channel_message m\njoin channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'user' and r.read_number >= m.number\nwhere m.kind = 'report' and m.deleted_at is null\n  and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number);"
 
-export const ownerReadReports = Effect.fn("OwnerReadReports")(function* () {
+export const userReadReports = Effect.fn("UserReadReports")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: OwnerReadReportsParams,
-    Result: OwnerReadReportsResult,
-    execute: () => sql.unsafe(OwnerReadReportsSql, []),
+    Request: UserReadReportsParams,
+    Result: UserReadReportsResult,
+    execute: () => sql.unsafe(UserReadReportsSql, []),
   })({})
 })
 

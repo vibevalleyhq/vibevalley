@@ -13,7 +13,7 @@ import { canCapture, localRelayHost, VisualCapture, type VisualSource } from "./
 let captureUrl: string | undefined;
 let playbackUrl: string | undefined;
 
-export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
+export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
   private static active: MossLine | undefined;
   phase: MossPhase = "idle";
   problem: string | undefined;

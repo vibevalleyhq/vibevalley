@@ -42,7 +42,7 @@ export interface SettingsStatus {
   memorySources: MemorySource[];
 }
 
-/** What the owner sets up and uses: the orchestrator's thinking, each media use, dictation, the call and its live parts. */
+/** What the user sets up and uses: the orchestrator's thinking, each media use, dictation, the call and its live parts. */
 export const FeatureValues = [
   "orchestrator",
   "image",

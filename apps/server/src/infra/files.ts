@@ -40,7 +40,7 @@ export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, b
   );
 }, Effect.mapError(notWritten));
 
-/** An owner's file (config.json, settings.json); one whose read fails is set aside and read as undefined. */
+/** A user's file (config.json, settings.json); one whose read fails is set aside and read as undefined. */
 export const readOrSetAside = <A, E>(
   file: string,
   read: (text: string) => Effect.Effect<A, E>,

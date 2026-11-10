@@ -45,7 +45,7 @@ export class ChatModel {
   private threadByRoot = new Map<string, string>();
   private threadBySubject = new Map<string, string>();
   private people = new Map<string, ParticipantRow>();
-  private ownerRead = new Map<string, number>();
+  private userRead = new Map<string, number>();
   private members = new Members();
   readonly lastRead = new Map<string, string>();
   private publishedLast = new Map<string, number>();
@@ -53,17 +53,17 @@ export class ChatModel {
   load(
     channels: readonly ChannelRow[],
     participants: readonly ParticipantRow[],
-    ownerRead: readonly { channel_id: string; read_number: number }[],
+    userRead: readonly { channel_id: string; read_number: number }[],
     follows?: readonly { channel_id: string; participant_id: string }[],
   ) {
     this.byId.clear();
     this.threadByRoot.clear();
     this.threadBySubject.clear();
     this.people.clear();
-    this.ownerRead.clear();
+    this.userRead.clear();
     for (const c of channels) this.created(c);
     for (const p of participants) this.people.set(p.id, { ...p });
-    for (const r of ownerRead) this.ownerRead.set(r.channel_id, r.read_number);
+    for (const r of userRead) this.userRead.set(r.channel_id, r.read_number);
     if (follows) this.members.load(follows);
   }
 
@@ -142,7 +142,7 @@ export class ChatModel {
     for (const c of [...this.byId.values()])
       if (c.id === id || c.parent_id === id) {
         this.byId.delete(c.id);
-        this.ownerRead.delete(c.id);
+        this.userRead.delete(c.id);
         this.publishedLast.delete(c.id);
         if (c.root_id !== null) this.threadByRoot.delete(c.root_id);
         if (c.subject_kind !== null && c.subject_id !== null && this.threadBySubject.get(subjectKey(c.subject_kind, c.subject_id)) === c.id)
@@ -150,9 +150,9 @@ export class ChatModel {
       }
   }
 
-  /** MarkUnread for the owner: it moves back too. */
-  ownerReadBack(channel: string, number: number) {
-    this.ownerRead.set(channel, number);
+  /** MarkUnread for the user: it moves back too. */
+  userReadBack(channel: string, number: number) {
+    this.userRead.set(channel, number);
   }
 
   /** ClearDefault, MakeDefault. */
@@ -220,13 +220,13 @@ export class ChatModel {
     this.publishedLast.set(channel, Math.max(this.publishedLast.get(channel) ?? 0, number));
   }
 
-  /** ReadCursor for the owner. */
-  ownerReadIn(channel: string): number | undefined {
-    return this.ownerRead.get(channel);
+  /** ReadCursor for the user. */
+  userReadIn(channel: string): number | undefined {
+    return this.userRead.get(channel);
   }
 
-  /** SetReadCursor for the owner: it only moves on. */
-  ownerReadTo(channel: string, number: number) {
-    this.ownerRead.set(channel, Math.max(this.ownerRead.get(channel) ?? number, number));
+  /** SetReadCursor for the user: it only moves on. */
+  userReadTo(channel: string, number: number) {
+    this.userRead.set(channel, Math.max(this.userRead.get(channel) ?? number, number));
   }
 }

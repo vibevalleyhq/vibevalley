@@ -14,9 +14,9 @@ export const keepChannels = 100;
 
 const isTop = (c: T.Channel) => c.type !== "thread";
 
-const emptyChat = (): T.Chat => ({ channels: [], ownerMentions: [] });
+const emptyChat = (): T.Chat => ({ channels: [], userMentions: [] });
 
-export const withOwnerMentions = (chat: T.Chat | undefined, ownerMentions: T.OwnerMention[]): T.Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
+export const withUserMentions = (chat: T.Chat | undefined, userMentions: T.UserMention[]): T.Chat => ({ ...(chat ?? emptyChat()), userMentions });
 
 /** A message said: news when its number is past what the state knows of its channel, or when the state does not keep that channel. */
 export function withMessage(chat: T.Chat | undefined, m: T.ChatMessage): [T.Chat | undefined, boolean] {

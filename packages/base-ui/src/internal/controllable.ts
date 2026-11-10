@@ -7,7 +7,7 @@ export function createControllable<T>(o: { value: () => T | undefined; initial: 
   const [kept, setKept] = createSignal<{ readonly v: T }>({ v: untrack(o.initial) });
   const get = () => {
     const given = o.value();
-    // Only undefined leaves it to the component: a T that may be null (nothing selected) is still the owner's.
+    // Only undefined leaves it to the component: a T that may be null (nothing selected) is still the caller's.
     // oxlint-disable-next-line typescript/prefer-nullish-coalescing -- `??` would also hand null over to the component
     return given === undefined ? kept().v : given;
   };

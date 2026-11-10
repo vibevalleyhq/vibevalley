@@ -6,7 +6,7 @@ import { assignedAgentOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@v
 
 import { Agent } from "#/agent/agent.ts";
 import { templateCatalog } from "#/agent/seed.ts";
-import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { actsForUser, type Actor } from "#/base/actor.ts";
 import { type ApiError, missing, lookIn, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -24,7 +24,7 @@ import { type Dispatched, issueDispatch } from "./dispatch.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
-import { needsOwner } from "./prompts.ts";
+import { needsUser } from "./prompts.ts";
 import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
@@ -40,7 +40,7 @@ export class Issue extends Context.Service<
     readonly onBoard: () => readonly T.Issue[];
     readonly get: (id: string) => Effect.Effect<T.Issue, ApiError>;
     readonly add: (req: T.IssueRequest, mandate: T.IssueMandate) => Effect.Effect<T.Issue, ApiError>;
-    /** On the owner's word only (actsForOwner). */
+    /** On the user's word only (actsForUser). */
     readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Effect.Effect<T.Issue, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
@@ -54,10 +54,10 @@ export class Issue extends Context.Service<
     readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Effect.Effect<T.Preview, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
+    /** An issue's id from what the user and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
     readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
     readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
-    /** The owner's look counts for the game; anyone else's does not. */
+    /** The user's look counts for the game; anyone else's does not. */
     readonly changes: (id: string, by: Actor) => Effect.Effect<T.Changes, ApiError>;
     readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<T.Issue, ApiError>;
     readonly refine: (id: string, word: string, channel: string) => Effect.Effect<T.Issue, ApiError>;
@@ -122,7 +122,7 @@ const make = Effect.gen(function* () {
     unqueue,
     recordReport,
     judged,
-    ownerSaid,
+    userSaid,
     setQueued,
     drop,
     savePullRequest,
@@ -162,7 +162,7 @@ const make = Effect.gen(function* () {
     const latest = latestSessionIdOf(issue);
     const session = latest === undefined ? undefined : sessions.sessionOf(latest);
     const thread = yield* chat.issueThread(issue.id, issue.title, session?.channel);
-    yield* chat.post({ _tag: "Owner", text: text, channel: thread, sendKey: sendKey });
+    yield* chat.post({ _tag: "User", text: text, channel: thread, sendKey: sendKey });
   });
 
   /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
@@ -219,7 +219,7 @@ const make = Effect.gen(function* () {
         yield* unqueue(n.issue);
         return;
       case "RunFinished":
-        // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
+        // However the orchestrator's turn ended, the issue waits on the user: a turn that did not fail is not an answer yet.
         yield* Effect.forEach(n.issues, (id) => endRun(id).pipe(bestEffort(`vibevalley: run ${n.id} finished on issue ${id}`)), { discard: true });
         return;
       default:
@@ -228,27 +228,27 @@ const make = Effect.gen(function* () {
     }
   });
 
-  const onOwnerInThread = Effect.fn("Issue.onOwnerInThread")(function* (thread: string) {
+  const onUserInThread = Effect.fn("Issue.onUserInThread")(function* (thread: string) {
     const issue = yield* Effect.option(get(thread));
     if (Option.isNone(issue)) return;
     const item = issue.value;
     if (isClosed(item.status)) return;
-    yield* ownerSaid(item.id);
+    yield* userSaid(item.id);
   });
 
   yield* loadKept;
   const news = yield* sessions.news;
-  const ownerWords = yield* chat.ownerInThread;
-  // One at a time: a report and the owner's word on it do not cross.
+  const userWords = yield* chat.userInThread;
+  // One at a time: a report and the user's word on it do not cross.
   yield* Effect.forkScoped(
     Stream.runForEach(
       Stream.merge(
         news,
-        Stream.map(ownerWords, (w) => ({ _tag: "OwnerSaid" as const, thread: w.thread, message: w.message })),
+        Stream.map(userWords, (w) => ({ _tag: "UserSaid" as const, thread: w.thread, message: w.message })),
       ),
       (n) =>
-        n._tag === "OwnerSaid"
-          ? onOwnerInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the owner's words in ${n.thread}`))
+        n._tag === "UserSaid"
+          ? onUserInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the user's words in ${n.thread}`))
           : onSessionNews(n).pipe(bestEffort(`vibevalley: issues after ${n._tag}`)),
     ),
   );
@@ -300,7 +300,7 @@ const make = Effect.gen(function* () {
     /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
      * next round goes by them. */
     edit: Effect.fn("Issue.edit")(function* (id, upd, by) {
-      if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
+      if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       const whileOpen =
         upd.title === undefined &&
         upd.description === undefined &&
@@ -349,7 +349,7 @@ const make = Effect.gen(function* () {
       yield* sessions.stop(liveSession2);
     }),
     setStatus: Effect.fn("Issue.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
-      if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
+      if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       const item = yield* get(ref);
       // Read by its number too: every write below goes by its id.
       const id = item.id;
@@ -388,7 +388,7 @@ const make = Effect.gen(function* () {
         case "revive":
           yield* revive(id);
           break;
-        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice, touches no git and opens no pull request.
+        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the user's choice, touches no git and opens no pull request.
         case "complete": {
           // Completing is the acceptance: whatever it was sent back for is settled.
           const unresolved = item.findings.some((f) => !f.resolved);
@@ -453,7 +453,7 @@ const make = Effect.gen(function* () {
       if (!changes) return yield* Effect.fail(refused(t("server.issue.notStarted")));
       yield* setConflict(id, conflictOf(changes));
       const session = latestSessionIdOf(item);
-      if (by.kind === "owner" && session && sessions.isReachable(session)) yield* core.did({ kind: "reviewed", session });
+      if (by.kind === "user" && session && sessions.isReachable(session)) yield* core.did({ kind: "reviewed", session });
       return changes;
     }),
     review: Effect.fn("Issue.review")(function* (id, req) {

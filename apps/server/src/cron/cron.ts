@@ -2,7 +2,7 @@ import { Clock, Config, Context, Effect, Layer, PubSub, Schedule, Schema, type S
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
@@ -34,7 +34,7 @@ export class Cron extends Context.Service<
     readonly list: () => T.Cron[];
     /** by is who asks, and on whose word (needsOK). */
     readonly add: (req: T.CronRequest, by: Actor) => Effect.Effect<T.Cron, ApiError>;
-    /** Turned on is the owner's yes. */
+    /** Turned on is the user's yes. */
     readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<T.Cron, ApiError>;
     readonly remove: (id: string) => Effect.Effect<T.Cron, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
@@ -75,7 +75,7 @@ const make = Effect.gen(function* () {
 
   for (const row of yield* db.run(q.crons())) {
     const when = whenOf(row.spec);
-    // A cron whose time or owner this code cannot read any more is left out.
+    // A cron whose time or setter this code cannot read any more is left out.
     if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
     const s: T.Cron = {
       id: row.id,
@@ -182,8 +182,8 @@ const make = Effect.gen(function* () {
       const at = now();
       const problem = cronProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
-      // A channel as the owner names it (general, #general) as well as by id.
-      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(ownerId, req.channel);
+      // A channel as the user names it (general, #general) as well as by id.
+      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(userId, req.channel);
       const channel = (yield* chat.channels()).find((c) => c.id === want);
       if (!channel) return yield* Effect.fail(refused(t("server.cron.noChannel", { name: want }), [lookIn.channel]));
       const named = (req.agent ?? "").trim();
@@ -231,7 +231,7 @@ const make = Effect.gen(function* () {
     }, lock.withPermits(1)),
     setEnabled: Effect.fn("Cron.setEnabled")(function* (id, enabled) {
       const was = yield* find(id);
-      // Turned on is the owner's yes (only the owner may: cron.update); the queries clear pending the same way.
+      // Turned on is the user's yes (only the user may: cron.update); the queries clear pending the same way.
       let s: T.Cron = { ...was, enabled, pending: was.pending && !enabled };
       // Switched back on: it counts from now, not from runs it skipped while off.
       if (enabled && !was.enabled && was.when.kind !== "once") {

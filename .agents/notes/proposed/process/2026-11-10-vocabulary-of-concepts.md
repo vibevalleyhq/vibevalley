@@ -89,23 +89,27 @@ Status: proposed
 | `scripts/glossary.ts`、`scripts/i18n.ts` | 改成读概念表的「叫法」「English」「不用」三列；「代码里」那条检查由 `vocabulary:check` 接走 |
 | `scripts/stale-names.ts` | 留着：它拦的是退役的名字，概念表管在用的 |
 
-**概念的地方收成两处。**
+**概念的地方收成两处，落后的删掉。** 手写的概念表在 `docs/concepts.md`，生成的清单在 `docs/reference/concept-map.md`。别处写着同一件事的，不留、不标「已过时」、不留跳转的空节，直接删；历史在 git 里。
 
-| 现在 | 以后 |
+| 删掉 | 里面还成立的去哪 |
 |---|---|
+| `docs/README.md` 的「用语」整节（「叫法」表和「农场的皮」表） | 概念的行进概念表，占「叫法」「English」「不用」三列；不是概念的行（在场、空位、完成、取消、关上、派活、起草、验收、巡查）进 `docs/concepts.md` 的「状态和动作」表，每行写明属于哪个概念；农场的词进「农场的皮」表。10 个链到这一节的文档改链到 `docs/concepts.md` |
 | `docs/concepts.md` 的「东西」表 | 换成概念表，按模块分组 |
-| 用语表（`docs/README.md#用语`） | 概念的行并进概念表，各占「叫法」「English」「不用」三列；这一节删掉，10 个链到它的文档改链到 `docs/concepts.md` |
-| 用语表里不是概念的行（在场、空位、完成、取消、关上、派活、起草、验收、巡查） | 它们是某个概念的状态或动作：进 `docs/concepts.md` 的第二张表「状态和动作」，每行写明属于哪个概念 |
-| `concepts.md` 的「农场是皮」表、用语表的「农场的皮」表、`concept-map.md` 的「农场里」一列 | 合成 `docs/concepts.md` 的一张「农场的皮」表 |
-| `concept-map.md` 的「看得见的几层」「服务端以下」两张表 | 生成：每个概念一行，列是表、服务、协议的形状、接口的前缀、页面的 `features/<概念>` |
-| `concept-map.md` 的「oar 那一层」表 | 挪进[帮工](docs/subsystems/session.md)，那里已经讲 Session 和 oar 会话 |
+| `docs/concepts.md` 的「农场是皮」表 | 和用语表的「农场的皮」表合成一张 |
+| `docs/concepts.md` 的「Host 和 Space」里讲 Host 的部分 | 照[`Host`](#host)定下来的写；`Host` 不再是概念的话整段删 |
+| `docs/reference/concept-map.md` 手写的「看得见的几层」「服务端以下」两张表 | 不搬：整篇换成生成的，每个概念一行，列是表、服务、协议的形状、接口的前缀、页面的 `features/<概念>` |
+| `docs/reference/concept-map.md` 的「oar 那一层」表 | 挪进[帮工](docs/subsystems/session.md)，那里已经讲 Session 和 oar 会话 |
+| `docs/subsystems/session.md` 的「三层概念」表 | `Session`、`Run`、`Machine` 是什么在概念表；这一节只留不变量 |
+| `docs/subsystems/issue.md`「状态和用语」里手写的取值表 | 取值由清单生成，叫法在词典（`shared.json`）和「状态和动作」表；这一节只留哪个字段由谁定 |
 
-`docs/concepts.md` 留下讲模型的文字（Host 和 Space、一件活怎么走）和四张表：概念、状态和动作、农场的皮、角色词和通用技术词。`docs/reference/concept-map.md` 整篇是生成的。
+删完以后 `docs/concepts.md` 是讲模型的文字（Space、一件活怎么走、Session 和 oar 会话）加四张表：概念、状态和动作、农场的皮、角色词和通用技术词。
+
+子系统文档讲一个概念的模型和不变量，不重写它是什么、取值有哪些。现在已经写错的三处（[其余](#九其余)的后两行）不单独改，跟着所在的表一起删。
 
 **分步。**
 
 1. 主人审下面的初稿，定[精确的概念](#精确的概念)里每一条改不改。
-2. 落 `scripts/vocabulary.ts`、概念表和检查，范围是 protocol、表和服务名；拼名规则在 protocol 上拦。
+2. 落 `scripts/vocabulary.ts`、概念表和检查，范围是 protocol、表和服务名；拼名规则在 protocol 上拦。同一个改动里删掉上表列的文档，改完链接。
 3. 服务端内部的导出名（2407 个）只出报告，不拦；看过例外的数量再定收不收紧。
 4. 定下要改的名字，每个概念一个改动，`stale-names` 拦旧名字。
 
@@ -113,7 +117,7 @@ Status: proposed
 
 ## 概念初稿
 
-上一版列了 131 个，表、服务、带 `id` 的形状、封闭联合都算。按[三类名词](#术怎么做)重分以后：
+脚本认出的候选按[三类名词](#术怎么做)分：
 
 | 类 | 个数 | 去向 |
 |---|---|---|
@@ -174,7 +178,7 @@ Status: proposed
 
 | 概念 | 是什么 | 认它靠 | 属于它的 | 待理清 |
 |---|---|---|---|---|
-| `Fact` | 改核心状态的一件事 | 没有 id；折进去以后是一个 `seq` | 每一种 `Fact*` | |
+| `Fact` | 改核心状态的一件事 | 没有 id；折进去以后是一个 `seq` | 每一种 `Fact*` | 名字不贴（第十组） |
 | `LiveEvent` | 不改核心状态、只是路过的一条：一步、一句提醒、农机的探测结果 | 没有 id | `Notice` | 三个成员在 `ServerEvent` 里又写了一遍（第六组） |
 
 **信箱**
@@ -289,11 +293,11 @@ Status: proposed
 
 其余 14 个服务里，11 个和一个概念同名（`Issue`、`Session`、`Channel`……），那一行已经在概念表里；3 个是地基（`ServerConfig`、`Db`、`PublicHttp`）。
 
-### 收掉的
+### 不算概念的
 
-上一版单列、这一版不再是一行的：
+有名字、有形状或有表，但不在概念表里占一行的：
 
-| 上一版 | 现在 | 为什么 |
+| 名字 | 它是什么 | 为什么不是概念 |
 |---|---|---|
 | `ServerEvent` | `LiveEvent` 的待理清 | 它是 `Fact`、快照和 `LiveEvent` 的并集，不是一样新东西 |
 | `Execution` | `Assignment` 的 `executions` | 它存的就是 Session |
@@ -486,15 +490,40 @@ Status: proposed
 | 故事两个名字 | `IssueTimeline`（里程碑加花费）、`IssueHistory`（工单加全部 Session） | `IssueHistory` 改成它装的 |
 | 拼写 | `ToolConnectionStatus` 写 `cancelled`，别处写 `canceled` | 改 |
 | 时刻的字段 | `Cron.created`、`PkmComment.created`、`Memory.at`、`SessionEvent.time`；别处是 `createdAt` | 统一成 `At` |
-| `owner` | 用语表「代码里」一列写 owner，代码已改叫 user | 改用语表 |
-| 文档里的旧表名 | `concept-map.md` 的 `artifact_revision`、`artifact_op`、`pkm_undo` | 改文档 |
-| 文档里的旧取值 | `docs/subsystems/issue.md` 写 `stage.state` 有 `refining`（代码是 `draft`）、`Session.phase` 有 `arriving`（代码里没有）；`docs/subsystems/session.md` 写 `RunTrigger` 有 `refining`（代码是 `refine`） | 改文档；封闭联合的取值由清单生成以后不再手写 |
+| `owner` | 用语表「代码里」一列写 owner，代码已改叫 user | 并进概念表时写 `User` |
+| 文档里的旧表名 | `concept-map.md` 的 `artifact_revision`、`artifact_op`、`pkm_undo` | 跟着手写的表一起删 |
+| 文档里的旧取值 | `docs/subsystems/issue.md` 写 `stage.state` 有 `refining`（代码是 `draft`）、`Session.phase` 有 `arriving`（代码里没有）；`docs/subsystems/session.md` 写 `RunTrigger` 有 `refining`（代码是 `refine`） | 跟着手写的取值表一起删；取值由清单生成 |
+
+### 十、`Fact`（名不副实）
+
+`Fact` 是 `Core.apply` 的输入，`reduce(state, fact)` 把它折进 `SpaceState`。19 个成员分两种：
+
+| 种 | 个数 | 成员 | 带的是 |
+|---|---|---|---|
+| 一样东西现在是这样、或没了 | 13 | `issueChanged`、`channelChanged`、`messageChanged`、`cronChanged`、`machineChanged`、`connectorChanged`、`sessionChanged`、`mediaChanged`、`userMentionsChanged`、`callChanged`；`issueRemoved`、`channelRemoved`、`cronRemoved` | 整个新值，或一个 id |
+| 发生了一件事 | 6 | `sessionPhaseChanged`、`sessionReported`、`sessionLeft`、`sessionToolChanged`、`sessionToolsReset`、`progressChanged` | 这件事的内容 |
+
+名字不贴的三处：
+
+- 事实通常指记下来、不会变的一条。这里不存：各模块先落库，再告诉 `Core` 让内存里的那份跟上（[核心状态](docs/subsystems/core.md)的「先落库，后发事实」），重启时从库里重新算。
+- 三分之二的成员不是「发生了什么」，是「它现在的值」。
+- 这个词会吸别的意思：`scripts/stale-names.ts` 有一条规则专门拦 `RuntimeFacts`、`RowFacts`、`FactsCard`、`FactContext` 等十个名字，都是把「知道的一件事」叫成了 fact。
+
+| 候选 | 中文 | 贴在哪 | 撞在哪 |
+|---|---|---|---|
+| `Change` | 变更 | 现有的定义就是「核心状态的一次改变」；11 个成员以 `Changed` 结尾；折出来的那一对叫 `Transition` | `Changes`（工单分支的改动）、`artifact_change`、`pkm_change` |
+| `SpaceEvent` | 空间事件 | 它是事，是 `Core` 那条流里的一条；`Event` 当角色词（某条流里的一条）和 `SessionEvent`、`ChannelEvent` 一致 | 和 `LiveEvent` 从名字上分不出哪个改状态；13 个成员带的是值，不是事 |
+| `Fact`（不改） | 事实 | 说得出「已经发生，`Core` 不能拒绝」；已经收成一个意思 | 上面三处 |
+
+没考虑的：`Update`（请求形状的角色词）、`Patch`（核心状态明说不发 patch）、`Action`（四个 `XAction` 在用，且指意图）、`Delta`（[实体增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)指推给页面的）、`Mutation`（`PkmMutation`）、`Transition`（已经是前后状态的一对）。
+
+建议 `Change`，中文叫变更，成员去掉 `Fact` 前缀（`IssueChanged`，`type` 的取值不变）。撞的三处一并收：工单的 `Changes` 改叫 `Diff`，它的接口本来就是 `issue.diff.get`，界面上仍叫改动；`artifact_change` 照第九组改 `artifact_batch`；`pkm_change` 存的是一次修改的前后文字，改叫什么待定。
 
 ## Alternatives considered
 
 **按词批准。** 把导出名、字段、字面量拆成词，全部进概念表。protocol 一处就是 709 个词，最常见的是 `request`、`kind`、`changed` 这类角色词；批的是字面，一个词在两个模块指两样东西时只看得到出现次数。
 
-**清单不存盘，只当命令的输出。** 本 Note 的第一版这样写：新名词必须先写进概念表才能过检查，再存一份清单是第二份状态。放弃的原因：`concept-map.md` 就是一份手写的清单，已经漂了三张表名；不生成它，就得留着手写的。
+**清单不存盘，只当命令的输出。** 新名词必须先写进概念表才能过检查，再存一份清单是第二份状态。放弃的原因：`concept-map.md` 就是一份手写的清单，已经漂了三张表名；不生成它，就得留着手写的。
 
 **把定义写成声明上的注释，从注释生成概念表。** 定义挨着代码，不会漂。放弃的原因：一个概念常常同时是表、服务和形状，没有唯一的声明可挂；[代码风格](docs/style/code.md)不让注释复述名字已经说了的。
 
@@ -502,19 +531,20 @@ Status: proposed
 
 **只让模型审，不要结构规则。** 模型分得出同义和双关，但每次读的范围不同、结论不稳定，不能做门禁；它用在 AST 做不了的那一步。
 
-**另起 `docs/reference/vocabulary.md`，用语表和 `concepts.md` 不动。** 本 Note 的第一版这样写。概念会写在四处，定义在其中三处各有一份。
+**另起 `docs/reference/vocabulary.md`，用语表和 `concepts.md` 不动。** 概念会写在四处，定义在其中三处各有一份。
 
 **概念表按中文叫法组织**（留着用语表的样子，往里加代码名）。一个叫法可以对着几个代码名（「聊清楚、安排活、完成」），按它查代码要反着找；按代码名组织，叫法是它的一列。
 
 ## Acceptance criteria
 
 - 主人逐条定过[精确的概念](#精确的概念)，初稿的每个「待核实」有结论。
-- `docs/concepts.md` 有概念、状态和动作、农场的皮、角色词和通用技术词四张表；`docs/README.md` 的「用语」一节和 `concepts.md` 的「东西」表不在了，链到它们的文档都改了。
+- `docs/concepts.md` 有概念、状态和动作、农场的皮、角色词和通用技术词四张表。
+- 「删掉」一列的八处都不在了，没有留「已过时」的标记或只剩一个链接的空节；`vp run docs:verify` 过（链到它们的文档都改了）。
 - `vp run vocabulary:check` 在提交前的钩子和 CI 里跑：在 `packages/protocol/src/issue/shapes.ts` 加一个带 `id` 的 `interface Ticket`，检查失败，说出名字、`Fix:` 和 `See`；删掉概念表的一行，检查失败。
 - protocol 里拼不出来的导出名进棘轮；`scripts/vocabulary.test.ts` 用样例文件测三类的认法和拼名规则。
 - `docs/reference/concept-map.md` 由 `vp run vocabulary` 写出，开头写明不手改；改一个表名不重写它，`docs:verify` 失败。
 - `scripts/glossary.ts` 和 `vpx scripts/i18n.ts check` 读概念表，原来的检查照过。
-- 一个概念的定义只在概念表的一行里：`docs/subsystems/` 讲它的模型和不变量，不重写「是什么」。
+- 一个概念的定义只在概念表的一行里，封闭联合的取值只在清单里：`docs/subsystems/` 讲模型和不变量，不重写这两样。
 
 ## Risks
 

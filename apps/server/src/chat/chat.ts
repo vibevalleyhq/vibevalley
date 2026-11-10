@@ -89,7 +89,7 @@ const terminal = Stream.callback<Typed>((queue) =>
   ),
 );
 
-/** The owner is done: /exit, Ctrl+C with nothing under way, or the input's end. */
+/** The user is done: /exit, Ctrl+C with nothing under way, or the input's end. */
 class Quit extends Schema.TaggedError<Quit, { readonly brand: unique symbol }>()("Quit", {}) {}
 
 const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));

@@ -1,5 +1,5 @@
 import { dagLayers } from "@vibevalley/agent/dag";
-import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { everyone, defaultOrchestrator, userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
@@ -222,13 +222,13 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
       break;
     }
     case "messageChanged": {
-      if (fact.message.fromKind === "owner") {
+      if (fact.message.fromKind === "user") {
         if (fact.thread) {
           const h = sessionOnIssue(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions) {
-          const h = named !== defaultOrchestrator && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
+          const h = named !== defaultOrchestrator && named !== userId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }
       } else if (fact.message.fromRole === "worker" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });

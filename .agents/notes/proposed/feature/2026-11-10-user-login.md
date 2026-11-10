@@ -35,6 +35,12 @@ Status: proposed
 4. **命令行。** `vibevalley user password`；`vibevalley login <服务端地址>` 存下钥匙，之后的命令带着它（第 4 步机器加入时也要用）。
 5. **文档与规矩。** AGENTS.md、`lan.md`、`setting.md`、`architecture.md`。
 
+## 进度
+
+| 步 | 状态 | 做了什么 |
+|---|---|---|
+| 1 改名 | 完成 | 代码、表、取值、词典的键、黄金数据里指这个人的 owner 都改叫 user；界面上的「主人」「Owner」不动。别的东西的 owner 照旧：线程归哪个帮工（`threadOwnerOf`）、触发器归哪张工单（`Mailbox.ownerOf`）、块归哪篇稿子、Solid 的响应式 owner、oar 的会话键；EverOS 的 `sender_id` 仍是 `owner`，外面已存的记忆按它归档。`stale-names` 加了一条拦这个人的旧名字（改名前的代码在它查的目录里命中 882 处） |
+
 ## Alternatives considered
 
 - **多用户、注册。** 主人定了只有一个用户；每个用户各自的工单、提及、收件箱、记忆要把一个用户的假设从各处拿掉，等真要团队时另起。账号表已经按「用户」建，那时不用推倒。

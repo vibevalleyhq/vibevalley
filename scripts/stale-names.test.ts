@@ -13,6 +13,24 @@ it("regression: browser worker feature detection is not a stale domain name", ()
   expect(staleNamesIn(browser, "const worker = Worker;")).toHaveLength(1);
 });
 
+it("the farm's person is the user, while other things' owners stay", () => {
+  for (const line of [
+    "const ownerId = row.owner_id;",
+    "if (actsForOwner(actor)) {}",
+    'const kind = "owner";',
+    "stageWantsOwner(stage)",
+    "publishOwnerMentions()",
+  ])
+    expect(staleNamesIn(source, line)).toHaveLength(1);
+  for (const line of [
+    "const issue = yield* mailbox.ownerOf(trigger.id);",
+    "threadOwnerOf(thread, sessions)",
+    "const userId = row.user_id;",
+    'const kind = "user";',
+  ])
+    expect(staleNamesIn(source, line)).toEqual([]);
+});
+
 it("regression: stale service names are rejected while Effect Config APIs remain valid", () => {
   for (const service of ["Config", "Settings"]) {
     for (const statement of [`const config = yield* ${service};`, `const config = (yield* ${service});`]) {

@@ -24,7 +24,7 @@ describe("@vibevalley/artifact domain engine", () => {
     const b1 = blockId("00000000-0000-4000-a000-000000000011");
     const b2 = blockId("00000000-0000-4000-a000-000000000012");
     const firstKey = keyBetween("", "");
-    const page = new Page(aid, "owner", 1000, []);
+    const page = new Page(aid, "user", 1000, []);
 
     expect(
       page.apply({

@@ -10,7 +10,7 @@ import {
   type BlockOp,
   type BlockSnapshot,
   type BlockType,
-  ownerId,
+  userId,
   type TextSpan,
   type VibeValleyApi,
 } from "@vibevalley/protocol";
@@ -29,7 +29,7 @@ const writingMs = 3000;
 const newBlockId = () => blockId(crypto.randomUUID());
 const defaultFormatError = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** One block as the editor holds it: the server's last word on it (rev, who wrote it) and the owner's text as it is now. */
+/** One block as the editor holds it: the server's last word on it (rev, who wrote it) and the user's text as it is now. */
 export class EditBlock {
   readonly id: BlockId;
   parentId: BlockId | undefined;
@@ -56,7 +56,7 @@ export class EditBlock {
     this.spans = b.text;
     this.sent = b.text;
     this.rev = "rev" in b ? b.rev : 0;
-    this.updatedBy = "updatedBy" in b ? b.updatedBy : ownerId;
+    this.updatedBy = "updatedBy" in b ? b.updatedBy : userId;
     this.text = plainOf(b.text);
   }
 }
@@ -120,14 +120,14 @@ export class BlockEditor {
   }
 
   writing(b: EditBlock) {
-    return b.updatedBy !== ownerId && b.heardAt !== undefined && Date.now() - b.heardAt < writingMs;
+    return b.updatedBy !== userId && b.heardAt !== undefined && Date.now() - b.heardAt < writingMs;
   }
 
   private armWriting() {
     clearTimeout(this.writingTimer);
     if (this.disposed) return;
     const now = Date.now();
-    const ends = [...this.byId.values()].flatMap((block) => (block.updatedBy !== ownerId && block.heardAt !== undefined ? [block.heardAt + writingMs] : []));
+    const ends = [...this.byId.values()].flatMap((block) => (block.updatedBy !== userId && block.heardAt !== undefined ? [block.heardAt + writingMs] : []));
     if (this.heardAt !== undefined) ends.push(this.heardAt + busyMs);
     const next = ends.filter((end) => end > now).toSorted((a, b) => a - b)[0];
     if (next === undefined) return;
@@ -231,7 +231,7 @@ export class BlockEditor {
       this.byId.delete(b.id);
       return;
     }
-    const news = heard && b.updatedBy !== ownerId && b.rev > Math.max(mine?.rev ?? 0, this.held.get(b.id)?.rev ?? 0);
+    const news = heard && b.updatedBy !== userId && b.rev > Math.max(mine?.rev ?? 0, this.held.get(b.id)?.rev ?? 0);
     if (news) {
       this.heardAt = Date.now();
       if (mine) mine.heardAt = this.heardAt;

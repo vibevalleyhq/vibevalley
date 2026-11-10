@@ -471,8 +471,8 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  // An issue handed back while the owner is on the call: the orchestrator's words about it are read out on the call, queued after what is being said.
-  it.live("tells the owner on the call when an issue comes to want the owner", () => {
+  // An issue handed back while the user is on the call: the orchestrator's words about it are read out on the call, queued after what is being said.
+  it.live("tells the user on the call when an issue comes to want the user", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
       const voice = yield* Voice;
@@ -717,7 +717,7 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  it.live("relays the owner's words without a call id only with one call on", () =>
+  it.live("relays the user's words without a call id only with one call on", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
       const heardCurrentFailure = yield* Effect.flip(voice.heardCurrent("none", "", ""));
@@ -864,7 +864,7 @@ describe("voice", () => {
           file: "dictation.wav",
         },
       ]);
-      // The owner's own address, chosen, keeps its own key; switching back to MOSS finds it again.
+      // The user's own address, chosen, keeps its own key; switching back to MOSS finds it again.
       yield* Effect.orDie(setting.save({ dictation: { via: "own", url: "http://dictation.test/v1", model: "whisper-1" }, dictationKey: "own-key" }));
       yield* voice.dictate("AAAA", "wav");
       expect(sent[1]).toMatchObject({ url: "http://dictation.test/v1/audio/transcriptions", auth: "Bearer own-key", model: "whisper-1" });

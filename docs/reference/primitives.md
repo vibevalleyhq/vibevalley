@@ -46,7 +46,7 @@
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
 | `githubRepository` | `repo.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
-| `stageWantsOwner` | `stage.ts` | Questions the owner for something: the page leads with it, the board flags it. |
+| `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
 
 ## `apps/server/src/base`
 
@@ -54,11 +54,11 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `owner` | `actor.ts` |  |
+| `user` | `actor.ts` |  |
 | `system` | `actor.ts` |  |
-| `orchestrator` | `actor.ts` | forOwner: the owner's own words are in the run it acts in. |
+| `orchestrator` | `actor.ts` | forUser: the user's own words are in the run it acts in. |
 | `worker` | `actor.ts` | A helper at work, by its session's id. |
-| `actsForOwner` | `actor.ts` | On the owner's word: the owner, or the orchestrator in a run the owner's words are in. |
+| `actsForUser` | `actor.ts` | On the user's word: the user, or the orchestrator in a run the user's words are in. |
 | `serverFiles` | `assets.ts` | What the package script copies beside the bundle: every path serverFile is given lies under one of these. |
 | `serverFile` | `assets.ts` |  |
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
@@ -87,7 +87,7 @@
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `numberIn` | `order.ts` |  |
-| `ownersLanguage` | `prompts.ts` |  |
+| `usersLanguage` | `prompts.ts` |  |
 | `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
 | `checksFromText` | `questions.ts` | The helper's text checks, one per criterion line; explicit issue_report.checks still win. |
 | `questionsFromText` | `questions.ts` |  |
@@ -109,6 +109,7 @@
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
 | `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
 | `pkmDir` | `config.ts` |  |
+| `hostName` | `config.ts` | This computer's name as people say it: its host name without .local. |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
 | `reposDir` | `config.ts` | Where the space's repositories are: each folder in it is one. |
@@ -122,7 +123,7 @@
 | `fileBlob` | `files.ts` |  |
 | `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` |  |
-| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json); one whose read fails is set aside and read as undefined. |
+| `readOrSetAside` | `files.ts` | A user's file (config.json, settings.json); one whose read fails is set aside and read as undefined. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `HomeUnavailable` | `lease.ts` | The lock file could not be read or written for another reason (permissions, a missing home). |
@@ -188,7 +189,7 @@
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. |
 | `worldBelowIngress` | `world.ts` | Services below Ingress for module tests. |
 | `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
-| `testIssues` | `world.ts` | Issues a test adds are ones the owner sent, so their mandate is explicit. |
+| `testIssues` | `world.ts` | Issues a test adds are ones the user sent, so their mandate is explicit. |
 | `Said` | `world.ts` |  |
 | `said` | `world.ts` |  |
 
@@ -229,8 +230,8 @@
 | `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |
 | `inField` | `shortcuts.ts` |  |
 | `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
-| `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
-| `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
+| `useInterval` | `timer.ts` | fn every ms for as long as the reactive owner lives. |
+| `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 
 ## `apps/web/src/infra`
@@ -248,7 +249,7 @@
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
-| `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's). a new one after. |
+| `createRequestKey` | `api.ts` | The request key of one thing the user may send again (a form's create, a button's). a new one after. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
 | `formIssues` | `form/issues.ts` |  |
@@ -357,7 +358,7 @@
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
 | `defineIntent` | `intent.ts` |  |
 | `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the repo map's sow, an artifact's reply). |
-| `sendReplacing` | `intent.ts` | A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). |
+| `sendReplacing` | `intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
 | `intentsIn` | `intent.ts` | A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. |
 | `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
 | `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |

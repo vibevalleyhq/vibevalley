@@ -185,6 +185,6 @@ export const coding = {
 };
 
 export const memory = {
-  /** Heads a memory file's prompt when it was cut: the owner's file keeps the rest. */
+  /** Heads a memory file's prompt when it was cut: the user's file keeps the rest. */
   truncatedNote: (file: string) => `（更早的记录省略了，全文在 ${file}）\n`,
 };

@@ -11,7 +11,7 @@ const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
 const intents = 1 << 25;
 
-// A refused AppID or secret answers without a token, with QQ's reason in message: that reason is what the owner sees.
+// A refused AppID or secret answers without a token, with QQ's reason in message: that reason is what the user sees.
 const TokenResponse = Schema.Struct({
   access_token: Schema.optionalKey(Schema.String),
   expires_in: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.String])),
@@ -73,7 +73,7 @@ const C2CMessage = Schema.Struct({
 });
 const Hello = Schema.Struct({ heartbeat_interval: Schema.optionalKey(Schema.Finite) });
 
-/** A refused send, by its status: a bad login is stale; a passive reply refused (too late, too many) waits for the owner's
+/** A refused send, by its status: a bad login is stale; a passive reply refused (too late, too many) waits for the user's
  * next message. */
 const sendFailure = (status: number, message: string) =>
   AppFailed.make({ kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", message });
@@ -259,7 +259,7 @@ export function qqAdapter(api: QQApi): Adapter {
         const secret = (input.secret ?? "").trim();
         if (!appId || !secret) return yield* failedWith(t("server.connector.qqKeys"));
         yield* api.check({ appId, secret });
-        return { secrets: { appId, secret }, owner: "" };
+        return { secrets: { appId, secret }, user: "" };
       }),
     receive: (secrets, io) =>
       api.listen(appOf(secrets), (m) => {

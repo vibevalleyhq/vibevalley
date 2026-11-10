@@ -15,7 +15,7 @@ import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, worker } from "#/base/actor.ts";
+import { user, worker } from "#/base/actor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -278,7 +278,7 @@ describe("Nowledge Mem", () => {
       expect((yield* m.search(q)).found).toEqual([]);
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
       expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
-      yield* m.write({ agent: "lab", text: "不写进去", repo: "", by: owner });
+      yield* m.write({ agent: "lab", text: "不写进去", repo: "", by: user });
       // A write would go out in the background; nothing to wait on shows that none does.
       yield* TestClock.adjust(50);
       expect(fake.adds).toEqual([]);
@@ -290,7 +290,7 @@ describe("Nowledge Mem", () => {
       const url = yield* listen(createServer(() => {}));
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", repo: "demo", by: owner });
+      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", repo: "demo", by: user });
       const recall = yield* Effect.forkChild(m.recall({ agent: "lab", repo: "demo", text: "迁移" }));
       yield* TestClock.adjust(100);
       expect((yield* Fiber.join(recall)).lines).toHaveLength(1);
@@ -440,7 +440,7 @@ describe("EverOS", () => {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: true });
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: owner });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: user });
       yield* until(() => fake.seen("flush").length === 1);
       const add = fake.seen("add")[0]!;
       expect(add.body.session_id).toBe(fake.seen("flush")[0]!.body.session_id);

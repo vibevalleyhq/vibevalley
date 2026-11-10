@@ -1,6 +1,6 @@
 import { type Accessor, createEffect, createMemo } from "solid-js";
 
-import { type Channel, type Chat, type ChatMessage, type Notify, ownerId, type StateFrame } from "@vibevalley/protocol";
+import { type Channel, type Chat, type ChatMessage, type Notify, userId, type StateFrame } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
@@ -28,7 +28,7 @@ export interface PinMark {
 
 const copyOf = (channel: string, id: string) => followed.get(channel).messages.find((m) => m.id === id);
 
-const reacted = (m: Pick<ChatMessage, "reactions">, emoji: string) => m.reactions.some((r) => r.emoji === emoji && r.by.includes(ownerId));
+const reacted = (m: Pick<ChatMessage, "reactions">, emoji: string) => m.reactions.some((r) => r.emoji === emoji && r.by.includes(userId));
 
 export const reactionSet = defineIntent<ReactionMark, ChatMessage>({
   send: (r) => api.channel.reaction.set({ id: r.id, emoji: r.emoji, on: r.on }),
@@ -90,11 +90,11 @@ export const unreadMark = defineIntent<ReadMark, void>({
 
 const sameChannel = (a: ReadMark, b: ReadMark) => a.channel === b.channel;
 
-// Channels the owner marked unread while looking at them: they stay unread until the owner leaves and comes back.
+// Channels the user marked unread while looking at them: they stay unread until the user leaves and comes back.
 const held = defineAtom<ReadonlySet<string>>(new Set());
 const release = (channel: string) => held.update((h) => new Set([...h].filter((c) => c !== channel)));
 
-/** The owner's read in a channel goes back to just before this message, and the shown list leaves it so. */
+/** The user's read in a channel goes back to just before this message, and the shown list leaves it so. */
 export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say: (reason: string) => void) {
   held.update((h) => new Set([...h, mark.channel]));
   setMark(intents, mark, sameChannel, (reason) => {
@@ -103,7 +103,7 @@ export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say
   });
 }
 
-/** A channel with the owner's mark unread on its way laid over its read; the same object with none. */
+/** A channel with the user's mark unread on its way laid over its read; the same object with none. */
 export function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[]): Channel {
   const mark = unreads.findLast((u) => u.input.channel === c.id);
   if (mark === undefined) return c;
@@ -153,7 +153,7 @@ export const notifySet = defineIntent<NotifyMark, void>({
 });
 
 /**
- * A mark set again before the first showed replaces it (sendReplacing); a failed one is let go and said, so the owner
+ * A mark set again before the first showed replaces it (sendReplacing); a failed one is let go and said, so the user
  * sees the server's state again and why.
  */
 export function setMark<I, R>(intents: Intents<I, R>, input: I, same: (a: I, b: I) => boolean, say: (reason: string) => void) {
@@ -172,13 +172,13 @@ function withReaction(m: ChatMessage, emoji: string, on: boolean): ChatMessage {
   const had = m.reactions.some((r) => r.emoji === emoji);
   const reactions = on
     ? had
-      ? m.reactions.map((r) => (r.emoji === emoji ? { ...r, by: [...r.by, ownerId] } : r))
-      : [...m.reactions, { emoji, by: [ownerId] }]
-    : m.reactions.flatMap((r) => (r.emoji !== emoji ? [r] : r.by.length > 1 ? [{ ...r, by: r.by.filter((b) => b !== ownerId) }] : []));
+      ? m.reactions.map((r) => (r.emoji === emoji ? { ...r, by: [...r.by, userId] } : r))
+      : [...m.reactions, { emoji, by: [userId] }]
+    : m.reactions.flatMap((r) => (r.emoji !== emoji ? [r] : r.by.length > 1 ? [{ ...r, by: r.by.filter((b) => b !== userId) }] : []));
   return { ...m, reactions };
 }
 
-/** The messages with the owner's reactions and pins on their way laid over them; a message with none is the same object. */
+/** The messages with the user's reactions and pins on their way laid over them; a message with none is the same object. */
 export function markedMessages(
   messages: readonly ChatMessage[],
   reactions: readonly Intent<ReactionMark, ChatMessage>[],
@@ -197,7 +197,7 @@ export function markedMessages(
   });
 }
 
-/** A channel's messages while it is shown, with the owner's reactions and pins on their way. */
+/** A channel's messages while it is shown, with the user's reactions and pins on their way. */
 export function useMarkedFollowed(id: Accessor<string | undefined>): Accessor<Followed> {
   const said = useFollowed(id);
   const reactions = useIntents(reactionSet);
@@ -215,7 +215,7 @@ interface ChannelMarks {
   readonly unreads: readonly Intent<ReadMark, void>[];
 }
 
-/** A channel with the owner's archive, notify and unread choices on their way laid over it; the same object with none. */
+/** A channel with the user's archive, notify and unread choices on their way laid over it; the same object with none. */
 export function markedChannel(c: Channel, marks: ChannelMarks): Channel {
   let shown = markedRead(c, marks.unreads);
   const archive = marks.archives.findLast((a) => a.input.id === c.id);
@@ -228,13 +228,13 @@ export function markedChannel(c: Channel, marks: ChannelMarks): Channel {
   return shown;
 }
 
-/** The frame's chat with the owner's channel marks on their way; the same object with none. */
+/** The frame's chat with the user's channel marks on their way; the same object with none. */
 function markedChat(chat: Chat | undefined, marks: ChannelMarks): Chat | undefined {
   if (!chat || (marks.archives.length === 0 && marks.notifies.length === 0 && marks.unreads.length === 0)) return chat;
   return { ...chat, channels: chat.channels.map((c) => markedChannel(c, marks)) };
 }
 
-/** The chat as the chat page shows it: the frame's, with the owner's channel marks on their way. */
+/** The chat as the chat page shows it: the frame's, with the user's channel marks on their way. */
 export function useMarkedChat() {
   const core = useCore();
   const archives = useIntents(archiveSet);

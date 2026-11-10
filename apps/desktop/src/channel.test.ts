@@ -14,7 +14,7 @@ test("each channel has its own name, app id, command, farm and ports, so they op
   expect(new Set(ports).size).toBe(ports.length);
 });
 
-test("the channel's farm, work folder and ports go to its server unless the owner set them", () => {
+test("the channel's farm, work folder and ports go to its server unless the user set them", () => {
   expect(farmHomeOf("beta", {}, "/Users/o")).toBe("/Users/o/.vibevalley-beta");
   expect(serverEnvOf("alpha", { PATH: "/bin" }, "/Users/o")).toEqual({
     PATH: "/bin",

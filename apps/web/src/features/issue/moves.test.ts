@@ -26,7 +26,7 @@ test("a card on its way shows in the lane it was dropped on, moving, and nothing
   const [a, b] = [todo(1), todo(2)];
   const shown = movedCards([a, b], [move("i1")]);
   expect(shown[0]).toEqual({ ...a, lane: "working", move: { key: "k-i1", state: "moving" } });
-  // The issue is the frame's, status and all: the overlay sets the lane the owner chose and no more.
+  // The issue is the frame's, status and all: the overlay sets the lane the user chose and no more.
   expect(shown[0]?.kind === "todo" && shown[0].issue).toBe(a.kind === "todo" && a.issue);
   expect(shown[1]).toBe(b);
 });

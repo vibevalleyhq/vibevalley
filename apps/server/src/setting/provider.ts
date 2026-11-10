@@ -38,7 +38,7 @@ export const emptyProviders: ProviderSettings = {
   vision: null,
 };
 
-/** What an account serves: each use the owner binds to one. */
+/** What an account serves: each use the user binds to one. */
 export type Use = "dictation" | "image" | "understanding" | "speech" | "live" | "speakers" | "voiceDesign" | "transcription" | "vision";
 
 type Connection = ProviderSettings["connections"][number];

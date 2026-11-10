@@ -18,7 +18,7 @@ describe("the tools", () => {
       expect(hosts.filter((h) => !said.includes(h))).toEqual([]);
   });
 
-  // A tool is its endpoint as a model sees it. Dry runs are the owner's: no agent is given one.
+  // A tool is its endpoint as a model sees it. Dry runs are the user's: no agent is given one.
   it("are their endpoints: named by them, with their fields, for those their can names", () => {
     const dryRuns = new Set(endpoints.flatMap((e) => (e.dryRun ? [e.dryRun] : [])));
     for (const [caller, table] of [
@@ -61,7 +61,7 @@ describe("the tools", () => {
     expect(toolStart("unknown", undefined).text).toBe("unknown");
   });
 
-  it("are named in the owner's language", () => {
+  it("are named in the user's language", () => {
     setLocale("en");
     try {
       expect(toolStart("memory_search", { text: "the port" }).text).toBe("Search the memory: the port");

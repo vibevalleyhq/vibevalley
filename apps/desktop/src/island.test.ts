@@ -30,7 +30,7 @@ const working = (id: string, name: string, label: string) =>
 const frame = (issues: Issue[], sessions: Session[] = []) => ({ state: { issues, sessions } }) as unknown as StateFrame;
 
 describe("the island's glance", () => {
-  test("shows the issues in flight, those waiting on the owner first", () => {
+  test("shows the issues in flight, those waiting on the user first", () => {
     const g = glanceOf(
       frame(
         [

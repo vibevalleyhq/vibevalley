@@ -61,7 +61,7 @@
     "cleanup": "清理远端文件",
     "cleanupAsk": "删除已知远端文件并释放本机输入的保留？供应商可能还在处理结果未知的请求。没有确认 ID 的上传可能仍有文件，需要人工核对；这不会重复理解。"
   },
-  "sourceOwner": "来源：主人",
+  "sourceUser": "来源：主人",
   "sourceAgent": "来源：管家 {agent} · 频道 {channel}",
   "usage": "厂商报告：{images} 张 · {width} × {height}",
   "usageUnknown": "尚无厂商用量结果；不代表未计费。",

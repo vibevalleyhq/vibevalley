@@ -313,10 +313,10 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
       return yield* Effect.forEach(recentSpeech2, view);
     }),
     create: Effect.fn("Media.createSpeech")(function* (given: T.MediaSpeechRequest, caller: MediaCaller) {
-      if (caller.kind === "orchestrator" && !caller.forOwner) return yield* Effect.fail(refused(t("server.media.ownerRequired")));
+      if (caller.kind === "orchestrator" && !caller.forUser) return yield* Effect.fail(refused(t("server.media.userRequired")));
       const source: T.MediaSource = yield* Schema.decodeEffect(S.MediaSource)(caller).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
       const input = yield* Schema.decodeEffect(S.MediaSpeechRequest)(given).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
-      if (input.streaming === true && (caller.kind !== "owner" || input.asynchronous === true || input.format !== "pcm"))
+      if (input.streaming === true && (caller.kind !== "user" || input.asynchronous === true || input.format !== "pcm"))
         return yield* Effect.fail(refused(t("server.media.speechInvalid")));
       return yield* ports.lock.withPermits(1)(
         Effect.gen(function* () {

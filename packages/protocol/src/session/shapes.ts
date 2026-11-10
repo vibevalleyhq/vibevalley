@@ -21,7 +21,7 @@ export interface Doing {
   label: string;
 }
 
-/** A Doing as the frame tells it: its action in the owner's words. */
+/** A Doing as the frame tells it: its action in the user's words. */
 export interface DoingView extends Doing {
   actionText: string;
 }

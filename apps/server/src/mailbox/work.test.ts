@@ -13,7 +13,7 @@ it.effect("regression: reassignment selects unread inputs without loading consum
     yield* sql`insert into session (id, role, agent, name, runtime, brief, hired_at)
       values ('old', 'worker', 'lab', 'lab', 'pi', '', 0)`;
     yield* sql`insert into mailbox_trigger (id, source, source_key, trigger_json, payload_json, occurred_at, routed_at, routing_scope, routing_position)
-      select n, 'github', n, '{"actor":{"kind":"owner"}}', '{}', 0, 0, 'issue:work', n
+      select n, 'github', n, '{"actor":{"kind":"user"}}', '{}', 0, 0, 'issue:work', n
       from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2007) select n from s)`;
     yield* sql`insert into mailbox_issue (trigger_id, issue_id, state, session_id, created_at)
       select n, 'work', 'forwarded', 'old', 0 from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2007) select n from s)`;

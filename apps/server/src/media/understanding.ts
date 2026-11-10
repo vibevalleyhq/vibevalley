@@ -2,7 +2,7 @@ import { Clock, Effect, Fiber, FiberMap, Option, Schema, Semaphore } from "effec
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -214,7 +214,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
       yield* ports.capacity();
       const account = yield* provider.understanding();
       if (input.connection !== account.connection || input.revision !== account.revision) return yield* Effect.fail(refused(t("server.media.consentChanged")));
-      if (channel !== null && (yield* channels.placeOf(ownerId, channel)) !== channel) return yield* Effect.fail(invalid());
+      if (channel !== null && (yield* channels.placeOf(userId, channel)) !== channel) return yield* Effect.fail(invalid());
       const references = yield* Effect.forEach(input.inputs, (id) =>
         ports.inputs.get(id).pipe(Effect.flatMap(Schema.decodeUnknownEffect(S.MediaInputReference)), Effect.mapError(invalid)),
       );
@@ -230,7 +230,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
             id: input.id,
             request: yield* requestJson(input).pipe(Effect.mapError(invalid)),
             inputs: yield* referencesJson(references).pipe(Effect.mapError(invalid)),
-            source: yield* sourceJson({ kind: "owner" }).pipe(Effect.mapError(invalid)),
+            source: yield* sourceJson({ kind: "user" }).pipe(Effect.mapError(invalid)),
             authorization:
               channel === null
                 ? null
@@ -267,7 +267,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
     }),
     start: Effect.fn("Media.startUnderstanding")(
       function* (id: string, caller: MediaCaller) {
-        if (caller.kind !== "orchestrator" || !caller.forOwner) return yield* Effect.fail(refused(t("server.media.ownerRequired")));
+        if (caller.kind !== "orchestrator" || !caller.forUser) return yield* Effect.fail(refused(t("server.media.userRequired")));
         const row = yield* found(id);
         const approval = yield* authorization(row);
         if (!approval || approval.channel !== caller.channel) return yield* Effect.fail(refused(t("server.media.authorizationRequired")));
@@ -279,7 +279,7 @@ export const makeUnderstanding = Effect.fnUntraced(function* (ports: Ports) {
           return existing;
         }
         const account = yield* approvedAccount(row);
-        yield* channels.placeOf(ownerId, approval.channel);
+        yield* channels.placeOf(userId, approval.channel);
         const next = { ...row, source: yield* sourceJson(source).pipe(Effect.mapError(invalid)), phase: "queued" as const };
         yield* db.run(q.changeUnderstanding({ ...next, now: yield* Clock.currentTimeMillis }));
         yield* ports.publish();

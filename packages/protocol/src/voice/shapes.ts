@@ -45,7 +45,7 @@ export interface AgoraGrant {
 export const DictationViaValues = ["moss", "own"] as const;
 export type DictationVia = (typeof DictationViaValues)[number];
 
-/** url and model are the owner's own address's; kept while MOSS is chosen, so switching back finds them. */
+/** url and model are the user's own address's; kept while MOSS is chosen, so switching back finds them. */
 export interface Dictation {
   via: DictationVia;
   url: string;
@@ -178,7 +178,7 @@ export interface VoiceSaid {
 export interface VoiceHeard {
   agentId: string;
   text: string;
-  /** The profile the owner picked; absent for none. */
+  /** The profile the user picked; absent for none. */
   agent?: string;
   sendKey?: string;
 }

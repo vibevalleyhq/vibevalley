@@ -1,11 +1,11 @@
 {
   "name": {
-    "owner": "You",
+    "user": "You",
     "orchestrator": "Manager"
   },
   "mention": {
     "orchestrator": "@manager",
-    "owner": "@owner",
+    "user": "@user",
     "everyone": "@everyone"
   },
   "channelName": "A channel name has only letters, digits, - and _, up to 24 characters",

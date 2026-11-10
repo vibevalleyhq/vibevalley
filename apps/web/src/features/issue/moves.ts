@@ -9,7 +9,7 @@ import type { BoardCard, Lane } from "./cards";
 export interface IssueMove {
   readonly id: string;
   readonly status: IssueStatus;
-  /** What the owner said with it: the findings of reject, what a reopen asks for. */
+  /** What the user said with it: the findings of reject, what a reopen asks for. */
   readonly text?: string;
   /** Fields edited and not saved, saved first so the move sees them (starting a todo). */
   readonly edit?: IssueUpdate;
@@ -51,7 +51,7 @@ export function issueMoveOf(id: string, moves: readonly Intent<IssueMove, Applie
   return m && cardMoveOf(m);
 }
 
-/** The issue as its page shows it: the status the owner moved it to while the move is on its way, the rest the frame's. */
+/** The issue as its page shows it: the status the user moved it to while the move is on its way, the rest the frame's. */
 export function movedIssue(issue: Issue, moves: readonly Intent<IssueMove, AppliedIssue>[]): Issue {
   const m = moves.findLast((x) => x.input.id === issue.id);
   return m && m.phase !== "failed" && m.input.status !== issue.status ? { ...issue, status: m.input.status } : issue;

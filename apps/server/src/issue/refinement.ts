@@ -87,12 +87,12 @@ export function refinement(d: RefinementDeps) {
       const thread = yield* chat.issueThread(item.id, item.title, channel || undefined);
       const history = yield* chat.history(thread, undefined, 40);
       const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
-      if (said) yield* chat.post({ _tag: "Owner", text: said, channel: thread, sendKey: "" });
+      if (said) yield* chat.post({ _tag: "User", text: said, channel: thread, sendKey: "" });
       yield* beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
       const kept = where ? yield* sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
       if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: retained draft workplace`);
-      // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the owner's checkout.
+      // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the user's checkout.
       const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
       if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
       return yield* get(id);

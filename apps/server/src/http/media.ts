@@ -11,7 +11,7 @@ import { Media } from "#/media/media.ts";
 
 import { fromTheFarm } from "./rpc.ts";
 
-// This route is deliberately absent from the LAN listener: only the local owner can upload new inputs.
+// This route is deliberately absent from the LAN listener: only the local user can upload new inputs.
 export const mediaUploads = HttpRouter.add(
   "PUT",
   "/api/v1/media/input/:id/content",

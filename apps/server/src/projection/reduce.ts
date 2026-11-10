@@ -1,7 +1,7 @@
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
-import { withChannel, withMessage, withOwnerMentions } from "#/channel/messages.ts";
+import { withChannel, withMessage, withUserMentions } from "#/channel/messages.ts";
 import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "#/game/view.ts";
 import { withIssue, withIssueStatuses } from "#/issue/status.ts";
 import { isOnDuty, sessionOf, withSession } from "#/session/roster.ts";
@@ -70,8 +70,8 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
       const kept = all.filter((c) => c.id !== f.id && c.parent !== f.id);
       return kept.length === all.length || !state.chat ? [state, false] : [{ ...state, chat: { ...state.chat, channels: kept } }, true];
     }
-    case "ownerMentionsChanged":
-      return same(state.chat?.ownerMentions, f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
+    case "userMentionsChanged":
+      return same(state.chat?.userMentions, f.mentions) ? [state, false] : [{ ...state, chat: withUserMentions(state.chat, f.mentions) }, true];
     case "sessionChanged": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);

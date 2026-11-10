@@ -44,8 +44,8 @@ export interface InsertDelivery {
 }
 
 const RoutePosition = Schema.Struct({ scope: Schema.String, position: Schema.Int });
-const readRouteReceipt = Schema.decodeUnknownSync(Schema.Struct({ ...RoutePosition.fields, from_owner: Schema.Boolean }));
-const readOwnerRoutes = Schema.decodeUnknownSync(Schema.Array(RoutePosition));
+const readRouteReceipt = Schema.decodeUnknownSync(Schema.Struct({ ...RoutePosition.fields, from_user: Schema.Boolean }));
+const readUserRoutes = Schema.decodeUnknownSync(Schema.Array(RoutePosition));
 
 export interface QueuedInput {
   readonly issue: string;
@@ -59,7 +59,7 @@ export interface TalkRow {
 }
 
 /** What comes to the door: a recorded trigger, for those its threads reach, the hearers of a channel message, or one
- * session told straight; or the owner's first words in a direct conversation with a profile that has no session yet. */
+ * session told straight; or the user's first words in a direct conversation with a profile that has no session yet. */
 export type Arrival =
   | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelHearers | { readonly session: string } }
   | {
@@ -167,11 +167,11 @@ export class Mailbox extends Context.Service<
       const reach = new Reach();
       const received = (row: qr.MarkRoutedResult) => {
         const receipt = readRouteReceipt(row);
-        if (receipt.from_owner) reach.ownerSpoke(receipt.scope, receipt.position);
+        if (receipt.from_user) reach.userSpoke(receipt.scope, receipt.position);
       };
       const stored = (session: string, row: DeliveryRow) => {
         open.inserted(session, row);
-        if (row.payload.trigger.actor.kind === "owner" && row.envelope_id !== row.payload.trigger.id) reach.ownerSpoke(row.scope, row.position);
+        if (row.payload.trigger.actor.kind === "user" && row.envelope_id !== row.payload.trigger.id) reach.userSpoke(row.scope, row.position);
         reach.delivered({
           scope: row.scope,
           position: row.position,
@@ -227,7 +227,7 @@ export class Mailbox extends Context.Service<
                 rows: db.run(qd.allOpenDeliveries()),
                 scopes: db.run(qd.agentWakesByScope()),
                 sessions: db.run(qd.lastAgentWakes()),
-                owners: db.run(qd.lastOwnerRoutes()),
+                users: db.run(qd.lastUserRoutes()),
               });
             }),
           );
@@ -235,7 +235,7 @@ export class Mailbox extends Context.Service<
           reach.load(
             snapshot.scopes,
             snapshot.sessions.filter((row) => sessions.isReachable(row.session_id)),
-            readOwnerRoutes(snapshot.owners),
+            readUserRoutes(snapshot.users),
           );
         }),
       );
@@ -253,7 +253,7 @@ export class Mailbox extends Context.Service<
                     session: to.session,
                     role: agents.isOrchestrator(to.session) ? ("orchestrator" as const) : ("worker" as const),
                     commit: Effect.void,
-                    event: trigger.actor.kind === "owner" ? ("conversation" as const) : ("mention" as const),
+                    event: trigger.actor.kind === "user" ? ("conversation" as const) : ("mention" as const),
                   },
                 ];
         const result = yield* work.receive(trigger, audience);
@@ -424,7 +424,7 @@ export class Mailbox extends Context.Service<
           };
           const answered = new Set(
             rows
-              .filter((row) => row.payload.trigger.actor.kind === "owner" && row.state === "pending")
+              .filter((row) => row.payload.trigger.actor.kind === "user" && row.state === "pending")
               .flatMap((row) => {
                 const issue = itemOf(row);
                 return issue && issue.status !== "done" && issue.status !== "canceled" ? [issue.id] : [];
@@ -436,7 +436,7 @@ export class Mailbox extends Context.Service<
               !issue ||
               (issue.status !== "done" &&
                 issue.status !== "canceled" &&
-                (!waitsForHuman(issue) || row.payload.trigger.actor.kind === "owner" || answered.has(issue.id)))
+                (!waitsForHuman(issue) || row.payload.trigger.actor.kind === "user" || answered.has(issue.id)))
             );
           });
         },

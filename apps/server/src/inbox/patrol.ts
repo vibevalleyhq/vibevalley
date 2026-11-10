@@ -35,13 +35,13 @@ export function patrolStep(
   state: SpaceState,
   now: number,
   memory: PatrolMemory,
-  ownerSeen: Readonly<Record<string, number>> = {},
+  userSeen: Readonly<Record<string, number>> = {},
 ): [PatrolNote[], PatrolMemory] {
   const next = emptyPatrol();
   const report: PatrolNote[] = [];
   for (const e of inboxEntries(state)) {
     const key = e.item.id;
-    const seenAt = ownerSeen[key];
+    const seenAt = userSeen[key];
     const grace = seenAt === undefined ? patrolGrace[e.item.kind] : Math.max(patrolGrace[e.item.kind] ?? 0, 2 * 60 * 60_000);
     if (grace === undefined) continue;
     const seen = memory.firstSeen[key] ?? now;

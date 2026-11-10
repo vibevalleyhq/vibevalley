@@ -18,7 +18,7 @@ export type Inbound = typeof Inbound.Type;
 
 const AppFailedKindValues = ["restricted", "stale", "failed"] as const;
 
-/** Why an app did not do what it was asked. The message is what the owner sees. */
+/** Why an app did not do what it was asked. The message is what the user sees. */
 export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: unique symbol }>()("AppFailed", {
   kind: Schema.Literals(AppFailedKindValues),
   message: Schema.String,
@@ -34,8 +34,8 @@ export type Secrets = Readonly<Record<string, string>>;
 
 export interface Linked {
   readonly secrets: Secrets;
-  /** The owner's id in the app; "" until the owner pairs by a message. */
-  readonly owner: string;
+  /** The user's id in the app; "" until the user pairs by a message. */
+  readonly user: string;
 }
 
 export interface Progress {

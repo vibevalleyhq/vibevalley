@@ -79,7 +79,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
     const handedOn = Effect.fn("Channel.handedOn")(function* (h: T.Session, thread: string) {
       if (model.membersOf(thread).includes(h.id)) return;
       // A profile's talk: the session that answers there is not told of in it; it only follows.
-      if (model.channel(thread)?.type === "direct") return yield* addMember(thread, h.id, "owner", model.channel(thread)?.last_number ?? 0);
+      if (model.channel(thread)?.type === "direct") return yield* addMember(thread, h.id, "user", model.channel(thread)?.last_number ?? 0);
       const channel = channelOfSession(h);
       const latest = (yield* db.run(qm.latestNumber({ channel_id: channel }))).n ?? 0;
       const now = yield* Clock.currentTimeMillis;

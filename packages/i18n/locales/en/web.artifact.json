@@ -58,7 +58,7 @@
     "helpersWriting": "helpers writing",
     "demo": "Demo: several helpers writing at once",
     "append": "Write a paragraph at the end",
-    "owner": "Owner",
+    "user": "Owner",
     "done": "Done",
     "notDone": "Not done",
     "writing": "{who} is writing",

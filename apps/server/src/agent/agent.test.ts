@@ -227,7 +227,7 @@ describe("profiles", () => {
         expect([second.id, second.name, second.from]).toEqual(["backend-2", "后端老周 2", { template: "backend", version: 1 }]);
         expect((yield* s.templates()).find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
         expect((yield* Effect.flip(s.installTemplate("nobody")))._tag).toBe("Missing");
-        // The owner's changes stay until the profile is made again from the template; the machine's stay after it too.
+        // The user's changes stay until the profile is made again from the template; the machine's stay after it too.
         yield* s.save({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
         const again = yield* s.updateFromTemplate("backend-2");
         expect([again.name, again.persona, again.env, again.from?.version]).toEqual(["后端二号", starter("backend").persona, { CI: "1" }, 1]);

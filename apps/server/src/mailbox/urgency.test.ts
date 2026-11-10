@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { urgencyOf } from "./routing.ts";
 
-const input = { source: "channel", actor: "owner", recipient: "worker", event: "conversation", canSteer: true } as const;
+const input = { source: "channel", actor: "user", recipient: "worker", event: "conversation", canSteer: true } as const;
 
 describe("mailbox urgency", () => {
   it("keeps the routing table in one exhaustive rule", () => {

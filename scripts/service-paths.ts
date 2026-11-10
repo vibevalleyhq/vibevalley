@@ -45,14 +45,14 @@ export function edgesOf(files: ReadonlyArray<{ readonly path: string; readonly t
     const program: unknown = parseSync(path, text, { lang: "ts" }).program;
     return isNode(program) ? [{ path, program }] : [];
   });
-  const owner = new Map<string, string>();
+  const user = new Map<string, string>();
   for (const { path, program } of programs)
     walk(program, (n) => {
       if (n.type !== "ClassDeclaration") return;
       const name = identName(n["id"]);
       const module = moduleOf(path);
       const base = n["superClass"];
-      if (name !== undefined && module !== undefined && isNode(base) && JSON.stringify(base).includes('"Service"')) owner.set(name, module);
+      if (name !== undefined && module !== undefined && isNode(base) && JSON.stringify(base).includes('"Service"')) user.set(name, module);
     });
   const edges = new Map<string, Set<string>>();
   for (const { path, program } of programs) {
@@ -65,13 +65,13 @@ export function edgesOf(files: ReadonlyArray<{ readonly path: string; readonly t
       const variable = identName(n["id"]);
       if (variable === undefined || !isNode(init) || init.type !== "YieldExpression" || init["delegate"] !== true) return;
       const service = identName(init["argument"]);
-      if (service !== undefined && owner.has(service)) bound.set(variable, service);
+      if (service !== undefined && user.has(service)) bound.set(variable, service);
     });
     walk(program, (n) => {
       if (n.type !== "MemberExpression" && n.type !== "StaticMemberExpression") return;
       const service = bound.get(identName(n["object"]) ?? "");
       const member = identName(n["property"]);
-      const home = service === undefined ? undefined : owner.get(service);
+      const home = service === undefined ? undefined : user.get(service);
       if (service === undefined || member === undefined || home === undefined || home === module || ground.has(home)) return;
       const key = `${service}.${member}`;
       edges.set(key, (edges.get(key) ?? new Set()).add(module));

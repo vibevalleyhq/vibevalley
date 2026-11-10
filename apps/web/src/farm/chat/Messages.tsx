@@ -8,7 +8,7 @@ const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyTo
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
-import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
+import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, userId } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus } from "#/base/dom.tsx";
@@ -21,7 +21,7 @@ import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { Link as A } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
-import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace, UserFace } from "#/ui/Face.tsx";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -454,8 +454,8 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
   const size = () => props.size ?? 30;
   return (
     <Switch fallback={<AgentFace agentId={agentId()} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={size()} />}>
-      <Match when={props.m.fromKind === "owner"}>
-        <OwnerFace size={size()} />
+      <Match when={props.m.fromKind === "user"}>
+        <UserFace size={size()} />
       </Match>
       <Match when={props.m.fromRole === "orchestrator"}>
         <OrchestratorFace size={size()} agent={props.m.from} />
@@ -502,7 +502,7 @@ export function ChatRow(props: {
 
 type FarmMenuState = "closed" | "menu" | "confirmDelete" | "emojiPicker";
 
-/** What the owner can do to a message from the farm's window: the same requests as the workbench's tools. */
+/** What the user can do to a message from the farm's window: the same requests as the workbench's tools. */
 function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
   const core = useCore();
   const [menu, setMenu] = createSignal<FarmMenuState>("closed");
@@ -523,7 +523,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
       toasts.add({ type: ToastType.error, title: noticeTitle.error ?? reason, description: reason }),
     );
   };
-  const editable = () => props.m.from === ownerId && props.m.kind === "chat";
+  const editable = () => props.m.from === userId && props.m.kind === "chat";
   return (
     <div {...stylex.attrs(viewStyles.messageMenuDiv)}>
       <button

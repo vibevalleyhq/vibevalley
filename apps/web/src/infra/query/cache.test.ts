@@ -209,7 +209,7 @@ test("polls at the shortest demand, marks stale on time, and stops timers on GC"
   expect(c.read(query()).record).toBeUndefined();
 });
 
-test("bounded classified retries are canceled with their owner", async () => {
+test("bounded classified retries are canceled with their user", async () => {
   vi.useFakeTimers();
   const fetch = vi.fn(() => Promise.reject(new Error("retry")));
   const query = defineQuery({ schema: Schema.Finite, key: () => ["one"], fetch, retry: 1, retryWhen: () => true });

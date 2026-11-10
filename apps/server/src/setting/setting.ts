@@ -26,7 +26,7 @@ const MemorySourceConfig = Schema.Struct({
 });
 type MemorySourceConfig = typeof MemorySourceConfig.Type;
 
-/** MOSS is dictation's default, so only the owner's own address is written as a choice. */
+/** MOSS is dictation's default, so only the user's own address is written as a choice. */
 const StoredDictation = Schema.Struct({
   via: Schema.optionalKey(Schema.Literal("own")),
   url: Schema.String,
@@ -91,7 +91,7 @@ export class Setting extends Context.Service<
     readonly deepseekApiKey: () => Redacted.Redacted | undefined;
     readonly agora: () => AgoraCredentials | undefined;
     readonly voice: () => VoiceSettings;
-    /** Undefined when the owner's own address is chosen and not set. */
+    /** Undefined when the user's own address is chosen and not set. */
     readonly dictation: () => DictationConfig | undefined;
     readonly providers: () => ProviderSettings;
     readonly updateProviders: (

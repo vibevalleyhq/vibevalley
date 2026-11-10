@@ -143,7 +143,7 @@ it.effect("the orchestrator retries only a download and cancels a separate pendi
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });
 
-it.effect("the orchestrator executes a frozen owner approval through its trusted channel context", () => {
+it.effect("the orchestrator executes a frozen user approval through its trusted channel context", () => {
   const id = "authorized-understanding";
   const { llm, requests } = scriptedLLM([
     answer([toolCall("media_understanding_start", { id })]),

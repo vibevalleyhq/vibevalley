@@ -22,7 +22,7 @@ import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.t
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { sourceBrief } from "./prompts.ts";
-import { handsToOwner, summaryOf } from "./report.ts";
+import { handsToUser, summaryOf } from "./report.ts";
 import { isHired, isOnDuty, sessionOnIssue } from "./roster.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
 import type { Delivered, DeliveryInput, RunFinished, SessionNews } from "./signals.ts";
@@ -636,7 +636,7 @@ const make = Effect.gen(function* () {
             .attempt(Effect.flatMap(jsonText(report), (text) => qs.setPendingReport({ id, report: text })))
             .pipe(Effect.mapError((error) => error.pipe(causeMessage, refused)));
           h.report = report;
-          if (h.settling && handsToOwner(report)) {
+          if (h.settling && handsToUser(report)) {
             const pending = h.settling;
             delete h.settling;
             finishReport(h, pending.report, pending.completedBefore);

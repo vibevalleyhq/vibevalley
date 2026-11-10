@@ -130,7 +130,7 @@ export interface AppliedIssue extends Issue {
   seq: number;
 }
 
-/** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
+/** A question the helper is waiting on the user for; options are the answers it thought of, each one a reply as it is. */
 export interface Question {
   question: string;
   options: string[];
@@ -146,7 +146,7 @@ export interface CriterionCheck {
   proof: string;
 }
 
-/** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
+/** Where an issue stands for the user, the one set of states the board, the farm and the page all say. */
 export const IssueStageKindValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "done", "canceled"] as const;
 export type IssueStageKind = (typeof IssueStageKindValues)[number];
 
@@ -157,7 +157,7 @@ export type StuckReason = (typeof StuckReasonValues)[number];
 export const IssueActValues = ["start", "answer", "reject", "complete", "acknowledge", "resolve", "resume", "cure", "tell", "stop", "close", "reopen"] as const;
 export type IssueAct = (typeof IssueActValues)[number];
 
-/** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any. */
+/** since: when it came to stand so, when known. lead is the one thing the user is asked to do, if any. */
 export interface IssueStage {
   state: IssueStageKind;
   since?: number;
@@ -190,7 +190,7 @@ export const MilestoneKindValues = [
 ] as const;
 export type MilestoneKind = (typeof MilestoneKindValues)[number];
 
-/** One line of an issue's story; who is the session's name, or absent for the owner and the farm. */
+/** One line of an issue's story; who is the session's name, or absent for the user and the farm. */
 export interface Milestone {
   at: number;
   kind: MilestoneKind;
@@ -211,7 +211,7 @@ export interface IssueRefining {
 
 export interface IssueRefineRequest {
   text?: string;
-  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  /** Fields the user changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
 }
 
@@ -258,7 +258,7 @@ export interface IssueRequest {
   requestKey?: string;
 }
 
-/** What an issue delivers: a change, a change kept on its branch for the owner to take in, or an answer (on the issue). */
+/** What an issue delivers: a change, a change kept on its branch for the user to take in, or an answer (on the issue). */
 export const DeliverableValues = ["change", "branch", "answer", "pull_request"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
@@ -266,7 +266,7 @@ export type Deliverable = (typeof DeliverableValues)[number];
 export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
-/** Why an issue is not done: the owner closed it, or its workplace was lost. */
+/** Why an issue is not done: the user closed it, or its workplace was lost. */
 export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];
 
@@ -292,8 +292,8 @@ export interface IssueFilter {
   /** At most this many; none is all. */
   limit?: number;
   closed?: boolean;
-  /** Only those waiting on the owner, the longest waiting first. */
-  wantsOwner?: boolean;
+  /** Only those waiting on the user, the longest waiting first. */
+  wantsUser?: boolean;
 }
 
 /** One task of an issue split into several people's work: an issue under the graph the issue becomes. */
@@ -321,7 +321,7 @@ export interface IssueStatusRequest {
   text?: string;
   /** Moving to todo: the profile that takes it on. */
   agent?: string;
-  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  /** Fields the user changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
   /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
   requestKey?: string;
@@ -333,7 +333,7 @@ export interface FactSessionReported {
   id: SessionId;
   run?: string;
   outcome: Outcome;
-  /** A successful turn can rest for external feedback without handing off to the owner. */
+  /** A successful turn can rest for external feedback without handing off to the user. */
   phase?: PhaseResting;
   summary: string;
   runs: number;

@@ -8,7 +8,7 @@
 |---|---|
 | 频道、私聊、串的增删改查，消息号与地址 `#<频道>:<消息号>` | 工单生命周期与派活决策（[工单](docs/subsystems/issue.md)） |
 | 消息写入、编辑、删除、回应、置顶、附件、搜索与链接预览 | 收件优先级、三道刹车、投递状态与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
-| 阅读游标（`channel_read_cursor`）与未处理 `@主人`（`ownerMentions`） | 会话如何跑一轮、私聊执行器休眠实现（[帮工](docs/subsystems/session.md)） |
+| 阅读游标（`channel_read_cursor`）与未处理 `@主人`（`userMentions`） | 会话如何跑一轮、私聊执行器休眠实现（[帮工](docs/subsystems/session.md)） |
 | 页面按频道的 RPC WebSocket 实时订阅与按修订号（`revision`）补齐 | 哪些未读事项提醒主人或外推连接器（[Inbox](docs/subsystems/inbox.md)） |
 | 外部连接器（微信、飞书、QQ）：配对、收件去重、发件退避与摘要 | 管家如何生成回复（[管家](docs/subsystems/orchestrator.md)） |
 
@@ -38,7 +38,7 @@
   - `direct`：主人与单个管家或帮工档案的私聊；与帮工私聊直接拉起绑定该频道的 `Session`（用独立 `contexts/` 目录，闲置 10 分钟休眠），不建隐藏工单。
   - `thread`：挂在父频道某条消息下的串；每张工单固定一个工单串（`subject_kind: "issue"`），重开或换帮工复用同一串。
 - **单连接串行写库，消息号从 `1` 递增**：所有写操作经 `hub.ts` 信号量串行提交，对外地址为 `#<频道>:<消息号>`。
-- **核心状态只留近期摘要，正文按频道订阅**：`SpaceState.chat` 仅保留最近 100 个频道/串摘要与全量未处理的 `ownerMentions`。正文经 `/api/v1/rpc` 的 `channel.follow({ id, after })` 订阅：消息增改删或置顶均递增 `revision`，重连落后 200 条以内按修订号补齐，超出则回 `Reset` 重拉最新页。
+- **核心状态只留近期摘要，正文按频道订阅**：`SpaceState.chat` 仅保留最近 100 个频道/串摘要与全量未处理的 `userMentions`。正文经 `/api/v1/rpc` 的 `channel.follow({ id, after })` 订阅：消息增改删或置顶均递增 `revision`，重连落后 200 条以内按修订号补齐，超出则回 `Reset` 重拉最新页。
 - **主动阅读与被动消费分开记账**：
   - 调读取接口推进 `channel_read_cursor.read_number`。
   - 模型实际消费投递推进 `mailbox_delivery.consumed_at` 并加 👀 反应，未读查询同时排除两者已覆盖的消息。
@@ -69,7 +69,7 @@
 - **只走出站长连接，只认配对主人**：微信长轮询、飞书与 QQ 官方长连接，不开 webhook；仅绑定扫码或发 6 位配对码的主人，忽略群聊与陌生人。
 - **收件至少一次，发件受 Inbox 门禁控制**：
   - 入站先同事务写 `connector_inbound` 与游标，再以平台消息 ID 哈希作 `sendKey` 入频道。
-  - 出站只发 `Inbox.toOwner` 放行的未读事项，在工作台已读或回复后自动撤回未发的 `connector_outbox`；拒收时指数退避并在主人下次发言时合并补发。
+  - 出站只发 `Inbox.toUser` 放行的未读事项，在工作台已读或回复后自动撤回未发的 `connector_outbox`；拒收时指数退避并在主人下次发言时合并补发。
 
 ## 怎么走
 
@@ -77,7 +77,7 @@
 
 1. `Channel.say` 在单写锁内将消息、提及、关注和 `Trigger` 写入库，推进主人已读游标。
 2. 调用 `Mailbox.receive` 在事务内写投递行与路由回执（中途崩溃由启动重放恢复）。
-3. 施加 `messageChanged`、`channelChanged`、`ownerMentionsChanged` 事实，并向 WebSocket 订阅者推送。
+3. 施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，并向 WebSocket 订阅者推送。
 
 **派活开启工单串与贴出汇报**
 
@@ -88,7 +88,7 @@
 
 - **信箱**：Channel 算出候选受众并落库后，交 [Mailbox](docs/subsystems/mailbox.md) 执行刹车、蓄水与唤醒。
 - **帮工与管家（`session`、`orchestrator`）**：订阅 `Session` 事件维护串；管家经 `Channel.post` 的 `Run` 写回复（在服务端里跑的 agent 一轮说的话，一整条）。
-- **工单与通知（`issue`、`inbox`）**：向工单广播 `ownerInThread`；向 Inbox 提供 `ownerMentions` 并消费 `Inbox.toOwner`。
+- **工单与通知（`issue`、`inbox`）**：向工单广播 `userInThread`；向 Inbox 提供 `userMentions` 并消费 `Inbox.toUser`。
 
 ## 为什么这样
 
@@ -104,7 +104,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/channel/channel.test.ts`、`mentions.test.ts`、`recorded.test.ts`：路由、修订号补齐、新鲜度拦截与 `ownerMentions` 测试。
+- `apps/server/src/channel/channel.test.ts`、`mentions.test.ts`、`recorded.test.ts`：路由、修订号补齐、新鲜度拦截与 `userMentions` 测试。
 - `apps/server/src/flows/thread.test.ts`、`talk.test.ts`：工单串跨重开复用與私聊休眠恢复测试。
 - `apps/server/src/connector/connector.test.ts`、`digest.test.ts`：微信/飞书/QQ 收发去重、退避与配对测试。
 - `apps/web/test/chat.spec.ts`、`chat-messages.spec.ts`、`chat-rest.spec.ts`、`channel-follow.spec.ts`：聊天界面与实时订阅端到端测试。

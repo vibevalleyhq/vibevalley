@@ -152,7 +152,7 @@ export function createChannelForm(channel?: Channel) {
   /** The channel's id once it went through; undefined, with the reason in error, when refused. */
   const save = (): Promise<string | undefined> => {
     setError(undefined);
-    // Read as the owner saves: the form may change while the call waits.
+    // Read as the user saves: the form may change while the call waits.
     const now = {
       name: name().trim(),
       description: description(),
@@ -330,11 +330,11 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
   );
 }
 
-/** Archiving, and deleting once the owner has read what it does: the server's dry run, or why it refuses. */
+/** Archiving, and deleting once the user has read what it does: the server's dry run, or why it refuses. */
 function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: () => void }) {
   const [does, setDoes] = createSignal<readonly string[]>();
   const [error, setError] = createSignal<string>();
-  // The refusal is said under the buttons, where the owner pressed.
+  // The refusal is said under the buttons, where the user pressed.
   const steps = createAct(setError);
   const busy = steps.busy;
   const act = (step: "archive" | "preview" | "delete") => {

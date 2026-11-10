@@ -26,7 +26,7 @@ const until = async <T>(get: () => Promise<T | undefined> | T | undefined, what:
 
 interface Device {
   install(): void;
-  /** Quits the app and starts it again as the owner would, with no link. */
+  /** Quits the app and starts it again as the user would, with no link. */
   restart(): void;
   /** Evaluates expression in the page (awaiting a promise), where the build lets DevTools in; undefined where it cannot. */
   evaluate(expression: string): Promise<unknown>;

@@ -27,7 +27,7 @@ import { kept, openQuestions } from "./refinement.ts";
 import { issueRows, jsonOrNull, nullText } from "./rows.ts";
 import { isClosed, issueOrder, keepClosedIssues } from "./status.ts";
 
-/** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
+/** Only while the issue is still open: a completion the user chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
 const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Delivery } | { canceled: T.IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
@@ -124,7 +124,7 @@ export const issueLifecycle = Effect.gen(function* () {
     return Effect.succeed([title, description] as const);
   };
 
-  /** add, with the database refusing the row kept as a failure: hire tells it to the owner. */
+  /** add, with the database refusing the row kept as a failure: hire tells it to the user. */
   const attemptAdd = Effect.fn("Issue.attemptAdd")(function* (req: T.IssueRequest, mandate: T.IssueMandate, cron?: string) {
     const [title, description] = yield* issueWords(req);
     if (req.constraints?.acceptance === true && !req.constraints.check?.trim())
@@ -254,7 +254,7 @@ export const issueLifecycle = Effect.gen(function* () {
     const row = yield* db.one(q.getIssue({ id: issue }));
     if (!row) return;
     const runs = worked.sessionIds(issue);
-    // Closed already (completed by the owner before its session went home): the verdict stands.
+    // Closed already (completed by the user before its session went home): the verdict stands.
     if (runs.at(-1) !== sessionId || row.closed_at !== null) return;
     const closing = closingOf(closed);
     yield* db.run(
@@ -291,7 +291,7 @@ export const issueLifecycle = Effect.gen(function* () {
 
   const unqueue = (id: string) => Effect.andThen(db.run(q.unqueueIssue({ id })), publish(id));
 
-  /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
+  /** What the session waits on the user for, from its report; a report with none, or a comment, clears them. */
   const asked = (id: string, questions: readonly T.Question[] | undefined) =>
     Effect.andThen(db.run(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
@@ -330,8 +330,8 @@ export const issueLifecycle = Effect.gen(function* () {
   const judged = (id: string, at: number, findings: readonly T.Finding[]) =>
     Effect.andThen(db.run(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
-  /** A new owner reply invalidates the previous acceptance. */
-  const ownerSaid = Effect.fn("Issue.ownerSaid")(function* (id: string) {
+  /** A new user reply invalidates the previous acceptance. */
+  const userSaid = Effect.fn("Issue.userSaid")(function* (id: string) {
     const item = yield* get(id);
     yield* db.inTx(
       Effect.gen(function* () {
@@ -581,7 +581,7 @@ export const issueLifecycle = Effect.gen(function* () {
     asked,
     recordReport,
     judged,
-    ownerSaid,
+    userSaid,
     recordHiredStart,
     recordOnDutyStart,
     setQueued,

@@ -6,7 +6,7 @@ import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle }
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import { actsForOwner } from "#/base/actor.ts";
+import { actsForUser } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import { Channel, type Info } from "#/channel/channel.ts";
 import { explicitMandate, inferredMandate, mandateNoteFits } from "#/issue/creation.ts";
@@ -27,7 +27,7 @@ import {
   issuePrSubmitted,
   issueReportDescription,
   issueReportRecorded,
-  ownerAgentWord,
+  userAgentWord,
   sessionLine,
 } from "./prompts.ts";
 import {
@@ -102,14 +102,14 @@ export const issueTools = Effect.gen(function* () {
 
   const whoOf = (issue: T.Issue) => {
     const agent = assignedAgentOf(issue);
-    return workerOf(issue)?.name ?? (agent === defaultOrchestrator ? ownerAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
+    return workerOf(issue)?.name ?? (agent === defaultOrchestrator ? userAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
   };
 
   const nobodyOn = (issue: T.Issue) => answers.nobodyOn(issue.number);
 
   const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
 
-  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for this input, else by the farm's rule.
+  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the user picked for this input, else by the farm's rule.
   const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<T.Agent, string> {
     const key = name.trim();
     const a = yield* runtimes.choose(brief, key, picked);
@@ -220,7 +220,7 @@ export const issueTools = Effect.gen(function* () {
     );
 
   // Review is judging what came back against what the issue asked for; a pass only makes it ready, completing it stays
-  // the owner's (issue_status_update to done).
+  // the user's (issue_status_update to done).
   const issueReview = tool(
     "issue.review",
     Effect.fn("Tool.issueReview")(
@@ -272,7 +272,7 @@ export const issueTools = Effect.gen(function* () {
     Effect.fn("Tool.issueList")(function* (p: Orchestrator<"issue.list">) {
       const { limit: _, ...rest } = p;
       const found = yield* issue.query(rest);
-      if (found.length === 0) return p.wantsOwner === true ? answers.issues.noneWaiting : answers.issues.none;
+      if (found.length === 0) return p.wantsUser === true ? answers.issues.noneWaiting : answers.issues.none;
       const now = yield* Clock.currentTimeMillis;
       const limit = p.limit != null && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? answers.issues.moreNote(found.length - limit) : "";
@@ -326,7 +326,7 @@ export const issueTools = Effect.gen(function* () {
                 ...(p.priority ? { priority: p.priority } : {}),
                 ...(p.deliver ? { deliver: p.deliver } : {}),
               },
-              actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
+              actsForUser(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
             )
             .pipe(Effect.mapError((e) => answers.issueCreate.notRecordedFailed(said(e))));
           const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
@@ -402,7 +402,7 @@ export const issueTools = Effect.gen(function* () {
           p.id,
           Effect.fnUntraced(
             function* (item: T.Issue) {
-              // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
+              // Sent out with nobody named yet: chosen by the farm's rule, the user's pick first; another one named hands it over.
               let agent: string | undefined;
               if (p.agent || (to === "todo" && item.status === "backlog" && !assignedAgentOf(item))) {
                 const chosen = yield* choose(item.title + "\n" + item.description, p.agent ?? "", p.agent ? "" : c.picked);

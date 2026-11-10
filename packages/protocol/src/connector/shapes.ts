@@ -4,7 +4,7 @@ export interface ConnectorStatus {
   qr: string;
   pairCode: string;
   channel?: string;
-  owner?: string;
+  user?: string;
   since?: number;
   lastInbound?: number;
   pausedUntil?: number;

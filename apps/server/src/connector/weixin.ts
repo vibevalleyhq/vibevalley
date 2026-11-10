@@ -93,7 +93,7 @@ type LoginState = "waiting" | "scanned" | "verify";
 export interface LoginAccount {
   readonly account: Account;
   readonly botId: string;
-  readonly owner: string;
+  readonly user: string;
 }
 
 export interface WeixinApi {
@@ -220,7 +220,7 @@ export class WeixinClient implements WeixinApi {
           case "confirmed": {
             const s = status;
             if (!("bot_token" in s) || !s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) return yield* failedWith(t("server.connector.weixin.incomplete"));
-            return { account: { baseUrl: s.baseurl || base, token: s.bot_token }, botId: s.ilink_bot_id, owner: s.ilink_user_id };
+            return { account: { baseUrl: s.baseurl || base, token: s.bot_token }, botId: s.ilink_bot_id, user: s.ilink_user_id };
           }
           default:
             break;
@@ -306,7 +306,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         api.login((state, url) => progress({ state, qr: url }), verifyCode),
         (linked) => ({
           secrets: { token: linked.account.token, botId: linked.botId, baseUrl: linked.account.baseUrl },
-          owner: linked.owner,
+          user: linked.user,
         }),
       ),
     receive: (secrets, io) =>

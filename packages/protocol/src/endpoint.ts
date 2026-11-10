@@ -5,7 +5,7 @@ import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
 
 export { pathOf };
 
-export type Caller = "owner" | "remote" | "orchestrator" | "session";
+export type Caller = "user" | "remote" | "orchestrator" | "session";
 
 /** One thing to do next after a refusal: what to do, and, when it is a command, the command line's words for it (without
  * the program's name), runnable as they are. */
@@ -33,7 +33,7 @@ export type { VoiceFix } from "./shapes";
 export interface VoiceUnavailable {
   readonly _tag: "VoiceUnavailable";
   readonly reason: string;
-  /** Where in Settings the owner fixes it, when a setting does. */
+  /** Where in Settings the user fixes it, when a setting does. */
   readonly settings?: VoiceFix;
 }
 

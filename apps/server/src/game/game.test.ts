@@ -96,11 +96,11 @@ describe("the game", () => {
     });
   });
 
-  // What the owner did reaches the ledger from the service it went through, whatever the entry point.
-  it.effect("counts the owner's review and call", () =>
+  // What the user did reaches the ledger from the service it went through, whatever the entry point.
+  it.effect("counts the user's review and call", () =>
     Effect.gen(function* () {
       const core = yield* Core;
-      // The game hears the owner from its start: Core.owner is subscribed before the game's layer is built.
+      // The game hears the user from its start: Core.user is subscribed before the game's layer is built.
       yield* core.did({ kind: "reviewed", session: sessionId("w1") });
       yield* core.did({ kind: "talked" });
       yield* until(kinds, (k) => [...k].toSorted().join() === "reviewed,voice", "both");

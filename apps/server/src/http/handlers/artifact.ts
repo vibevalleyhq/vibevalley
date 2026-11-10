@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import type { ArtifactHandlers } from "@vibevalley/protocol/api";
 
 import { Agent } from "#/agent/agent.ts";
@@ -18,23 +18,23 @@ export const artifactHandlers = Effect.gen(function* () {
     "artifact.content.get": ({ id, version }) => Effect.map(artifacts.content(id, version), (c) => ({ version: c.version, content: c.content })),
     "artifact.create": (req) =>
       Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.undefined, (issue) =>
-        artifacts.create({ from: ownerId, by: ownerId }, { ...req, ...(issue ? { issue } : {}) }),
+        artifacts.create({ from: userId, by: userId }, { ...req, ...(issue ? { issue } : {}) }),
       ),
-    "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),
-    "artifact.html.edit": (req) => artifacts.htmlEdit({ from: ownerId, by: ownerId }, req),
+    "artifact.version.create": (req) => artifacts.version({ from: userId, by: userId }, req),
+    "artifact.html.edit": (req) => artifacts.htmlEdit({ from: userId, by: userId }, req),
     "artifact.update": ({ id, title }) => artifacts.rename(id, title),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
     "artifact.block.list": ({ id }) => artifacts.blocks(id),
-    "artifact.submit": ({ id, ...body }) => artifacts.submit(id, ownerId, body),
-    "artifact.block.create": ({ id, ...body }) => artifacts.insertBlock(id, ownerId, body),
-    "artifact.block.update": ({ id, ...body }) => artifacts.updateBlock(id, ownerId, body),
-    "artifact.block.delete": ({ id, ...body }) => artifacts.deleteBlock(id, ownerId, body),
+    "artifact.submit": ({ id, ...body }) => artifacts.submit(id, userId, body),
+    "artifact.block.create": ({ id, ...body }) => artifacts.insertBlock(id, userId, body),
+    "artifact.block.update": ({ id, ...body }) => artifacts.updateBlock(id, userId, body),
+    "artifact.block.delete": ({ id, ...body }) => artifacts.deleteBlock(id, userId, body),
     "artifact.block.previewDelete": ({ id, block }) => artifacts.previewDeleteBlock(id, { block }),
     "artifact.suggestion.list": ({ id }) => artifacts.suggestions(id),
-    "artifact.suggestion.create": ({ id, ...body }) => artifacts.suggest(id, ownerId, body),
-    "artifact.suggestion.accept": ({ id, suggestion }) => artifacts.acceptSuggestion(id, suggestion, ownerId),
-    "artifact.suggestion.reject": ({ id, suggestion }) => artifacts.rejectSuggestion(id, suggestion, ownerId),
+    "artifact.suggestion.create": ({ id, ...body }) => artifacts.suggest(id, userId, body),
+    "artifact.suggestion.accept": ({ id, suggestion }) => artifacts.acceptSuggestion(id, suggestion, userId),
+    "artifact.suggestion.reject": ({ id, suggestion }) => artifacts.rejectSuggestion(id, suggestion, userId),
     "artifact.markdown.get": ({ id }) => Effect.map(artifacts.markdown(id), (markdown) => ({ markdown })),
     "artifact.demo": ({ id }) => artifacts.demo(id, agents.agents()),
   };

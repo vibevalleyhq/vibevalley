@@ -251,10 +251,10 @@ export class MossEngine {
     switch (action) {
       case "input.transcript.updated":
       case "input.transcript.done":
-        this.turns = heard(this.turns, "owner", d.turn ?? "", text, action.endsWith("done")).slice(-200);
+        this.turns = heard(this.turns, "user", d.turn ?? "", text, action.endsWith("done")).slice(-200);
         break;
       case "input.transcript.revised":
-        if (d.turn) this.turns = this.turns.map((entry) => (entry.who === "owner" && entry.key === d.turn ? { ...entry, text } : entry));
+        if (d.turn) this.turns = this.turns.map((entry) => (entry.who === "user" && entry.key === d.turn ? { ...entry, text } : entry));
         break;
       case "output.transcript.updated":
       case "output.transcript.done": {

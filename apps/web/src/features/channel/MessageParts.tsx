@@ -3,7 +3,7 @@ import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
-import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
+import { type Attachment, attachmentPath, type ChatMessage, type Embed, userId } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus } from "#/base/dom.tsx";
@@ -513,11 +513,11 @@ const viewStyles = stylex.create({
   },
 });
 
-const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
+const nameOf = (m: ChatMessage) => (m.from === userId ? t("web.channel.messages.user") : m.name);
 
 const bad = (reason: string) => toast(reason, "bad");
 
-/** The owner's reaction set on a message, shown at once (marks.ts); a refusal is said and the reaction goes back. */
+/** The user's reaction set on a message, shown at once (marks.ts); a refusal is said and the reaction goes back. */
 function useReact() {
   const reactions = useIntents(reactionSet);
   return (m: ChatMessage, emoji: string, on: boolean) => setMark(reactions, { channel: m.channel, id: m.id, emoji, on }, sameReaction, bad);
@@ -714,7 +714,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
     <div {...stylex.attrs(viewStyles.reactionsDiv)}>
       <For each={props.m.reactions} keyed={(r) => r.emoji}>
         {(r) => {
-          const mine = () => r().by.includes(ownerId);
+          const mine = () => r().by.includes(userId);
           return (
             <button
               type="button"
@@ -798,7 +798,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       toast(t("web.channel.more.copied"));
     });
   };
-  const editable = () => props.m.from === ownerId && props.m.kind === "chat";
+  const editable = () => props.m.from === userId && props.m.kind === "chat";
   return (
     <Toolbar.Root
       data-testid="message-tools"
@@ -955,7 +955,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
 }
 
 export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
-  // The words as they were when editing began: a change heard meanwhile does not move the box under the owner's hands.
+  // The words as they were when editing began: a change heard meanwhile does not move the box under the user's hands.
   const { id, text: was, attachments: files } = untrack(() => props.m);
   const done = () => untrack(() => props.onDone)();
   const [text, setText] = createSignal(was);

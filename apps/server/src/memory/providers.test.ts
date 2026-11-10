@@ -6,7 +6,7 @@ import { FetchHttpClient } from "effect/http";
 import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner as ownerActor } from "#/base/actor.ts";
+import { user as userActor } from "#/base/actor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import type { MemorySourceConfig } from "#/setting/memorySources.ts";
@@ -104,7 +104,7 @@ const withFake = <A, E>(fake: Fake, body: (m: Memory["Service"]) => Effect.Effec
     return yield* body(memory);
   }).pipe(Effect.provide(world(() => sourceOf(fake))));
 
-const owner = (agent: string, text: string, repo = ""): Note => ({ agent, text, repo, by: ownerActor });
+const user = (agent: string, text: string, repo = ""): Note => ({ agent, text, repo, by: userActor });
 
 const until = (ok: () => boolean) => whenTrue(ok, "it");
 
@@ -112,7 +112,7 @@ describe("memory sources", () => {
   it.live("one source recalls as the preview shows", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write(owner("lab", "这个仓库测试用 pnpm test", "demo"));
+      yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
       const preview = yield* m.recallOf("lab", "demo", "跑测试");
       const got = yield* m.recall({ agent: "lab", repo: "demo", text: "跑测试" });
       expect(got.lines).toHaveLength(1);
@@ -125,7 +125,7 @@ describe("memory sources", () => {
     const fake = Object.assign(new Fake("slow"), { slow: true });
     return withFake(fake, (m) =>
       Effect.gen(function* () {
-        yield* m.write(owner("lab", "迁移文件放 db/migrations", "demo"));
+        yield* m.write(user("lab", "迁移文件放 db/migrations", "demo"));
         const start = yield* Clock.currentTimeMillis;
         expect((yield* m.recall({ agent: "lab", repo: "demo", text: "迁移" })).lines).toHaveLength(1);
         expect((yield* m.search({ agent: "lab", repo: "", text: "迁移", kind: "", limit: 0 })).found).toHaveLength(1);
@@ -140,7 +140,7 @@ describe("memory sources", () => {
     fake.listed = [{ id: "m9", agent: "lab", kind: "note", text: "主人要中文的提交信息" } as T.Memory];
     return withFake(fake, (m) =>
       Effect.gen(function* () {
-        const local = yield* m.write(owner("lab", "这个仓库测试用 pnpm test", "demo"));
+        const local = yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
         const got = yield* m.recall({ agent: "lab", repo: "demo", text: "测试 提交", skip: new Set(["nowledge:m1", "other:m2", local.id + "x"]) });
         expect(got.ids).toEqual([local.id, "nowledge:m9"]);
         expect(got.lines[1]).toBe("主人要中文的提交信息");
@@ -175,7 +175,7 @@ describe("memory sources", () => {
         expect(ms).toHaveLength(1);
         yield* Effect.promise(() => until(() => fake.synced.length === 1));
         expect(fake.synced[0]!.said).toBe(run.said);
-        yield* m.write(owner("lab", "替它记一条"));
+        yield* m.write(user("lab", "替它记一条"));
         yield* Effect.promise(() => until(() => fake.added.length === 1));
         expect(fake.added[0]!.text).toBe("替它记一条");
       }),
@@ -224,13 +224,13 @@ describe("memory sources", () => {
     return Effect.gen(function* () {
       yield* save(nowledgeOn);
       const m = yield* Memory;
-      yield* m.write(owner("lab", "first"));
+      yield* m.write(user("lab", "first"));
       yield* Effect.promise(() => until(() => events.includes("old:first")));
-      yield* m.write(owner("lab", "second"));
+      yield* m.write(user("lab", "second"));
       yield* save({ ...nowledgeOn, url: "http://new/" });
       yield* m.sources;
       yield* Effect.promise(() => until(() => events.includes("old:stop")));
-      yield* m.write(owner("lab", "third"));
+      yield* m.write(user("lab", "third"));
       yield* Effect.promise(() => until(() => events.includes("new:third")));
       expect(events).not.toContain("old:second");
       release();
@@ -291,7 +291,7 @@ describe("memory sources", () => {
     fake.lines = words.slice(0, recallCount).map((w, i) => ({ id: `m${i}`, line: "- （Nowledge）外面的 " + w, score: 1 }));
     return withFake(fake, (m) =>
       Effect.gen(function* () {
-        for (let i = 0; i < recallCount; i++) yield* m.write(owner("lab", "测试用 " + words[recallCount + i], "demo"));
+        for (let i = 0; i < recallCount; i++) yield* m.write(user("lab", "测试用 " + words[recallCount + i], "demo"));
         const got = yield* m.recall({ agent: "lab", repo: "demo", text: "测试" });
         const local = got.ids.filter((id) => !id.includes(":"));
         expect([got.ids.length, local.length]).toEqual([recallCount, recallCount / 2]);
@@ -346,7 +346,7 @@ describe("memory sources", () => {
         ["lab", "提交信息写中文", ""],
         ["scout", "测试前先 pnpm install", "demo"],
       ])
-        yield* m.write(owner(agent!, text!, repo));
+        yield* m.write(user(agent!, text!, repo));
       const texts = (found: Found[]) => found.map((f) => f.text);
       const q = (agent: string, repo: string, text: string): SearchQuery => ({ agent, repo, text, kind: "", limit: 0 });
       expect(texts((yield* m.search(q("lab", "demo", "测试"))).found)).toEqual(["这个仓库测试用 pnpm test"]);
@@ -369,7 +369,7 @@ describe("memory sources", () => {
     ];
     return withFake(fake, (m) =>
       Effect.gen(function* () {
-        yield* m.write(owner("lab", "这个仓库测试用 pnpm test", "demo"));
+        yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
         const got = (yield* m.search({ agent: "lab", repo: "demo", text: "测试", kind: "", limit: 0 })).found;
         expect([got.length, got[0]!.source, got[1]!.id, got[1]!.source]).toEqual([2, localName, "nowledge:m2", "nowledge"]);
         const asked = fake.searched[0]!;

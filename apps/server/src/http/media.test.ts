@@ -33,7 +33,7 @@ const farm = Effect.gen(function* () {
   return { base, client, post, get };
 });
 
-it.live("raw input upload is owner-only, immutable, and separate from JSON attachments", () =>
+it.live("raw input upload is user-only, immutable, and separate from JSON attachments", () =>
   Effect.gen(function* () {
     const { base, client, post } = yield* farm;
     const bytes = png();

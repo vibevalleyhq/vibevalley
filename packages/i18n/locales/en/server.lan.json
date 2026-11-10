@@ -13,7 +13,7 @@
   "codeExpired": "The pairing code expired: get a new one on that computer",
   "wrongCode": "Wrong pairing code",
   "anotherAsking": "Another device is waiting for the owner's approval: try again in a moment",
-  "ownerLate": "The owner did not approve in time and the pairing code expired: get a new one on that computer",
+  "userLate": "The owner did not approve in time and the pairing code expired: get a new one on that computer",
   "denied": "The owner did not let this device in",
   "noCode": "No pairing code is out: nothing changes",
   "dropCode": "Withdraw the pairing code {code}",

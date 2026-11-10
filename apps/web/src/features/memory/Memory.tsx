@@ -441,7 +441,7 @@ export function MemoryPanel(props: { agent: string }) {
   const repos = () => [...new Set(all().flatMap((m) => (m.repo ? [m.repo] : [])))].toSorted();
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.repo === undefined : m.repo === shown()));
   const whose = (m: Memory) =>
-    m.author === "owner"
+    m.author === "user"
       ? t("web.memory.memory.yours")
       : m.session
         ? t("web.memory.memory.sessions", { name: sessions().get(m.session) ?? m.session })
@@ -603,7 +603,7 @@ function RecallPreview(props: { agent: string }) {
   );
 }
 
-/** Notes belong to the profile; authorship distinguishes the owner's words. */
+/** Notes belong to the profile; authorship distinguishes the user's words. */
 export function OrchestratorMemoryPanel(props: { agent: string }) {
   const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
@@ -622,7 +622,7 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
                   <MemoryItem
                     memory={m()}
                     onForget={() => forget(m().id)}
-                    meta={[m().author === "owner" ? t("web.memory.memory.told") : t("web.memory.memory.orchestratorOwn"), ago(m().at, now())]}
+                    meta={[m().author === "user" ? t("web.memory.memory.told") : t("web.memory.memory.orchestratorOwn"), ago(m().at, now())]}
                   />
                 )}
               </For>

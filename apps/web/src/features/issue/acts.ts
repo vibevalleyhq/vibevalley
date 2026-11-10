@@ -11,7 +11,7 @@ import type { Act } from "#/ui/act.ts";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { issueSay, pendingWords } from "./write";
 
-// The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
+// The user's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
 
 /** An action sent once, without an overlay (the farm's bed tools, which play their effect after it). */
 export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""): Promise<unknown> {

@@ -4,17 +4,17 @@ import { IssueStatusValues } from "@vibevalley/protocol";
 import { actCommand, type Next } from "@vibevalley/protocol/api";
 import { executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-/** in_progress and in_review are the session's to reach, never the owner's. */
+/** in_progress and in_review are the session's to reach, never the user's. */
 export type Move =
   | "none"
   /** backlog → todo: sent out now, or waits in todo for room */
   | "start"
   /** todo → backlog */
   | "unqueue"
-  /** in_review → todo: another round, with the owner's words (the findings, while it waits for acceptance), or with the
+  /** in_review → todo: another round, with the user's words (the findings, while it waits for acceptance), or with the
    * server's own for why it is stuck */
   | "round"
-  /** done, canceled → todo: its doer takes it up again (a new session, or the orchestrator), with the owner's words */
+  /** done, canceled → todo: its doer takes it up again (a new session, or the orchestrator), with the user's words */
   | "reopen"
   /** canceled before it was ever sent → backlog */
   | "revive"
@@ -64,7 +64,7 @@ export function statusMove(issue: T.Issue, to: T.IssueStatus): [Move, string] {
 
 export const statusMoves = (issue: T.Issue): T.IssueStatus[] => IssueStatusValues.filter((to) => statusMove(issue, to)[0] !== "none");
 
-/** One that needs the owner's words runs nothing and says which field takes them. */
+/** One that needs the user's words runs nothing and says which field takes them. */
 export function nextSteps(item: T.Issue): Next[] {
   const n = String(item.number);
   const session = latestSessionIdOf(item);
@@ -72,7 +72,7 @@ export function nextSteps(item: T.Issue): Next[] {
     const label = t(`shared.act.${a.act}`);
     const command = actCommand(item, a, session);
     if (command === undefined) return [];
-    // One that needs the owner's words runs nothing: it says the command, and where the words go.
+    // One that needs the user's words runs nothing: it says the command, and where the words go.
     if (command.words === "required")
       return [
         {

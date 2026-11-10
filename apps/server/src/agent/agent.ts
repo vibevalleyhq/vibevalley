@@ -351,7 +351,7 @@ const make = Effect.gen(function* () {
   return shape;
 });
 
-/** Where to put a key, in the owner's words. */
+/** Where to put a key, in the user's words. */
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
 
 /** A DeepSeek client; the key is read out of its redaction only as each request is sent. */

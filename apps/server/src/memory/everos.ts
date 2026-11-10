@@ -113,7 +113,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
 
   const flush = (session: string, repo: string, closing = false) => post("flush", { session_id: session, app_id: app, repo_id: scopeOf(repo) }, closing);
 
-  /** A profile's cases, or with kind issue the owner's episodes. */
+  /** A profile's cases, or with kind issue the user's episodes. */
   const findIn = Effect.fnUntraced(function* (agent: string, query: string, limit: number, kind: MemoryKind, repo: string) {
     const scope = scopeOf(repo);
     const body = {
@@ -174,7 +174,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
         .slice(0, recallCount)
         .map((h) => ({ id: h.id, line: recallWords.sourceLine("EverOS", clip(h.text, lineMost)), score: h.score }));
     }),
-    // A search over every profile has no one owner to ask with: it gives nothing here.
+    // A search over every profile has no one user to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {
       if (c.read !== true || q.text.trim() === "") return { found: [] };
       if (q.repo === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };

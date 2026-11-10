@@ -211,7 +211,7 @@ const viewStyles = stylex.create({
 
 export type DictationState = "unset" | DictationPhase;
 
-/** One field's hold on the page's recorder: the words go into it at its caret, for the owner to read before sending. */
+/** One field's hold on the page's recorder: the words go into it at its caret, for the user to read before sending. */
 export function useDictation(field: {
   input: () => HTMLTextAreaElement | HTMLInputElement | undefined;
   value: () => string;

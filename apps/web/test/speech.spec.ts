@@ -81,7 +81,7 @@ for (const scenario of [
     if (ready.kind !== "speech") throw new Error("Expected speech task");
     expect(ready).toMatchObject({
       kind: "speech",
-      source: { kind: "owner" },
+      source: { kind: "user" },
       model: scenario.model,
       connection: scenario.connection,
       revision: status.revision,
@@ -133,7 +133,7 @@ for (const scenario of [
   });
 }
 
-test("regression: large speech survives reload until the owner explicitly releases it", async ({ page, api }) => {
+test("regression: large speech survives reload until the user explicitly releases it", async ({ page, api }) => {
   await bindSpeech(api);
   const publications: string[] = [];
   page.on("request", (request) => {

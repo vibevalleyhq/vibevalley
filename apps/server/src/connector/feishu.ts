@@ -40,7 +40,7 @@ export interface App {
 
 export interface LoginAccount {
   readonly app: App;
-  readonly owner: string;
+  readonly user: string;
 }
 
 export interface FeishuApi {
@@ -75,7 +75,7 @@ const RegistrationPoll = Schema.Struct({
 });
 
 type Polled =
-  | { readonly status: "succeeded"; readonly app: App; readonly owner: string }
+  | { readonly status: "succeeded"; readonly app: App; readonly user: string }
   | { readonly status: "failed"; readonly reason: string }
   | { readonly status: "pending"; readonly domain: Domain };
 
@@ -129,7 +129,7 @@ export class FeishuClient implements FeishuApi {
         const user = res.user_info;
         const where: Domain = user?.tenant_brand === "lark" ? "lark" : domain;
         if (res.client_id !== undefined && res.client_secret !== undefined)
-          return { status: "succeeded" as const, app: { appId: res.client_id, appSecret: res.client_secret, domain: where }, owner: user?.open_id ?? "" };
+          return { status: "succeeded" as const, app: { appId: res.client_id, appSecret: res.client_secret, domain: where }, user: user?.open_id ?? "" };
         if (res.error === "access_denied") return { status: "failed" as const, reason: t("server.connector.feishu.denied") };
         if (res.error === "expired_token") return { status: "failed" as const, reason: t("server.connector.feishu.qrExpired") };
         return { status: "pending" as const, domain: where };
@@ -149,7 +149,7 @@ export class FeishuClient implements FeishuApi {
         const p: Polled = yield* this.poll(reg.deviceCode, current);
         if (p.status === "succeeded") {
           if (!p.app.appId.trim() || !p.app.appSecret.trim()) return yield* failedWith(t("server.connector.feishu.incomplete"));
-          return Option.some<LoginAccount>({ app: p.app, owner: p.owner });
+          return Option.some<LoginAccount>({ app: p.app, user: p.user });
         }
         if (p.status === "failed") return yield* failedWith(p.reason);
         yield* Ref.set(domain, p.domain);
@@ -254,7 +254,7 @@ export function feishuAdapter(api: FeishuApi): Adapter {
         api.login((url) => progress({ state: "waiting", qr: url })),
         (linked) => ({
           secrets: { appId: linked.app.appId, appSecret: linked.app.appSecret, domain: linked.app.domain },
-          owner: linked.owner,
+          user: linked.user,
         }),
       ),
     // The SDK's acknowledgement waits only for the durable inbox write; the orchestrator's work runs elsewhere.

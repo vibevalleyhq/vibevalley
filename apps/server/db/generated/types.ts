@@ -13,7 +13,7 @@ export type Words_artifact_body = typeof Words_artifact_body.Type
 export const Words_artifact_suggestion_status = Schema.Literals(["open","accepted","rejected"])
 export type Words_artifact_suggestion_status = typeof Words_artifact_suggestion_status.Type
 
-export const Words_channel_member_reason = Schema.Literals(["owner","replied","mentioned","manual"])
+export const Words_channel_member_reason = Schema.Literals(["user","replied","mentioned","manual"])
 export type Words_channel_member_reason = typeof Words_channel_member_reason.Type
 
 export const Words_channel_mention_resolved = Schema.Literals(["delivered","absent","unknown"])
@@ -25,7 +25,7 @@ export type Words_channel_message_kind = typeof Words_channel_message_kind.Type
 export const Words_channel_notify = Schema.Literals(["all","mentions","none"])
 export type Words_channel_notify = typeof Words_channel_notify.Type
 
-export const Words_channel_participant_kind = Schema.Literals(["owner","orchestrator","session","profile","system"])
+export const Words_channel_participant_kind = Schema.Literals(["user","orchestrator","session","profile","system"])
 export type Words_channel_participant_kind = typeof Words_channel_participant_kind.Type
 
 export const Words_channel_subject_kind = Schema.Literals(["issue","talk"])
@@ -37,7 +37,7 @@ export type Words_channel_type = typeof Words_channel_type.Type
 export const Words_connector_account_connector = Schema.Literals(["weixin","feishu","qq"])
 export type Words_connector_account_connector = typeof Words_connector_account_connector.Type
 
-export const Words_cron_set_by = Schema.Literals(["owner","agent","system"])
+export const Words_cron_set_by = Schema.Literals(["user","agent","system"])
 export type Words_cron_set_by = typeof Words_cron_set_by.Type
 
 export const Words_issue_canceled = Schema.Literals(["dismissed","lost"])
@@ -103,7 +103,7 @@ export type Words_media_understanding_cleanup = typeof Words_media_understanding
 export const Words_media_understanding_phase = Schema.Literals(["authorized","queued","uploading","generating","ready","incomplete","failed","unknown","canceled"])
 export type Words_media_understanding_phase = typeof Words_media_understanding_phase.Type
 
-export const Words_memory_author = Schema.Literals(["owner","agent","system"])
+export const Words_memory_author = Schema.Literals(["user","agent","system"])
 export type Words_memory_author = typeof Words_memory_author.Type
 
 export const Words_memory_kind = Schema.Literals(["note","issue"])

@@ -14,6 +14,6 @@ export const coreEndpoints: readonly Endpoint[] = [
     about: [],
     input: undefined,
     result: S.Health,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
 ];

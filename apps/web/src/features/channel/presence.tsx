@@ -6,7 +6,7 @@ import { spanText } from "@vibevalley/protocol/rules";
 
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
-import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace, UserFace } from "#/ui/Face.tsx";
 import { Icon, type IconSize } from "#/ui/Icon.tsx";
 import { actionIcon, type IconName } from "#/ui/icons.ts";
 import { styleProps } from "#/ui/positioner.ts";
@@ -149,8 +149,8 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
   const session = () => core()?.sessions.find((s) => s.id === (props.m.session ?? props.m.from));
   return (
     <Switch>
-      <Match when={props.m.fromKind === "owner"}>
-        <OwnerFace size={props.size ?? 36} />
+      <Match when={props.m.fromKind === "user"}>
+        <UserFace size={props.size ?? 36} />
       </Match>
       <Match when={props.m.fromRole === "orchestrator"}>
         <OrchestratorFace size={props.size ?? 36} agent={props.m.from} />

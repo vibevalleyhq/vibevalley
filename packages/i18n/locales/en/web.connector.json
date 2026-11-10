@@ -48,7 +48,7 @@
     "scan": "Sign in to {app} by scanning",
     "pairing": "The bot is connected. Last step: with your own {app}, message this bot directly and send:",
     "pairingNote": "Whoever sends this code is the owner: from then on only that person's words come in. The code works once.",
-    "owner": "Owner",
+    "user": "Owner",
     "channel": "Connected to",
     "since": "Connected since",
     "lastInbound": "Last heard from you",

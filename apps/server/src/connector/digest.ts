@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-// What the chat apps are sent: which farm messages reach the owner, as plain text, cut to what each app takes. a digest of what waited.
+// What the chat apps are sent: which farm messages reach the user, as plain text, cut to what each app takes. a digest of what waited.
 import type * as T from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 
@@ -22,8 +22,8 @@ export function plainText(markdown: string): string {
     .trim();
 }
 
-/** The owner sees one chat, the farm has many threads. */
-export function ownerLine(m: T.ChatMessage, where: T.Channel | undefined): string {
+/** The user sees one chat, the farm has many threads. */
+export function userLine(m: T.ChatMessage, where: T.Channel | undefined): string {
   const who = m.fromRole === "orchestrator" ? t("server.connector.line.orchestrator") : m.name;
   const what =
     m.kind === "report"

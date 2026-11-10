@@ -8,7 +8,7 @@ import { Effect } from "effect";
 import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, worker as sessionActor } from "#/base/actor.ts";
+import { user, worker as sessionActor } from "#/base/actor.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
@@ -63,7 +63,7 @@ it.live("regression: splitting preserves the parent's assignment and branch ance
     const sessions = yield* Session;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "整个看板重做", description: "像 Linear 那样", repo: "board", agent: "lab" });
-    yield* issues.edit(issue.id, { criteria: ["卡片紧凑"] }, owner);
+    yield* issues.edit(issue.id, { criteria: ["卡片紧凑"] }, user);
     const hired = yield* issues.hire(lab(), "hold-parent", "board", { issue: issue.id, worktree: true });
     const helper = mustHire(hired);
     const service = yield* Issue;

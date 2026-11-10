@@ -389,7 +389,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       yield* refreshPrefix;
     });
 
-    // Folding when the run ends would give the owner a lossy summary a minute later.
+    // Folding when the run ends would give the user a lossy summary a minute later.
     const idleLater = Effect.suspend(() => {
       const after = idleAfter();
       if (after < 0 || estimateTokens(history()) <= idleAt()) return Effect.void;

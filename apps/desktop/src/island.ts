@@ -5,7 +5,7 @@ import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { type IssueStageKind, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
-import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, phaseText, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { jsonLines } from "./lines";
 
@@ -23,7 +23,7 @@ interface IslandRow {
 
 interface Glance {
   working: number;
-  /** Issues that want the owner: asked, handed back, stuck. */
+  /** Issues that want the user: asked, handed back, stuck. */
   waiting: number;
   /** The strip's words for the two counts, in the farm's language. */
   strip: { working: string; waiting: string };
@@ -51,7 +51,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     if (!tone) continue;
     const head = frame.state.sessions.find((h) => h.id === latestSessionIdOf(issue));
     const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? t(`shared.stuck.${stuck}`) : t(`shared.stage.${state}`);
-    rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: stageWantsOwner(state) });
+    rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: stageWantsUser(state) });
   }
   rows.sort((a, b) => (b.first !== a.first ? Number(b.first) - Number(a.first) : a.number - b.number));
   const working = rows.filter((r) => r.tone === "working").length;

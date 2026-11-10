@@ -61,7 +61,7 @@
     "cleanup": "Clean remote files",
     "cleanupAsk": "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding."
   },
-  "sourceOwner": "Source: owner",
+  "sourceUser": "Source: owner",
   "sourceAgent": "Source: orchestrator {agent} · channel {channel}",
   "usage": "Provider reported: {images} image(s) · {width} × {height}",
   "usageUnknown": "No provider usage result yet. This does not mean there was no charge.",

@@ -40,7 +40,7 @@
 | `apps/server/src/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单与合入父分支、本地合并与 PR 轮询 |
 | `apps/server/src/issue/status.ts`、`stage.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
 | `apps/server/src/issue/dependencies.ts`、`brief.ts`、`timeline.ts`、`rows.ts` | 依赖环检测与解锁、任务说明拼装、时间线与行转换 |
-| `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsOwner` |
+| `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
 | 表 `issue`、`issue_assignment`、`issue_assignment_execution` | 工单主表、档案责任关系与实际执行的 `Session` 关联 |
 | `apps/web/src/features/issue/`、`apps/web/src/farm/issue/IssueView.tsx` | 工作台看板与工单详情、动作分发 `acts.ts`、农场工单详情 |
 
@@ -101,7 +101,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 - **帮工（`session`）**：调用 `send`、`deliver`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
 - **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并与 `gh` PR 操作。
-- **信箱与频道（`mailbox`、`channel`）**：排队输入经 `Mailbox` 投递；主人发言经 `Channel.ownerInThread` 清空问题并作废旧验收标记。
+- **信箱与频道（`mailbox`、`channel`）**：排队输入经 `Mailbox` 投递；主人发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 - **接入（`ingress`）**：轮询 GitHub PR 的 CI 与 Review 事件，转为 `Trigger` 投入工单信箱。
 
 ## 为什么这样
@@ -127,4 +127,4 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 `GET /api/v1/issue/watch/:id` 是本机的 SSE 观察流，CLI `issue watch` 使用它。路由只解析工单引用；`issue/watch.ts` 先订阅 Core 实时事件，再读取 `Core.states` 折好的工单和会话，补最近 8 个会话的保留轨迹。历史以批次发送（每批最多 241 条），实时发送 `SessionEvent`；新会话和进入交回阶段时补读历史，使尚未推送的末尾草稿也在退出前交出。`gap.before` 标明保留历史的起点；归档会话没有保留日志时发送不带 `before` 的 `gap`。`omittedSessions` 标明省略的较早会话数。
 
-观察流复用 Core 的 64 项有界缓冲，积压超限关闭连接，客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsOwner`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察订阅的作用域关闭只释放队列与连接，不调用会话停止。JSONL 字段和退出方式见 [CLI](apps/cli/README.md#观察工单执行)。
+观察流复用 Core 的 64 项有界缓冲，积压超限关闭连接，客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsUser`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察订阅的作用域关闭只释放队列与连接，不调用会话停止。JSONL 字段和退出方式见 [CLI](apps/cli/README.md#观察工单执行)。

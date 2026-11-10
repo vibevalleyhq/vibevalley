@@ -2,7 +2,7 @@
   "id": "answer-from-state",
   "createdAt": 1792271220000,
   "model": "deepseek-flash",
-  "want": "主人问哪些在等他，管家派了个帮工去查。农场自己的数据就能答：用 issue_list（wantsOwner）列出来，不建工单。",
+  "want": "主人问哪些在等他，管家派了个帮工去查。农场自己的数据就能答：用 issue_list（wantsUser）列出来，不建工单。",
   "memory": "",
   "tools": [
     "channel_create",
@@ -129,7 +129,7 @@
     {
       "kind": "called",
       "tool": "issue_list",
-      "argContains": "wantsOwner"
+      "argContains": "wantsUser"
     }
   ]
 }

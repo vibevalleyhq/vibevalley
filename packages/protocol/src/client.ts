@@ -198,7 +198,7 @@ export class VibeValleyApi {
     /** What channel.delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("/api/v1/channel/previewDelete", a, options),
-    /** The owner's read moved back to just before this message. */
+    /** The user's read moved back to just before this message. */
     markUnread: (a: { id: string } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("/api/v1/channel/markUnread", a, options),
     /** Every channel and direct channel, the default first. */
@@ -208,7 +208,7 @@ export class VibeValleyApi {
       /** What deleteTask would do, refused as it would be; nothing changes. */
       list: (a: { id: string; before?: number; limit?: number }, options?: { signal?: AbortSignal }): Promise<T.ChatMessage[]> =>
         this.call<T.ChatMessage[]>("/api/v1/channel/message/list", a, options),
-      /** The owner's own words, changed; nobody is told again. */
+      /** The user's own words, changed; nobody is told again. */
       update: (a: T.MessageEdit, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
         this.call<T.ChatMessage>("/api/v1/channel/message/update", a, options),
       /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
@@ -224,7 +224,7 @@ export class VibeValleyApi {
       set: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/default/set", a, options),
     },
     reaction: {
-      /** The owner's reaction on or off; as it already is, nothing changes. */
+      /** The user's reaction on or off; as it already is, nothing changes. */
       set: (a: T.ReactionSet, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
         this.call<T.ChatMessage>("/api/v1/channel/reaction/set", a, options),
     },
@@ -246,7 +246,7 @@ export class VibeValleyApi {
       set: (a: T.OnSet, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a, options),
     },
     direct: {
-      /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
+      /** The user's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
       create: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<string> => this.call<string>("/api/v1/channel/direct/create", a, options),
     },
     notify: {
@@ -320,7 +320,7 @@ export class VibeValleyApi {
         this.call<string | null>("/api/v1/issue/conversation/get", a, options),
     },
     comment: {
-      /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
+      /** To the issue's newest session, as the user: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
       create: (a: { id: string } & T.CommentRequest, options?: { signal?: AbortSignal }): Promise<T.Applied> =>
         this.call<T.Applied>("/api/v1/issue/comment/create", a, options),
     },
@@ -367,13 +367,13 @@ export class VibeValleyApi {
     get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a, options),
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a, options),
-    /** Its title, as the owner renames it. */
+    /** Its title, as the user renames it. */
     update: (a: { id: T.ArtifactId; title: string }, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("/api/v1/artifact/update", a, options),
     delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a, options),
     previewDelete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("/api/v1/artifact/previewDelete", a, options),
-    /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
+    /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
     submit: (a: { id: T.ArtifactId } & T.BlockSubmit, options?: { signal?: AbortSignal }): Promise<T.BlockAck> =>
       this.call<T.BlockAck>("/api/v1/artifact/submit", a, options),
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
@@ -391,7 +391,7 @@ export class VibeValleyApi {
         this.call<T.Artifact>("/api/v1/artifact/version/create", a, options),
     },
     html: {
-      /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
+      /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
       edit: (a: T.ArtifactHtmlEdit, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/html/edit", a, options),
     },
     block: {
@@ -414,10 +414,10 @@ export class VibeValleyApi {
       /** The open and resolved suggestions on an artifact, oldest first. */
       list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion[]> =>
         this.call<T.Suggestion[]>("/api/v1/artifact/suggestion/list", a, options),
-      /** A change an agent proposes to a block the owner wrote. */
+      /** A change an agent proposes to a block the user wrote. */
       create: (a: { id: T.ArtifactId } & T.SuggestionCreate, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("/api/v1/artifact/suggestion/create", a, options),
-      /** The owner takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+      /** The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
       accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("/api/v1/artifact/suggestion/accept", a, options),
       reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
@@ -560,7 +560,7 @@ export class VibeValleyApi {
     comment: {
       list: (a: { page?: string }, options?: { signal?: AbortSignal }): Promise<T.PkmComment[]> =>
         this.call<T.PkmComment[]>("/api/v1/pkm/comment/list", a, options),
-      /** A rewrite of a block for the owner to accept: it keeps every [[link]] and ((ref)) the block had. */
+      /** A rewrite of a block for the user to accept: it keeps every [[link]] and ((ref)) the block had. */
       suggest: (a: T.PkmProposalRequest, options?: { signal?: AbortSignal }): Promise<T.PkmProposal> =>
         this.call<T.PkmProposal>("/api/v1/pkm/comment/suggest", a, options),
       /** Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays. */

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import type { ChannelHandlers } from "@vibevalley/protocol/api";
 
 import { missing, lookIn, reasonOf } from "#/base/errors.ts";
@@ -34,7 +34,7 @@ export const channelHandlers = Effect.gen(function* () {
     "channel.direct.create": ({ agent }) => channels.direct(agent),
     "channel.markUnread": ({ id, number }) => channels.markUnread(id, number),
     "channel.list": () => channels.list(),
-    "channel.unread.list": () => channels.unread(ownerId),
+    "channel.unread.list": () => channels.unread(userId),
     "channel.default.set": ({ id }) => channels.makeDefault(id),
     "channel.message.list": ({ id, before, limit }) => channels.history(id, before, limit),
     "channel.markRead": ({ id, ...body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e), [lookIn.channel]))),
@@ -42,7 +42,7 @@ export const channelHandlers = Effect.gen(function* () {
     "channel.message.delete": ({ id }) => channels.remove(id),
     "channel.message.previewDelete": ({ id }) => channels.previewRemove(id),
     "channel.message.search": ({ text, channel }) => channels.search(text, channel),
-    "channel.reaction.set": ({ id, emoji, on }) => channels.react(id, ownerId, emoji, on),
+    "channel.reaction.set": ({ id, emoji, on }) => channels.react(id, userId, emoji, on),
     "channel.pin.set": ({ id, on }) => channels.pin(id, on),
     "channel.pin.list": ({ id }) => channels.pins(id),
     "channel.thread.create": ({ id, requestKey }) => threadOnce(requestKey, channels.threadUnder(id)),

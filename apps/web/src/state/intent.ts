@@ -23,7 +23,7 @@ export type IntentAt<R> =
   | { /** Held back while the link was lost; sent once it is back. */ readonly phase: "queued" }
   | { readonly phase: "sending" }
   | { /** Answered; waits until the frame shows it. */ readonly phase: "confirming"; readonly replied: { readonly reply: R } }
-  | { /** Why, in the owner's words (fault.reason) and as the page acts on it. */ readonly phase: "failed"; readonly fault: UiFault };
+  | { /** Why, in the user's words (fault.reason) and as the page acts on it. */ readonly phase: "failed"; readonly fault: UiFault };
 
 type IntentState<R> =
   | { readonly _tag: "queued" }
@@ -47,7 +47,7 @@ function projectIntent<I, R>(key: string, input: I, state: IntentState<R>): Inte
 interface IntentKind<I, R> {
   /** Sends it with its key; a repeat with the same key is the same request. */
   readonly send: (input: I, key: string) => Promise<R>;
-  /** What the owner sees shows the change. asked on every frame, whenever `watch` says, and when the server answers. */
+  /** What the user sees shows the change. asked on every frame, whenever `watch` says, and when the server answers. */
   readonly confirmed: (frame: StateFrame | undefined, intent: Intent<I, R>) => boolean;
   /** A source the check reads besides the frame (a channel's messages): watched while the intent is kept. */
   readonly watch?: (input: I, changed: () => void) => () => void;
@@ -100,7 +100,7 @@ export function sendOnce<I, R>(intents: Intents<I, R>, input: I): Promise<Intent
   return kept.phase === "failed" ? intents.retry(kept.key) : Promise.resolve(kept);
 }
 
-/** A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). */
+/** A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). */
 export function sendReplacing<I, R>(intents: Intents<I, R>, input: I, sameTarget: (a: I, b: I) => boolean): Sent<I, R> {
   for (const kept of intents.all()) if (sameTarget(kept.input, input)) intents.drop(kept.key);
   return intents.send(input);

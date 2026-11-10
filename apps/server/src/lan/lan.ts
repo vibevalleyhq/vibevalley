@@ -31,7 +31,7 @@ import { callbackLog } from "#/infra/log.ts";
 import * as lanQ from "#db/lan.sql.ts";
 import * as q from "#db/lan_device.sql.ts";
 
-/** A device's asking gets as long again for the owner to answer. */
+/** A device's asking gets as long again for the user to answer. */
 const pairingForMs = 2 * 60_000;
 const wrongTries = 5;
 const seenEveryMs = 60_000;
@@ -448,7 +448,7 @@ const make = (options: LanOptions = {}) =>
         logs.info(`vibevalley: lan access: "${name}" questions to pair`);
         const allow = yield* Effect.callback<boolean>((resume) => {
           approval.answer = (a) => resume(Effect.succeed(a));
-          // Cut short (the time ran out, or the request went away): unless the owner has answered or a new pairing
+          // Cut short (the time ran out, or the request went away): unless the user has answered or a new pairing
           // replaced it.
           return Effect.sync(() => {
             if (pairing === approval) pairing = { _tag: "idle" };
@@ -456,7 +456,7 @@ const make = (options: LanOptions = {}) =>
         }).pipe(Effect.timeoutOption(pairingForMs), Effect.map(Option.getOrElse(() => "late" as const)));
         if (allow === "late") {
           if (pairing === approval) pairing = { _tag: "idle" };
-          return yield* Effect.fail(refuse(t("server.lan.ownerLate")));
+          return yield* Effect.fail(refuse(t("server.lan.userLate")));
         }
         if (!allow) return yield* Effect.fail(refuse(t("server.lan.denied")));
         return yield* addDevice(name);

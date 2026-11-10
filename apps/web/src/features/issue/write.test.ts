@@ -28,7 +28,7 @@ test("words said on an issue show under its box, sending or refused with why, an
   ]);
 });
 
-test("the deliver pick shows the owner's choice on its way, and the frame's again, marked, once refused", () => {
+test("the deliver pick shows the user's choice on its way, and the frame's again, marked, once refused", () => {
   const pick = (status: "pending" | "failed"): Intent<DeliverPick, never> => ({
     key: "k",
     input: { id: "i1", deliver: "answer" },

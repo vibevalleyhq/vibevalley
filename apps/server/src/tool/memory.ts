@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { Agent } from "#/agent/agent.ts";
 import { foundText, Memory, type SearchQuery } from "#/memory/memory.ts";
 
-import { answers, memoryWhere, ownerAgentWord } from "./prompts.ts";
+import { answers, memoryWhere, userAgentWord } from "./prompts.ts";
 import {
   answered,
   callerOf,
@@ -24,7 +24,7 @@ export const memoryTools = Effect.gen(function* () {
   // The orchestrator may say a profile's name or id.
   const profile = (key: string): Effect.Effect<string, ToolRefusal> => {
     const k = key.trim();
-    if (k === ownerAgentWord) return refuse(answers.rememberOwnNote);
+    if (k === userAgentWord) return refuse(answers.rememberOwnNote);
     const a = agents.named(k) ?? agents.agent(k) ?? agents.orchestrators().find((o) => o.name === k);
     if (a && agents.isOrchestrator(a.id)) return refuse(answers.rememberOwnNote);
     return a ? Effect.succeed(a.id) : refuse(answers.noProfileNamed(k));

@@ -5,7 +5,7 @@ import { createSignal, flush, For, Show, untrack } from "solid-js";
 
 import { Progress } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import type { BlockRef, Channel } from "@vibevalley/protocol";
 
 import { aria } from "#/base/dom.tsx";
@@ -439,7 +439,7 @@ export function Composer(props: {
   };
   /** A command is the line's first word: a / at its start opens the commands menu, the words after it kept. */
   const startCommand = () => put(Str.startsWith("/")(box.text()) ? box.text() : "/" + box.text(), 1);
-  // ↑ in an empty box changes the owner's last message here; Esc lets go of the message being answered.
+  // ↑ in an empty box changes the user's last message here; Esc lets go of the message being answered.
   const dictating = useDictation({ input: () => input, value: () => box.text(), onValue: (v, c) => box.edit(v, c) });
   // While this box listens, its row is the recording's: cancel or done in place of attach and send.
   const listening = () => dictating.mine() && (dictating.state() === "recording" || dictating.state() === "transcribing");
@@ -448,7 +448,7 @@ export function Composer(props: {
     const id = props.channel?.id;
     if (!e.isComposing && id && box.offered().length === 0) {
       if (e.key === "ArrowUp" && box.text() === "") {
-        const mine = [...followed.get(id).messages].toReversed().find((m) => m.from === ownerId && m.kind === "chat" && m.deleted === undefined);
+        const mine = [...followed.get(id).messages].toReversed().find((m) => m.from === userId && m.kind === "chat" && m.deleted === undefined);
         if (mine) {
           e.preventDefault();
           setEditingId(mine.id);
@@ -555,7 +555,7 @@ export function Composer(props: {
             <Icon name="reply" size={12} />
             <span {...stylex.attrs(viewStyles.composerSpan5)}>
               {t("shared.join.labeled", {
-                label: t("web.channel.composer.replying", { name: m().from === ownerId ? t("web.channel.messages.owner") : m().name }),
+                label: t("web.channel.composer.replying", { name: m().from === userId ? t("web.channel.messages.user") : m().name }),
                 text: m().text,
               })}
             </span>

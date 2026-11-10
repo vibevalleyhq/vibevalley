@@ -34,7 +34,7 @@ export async function writeIssue(text: string, agent: string, repo: string, requ
   }
 }
 
-// What an issue delivers, picked by the owner on its page: an intent (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's.
+// What an issue delivers, picked by the user on its page: an intent (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's.
 
 export interface DeliverPick {
   readonly id: string;
@@ -49,7 +49,7 @@ export const issueDeliver = defineIntent<DeliverPick, AppliedIssue>({
   timeoutMs: 20_000,
 });
 
-/** The deliverable the pick shows, and whether the owner's choice is on its way or was refused. */
+/** The deliverable the pick shows, and whether the user's choice is on its way or was refused. */
 export function shownDeliver(
   id: string,
   frame: Deliverable,

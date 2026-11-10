@@ -5,7 +5,7 @@ import * as T from "./shapes";
 
 export const MediaPhase: Codec<T.MediaPhase> = Schema.Literals(T.MediaPhaseValues);
 export const MediaSource: Codec<T.MediaSource> = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("owner") }),
+  Schema.Struct({ kind: Schema.Literal("user") }),
   Schema.Struct({ kind: Schema.Literal("orchestrator"), agent: Schema.NonEmptyString, channel: Schema.String }),
 ]);
 export const MediaInputReference: Codec<T.MediaInputReference> = Schema.Struct({

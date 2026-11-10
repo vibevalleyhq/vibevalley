@@ -298,8 +298,8 @@ function JobCard(props: { job: MediaImageJob }) {
           {props.job.model} · {props.job.id}
         </p>
         <p data-testid="media-source" {...stylex.attrs(viewStyles.source)}>
-          {props.job.source.kind === "owner"
-            ? t("web.media.sourceOwner")
+          {props.job.source.kind === "user"
+            ? t("web.media.sourceUser")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
         <p data-testid="media-usage" {...stylex.attrs(viewStyles.detail)}>

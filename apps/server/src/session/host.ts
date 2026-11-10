@@ -110,7 +110,7 @@ export class Caller {
   );
 }
 
-/** Why the agent did not start: the model missing a key, or the host closing. The message is what the owner reads. */
+/** Why the agent did not start: the model missing a key, or the host closing. The message is what the user reads. */
 class CannotStart extends Schema.TaggedError<CannotStart, { readonly brand: unique symbol }>()("CannotStart", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -265,7 +265,7 @@ export const makeHost = <R>(
     // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
     const settled = (aborted: boolean) =>
       Effect.suspend(() => {
-        if (aborted && !closing) journal.note("run/error", t("server.session.log.stoppedByOwner"));
+        if (aborted && !closing) journal.note("run/error", t("server.session.log.stoppedByUser"));
         input.caller?.end();
         input = { route: input.route, run: input.run };
         open = false;
@@ -504,7 +504,7 @@ export const makeHost = <R>(
 
 const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.role === "custom" && m.customType === inputType;
 
-/** The input that began the turn asked. the message puts what the owner adds before them). */
+/** The input that began the turn asked. the message puts what the user adds before them). */
 function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;

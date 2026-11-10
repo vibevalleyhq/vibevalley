@@ -46,7 +46,7 @@ export function repoProblem(req: T.NewRepo): string {
 /** What a fresh repository ignores, so a first commit of an existing folder does not take its dependencies. */
 const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.DS_Store\n__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\n";
 
-/** A merge's failure as the owner reads it: git's own, or the one the merge already said. */
+/** A merge's failure as the user reads it: git's own, or the one the merge already said. */
 const failed = (e: MergeFailure | GitError | RepoError) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {

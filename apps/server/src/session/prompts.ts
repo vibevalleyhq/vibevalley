@@ -1,4 +1,4 @@
-import { ownersLanguage } from "#/base/prompts.ts";
+import { usersLanguage } from "#/base/prompts.ts";
 import { pullRequestFile, type Workplace } from "#/repo/workplace.ts";
 export const sourceBrief = (id: string) =>
   `一手输入：vv://trigger/${id}\n先用 resource_read 读取原话与上下文；工单说明只是附言，不能扩大原始授权。用主人的语言回答。`;
@@ -11,8 +11,8 @@ export function workplaceRules(place: Workplace, house: string, id: string, pull
   const lines = [
     "## 在码农场物语干活的规矩",
     "- " + where,
-    `- 汇报、提问都用${ownersLanguage()}写，那是主人的语言。`,
-    `- 做完一轮：git add 你改的文件，git commit。提交信息照仓库的约定写（看它的 AGENTS.md 和 git log）；仓库没约定的，用一句${ownersLanguage()}说清楚做了什么；主人这一轮另有说法的，照主人说的。`,
+    `- 汇报、提问都用${usersLanguage()}写，那是主人的语言。`,
+    `- 做完一轮：git add 你改的文件，git commit。提交信息照仓库的约定写（看它的 AGENTS.md 和 git log）；仓库没约定的，用一句${usersLanguage()}说清楚做了什么；主人这一轮另有说法的，照主人说的。`,
     "- 汇报时写上 commit 号，以及你是怎么验证的（跑了什么命令、结果如何）。",
     ...(pullRequest && place.branch
       ? [
@@ -56,7 +56,7 @@ export const restartedContextNote = "（之前的执行会话接不上了。你�
 export function channelRules(cwd: string, channel: string, id: string): string {
   return [
     "## 和主人对话的规矩",
-    `- 你是 @${id}，这是一份持续的对话上下文，回复位置是 ${channel}。用${ownersLanguage()}回答。`,
+    `- 你是 @${id}，这是一份持续的对话上下文，回复位置是 ${channel}。用${usersLanguage()}回答。`,
     `- 你的独立工作目录是 ${cwd}，这里的文件会保留到下一轮。只在这个目录里写文件；不要切换、重置或改动仓库的工作目录。`,
     "- 这次对话不关联工单，不用为了聊天创建工单，也不要求 git 提交、验收或合并。按主人当前的话回答、分析或制作内容。",
     "- 这一轮最后的回答会自动发回原频道，不用重复发送；中间需要说话时用 channel_message_send，沿用输入中的 target。",

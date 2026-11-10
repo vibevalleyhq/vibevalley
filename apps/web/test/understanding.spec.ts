@@ -140,7 +140,7 @@ test("unknown and canceled understanding retain honest states and explicit clean
   await expect(canceledCard).toHaveAttribute("data-cleanup", "done");
 });
 
-test("owner can authorize immutable input for a channel and revoke it before any vendor upload", async ({ page, api }) => {
+test("user can authorize immutable input for a channel and revoke it before any vendor upload", async ({ page, api }) => {
   await bindUnderstanding(api);
   const channel = await api.channel.create({ name: "understanding-approval" });
   await page.goto("/media");

@@ -5,5 +5,5 @@ on conflict (thread_key) do update set issue_id = excluded.issue_id where mailbo
 returning issue_id;
 
 -- name: SubscribedIssues :many
--- bound: one owner per supplied thread key.
+-- bound: one user per supplied thread key.
 select distinct issue_id from mailbox_subscription where thread_key in (select unnest(sqlc.arg(keys)::text[]));

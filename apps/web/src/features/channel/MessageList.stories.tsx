@@ -40,7 +40,7 @@ const msg = (fromKind: ChatMessage["fromKind"], from: string, name: string, text
   outcome: more.outcome ?? null,
 });
 
-const owner = (text: string, more: Partial<ChatMessage> = {}) => msg("owner", "owner", "主人", text, more);
+const user = (text: string, more: Partial<ChatMessage> = {}) => msg("user", "user", "主人", text, more);
 const orchestrator = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "orchestrator", "管家", text, { fromRole: "orchestrator", ...more });
 const helper = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "w1", "老周", text, { fromRole: "worker", agent: "老周", ...more });
 
@@ -59,7 +59,7 @@ export default stories({
   title: "界面/频道/消息",
   stories: {
     Talk: list("主人、管家、帮工在频道里说话；同一个人接着说，头像和名字只出现一次。", [
-      { m: owner("登录过期的问题谁来修？") },
+      { m: user("登录过期的问题谁来修？") },
       { m: orchestrator("派给老周了，在工单 #18 里。") },
       { m: orchestrator("他说半小时左右。"), continues: true },
       { m: helper("收到，先看 session.ts。") },
@@ -70,7 +70,7 @@ export default stories({
     ]),
     Rich: list("附件、链接预览、表态、Markdown；很长的一条先折起来。", [
       {
-        m: owner("设计稿和录屏在这，参考 https://example.com/design", {
+        m: user("设计稿和录屏在这，参考 https://example.com/design", {
           attachments: [
             { id: "a1", name: "design-review.pdf", type: "application/pdf", size: 1_400_000 },
             { id: "a2", name: "bug.mov", type: "video/quicktime", size: 48_000_000 },
@@ -78,7 +78,7 @@ export default stories({
           embeds: [{ url: "https://example.com/design", image: "", site: "example.com", title: "登录页改版", description: "过期提示、重新登录、记住我" }],
           reactions: [
             { emoji: "👍", by: ["orchestrator", "w1"] },
-            { emoji: "👀", by: ["owner"] },
+            { emoji: "👀", by: ["user"] },
           ],
         }),
       },
@@ -91,7 +91,7 @@ export default stories({
       },
     ]),
     "Edited, pinned, deleted": list("改过的带「已编辑」，钉住的带标记，删掉的只留一行。", [
-      { m: owner("周五之前合进去。", { edited: now - 2 * min }) },
+      { m: user("周五之前合进去。", { edited: now - 2 * min }) },
       { m: orchestrator("记下了：周五之前。", { pinned: now - min }) },
       { m: helper("（这条删了）", { deleted: now - min }) },
     ]),

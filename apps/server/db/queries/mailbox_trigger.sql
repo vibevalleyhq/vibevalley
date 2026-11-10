@@ -32,7 +32,7 @@ update mailbox_trigger set
   routed_at = coalesce(routed_at, sqlc.arg(routed_at))
 where id = sqlc.arg(envelope_id)
 returning routing_position as position, routing_scope as scope,
-  (trigger_json::jsonb -> 'actor' ->> 'kind' = 'owner')::bool? as from_owner;
+  (trigger_json::jsonb -> 'actor' ->> 'kind' = 'user')::bool? as from_user;
 
 -- name: IsRouted :one
 select exists (select 1 from mailbox_trigger where id = sqlc.arg(envelope_id) and routed_at is not null)::bool as routed;

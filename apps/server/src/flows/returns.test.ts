@@ -6,7 +6,7 @@ import { SqlClient } from "effect/sql";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Ingress, type SourceEvent } from "#/ingress/ingress.ts";
 import { Issue } from "#/issue/issue.ts";
@@ -18,7 +18,7 @@ import { await_, farm, lab } from "./farm.ts";
 const event = (issue: string, key: string): SourceEvent => ({
   source: "connector",
   key,
-  actor: { kind: "owner", id: "owner" },
+  actor: { kind: "user", id: "user" },
   text: key,
   threads: [`issue:${issue}`],
   addressed: "thread_owner",
@@ -59,12 +59,12 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     expect(rows2).toEqual(receipt);
     yield* mailbox.restore;
     expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
-    const ownerEpoch = yield* sql<{ position: number }>`select max(position) as position from mailbox_owner_route where scope = ${returned[0]!.scope}`;
-    expect(ownerEpoch[0]!.position).toBe(returned[0]!.position);
+    const userEpoch = yield* sql<{ position: number }>`select max(position) as position from mailbox_user_route where scope = ${returned[0]!.scope}`;
+    expect(userEpoch[0]!.position).toBe(returned[0]!.position);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
 
-it.live("regression: closing an unassigned issue returns its held owner input without a machine chat message", () => {
+it.live("regression: closing an unassigned issue returns its held user input without a machine chat message", () => {
   const f = farm();
   return Effect.gen(function* () {
     const service = yield* Issue;
@@ -74,9 +74,9 @@ it.live("regression: closing an unassigned issue returns its held owner input wi
     const chat = yield* Channel;
     const sql = yield* SqlClient.SqlClient;
     const issue = yield* issues.add({ title: "waiting", repo: "unassigned-return" });
-    const source = event(issue.id, "unread-owner-followup");
+    const source = event(issue.id, "unread-user-followup");
     const trigger = (yield* ingress.accept(source))!;
-    yield* service.setStatus(issue.id, "canceled", "", "", owner);
+    yield* service.setStatus(issue.id, "canceled", "", "", user);
     yield* await_(
       () => Effect.succeed(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
       (rows) => rows.length === 1,

@@ -28,7 +28,7 @@ test("a turn's text is replaced as it grows, and ends with final or turn_status"
     ["orchestrator", "挺好的，地里有一个帮工。", true],
   ]);
   expect(voiceTurnsOfCaptions(c.turns)).toEqual([
-    { who: "owner", key: "1", text: "你好，农场怎么样", done: true },
+    { who: "user", key: "1", text: "你好，农场怎么样", done: true },
     { who: "orchestrator", key: "1", text: "挺好的，地里有一个帮工。", done: true },
   ]);
 });

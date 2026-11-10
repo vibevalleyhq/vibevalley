@@ -8,7 +8,7 @@ import { voiceCall } from "#/features/voice/index.ts";
 import { rawFrame } from "#/infra/frame.ts";
 import { currentHost } from "#/infra/host.ts";
 
-import { tabTitle, traySummary, waitingOnOwner } from "./tray";
+import { tabTitle, traySummary, waitingOnUser } from "./tray";
 
 export function Follow() {
   // The frame as it came: what is news compares one inbox with the one before.
@@ -17,7 +17,7 @@ export function Follow() {
   let tray = "";
   createEffect(frame, (f) => {
     if (!f) return;
-    document.title = tabTitle(waitingOnOwner(f.inbox), unreadTotal(f.state.chat));
+    document.title = tabTitle(waitingOnUser(f.inbox), unreadTotal(f.state.chat));
     const host = currentHost();
     const news = freshOf(known, f.inbox);
     known = news.known;

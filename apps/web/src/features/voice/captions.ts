@@ -14,9 +14,9 @@ export interface Caption {
   interrupted: boolean;
 }
 
-export function voiceTurnsOfCaptions(turns: readonly Caption[]): VoiceTurn<"owner" | "orchestrator">[] {
+export function voiceTurnsOfCaptions(turns: readonly Caption[]): VoiceTurn<"user" | "orchestrator">[] {
   return turns.map((c) => ({
-    who: c.speaker === "you" ? "owner" : "orchestrator",
+    who: c.speaker === "you" ? "user" : "orchestrator",
     key: String(c.turn),
     text: c.text,
     done: c.done,

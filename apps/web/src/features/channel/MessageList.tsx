@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, userId } from "@vibevalley/protocol";
 import { channelOf, plainText } from "@vibevalley/protocol/rules";
 
 import { aria, useNow } from "#/base/dom.tsx";
@@ -16,7 +16,7 @@ import { useCore } from "#/infra/frame.ts";
 import { useRouter, Link as A } from "#/infra/router.ts";
 import { useLatest } from "#/state/atom.ts";
 import { useIntents } from "#/state/intent.ts";
-import { OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
+import { OrchestratorFace, UserFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 import { Markdown } from "#/ui/Markdown.tsx";
@@ -560,7 +560,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   // Rows newer than this arrived while the list was shown: they rise in; the rest just appear.
   const shownAt = Date.now();
 
-  // Where the owner had read to as the list opened: the new ones below a line.
+  // Where the user had read to as the list opened: the new ones below a line.
   const readTo = untrack(() => props.channel?.read ?? 0);
   const searching = () => (props.filter ?? "").trim() !== "";
   // A search is the server's, over the whole channel and its threads, not only the pages read here.
@@ -594,7 +594,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       : feedOf(core()?.chat, said().messages),
   );
   const addressOf = (m: ChatMessage) => (m.channel === id() ? undefined : hits()?.find((h) => h.message.id === m.id)?.address);
-  const firstNew = () => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== ownerId)?.id);
+  const firstNew = () => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== userId)?.id);
   const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
   const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
   const typing = () => orchestratorTyping(core(), props.channel);
@@ -610,7 +610,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const newest = () => said().messages.at(-1)?.number ?? 0;
   const unseen = () => {
     const from = awayFrom();
-    return from === undefined ? 0 : said().messages.filter((m) => m.number > from && m.from !== ownerId).length;
+    return from === undefined ? 0 : said().messages.filter((m) => m.number > from && m.from !== userId).length;
   };
   // The log is reversed: at the newest its scrollTop is 0, and it goes negative upward.
   const onScroll = () => {
@@ -751,7 +751,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   );
 }
 
-/** The owner's lines on their way here (composing.ts), under the messages: sending, or failed with a retry. */
+/** The user's lines on their way here (composing.ts), under the messages: sending, or failed with a retry. */
 function PendingLines(props: { channel: string | undefined; messages: readonly ChatMessage[] }) {
   const says = useIntents(chatSay);
   const lines = createMemo(() => pendingLines(says.list(), props.channel, props.messages));
@@ -760,8 +760,8 @@ function PendingLines(props: { channel: string | undefined; messages: readonly C
       {(l) => (
         <div data-testid="pending-line" data-key={l().key} data-state={l().state} {...stylex.attrs(l().state === "sending" && viewStyles.pendingSending)}>
           <Frame
-            face={<OwnerFace size={36} />}
-            name={t("web.channel.messages.owner")}
+            face={<UserFace size={36} />}
+            name={t("web.channel.messages.user")}
             meta={l().state === "sending" ? t("web.channel.messages.sending") : t("web.channel.messages.notSent")}
           >
             <p {...stylex.attrs(viewStyles.pendingLinesP)}>{l().text}</p>
@@ -845,7 +845,7 @@ function Frame(props: {
 }
 
 /** A dispatch: one line until it is opened, then the whole task in its place. */
-/** A dispatch said as what it is for the owner: who went to which issue. */
+/** A dispatch said as what it is for the user: who went to which issue. */
 function Dispatch(props: { m: ChatMessage }) {
   const core = useCore();
   const [open, setOpen] = createSignal(false);
@@ -909,8 +909,8 @@ export function MessageRow(props: {
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
   const orchestrators = useOrchestrators();
   const nameOf = (who: string) =>
-    who === ownerId
-      ? t("web.channel.messages.owner")
+    who === userId
+      ? t("web.channel.messages.user")
       : (orchestrators().find((a) => a.id === who)?.name ??
         (who === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
         (core()?.sessions ?? []).find((h) => h.id === who)?.name ??
@@ -932,7 +932,7 @@ export function MessageRow(props: {
     <Frame
       face={<SenderFace m={props.m} />}
       dot={<Show when={session()}>{(s) => <Dot tone={phaseDot(s().phase)} size={11} />}</Show>}
-      name={props.m.fromKind === "owner" ? t("web.channel.messages.owner") : props.m.name}
+      name={props.m.fromKind === "user" ? t("web.channel.messages.user") : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
       quote={props.m.replyTo !== undefined ? { channel: props.m.channel, number: props.m.replyTo } : undefined}
@@ -1052,7 +1052,7 @@ function ThreadPreview(props: { thread: Channel }) {
       <Show when={last()}>
         {(m) => (
           <span {...stylex.attrs(viewStyles.threadPreviewSpan5)}>
-            <span {...stylex.attrs(viewStyles.threadPreviewSpan6)}>{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
+            <span {...stylex.attrs(viewStyles.threadPreviewSpan6)}>{m().from === userId ? t("web.channel.messages.user") : m().name}</span>
             <span {...stylex.attrs(viewStyles.threadPreviewSpan7)}>{plainText(m().text)}</span>
             <span {...stylex.attrs(viewStyles.dispatchSpan2)}>{workbenchClock(m().at)}</span>
           </span>

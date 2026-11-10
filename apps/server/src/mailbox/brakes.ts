@@ -31,7 +31,7 @@ export function brakes(deliveries: readonly Recipient[], input: BrakeInput): Hel
     let heldBy: HeldBy | undefined;
     if (delivery.wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
     else if (delivery.wakes && byAgent && !input.orchestrators.includes(delivery.recipient) && input.cooling.includes(delivery.recipient)) heldBy = "cooldown";
-    else if (delivery.wakes && input.fromKind !== "owner" && input.broken.includes(delivery.recipient)) heldBy = "wake_breaker";
+    else if (delivery.wakes && input.fromKind !== "user" && input.broken.includes(delivery.recipient)) heldBy = "wake_breaker";
     if (delivery.wakes && byAgent && heldBy === undefined) hops++;
     out.push({ ...delivery, ...(heldBy === undefined ? {} : { heldBy }) });
   }
@@ -85,26 +85,26 @@ export class WakeBreaker {
 
 export class Reach {
   private readonly hopsIn = new Map<string, number>();
-  private readonly ownerLast = new Map<string, number>();
+  private readonly userLast = new Map<string, number>();
   private readonly lastWakeOf = new Map<string, number>();
 
   load(
     hops: readonly { scope: string; n: number | null }[],
     lastWakes: readonly { session_id: string; at: number | null }[],
-    ownerLast: readonly { scope: string; position: number | null }[],
+    userLast: readonly { scope: string; position: number | null }[],
   ) {
     this.hopsIn.clear();
-    this.ownerLast.clear();
+    this.userLast.clear();
     this.lastWakeOf.clear();
     for (const hop of hops) this.hopsIn.set(hop.scope, hop.n ?? 0);
-    for (const owner of ownerLast) if (owner.position !== null) this.ownerLast.set(owner.scope, owner.position);
+    for (const last of userLast) if (last.position !== null) this.userLast.set(last.scope, last.position);
     for (const wake of lastWakes) this.lastWakeOf.set(wake.session_id, wake.at ?? 0);
   }
 
-  ownerSpoke(scope: string, position: number) {
-    if (position <= (this.ownerLast.get(scope) ?? 0)) return;
+  userSpoke(scope: string, position: number) {
+    if (position <= (this.userLast.get(scope) ?? 0)) return;
     this.hopsIn.delete(scope);
-    this.ownerLast.set(scope, position);
+    this.userLast.set(scope, position);
   }
 
   hops(scope: string): number {
@@ -118,7 +118,7 @@ export class Reach {
   delivered(input: ReachDelivery) {
     if (!input.wakes || input.held || input.senderKind !== "agent") return;
     this.lastWakeOf.set(input.session, Math.max(this.lastWakeOf.get(input.session) ?? 0, input.at));
-    if (input.position > (this.ownerLast.get(input.scope) ?? 0)) this.hopsIn.set(input.scope, this.hops(input.scope) + 1);
+    if (input.position > (this.userLast.get(input.scope) ?? 0)) this.hopsIn.set(input.scope, this.hops(input.scope) + 1);
   }
 
   left(session: string) {

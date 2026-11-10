@@ -79,7 +79,7 @@ export const sourceControl =
 /** Agent Sessions: an agent at work on an issue in a workplace. */
 export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Machine.layer), on(Session.layer));
 
-/** Collaboration: channels, threads, messages, documents, the owner's notes; the sessions register as its helpers. */
+/** Collaboration: channels, threads, messages, documents, the user's notes; the sessions register as its helpers. */
 export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Media.layer), on(Artifact.layer), on(Pkm.layer));
 
 /** Mailbox: delivery priority, durable per-Session input and the execution pump. */
@@ -93,10 +93,10 @@ export const ingress = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(I
 /** Resource: authorized, paged reads over stable per-session snapshots. */
 export const resources = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Resource.layer));
 
-/** Inbox: what in it is news to the owner, and the patrol. */
+/** Inbox: what in it is news to the user, and the patrol. */
 const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.layer));
 
-/** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
+/** Orchestrator: the agent that hands the user's work to helpers, and its tools. */
 const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>

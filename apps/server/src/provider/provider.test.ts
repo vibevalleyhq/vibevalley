@@ -219,7 +219,7 @@ it.effect("connections and uses share credentials; replacing and clearing observ
     const modelsFailure = yield* provider.models({ connection: "moss", revision: 3 }).pipe(Effect.flip);
     expect(modelsFailure).toMatchObject({ _tag: "Refused" });
     expect(keys).toHaveLength(2);
-    for (const endpoint of endpoints.filter((row) => row.op.startsWith("provider."))) expect(endpoint.can).toEqual(["owner"]);
+    for (const endpoint of endpoints.filter((row) => row.op.startsWith("provider."))) expect(endpoint.can).toEqual(["user"]);
   }).pipe(Effect.provide(layer(capture)));
 });
 

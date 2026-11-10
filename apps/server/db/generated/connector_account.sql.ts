@@ -15,7 +15,7 @@ export type ConnectorAccountParams = typeof ConnectorAccountParams.Type
 export const ConnectorAccountResult = Schema.Struct({
   ["connector"]: Words_connector_account_connector,
   ["secrets"]: Schema.String,
-  ["owner_id"]: Schema.NullOr(Schema.String),
+  ["user_id"]: Schema.NullOr(Schema.String),
   ["pair_code"]: Schema.NullOr(Schema.String),
   ["cursor"]: Schema.String,
   ["reply_context"]: Schema.NullOr(Schema.String),
@@ -42,20 +42,20 @@ export const connectorAccount = Effect.fn("ConnectorAccount")(function* (params:
 export const ConnectAccountParams = Schema.Struct({
   ["connector"]: Words_connector_account_connector,
   ["secrets"]: Schema.String,
-  ["owner_id"]: Schema.NullOr(Schema.String),
+  ["user_id"]: Schema.NullOr(Schema.String),
   ["pair_code"]: Schema.NullOr(Schema.String),
   ["connected_at"]: Schema.Number,
 })
 export type ConnectAccountParams = typeof ConnectAccountParams.Type
 
 
-export const ConnectAccountSql = "-- name: ConnectAccount :exec\n-- Connected again: what was kept of the account before goes.\ninsert into connector_account (connector, secrets, owner_id, pair_code, connected_at)\nvalues ($1, $2, $3, $4, $5)\non conflict (connector) do update set secrets = excluded.secrets, owner_id = excluded.owner_id, pair_code = excluded.pair_code,\n  cursor = '', reply_context = null, reply_at = null, last_inbound = null, paused_until = null, connected_at = excluded.connected_at;"
+export const ConnectAccountSql = "-- name: ConnectAccount :exec\n-- Connected again: what was kept of the account before goes.\ninsert into connector_account (connector, secrets, user_id, pair_code, connected_at)\nvalues ($1, $2, $3, $4, $5)\non conflict (connector) do update set secrets = excluded.secrets, user_id = excluded.user_id, pair_code = excluded.pair_code,\n  cursor = '', reply_context = null, reply_at = null, last_inbound = null, paused_until = null, connected_at = excluded.connected_at;"
 
 export const connectAccount = Effect.fn("ConnectAccount")(function* (params: ConnectAccountParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: ConnectAccountParams,
-    execute: (p) => sql.unsafe(ConnectAccountSql, [p["connector"], p["secrets"], p["owner_id"], p["pair_code"], p["connected_at"]]),
+    execute: (p) => sql.unsafe(ConnectAccountSql, [p["connector"], p["secrets"], p["user_id"], p["pair_code"], p["connected_at"]]),
   })(params)
 })
 
@@ -92,20 +92,20 @@ export const pauseAccount = Effect.fn("PauseAccount")(function* (params: PauseAc
   })(params)
 })
 
-export const AccountOwnerParams = Schema.Struct({
-  ["owner_id"]: Schema.NullOr(Schema.String),
+export const AccountUserParams = Schema.Struct({
+  ["user_id"]: Schema.NullOr(Schema.String),
   ["connector"]: Words_connector_account_connector,
 })
-export type AccountOwnerParams = typeof AccountOwnerParams.Type
+export type AccountUserParams = typeof AccountUserParams.Type
 
 
-export const AccountOwnerSql = "-- name: AccountOwner :exec\nupdate connector_account set owner_id = $1, pair_code = null where connector = $2;"
+export const AccountUserSql = "-- name: AccountUser :exec\nupdate connector_account set user_id = $1, pair_code = null where connector = $2;"
 
-export const accountOwner = Effect.fn("AccountOwner")(function* (params: AccountOwnerParams) {
+export const accountUser = Effect.fn("AccountUser")(function* (params: AccountUserParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: AccountOwnerParams,
-    execute: (p) => sql.unsafe(AccountOwnerSql, [p["owner_id"], p["connector"]]),
+    Request: AccountUserParams,
+    execute: (p) => sql.unsafe(AccountUserSql, [p["user_id"], p["connector"]]),
   })(params)
 })
 

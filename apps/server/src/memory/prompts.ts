@@ -1,5 +1,5 @@
 /** Authorship stays explicit when database notes become model input. */
-export const fromOwner = "主人交代：";
+export const fromUser = "主人交代：";
 
 export function carriedMemory(lines: readonly string[]): string {
   const text = lines.map((line) => "- " + line).join("\n");

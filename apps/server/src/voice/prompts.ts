@@ -6,7 +6,7 @@ export function mossInstructions(greeting: string): string {
   return greeting ? `开场先简短问候：「${greeting}」。${tail}` : tail;
 }
 
-/** What the orchestrator is given to tell the owner on the call: everything that waited, as one. */
+/** What the orchestrator is given to tell the user on the call: everything that waited, as one. */
 /** A notice told on a call. */
 export const noticeLine = (title: string, body: string) => (body ? title + "：" + body : title);
 

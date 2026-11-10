@@ -48,7 +48,7 @@ describe("a request the page may send again", () => {
       const statusUpdateFailure = yield* Effect.flip(h["issue.status.update"]({ id: made.id, status: "canceled" }));
       expect(statusUpdateFailure).toMatchObject({ _tag: "Refused" });
 
-      const said = (yield* (yield* Channel).post({ _tag: "Owner", text: "开个串", sendKey: "" })).message;
+      const said = (yield* (yield* Channel).post({ _tag: "User", text: "开个串", sendKey: "" })).message;
       const thread = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
       const threadCreate = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
       expect(threadCreate).toBe(thread);
@@ -83,7 +83,7 @@ describe("a request the page may send again", () => {
     const f = farm();
     return Effect.gen(function* () {
       const h = yield* handlers;
-      const said = (yield* (yield* Channel).post({ _tag: "Owner", text: "点个赞", sendKey: "" })).message;
+      const said = (yield* (yield* Channel).post({ _tag: "User", text: "点个赞", sendKey: "" })).message;
       const liked = yield* h["channel.reaction.set"]({ id: said.id, emoji: "👍", on: true });
       const again = yield* h["channel.reaction.set"]({ id: said.id, emoji: "👍", on: true });
       expect([again.reactions, again.revision]).toEqual([liked.reactions, liked.revision]);

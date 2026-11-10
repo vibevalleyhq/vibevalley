@@ -64,6 +64,6 @@ it.live("repo pr submit sends the explicit checkout and dry-run to the server", 
   }).pipe(Effect.scoped, Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it("existing branch publication is exposed only to the owner", () => {
-  expect(endpoints.find((e) => e.op === "repo.pr.submit")?.can).toEqual(["owner"]);
+it("existing branch publication is exposed only to the user", () => {
+  expect(endpoints.find((e) => e.op === "repo.pr.submit")?.can).toEqual(["user"]);
 });

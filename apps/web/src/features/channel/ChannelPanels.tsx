@@ -3,7 +3,7 @@ import { Array as Arr } from "effect";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, type ChatMessage, type MessageHit, ownerId } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus, useNow } from "#/base/dom.tsx";
@@ -522,7 +522,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
             }}
           >
             <span {...stylex.attrs(viewStyles.pinsSpan)}>
-              <span {...stylex.attrs(viewStyles.pinsSpan2)}>{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
+              <span {...stylex.attrs(viewStyles.pinsSpan2)}>{m().from === userId ? t("web.channel.messages.user") : m().name}</span>
               <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(m().at)}</span>
             </span>
             <span {...stylex.attrs(variantStyles.pinsSpan)}>{m().text}</span>
@@ -540,7 +540,7 @@ export function Members(props: { channel: Channel }) {
   const now = useNow();
   const orchestrators = useOrchestrators();
   const isOrchestrator = (id: string) => Arr.some(orchestrators(), (a) => a.id === id);
-  // The orchestrators in the place: a direct channel's other one, or those the owner put in the channel.
+  // The orchestrators in the place: a direct channel's other one, or those the user put in the channel.
   const inside = () =>
     props.channel.type === "direct"
       ? props.channel.peer !== undefined && isOrchestrator(props.channel.peer)
@@ -557,8 +557,8 @@ export function Members(props: { channel: Channel }) {
     <aside aria-label={t("web.channel.members.title")} data-testid="members" {...stylex.attrs(viewStyles.members)}>
       <p {...stylex.attrs(viewStyles.membersP)}>{t("web.channel.members.title")}</p>
       <div {...stylex.attrs(viewStyles.membersDiv)}>
-        <span {...stylex.attrs(viewStyles.membersSpan)}>{t("web.channel.members.owner").slice(0, 1)}</span>
-        {t("web.channel.members.owner")}
+        <span {...stylex.attrs(viewStyles.membersSpan)}>{t("web.channel.members.user").slice(0, 1)}</span>
+        {t("web.channel.members.user")}
       </div>
       <For each={inside()} keyed={(id) => id}>
         {(id) => (
@@ -739,7 +739,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             <Show when={props.thread.last}>
               {(m) => (
                 <span {...stylex.attrs(viewStyles.membersSpan4)}>
-                  {t("shared.join.labeled", { label: m().from === ownerId ? t("web.channel.messages.owner") : m().name, text: m().text })}
+                  {t("shared.join.labeled", { label: m().from === userId ? t("web.channel.messages.user") : m().name, text: m().text })}
                 </span>
               )}
             </Show>
@@ -869,7 +869,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
             >
               <span {...stylex.attrs(viewStyles.pinsSpan)}>
                 <span {...stylex.attrs(viewStyles.farmSearchBodySpan)}>{h().address}</span>
-                <span {...stylex.attrs(viewStyles.pinsSpan2)}>{h().message.from === ownerId ? t("web.channel.messages.owner") : h().message.name}</span>
+                <span {...stylex.attrs(viewStyles.pinsSpan2)}>{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</span>
                 <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(h().message.at)}</span>
               </span>
               <span {...stylex.attrs(variantStyles.farmSearchBodySpan)}>{h().message.text}</span>

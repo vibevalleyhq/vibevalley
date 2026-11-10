@@ -133,7 +133,7 @@ test("on a phone the canvas covers the chat, and closing it keeps what was typed
   await expect(page.getByTestId("composer-input")).toHaveValue("kept while looking");
 });
 
-test("the canvas keeps the same artifact open after a reload, in the owner's theme", async ({ page, api }) => {
+test("the canvas keeps the same artifact open after a reload, in the user's theme", async ({ page, api }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: "dark" })));
   const title = `canvas theme ${Date.now() % 100000}`;
   await api.artifact.create({ title, kind: "markdown", content: "# Dark\n\nstill here" });
@@ -148,7 +148,7 @@ test("the canvas keeps the same artifact open after a reload, in the owner's the
 });
 
 test("a suggestion shows its diff, and accepting it changes the block", async ({ page, api }) => {
-  const made = await api.artifact.create({ title: `suggestion ${Date.now() % 100000}`, kind: "markdown", content: "owner line" });
+  const made = await api.artifact.create({ title: `suggestion ${Date.now() % 100000}`, kind: "markdown", content: "user line" });
   const block = (await api.artifact.block.list({ id: made.id })).blocks[0]!;
   await api.artifact.suggestion.create({
     id: made.id,
@@ -174,7 +174,7 @@ test("a suggestion whose block moved on is stale and cannot be accepted", async 
     baseRev: block.rev,
     change: { text: [{ t: "too late", marks: {} }] },
   });
-  await api.artifact.block.update({ id: made.id, block: block.id, baseRev: block.rev, text: "owner moved on" });
+  await api.artifact.block.update({ id: made.id, block: block.id, baseRev: block.rev, text: "user moved on" });
   await page.goto(`/artifacts/${made.id}`);
   const suggestion = page.getByTestId("artifact-suggestion");
   await expect(suggestion).toHaveAttribute("data-status", "stale");

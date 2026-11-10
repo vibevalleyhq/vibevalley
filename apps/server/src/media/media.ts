@@ -25,8 +25,8 @@ import { makeSpeech } from "./speech.ts";
 import { makeUnderstanding } from "./understanding.ts";
 
 export type MediaCaller =
-  | { readonly kind: "owner" }
-  | { readonly kind: "orchestrator"; readonly agent: string; readonly channel: string; readonly forOwner: boolean };
+  | { readonly kind: "user" }
+  | { readonly kind: "orchestrator"; readonly agent: string; readonly channel: string; readonly forUser: boolean };
 
 export class Media extends Context.Service<
   Media,
@@ -154,7 +154,7 @@ const make = Effect.gen(function* () {
   );
 
   /** A made image goes back to the channel an orchestrator was asked for it in, under its name, once: the send key is the
-   * job's, so a retried download or a restart says nothing again. The owner's own jobs (the media page) stay where they are. */
+   * job's, so a retried download or a restart says nothing again. The user's own jobs (the media page) stay where they are. */
   const postBack = Effect.fnUntraced(function* (id: string) {
     const row = yield* found(id);
     if (row.phase !== "ready" || row.attachment === null) return;
@@ -257,8 +257,8 @@ const make = Effect.gen(function* () {
     speechEvents: speech.events,
     createSpeakers: audio.createSpeakers,
     createVoiceDesign: audio.createVoiceDesign,
-    createClone: Effect.fn("Media.createClone")((input) => audio.createClone(input, { kind: "owner" })),
-    createTranscription: Effect.fn("Media.createTranscription")((input) => audio.createTranscription(input, { kind: "owner" })),
+    createClone: Effect.fn("Media.createClone")((input) => audio.createClone(input, { kind: "user" })),
+    createTranscription: Effect.fn("Media.createTranscription")((input) => audio.createTranscription(input, { kind: "user" })),
     audioResume: audio.resume,
     audioPreviewCleanup: audio.previewCleanup,
     audioCleanup: audio.cleanup,
@@ -290,7 +290,7 @@ const make = Effect.gen(function* () {
       Effect.uninterruptible,
     ),
     createImage: Effect.fn("Media.createImage")(function* (given, caller) {
-      if (caller.kind === "orchestrator" && !caller.forOwner) return yield* Effect.fail(refused(t("server.media.ownerRequired")));
+      if (caller.kind === "orchestrator" && !caller.forUser) return yield* Effect.fail(refused(t("server.media.userRequired")));
       const source: T.MediaSource = yield* Schema.decodeEffect(S.MediaSource)(caller).pipe(Effect.mapError(() => refused(t("server.media.invalid"))));
       const input = yield* Schema.decodeEffect(S.MediaImageRequest)(given).pipe(Effect.mapError(() => refused(t("server.media.invalid"))));
       return yield* lock.withPermits(1)(

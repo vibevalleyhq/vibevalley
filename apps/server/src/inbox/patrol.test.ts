@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { type ChatMessage, ownerId, type SpaceState } from "@vibevalley/protocol";
+import { type ChatMessage, userId, type SpaceState } from "@vibevalley/protocol";
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { emptySpaceState } from "#/core/core.ts";
 import { checkCases, goldenCases } from "#/testing/golden.ts";
 
-import { forOwner, inboxEntries } from "./items.ts";
+import { forUser, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolNote, patrolStep } from "./patrol.ts";
 
 describe("the patrol", () => {
@@ -30,7 +30,7 @@ describe("the patrol", () => {
     expect(failed).toEqual([]);
   });
 
-  it("gives a seen owner two hours before another reminder", () => {
+  it("gives a seen user two hours before another reminder", () => {
     const at = 1_000;
     const message: ChatMessage = {
       id: messageId("seen-message"),
@@ -43,7 +43,7 @@ describe("the patrol", () => {
       name: "帮工",
       kind: "chat",
       text: "请主人决定",
-      mentions: [ownerId],
+      mentions: [userId],
       spoken: false,
       at,
       revision: 1,
@@ -69,7 +69,7 @@ describe("the patrol", () => {
             subjectKind: null,
           },
         ],
-        ownerMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
+        userMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
       },
     };
     const mention = inboxEntries(state)[0]!;
@@ -79,7 +79,7 @@ describe("the patrol", () => {
   });
 });
 
-describe("what reaches the owner off the farm", () => {
+describe("what reaches the user off the farm", () => {
   const said = (more: Partial<ChatMessage>): ChatMessage => ({
     id: messageId("m"),
     number: 1,
@@ -101,7 +101,7 @@ describe("what reaches the owner off the farm", () => {
     outcome: more.outcome ?? null,
   });
   it("follows how much the place it is said in counts", () => {
-    const named = said({ mentions: [ownerId] });
-    expect([forOwner(said({})), forOwner(said({}), "mentions"), forOwner(named, "mentions"), forOwner(named, "none")]).toEqual([true, false, true, false]);
+    const named = said({ mentions: [userId] });
+    expect([forUser(said({})), forUser(said({}), "mentions"), forUser(named, "mentions"), forUser(named, "none")]).toEqual([true, false, true, false]);
   });
 });

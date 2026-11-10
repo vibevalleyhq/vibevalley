@@ -856,8 +856,8 @@ function AudioJob(props: { job: MediaAudioJob }) {
           )}
         </Show>
         <p {...stylex.attrs(viewStyles.source)}>
-          {props.job.source.kind === "owner"
-            ? t("web.media.sourceOwner")
+          {props.job.source.kind === "user"
+            ? t("web.media.sourceUser")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
         <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>

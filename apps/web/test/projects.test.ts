@@ -12,10 +12,10 @@ describe("browser test boundaries", () => {
     const files = readdirSync(import.meta.dirname, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".spec.ts"));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
-      const owners = Object.entries(suites)
+      const users = Object.entries(suites)
         .filter(([, suite]) => suite.testMatch.some((pattern) => matchesGlob(file, pattern)) && !suite.testIgnore.some((pattern) => matchesGlob(file, pattern)))
         .map(([name]) => name);
-      expect(owners, `${file}: Fix: give each browser spec one owner in test/projects.ts.`).toHaveLength(1);
+      expect(users, `${file}: Fix: give each browser spec one user in test/projects.ts.`).toHaveLength(1);
     }
   });
 

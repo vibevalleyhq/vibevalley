@@ -69,7 +69,7 @@ describe("a talk with a helper profile", () => {
       const channel = channelOf(core.state().chat, dm);
       expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", null, undefined]);
       const answers = () => saidIn(dm).filter((m) => m.kind === "report").length;
-      yield* channels.post({ _tag: "Owner", text: "你好，记得这段对话", channel: dm, sendKey: "" });
+      yield* channels.post({ _tag: "User", text: "你好，记得这段对话", channel: dm, sendKey: "" });
       yield* until(() => answers() === 1, "the first answer");
       const first = sessions.hired().find((s) => s.channel === dm);
       expect(first).toMatchObject({ agent: "lab", channel: dm });
@@ -78,7 +78,7 @@ describe("a talk with a helper profile", () => {
       yield* TestClock.adjust(10 * 60_000);
       yield* until(() => disposed === 1, "the idle execution suspended");
       expect(sessions.hired().find((s) => s.channel === dm)?.id).toBe(first?.id);
-      yield* channels.post({ _tag: "Owner", text: "接着聊", channel: dm, sendKey: "" });
+      yield* channels.post({ _tag: "User", text: "接着聊", channel: dm, sendKey: "" });
       yield* until(() => answers() === 2, "the resumed answer");
       expect(
         sessions
@@ -132,9 +132,9 @@ describe("a talk with a helper profile", () => {
       const said = (yield* Said).in;
       yield* (yield* Agent).save(lab());
       const dm = yield* channels.direct("lab");
-      yield* channels.post({ _tag: "Owner", text: "第一句", channel: dm, sendKey: "" });
+      yield* channels.post({ _tag: "User", text: "第一句", channel: dm, sendKey: "" });
       yield* Effect.promise(() => opening.promise);
-      yield* channels.post({ _tag: "Owner", text: "启动中的第二句", channel: dm, sendKey: "" });
+      yield* channels.post({ _tag: "User", text: "启动中的第二句", channel: dm, sendKey: "" });
       opened.resolve();
       yield* until(() => sessions.hired().some((s) => s.channel === dm), "the context registered");
       releaseFirst.resolve();
@@ -185,7 +185,7 @@ describe("a talk with a helper profile", () => {
         const said = (yield* Said).in;
         yield* (yield* Agent).save(lab());
         const dm = yield* channels.direct("lab");
-        yield* channels.post({ _tag: "Owner", text: "重启之前", channel: dm, sendKey: "" });
+        yield* channels.post({ _tag: "User", text: "重启之前", channel: dm, sendKey: "" });
         yield* until(() => said(dm).some((m) => m.kind === "report"), "the first report");
         const db = yield* Db;
         const sql = yield* SqlClient.SqlClient;
@@ -209,7 +209,7 @@ describe("a talk with a helper profile", () => {
         expect(direct2).toBe(first.dm);
         expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);
         expect((yield* Core).state().plays?.[first.session]?.station).toBe(0);
-        yield* channels.post({ _tag: "Owner", text: "重启之后", channel: first.dm, sendKey: "" });
+        yield* channels.post({ _tag: "User", text: "重启之后", channel: first.dm, sendKey: "" });
         yield* until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");
         expect(resumes[1]).toBeTruthy();
         expect(inputs[1]).toContain("重启之后");
@@ -246,11 +246,11 @@ describe("a talk with a helper profile", () => {
       yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
       const existing = yield* channels.direct("lab");
       const starting = yield* channels.direct("lab2");
-      yield* channels.post({ _tag: "Owner", text: "B first", channel: existing, sendKey: "" });
+      yield* channels.post({ _tag: "User", text: "B first", channel: existing, sendKey: "" });
       yield* until(() => said(existing).filter((m) => m.kind === "report").length === 1, "the existing conversation ready");
-      yield* channels.post({ _tag: "Owner", text: "A first", channel: starting, sendKey: "" });
+      yield* channels.post({ _tag: "User", text: "A first", channel: starting, sendKey: "" });
       yield* Effect.promise(() => opening.promise);
-      const delivery = yield* Effect.forkScoped(channels.post({ _tag: "Owner", text: "B next", channel: existing, sendKey: "" }));
+      const delivery = yield* Effect.forkScoped(channels.post({ _tag: "User", text: "B next", channel: existing, sendKey: "" }));
       yield* until(() => said(existing).some((m) => m.text === "B next"), "the followup committed under the channel lock");
       releaseOpening.resolve();
       yield* Fiber.join(delivery).pipe(Effect.timeout(3_000));

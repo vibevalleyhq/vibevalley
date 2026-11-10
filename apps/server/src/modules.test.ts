@@ -19,7 +19,7 @@ function files(dir: string): string[] {
 
 const rel = (p: string) => relative(src, p).split("\\").join("/");
 const rank = (path: string) => modules.findIndex((m) => m === moduleOf(path));
-const owners: Readonly<Record<string, string>> = {
+const users: Readonly<Record<string, string>> = {
   sessions: "Agent Sessions",
   chat: "Collaboration",
   issues: "Issues",
@@ -56,7 +56,7 @@ const sources = () =>
 
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   mailbox: { "channel.sql.ts": ["defaultID", "topPlace", "unreadOf"], "channel_member.sql.ts": ["membersOf"], "issue.sql.ts": ["issueExists"] },
-  inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "ownerReadReports"] },
+  inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "userReadReports"] },
 };
 const folders = readdirSync(src).filter((name) => statSync(join(src, name)).isDirectory());
 const tableModule = (name: string) => {
@@ -146,11 +146,11 @@ describe("the modules", () => {
     const found = sources().flatMap(({ from, parts }) => {
       const top = from.split("/")[0];
       if (top === "core" || top === "projection") return [];
-      return parts.filter((part) => owners[part] !== undefined && owners[part] !== moduleOf(from)?.name).map((part) => `${from} -> ${part}`);
+      return parts.filter((part) => users[part] !== undefined && users[part] !== moduleOf(from)?.name).map((part) => `${from} -> ${part}`);
     });
     expect(
       found.filter((f) => !(f in reads)),
-      "a module reads another's part of the core state, so the owner's rules are skipped. Fix: ask the owning module's service for it (a method or a Stream), and keep core.state() reads to the module that owns the field. See docs/subsystems/core.md",
+      "a module reads another's part of the core state, so the user's rules are skipped. Fix: ask the owning module's service for it (a method or a Stream), and keep core.state() reads to the module that owns the field. See docs/subsystems/core.md",
     ).toEqual([]);
     expect(
       Object.keys(reads).filter((r) => !found.includes(r)),

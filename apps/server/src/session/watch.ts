@@ -17,7 +17,7 @@ import { Runtime } from "#/runtime/runtime.ts";
 import { type Journal } from "./journal.ts";
 import { reactionTo, phaseFact, type Op, since } from "./reaction.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
-import { handsToOwner, readReport } from "./report.ts";
+import { handsToUser, readReport } from "./report.ts";
 import type { LaunchActivity } from "./signals.ts";
 
 export const sessionWatch = (r: SessionRegistry) =>
@@ -108,7 +108,7 @@ export const sessionWatch = (r: SessionRegistry) =>
     };
 
     const applyReport = (h: Hand, report: SubagentReport, completedBefore: number) => {
-      if (report.outcome.kind === "completed" && !handsToOwner(h.report) && (executor.find(h.id)?.pendingTasks ?? 0) > 0) {
+      if (report.outcome.kind === "completed" && !handsToUser(h.report) && (executor.find(h.id)?.pendingTasks ?? 0) > 0) {
         h.settling = { report, completedBefore };
         const channel = core.session(h.id)?.channel;
         apply({
@@ -129,7 +129,7 @@ export const sessionWatch = (r: SessionRegistry) =>
       if (!session) return;
       const read = readReport(report.outcome, report.text);
       const declared = h.report;
-      const canRest = read.outcome === "completed" && session.issue !== undefined && !handsToOwner(declared);
+      const canRest = read.outcome === "completed" && session.issue !== undefined && !handsToUser(declared);
       h.report = undefined;
       const summary = declared?.summary.trim() || read.summary;
       const spent = session.spent ? since(session.spent, h.tracking.runFrom) : undefined;

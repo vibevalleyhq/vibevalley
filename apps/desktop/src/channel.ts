@@ -41,10 +41,10 @@ export function channelOf(version: string, packaged: boolean): Channel {
   return stageOf(version) ?? "dev";
 }
 
-/** The farm's home: VIBEVALLEY_HOME when the owner set one, else the channel's. */
+/** The farm's home: VIBEVALLEY_HOME when the user set one, else the channel's. */
 export const farmHomeOf = (channel: Channel, env: NodeJS.ProcessEnv, home = homedir()) => env.VIBEVALLEY_HOME || defaultHome(channels[channel].suffix, home);
 
-/** What the channel's server starts with: its farm, work folder and ports, each unless the owner set it. */
+/** What the channel's server starts with: its farm, work folder and ports, each unless the user set it. */
 export function serverEnvOf(channel: Channel, env: NodeJS.ProcessEnv, home = homedir()): NodeJS.ProcessEnv {
   const c = channels[channel];
   return {

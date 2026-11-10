@@ -52,7 +52,7 @@ const farm = (llm: ModelClient) => {
   return Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(tools));
 };
 
-it.effect("owner-directed audio tools create attributed dialogue and a preview without silently cloning a voice", () => {
+it.effect("user-directed audio tools create attributed dialogue and a preview without silently cloning a voice", () => {
   const { llm, requests } = scriptedLLM([
     answer([toolCall("media_dialogue_create", dialogue), toolCall("media_voice_design_create", design)]),
     answer("Submitted"),
@@ -91,7 +91,7 @@ it.effect("owner-directed audio tools create attributed dialogue and a preview w
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });
 
-it.effect("regression: audio tools reject autonomous and worker callers; cloning and source upload remain owner-only", () => {
+it.effect("regression: audio tools reject autonomous and worker callers; cloning and source upload remain user-only", () => {
   const { llm } = scriptedLLM([answer("No operation")]);
   return Effect.gen(function* () {
     yield* configured;

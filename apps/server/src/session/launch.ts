@@ -28,10 +28,10 @@ import { WorkerAccess } from "./worker.ts";
 /** Work that did not go in (see handOver); the session stays. */
 export class NotTakenIn extends Schema.TaggedError<NotTakenIn, { readonly brand: unique symbol }>()("NotTakenIn", {
   failure: MergeFailure,
-  /** What the helper is sent back with; "" when the owner settles it. */
+  /** What the helper is sent back with; "" when the user settles it. */
   fix: Schema.String,
-  /** What the owner is told; also the message. */
-  owner: Schema.String,
+  /** What the user is told; also the message. */
+  user: Schema.String,
   notice: Schema.String,
   short: Schema.String,
   message: Schema.String,
@@ -222,7 +222,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
         const starts = !isBusy(session);
         let recall = "";
         if (starts) {
-          const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byOwnerComment);
+          const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byUserComment);
           if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
           recall = yield* remind(session.agent, id, h.place.repo, text, h.recalled);
         }
@@ -263,7 +263,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
       id: string,
       closed: T.SessionClose,
       use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | RepoError>,
-      settle: Settle = "owner",
+      settle: Settle = "user",
     ) {
       const h = hands.get(id);
       if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing(t("server.session.life.helperRef", { id }), [lookIn.session]));
@@ -280,7 +280,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
             Effect.mapError((e) => {
               const f = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reasonText(e));
               const words = notTakenIn(f, current.name, settle);
-              return NotTakenIn.make({ failure: f, ...words, message: words.owner });
+              return NotTakenIn.make({ failure: f, ...words, message: words.user });
             }),
           );
           if (merged.pullRequest) return merged;

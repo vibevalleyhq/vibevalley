@@ -230,8 +230,8 @@ describe("GitHub", () => {
   );
 
   it("origins", () => {
-    for (const s of ["git@github.com:owner/repo.git", "ssh://git@github.com/owner/repo.git", "https://github.com/owner/repo.git"])
-      expect(githubOrigin(s)).toBe("owner/repo");
+    for (const s of ["git@github.com:user/repo.git", "ssh://git@github.com/user/repo.git", "https://github.com/user/repo.git"])
+      expect(githubOrigin(s)).toBe("user/repo");
     for (const s of ["https://github.com.evil/o/r", "https://token@github.com/o/r", "/tmp/repo", "https://github.com/o/r/issues"])
       expect(githubOrigin(s)).toBe("");
   });
@@ -245,7 +245,7 @@ describe("GitHub", () => {
       Effect.gen(function* () {
         const p = yield* Repo;
         const made = yield* p.create({ name: "garden" });
-        gitSync(made.path, "remote", "add", "origin", "git@github.com:owner/repo.git");
+        gitSync(made.path, "remote", "add", "origin", "git@github.com:user/repo.git");
         for (const perm of ["WRITE", "ADMIN", "MAINTAIN", "READ", "TRIAGE"]) {
           permission = perm;
           yield* p.refreshGitHub();
@@ -254,7 +254,7 @@ describe("GitHub", () => {
           expect((yield* p.summary(made)).pullRequest).toEqual(want ? { available: true, reason: "" } : { available: false, reason: "没有写权限" });
           expect(calls).toBe(before);
         }
-        gitSync(made.path, "remote", "set-url", "origin", "https://gitlab.com/owner/repo");
+        gitSync(made.path, "remote", "set-url", "origin", "https://gitlab.com/user/repo");
         yield* p.refreshGitHub();
         expect((yield* p.summary(made)).pullRequest).toEqual({
           available: false,
@@ -279,7 +279,7 @@ describe("GitHub", () => {
       Effect.gen(function* () {
         const p = yield* Repo;
         const made = yield* p.create({ name: "garden" });
-        gitSync(made.path, "remote", "add", "origin", "https://github.com/owner/repo.git");
+        gitSync(made.path, "remote", "add", "origin", "https://github.com/user/repo.git");
         yield* p.refreshGitHub();
         expect((yield* p.summary(made)).pullRequest.available).toBe(true);
         for (const [m, reason] of [
@@ -302,7 +302,7 @@ describe("GitHub", () => {
     const cloning = gh((args) => {
       if (args[0] === "--version") return { out: "gh version 2.80.0" };
       if (args[0] === "auth") return { out: "Logged in to github.com account gardener (keyring)" };
-      expect(args.slice(0, 3)).toEqual(["repo", "clone", "owner/private"]);
+      expect(args.slice(0, 3)).toEqual(["repo", "clone", "user/private"]);
       gitSync(root, "init", "-q", "-b", "main", args[3]!);
       return { out: "" };
     });
@@ -312,7 +312,7 @@ describe("GitHub", () => {
         expect(
           (yield* (yield* Repo).create({
             name: "private",
-            github: "https://github.com/owner/private",
+            github: "https://github.com/user/private",
           })).git,
         ).toBe(true);
       }),
@@ -328,7 +328,7 @@ describe("GitHub", () => {
         const p = yield* Repo;
         for (const name of ["enabled", "other"]) {
           const made = yield* p.create({ name });
-          gitSync(made.path, "remote", "add", "origin", `https://github.com/owner/${name}.git`);
+          gitSync(made.path, "remote", "add", "origin", `https://github.com/user/${name}.git`);
         }
         expect(p.usesPullRequests("enabled")).toBe(false);
         yield* p.refreshGitHub();

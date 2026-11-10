@@ -80,7 +80,7 @@
     "typing": "正在输入…",
     "foldDispatch": "收起派活",
     "unfoldDispatch": "展开派活",
-    "owner": "主人",
+    "user": "主人",
     "dispatch": "派活",
     "spent": "这一轮花了 {spent}",
     "unread": "{n} 条新",
@@ -127,7 +127,7 @@
   "members": {
     "open": "成员",
     "title": "成员",
-    "owner": "主人",
+    "user": "主人",
     "none": "这里还没有帮工",
     "inChannel": "频道里的管家"
   },
@@ -237,7 +237,7 @@
     "thread": "串",
     "mention": {
       "orchestrator": "@管家",
-      "owner": "@主人",
+      "user": "@主人",
       "everyone": "@所有人"
     },
     "orchestratorNote": "派活、拆计划、问进度",

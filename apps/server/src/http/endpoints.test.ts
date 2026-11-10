@@ -164,7 +164,7 @@ describe("the endpoints the agents' tools stand on", () => {
         }),
       );
       const saved = (yield* call(() => api.artifact.block.list({ id: made.id }))).blocks[0]!;
-      expect(saved).toMatchObject({ id: inserted, artifactId: made.id, rev: 1, updatedBy: "owner", text: [{ t: "你好世界", marks: {} }] });
+      expect(saved).toMatchObject({ id: inserted, artifactId: made.id, rev: 1, updatedBy: "user", text: [{ t: "你好世界", marks: {} }] });
       expect(saved.updated).toBeGreaterThanOrEqual(before);
       expect(saved.deleted).toBeUndefined();
 
@@ -189,11 +189,11 @@ describe("the endpoints the agents' tools stand on", () => {
       );
       const after = yield* call(() => api.artifact.block.list({ id: imported.id }));
       expect(after.blocks.map((b) => b.text.map((x) => x.t).join(""))).toEqual(["你好", "世界"]);
-      expect(after.blocks[1]).toMatchObject({ id: split, artifactId: imported.id, rev: 1, updatedBy: "owner" });
+      expect(after.blocks[1]).toMatchObject({ id: split, artifactId: imported.id, rev: 1, updatedBy: "user" });
     }).pipe(Effect.scoped),
   );
 
-  // The issue's page sends what the owner changed but has not saved with the button they pressed.
+  // The issue's page sends what the user changed but has not saved with the button they pressed.
   it.live("save an issue's unsaved fields before its act is tried, even when the act is refused", () =>
     Effect.gen(function* () {
       const api = yield* farm;

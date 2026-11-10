@@ -5,7 +5,7 @@ import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
-import { defaultOrchestrator, orchestratorRuntime, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
 import { Agent, modelClient, noDeepSeekKey } from "#/agent/agent.ts";
 import { traitsOf } from "#/agent/prompts.ts";
@@ -13,7 +13,7 @@ import { orchestrator } from "#/base/actor.ts";
 import { serverFile } from "#/base/assets.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
-import { ownersLanguage } from "#/base/prompts.ts";
+import { usersLanguage } from "#/base/prompts.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
@@ -45,21 +45,21 @@ const notesRecalled = 3;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */
 const resumeWithinMs = 30 * 60_000;
 
-/** What the owner chose beside the words (the sowing form, the chat's profile pick); empty for none. */
+/** What the user chose beside the words (the sowing form, the chat's profile pick); empty for none. */
 export type Pick = Picked;
 
 /** Where an input's answer goes and what it is worth; kept with it in the transcript. */
 interface Route {
   readonly channel: string;
   readonly envelope: string;
-  /** The profile the owner picked beside the words. */
+  /** The profile the user picked beside the words. */
   readonly agent?: string;
   readonly quiet?: boolean;
   readonly source: Source;
   /** The issue handed to the orchestrator that this input is; its run ends when the orchestrator's settles. */
   readonly issue?: string;
-  /** The owner's own words are in this input: only then may the orchestrator complete an issue or change one. */
-  readonly owner?: boolean;
+  /** The user's own words are in this input: only then may the orchestrator complete an issue or change one. */
+  readonly user?: boolean;
 }
 
 /** One input as its producer gives it: the intake table fills in the rest by its source. */
@@ -71,7 +71,7 @@ interface Intake {
   readonly line: string;
   readonly channel: string;
   readonly agent?: string;
-  readonly owner?: boolean;
+  readonly user?: boolean;
   readonly issue?: string;
   readonly envelope?: string;
   /** What started its run, when the producer knows better than its source (an issue's trigger, a missed cron). */
@@ -125,7 +125,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const toolsFor = (id: string) => (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.owner ?? false) };
+        return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.user ?? false) };
       });
 
     /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
@@ -186,7 +186,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 tools: toolsFor(id),
                 skills: [orchestratorSkills],
                 wakeSoon,
-                first: { channel: chat.defaultChannel(), envelope: "", source: "owner" },
+                first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
                 quiet: (r) => r.quiet ?? false,
                 say: (r, text, runId) => chat.post({ _tag: "Run", from: id, channel: r.channel, text: text, run: runId }),
                 // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
@@ -248,7 +248,7 @@ const make = (options: OrchestratorOptions = {}) =>
           sessions.join("\n"),
           byChannel.join("\n"),
           here.direct ? situationWords.direct(here.target) : here.target,
-          ownersLanguage(),
+          usersLanguage(),
         );
       });
 
@@ -266,7 +266,7 @@ const make = (options: OrchestratorOptions = {}) =>
       );
 
     const recall = (i: Intake) =>
-      i.source !== "owner" || i.line.trim().length < 4
+      i.source !== "user" || i.line.trim().length < 4
         ? Effect.succeed("")
         : Effect.map(notes.search({ text: head(i.line, 200), limit: notesRecalled }), (hits) => situationWords.recalled(hits.map(toolAnswers.pkm.hit)));
 
@@ -281,7 +281,7 @@ const make = (options: OrchestratorOptions = {}) =>
           ...(i.agent ? { agent: i.agent } : {}),
           source: i.source,
           ...(i.issue ? { issue: i.issue } : {}),
-          ...(i.owner === true ? { owner: true } : {}),
+          ...(i.user === true ? { user: true } : {}),
         };
         const taken = yield* me.host.submit(
           (busy, memoryNews) =>
@@ -335,8 +335,8 @@ const make = (options: OrchestratorOptions = {}) =>
 
     const heardInChat = (n: Handed) =>
       Effect.suspend(() => {
-        const fromPerson = n.messages.every((m) => m.from === ownerId);
-        const owner = n.messages.some((m) => m.from === ownerId);
+        const fromPerson = n.messages.every((m) => m.from === userId);
+        const user = n.messages.some((m) => m.from === userId);
         // The latest pick among them: it goes with its message.
         const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
         const response = n.messages.findLast((message) => message.responsePort);
@@ -345,28 +345,28 @@ const make = (options: OrchestratorOptions = {}) =>
         const line = n.source
           ? n.messages.map((message) => message.text.replace(new RegExp(`^@${n.agent}\\s*`, "u"), "")).join("\n")
           : voice?.voiceMode === "dictated"
-            ? pickedNote(picked) + lineWords.dictated + lineWords.owner(n.messages.map((message) => message.text).join("\n"))
+            ? pickedNote(picked) + lineWords.dictated + lineWords.user(n.messages.map((message) => message.text).join("\n"))
             : voice?.voiceMode === "conversation"
-              ? voiceNote + "\n" + lineWords.owner(n.messages.map((message) => message.text).join("\n"))
+              ? voiceNote + "\n" + lineWords.user(n.messages.map((message) => message.text).join("\n"))
               : n.messages.every((message) => message.number === 0)
                 ? pickedNote(picked) + lineWords.events(orchestratorEnvelopeLines(n.messages))
                 : fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
-                  ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
+                  ? pickedNote(picked) + lineWords.user(n.messages.map((m) => m.text).join("\n"))
                   : pickedNote(picked) + lineWords.chat(n.target, orchestratorEnvelopeLines(n.messages));
         return take({
           envelopes: n.messages.map((message) => message.id),
           to: n.agent,
-          source: n.source ?? (fromPerson ? "owner" : "chat"),
+          source: n.source ?? (fromPerson ? "user" : "chat"),
           line,
           channel: n.channel,
           ...(picked.agent ? { agent: picked.agent } : {}),
           envelope:
-            n.messages.findLast((message) => message.from === ownerId)?.originTrigger ??
-            n.messages.findLast((message) => message.from === ownerId)?.id ??
+            n.messages.findLast((message) => message.from === userId)?.originTrigger ??
+            n.messages.findLast((message) => message.from === userId)?.id ??
             n.messages.at(-1)?.originTrigger ??
             n.messages.at(-1)?.id ??
             "",
-          owner,
+          user,
           ...(n.issue ? { issue: n.issue } : {}),
           ...(n.by ? { by: n.by } : {}),
           ...(caller ? { caller } : {}),

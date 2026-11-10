@@ -51,7 +51,7 @@ const WordsFile = Schema.Struct({
   tags: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
-/** Why a folder is not a template, in the owner's words: which file, and what in it. */
+/** Why a folder is not a template, in the user's words: which file, and what in it. */
 export class TemplateProblem extends Schema.TaggedError<TemplateProblem, { readonly brand: unique symbol }>()("TemplateProblem", { message: Schema.String }) {}
 
 /** A file's text, or none when there is no such file. */

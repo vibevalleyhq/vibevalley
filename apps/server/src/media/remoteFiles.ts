@@ -62,7 +62,7 @@ export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Succe
             const file = yield* resume(inputs.blob(inputId, holder));
             const now = yield* Clock.currentTimeMillis;
             const id = newId(now);
-            // A unique upload name records intent without disclosing the owner's original filename.
+            // A unique upload name records intent without disclosing the user's original filename.
             const filename = `vv-${id}.${extension}`;
             yield* db.run(
               q.insertRemoteFile({

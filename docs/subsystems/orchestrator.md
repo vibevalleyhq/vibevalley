@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 管家输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[Mailbox](docs/subsystems/mailbox.md)） |
-| 管家与帮工的工具表声明（`apps/server/src/tool/`）及主人授权门禁（`actsForOwner`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
+| 管家与帮工的工具表声明（`apps/server/src/tool/`）及主人授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
 | 按档案管理多个管家实例、将回复写回频道或语音响应端口 | 对话循环、前缀缓存、上下文压缩与断点续跑（[VibeValley 自己的 agent](docs/subsystems/brain.md)、[帮工](docs/subsystems/session.md)） |
 | 挑档案算法（`Runtime.choose`）与错轮评测录制（`orchestrator.eval.create`） | 农机可用性检查（[档案和农机](docs/subsystems/agent.md)）与语音通话传输（[语音](docs/subsystems/voice.md)） |
 
@@ -36,7 +36,7 @@
 - **输入带来源头，非主人长话截断**：首行标明 `[来源：主人|群聊|工单|定时任务|巡查]`。非主人群聊消息超 800 字时截断并附地址，主人发言从不截断。
 - **工具名与参数对齐协议接口**：工具名由接口 `op` 将 `.` 换为 `_` 得出，参数复用接口 Schema（模型专用字段放 `agentOnly`），由 `tool/tool.test.ts` 校验。
 - **工具枚举在入口归一，非法值拒绝**：状态和优先级接受标准值与别名；未传才是缺省，非法值不转成缺省。解码失败时不执行工具的业务函数，`tool/schemas.test.ts` 验证这条。
-- **改工单与定周期任务须有当轮主人授权（`actsForOwner`）**：仅当本轮最新输入含主人原话时 `Actor.forOwner` 为真；否则调 `issue_update`、`issue_status_update` 直接拒绝，调周期/派工 `cron_create` 存为 `pending` 待批。
+- **改工单与定周期任务须有当轮主人授权（`actsForUser`）**：仅当本轮最新输入含主人原话时 `Actor.forUser` 为真；否则调 `issue_update`、`issue_status_update` 直接拒绝，调周期/派工 `cron_create` 存为 `pending` 待批。
 - **挑档案顺序（`chooseAgent`）**：依次匹配：点名的档案名/ID → 指定农机首个可用档案 → 主人界面选定档案 → 工单文字命中 `Agent.tags` 最多的可用档案。
 - **整条消息落库，流式字只走响应端口**：思考与书写阶段更新管家 `Session.phase`（`thinking` / `speaking_text`）与 `channel`；完整回复生成后一次性写入频道，若带 `responsePort` 则同步流式推送。
 
@@ -64,7 +64,7 @@
 
 - **编排策略与运行机器分离**：起大脑、排队列、记 `Run` 和断点续跑收在 `session/host.ts` 的 `AgentHost`，`orchestrator/` 只管来源分发、现状拼装与工具绑定。
 - **工具对齐协议接口，不起别名**：保证 HTTP、CLI、管家和帮工对同一件事使用完全相同的名字与参数校验。
-- **代码硬拦未授权合并，不靠提示词防注入**：在服务层按 `Actor.forOwner` 拦截工单修改与合并，防止帮工汇报中的提示注入触发合并或花钱。
+- **代码硬拦未授权合并，不靠提示词防注入**：在服务层按 `Actor.forUser` 拦截工单修改与合并，防止帮工汇报中的提示注入触发合并或花钱。
 - **调研记成 `deliver: answer` 工单交给帮工，管家不读代码**：避免读取大量代码撑爆管家常驻对话上下文并破坏前缀缓存。
 
 ## 还没做的
@@ -76,6 +76,6 @@
 
 ## 怎么验证
 
-- `apps/server/src/orchestrator/orchestrator.test.ts`、`situation.test.ts`、`apps/server/src/session/host.test.ts`：多管家路由、现状增量、长文截断與 `forOwner` 授权测试。
+- `apps/server/src/orchestrator/orchestrator.test.ts`、`situation.test.ts`、`apps/server/src/session/host.test.ts`：多管家路由、现状增量、长文截断與 `forUser` 授权测试。
 - `apps/server/src/tool/tool.test.ts`：工具名、权限与参数 Schema 一致性测试。
 - `apps/server/src/orchestrator/evals.test.ts`、`evals.live.test.ts`：评测断言与真模型回放测试。

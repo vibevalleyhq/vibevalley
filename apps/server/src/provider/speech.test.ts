@@ -127,7 +127,7 @@ it.effect("voice listing uses only the selected account and forwards one page, n
   return Effect.gen(function* () {
     const provider = yield* Provider;
     const api = yield* providerHandlers;
-    expect(endpoints.find((endpoint) => endpoint.op === "provider.voice.list")?.can).toEqual(["owner"]);
+    expect(endpoints.find((endpoint) => endpoint.op === "provider.voice.list")?.can).toEqual(["user"]);
     yield* provider.update(config);
     const first = yield* api["provider.voice.list"]({ connection: "first", revision: 1 });
     expect(first).toEqual({

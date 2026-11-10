@@ -19,7 +19,7 @@ import { NotRecorded, Session } from "./session.ts";
 import type { DeliveryInput } from "./signals.ts";
 
 const profile = () => ({ ...starter("lab"), effort: "" });
-const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });
+const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byUserComment: false });
 
 describe("an agent's channel context", () => {
   it.live("regression: a channel context resumes without an issue or a repo checkout", () => {

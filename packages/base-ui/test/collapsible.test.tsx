@@ -28,7 +28,7 @@ test("the trigger opens and closes its panel, saying so in ARIA and data attribu
   expect(trigger.getAttribute("aria-expanded")).toBe("false");
 });
 
-test("an owner controls it, and a kept panel is only hidden", async () => {
+test("a user controls it, and a kept panel is only hidden", async () => {
   const [open, setOpen] = createSignal(true);
   const said: boolean[] = [];
   mount(() => (
@@ -39,7 +39,7 @@ test("an owner controls it, and a kept panel is only hidden", async () => {
   ));
   await userEvent.click($("button"));
   await settle();
-  // Asked, but the owner did not change it.
+  // Asked, but the caller did not change it.
   expect(said).toEqual([false]);
   expect($("button").getAttribute("aria-expanded")).toBe("true");
   setOpen(false);

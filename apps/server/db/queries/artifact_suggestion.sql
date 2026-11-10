@@ -1,4 +1,4 @@
--- Each change an agent proposes to a block the owner wrote (artifact/blocks.ts); the owner accepts or rejects it.
+-- Each change an agent proposes to a block the user wrote (artifact/blocks.ts); the user accepts or rejects it.
 
 -- name: AddArtifactSuggestion :exec
 insert into artifact_suggestion (id, artifact_id, block_id, author, at_rev, change, status, created_at)

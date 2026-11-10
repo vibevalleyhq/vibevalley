@@ -84,7 +84,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   at: Schema.Finite,
 });
 
-export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
+export const UserMention: Codec<T.UserMention> = Schema.Struct({
   message: ChatMessage,
   channel: Schema.String,
   address: Schema.String,
@@ -92,7 +92,7 @@ export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
 
 export const Chat: Codec<T.Chat> = Schema.Struct({
   channels: Schema.mutable(Schema.Array(Channel)),
-  ownerMentions: Schema.mutable(Schema.Array(OwnerMention)),
+  userMentions: Schema.mutable(Schema.Array(UserMention)),
 });
 
 export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([Schema.TaggedStruct("Message", { message: ChatMessage }), Schema.TaggedStruct("Reset", {})]);
@@ -174,8 +174,8 @@ export const FactChannelRemoved: Codec<T.FactChannelRemoved> = Schema.Struct({
   id: Schema.String,
 });
 
-export const FactOwnerMentionsChanged: Codec<T.FactOwnerMentionsChanged> = Schema.Struct({
-  type: Schema.Literal("ownerMentionsChanged"),
+export const FactUserMentionsChanged: Codec<T.FactUserMentionsChanged> = Schema.Struct({
+  type: Schema.Literal("userMentionsChanged"),
   at: Schema.Finite,
-  mentions: Schema.mutable(Schema.Array(OwnerMention)),
+  mentions: Schema.mutable(Schema.Array(UserMention)),
 });

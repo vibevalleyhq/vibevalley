@@ -16,7 +16,7 @@ export const BlockTypeValues = [
 ] as const;
 export type BlockType = (typeof BlockTypeValues)[number];
 
-/** What the owner and the agents leave for people to read (docs/subsystems/artifact.md). */
+/** What the user and the agents leave for people to read (docs/subsystems/artifact.md). */
 export const ArtifactBodyValues = ["blocks", "html"] as const;
 export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 
@@ -43,7 +43,7 @@ export interface ArtifactVersion {
   version: number;
   size: number;
   note: string;
-  /** Who made it: a profile's id, or the owner's. */
+  /** Who made it: a profile's id, or the user's. */
   by: string;
   byName: string;
   at: number;
@@ -56,7 +56,7 @@ export interface Artifact {
   id: ArtifactId;
   title: string;
   body: ArtifactBody;
-  /** The channel or thread it was announced in; none for one the owner started on the page. */
+  /** The channel or thread it was announced in; none for one the user started on the page. */
   channel?: string;
   /** The message that first announced it: a blocks one's comments are the replies to it. */
   said?: { channel: string; number: number };
@@ -73,7 +73,7 @@ export interface Artifact {
   updated: number;
 }
 
-/** Without content, an empty blocks artifact to write in, not announced (the owner's New). */
+/** Without content, an empty blocks artifact to write in, not announced (the user's New). */
 export interface ArtifactRequest {
   title: string;
   kind: ArtifactKind;
@@ -97,7 +97,7 @@ export interface HtmlAnchor {
   suffix: string;
 }
 
-/** The owner's words in place of the anchored ones, in the version they were read in; kept as the next version. */
+/** The user's words in place of the anchored ones, in the version they were read in; kept as the next version. */
 export interface ArtifactHtmlEdit {
   id: ArtifactId;
   version: number;
@@ -105,7 +105,7 @@ export interface ArtifactHtmlEdit {
   text: string;
 }
 
-// The page's own scripts can send the same message, so a selection is only ever data: saving is the owner's button.
+// The page's own scripts can send the same message, so a selection is only ever data: saving is the user's button.
 export interface HtmlShellMessage {
   vibevalley: "selection";
   anchor: HtmlAnchor;
@@ -331,7 +331,7 @@ export interface SuggestionChange {
   readonly delete?: boolean;
 }
 
-/** A change an agent proposed to a block the owner wrote; the owner accepts or rejects it. */
+/** A change an agent proposed to a block the user wrote; the user accepts or rejects it. */
 export interface Suggestion {
   readonly id: SuggestionId;
   readonly artifactId: ArtifactId;
@@ -366,7 +366,7 @@ export interface BlockOpResult {
   text?: TextSpan[];
   yours?: TextSpan[];
   reason?: string;
-  /** When an agent changed a block the owner wrote: the suggestion it made instead. */
+  /** When an agent changed a block the user wrote: the suggestion it made instead. */
   suggestion?: SuggestionId;
 }
 

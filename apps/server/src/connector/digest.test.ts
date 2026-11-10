@@ -2,10 +2,10 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { ChatMessage, Channel } from "@vibevalley/protocol";
 
-import { forOwner } from "#/inbox/items.ts";
+import { forUser } from "#/inbox/items.ts";
 import { checkCases, goldenCases } from "#/testing/golden.ts";
 
-import { flushText, isPairing, ownerLine, plainText, shortId, splitText } from "./digest.ts";
+import { flushText, isPairing, userLine, plainText, shortId, splitText } from "./digest.ts";
 
 describe("the connector's words", () => {
   it("are as recorded", () => {
@@ -25,11 +25,11 @@ describe("the connector's words", () => {
         }
         case "shortId":
           return shortId(c.in as string);
-        case "ownerLine": {
+        case "userLine": {
           const given = c.in as { m: ChatMessage; where: Channel | null };
           return {
-            line: ownerLine(given.m, given.where ?? undefined),
-            forOwner: forOwner(given.m),
+            line: userLine(given.m, given.where ?? undefined),
+            forUser: forUser(given.m),
           };
         }
       }

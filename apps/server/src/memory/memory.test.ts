@@ -8,7 +8,7 @@ import { TestClock } from "effect/testing";
 import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, worker } from "#/base/actor.ts";
+import { user, worker } from "#/base/actor.ts";
 import { agentHome, ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -93,9 +93,9 @@ describe("memory", () => {
       expect(picked.ids).toHaveLength(3);
       expect(picked.lines[0]).toBe("- （这个仓库）这个仓库用 pnpm test 跑测试");
       for (const x of yield* m.list("lab")) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
-      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", repo: " clock ", by: owner });
+      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", repo: " clock ", by: user });
       expect([note.text, note.repo, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
-      const writtenFailure = yield* Effect.flip(m.write({ agent: "lab", text: "  ", repo: "", by: owner }));
+      const writtenFailure = yield* Effect.flip(m.write({ agent: "lab", text: "  ", repo: "", by: user }));
       expect(writtenFailure).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
       yield* m.forget("lab", note.id);
       // One that is not there is missing, not silently passed over.
@@ -107,19 +107,19 @@ describe("memory", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.effect("regression: orchestrator memory uses database rows and rewriting preserves the owner's notes", () => {
+  it.effect("regression: orchestrator memory uses database rows and rewriting preserves the user's notes", () => {
     const config = testConfig();
     return Effect.gen(function* () {
       const m = yield* Memory;
       const port = m.forAgent(defaultOrchestrator, defaultOrchestrator);
       yield* port.remember("agent note");
-      const written = yield* m.remember({ agent: defaultOrchestrator, text: "owner note", repo: "", by: owner });
-      expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["owner", "agent"]);
-      expect((yield* port.read()).prompt).toContain("主人交代：owner note");
-      yield* port.rewrite("# notes\n- replacement note\n- 主人交代：owner note");
+      const written = yield* m.remember({ agent: defaultOrchestrator, text: "user note", repo: "", by: user });
+      expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["user", "agent"]);
+      expect((yield* port.read()).prompt).toContain("主人交代：user note");
+      yield* port.rewrite("# notes\n- replacement note\n- 主人交代：user note");
       const notes = (yield* m.memoriesOf(defaultOrchestrator)).memories;
-      expect(notes.map((note) => note.text)).toEqual(["replacement note", "owner note"]);
-      expect(notes.find((note) => note.author === "owner")?.id).toBe(written.id);
+      expect(notes.map((note) => note.text)).toEqual(["replacement note", "user note"]);
+      expect(notes.find((note) => note.author === "user")?.id).toBe(written.id);
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const legacy = yield* fs.exists(path.join(agentHome(config, defaultOrchestrator), "MEMORY.md"));
@@ -158,14 +158,14 @@ describe("memory", () => {
   it.effect("a preview picks without counting, and the longest unused fade", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", repo: "clock", by: owner });
-      yield* m.write({ agent: "lab", text: "提交前跑 lint", repo: "", by: owner });
+      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", repo: "clock", by: user });
+      yield* m.write({ agent: "lab", text: "提交前跑 lint", repo: "", by: user });
       const preview = yield* m.recallOf("lab", "clock", "");
       expect(preview.lines).toEqual(["- （这个仓库）clock 的测试用 pnpm test", "- （所有仓库）提交前跑 lint"]);
       expect(preview.limit).toBe(recallChars);
       for (const x of yield* m.list("lab")) expect([x.recalled, x.fading]).toEqual([0, false]);
       expect((yield* m.recallOf("lab", "", "")).lines).toEqual([]);
-      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, repo: "", by: owner });
+      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, repo: "", by: user });
       expect((yield* m.list("lab")).filter((x) => x.fading)).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
@@ -173,8 +173,8 @@ describe("memory", () => {
   it.effect("the search index follows the table", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      const note = yield* m.write({ agent: "lab", text: "这个仓库测试用 pnpm test", repo: "demo", by: owner });
-      yield* m.write({ agent: "other", text: "测试前先装依赖", repo: "demo", by: owner });
+      const note = yield* m.write({ agent: "lab", text: "这个仓库测试用 pnpm test", repo: "demo", by: user });
+      yield* m.write({ agent: "other", text: "测试前先装依赖", repo: "demo", by: user });
       const found = (yield* m.search({ agent: "lab", repo: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
       expect(found.map((f) => f.id)).toEqual([note.id]);
       expect(found[0]!.score).toBeGreaterThan(0.5);
@@ -278,7 +278,7 @@ describe("memory", () => {
       legacy,
       Effect.gen(function* () {
         const m = yield* Memory;
-        const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", repo: "", by: owner });
+        const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", repo: "", by: user });
         expect((yield* m.memoriesOf(defaultOrchestrator)).memories[0]?.id).toBe(note.id);
         expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Missing");
         expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Missing");

@@ -15,8 +15,8 @@ CREATE FUNCTION term_query(words text[], prefix boolean) RETURNS tsquery LANGUAG
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  -- A profile is a helper profile the owner talks with alone (its id is profile:<agent>), not one of its sessions.
-  kind       text not null check (kind in ('owner', 'orchestrator', 'session', 'profile', 'system')),
+  -- A profile is a helper profile the user talks with alone (its id is profile:<agent>), not one of its sessions.
+  kind       text not null check (kind in ('user', 'orchestrator', 'session', 'profile', 'system')),
   name       text not null,
   agent_id   text,
   runtime    text,
@@ -42,7 +42,7 @@ CREATE TABLE channel (
   description   text,
   repo       text,
   parent_id     text references channel (id),
-  -- A direct channel is the owner's and one other participant's: the peer.
+  -- A direct channel is the user's and one other participant's: the peer.
   peer_id       text unique references channel_participant (id),
   -- Moves on with every message written or changed here: what a follower catches up from (channel_message.revision).
   revision      integer not null default 0,
@@ -51,7 +51,7 @@ CREATE TABLE channel (
   -- Its place in the sidebar, lowest first; none comes after the placed, oldest first.
   position      integer,
   archived_at   double precision,
-  -- What of it counts for the owner: everything, only what @s the owner, or nothing.
+  -- What of it counts for the user: everything, only what @s the user, or nothing.
   notify        text not null default 'all' check (notify in ('all', 'mentions', 'none')),
   check ((type = 'thread') = (root_id is not null)),
   check ((type = 'direct') = (peer_id is not null)),
@@ -233,7 +233,7 @@ CREATE TABLE channel_mention (
 CREATE TABLE channel_member (
   channel_id  text not null references channel (id),
   participant_id   text not null references channel_participant (id),
-  reason           text not null check (reason in ('owner', 'replied', 'mentioned', 'manual')),
+  reason           text not null check (reason in ('user', 'replied', 'mentioned', 'manual')),
   from_number      integer not null,
   left_at    double precision,
   primary key (channel_id, participant_id)
@@ -352,7 +352,7 @@ CREATE TABLE issue_assignment_execution (
   primary key (assignment, executor)
 );
 CREATE INDEX session_by_agent on session (agent, hired_at);
--- One order across the deliveries and the routed triggers (mailbox_owner_route reads both): each takes the next id here.
+-- One order across the deliveries and the routed triggers (mailbox_user_route reads both): each takes the next id here.
 CREATE TABLE mailbox_order (
   id integer primary key
 );
@@ -431,9 +431,9 @@ CREATE TABLE cron (
   enabled     boolean not null default true,
   created_at  double precision not null,
   last_run    double precision,
-  -- Who set it, and whether it waits for the owner to say yes (cron/rules.go's needsOK): a waiting one stays off
-  -- until the owner turns it on, which clears pending.
-  set_by      text not null default 'owner' check (set_by in ('owner', 'agent', 'system')),
+  -- Who set it, and whether it waits for the user to say yes (cron/rules.go's needsOK): a waiting one stays off
+  -- until the user turns it on, which clears pending.
+  set_by      text not null default 'user' check (set_by in ('user', 'agent', 'system')),
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
@@ -444,8 +444,8 @@ CREATE TABLE game_ledger (
 );
 CREATE TABLE memory (
   id           text primary key,
-  scope        text not null check (scope in ('owner', 'agent')),
-  agent        text,                -- the profile id; null for scope owner
+  scope        text not null check (scope in ('user', 'agent')),
+  agent        text,                -- the profile id; null for scope user
   kind         text not null check (kind in ('note', 'issue')),
   title        text,
   body         text not null,
@@ -455,13 +455,13 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   repo      text,                -- null: every repo
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'agent', 'system')),
+  author       text not null check (author in ('user', 'agent', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   double precision not null,
   updated_at   double precision not null,
   recalled     integer not null default 0,
   recalled_at  double precision,
-  check ((scope = 'owner') = (agent is null))
+  check ((scope = 'user') = (agent is null))
 );
 CREATE INDEX memory_by_agent ON memory (agent, created_at desc);
 CREATE INDEX memory_by_scope ON memory (scope, kind) WHERE replaced_by IS NULL;
@@ -471,7 +471,7 @@ CREATE INDEX memory_terms ON memory USING gin (term_vector(terms));
 CREATE TABLE connector_account (
   connector      text primary key check (connector in ('weixin', 'feishu', 'qq')),
   secrets        text not null,
-  owner_id       text,
+  user_id       text,
   pair_code      text,
   cursor         text not null default '',
   reply_context  text,
@@ -561,12 +561,12 @@ CREATE TABLE artifact (
   title       text not null,
   -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version).
   body        text not null check (body in ('blocks', 'html')),
-  -- The channel or thread it was announced in, none for one the owner started on the page; the issue it was made for, if any.
+  -- The channel or thread it was announced in, none for one the user started on the page; the issue it was made for, if any.
   channel_id  text references channel (id),
   -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).
   message_id  text references channel_message (id) on delete set null,
   issue       text,
-  -- Its maker, a profile's id or the owner's, and the name it went by then.
+  -- Its maker, a profile's id or the user's, and the name it went by then.
   by_id       text not null,
   by_name     text not null,
   -- html: the latest version; blocks: 0.
@@ -630,8 +630,8 @@ CREATE TABLE artifact_change (
 );
 
 -- Postgres does not index a foreign key; a delete that cascades and a lookup by it scan without one.
--- A change an agent proposed to a block the owner wrote (artifact/blocks.ts): once open, then accepted or rejected by the
--- owner. A block that moved on since base_rev comes back stale instead of being changed.
+-- A change an agent proposed to a block the user wrote (artifact/blocks.ts): once open, then accepted or rejected by the
+-- user. A block that moved on since base_rev comes back stale instead of being changed.
 CREATE TABLE artifact_suggestion (
   id          text primary key,
   artifact_id text not null references artifact (id) on delete cascade,
@@ -661,12 +661,12 @@ CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);
 CREATE INDEX artifact_by_message on artifact (message_id) where message_id is not null;
 CREATE INDEX artifact_version_by_message on artifact_version (message_id) where message_id is not null;
 
-CREATE VIEW mailbox_owner_route AS
+CREATE VIEW mailbox_user_route AS
 select routing_scope as scope, routing_position as position from mailbox_trigger
-where routed_at is not null and trigger_json::jsonb -> 'actor' ->> 'kind' = 'owner'
+where routed_at is not null and trigger_json::jsonb -> 'actor' ->> 'kind' = 'user'
 union all
 select scope, position from mailbox_delivery
-where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'owner'
+where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'user'
   and envelope_id <> payload_json::jsonb -> 'trigger' ->> 'id';
 
 CREATE TABLE runtime_spend (
@@ -676,14 +676,14 @@ CREATE TABLE runtime_spend (
   PRIMARY KEY (day, runtime)
 );
 
--- PKM (pkm/pkm.ts): the pages are files in the vault; these hold what the files do not. A remark the owner wrote in a file
+-- PKM (pkm/pkm.ts): the pages are files in the vault; these hold what the files do not. A remark the user wrote in a file
 -- is kept here by an id made from its block, so its status outlives a reading of the file.
 CREATE TABLE pkm_comment (
   id          text primary key,
   page        text not null,      -- the page's slug
   block       text not null,
   span        text,               -- the words an inline remark is on
-  author      text not null,      -- the owner's id, or the agent's that proposed the rewrite
+  author      text not null,      -- the user's id, or the agent's that proposed the rewrite
   body        text not null,
   status      text not null default 'open' check (status in ('open', 'suggested', 'accepted', 'rejected')),
   suggested   text,               -- the block's text as proposed

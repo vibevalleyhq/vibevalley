@@ -128,7 +128,7 @@ const why: Record<Rule, string> = {
     "See .agents/skills/vv-effect/references/cases.md (37.)",
   "cause-as-string":
     "the outside failure is kept only as text: its stack, status and the library's own error are gone. " +
-    "Fix: pass it whole as cause (cause: Schema.Defect()); say it to the owner where it is handled, with t(). " +
+    "Fix: pass it whole as cause (cause: Schema.Defect()); say it to the user where it is handled, with t(). " +
     "See .agents/skills/vv-effect/references/cases.md (10.)",
   "uninterruptible-wait":
     "Effect.uninterruptible around a wait: no timeout, race or shutdown can stop it. " +

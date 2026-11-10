@@ -349,7 +349,7 @@ function Chat() {
   const [dialog, setDialog] = createSignal<"none" | "new" | "search">("none");
   // A message's address (?m=) lights it up in the pane it is in: the thread's, or the channel's.
   const point = () => pointedAt(router.path());
-  // An artifact opened beside the talk that made it (?artifact=), and the block the owner is about to speak about.
+  // An artifact opened beside the talk that made it (?artifact=), and the block the user is about to speak about.
   const [quoted, setQuoted] = createSignal<QuotedBlockDraft[]>([]);
   const artifact = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("artifact");
   createEffect(

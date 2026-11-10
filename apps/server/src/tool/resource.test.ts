@@ -6,7 +6,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
 import { sampleAgent } from "#/agent/seed.ts";
-import { owner, worker as sessionActor } from "#/base/actor.ts";
+import { user, worker as sessionActor } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Issue } from "#/issue/issue.ts";
 import { testIssues, world } from "#/testing/world.ts";
@@ -32,11 +32,11 @@ describe("resource_read", () => {
     Effect.gen(function* () {
       const channels = yield* Channel;
       const tools = yield* Tool;
-      const caller = () => ({ agent: defaultOrchestrator, session: "", repo: "", here: channels.defaultChannel(), picked: "", envelope: "", actor: owner });
+      const caller = () => ({ agent: defaultOrchestrator, session: "", repo: "", here: channels.defaultChannel(), picked: "", envelope: "", actor: user });
       const read = tools.orchestrator(caller).find((item) => item.name === "resource_read");
       if (read === undefined) throw new Error("resource_read is missing");
       const original = "甲".repeat(500);
-      const message = (yield* channels.post({ _tag: "Owner", text: original, sendKey: "" })).message;
+      const message = (yield* channels.post({ _tag: "User", text: original, sendKey: "" })).message;
       const uri = `vv://envelope/${message.id}`;
       const firstText = yield* textResult(read, { uri, offset: 0, limit: 120 });
       let page = yield* decodePage(firstText);
@@ -64,7 +64,7 @@ describe("resource_read", () => {
       const issues = testIssues(issue2);
       const tools = yield* Tool;
       const secret = yield* channels.openChannel("secret", "", "");
-      const message = (yield* channels.post({ _tag: "Owner", text: "owner only", channel: secret.id, sendKey: "" })).message;
+      const message = (yield* channels.post({ _tag: "User", text: "user only", channel: secret.id, sendKey: "" })).message;
       const agent = sampleAgent({ id: "lab" });
       yield* agents.save(agent);
       const issue = yield* issues.add({ title: "work", repo: "demo", agent: agent.id });

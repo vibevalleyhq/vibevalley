@@ -10,7 +10,7 @@ import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
@@ -217,12 +217,12 @@ describe("a pull request", () => {
           expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
           expect(sessions.runOf(id)).toBe(running);
           expect((yield* issues.get(issue.id)).pullRequest?.state).toBe(ending === "SUBMITTED" ? undefined : "open");
-          if (ending === "ACCEPTED" || ending === "SUBMITTED") yield* issues.edit(issue.id, { deliver: "pull_request" }, owner);
+          if (ending === "ACCEPTED" || ending === "SUBMITTED") yield* issues.edit(issue.id, { deliver: "pull_request" }, user);
           release();
           yield* w.nextReport;
           if (ending === "ACCEPTED" || ending === "SUBMITTED") {
             if (ending === "ACCEPTED") writeFileSync(join(cwd, "uncommitted.txt"), "retain this work");
-            const accepted = yield* issues.setStatus(issue.id, "done", "", "", owner);
+            const accepted = yield* issues.setStatus(issue.id, "done", "", "", user);
             expect([accepted.status, accepted.delivered, accepted.pullRequest?.state]).toEqual(["done", "submitted", "open"]);
             expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
             expect(git(path, "rev-parse", "main")).toBe(main);
@@ -233,7 +233,7 @@ describe("a pull request", () => {
             expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
             return;
           }
-          issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
+          issue = yield* issues.setStatus(issue.id, "done", "", "", user);
           expect(issue.pullRequest).toMatchObject({
             number: 7,
             state: "open",
@@ -242,9 +242,9 @@ describe("a pull request", () => {
           expect(issue.status).toBe("in_review");
           expect(git(path, "rev-parse", "main")).toBe(main);
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));
-          yield* issues.setStatus(issue.id, "todo", "再写版本B", "", owner);
+          yield* issues.setStatus(issue.id, "todo", "再写版本B", "", user);
           yield* w.nextReport;
-          issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
+          issue = yield* issues.setStatus(issue.id, "done", "", "", user);
           expect([creates, pushes]).toEqual([1, 3]);
           const chat = yield* Channel;
           const thread = yield* chat.issueThread(issue.id, issue.title);
@@ -314,8 +314,8 @@ describe("a pull request", () => {
           expect(resolvedThreads).toEqual([]);
           const released = (yield* ingress.accept({
             source: "connector",
-            key: "owner-review-release",
-            actor: { kind: "owner", id: "owner" },
+            key: "user-review-release",
+            actor: { kind: "user", id: "user" },
             addressed: "thread_owner",
             threads: ["github:clock#7"],
             text: "处理剩余评审",
@@ -328,7 +328,7 @@ describe("a pull request", () => {
           yield* await_(
             () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${id} and envelope_id = ${released.id}`,
             (rows) => rows[0]?.state === "consumed",
-            "the owner's release consumed",
+            "the user's release consumed",
           );
           yield* until(() => sessions.sessionOf(id)?.phase._tag === "resting", "the review followup waiting for external events");
           state = ending;

@@ -1,7 +1,7 @@
 -- The devices paired for lan access (lan/lan.ts).
 
 -- name: LanDevices :many
--- bound: a row per device the owner paired.
+-- bound: a row per device the user paired.
 select * from lan_device;
 
 -- name: AddLanDevice :exec

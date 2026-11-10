@@ -20,7 +20,7 @@ export const LanDevicesResult = Schema.Struct({
 export type LanDevicesResult = typeof LanDevicesResult.Type
 
 
-export const LanDevicesSql = "-- name: LanDevices :many\n-- bound: a row per device the owner paired.\nselect * from lan_device;"
+export const LanDevicesSql = "-- name: LanDevices :many\n-- bound: a row per device the user paired.\nselect * from lan_device;"
 
 export const lanDevices = Effect.fn("LanDevices")(function* () {
   const sql = yield* SqlClient.SqlClient

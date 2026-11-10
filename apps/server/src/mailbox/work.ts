@@ -165,7 +165,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         received(entry.receipt);
         if (entry.input.previous) open.remove(entry.input.previous, entry.input.trigger.id);
         for (const added of entry.added) stored(entry.input.session, { ...entry.row, position: added.position });
-        if (entry.input.trigger.actor.kind === "owner" && entry.row.wakes) breaker.reset(entry.input.session);
+        if (entry.input.trigger.actor.kind === "user" && entry.row.wakes) breaker.reset(entry.input.session);
       }
       return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "" };
     }, writtenLocked);
@@ -220,7 +220,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(recorded.trigger_json).pipe(
             Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })),
           );
-          const urgency = urgencyOf({ source: trigger.source, actor: "owner", recipient: "worker", event: "conversation", canSteer: true });
+          const urgency = urgencyOf({ source: trigger.source, actor: "user", recipient: "worker", event: "conversation", canSteer: true });
           const row: DeliveryDraft = {
             envelope_id: talk.row.envelope_id,
             scope: deliveryScope(talk.row.channel_id, talk.row.subject_kind === "issue" ? (talk.row.subject_id ?? undefined) : undefined),
@@ -326,7 +326,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           (input) =>
             Effect.gen(function* () {
               const trigger = readTrigger(input.trigger_json);
-              if (trigger.actor.kind === "owner") yield* retire(issue, trigger, input.session_id, "closed", true);
+              if (trigger.actor.kind === "user") yield* retire(issue, trigger, input.session_id, "closed", true);
               else yield* db.run(qi.returnIssueInput({ trigger_id: trigger.id, reason: "closed" }));
             }),
           { discard: true },
@@ -344,7 +344,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
                 ? "budget"
                 : !recipient
                   ? "session"
-                  : waitsForHuman(issue) && trigger.actor.kind !== "owner" && !human
+                  : waitsForHuman(issue) && trigger.actor.kind !== "user" && !human
                     ? "human"
                     : undefined;
             if (reason) {
@@ -392,7 +392,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         return;
       }
       if (!audience && (yield* isRouted(trigger.id))) return;
-      const threads = audience && trigger.actor.kind !== "owner" ? [] : trigger.threads;
+      const threads = audience && trigger.actor.kind !== "user" ? [] : trigger.threads;
       const matches = yield* db.run(qs.subscribedIssues({ keys: [...threads] }));
       const ids = new Set(matches.map((row) => row.issue_id));
       yield* Effect.forEach(
@@ -424,7 +424,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           }),
         );
         yield* writtenLocked(Effect.sync(() => received(receipt)));
-        yield* flush(issue, trigger.actor.kind === "owner");
+        yield* flush(issue, trigger.actor.kind === "user");
         return;
       }
       if (audience) {

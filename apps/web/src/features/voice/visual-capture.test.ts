@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { localRelayHost } from "./visual-capture.ts";
 
 describe("local realtime relay admission", () => {
-  it.each(["localhost", "127.0.0.1", "[::1]", "::1"])("allows owner loopback host %s", (hostname) => {
+  it.each(["localhost", "127.0.0.1", "[::1]", "::1"])("allows user loopback host %s", (hostname) => {
     expect(localRelayHost(hostname)).toBe(true);
   });
 

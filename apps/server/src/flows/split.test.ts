@@ -9,7 +9,7 @@ import { SqlClient } from "effect/sql";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { inbox } from "#/inbox/items.ts";
 import { Issue } from "#/issue/issue.ts";
@@ -45,7 +45,7 @@ it.live("regression: a parent without a session can receive and resolve its own 
     gitSync(root, "add", ".");
     gitSync(root, "commit", "-m", "Prepare conflict file");
     const parent = yield* testIssues(issues).add({ title: "parent", repo: "parent-conflict", agent: "lab" });
-    yield* issues.split(parent.id, "", [{ id: "child", title: "child", brief: "child work" }], owner);
+    yield* issues.split(parent.id, "", [{ id: "child", title: "child", brief: "child work" }], user);
     yield* await_(
       () => issues.get(parent.id),
       (item) => item.status === "in_review",
@@ -54,19 +54,19 @@ it.live("regression: a parent without a session can receive and resolve its own 
     writeFileSync(join(root, "same.ts"), "main\n");
     gitSync(root, "add", ".");
     gitSync(root, "commit", "-m", "Change main");
-    yield* issues.changes(parent.id, owner);
+    yield* issues.changes(parent.id, user);
     const conflicted = yield* issues.get(parent.id);
     expect(conflicted.conflict).toEqual({ base: "main", files: ["same.ts"] });
     expect(conflicted.stage).toMatchObject({ state: "stuck", stuck: "conflict" });
     expect(inbox((yield* Core).state()).some((item) => item.kind === "conflict" && item.target.kind === "issue" && item.target.id === parent.id)).toBe(true);
-    yield* issues.setStatus(parent.id, "todo", "", "", owner);
+    yield* issues.setStatus(parent.id, "todo", "", "", user);
     const resolved = yield* await_(
       () => issues.get(parent.id),
       (item) => item.status === "in_review" && item.conflict === undefined,
       "the parent conflict resolved",
     );
     expect(latestSessionIdOf(resolved)).toBeDefined();
-    expect((yield* issues.setStatus(parent.id, "done", "", "", owner)).status).toBe("done");
+    expect((yield* issues.setStatus(parent.id, "done", "", "", user)).status).toBe("done");
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
 
@@ -97,7 +97,7 @@ it.live("regression: splitting creates real queued issues whose dependencies mer
         { id: "first", title: "first", brief: "first work" },
         { id: "second", title: "second", brief: "second work", needs: ["first"] },
       ],
-      owner,
+      user,
     );
     const children = (yield* issues.list()).filter((item) => item.parent === parent.id);
     const a = children.find((item) => item.title === "first")!;
@@ -122,10 +122,10 @@ it.live("regression: splitting creates real queued issues whose dependencies mer
     const waiting = inbox((yield* Core).state()).filter((item) => item.kind === "review");
     expect(waiting).toHaveLength(1);
     expect(waiting[0]?.target).toEqual({ kind: "issue", id: parent.id });
-    expect((yield* service.changes(parent.id, owner)).commits.length).toBeGreaterThan(0);
+    expect((yield* service.changes(parent.id, user)).commits.length).toBeGreaterThan(0);
     const place = yield* (yield* Repo).workplace("split", parent.number, true, "");
     expect(readFileSync(join(place.cwd, "second.txt"), "utf8")).toBe("done");
-    yield* service.setStatus(parent.id, "done", "", "", owner);
+    yield* service.setStatus(parent.id, "done", "", "", user);
     const core = yield* Core;
     yield* await_(
       () => core.state().progress,
@@ -153,7 +153,7 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
           { id: "first", title: "first", brief: "work" },
           { id: "second", title: "second", brief: "work", needs: ["first"] },
         ],
-        owner,
+        user,
       ),
     );
     expect(result._tag).toBe("Refused");

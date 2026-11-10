@@ -1,4 +1,4 @@
-import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactOwnerMentionsChanged } from "../channel/shapes";
+import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/shapes";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes";
 import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
@@ -85,7 +85,7 @@ export type Fact =
   | FactMessageChanged
   | FactChannelChanged
   | FactChannelRemoved
-  | FactOwnerMentionsChanged
+  | FactUserMentionsChanged
   | FactSessionChanged
   | FactSessionReported
   | FactSessionLeft

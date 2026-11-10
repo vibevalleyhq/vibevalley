@@ -151,7 +151,7 @@ test("the voice line saves its own part and goes back to the defaults", async ({
   await expect(page.getByTestId("reset")).toBeDisabled();
 });
 
-test("dictation goes to MOSS unless the owner picks an own address, which then saves its address and model", async ({ page, api }) => {
+test("dictation goes to MOSS unless the user picks an own address, which then saves its address and model", async ({ page, api }) => {
   await page.goto("/settings/dictation");
   const via = page.getByTestId("dictation-via");
   await expect(via.locator('[data-key="moss"]')).toHaveAttribute("aria-pressed", "true");

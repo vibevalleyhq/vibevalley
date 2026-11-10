@@ -181,8 +181,8 @@ describe("official Live lifecycle fixtures", () => {
   it("regression: finished response does not end the call and transcript revisions replace history", () => {
     const f = fixture();
     f.live();
-    f.receive({ action: "input.transcript.done", data: { turn: "owner-1", text: "old" } });
-    f.receive({ action: "input.transcript.revised", data: { turn: "owner-1", previous: "old", text: "corrected" } });
+    f.receive({ action: "input.transcript.done", data: { turn: "user-1", text: "old" } });
+    f.receive({ action: "input.transcript.revised", data: { turn: "user-1", previous: "old", text: "corrected" } });
     f.receive({ action: "output.transcript.done", data: { run_id: "r1", turn_id: "t1", text: "answer" } });
     f.receive({ action: "response.ended", data: { run_id: "r1", turn_id: "t1", status: "completed" } });
     f.receive({ action: "output.transcript.updated", data: { run_id: "r1", turn_id: "t1", text: "stale" } });

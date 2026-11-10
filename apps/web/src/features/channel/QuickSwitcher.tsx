@@ -132,7 +132,7 @@ function SwitcherBody(props: { onClose: () => void }) {
       ...(typed ? [{ kind: "notes", id: typed, label: t("web.channel.switcher.searchNotes", { q: typed }), hint: "", unread: 0, at: 0 } as const] : []),
     ];
   });
-  // Made here, not in go: the dialog closes as the owner picks, and the act outlives it.
+  // Made here, not in go: the dialog closes as the user picks, and the act outlives it.
   const act = createAct();
   const go = (t: SwitchTarget) => {
     untrack(() => props.onClose)();

@@ -9,7 +9,7 @@ import type * as T from "@vibevalley/protocol";
 import { needOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { orchestrator, owner } from "#/base/actor.ts";
+import { orchestrator, user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Session } from "#/session/session.ts";
@@ -20,7 +20,7 @@ import { releaseHeld } from "#/testing/worker.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
 const lastText = (sessions: Session["Service"], id: string, summary: string) => sessions.lastTextOf(id) || summary;
-const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
+const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byUserComment: false });
 
 describe("a session's work", () => {
   it.live("is sent, works, reports and goes home", () => {
@@ -38,8 +38,8 @@ describe("a session's work", () => {
       expect(report.outcome).toBe("completed");
       expect(text).toMatch(/做完了：写 hello\.py/u);
       expect(text).toMatch(/原型/u);
-      // The farm's other news (its commits, the issue, the default channel and the owner's mentions in it) comes and goes beside the session's own.
-      const mine = w.facts.filter((x) => !["commits", "issueChanged", "messageChanged", "channelChanged", "ownerMentionsChanged", "progress"].includes(x.type));
+      // The farm's other news (its commits, the issue, the default channel and the user's mentions in it) comes and goes beside the session's own.
+      const mine = w.facts.filter((x) => !["commits", "issueChanged", "messageChanged", "channelChanged", "userMentionsChanged", "progress"].includes(x.type));
       expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["sessionChanged", "sessionLeft"]);
       expect(mine.some((x) => x.type === "sessionPhaseChanged" && x.phase._tag === "working")).toBe(true);
       expect(
@@ -68,7 +68,7 @@ describe("a session's work", () => {
       const hired = yield* issues.hire(lab(), "写打卡并提交", "clock");
       const session = mustHire(hired);
       yield* w.nextReport;
-      const said = yield* issues.setStatus(session.issue!, "done", "", "", owner);
+      const said = yield* issues.setStatus(session.issue!, "done", "", "", user);
       expect(session.branch).toMatch(/^vibevalley\//u);
       expect(said).toMatchObject({ status: "done", delivered: "merged" });
       yield* until(() => w.notes.some((note) => /1 个提交合进了 clock 的 main/u.test(note)), "the merge notice");
@@ -90,7 +90,7 @@ describe("a session's work", () => {
       const hired = yield* issues.hire(lab(), "写打卡并提交", "ledger");
       const session = mustHire(hired);
       yield* w.nextReport;
-      yield* issues.setStatus(session.issue!, "done", "", "", owner);
+      yield* issues.setStatus(session.issue!, "done", "", "", user);
       const entries = () =>
         runPromise(
           sql<{
@@ -128,7 +128,7 @@ describe("a session's work", () => {
         const delivered2 = yield* sessions.deliver(session!.id, "再加一句并提交", delivery({ kind: "comment" }));
         expect(delivered2).toMatchObject({ kind: "run", woke: true });
         yield* w.nextReport;
-        const setStatus2 = yield* (yield* Issue).setStatus(session!.issue!, "done", "", "", owner);
+        const setStatus2 = yield* (yield* Issue).setStatus(session!.issue!, "done", "", "", user);
         expect(setStatus2).toMatchObject({ status: "done", delivered: "merged" });
       }).pipe(Effect.scoped, Effect.provide(after.layer));
     });
@@ -280,19 +280,19 @@ describe("a session's work", () => {
       const b = mustHire(hired2);
       yield* w.nextReport;
       yield* w.nextReport;
-      const setStatus2 = yield* issues.setStatus(a.issue!, "done", "", "", owner);
+      const setStatus2 = yield* issues.setStatus(a.issue!, "done", "", "", user);
       expect(setStatus2).toMatchObject({ status: "done", delivered: "merged" });
       expect((yield* issues.changes(b.issue!, orchestrator(true))).conflicts).toEqual(["same.ts"]);
-      const failed = yield* Effect.flip(issues.setStatus(b.issue!, "done", "", "", owner));
+      const failed = yield* Effect.flip(issues.setStatus(b.issue!, "done", "", "", user));
       expect(Formatter.formatJson(failed)).toMatch(/会冲突（same\.ts）/u);
       const stayed = yield* issues.get(b.issue!);
       expect(stayed.conflict).toEqual({ base: "main", files: ["same.ts"] });
-      yield* issues.setStatus(b.issue!, "todo", "", "", owner);
+      yield* issues.setStatus(b.issue!, "todo", "", "", user);
       yield* w.nextReport;
       // Issue rechecks its branch after the worker reports.
       const core = yield* Core;
       yield* until(() => core.state().issues.find((issue) => issue.id === b.issue)?.conflict === undefined, "the conflict mark cleared");
-      const setStatus3 = yield* issues.setStatus(b.issue!, "done", "", "", owner);
+      const setStatus3 = yield* issues.setStatus(b.issue!, "done", "", "", user);
       expect(setStatus3).toMatchObject({ status: "done", delivered: "merged" });
       const repo = join(f.config.workRoot, "repos", "clash");
       expect(git(repo, "show", "main:same.ts")).toBe("export const v = 'A+B'");
@@ -315,8 +315,8 @@ describe("a session's work", () => {
         const second = mustHire(hired2);
         yield* w.nextReport;
         yield* w.nextReport;
-        yield* issues.setStatus(first.issue!, "done", "", "", owner);
-        yield* issues.changes(second.issue!, owner);
+        yield* issues.setStatus(first.issue!, "done", "", "", user);
+        yield* issues.changes(second.issue!, user);
         yield* (yield* Session).dismiss(second.id);
         expect((yield* issues.get(second.issue!)).conflict).toEqual({ base: "main", files: ["same.ts"] });
         expect(Object.hasOwn((yield* (yield* Session).get(second.id))!, "conflict")).toBe(false);
@@ -324,7 +324,7 @@ describe("a session's work", () => {
       }).pipe(Effect.scoped, Effect.provide(f.layer));
       yield* Effect.gen(function* () {
         expect((yield* (yield* Issue).get(id)).conflict).toEqual({ base: "main", files: ["same.ts"] });
-        expect((yield* (yield* Issue).changes(id, owner)).conflicts).toEqual(["same.ts"]);
+        expect((yield* (yield* Issue).changes(id, user)).conflicts).toEqual(["same.ts"]);
       }).pipe(Effect.scoped, Effect.provide(farm({ config }).layer));
     });
   });

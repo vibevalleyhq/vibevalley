@@ -38,7 +38,7 @@ describe("regression tests", () => {
         before,
         after: file(weakened),
         branch: "feat/x",
-        body: body("## Regression", "- `regression: the helper idle longest goes home`: who goes home is now the owner's choice."),
+        body: body("## Regression", "- `regression: the helper idle longest goes home`: who goes home is now the user's choice."),
       }),
     ).toEqual([]);
     expect(regressionProblems({ before, after: file(kept), branch: "feat/x", body: body() })).toEqual([]);

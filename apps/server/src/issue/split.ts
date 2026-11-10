@@ -7,7 +7,7 @@ import { assignedAgentOf, isBusy, latestSessionIdOf } from "@vibevalley/protocol
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { actsForUser, type Actor } from "#/base/actor.ts";
 import { reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -18,7 +18,7 @@ import { Session } from "#/session/session.ts";
 import { maxChildren } from "./creation.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { verifyChild } from "./merge.ts";
-import { needsOwner } from "./prompts.ts";
+import { needsUser } from "./prompts.ts";
 import { isClosed } from "./status.ts";
 
 export const issueSplitting = (r: IssueLifecycle) =>
@@ -35,7 +35,7 @@ export const issueSplitting = (r: IssueLifecycle) =>
         const caller = sessions.sessionOf(by.id);
         if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id)
           return yield* Effect.fail(refused(t("server.issue.split.notCurrent")));
-      } else if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
+      } else if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       if (isClosed(parent.status)) return yield* Effect.fail(refused(t("server.issue.dependencies.closedParent")));
       const parentRepo = parent.repo;
       if (!parentRepo) return yield* Effect.fail(refused(t("server.issue.noRepo")));

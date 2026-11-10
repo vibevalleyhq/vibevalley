@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { For, onSettled, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type ChatMessage, ownerId } from "@vibevalley/protocol";
+import { type ChatMessage, userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
 const recipeStyles = stylex.create({
@@ -68,8 +68,8 @@ const viewStyles = stylex.create({
   },
 });
 
-/** What pressing an emoji on a message asks for: the owner's reaction off when it is on the message now, else on. */
-export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(ownerId) ?? false);
+/** What pressing an emoji on a message asks for: the user's reaction off when it is on the message now, else on. */
+export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(userId) ?? false);
 
 /** What a reaction offers first; an agent can still react with any other. */
 export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];

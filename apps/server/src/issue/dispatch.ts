@@ -258,7 +258,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       if (issue.delivered === "merged_into_parent") return yield* Effect.fail(refused(t("server.issue.mergedChildRetry")));
       const newest = latestSessionIdOf(issue);
       if (newest === undefined) {
-        // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
+        // Run before by no session (the orchestrator): its doer takes it up again, with the user's words.
         if (!issue.lastRun) return yield* Effect.fail(refused(t("server.issue.neverStarted")));
         if (!isClosed(issue.status)) return yield* Effect.fail(refused(t("server.issue.stillOpen")));
         yield* start(id, channel, by, text);

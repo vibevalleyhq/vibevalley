@@ -22,19 +22,19 @@ describe("heard", () => {
     ]);
   });
 
-  it("names the owner's line when MOSS names its turn, and keeps the sides apart", () => {
+  it("names the user's line when MOSS names its turn, and keeps the sides apart", () => {
     let turns: MossTurn[] = [];
-    turns = heard(turns, "owner", "", "hi", false);
+    turns = heard(turns, "user", "", "hi", false);
     turns = heard(turns, "moss", "m1", "yes", false);
-    turns = heard(turns, "owner", "o1", "hi there", true);
+    turns = heard(turns, "user", "o1", "hi there", true);
     expect(turns).toEqual([
-      { who: "owner", key: "o1", text: "hi there", done: true },
+      { who: "user", key: "o1", text: "hi there", done: true },
       { who: "moss", key: "m1", text: "yes", done: false },
     ]);
   });
 
   it("ignores empty words", () => {
-    expect(heard([], "owner", "o1", "", false)).toEqual([]);
+    expect(heard([], "user", "o1", "", false)).toEqual([]);
   });
 });
 

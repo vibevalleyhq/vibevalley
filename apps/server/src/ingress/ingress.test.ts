@@ -49,7 +49,7 @@ it("regression: trigger control fields reject malformed values and preserve voic
   const trigger = triggerOf({
     source: "voice",
     key: "voice-control",
-    actor: { kind: "owner", id: "owner" },
+    actor: { kind: "user", id: "user" },
     addressed: "direct",
     threads: [],
     text: "voice input",

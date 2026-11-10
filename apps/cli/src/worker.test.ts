@@ -4,7 +4,7 @@ import { Effect, FileSystem, Schema } from "effect";
 
 import { cli, farm } from "./testing.ts";
 
-it.effect("regression: worker commands refuse missing credentials without owner fallback", () =>
+it.effect("regression: worker commands refuse missing credentials without user fallback", () =>
   Effect.gen(function* () {
     const result = yield* cli(["worker", "report", "{}"]);
     expect(result.code).not.toBe(0);

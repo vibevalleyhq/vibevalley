@@ -527,7 +527,7 @@ export function ChatWindow() {
     if (c.phase !== "live" || here?.default !== true) return [];
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
-      .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
+      .map((m) => ({ speaker: m.fromKind === "user" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, spoken, tick()).map((turn) => ({ ...turn }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
@@ -619,7 +619,7 @@ export function ChatWindow() {
                   aria-label={p().state === "failed" ? t("web.farm.chat.notSentLine") : t("web.farm.chat.sending")}
                   data-testid="message"
                   data-key={p().key}
-                  data-from-kind="owner"
+                  data-from-kind="user"
                   data-state={p().state}
                 >
                   <ChatRow mine first title={p().state === "failed" ? (p().reason ?? t("web.farm.chat.notSentLine")) : t("web.farm.chat.sending")}>
@@ -826,7 +826,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
           steps={props.m.fromRole === "worker" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
-      <Match when={props.m.fromKind === "owner"}>
+      <Match when={props.m.fromKind === "user"}>
         <ChatBubble m={props.m} mine first={props.first} after={chip()} />
       </Match>
     </Switch>

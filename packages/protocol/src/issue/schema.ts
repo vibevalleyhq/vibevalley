@@ -248,7 +248,7 @@ export const IssueFilter: Codec<T.IssueFilter> = Schema.Struct({
   repo: Schema.optionalKey(Schema.String),
   limit: Schema.optionalKey(Schema.Finite),
   closed: Schema.optionalKey(Schema.Boolean),
-  wantsOwner: Schema.optionalKey(Schema.Boolean),
+  wantsUser: Schema.optionalKey(Schema.Boolean),
 });
 
 export const IssueChildDraft: Codec<T.IssueChildDraft> = Schema.Struct({

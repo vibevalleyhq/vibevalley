@@ -1,11 +1,11 @@
 {
   "name": {
-    "owner": "主人",
+    "user": "主人",
     "orchestrator": "管家"
   },
   "mention": {
     "orchestrator": "@管家",
-    "owner": "@主人",
+    "user": "@主人",
     "everyone": "@所有人"
   },
   "channelName": "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",

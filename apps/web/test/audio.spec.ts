@@ -210,7 +210,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("regression: large speaker audio survives reload until the owner explicitly releases it", async ({ page, api }) => {
+test("regression: large speaker audio survives reload until the user explicitly releases it", async ({ page, api }) => {
   await bindAudio(api);
   const publications: string[] = [];
   page.on("request", (request) => {

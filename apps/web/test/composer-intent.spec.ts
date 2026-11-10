@@ -42,7 +42,7 @@ test("a line whose reply was lost is the one the server took: it shows once and 
   const chat = page.getByTestId("farm-chat");
   // The channel's copy carries the line's key: the line settles on it, without a second send.
   await expect(chat.locator('[data-testid="message"][data-state]')).toHaveCount(0);
-  await expect(chat.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: words })).toHaveCount(1);
+  await expect(chat.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: words })).toHaveCount(1);
   expect(sent.map((s) => s.id)).toEqual([channel]);
   expect((await api.channel.message.list({ id: channel })).filter((m) => m.text === words)).toHaveLength(1);
 });
@@ -64,7 +64,7 @@ test("a failed line in the farm chat sent again is the same message", async ({ p
   await expect(chat.getByTestId("chat-problem")).toBeVisible();
   await chat.locator('[data-testid="message"][data-state="failed"]').getByTestId("pending-retry").click();
   await expect(chat.locator('[data-testid="message"][data-state]')).toHaveCount(0);
-  await expect(chat.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: words })).toHaveCount(1);
+  await expect(chat.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: words })).toHaveCount(1);
   expect(sent.map((s) => s.sendKey)).toEqual([sent[0]?.sendKey, sent[0]?.sendKey]);
 });
 

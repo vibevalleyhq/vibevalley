@@ -14,7 +14,7 @@ export const isPaired = (cookie: string) => cookie.split(";").some((c) => c.trim
 /** The cookie to keep a paired key in, for ten years; only this origin's own requests carry it. */
 export const keyCookie = (key: string) => `${lanKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Strict`;
 
-/** What the device is called on the owner's list, until they rename it there: a guess from the browser. */
+/** What the device is called on the user's list, until they rename it there: a guess from the browser. */
 export function deviceGuess(userAgent: string): string {
   if (/iPhone/u.test(userAgent)) return "iPhone";
   if (/iPad/u.test(userAgent)) return "iPad";

@@ -1,5 +1,5 @@
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined, same, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined, same, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { compare, compareText, or } from "#/base/order.ts";
 import { sessionOf } from "#/session/roster.ts";
@@ -88,18 +88,18 @@ export function issueStageIn(t: T.Issue, state: T.SpaceState): T.IssueStage {
 const spaces = /\s+/u;
 
 /** The issues a filter picks, newest first: the open ones unless it asks for closed ones or names a closed status; waiting on
- * the owner, the longest waiting first. */
+ * the user, the longest waiting first. */
 export function pickIssues(all: readonly T.Issue[], f: T.IssueFilter, now: number): T.Issue[] {
   const words = (f.text ?? "").split(spaces).filter(Boolean);
   const repo = (f.repo ?? "").trim();
   let found = all.filter(
     (item) =>
       (f.status ? item.status === f.status : f.closed === true || (item.status !== "done" && item.status !== "canceled")) &&
-      (f.wantsOwner !== true || stageWantsOwner(item.stage.state)) &&
+      (f.wantsUser !== true || stageWantsUser(item.stage.state)) &&
       (!repo || item.repo === repo) &&
       words.every((w) => (item.title + "\n" + item.description).includes(w)),
   );
-  if (f.wantsOwner === true) found = found.toSorted((a, b) => (a.stage.since ?? now) - (b.stage.since ?? now));
+  if (f.wantsUser === true) found = found.toSorted((a, b) => (a.stage.since ?? now) - (b.stage.since ?? now));
   return f.limit != null && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
 }
 

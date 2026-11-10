@@ -245,12 +245,12 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     focus: () => setMenu((m) => (m._tag === "away" ? { _tag: "open" } : m)),
     canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     here,
-    /** The place's orchestrator is in a round the owner may stop. */
+    /** The place's orchestrator is in a round the user may stop. */
     stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),
   };
 }
 
-/** What the owner is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. */
+/** What the user is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. */
 const DraftSchema = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   reply: Schema.optionalKey(Schema.Struct({ id: Schema.String, number: Schema.Int })),
@@ -299,7 +299,7 @@ export function useReplying(channel: Accessor<string | undefined>): Accessor<Cha
   };
 }
 
-/** The message the owner is changing in place, one at a time across the page (↑ in an empty box picks the last). */
+/** The message the user is changing in place, one at a time across the page (↑ in an empty box picks the last). */
 const editing = defineAtom<string | undefined>(undefined);
 export const editingId = editing.get;
 export const setEditingId = editing.set;

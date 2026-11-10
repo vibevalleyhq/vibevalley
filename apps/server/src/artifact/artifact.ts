@@ -6,7 +6,7 @@ import { Clock, Context, Effect, FileSystem, Layer, Semaphore, type Stream } fro
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
@@ -24,7 +24,7 @@ import { htmlCheck, htmlProblem } from "./check.ts";
 import { htmlEdit } from "./edit.ts";
 import { artifactProblem } from "./policy.ts";
 
-/** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator). */
+/** Who makes it. from: who says so in the channel (the user, a session, an orchestrator). */
 interface Maker {
   readonly from: string;
   readonly by: string;
@@ -43,7 +43,7 @@ export class Artifact extends Context.Service<
     readonly create: (maker: Maker, req: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError>;
     /** An html one's next version; a blocks one is refused, it is changed block by block. */
     readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError>;
-    /** The owner's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
+    /** The user's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
     readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError>;
     readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
     readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
@@ -51,7 +51,7 @@ export class Artifact extends Context.Service<
     readonly remove: (id: T.ArtifactId) => Effect.Effect<void, ApiError>;
     readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.BlockSnapshot, ApiError>;
     readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-    /** A batch of ops from actor (the owner, or a helper's profile id): blocks.ts. */
+    /** A batch of ops from actor (the user, or a helper's profile id): blocks.ts. */
     readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
     readonly insertBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
     readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
@@ -143,11 +143,11 @@ const make = () =>
 
     const words = (base: string, note: string | undefined) => (note ? t("server.artifact.withNote", { said: base, note }) : base);
 
-    /** An empty blocks one the owner starts on the page: nowhere to announce, nothing to read in. */
+    /** An empty blocks one the user starts on the page: nowhere to announce, nothing to read in. */
     const start = Effect.fn("Artifact.start")(function* (maker: Maker, title: string) {
       const id = S.artifactId(newId());
       const now = yield* Clock.currentTimeMillis;
-      const name = maker.by === ownerId ? t("server.channel.name.owner") : maker.by;
+      const name = maker.by === userId ? t("server.channel.name.user") : maker.by;
       yield* db.run(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
       const found2 = yield* found(id);
       return yield* assemble(found2);

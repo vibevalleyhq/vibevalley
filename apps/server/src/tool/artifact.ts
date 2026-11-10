@@ -171,7 +171,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
         }),
       );
 
-    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op pipeline the owner's editor uses, written as the agent's profile.
+    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op pipeline the user's editor uses, written as the agent's profile.
     const writer = (c: Caller) => c.agent || c.session;
 
     interface BlockCreateInput {

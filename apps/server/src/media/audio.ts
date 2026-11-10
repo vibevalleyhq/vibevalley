@@ -193,7 +193,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         }),
       { discard: true },
     );
-    // Saved results retain their source until the owner explicitly releases local assets.
+    // Saved results retain their source until the user explicitly releases local assets.
     if (row.input !== null && row.result === null) yield* ports.inputs.release(id);
     if (row.problem === t("server.media.audioCleanupPending")) yield* change(id, ["ready", "failed", "canceled"], { problem: "" });
     else yield* ports.publish();
@@ -454,8 +454,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     );
   });
   const create = Effect.fnUntraced(function* (given: T.MediaAudioRequest, caller: MediaCaller): Effect.fn.Return<T.MediaAudioJob, ApiError> {
-    if ((caller.kind === "orchestrator" && !caller.forOwner) || ((given.kind === "clone" || given.kind === "transcription") && caller.kind !== "owner"))
-      return yield* Effect.fail(refused(t("server.media.ownerRequired")));
+    if ((caller.kind === "orchestrator" && !caller.forUser) || ((given.kind === "clone" || given.kind === "transcription") && caller.kind !== "user"))
+      return yield* Effect.fail(refused(t("server.media.userRequired")));
     const source = yield* Schema.decodeEffect(S.MediaSource)(caller).pipe(Effect.mapError(invalid));
     const input = yield* Schema.decodeEffect(S.MediaAudioRequest)(given, { onExcessProperty: "error" }).pipe(Effect.mapError(invalid));
     return yield* ports.lock.withPermits(1)(

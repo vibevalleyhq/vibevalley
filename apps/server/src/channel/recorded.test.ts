@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from "vite-plus/test";
 
-import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 import type { ChannelAudience } from "#/channel/contracts.ts";
@@ -21,9 +21,9 @@ test("regression: a delivery batch includes every acknowledged card", () => {
     id: `delivery-${i}`,
     number: i + 1,
     target: "#room",
-    from: "owner",
-    fromKind: "owner",
-    name: "owner",
+    from: "user",
+    fromKind: "user",
+    name: "user",
     text: `body-text-${i}`,
   }));
   const input = wakeInput(messages, []);
@@ -65,14 +65,14 @@ test("an @ right after Chinese names someone, and one inside a Latin word or an 
   expect(mentionsIn("mail a@w3.dev, x@@w3")).toEqual([]);
 });
 
-test("with several orchestrators: the place's hears the owner, 管家 is the place's, and each is named by its id", () => {
+test("with several orchestrators: the place's hears the user, 管家 is the place's, and each is named by its id", () => {
   const names = { here: "lead", orchestrators: ["orchestrator", "lead", "agent-1", "agent-12"] };
   expect(mentionsIn("@管家 看看，@agent-12 也看看，@agent-1", names)).toEqual(["lead", "agent-12", "agent-1"]);
   expect(mentionsIn("@orchestrator 你呢 `@lead`", names)).toEqual(["orchestrator"]);
   expect(mentionsIn("@lead 在吗")).toEqual([]);
   const base: ChannelAudience & BrakeInput = {
-    from: "owner",
-    fromKind: "owner",
+    from: "user",
+    fromKind: "user",
     kind: "chat",
     mentions: [],
     channel: { type: "channel" },
@@ -89,7 +89,7 @@ test("with several orchestrators: the place's hears the owner, 管家 is the pla
     ["lead", "addressed", true],
     ["w1", "channel", false],
   ]);
-  // No one in the channel: what the owner says there to no one in particular wakes no one.
+  // No one in the channel: what the user says there to no one in particular wakes no one.
   expect(chatAudience({ ...base, channelMembers: [] })).toEqual([{ recipient: "w1", reason: "channel", wakes: false }]);
   expect(chatAudience({ ...base, mentions: ["orchestrator"] }).map((d) => [d.recipient, d.reason])).toEqual([
     ["orchestrator", "mention"],
@@ -132,7 +132,7 @@ describe("a search", () => {
       in: "clock-in",
       has: ["image", "link"],
     });
-    expect(parseSearch("from:@主人 来了").from).toBe(ownerId);
+    expect(parseSearch("from:@主人 来了").from).toBe(userId);
     expect(parseSearch("from:w3").from).toBe("w3");
     const day = parseSearch("before:2026-10-28 after:2026-10-01 has:pdf");
     expect([day.before, day.after, day.words]).toEqual([new Date(2026, 9, 28).getTime(), new Date(2026, 9, 1).getTime(), "has:pdf"]);
@@ -144,8 +144,8 @@ const said = {
   id: "m",
   number: 1,
   target: "#general",
-  from: "owner",
-  fromKind: "owner" as const,
+  from: "user",
+  fromKind: "user" as const,
   name: "主人",
   text: "看这块",
 };

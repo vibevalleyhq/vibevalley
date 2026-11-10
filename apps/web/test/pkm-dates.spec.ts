@@ -25,7 +25,7 @@ for (const [before, after] of [
     const check = diagnosticsOf(page);
     await startOn(page, `${before}T23:59:59+08:00`);
     const calendar = page.getByTestId("pkm-calendar");
-    const owner = await calendar.elementHandle();
+    const user = await calendar.elementHandle();
     const journals = page.getByTestId("pkm-day");
     const oldSlug = before.replaceAll("-", "_");
     const newSlug = after.replaceAll("-", "_");
@@ -40,7 +40,7 @@ for (const [before, after] of [
     await expect(journals.first()).toHaveAttribute("data-key", newSlug);
     await expect(journals.nth(1)).toHaveAttribute("data-key", oldSlug);
     await expect(journals.filter({ has: page.locator(`[data-testid="pkm-block"]`) }).first()).toHaveAttribute("data-key", newSlug);
-    expect(await calendar.evaluate((current, original) => current === original, owner)).toBe(true);
+    expect(await calendar.evaluate((current, original) => current === original, user)).toBe(true);
     const current = calendar.locator("[data-today]");
     await expect(current).toHaveAttribute("data-journal", "");
     const accent = await current.locator('[aria-hidden="true"]').evaluate((element) => getComputedStyle(element).backgroundColor);

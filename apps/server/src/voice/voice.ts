@@ -129,7 +129,7 @@ interface Call {
   readonly session?: CallSession | undefined;
   readonly say: (piece: string) => Effect.Effect<void, CallStepFailed>;
   readonly release: () => void;
-  /** A quick/realtime model answers on its own, so its words reach the default channel through `said` and the owner's reach `heard`. */
+  /** A quick/realtime model answers on its own, so its words reach the default channel through `said` and the user's reach `heard`. */
   readonly quick: boolean;
   /** Said at every pickup; not worth keeping in the chat. */
   readonly greeting: string;
@@ -150,7 +150,7 @@ export class Voice extends Context.Service<
     /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
     readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
     readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
-    /** What the owner said on a call: the orchestrator overhears it when Agora's model or MOSS answers. */
+    /** What the user said on a call: the orchestrator overhears it when Agora's model or MOSS answers. */
     readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
     /** The relay without a call id: the one call on. */
     readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -265,7 +265,7 @@ const make = (options: VoiceOptions = {}) =>
 
     const liveCall = () => [...calls].find(([, c]) => !ending(c))?.[0];
 
-    // Queued after what is being said (APPEND): never over the owner; the owner may talk over it.
+    // Queued after what is being said (APPEND): never over the user; the user may talk over it.
     const speakOn = Effect.fnUntraced(
       function* (agentId: string, text: string) {
         const call = calls.get(agentId);
@@ -332,7 +332,7 @@ const make = (options: VoiceOptions = {}) =>
     const heard = Effect.fn("Voice.heard")(function* (agentId: string, text: string, picked: string, sendKey: string) {
       const call = yield* callOf(agentId);
       if (!call.quick) return;
-      yield* ingress.owner({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
+      yield* ingress.user({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
     });
 
     return Voice.of({

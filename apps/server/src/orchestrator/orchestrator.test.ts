@@ -12,7 +12,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Cron } from "#/cron/cron.ts";
@@ -147,7 +147,7 @@ describe("the orchestrator", () => {
     expect(() => deepseekModel("anthropic/claude", "x")).toThrow(/只接 DeepSeek/u);
   });
 
-  it.live("writes an issue down and starts it, and hears the owner's voice in the default channel", () => {
+  it.live("writes an issue down and starts it, and hears the user's voice in the default channel", () => {
     const f = farm();
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
@@ -160,7 +160,7 @@ describe("the orchestrator", () => {
       yield* ingress.say("帮我在 demo 里加个 README", {}, undefined, "");
       const reached = yield* until(() => words().length >= 1 && words(), "its words");
       expect(reached).toEqual(["好，记下了"]);
-      const origin = saidIn(chat.defaultChannel()).find((message) => message.from === "owner" && message.text.includes("加个 README"))!;
+      const origin = saidIn(chat.defaultChannel()).find((message) => message.from === "user" && message.text.includes("加个 README"))!;
       const created = (yield* issues.list()).find((item) => item.title.includes("README"))!;
       expect(created.mandate).toMatchObject({ originTriggerId: origin.id, strength: "explicit", autoSubmitPr: false });
       const first = f.requests[0]!;
@@ -185,18 +185,18 @@ describe("the orchestrator", () => {
       yield* until(() => sessions.hired()[0]?.lastRun, "its report");
 
       const before = f.requests.length;
-      yield* ingress.owner({ source: "voice", voiceMode: "dictated", text: "随便说一句", envelope: "" });
+      yield* ingress.user({ source: "voice", voiceMode: "dictated", text: "随便说一句", envelope: "" });
       yield* until(() => f.requests.length > before, "the orchestrator asked");
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
       const answered = f.requests.length;
       yield* marked(f);
-      expect(saidIn(chat.defaultChannel()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
+      expect(saidIn(chat.defaultChannel()).some((m) => m.from === "user" && m.text === "随便说一句" && m.spoken)).toBe(true);
       expect(f.requests.slice(before).filter((c) => lastLine(c).includes("随便说一句")).length).toBe(1);
       expect(lastLine(f.requests[answered - 1]!)).toContain("语音那边已经回答了");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("is shown the owner's note repos, and the notes the owner's words call up", () => {
+  it.live("is shown the user's note repos, and the notes the user's words call up", () => {
     const f = farm();
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
@@ -211,7 +211,7 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("answers the owner in their direct channel", () => {
+  it.live("answers the user in their direct channel", () => {
     const f = farm();
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
@@ -224,7 +224,7 @@ describe("the orchestrator", () => {
       expect(saidIn(chat.defaultChannel()).some((m) => m.from === defaultOrchestrator)).toBe(false);
       const asked = f.requests.at(-1)!;
       expect(lastLine(asked)).toBe("[来源：主人]\n主人说：单独问你一句：地里怎么样");
-      expect(lastInput(asked)).toContain("你正在回话的地方：和主人的私聊 @owner");
+      expect(lastInput(asked)).toContain("你正在回话的地方：和主人的私聊 @user");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -251,7 +251,7 @@ describe("the orchestrator", () => {
       expect(log).toContain("私下问你");
 
       const notes = (yield* chat.openChannel("notes-room", "", "")).id;
-      // A new channel has the default orchestrator in it; the owner puts 阿青 there instead.
+      // A new channel has the default orchestrator in it; the user puts 阿青 there instead.
       const core = yield* Core;
       const membersOfNotes = () => Arr.findFirst(core.state().chat?.channels ?? [], (c) => c.id === notes).pipe(Option.map((c) => c.members));
       expect(membersOfNotes()).toEqual(Option.some([defaultOrchestrator]));
@@ -280,14 +280,14 @@ describe("the orchestrator", () => {
       const words = yield* said;
       expect((yield* Core).state().call).not.toBe("live");
       yield* ingress.say("地里怎么样", {}, undefined, "");
-      // The owner speaking, from any door, opens the farm.
+      // The user speaking, from any door, opens the farm.
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const kept = yield* fs.readFileString(path.join(config.home, "agent", "orchestrator", "orchestrator.jsonl"));
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/u);
-      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/u);
+      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"user","user":true/u);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -322,7 +322,7 @@ describe("the orchestrator", () => {
           .filter((m) => m.spoken || m.from === defaultOrchestrator)
           .map((m) => m.from + "：" + m.text);
       const reached = yield* until(() => call().length === 2 && call(), "the call in the default channel");
-      expect(reached).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
+      expect(reached).toEqual(["user：现在地里怎么样", "orchestrator：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -410,7 +410,7 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const words = yield* said;
-      yield* (yield* Ingress).owner({ source: "voice", voiceMode: "api", responsePort: "gone-after-restart", text: "重启后继续", envelope: "gone-1" });
+      yield* (yield* Ingress).user({ source: "voice", voiceMode: "api", responsePort: "gone-after-restart", text: "重启后继续", envelope: "gone-1" });
       const reached = yield* until(() => words().at(-1), "the answer without its response port");
       expect(reached).toBe("收到");
       expect(lastLine(f.requests.at(-1)!)).toContain("重启后继续");
@@ -477,7 +477,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
       for (let i = 0; i < 2; i++) yield* ingress.say("地里怎么样", {}, undefined, "k1");
-      for (let i = 0; i < 2; i++) yield* ingress.owner({ source: "voice", voiceMode: "dictated", text: "电话里问一句", envelope: "k2" });
+      for (let i = 0; i < 2; i++) yield* ingress.user({ source: "voice", voiceMode: "dictated", text: "电话里问一句", envelope: "k2" });
       yield* until(
         () =>
           f.requests.some((request) =>
@@ -531,14 +531,14 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("completes an issue only when the owner asks, and says what it delivered", () => {
+  it.live("completes an issue only when the user asks, and says what it delivered", () => {
     let helper = "";
     let number = 0;
     const f = farm((c) => {
       const result = answeredWith(c);
       if (result !== undefined) return answer("合并：" + result);
       const line = lastLine(c);
-      // A helper's words name it by its name; the owner's, by the issue's number.
+      // A helper's words name it by its name; the user's, by the issue's number.
       if (line.includes("直接收")) return answer([toolCall("issue_status_update", { id: helper, status: "已完成" })]);
       if (line.includes("收下")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "已完成" })]);
       return respond(c);
@@ -571,8 +571,8 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // The owner's words name issues by number: noted down without anyone sent, started on the owner's say, found again
-  // among those waiting on the owner.
+  // The user's words name issues by number: noted down without anyone sent, started on the user's say, found again
+  // among those waiting on the user.
   it.live("works in issues", () => {
     let number = 0;
     const f = farm((c) => {
@@ -581,7 +581,7 @@ describe("the orchestrator", () => {
       const line = lastLine(c);
       if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", repo: "demo", agent: "lab" })]);
       if (line.includes("开工")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "待办" })]);
-      if (line.includes("在等我")) return answer([toolCall("issue_list", { wantsOwner: true })]);
+      if (line.includes("在等我")) return answer([toolCall("issue_list", { wantsUser: true })]);
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -604,7 +604,7 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.effect("lets a cron it sets unasked wait for the owner", () => {
+  it.effect("lets a cron it sets unasked wait for the user", () => {
     const daily = { name: "每日测试", text: "跑一遍测试", when: { kind: "daily", time: "09:00" } };
     const f = farm((c) => {
       const result = answeredWith(c);
@@ -617,8 +617,8 @@ describe("the orchestrator", () => {
       const crons = yield* Cron;
       const ingress = yield* Ingress;
       const words = yield* said;
-      // Woken by a cron, not the owner: what it sets to come back daily waits.
-      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, owner);
+      // Woken by a cron, not the user: what it sets to come back daily waits.
+      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, user);
       // The farm's clock, not a wait, brings it due.
       yield* TestClock.adjust(100);
       yield* crons.tick;
@@ -626,19 +626,19 @@ describe("the orchestrator", () => {
       const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
       expect(mine(false)).toMatchObject([{ pending: true, by: "agent" }]);
       yield* ingress.say("每天九点跑一遍测试", {}, undefined, "");
-      const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's cron on");
+      const on = yield* until(() => mine(true).length === 1 && mine(true), "the user's cron on");
       expect(on[0]).toMatchObject({ by: "agent" });
       expect(on[0]!.pending).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // However its turn ends, the orchestrator's issue waits on the owner: a turn that did not fail is not an answer taken.
-  it.effect("leaves its issue for the owner to take as done", () => {
+  // However its turn ends, the orchestrator's issue waits on the user: a turn that did not fail is not an answer taken.
+  it.effect("leaves its issue for the user to take as done", () => {
     const f = farm(respond, testConfig());
     return Effect.gen(function* () {
       const crons = yield* Cron;
       const issues = yield* Issue;
-      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, owner);
+      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, user);
       // The farm's clock, not a wait, brings it due.
       yield* TestClock.adjust(100);
       yield* crons.tick;
@@ -650,12 +650,12 @@ describe("the orchestrator", () => {
       expect(handed.stage).toMatchObject({ state: "reviewing", lead: "acknowledge" });
       // One table whoever did the work: asked again (todo), taken (done), or put away (canceled).
       expect(handed.moves).toEqual(["todo", "done", "canceled"]);
-      const done = yield* issues.setStatus(id, "done", "", "", owner);
+      const done = yield* issues.setStatus(id, "done", "", "", user);
       expect([done.status, done.delivered]).toEqual(["done", "none"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.effect("hears the patrol once with the next owner input", () => {
+  it.effect("hears the patrol once with the next user input", () => {
     const f = farm(respond, testConfig());
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
@@ -685,7 +685,7 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("saves a turn the owner marks wrong as a case", () => {
+  it.live("saves a turn the user marks wrong as a case", () => {
     const config = testConfig();
     const f = farm(respond, config);
     return Effect.gen(function* () {

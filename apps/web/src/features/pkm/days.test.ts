@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import { dayKey, daysUntil, dayTitle, monthWeeks } from "./days";
 
-test("a journal's title in the owner's words, with the year only when it is another", () => {
+test("a journal's title in the user's words, with the year only when it is another", () => {
   expect(dayTitle("2026-11-03", "2026-11-04", "zh")).toBe("11月3日周二");
   expect(dayTitle("2025-12-31", "2026-11-04", "en")).toBe("Wed, December 31, 2025");
   expect(dayTitle("not a day", "2026-11-04")).toBeUndefined();

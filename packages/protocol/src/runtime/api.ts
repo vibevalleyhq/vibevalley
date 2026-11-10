@@ -16,20 +16,20 @@ export const runtimeEndpoints: readonly Endpoint[] = [
     about: [],
     input: undefined,
     result: Schema.mutable(Schema.Array(S.RuntimeInfo)),
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "runtime.refresh",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.RuntimeInfo,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "runtime.setting.update",
     about: ["id"],
     input: input({ id: Schema.String }, S.RuntimeSettings),
     result: S.RuntimeInfo,
-    can: ["owner"],
+    can: ["user"],
   },
 ];

@@ -6,7 +6,7 @@ import { Inbox } from "#/inbox/inbox.ts";
 
 import { farm } from "./farm.ts";
 
-it.effect("regression: owner read cursors and later replies suppress external notifications", () => {
+it.effect("regression: user read cursors and later replies suppress external notifications", () => {
   const f = farm();
   return Effect.gen(function* () {
     const chat = yield* Channel;
@@ -20,7 +20,7 @@ it.effect("regression: owner read cursors and later replies suppress external no
     yield* chat.markRead(channel, message.number);
     const handoffState3 = yield* inbox.handoffState(message.id);
     expect(handoffState3).toBe("seen");
-    yield* chat.post({ _tag: "Owner", text: "确认", channel: channel, sendKey: "owner-reply" });
+    yield* chat.post({ _tag: "User", text: "确认", channel: channel, sendKey: "user-reply" });
     const handoffState4 = yield* inbox.handoffState(message.id);
     expect(handoffState4).toBeUndefined();
     yield* chat.post({ _tag: "Run", from: agent, channel: channel, text: "又有一项变化", run: "incremental-update" });

@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
-import { phaseText, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import type { HtmlWarning } from "#/artifact/check.ts";
 import { artifactMax, htmlSources } from "#/artifact/policy.ts";
@@ -65,7 +65,7 @@ export function sessionLine(h: T.Session, now: number, number?: number): string 
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
-/** The words for a status: its label (wording().status), a few the owner says for it, and its own name. */
+/** The words for a status: its label (wording().status), a few the user says for it, and its own name. */
 export const statusNames: Readonly<Record<string, T.IssueStatus>> = {
   ...Object.fromEntries(IssueStatusValues.map((s) => [t(`shared.status.${s}`), s])),
   草稿: "backlog",
@@ -104,7 +104,7 @@ export function issueLine(issue: T.Issue, who: string, now: number): string {
   if (issue.repo) parts.push(issue.repo);
   if (who) parts.push(who);
   if (issue.priority !== "medium") parts.push(t(`shared.priority.${issue.priority}`) + "优先级");
-  if (stageWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
+  if (stageWantsUser(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
 
@@ -214,7 +214,7 @@ export const params = {
     repo: "只看这个仓库的",
     status: "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
     text: "标题或说明里有这些字的（找重复、找某件事时用）",
-    wantsOwner: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
+    wantsUser: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
   },
   pkm: {
     text: "要找什么，几个词或一句话",
@@ -231,7 +231,7 @@ export const params = {
     text: "要它记住的一句话",
   },
   channelMessageList: {
-    id: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @owner",
+    id: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @user",
   },
   cron: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
@@ -305,7 +305,7 @@ const pkmTierWord: Record<T.PkmTier, string> = {
 };
 
 /** Who the orchestrator is, as a tool answer names it. */
-export const ownerAgentWord = "管家";
+export const userAgentWord = "管家";
 
 export const issueReportDescription =
   "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给主人验收用 prSubmit=false。有问题或未满足的验收项则等主人。问题、验收凭据和记性只认这些字段，不从正文猜。用主人的语言填写。";
@@ -352,13 +352,13 @@ export const descriptions = {
   "issue.get": "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
   "issue.diff.get": "看完成一张工单会合进仓库什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
   "channel.message.list":
-    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @owner；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   "issue.review":
     "验收一张交回来的工单：先用 issue_diff_get 看改动，对着它的验收标准逐条看。过了（pass: true）就记下验过，完成仍等主人说；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
   "issue.comment.create": "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
   "session.stop": "叫停在做一张工单的帮工正在做的这一轮：工单和改动都留着，带句话就接着做。",
   "issue.list":
-    "找工单、看一批工单：主人问「哪些在等我」（wantsOwner）、「某个仓库有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、仓库、谁在做、等了多久。",
+    "找工单、看一批工单：主人问「哪些在等我」（wantsUser）、「某个仓库有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、仓库、谁在做、等了多久。",
   "issue.create":
     "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status_update。记之前先用 issue_list 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
   "issue.update":

@@ -10,7 +10,7 @@ import { checksFromText, questionsFromText } from "#/base/questions.ts";
 
 const summaryMax = 160;
 
-export const handsToOwner = (report: IssueReport | undefined) =>
+export const handsToUser = (report: IssueReport | undefined) =>
   report !== undefined && (!report.prSubmit || report.questions.length > 0 || report.checks.some((check) => check.result !== "met"));
 
 export function failureText(f: FailedTurn): string {

@@ -28,7 +28,7 @@ export class Game extends Context.Service<
   {
     /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
     readonly achievements: () => Achievement[];
-    /** The title the owner wears: an achievement and its tier; none of either is the plain title. */
+    /** The title the user wears: an achievement and its tier; none of either is the plain title. */
     readonly chooseTitle: (achievement: string | undefined, tier: number | undefined) => Effect.Effect<void>;
     /** The next session hired within ten seconds goes to this station, if it is still free. */
     readonly want: (station: number) => void;
@@ -126,9 +126,9 @@ const make = Effect.gen(function* () {
       }),
     ),
   );
-  const owner2 = yield* core.owner;
+  const user2 = yield* core.user;
   yield* Effect.forkScoped(
-    Stream.runForEach(owner2, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
+    Stream.runForEach(user2, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
   );
 
   return Game.of({

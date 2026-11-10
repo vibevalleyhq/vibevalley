@@ -114,7 +114,7 @@ it.effect("regression: async speakers persist task ID before polling, retain act
     savedRow = (yield* Db).one(q.audio({ id: speakers.id }));
     const { audio } = yield* harness;
     const submittedRequest = { ...speakers, format: "mp3" as const };
-    yield* audio.createSpeakers(submittedRequest, { kind: "owner" });
+    yield* audio.createSpeakers(submittedRequest, { kind: "user" });
     const ready = yield* waitFor(audio.get(speakers.id), (job) => job.phase === "ready", "speakers saved");
     expect(ready).toMatchObject({
       kind: "speakers",
@@ -124,14 +124,14 @@ it.effect("regression: async speakers persist task ID before polling, retain act
       metadata: { source: "file", sampleRate: 24000, channels: 1 },
       attachment: { type: "audio/wav" },
     });
-    const speakersCreated = yield* audio.createSpeakers(submittedRequest, { kind: "owner" });
+    const speakersCreated = yield* audio.createSpeakers(submittedRequest, { kind: "user" });
     expect(speakersCreated).toEqual(ready);
     const speakersCreatedFailure = yield* audio
-      .createSpeakers({ ...submittedRequest, segments: [{ speaker: "host", text: "Changed" }] }, { kind: "owner" })
+      .createSpeakers({ ...submittedRequest, segments: [{ speaker: "host", text: "Changed" }] }, { kind: "user" })
       .pipe(Effect.flip);
     expect(speakersCreatedFailure).toMatchObject({ _tag: "Refused" });
     const speakersCreatedFailure2 = yield* audio
-      .createSpeakers(submittedRequest, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: true })
+      .createSpeakers(submittedRequest, { kind: "orchestrator", agent: "agent", channel: "channel", forUser: true })
       .pipe(Effect.flip);
     expect(speakersCreatedFailure2).toMatchObject({ _tag: "Refused" });
     expect(submitted).toBe(1);
@@ -143,7 +143,7 @@ it.effect("regression: async speakers persist task ID before polling, retain act
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
 });
 
-it.effect("regression: design preview is not a voice; explicit owner consent clones the immutable saved sample once", () => {
+it.effect("regression: design preview is not a voice; explicit user consent clones the immutable saved sample once", () => {
   let clones = 0;
   const http = HttpClient.make((request) => {
     if (request.url.endsWith("/voices")) {
@@ -161,7 +161,7 @@ it.effect("regression: design preview is not a voice; explicit owner consent clo
   return Effect.gen(function* () {
     yield* configured();
     const { audio, inputs } = yield* harness;
-    yield* audio.createVoiceDesign(design, { kind: "owner" });
+    yield* audio.createVoiceDesign(design, { kind: "user" });
     const ready = yield* waitFor(audio.get(design.id), (job) => job.phase === "ready", "preview saved");
     expect(ready.result).toBeNull();
     expect(clones).toBe(0);
@@ -175,14 +175,14 @@ it.effect("regression: design preview is not a voice; explicit owner consent clo
       consent: true,
       name: "Warm",
     };
-    const cloneCreatedFailure = yield* audio.createClone(clone, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: true }).pipe(Effect.flip);
+    const cloneCreatedFailure = yield* audio.createClone(clone, { kind: "orchestrator", agent: "agent", channel: "channel", forUser: true }).pipe(Effect.flip);
     expect(cloneCreatedFailure).toMatchObject({
       _tag: "Refused",
     });
-    yield* audio.createClone(clone, { kind: "owner" });
+    yield* audio.createClone(clone, { kind: "user" });
     const saved = yield* waitFor(audio.get(clone.id), (job) => job.phase === "ready", "voice cloned");
     expect(saved.result).toEqual({ kind: "clone", voice: { id: "saved-voice", name: "Warm", createdAtSeconds: 1 } });
-    const cloneCreated = yield* audio.createClone(clone, { kind: "owner" });
+    const cloneCreated = yield* audio.createClone(clone, { kind: "user" });
     expect(cloneCreated).toEqual(saved);
     expect(clones).toBe(1);
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
@@ -197,10 +197,10 @@ it.effect("regression: unknown submission outcomes cannot be resubmitted or resu
   return Effect.gen(function* () {
     yield* configured();
     const { audio } = yield* harness;
-    yield* audio.createSpeakers(speakers, { kind: "owner" });
+    yield* audio.createSpeakers(speakers, { kind: "user" });
     const unknown = yield* waitFor(audio.get(speakers.id), (job) => job.phase === "unknown", "unknown submit");
     expect(unknown.canResume).toBe(false);
-    const speakersCreated = yield* audio.createSpeakers(speakers, { kind: "owner" });
+    const speakersCreated = yield* audio.createSpeakers(speakers, { kind: "user" });
     expect(speakersCreated).toEqual(unknown);
     const resumedFailure = yield* audio.resume(speakers.id).pipe(Effect.flip);
     expect(resumedFailure).toMatchObject({ _tag: "Refused" });
@@ -231,7 +231,7 @@ it.effect("regression: local cancellation retains a known task; resume polls onl
     yield* Effect.gen(function* () {
       yield* configured();
       const { audio } = yield* harness;
-      yield* audio.createSpeakers(speakers, { kind: "owner" });
+      yield* audio.createSpeakers(speakers, { kind: "user" });
       yield* Deferred.await(started);
       const cancel2 = yield* audio.cancel(speakers.id);
       expect(cancel2).toMatchObject({ phase: "canceled", canResume: true });
@@ -265,7 +265,7 @@ it.effect("regression: restored known tasks poll the original account while queu
           id,
           kind: "speakers",
           request: yield* json({ ...speakers, id, kind: "speakers" }),
-          source: yield* json({ kind: "owner" }),
+          source: yield* json({ kind: "user" }),
           input: null,
           connection: "moss",
           revision: 1,
@@ -303,26 +303,26 @@ it.effect("regression: shared capacity and IDs apply across audio kinds and auto
     yield* Effect.gen(function* () {
       yield* configured();
       const { audio } = yield* harness;
-      const speakersCreatedFailure = yield* audio.createSpeakers({ ...speakers, id: "image-id" }, { kind: "owner" }).pipe(Effect.flip);
+      const speakersCreatedFailure = yield* audio.createSpeakers({ ...speakers, id: "image-id" }, { kind: "user" }).pipe(Effect.flip);
       expect(speakersCreatedFailure).toMatchObject({ _tag: "Refused" });
       const speakersCreatedFailure2 = yield* audio
-        .createSpeakers(speakers, { kind: "orchestrator", agent: "agent", channel: "", forOwner: false })
+        .createSpeakers(speakers, { kind: "orchestrator", agent: "agent", channel: "", forUser: false })
         .pipe(Effect.flip);
       expect(speakersCreatedFailure2).toMatchObject({
         _tag: "Refused",
       });
-      yield* audio.createSpeakers(speakers, { kind: "owner" });
+      yield* audio.createSpeakers(speakers, { kind: "user" });
       yield* Deferred.await(started);
-      const voiceDesignCreatedFailure = yield* audio.createVoiceDesign({ ...design, id: speakers.id }, { kind: "owner" }).pipe(Effect.flip);
+      const voiceDesignCreatedFailure = yield* audio.createVoiceDesign({ ...design, id: speakers.id }, { kind: "user" }).pipe(Effect.flip);
       expect(voiceDesignCreatedFailure).toMatchObject({ _tag: "Refused" });
-      for (let index = 0; index < 7; index++) yield* audio.createVoiceDesign({ ...design, id: `queued-${index}` }, { kind: "owner" });
+      for (let index = 0; index < 7; index++) yield* audio.createVoiceDesign({ ...design, id: `queued-${index}` }, { kind: "user" });
       const pending2 = yield* audio.pending();
       expect(pending2).toBe(8);
-      const voiceDesignCreatedFailure2 = yield* audio.createVoiceDesign(design, { kind: "owner" }).pipe(Effect.flip);
+      const voiceDesignCreatedFailure2 = yield* audio.createVoiceDesign(design, { kind: "user" }).pipe(Effect.flip);
       expect(voiceDesignCreatedFailure2).toMatchObject({ _tag: "Refused" });
       expect(calls).toBe(1);
       yield* audio.cancel("queued-0");
-      yield* audio.createVoiceDesign(design, { kind: "owner" });
+      yield* audio.createVoiceDesign(design, { kind: "user" });
       const pending3 = yield* audio.pending();
       expect(pending3).toBe(8);
     }).pipe(Effect.scoped, Effect.provide(layer(http)));
@@ -385,10 +385,10 @@ it.effect(
         allowUpload: true,
         diarize: true,
       };
-      yield* audio.createTranscription(request, { kind: "owner" });
+      yield* audio.createTranscription(request, { kind: "user" });
       const ready = yield* waitFor(audio.get(request.id), (job) => job.phase === "ready", "transcription saved");
       expect(ready.result).toEqual({ kind: "transcription", text: "Hello.", segments: [{ speaker: "speaker_0", text: "Hello.", start: 0, end: 0.12 }] });
-      yield* audio.createTranscription(request, { kind: "owner" });
+      yield* audio.createTranscription(request, { kind: "user" });
       yield* waitFor(
         Effect.sync(() => operations.filter((op) => op.startsWith("DELETE")).length),
         (count) => count === 1,
@@ -415,7 +415,7 @@ it.effect("regression: oversized-duration clone samples are rejected from actual
     const reserved = yield* inputs.create({ kind: "audio", name: "short-name.wav", mime: "audio/wav", size: bytes.length });
     yield* inputs.upload(reserved.id, Stream.make(bytes));
     const cloneCreatedFailure = yield* audio
-      .createClone({ id: "too-long", input: reserved.id, connection: "moss", revision: 1, consent: true }, { kind: "owner" })
+      .createClone({ id: "too-long", input: reserved.id, connection: "moss", revision: 1, consent: true }, { kind: "user" })
       .pipe(Effect.flip);
     expect(cloneCreatedFailure).toMatchObject({ _tag: "Refused" });
     const has2 = yield* audio.has("too-long");
@@ -445,7 +445,7 @@ it.effect("regression: failed result downloads retry only the persisted actual f
   return Effect.gen(function* () {
     yield* configured();
     const { audio } = yield* harness;
-    yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "owner" });
+    yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "user" });
     const forWaited = yield* waitFor(audio.get(speakers.id), (job) => job.phase === "download_failed", "download paused");
     expect(forWaited).toMatchObject({
       canRetryDownload: true,
@@ -473,7 +473,7 @@ it.effect("regression: transient polling failures have bounded backoff and prese
   return Effect.gen(function* () {
     yield* configured();
     const { audio } = yield* harness;
-    yield* audio.createSpeakers(speakers, { kind: "owner" });
+    yield* audio.createSpeakers(speakers, { kind: "user" });
     for (const [index, delay] of [1000, 2000, 4000].entries()) {
       yield* waitFor(
         Effect.sync(() => polls),
@@ -506,12 +506,12 @@ it.effect("regression: queued clone consent cannot upload after the account cred
     yield* Effect.gen(function* () {
       yield* configured();
       const { audio, inputs } = yield* harness;
-      yield* audio.createSpeakers(speakers, { kind: "owner" });
+      yield* audio.createSpeakers(speakers, { kind: "user" });
       yield* Deferred.await(started);
       const bytes = wav();
       const reserved = yield* inputs.create({ kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length });
       yield* inputs.upload(reserved.id, Stream.make(bytes));
-      yield* audio.createClone({ id: "queued-clone", input: reserved.id, connection: "moss", revision: 1, consent: true }, { kind: "owner" });
+      yield* audio.createClone({ id: "queued-clone", input: reserved.id, connection: "moss", revision: 1, consent: true }, { kind: "user" });
       const provider = yield* Provider;
       yield* provider.update({ ...provider.status(), connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "rotated-key" }] });
       yield* audio.cancel(speakers.id);
@@ -578,7 +578,7 @@ it.effect("regression: explicit cleanup retries only the failed deletion and ret
     const bytes = wav();
     const local = yield* inputs.create({ kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length });
     yield* inputs.upload(local.id, Stream.make(bytes));
-    yield* audio.createTranscription({ id: "cleanup-test", connection: "moss", revision: 1, input: local.id, allowUpload: true }, { kind: "owner" });
+    yield* audio.createTranscription({ id: "cleanup-test", connection: "moss", revision: 1, input: local.id, allowUpload: true }, { kind: "user" });
     const pending = yield* waitFor(
       audio.get("cleanup-test"),
       (job) => job.problem !== "" || job.phase === "failed" || job.phase === "unknown",
@@ -627,7 +627,7 @@ it.effect("regression: unknown audio jobs refuse destructive cleanup even when a
     const bytes = wav();
     const local = yield* inputs.create({ kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length });
     yield* inputs.upload(local.id, Stream.make(bytes));
-    yield* audio.createTranscription({ id: "uncertain-cleanup", connection: "moss", revision: 1, input: local.id, allowUpload: true }, { kind: "owner" });
+    yield* audio.createTranscription({ id: "uncertain-cleanup", connection: "moss", revision: 1, input: local.id, allowUpload: true }, { kind: "user" });
     const unknown = yield* waitFor(audio.get("uncertain-cleanup"), (job) => job.phase === "unknown", "uncertain transcription");
     expect(unknown.canCleanup).toBe(false);
     expect(unknown.usage).toBeUndefined();
@@ -679,7 +679,7 @@ it.effect(
     return Effect.gen(function* () {
       yield* configured();
       const { audio, inputs } = yield* harness;
-      yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "owner" });
+      yield* audio.createSpeakers({ ...speakers, format: "mp3" }, { kind: "user" });
       const ready = yield* waitFor(audio.get(speakers.id), (job) => !job.canCancel, "large WAV saved");
       expect(ready.phase, ready.problem).toBe("ready");
       expect(ready.attachment).toBeUndefined();
@@ -762,7 +762,7 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
         streaming: true,
         diarize: true,
       };
-      yield* audio.createTranscription(request, { kind: "owner" });
+      yield* audio.createTranscription(request, { kind: "user" });
       const partial = yield* waitFor(
         audio.get(request.id),
         (job) => job.result?.kind === "transcription" && job.result.segments.length > 0,
@@ -779,7 +779,7 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
       else expect(final.result).toMatchObject({ text: expect.stringContaining("Hello.") });
       expect((yield* inputs.get(reserved.id)).canDelete).toBe(false);
       expect((yield* inputs.content(reserved.id)).size).toBe(bytes.length);
-      const transcriptionCreated = yield* audio.createTranscription(request, { kind: "owner" });
+      const transcriptionCreated = yield* audio.createTranscription(request, { kind: "user" });
       expect(transcriptionCreated).toEqual(final);
       expect(submissions).toBe(1);
       const row = yield* (yield* Db).one(q.audio({ id: request.id }));

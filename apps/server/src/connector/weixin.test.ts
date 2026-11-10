@@ -80,11 +80,11 @@ describe("WeChat HTTP responses", () => {
     const base = await serve((path) =>
       path.includes("get_bot_qrcode")
         ? `{"qrcode":"code","qrcode_img_content":"https://qr.example"}`
-        : `{"status":"confirmed","bot_token":"tok","ilink_bot_id":"bot","ilink_user_id":"owner"}`,
+        : `{"status":"confirmed","bot_token":"tok","ilink_bot_id":"bot","ilink_user_id":"user"}`,
     );
     const client = new WeixinClient(http, base);
     const got = await run(client.login(() => Effect.void, Effect.succeed("")));
-    expect(got).toEqual({ account: { baseUrl: base, token: "tok" }, botId: "bot", owner: "owner" });
+    expect(got).toEqual({ account: { baseUrl: base, token: "tok" }, botId: "bot", user: "user" });
   });
 
   it("rejects a QR response with the wrong shape", async () => {
@@ -98,9 +98,9 @@ describe("WeChat HTTP responses", () => {
     const base = await serve(() => answer);
     const client = new WeixinClient(http, base);
     const account = { baseUrl: base, token: "tok" };
-    expect(await run(client.sendText(account, "owner", "hello", "ctx"))).toBe("9007199254740993");
+    expect(await run(client.sendText(account, "user", "hello", "ctx"))).toBe("9007199254740993");
     answer = `{"ret":0,"message_id":{}}`;
-    expect(await refusal(client.sendText(account, "owner", "hello", "ctx"))).toMatchObject({ _tag: "AppFailed", kind: "failed" });
+    expect(await refusal(client.sendText(account, "user", "hello", "ctx"))).toMatchObject({ _tag: "AppFailed", kind: "failed" });
   });
 
   it("rejects malformed updates and decodes a later valid page", async () => {

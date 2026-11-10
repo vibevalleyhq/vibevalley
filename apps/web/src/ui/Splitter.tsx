@@ -43,13 +43,13 @@ const viewStyles = stylex.create({
   },
 });
 
-/** A pane's width: the one the owner dragged it to on this machine, else its default, kept between min and max. */
+/** A pane's width: the one the user dragged it to on this machine, else its default, kept between min and max. */
 export function usePaneWidth(pane: string, fallback: number, min: number, max: number): Accessor<number> {
   const kept = usePrefs((p) => p.widths[pane]);
   return () => Math.min(max, Math.max(min, kept() ?? fallback));
 }
 
-/** A pane's edge the owner drags to set its width (docs/style/design.md). side: the edge it is on, so dragging outward widens the pane. */
+/** A pane's edge the user drags to set its width (docs/style/design.md). side: the edge it is on, so dragging outward widens the pane. */
 export function Splitter(props: { pane: string; side: "left" | "right"; width: number; min: number; max: number; label: string }) {
   const [dragging, setDragging] = createSignal(false);
   const sign = () => (props.side === "left" ? -1 : 1);

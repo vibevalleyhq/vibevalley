@@ -87,13 +87,13 @@ export function extractMossToolAck(raw: string): string | undefined {
 export const mossOrchestratorTool = {
   type: "function",
   name: "ask_orchestrator",
-  description: "Consult the farm's orchestrator whenever the owner asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
+  description: "Consult the farm's orchestrator whenever the user asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
   parameters: {
     type: "object",
     properties: {
       question: {
         type: "string",
-        description: "The owner's exact request or question for the orchestrator.",
+        description: "The user's exact request or question for the orchestrator.",
       },
     },
     required: ["question"],

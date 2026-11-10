@@ -7,7 +7,7 @@ import { Deferred, Effect, Fiber, Stream } from "effect";
 import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { Memory } from "#/memory/memory.ts";
@@ -82,7 +82,7 @@ describe("AgentHost", () => {
         answer("看完了，一切正常"),
       ]);
       const memory = yield* Memory;
-      yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: owner });
+      yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: user });
       const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
       const consumed: Extract<SessionNews, { _tag: "Consumed" }>[] = [];
       const answeringRuns: (string | undefined)[] = [];

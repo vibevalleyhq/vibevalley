@@ -237,7 +237,7 @@ describe("room and names", () => {
     expect(noRoom(two, "pi", "a", { space: 3, perRuntime: 3, perRepo: 3 }, "w1")).toBe("");
   });
 
-  it("gives an owner follow-up one space slot without bypassing repo or runtime limits", () => {
+  it("gives a user follow-up one space slot without bypassing repo or runtime limits", () => {
     const full = [h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)];
     expect(noRoom(full, "dsh", "d", limits, "", true)).toBe("");
     expect(noRoom(full, "pi", "d", { ...limits, perRuntime: 1 }, "", true)).not.toBe("");
@@ -268,11 +268,11 @@ describe("shell", () => {
 
 describe("work that does not go in", () => {
   it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
-    const check = notTakenIn(MergeFailure.failedCheck("测试没过"), "阿狐", "owner");
+    const check = notTakenIn(MergeFailure.failedCheck("测试没过"), "阿狐", "user");
     expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "仓库检查没通过"]);
     const conflict = MergeFailure.conflict("main", ["a.ts", "b.ts"]);
-    expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
-    expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");
+    expect(notTakenIn(conflict, "阿狐", "user").fix).toBe("");
+    expect(notTakenIn(conflict, "阿狐", "user").user).toContain("要它解决就用 tell 告诉它");
     expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
     expect(notTakenIn(MergeFailure.error("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
   });

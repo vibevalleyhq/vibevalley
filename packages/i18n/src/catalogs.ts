@@ -44,7 +44,7 @@ export const catalogs = {
         reviewComment: "验收的话",
         statusComment: "一起说的话：再来一轮时说要改什么",
         title: "新的标题",
-        wantsOwner: "只看在等主人的，等得最久的在前",
+        wantsUser: "只看在等主人的，等得最久的在前",
         issueWatch: "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr",
         tier: "PARA 分层",
         marker: "待办标记",
@@ -441,7 +441,7 @@ export const catalogs = {
         issueReviewPass: { about: "12 号验收通过" },
         issueStatus: { about: "派 12 号出去（或再来一轮）" },
         issueTimeline: { about: "12 号的时间线和花费" },
-        issueWantsOwner: { about: "在等主人的工单，等得最久的在前" },
+        issueWantsUser: { about: "在等主人的工单，等得最久的在前" },
         issueWatch: { about: "跟着 12 号，等它交回来或完了再看，最多等十分钟" },
         memoryCreate: { run: "vibevalley memory create docs 端口用 8797", about: "让 docs 记住端口用 8797" },
         memoryDelete: { about: "先试删 docs 的 m1" },
@@ -739,8 +739,8 @@ export const catalogs = {
       requestKeyLong: "requestKey 太长（最多 {max} 个字符）",
     },
     "server.channel": {
-      name: { owner: "主人", orchestrator: "管家" },
-      mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
+      name: { user: "主人", orchestrator: "管家" },
+      mention: { orchestrator: "@管家", user: "@主人", everyone: "@所有人" },
       channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
       channelTaken: "已经有叫 {name} 的频道了",
       hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
@@ -1100,7 +1100,7 @@ export const catalogs = {
       codeExpired: "配对码过期了：回那台电脑上换一个码",
       wrongCode: "配对码不对",
       anotherAsking: "另一台设备正在等主人点头：等一会儿再试",
-      ownerLate: "主人没来得及点头，配对码过期了：回那台电脑上换一个码",
+      userLate: "主人没来得及点头，配对码过期了：回那台电脑上换一个码",
       denied: "主人没让这台设备进来",
       noCode: "没有在配对的码：什么都不会动",
       dropCode: "收起配对码 {code}",
@@ -1160,7 +1160,7 @@ export const catalogs = {
       inputChanged: "已保存的输入不能换成另一份内容，请创建新的输入。",
       inputTimeout: "上传到本机已超时，不完整的文件已删除，没有向供应商发起请求。",
       inputDisconnected: "上传到本机已中断，不完整的文件已删除，没有向供应商发起请求。",
-      ownerRequired: "需要主人的委托才能提交生成，管家不会在自主巡查中发起可能计费的请求。",
+      userRequired: "需要主人的委托才能提交生成，管家不会在自主巡查中发起可能计费的请求。",
       invalid: "生图参数无效，请检查提示词、布局、尺寸和高级参数。",
       missing: "找不到这次生成任务。",
       corrupt: "生成任务记录无法读取，请保留本机数据后检查。",
@@ -1349,7 +1349,7 @@ export const catalogs = {
       "publish.refused": "分支发布被拒绝：{detail}",
       "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
       "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
-      "publish.ownerOnly": "只有本机主人可以发布已有分支",
+      "publish.userOnly": "只有本机主人可以发布已有分支",
       "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。",
     },
     "server.runtime": {
@@ -1417,11 +1417,11 @@ export const catalogs = {
         repo: "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件",
       },
       notTaken: {
-        conflictOwner: "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
+        conflictUser: "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
         conflictNotice: "{name} 的分支合进 {base} 会冲突（{files}），先没合。可以让它自己把冲突解决掉",
         conflictShort: "合进 {base} 会冲突：{files}",
         checkFix: "{reason}\n请修好检查，再交回来。",
-        owner: "没合进去：{why}。{name} 还在",
+        user: "没合进去：{why}。{name} 还在",
         notice: "{name} 的活没合进去：{why}",
         checkShort: "仓库检查没通过",
       },
@@ -1430,7 +1430,7 @@ export const catalogs = {
         image: "[图片]",
         exitedNotice: "{name} 的 {why}",
         staleRun: "上一轮停在了半路，太久了，没有接着做",
-        stoppedByOwner: "主人叫停了",
+        stoppedByUser: "主人叫停了",
         folded: "整理对话，{usage}",
         clipped: "… 省略 {n} 个字 …",
         quiet: "已经 {span}没动静了{last}。可能在跑很久的命令，也可能卡住了",
@@ -1903,7 +1903,7 @@ export const catalogs = {
         helpersWriting: "帮工在写",
         demo: "演示：几个帮工一起写",
         append: "在末尾写一段",
-        owner: "主人",
+        user: "主人",
         done: "做完了",
         notDone: "没做完",
         writing: "{who} 在写",
@@ -2083,7 +2083,7 @@ export const catalogs = {
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
       toasts: "提示",
       runtime: "运行工具：{name}",
-      owner: "主",
+      user: "主",
       orchestrator: "管家",
       unreachable: "暂时连不上服务端，请等它恢复后重试。",
       query: { invalidResponse: "返回的数据格式不符，已有的有效结果已保留。" },
@@ -2323,7 +2323,7 @@ export const catalogs = {
         typing: "正在输入…",
         foldDispatch: "收起派活",
         unfoldDispatch: "展开派活",
-        owner: "主人",
+        user: "主人",
         dispatch: "派活",
         spent: "这一轮花了 {spent}",
         unread: "{n} 条新",
@@ -2362,7 +2362,7 @@ export const catalogs = {
         editHint: "回车存下 · Esc 不改了",
       },
       pins: { open: "置顶的消息", title: "置顶", none: "这里还没有置顶的消息", failed: "置顶没读到：{why}" },
-      members: { open: "成员", title: "成员", owner: "主人", none: "这里还没有帮工", inChannel: "频道里的管家" },
+      members: { open: "成员", title: "成员", user: "主人", none: "这里还没有帮工", inChannel: "频道里的管家" },
       composer: {
         notSent: "没发出去：{why}",
         who: "叫谁",
@@ -2445,7 +2445,7 @@ export const catalogs = {
         issueThread: "工单串",
         talkThread: "{who}的串",
         thread: "串",
-        mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
+        mention: { orchestrator: "@管家", user: "@主人", everyone: "@所有人" },
         orchestratorNote: "派活、拆计划、问进度",
         everyone: "所有人",
         everyoneNote: "叫醒在场的每个帮工",
@@ -2508,7 +2508,7 @@ export const catalogs = {
         scan: "{app}扫码登录",
         pairing: "机器人连上了。最后一步：用你自己的{app}，私聊这个机器人，发：",
         pairingNote: "发了这个码的人就是主人：以后只有这个人的话进得来。码只能用一次。",
-        owner: "主人",
+        user: "主人",
         channel: "接在",
         since: "连上的时间",
         lastInbound: "上次收到你的话",
@@ -3487,7 +3487,7 @@ export const catalogs = {
         cleanup: "清理远端文件",
         cleanupAsk: "删除已知远端文件并释放本机输入的保留？供应商可能还在处理结果未知的请求。没有确认 ID 的上传可能仍有文件，需要人工核对；这不会重复理解。",
       },
-      sourceOwner: "来源：主人",
+      sourceUser: "来源：主人",
       sourceAgent: "来源：管家 {agent} · 频道 {channel}",
       usage: "厂商报告：{images} 张 · {width} × {height}",
       usageUnknown: "尚无厂商用量结果；不代表未计费。",
@@ -4488,7 +4488,7 @@ export const catalogs = {
         reviewComment: "Words with the review",
         statusComment: "Words with the move: what to change, when it goes for another round",
         title: "The new title",
-        wantsOwner: "Only those waiting on the owner, the longest waiting first",
+        wantsUser: "Only those waiting on the owner, the longest waiting first",
         issueWatch: "Follow it until in_review, done or canceled, then show it; each status on stderr",
         tier: "The PARA tier",
         marker: "The task marker",
@@ -4953,7 +4953,7 @@ export const catalogs = {
         issueReviewPass: { about: "#12 passes review" },
         issueStatus: { about: "Send #12 out (or for another round)" },
         issueTimeline: { about: "#12's timeline and cost" },
-        issueWantsOwner: { about: "The issues waiting on the owner, the longest waiting first" },
+        issueWantsUser: { about: "The issues waiting on the owner, the longest waiting first" },
         issueWatch: { about: "Follow #12 until it is handed back or over, then show it; ten minutes at most" },
         memoryCreate: { run: "vibevalley memory create docs 'the port is 8797'", about: "Have docs remember the port is 8797" },
         memoryDelete: { about: "Try deleting docs' m1 first" },
@@ -5261,8 +5261,8 @@ export const catalogs = {
       requestKeyLong: "requestKey is too long (at most {max} characters)",
     },
     "server.channel": {
-      name: { owner: "You", orchestrator: "Manager" },
-      mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
+      name: { user: "You", orchestrator: "Manager" },
+      mention: { orchestrator: "@manager", user: "@user", everyone: "@everyone" },
       channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
       channelTaken: "There is already a channel called {name}",
       hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
@@ -5632,7 +5632,7 @@ export const catalogs = {
       codeExpired: "The pairing code expired: get a new one on that computer",
       wrongCode: "Wrong pairing code",
       anotherAsking: "Another device is waiting for the owner's approval: try again in a moment",
-      ownerLate: "The owner did not approve in time and the pairing code expired: get a new one on that computer",
+      userLate: "The owner did not approve in time and the pairing code expired: get a new one on that computer",
       denied: "The owner did not let this device in",
       noCode: "No pairing code is out: nothing changes",
       dropCode: "Withdraw the pairing code {code}",
@@ -5693,7 +5693,7 @@ export const catalogs = {
       inputChanged: "A saved input cannot be replaced with different bytes. Create a new input instead.",
       inputTimeout: "The local upload timed out. Its partial file was removed; no provider request was made.",
       inputDisconnected: "The local upload was interrupted. Its partial file was removed; no provider request was made.",
-      ownerRequired: "Generation requires the owner's mandate. Autonomous patrols cannot submit potentially billable requests.",
+      userRequired: "Generation requires the owner's mandate. Autonomous patrols cannot submit potentially billable requests.",
       invalid: "Invalid image parameters. Check the prompt, layout, dimensions and advanced options.",
       missing: "This generation task was not found.",
       corrupt: "The generation record cannot be read. Preserve local data before investigating.",
@@ -5899,7 +5899,7 @@ export const catalogs = {
       "publish.refused": "Branch publication refused: {detail}",
       "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
       "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
-      "publish.ownerOnly": "Only the local owner can publish an existing branch",
+      "publish.userOnly": "Only the local owner can publish an existing branch",
       "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",
     },
     "server.runtime": {
@@ -5967,12 +5967,12 @@ export const catalogs = {
         repo: "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files",
       },
       notTaken: {
-        conflictOwner:
+        conflictUser:
           "Not merged: merging into {base} would conflict ({files}). {name} is still here, with its branch and worktree. To have it resolve this, tell it: {brief}",
         conflictNotice: "{name}'s branch would conflict with {base} ({files}), so it was not merged. It can resolve the conflict itself",
         conflictShort: "Merging into {base} would conflict: {files}",
         checkFix: "{reason}\nFix the check and hand it back.",
-        owner: "Not merged: {why}. {name} is still here",
+        user: "Not merged: {why}. {name} is still here",
         notice: "{name}'s work was not merged: {why}",
         checkShort: "the repo's check failed",
       },
@@ -5981,7 +5981,7 @@ export const catalogs = {
         image: "[image]",
         exitedNotice: "{name}: {why}",
         staleRun: "The last round stopped halfway too long ago, and was not carried on",
-        stoppedByOwner: "You stopped it",
+        stoppedByUser: "You stopped it",
         folded: "Folded the conversation, {usage}",
         clipped: "… {n} characters left out …",
         quiet: "Quiet for {span}{last}. It may be running a long command, or it may be stuck",
@@ -6477,7 +6477,7 @@ export const catalogs = {
         helpersWriting: "helpers writing",
         demo: "Demo: several helpers writing at once",
         append: "Write a paragraph at the end",
-        owner: "Owner",
+        user: "Owner",
         done: "Done",
         notDone: "Not done",
         writing: "{who} is writing",
@@ -6667,7 +6667,7 @@ export const catalogs = {
       },
       toasts: "Notices",
       runtime: "Runs on: {name}",
-      owner: "Me",
+      user: "Me",
       orchestrator: "Manager",
       unreachable: "The server cannot be reached for now: try again when it is back.",
       query: { invalidResponse: "The response does not match the expected data format. The last valid result has been kept." },
@@ -6924,7 +6924,7 @@ export const catalogs = {
         typing: "typing…",
         foldDispatch: "Fold the dispatch",
         unfoldDispatch: "Unfold the dispatch",
-        owner: "Owner",
+        user: "Owner",
         dispatch: "Sent work",
         spent: "This round spent {spent}",
         unread: "{n} new",
@@ -6963,7 +6963,7 @@ export const catalogs = {
         editHint: "Enter saves · Esc cancels",
       },
       pins: { open: "Pinned messages", title: "Pinned", none: "Nothing is pinned here yet", failed: "Could not read the pins: {why}" },
-      members: { open: "Members", title: "Members", owner: "Owner", none: "No helpers here yet", inChannel: "A manager in the channel" },
+      members: { open: "Members", title: "Members", user: "Owner", none: "No helpers here yet", inChannel: "A manager in the channel" },
       composer: {
         notSent: "Not sent: {why}",
         who: "Who",
@@ -6988,7 +6988,7 @@ export const catalogs = {
         membersHint: "The managers in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
         notify: "Notify",
         notifyAll: "All",
-        notifyMentions: "Only @owner",
+        notifyMentions: "Only @user",
         notifyNone: "Nothing",
         notifyHint: "Nothing means no unread count, no Inbox and nothing forwarded to WeChat",
         archive: "Archive",
@@ -7050,7 +7050,7 @@ export const catalogs = {
         issueThread: "Ticket thread",
         talkThread: "{who}'s thread",
         thread: "Thread",
-        mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
+        mention: { orchestrator: "@manager", user: "@user", everyone: "@everyone" },
         orchestratorNote: "sends work, splits plans, answers how it goes",
         everyone: "Everyone",
         everyoneNote: "wakes every helper here",
@@ -7120,7 +7120,7 @@ export const catalogs = {
         scan: "Sign in to {app} by scanning",
         pairing: "The bot is connected. Last step: with your own {app}, message this bot directly and send:",
         pairingNote: "Whoever sends this code is the owner: from then on only that person's words come in. The code works once.",
-        owner: "Owner",
+        user: "Owner",
         channel: "Connected to",
         since: "Connected since",
         lastInbound: "Last heard from you",
@@ -8166,7 +8166,7 @@ export const catalogs = {
         cleanupAsk:
           "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding.",
       },
-      sourceOwner: "Source: owner",
+      sourceUser: "Source: owner",
       sourceAgent: "Source: orchestrator {agent} · channel {channel}",
       usage: "Provider reported: {images} image(s) · {width} × {height}",
       usageUnknown: "No provider usage result yet. This does not mean there was no charge.",
@@ -9329,7 +9329,7 @@ export interface Messages {
   "cli.example.issueShow.about": undefined;
   "cli.example.issueStatus.about": undefined;
   "cli.example.issueTimeline.about": undefined;
-  "cli.example.issueWantsOwner.about": undefined;
+  "cli.example.issueWantsUser.about": undefined;
   "cli.example.issueWatch.about": undefined;
   "cli.example.memoryCreate.about": undefined;
   "cli.example.memoryCreate.run": undefined;
@@ -9417,7 +9417,7 @@ export interface Messages {
   "cli.flag.tier": undefined;
   "cli.flag.timeout": undefined;
   "cli.flag.title": undefined;
-  "cli.flag.wantsOwner": undefined;
+  "cli.flag.wantsUser": undefined;
   "cli.group.agent.about": undefined;
   "cli.group.artifact.about": undefined;
   "cli.group.channel.about": undefined;
@@ -9897,10 +9897,10 @@ export interface Messages {
   "server.channel.issuesThere": { readonly n: string | number };
   "server.channel.mention.everyone": undefined;
   "server.channel.mention.orchestrator": undefined;
-  "server.channel.mention.owner": undefined;
+  "server.channel.mention.user": undefined;
   "server.channel.messageGone": undefined;
   "server.channel.name.orchestrator": undefined;
-  "server.channel.name.owner": undefined;
+  "server.channel.name.user": undefined;
   "server.channel.noAttachment": { readonly id: string | number };
   "server.channel.noChannel": { readonly id: string | number };
   "server.channel.noChannelNamed": { readonly name: string | number; readonly tags: string | number };
@@ -10243,8 +10243,8 @@ export interface Messages {
   "server.lan.notOpen": undefined;
   "server.lan.notRemote": undefined;
   "server.lan.notUp": undefined;
-  "server.lan.ownerLate": undefined;
   "server.lan.unpaired": undefined;
+  "server.lan.userLate": undefined;
   "server.lan.wrongCode": undefined;
   "server.lookIn.agent": undefined;
   "server.lookIn.archive": undefined;
@@ -10298,7 +10298,6 @@ export interface Messages {
   "server.media.invalid": undefined;
   "server.media.missing": undefined;
   "server.media.noDownload": undefined;
-  "server.media.ownerRequired": undefined;
   "server.media.phase.canceled": undefined;
   "server.media.phase.download_failed": undefined;
   "server.media.phase.downloading": undefined;
@@ -10340,6 +10339,7 @@ export interface Messages {
   "server.media.understandingRejected": undefined;
   "server.media.understandingUnknown": undefined;
   "server.media.unknown": undefined;
+  "server.media.userRequired": undefined;
   "server.memory.coverage.everosAcross": undefined;
   "server.memory.coverage.everosAgent": undefined;
   "server.memory.coverage.failed": undefined;
@@ -10476,11 +10476,11 @@ export interface Messages {
   "server.repo.outside": undefined;
   "server.repo.parentBranchChanged": undefined;
   "server.repo.parentHasChanges": undefined;
-  "server.repo.publish.ownerOnly": undefined;
   "server.repo.publish.platformFailed": { readonly stage: string | number };
   "server.repo.publish.pushUnconfirmed": { readonly sha: string | number };
   "server.repo.publish.pushedWithoutLink": { readonly sha: string | number; readonly why: string | number };
   "server.repo.publish.refused": { readonly detail: string | number };
+  "server.repo.publish.userOnly": undefined;
   "server.repo.tokeiFailed": { readonly why: string | number };
   "server.repo.tokeiUnread": undefined;
   "server.repoRef": { readonly id: string | number };
@@ -10594,22 +10594,22 @@ export interface Messages {
   "server.session.log.retryWhy": { readonly reason: string | number };
   "server.session.log.staleRun": undefined;
   "server.session.log.stopped": undefined;
-  "server.session.log.stoppedByOwner": undefined;
+  "server.session.log.stoppedByUser": undefined;
   "server.session.noRoom.farm": { readonly max: string | number };
   "server.session.noRoom.repo": { readonly max: string | number; readonly on: string | number; readonly repo: string | number };
   "server.session.noRoom.runtime": { readonly max: string | number; readonly on: string | number; readonly runtime: string | number };
   "server.session.notTaken.checkFix": { readonly reason: string | number };
   "server.session.notTaken.checkShort": undefined;
   "server.session.notTaken.conflictNotice": { readonly base: string | number; readonly files: string | number; readonly name: string | number };
-  "server.session.notTaken.conflictOwner": {
+  "server.session.notTaken.conflictShort": { readonly base: string | number; readonly files: string | number };
+  "server.session.notTaken.conflictUser": {
     readonly base: string | number;
     readonly brief: string | number;
     readonly files: string | number;
     readonly name: string | number;
   };
-  "server.session.notTaken.conflictShort": { readonly base: string | number; readonly files: string | number };
   "server.session.notTaken.notice": { readonly name: string | number; readonly why: string | number };
-  "server.session.notTaken.owner": { readonly name: string | number; readonly why: string | number };
+  "server.session.notTaken.user": { readonly name: string | number; readonly why: string | number };
   "server.session.unfinished": undefined;
   "server.session.usage.cached": {
     readonly missed: string | number;
@@ -10983,11 +10983,11 @@ export interface Messages {
   "web.artifact.blocks.memoryItem": undefined;
   "web.artifact.blocks.notDone": undefined;
   "web.artifact.blocks.notSaved": { readonly why: string | number };
-  "web.artifact.blocks.owner": undefined;
   "web.artifact.blocks.saved": undefined;
   "web.artifact.blocks.saving": undefined;
   "web.artifact.blocks.start": undefined;
   "web.artifact.blocks.unknown": { readonly type: string | number };
+  "web.artifact.blocks.user": undefined;
   "web.artifact.blocks.writing": { readonly who: string | number };
   "web.artifact.blocks.wrote": { readonly who: string | number };
   "web.artifact.body.blocks": undefined;
@@ -11230,7 +11230,6 @@ export interface Messages {
   "web.base.money.underCent": undefined;
   "web.base.off": undefined;
   "web.base.orchestrator": undefined;
-  "web.base.owner": undefined;
   "web.base.place.agents.hint": undefined;
   "web.base.place.agents.label": undefined;
   "web.base.place.catalog.hint": undefined;
@@ -11332,6 +11331,7 @@ export interface Messages {
   "web.base.unreachable": undefined;
   "web.base.update": undefined;
   "web.base.updateReady": { readonly next: string | number };
+  "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
   "web.catalog.all": undefined;
@@ -11532,8 +11532,8 @@ export interface Messages {
   "web.channel.members.inChannel": undefined;
   "web.channel.members.none": undefined;
   "web.channel.members.open": undefined;
-  "web.channel.members.owner": undefined;
   "web.channel.members.title": undefined;
+  "web.channel.members.user": undefined;
   "web.channel.messages.containing": { readonly text: string | number };
   "web.channel.messages.deleted": undefined;
   "web.channel.messages.dispatch": undefined;
@@ -11549,7 +11549,6 @@ export interface Messages {
   "web.channel.messages.notFound": undefined;
   "web.channel.messages.notSent": undefined;
   "web.channel.messages.older": undefined;
-  "web.channel.messages.owner": undefined;
   "web.channel.messages.pinned": undefined;
   "web.channel.messages.quotedBlock": { readonly text: string | number; readonly title: string | number };
   "web.channel.messages.quotedGone": undefined;
@@ -11569,6 +11568,7 @@ export interface Messages {
   "web.channel.messages.typing": undefined;
   "web.channel.messages.unfoldDispatch": undefined;
   "web.channel.messages.unread": { readonly n: string | number };
+  "web.channel.messages.user": undefined;
   "web.channel.mood.idle": undefined;
   "web.channel.mood.listening": undefined;
   "web.channel.mood.speaking": undefined;
@@ -11583,7 +11583,7 @@ export interface Messages {
   "web.channel.names.issueThread": undefined;
   "web.channel.names.mention.everyone": undefined;
   "web.channel.names.mention.orchestrator": undefined;
-  "web.channel.names.mention.owner": undefined;
+  "web.channel.names.mention.user": undefined;
   "web.channel.names.orchestratorNote": undefined;
   "web.channel.names.talkThread": { readonly who: string | number };
   "web.channel.names.thread": undefined;
@@ -11663,7 +11663,6 @@ export interface Messages {
   "web.connector.connectors.notes.weixin.1": undefined;
   "web.connector.connectors.notes.weixin.2": undefined;
   "web.connector.connectors.ok": undefined;
-  "web.connector.connectors.owner": undefined;
   "web.connector.connectors.pairing": { readonly app: string | number };
   "web.connector.connectors.pairingNote": undefined;
   "web.connector.connectors.paused": { readonly clock: string | number };
@@ -11688,6 +11687,7 @@ export interface Messages {
   "web.connector.connectors.state.scanned": undefined;
   "web.connector.connectors.state.verify": undefined;
   "web.connector.connectors.state.waiting": undefined;
+  "web.connector.connectors.user": undefined;
   "web.connector.connectors.weixinIntro": undefined;
   "web.connector.connectors.whichChannel": undefined;
   "web.farm.achievements.category.craft": undefined;
@@ -12641,7 +12641,7 @@ export interface Messages {
   "web.media.save": undefined;
   "web.media.seed": undefined;
   "web.media.sourceAgent": { readonly agent: string | number; readonly channel: string | number };
-  "web.media.sourceOwner": undefined;
+  "web.media.sourceUser": undefined;
   "web.media.speech.asynchronous": undefined;
   "web.media.speech.binding": {
     readonly account: string | number;

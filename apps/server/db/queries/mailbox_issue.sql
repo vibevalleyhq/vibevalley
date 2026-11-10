@@ -19,7 +19,7 @@ from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id
 left join mailbox_delivery d on d.session_id = m.session_id and d.envelope_id = m.trigger_id
 where m.issue_id = sqlc.arg(issue_id) and m.state <> 'returned'
   and (
-    (sqlc.arg(closing)::boolean and (t.trigger_json::jsonb -> 'actor' ->> 'kind' <> 'owner' or d.state is distinct from 'consumed'))
+    (sqlc.arg(closing)::boolean and (t.trigger_json::jsonb -> 'actor' ->> 'kind' <> 'user' or d.state is distinct from 'consumed'))
     or (not sqlc.arg(closing)::boolean and (
       m.state = 'held' or m.session_id is null
       or (sqlc.narg(recipient)::text is not null and m.session_id <> sqlc.narg(recipient)

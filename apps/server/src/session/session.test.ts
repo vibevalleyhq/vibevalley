@@ -24,7 +24,7 @@ import { world } from "#/testing/world.ts";
 import { NotRecorded, Session } from "./session.ts";
 import type { SessionNews, DeliveryInput } from "./signals.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
-const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
+const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byUserComment: false });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
 const worker = (turns: ScriptedTurn[]) =>
@@ -627,7 +627,7 @@ it.live("regression: reopening a session rotates its credential before deliverin
     yield* until(() => sessions.sessionOf(id)?.phase._tag !== "working", "first turn ended");
     const suspend2 = yield* sessions.suspend(id);
     expect(suspend2).toBe(true);
-    expect((yield* sessions.deliver(id, "again", { trigger: { kind: "comment" }, envelopeIds: [], byOwnerComment: true })).kind).toBe("run");
+    expect((yield* sessions.deliver(id, "again", { trigger: { kind: "comment" }, envelopeIds: [], byUserComment: true })).kind).toBe("run");
     expect(tokens.length).toBe(2);
     expect(tokens[1] !== tokens[0]).toBe(true);
     expect(sessions.who(tokens[0]!)).toBe("");

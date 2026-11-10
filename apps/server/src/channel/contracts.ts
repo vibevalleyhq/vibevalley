@@ -1,7 +1,7 @@
 import { type Effect, Formatter, Schema, type Scope, type Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { type ApiError } from "#/base/errors.ts";
@@ -49,7 +49,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     outcome: meta.outcome ?? null,
     ...(meta.spent ? { spent: meta.spent } : {}),
     spoken: meta.spoken ?? false,
-    ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
+    ...(row.send_key && row.sender_id === userId ? { sendKey: row.send_key } : {}),
     at: row.created_at,
     revision: row.revision,
     ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
@@ -100,7 +100,7 @@ export interface SayMore {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
-  /** The blocks the owner pointed at, to be read as they are now before the message is stored. */
+  /** The blocks the user pointed at, to be read as they are now before the message is stored. */
   readonly blockRefs?: readonly T.BlockRef[];
   readonly blocks?: readonly T.QuotedBlock[];
   /** The orchestrator it is said to: only it hears it. */
@@ -163,20 +163,20 @@ export interface Write {
   readonly sendKey?: string;
   /** The number of the message in the same channel it answers. */
   readonly replyTo?: number;
-  /** Who has read up to this message once it is written (the owner, of its own words), in the same transaction. */
+  /** Who has read up to this message once it is written (the user, of its own words), in the same transaction. */
   readonly readBy?: string;
 }
 
 /** Words written into a place, by who writes them; each kind keeps its own checks and its own answer. */
 export type Post =
-  /** The owner's words; again: sendKey was sent before, and the message is that one. channel undefined: the default one. */
-  | ({ readonly _tag: "Owner"; readonly text: string; readonly channel?: string | undefined; readonly sendKey: string } & SayMore)
+  /** The user's words; again: sendKey was sent before, and the message is that one. channel undefined: the default one. */
+  | ({ readonly _tag: "User"; readonly text: string; readonly channel?: string | undefined; readonly sendKey: string } & SayMore)
   /** Words to a session in its thread; with no thread the session hears them straight. */
   | { readonly _tag: "Tell"; readonly from: string; readonly session: string; readonly text: string; readonly sendKey: string }
   /** A session's or the orchestrator's words, through channel_message_send: a retry is that message, unseen words are shown first. */
   | ({ readonly _tag: "Agent"; readonly from: string; readonly text: string } & SpeakOptions)
   /** Words that announce what was made, with it: an artifact's card (artifact/) or a made file's attachments (media/), said as from
-   * (the owner, a session or an orchestrator) in a channel placeOf names. A sendKey said before is that message again. */
+   * (the user, a session or an orchestrator) in a channel placeOf names. A sendKey said before is that message again. */
   | { readonly _tag: "Announce"; readonly from: string; readonly channel: string; readonly text: string; readonly made: Made; readonly sendKey?: string }
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   | { readonly _tag: "Call"; readonly from: string; readonly text: string; readonly sendKey: string }
@@ -189,7 +189,7 @@ export type PostOf<Tag extends Post["_tag"]> = Extract<Post, { readonly _tag: Ta
 
 /** Each kind of post with its answer; Run and Notice are best effort and never fail. */
 export interface PostDoor {
-  (p: PostOf<"Owner">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+  (p: PostOf<"User">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
   (p: PostOf<"Tell">): Effect.Effect<T.ChatMessage | undefined, ApiError>;
   (p: PostOf<"Agent">): Effect.Effect<Spoken, ApiError>;
   (p: PostOf<"Announce">): Effect.Effect<T.ChatMessage, ApiError>;
@@ -208,13 +208,13 @@ export interface Written {
 }
 
 export interface ChannelService {
-  readonly ownerReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
+  readonly userReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
   /** Words written into a place: one door, and what is checked and answered depends on who writes them (Post). */
   readonly post: PostDoor;
-  /** The owner's own chat words, changed. Changes tell and wake nobody. */
+  /** The user's own chat words, changed. Changes tell and wake nobody. */
   readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Effect.Effect<T.ChatMessage, ApiError>;
   /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
   readonly remove: (id: T.MessageId) => Effect.Effect<void, ApiError>;
@@ -253,9 +253,9 @@ export interface ChannelService {
   readonly follow: (channel: string, after: number) => Stream.Stream<T.ChannelEvent, ApiError>;
   /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
   readonly reports: (after?: string) => Stream.Stream<T.ChannelEvent>;
-  /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
+  /** The user's words said in full in a thread, whatever path they took in: what an issue hears the user by.
    * Subscribed before it returns. */
-  readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: T.ChatMessage }>, never, Scope.Scope>;
+  readonly userInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: T.ChatMessage }>, never, Scope.Scope>;
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, repo: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; repo undefined: as it was, empty: none. */
@@ -265,7 +265,7 @@ export interface ChannelService {
   readonly removeChannel: (id: string) => Effect.Effect<void, ApiError>;
   readonly previewRemoveChannel: (id: string) => Effect.Effect<T.Preview, ApiError>;
   readonly setNotify: (id: string, notify: T.Notify) => Effect.Effect<void, ApiError>;
-  /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
+  /** How much of a place counts for the user: none when it or its channel is set to none, else its own level, else its channel's. */
   readonly notifyOf: (id: string) => T.Notify;
   readonly direct: (agent: string) => Effect.Effect<string, ApiError>;
   /** The orchestrator in a place (mailbox/envelope.ts orchestratorIn): who work left to an orchestrator there goes to. */

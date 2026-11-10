@@ -15,7 +15,7 @@ const mentionIds = (core: Core["Service"]) =>
     .inbox.filter((item) => item.kind === "mention")
     .map((item) => item.id);
 
-it.live("an unresolved owner mention survives both history windows and restart until read", () => {
+it.live("an unresolved user mention survives both history windows and restart until read", () => {
   const config = testConfig({ db: "" });
   let thread = "";
   let message = "";
@@ -31,7 +31,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
     yield* Effect.gen(function* () {
       const chat = yield* Channel;
       const core = yield* Core;
-      const parent = (yield* chat.post({ _tag: "Owner", text: "需要确认的话题", sendKey: "" })).message;
+      const parent = (yield* chat.post({ _tag: "User", text: "需要确认的话题", sendKey: "" })).message;
       const written = (yield* chat.post({
         _tag: "Agent",
         from: "orchestrator",
@@ -42,7 +42,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
       ({ channel: thread, id: message, at, number } = written);
       expect(mentionIds(core)).toEqual([message]);
       for (let i = 0; i < 101; i++) {
-        const other = (yield* chat.post({ _tag: "Owner", text: `其他话题 ${i}`, sendKey: "" })).message;
+        const other = (yield* chat.post({ _tag: "User", text: `其他话题 ${i}`, sendKey: "" })).message;
         const fresh = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "其他答复", target: `#general:${other.number}`, anyway: true })).message!
           .channel;
         yield* chat.post({ _tag: "Notice", channel: fresh, text: "动静一", code: "history" });
@@ -61,16 +61,16 @@ it.live("an unresolved owner mention survives both history windows and restart u
   }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
 });
 
-it.live("only reading or replying in the mentioned channel completes an owner mention", () => {
+it.live("only reading or replying in the mentioned channel completes a user mention", () => {
   const config = testConfig();
   return Effect.gen(function* () {
     const chat = yield* Channel;
     const core = yield* Core;
     const channel = yield* chat.openChannel("review", "", "");
     const first = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@主人 第一份变更", target: "#review", anyway: true })).message!;
-    yield* chat.post({ _tag: "Owner", text: "默认频道的另一件事", sendKey: "" });
+    yield* chat.post({ _tag: "User", text: "默认频道的另一件事", sendKey: "" });
     expect(mentionIds(core)).toEqual([first.id]);
-    yield* chat.post({ _tag: "Owner", text: "确认了", channel: channel.id, sendKey: "" });
+    yield* chat.post({ _tag: "User", text: "确认了", channel: channel.id, sendKey: "" });
     expect(mentionIds(core)).toEqual([]);
     const second = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@主人 第二份变更", target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([second.id]);
@@ -78,7 +78,7 @@ it.live("only reading or replying in the mentioned channel completes an owner me
     expect(mentionIds(core)).toEqual([]);
     const third = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@主人 第三份变更", target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([third.id]);
-    yield* chat.read("owner", { target: "#review" });
+    yield* chat.read("user", { target: "#review" });
     expect(mentionIds(core)).toEqual([]);
   }).pipe(Effect.scoped, Effect.provide(world({ config })), Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
 });

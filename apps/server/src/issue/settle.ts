@@ -55,7 +55,7 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       return a;
     });
 
-    /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first). */
+    /** The issue as a move would see it once the user's unsaved fields are saved (issue.status saves them first). */
     const withEdit = Effect.fn("Issue.withEdit")(function* (issue: T.Issue, edit: T.IssueUpdate | undefined) {
       if (!edit) return issue;
       const reworded = Object.keys(edit).some((k) => k !== "deliver");
@@ -83,7 +83,7 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       const [move, why] = statusMove(issue, to);
       const said = text.trim();
       if (move === "none") return yield* Effect.fail(refused(why, nextSteps(issue)));
-      // Stuck, it goes back with the server's own words for why; otherwise the owner says what this round is for.
+      // Stuck, it goes back with the server's own words for why; otherwise the user says what this round is for.
       if (move === "round" && !taker && !said && issue.stage.state !== "stuck") return yield* Effect.fail(refused(t("server.issue.roundNeedsWords")));
       let delivery: "kept" | "none" | "merge" | "submitted" | "submit" | undefined;
       let commits = 0;

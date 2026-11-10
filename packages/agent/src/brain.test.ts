@@ -151,7 +151,7 @@ describe("the agent", () => {
   it.effect("cuts off a run under way when its owner's scope closes", () =>
     Effect.gen(function* () {
       let [started, cut] = [false, false];
-      const owner = yield* Scope.make();
+      const user = yield* Scope.make();
       const { llm } = scriptedLLM();
       const asked = Effect.onInterrupt(
         Effect.andThen(
@@ -161,15 +161,15 @@ describe("the agent", () => {
         () => Effect.sync(() => (cut = true)),
       );
       const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(asked) } };
-      const scope = yield* Scope.fork(owner);
+      const scope = yield* Scope.fork(user);
       const agent = yield* Scope.provide(makeBrain(testBrain(home(), held)), scope);
       yield* Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis;
         yield* agent.send(userMessage("说", now));
         yield* until(() => started, "started");
-        yield* Scope.close(owner, Exit.void);
+        yield* Scope.close(user, Exit.void);
         yield* until(() => cut, "cut");
-      }).pipe(Effect.ensuring(Scope.close(owner, Exit.void)));
+      }).pipe(Effect.ensuring(Scope.close(user, Exit.void)));
     }),
   );
 

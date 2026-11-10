@@ -39,7 +39,7 @@
     "reviewComment": "Words with the review",
     "statusComment": "Words with the move: what to change, when it goes for another round",
     "title": "The new title",
-    "wantsOwner": "Only those waiting on the owner, the longest waiting first",
+    "wantsUser": "Only those waiting on the owner, the longest waiting first",
     "issueWatch": "Follow it until in_review, done or canceled, then show it; each status on stderr",
     "tier": "The PARA tier",
     "marker": "The task marker",
@@ -742,7 +742,7 @@
     "issueTimeline": {
       "about": "#12's timeline and cost"
     },
-    "issueWantsOwner": {
+    "issueWantsUser": {
       "about": "The issues waiting on the owner, the longest waiting first"
     },
     "issueWatch": {

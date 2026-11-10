@@ -24,7 +24,7 @@ const PrefsSchema = Schema.Struct({
   theme: orFallback(ThemeChoice, "system"),
   scale: orFallback(Schema.Literals(ScaleValues), 100),
   start: orFallback(Schema.Literals(StartValues), "workbench"),
-  /** A pane's width the owner dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
+  /** A pane's width the user dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
   widths: orFallback(Schema.Record(Schema.String, Schema.Finite), {}),
 });
 

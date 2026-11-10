@@ -57,7 +57,7 @@ const mossRtc =
           if (prev && prev.text === turn.text && prev.done === turn.done) return;
           const turnId = prev?.id ?? nextTurnId++;
           sentTurns.set(key, { id: turnId, text: turn.text, done: turn.done });
-          if (turn.who === "owner") {
+          if (turn.who === "user") {
             on.stream(
               JSON.stringify({
                 object: "user.transcription",
@@ -176,13 +176,13 @@ const webRtc: Rtc = async (grant, on) => {
 
 export type CallPhase = VoicePhase;
 
-// Rejects the Promise a call's setup races against when the owner hangs up; the page's call code is not Effect.
+// Rejects the Promise a call's setup races against when the user hangs up; the page's call code is not Effect.
 // @effect-diagnostics-next-line extendsNativeError:off
 class Cancelled extends Error {}
 
 const sendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
-export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orchestrator"> {
+export class VoiceCall implements VoiceDriver<string | undefined, "user" | "orchestrator"> {
   phase: CallPhase = "idle";
   muted = false;
   agentHere = false;
@@ -200,10 +200,10 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
   private starting: Promise<void> | undefined = undefined;
   private ending: Promise<void> | undefined = undefined;
   private cancel?: () => void;
-  private readonly pending: { text: string; owner: boolean; picked?: string | undefined; key?: string }[] = [];
+  private readonly pending: { text: string; user: boolean; picked?: string | undefined; key?: string }[] = [];
   private readonly listeners = new Set<() => void>();
 
-  /** The helper the owner picked to send work to, or undefined for the orchestrator's choice. */
+  /** The helper the user picked to send work to, or undefined for the orchestrator's choice. */
   private readonly agentPick: () => string | undefined;
   constructor(agentPick: () => string | undefined = () => undefined) {
     this.agentPick = agentPick;
@@ -219,7 +219,7 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
     return this.orchestratorLevel;
   }
 
-  get turns(): readonly VoiceTurn<"owner" | "orchestrator">[] {
+  get turns(): readonly VoiceTurn<"user" | "orchestrator">[] {
     return voiceTurnsOfCaptions(this.captions.turns);
   }
 
@@ -247,7 +247,7 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
     this.changed();
   }
 
-  /** The owner read the problem and closed it. */
+  /** The user read the problem and closed it. */
   dismiss() {
     if (this.problem === "") return;
     this.problem = "";
@@ -255,15 +255,15 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
     this.changed();
   }
 
-  private caption(text: string, owner: boolean) {
+  private caption(text: string, user: boolean) {
     if (this.phase === "idle" || this.phase === "ending") return;
-    const c = { text, owner, ...(owner ? { picked: this.agentPick(), key: sendKey() } : {}) };
+    const c = { text, user, ...(user ? { picked: this.agentPick(), key: sendKey() } : {}) };
     if (this.agentId) this.send(agentIdOf(this.agentId), c);
     else this.pending.push(c);
   }
 
-  private send(agentId: string, c: { text: string; owner: boolean; picked?: string | undefined; key?: string }) {
-    const sent = c.owner
+  private send(agentId: string, c: { text: string; user: boolean; picked?: string | undefined; key?: string }) {
+    const sent = c.user
       ? api.voice.call.hear({ agentId, text: c.text, ...(c.picked ? { agent: c.picked } : {}), ...(c.key ? { sendKey: c.key } : {}) })
       : api.voice.call.say({ agentId, text: c.text });
     sent.catch(() => undefined);

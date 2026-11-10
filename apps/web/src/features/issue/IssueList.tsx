@@ -176,7 +176,7 @@ const viewStyles = stylex.create({
 /** The quick add, with the group's repo or helper when grouped by one. */
 export type ListAdd = (where: NewIssueAt) => void;
 
-/** The issues as rows, grouped as the owner picked: Linear's list. A row opens the issue as a card does. */
+/** The issues as rows, grouped as the user picked: Linear's list. A row opens the issue as a card does. */
 export function IssueList(props: {
   cards: BoardCard[];
   loading: boolean;

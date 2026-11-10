@@ -55,7 +55,7 @@ export const channelDirectory = (r: ChannelHub) =>
       hired,
       targetOfChannel,
       publishChannel,
-      publishOwnerMentions,
+      publishUserMentions,
     } = r;
 
     /** A channel nothing points at any more; refused with what still does. */
@@ -248,7 +248,7 @@ export const channelDirectory = (r: ChannelHub) =>
         yield* db.run(qc.setNotify({ notify, id }));
         model.patched(id, { notify });
         yield* publishChannel(id);
-        yield* publishOwnerMentions;
+        yield* publishUserMentions;
       }, locked),
       orchestratorIn: (channel) => orchestratorInRow(model.channel(channel)),
       direct: Effect.fn("Channel.direct")(function* (ref) {
@@ -267,9 +267,9 @@ export const channelDirectory = (r: ChannelHub) =>
         if (!model.channel(channel)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]));
         const upto = Math.max(0, number - 1);
         yield* db.run(qr.markUnread({ channel_id: channel, read_number: upto, updated_at: yield* Clock.currentTimeMillis }));
-        model.ownerReadBack(channel, upto);
+        model.userReadBack(channel, upto);
         yield* publishChannel(channel);
-        yield* publishOwnerMentions;
+        yield* publishUserMentions;
       }, locked),
       makeDefault: Effect.fn("Channel.makeDefault")(function* (id) {
         const row = model.channel(id);

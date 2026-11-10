@@ -89,20 +89,20 @@ it.effect.each([
     yield* configured(model);
     const media = yield* Media;
     const submitted = { ...input, format };
-    expect((yield* media.createSpeech(submitted, { kind: "owner" })).phase).toBe("queued");
+    expect((yield* media.createSpeech(submitted, { kind: "user" })).phase).toBe("queued");
     const ready = yield* waitFor(media.get(input.id), (job) => job.phase === "ready", "speech saved");
     if (ready.kind !== "speech") return yield* Effect.die("Expected speech task");
-    expect(ready).toMatchObject({ model, voice: input.voice, format, connection: "moss", revision: 1, source: { kind: "owner" }, canCancel: false });
+    expect(ready).toMatchObject({ model, voice: input.voice, format, connection: "moss", revision: 1, source: { kind: "user" }, canCancel: false });
     expect(ready.attachment?.type).toBe(type);
     const file = yield* (yield* Channel).attachment(ready.attachment?.id ?? "");
     if (!file) return yield* Effect.die("Expected local speech attachment");
     const file2 = yield* (yield* FileSystem.FileSystem).readFile(file.path);
     expect(Buffer.from(file2)).toEqual(bytes);
     const { text, ...rest } = submitted;
-    const speechCreated = yield* media.createSpeech({ text, ...rest }, { kind: "owner" });
+    const speechCreated = yield* media.createSpeech({ text, ...rest }, { kind: "user" });
     expect(speechCreated).toEqual(ready);
     for (const patch of [{ text: "Changed" }, { voice: "another-voice" }, { revision: 2 }, { format: format === "wav" ? "mp3" : "wav" }] as const) {
-      const changedFailure = yield* media.createSpeech({ ...submitted, ...patch }, { kind: "owner" }).pipe(Effect.flip);
+      const changedFailure = yield* media.createSpeech({ ...submitted, ...patch }, { kind: "user" }).pipe(Effect.flip);
       expect(changedFailure).toMatchObject({ _tag: "Refused" });
     }
     expect(calls).toBe(1);
@@ -141,7 +141,7 @@ it.effect("regression: synchronous speech retains observed usage and actual form
     yield* configured();
     const media = yield* Media;
     const request = { ...input, format: "mp3" as const };
-    yield* media.createSpeech(request, { kind: "owner" });
+    yield* media.createSpeech(request, { kind: "user" });
     const ready = yield* waitFor(media.get(input.id), (job) => job.phase === "ready", "actual speech format saved");
     expect(ready).toMatchObject({
       format: "wav",
@@ -150,7 +150,7 @@ it.effect("regression: synchronous speech retains observed usage and actual form
       metadata: { source: "file", sampleRate: 24000, channels: 1, bitDepth: 16, duration: 0.2 },
       attachment: { type: "audio/wav" },
     });
-    const speechCreated = yield* media.createSpeech(request, { kind: "owner" });
+    const speechCreated = yield* media.createSpeech(request, { kind: "user" });
     expect(speechCreated).toEqual(ready);
     expect(calls).toBe(1);
   }).pipe(Effect.provide(layer(http, download)));
@@ -181,7 +181,7 @@ it.effect("regression: speech download starts only after the private URL is stor
     yield* Effect.gen(function* () {
       yield* configured();
       const media = yield* Media;
-      yield* media.createSpeech(input, { kind: "owner" });
+      yield* media.createSpeech(input, { kind: "user" });
       yield* Deferred.await(started);
       const found = yield* (yield* Db).one(q.speech({ id: input.id }));
       expect(found).toMatchObject({ phase: "downloading", result_url: response.url });
@@ -211,7 +211,7 @@ it.effect("regression: speech attachment disk failures retain the result for dow
     const blocked = yield* pathOf(config.home, "attachments");
     yield* fs.writeFileString(blocked, "not a directory");
     const media = yield* Media;
-    yield* media.createSpeech(input, { kind: "owner" });
+    yield* media.createSpeech(input, { kind: "user" });
     const failed = yield* waitFor(media.get(input.id), (job) => job.phase === "download_failed", "speech disk failure");
     expect(failed.problem).not.toContain(config.home);
     yield* fs.remove(blocked);
@@ -240,20 +240,20 @@ it.effect("regression: queued speech freezes its selected model and credentials;
       yield* configured();
       const media = yield* Media;
       const provider = yield* Provider;
-      yield* media.createSpeech(input, { kind: "owner" });
+      yield* media.createSpeech(input, { kind: "user" });
       yield* Deferred.await(started);
-      yield* media.createSpeech({ ...input, id: "speech-queued" }, { kind: "owner" });
+      yield* media.createSpeech({ ...input, id: "speech-queued" }, { kind: "user" });
       const before = provider.status();
       yield* provider.update({
         ...before,
         connections: before.connections.map(({ key: _key, ...connection }) => ({ ...connection, key: "rotated-test-key" })),
         speech: { connection: "moss", model: "moss-tts-1.0-pro" },
       });
-      const speechCreatedFailure = yield* media.createSpeech({ ...input, id: "stale" }, { kind: "owner" }).pipe(Effect.flip);
+      const speechCreatedFailure = yield* media.createSpeech({ ...input, id: "stale" }, { kind: "user" }).pipe(Effect.flip);
       expect(speechCreatedFailure).toMatchObject({ _tag: "Refused" });
       yield* Deferred.succeed(release, undefined);
       expect((yield* waitFor(media.get("speech-queued"), (job) => job.phase === "ready", "frozen speech completed")).model).toBe("moss-tts-1.5-flash");
-      yield* media.createSpeech({ ...input, id: "speech-fresh", revision: provider.status().revision }, { kind: "owner" });
+      yield* media.createSpeech({ ...input, id: "speech-fresh", revision: provider.status().revision }, { kind: "user" });
       expect((yield* waitFor(media.get("speech-fresh"), (job) => job.phase === "ready", "fresh speech completed")).model).toBe("moss-tts-1.0-pro");
       expect(keys).toEqual(["Bearer test-private-key", "Bearer test-private-key", "Bearer rotated-test-key"]);
     }).pipe(Effect.provide(layer(http)));
@@ -278,7 +278,7 @@ it.effect("regression: canceling an old speech download cannot cancel its explic
     yield* Effect.gen(function* () {
       yield* configured();
       const media = yield* Media;
-      yield* media.createSpeech(input, { kind: "owner" });
+      yield* media.createSpeech(input, { kind: "user" });
       yield* Deferred.await(started);
       const cancel = yield* media.cancel(input.id).pipe(Effect.forkChild);
       expect((yield* waitFor(media.get(input.id), (job) => job.phase === "canceled", "speech waiting canceled")).canRetryDownload).toBe(true);
@@ -303,18 +303,18 @@ it.effect("speech shares image capacity and the ID namespace without sending can
       yield* configured();
       const media = yield* Media;
       const image: T.MediaImageRequest = { id: "shared-image", prompt: "A farm", format: "text", width: 256, height: 256, enhance: false, watermark: true };
-      yield* media.createImage(image, { kind: "owner" });
+      yield* media.createImage(image, { kind: "user" });
       yield* Deferred.await(started);
-      const speechCreatedFailure = yield* media.createSpeech({ ...input, id: image.id }, { kind: "owner" }).pipe(Effect.flip);
+      const speechCreatedFailure = yield* media.createSpeech({ ...input, id: image.id }, { kind: "user" }).pipe(Effect.flip);
       expect(speechCreatedFailure).toMatchObject({ _tag: "Refused" });
-      for (let index = 0; index < 7; index++) yield* media.createSpeech({ ...input, id: `queued-${index}` }, { kind: "owner" });
-      const imageCreatedFailure = yield* media.createImage({ ...image, id: "queued-0" }, { kind: "owner" }).pipe(Effect.flip);
+      for (let index = 0; index < 7; index++) yield* media.createSpeech({ ...input, id: `queued-${index}` }, { kind: "user" });
+      const imageCreatedFailure = yield* media.createImage({ ...image, id: "queued-0" }, { kind: "user" }).pipe(Effect.flip);
       expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
-      const speechCreatedFailure2 = yield* media.createSpeech(input, { kind: "owner" }).pipe(Effect.flip);
+      const speechCreatedFailure2 = yield* media.createSpeech(input, { kind: "user" }).pipe(Effect.flip);
       expect(speechCreatedFailure2).toMatchObject({ _tag: "Refused" });
       for (let index = 0; index < 7; index++) expect((yield* media.cancel(`queued-${index}`)).phase).toBe("canceled");
       yield* media.cancel(image.id);
-      expect((yield* media.createSpeech({ ...input, id: "queued-0" }, { kind: "owner" })).phase).toBe("canceled");
+      expect((yield* media.createSpeech({ ...input, id: "queued-0" }, { kind: "user" })).phase).toBe("canceled");
       expect(calls).toBe(1);
     }).pipe(Effect.provide(layer(http)));
   }),
@@ -329,12 +329,12 @@ it.effect.each([400, 503])("HTTP %i speech outcomes never resubmit synthesis", (
   return Effect.gen(function* () {
     yield* configured();
     const media = yield* Media;
-    yield* media.createSpeech(input, { kind: "owner" });
+    yield* media.createSpeech(input, { kind: "user" });
     const job = yield* waitFor(media.get(input.id), (row) => row.phase === (status === 400 ? "failed" : "unknown"), "speech failure recorded");
     yield* notIn(job, "private upstream error");
     const downloadRetriedFailure = yield* media.retryDownload(input.id).pipe(Effect.flip);
     expect(downloadRetriedFailure).toMatchObject({ _tag: "Refused" });
-    yield* media.createSpeech(input, { kind: "owner" });
+    yield* media.createSpeech(input, { kind: "user" });
     expect(calls).toBe(1);
   }).pipe(Effect.provide(layer(http)));
 });
@@ -358,11 +358,11 @@ it.effect("regression: canceling synthesis stops local waiting without granting 
     yield* Effect.gen(function* () {
       yield* configured();
       const media = yield* Media;
-      yield* media.createSpeech(input, { kind: "owner" });
+      yield* media.createSpeech(input, { kind: "user" });
       yield* Deferred.await(started);
       expect((yield* media.cancel(input.id)).phase).toBe("canceled");
       expect(interrupted).toBe(true);
-      expect((yield* media.createSpeech(input, { kind: "owner" })).phase).toBe("canceled");
+      expect((yield* media.createSpeech(input, { kind: "user" })).phase).toBe("canceled");
       const downloadRetriedFailure = yield* media.retryDownload(input.id).pipe(Effect.flip);
       expect(downloadRetriedFailure).toMatchObject({ _tag: "Refused" });
       expect(calls).toBe(1);
@@ -377,14 +377,14 @@ it.effect("regression: stopping the service during speech submission retains unc
     const http = HttpClient.make(() => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)));
     yield* Effect.gen(function* () {
       yield* configured();
-      yield* (yield* Media).createSpeech(input, { kind: "owner" });
+      yield* (yield* Media).createSpeech(input, { kind: "user" });
       yield* Deferred.await(started);
     }).pipe(Effect.provide(layer(http, downloaded, config)));
     yield* Effect.gen(function* () {
       const media = yield* Media;
       yield* media.restore();
       expect((yield* media.get(input.id)).phase).toBe("unknown");
-      expect((yield* media.createSpeech(input, { kind: "owner" })).phase).toBe("unknown");
+      expect((yield* media.createSpeech(input, { kind: "user" })).phase).toBe("unknown");
       const downloadRetriedFailure = yield* media.retryDownload(input.id).pipe(Effect.flip);
       expect(downloadRetriedFailure).toMatchObject({ _tag: "Refused" });
     }).pipe(
@@ -404,13 +404,13 @@ it.effect("regression: autonomous callers, invalid voices and unsupported Pro pa
     yield* configured("moss-tts-1.0-pro");
     const media = yield* Media;
     const speechCreatedFailure = yield* media
-      .createSpeech(input, { kind: "orchestrator", agent: "agent", channel: "channel", forOwner: false })
+      .createSpeech(input, { kind: "orchestrator", agent: "agent", channel: "channel", forUser: false })
       .pipe(Effect.flip);
     expect(speechCreatedFailure).toMatchObject({
       _tag: "Refused",
     });
     for (const patch of [{ voice: "../voice" }, { text: " " }, { text: "Hello [pause 1s] world" }]) {
-      const invalidFailure = yield* media.createSpeech({ ...input, ...patch }, { kind: "owner" }).pipe(Effect.flip);
+      const invalidFailure = yield* media.createSpeech({ ...input, ...patch }, { kind: "user" }).pipe(Effect.flip);
       expect(invalidFailure).toMatchObject({ _tag: "Refused" });
     }
     const medias = yield* media.list();
@@ -420,7 +420,7 @@ it.effect("regression: autonomous callers, invalid voices and unsupported Pro pa
 
 it.effect("speech source and completed attachment survive restart without accepting a different caller", () => {
   const config = testConfig({ db: "" });
-  const caller: MediaCaller = { kind: "orchestrator", agent: "speech-agent", channel: "speech-channel", forOwner: true };
+  const caller: MediaCaller = { kind: "orchestrator", agent: "speech-agent", channel: "speech-channel", forUser: true };
   const source = { kind: "orchestrator", agent: "speech-agent", channel: "speech-channel" };
   return Effect.gen(function* () {
     const saved = yield* Effect.gen(function* () {
@@ -440,7 +440,7 @@ it.effect("speech source and completed attachment survive restart without accept
       expect(media2).toEqual(saved);
       const speechCreated = yield* media.createSpeech(input, caller);
       expect(speechCreated).toEqual(saved);
-      const speechCreatedFailure = yield* media.createSpeech(input, { kind: "owner" }).pipe(Effect.flip);
+      const speechCreatedFailure = yield* media.createSpeech(input, { kind: "user" }).pipe(Effect.flip);
       expect(speechCreatedFailure).toMatchObject({ _tag: "Refused" });
       const speechCreatedFailure2 = yield* media.createSpeech(input, { ...caller, channel: "another-channel" }).pipe(Effect.flip);
       expect(speechCreatedFailure2).toMatchObject({ _tag: "Refused" });
@@ -465,7 +465,7 @@ it.effect("restart cancels unsent speech, marks uncertainty and resumes only per
         q.insertSpeech({
           id: phase,
           request: yield* json({ ...input, id: phase }),
-          source: yield* json({ kind: "owner" }),
+          source: yield* json({ kind: "user" }),
           connection: input.connection,
           revision: input.revision,
           model: "moss-tts-1.5-flash",
@@ -524,7 +524,7 @@ it.effect("regression: disconnecting the speech submitter cannot strand an admit
     });
     const built = yield* Layer.build(Layer.fresh(Media.layer).pipe(Layer.provide(Layer.succeed(Core, delayed))));
     const media = Context.get(built, Media);
-    const request = yield* media.createSpeech(input, { kind: "owner" }).pipe(Effect.forkChild);
+    const request = yield* media.createSpeech(input, { kind: "user" }).pipe(Effect.forkChild);
     yield* Deferred.await(admitted);
     const interrupt = yield* Fiber.interrupt(request).pipe(Effect.forkChild);
     yield* Effect.yieldNow;
@@ -571,7 +571,7 @@ it.effect("regression: asynchronous speech persists its task before polling and 
     yield* Effect.gen(function* () {
       yield* configured();
       const media = yield* Media;
-      yield* media.createSpeech({ ...input, asynchronous: true }, { kind: "owner" });
+      yield* media.createSpeech({ ...input, asynchronous: true }, { kind: "user" });
       yield* Deferred.await(polling);
       const found = yield* (yield* Db).one(q.speech({ id: input.id }));
       expect(found).toMatchObject({ phase: "generating", remote_task: "remote-speech" });
@@ -596,7 +596,7 @@ it.effect("regression: restart never queries a known asynchronous task with repl
       q.insertSpeech({
         id: input.id,
         request: yield* json({ ...input, asynchronous: true }),
-        source: yield* json({ kind: "owner" }),
+        source: yield* json({ kind: "user" }),
         connection: input.connection,
         revision: input.revision,
         model: "moss-tts-1.5-flash",
@@ -649,7 +649,7 @@ it.effect("regression: Flash delivers PCM before completion and saves actual met
     yield* Effect.gen(function* () {
       yield* configured();
       const media = yield* Media;
-      yield* media.createSpeech({ ...input, streaming: true, format: "pcm" }, { kind: "owner" });
+      yield* media.createSpeech({ ...input, streaming: true, format: "pcm" }, { kind: "user" });
       const events: T.MediaSpeechEvent[] = [];
       const reader = yield* (yield* media.speechEvents(input.id)).pipe(
         Stream.runForEach((event) =>
@@ -699,7 +699,7 @@ it.effect("regression: EOF is not Flash completion and the received partial WAV 
   return Effect.gen(function* () {
     yield* configured();
     const media = yield* Media;
-    yield* media.createSpeech({ ...input, streaming: true, format: "pcm" }, { kind: "owner" });
+    yield* media.createSpeech({ ...input, streaming: true, format: "pcm" }, { kind: "user" });
     const events = yield* (yield* media.speechEvents(input.id)).pipe(Stream.runCollect);
     expect(events.some((event) => event.type === "done")).toBe(false);
     const partial = yield* media.get(input.id);
@@ -707,7 +707,7 @@ it.effect("regression: EOF is not Flash completion and the received partial WAV 
   }).pipe(Effect.provide(layer(http)));
 });
 
-it.effect("regression: large speech is a pinned owner-readable asset and survives restart without attachment Base64", () => {
+it.effect("regression: large speech is a pinned user-readable asset and survives restart without attachment Base64", () => {
   const config = testConfig({ db: "" });
   const bytes = wav((26 * 1024 * 1024 - 44) / 2);
   const large = HttpClient.make((request) =>
@@ -731,7 +731,7 @@ it.effect("regression: large speech is a pinned owner-readable asset and survive
     const saved = yield* Effect.gen(function* () {
       yield* configured();
       const media = yield* Media;
-      yield* media.createSpeech(input, { kind: "owner" });
+      yield* media.createSpeech(input, { kind: "user" });
       const ready = yield* waitFor(media.get(input.id), (job) => !job.canCancel, "large speech saved");
       expect(ready.phase, ready.problem).toBe("ready");
       if (ready.kind !== "speech" || !ready.resultInput) return yield* Effect.die("Expected large speech asset");
@@ -758,7 +758,7 @@ it.effect("regression: large speech is a pinned owner-readable asset and survive
       expect(released).toMatchObject({ id: input.id, phase: "ready", resultInput: null, canRelease: false, voice: input.voice });
       const inputFailure = yield* media.inputs.get(saved.resultInput.id).pipe(Effect.flip);
       expect(inputFailure).toMatchObject({ _tag: "Refused" });
-      const speechCreated = yield* media.createSpeech(input, { kind: "owner" });
+      const speechCreated = yield* media.createSpeech(input, { kind: "user" });
       expect(speechCreated).toEqual(released);
       const previewRelease2 = yield* media.previewRelease(input.id);
       expect(previewRelease2).toEqual({ does: [] });

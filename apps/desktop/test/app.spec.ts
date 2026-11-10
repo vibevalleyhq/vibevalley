@@ -36,7 +36,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   const userData = join(dir, "electron");
   const app = await electron.launch({
-    // Electron applies this before main.ts requests its single-instance lock; the owner's running app has another profile.
+    // Electron applies this before main.ts requests its single-instance lock; the user's running app has another profile.
     args: [`--user-data-dir=${userData}`, join(import.meta.dirname, "..")],
     env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work"), VIBEVALLEY_DESKTOP_PROBE: "1" },
   });
@@ -394,7 +394,7 @@ test("the island follows the issues in flight and opens one", async () => {
 
     const fox = await api.agent.create(scripted);
     const repo = await api.repo.create({ name: "clock" });
-    // The scripted helper asks with options when its job says ask-first: the issue waits on the owner.
+    // The scripted helper asks with options when its job says ask-first: the issue waits on the user.
     const made = await api.issue.create({ title: "打卡页先问清楚，给选项", repo: repo.name, agent: fox.id });
     await api.issue.status.update({ id: made.id, status: "todo" });
     await expect

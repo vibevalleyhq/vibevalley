@@ -213,7 +213,7 @@ describe("settings", () => {
           Effect.gen(function* () {
             const s = yield* Setting;
             expect(s.agora()).toBeUndefined();
-            // A save after it writes a new file; the one set aside keeps the owner's bytes.
+            // A save after it writes a new file; the one set aside keeps the user's bytes.
             yield* s.save({ dictation: { via: "own", url: "http://127.0.0.1:1/v1", model: "m" } });
           }),
         );

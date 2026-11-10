@@ -1,15 +1,15 @@
 import { maybe, t } from "@vibevalley/i18n";
-import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { everyone, defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { mentionLead } from "@vibevalley/protocol/rules";
 // The chat's names for who is not a helper; defaultOrchestrator is filled in where the place is known.
 export const chatNamed: Readonly<Record<string, string>> = {
   管家: defaultOrchestrator,
-  主人: ownerId,
+  主人: userId,
   所有人: everyone,
   // @manager is what the English page says for the orchestrator (server.channel.mention.orchestrator); @orchestrator already names the
   // default by its profile id.
   manager: defaultOrchestrator,
-  owner: ownerId,
+  user: userId,
   everyone,
 };
 

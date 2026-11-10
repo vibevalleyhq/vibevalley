@@ -95,7 +95,7 @@ export const MarkUnreadParams = Schema.Struct({
 export type MarkUnreadParams = typeof MarkUnreadParams.Type
 
 
-export const MarkUnreadSql = "-- name: MarkUnread :exec\n-- The owner's read moved back to just before a message, even past where it was.\ninsert into channel_read_cursor (participant_id, channel_id, read_number, updated_at)\nvalues ('owner', $1, $2, $3)\non conflict (participant_id, channel_id) do update set read_number = excluded.read_number, updated_at = excluded.updated_at;"
+export const MarkUnreadSql = "-- name: MarkUnread :exec\n-- The user's read moved back to just before a message, even past where it was.\ninsert into channel_read_cursor (participant_id, channel_id, read_number, updated_at)\nvalues ('user', $1, $2, $3)\non conflict (participant_id, channel_id) do update set read_number = excluded.read_number, updated_at = excluded.updated_at;"
 
 export const markUnread = Effect.fn("MarkUnread")(function* (params: MarkUnreadParams) {
   const sql = yield* SqlClient.SqlClient

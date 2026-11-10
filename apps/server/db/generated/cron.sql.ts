@@ -30,7 +30,7 @@ export const CronsResult = Schema.Struct({
 export type CronsResult = typeof CronsResult.Type
 
 
-export const CronsSql = "-- name: Crons :many\n-- bound: a row per cron the owner or the orchestrator set.\nselect * from cron order by id;"
+export const CronsSql = "-- name: Crons :many\n-- bound: a row per cron the user or the orchestrator set.\nselect * from cron order by id;"
 
 export const crons = Effect.fn("Crons")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -57,7 +57,7 @@ export const AddCronParams = Schema.Struct({
 export type AddCronParams = typeof AddCronParams.Type
 
 
-export const AddCronSql = "-- name: AddCron :exec\n-- One waiting for the owner is stored off (pending).\ninsert into cron (id, name, body, channel_id, agent, repo, spec, tz, enabled, set_by, pending, created_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8,\n        not $9::boolean, $10, $9, $11);"
+export const AddCronSql = "-- name: AddCron :exec\n-- One waiting for the user is stored off (pending).\ninsert into cron (id, name, body, channel_id, agent, repo, spec, tz, enabled, set_by, pending, created_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8,\n        not $9::boolean, $10, $9, $11);"
 
 export const addCron = Effect.fn("AddCron")(function* (params: AddCronParams) {
   const sql = yield* SqlClient.SqlClient
@@ -75,7 +75,7 @@ export const CronRanParams = Schema.Struct({
 export type CronRanParams = typeof CronRanParams.Type
 
 
-export const CronRanSql = "-- name: CronRan :exec\n-- Turned on is the owner's yes: it waits no more.\nupdate cron set last_run = $1, enabled = $2, pending = pending and not $2::boolean where id = $3;"
+export const CronRanSql = "-- name: CronRan :exec\n-- Turned on is the user's yes: it waits no more.\nupdate cron set last_run = $1, enabled = $2, pending = pending and not $2::boolean where id = $3;"
 
 export const cronRan = Effect.fn("CronRan")(function* (params: CronRanParams) {
   const sql = yield* SqlClient.SqlClient

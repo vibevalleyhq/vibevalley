@@ -80,7 +80,7 @@
     "typing": "typing…",
     "foldDispatch": "Fold the dispatch",
     "unfoldDispatch": "Unfold the dispatch",
-    "owner": "Owner",
+    "user": "Owner",
     "dispatch": "Sent work",
     "spent": "This round spent {spent}",
     "unread": "{n} new",
@@ -127,7 +127,7 @@
   "members": {
     "open": "Members",
     "title": "Members",
-    "owner": "Owner",
+    "user": "Owner",
     "none": "No helpers here yet",
     "inChannel": "A manager in the channel"
   },
@@ -155,7 +155,7 @@
     "membersHint": "The managers in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
     "notify": "Notify",
     "notifyAll": "All",
-    "notifyMentions": "Only @owner",
+    "notifyMentions": "Only @user",
     "notifyNone": "Nothing",
     "notifyHint": "Nothing means no unread count, no Inbox and nothing forwarded to WeChat",
     "archive": "Archive",
@@ -237,7 +237,7 @@
     "thread": "Thread",
     "mention": {
       "orchestrator": "@manager",
-      "owner": "@owner",
+      "user": "@user",
       "everyone": "@everyone"
     },
     "orchestratorNote": "sends work, splits plans, answers how it goes",

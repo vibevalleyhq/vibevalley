@@ -201,7 +201,7 @@ describe("templates", () => {
         }
   });
 
-  it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {
+  it("issue.list's filter keeps the open ones by default, and what waits on the user the longest waiting first", () => {
     const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
       ({ title, status, repo: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
     const waiting = (since: number) => ({ stage: { state: "reviewing" as const, acts: [], since } });
@@ -218,7 +218,7 @@ describe("templates", () => {
     expect(titles({ status: "done" })).toEqual(["老的"]);
     expect(titles({ text: "修登录 页面" })).toEqual(["修登录 页面"]);
     expect(titles({ repo: "web" })).toEqual(["别处的"]);
-    expect(titles({ wantsOwner: true })).toEqual(["修登录 页面", "修登录 按钮"]);
+    expect(titles({ wantsUser: true })).toEqual(["修登录 页面", "修登录 按钮"]);
   });
 
   it("recent titles are the repo's own sent issues", () => {

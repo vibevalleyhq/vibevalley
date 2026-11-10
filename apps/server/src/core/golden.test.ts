@@ -5,7 +5,7 @@ import { Formatter } from "effect";
 import { describe, expect, test } from "vite-plus/test";
 
 import type { Channel, SpaceState, Fact, Issue, Cron, CronRequest, Session, Conflict } from "@vibevalley/protocol";
-import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, phaseText, stageWantsUser } from "@vibevalley/protocol/rules";
 import { jsonDiff } from "@vibevalley/testkit/golden";
 
 import { targetOf } from "#/channel/messages.ts";
@@ -80,7 +80,7 @@ describe("the golden files", () => {
         const last = latestSessionIdOf(t);
         const h = last === undefined ? undefined : next.sessions.find((s) => s.id === last);
         if (!h || t.parent) continue;
-        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: stageWantsOwner(t.stage.state) });
+        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: stageWantsUser(t.stage.state) });
       }
       state = next;
     });

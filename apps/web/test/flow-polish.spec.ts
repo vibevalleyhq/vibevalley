@@ -10,7 +10,7 @@ const fox: Agent = {
   role: "worker",
   duty: "",
   enabled: true,
-  // The test server's pi is the scripted helper (fixtures.ts); ask-first has it ask the owner.
+  // The test server's pi is the scripted helper (fixtures.ts); ask-first has it ask the user.
   runtime: "pi",
   model: "",
   effort: "",
@@ -26,7 +26,7 @@ const fox: Agent = {
   look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
-test("a dispatch links its issue, and what waits on the owner is counted on the rail and in the title", async ({ page, api }) => {
+test("a dispatch links its issue, and what waits on the user is counted on the rail and in the title", async ({ page, api }) => {
   const helper = await api.agent.create(fox);
   const repo = await api.repo.create({ name: "polish" });
   const made = await api.issue.create({ title: "打卡页先问清楚", repo: repo.name, agent: helper.id });

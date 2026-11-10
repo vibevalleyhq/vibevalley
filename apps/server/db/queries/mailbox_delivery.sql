@@ -46,11 +46,11 @@ where session_id = sqlc.arg(session_id) and state in ('pending', 'handed');
 
 -- name: AgentWakesByScope :many
 -- bound: a row per routing scope.
-with owners as (
-  select scope, max(position) as position from mailbox_owner_route group by scope
+with users as (
+  select scope, max(position) as position from mailbox_user_route group by scope
 )
 select d.scope, count(*)::int as n from mailbox_delivery d
-left join owners o on o.scope = d.scope
+left join users o on o.scope = d.scope
 where d.position > coalesce(o.position, 0)
   and d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null
 group by d.scope;
@@ -82,6 +82,6 @@ returning session_id;
 -- Who a message is still waiting to be handed to.
 select session_id from mailbox_delivery where message_id = sqlc.arg(message_id) and state in ('pending', 'handed');
 
--- name: LastOwnerRoutes :many
--- bound: one owner epoch per routing scope, including returned deliveries.
-select scope, max(position)::int as position from mailbox_owner_route group by scope;
+-- name: LastUserRoutes :many
+-- bound: one user epoch per routing scope, including returned deliveries.
+select scope, max(position)::int as position from mailbox_user_route group by scope;

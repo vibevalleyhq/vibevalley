@@ -24,7 +24,7 @@ export const groupingLabel: Record<Grouping, string> = {
   none: t("web.issue.boardLabels.grouping.none"),
 };
 
-/** `manual` keeps the order the rows came in: the history's, which for todo is the owner's own order. */
+/** `manual` keeps the order the rows came in: the history's, which for todo is the user's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
 export const orderings = ["manual", "priority", "updated", "created"] as const satisfies readonly Ordering[];
 export const orderingLabel: Record<Ordering, string> = {
@@ -149,7 +149,7 @@ function closedAt(c: BoardCard) {
   }
 }
 
-/** A lane's cards in the order the owner picked; the closed lane by default newest closed first. */
+/** A lane's cards in the order the user picked; the closed lane by default newest closed first. */
 export function laneOrder(lane: Lane, cards: BoardCard[], ordering: Ordering) {
   if (lane === "closed" && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
   return orderRows(cards, ordering, rowKeys);

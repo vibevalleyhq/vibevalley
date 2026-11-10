@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures";
 // A server of its own: the language is the whole farm's, and every other file reads the Chinese.
 test.use({ farm: "english" });
 
-test("the farm speaks English once the owner picks it, and Chinese again", async ({ page, api }) => {
+test("the farm speaks English once the user picks it, and Chinese again", async ({ page, api }) => {
   await api.issue.create({ title: "Add paging to clock-in" });
   await page.goto("/settings/general");
   const language = page.getByTestId("language");
@@ -36,7 +36,7 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   await expect(page.getByTestId("rail")).toBeVisible();
 });
 
-// Every page, in English, has no Chinese left but what the owner stored and the language picker's own the Chinese label: a word left out of the catalogs, or one the server worked out in Chinese and kept, shows here.
+// Every page, in English, has no Chinese left but what the user stored and the language picker's own the Chinese label: a word left out of the catalogs, or one the server worked out in Chinese and kept, shows here.
 test("no page of an English farm shows Chinese of its own", async ({ page, api }) => {
   await api.setting.update({ locale: "en" });
   const issue = await api.issue.create({ title: "Count the clock-ins" });

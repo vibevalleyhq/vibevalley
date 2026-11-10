@@ -160,7 +160,7 @@ export function completionAt(value: string, caret: number): Completion | undefin
   return tag ? { kind: "tag", query: tag[1] ?? "", from: caret - (tag[1] ?? "").length - 1 } : undefined;
 }
 
-/** A trigger the owner closed with Escape: its list stays shut while the caret is in it. */
+/** A trigger the user closed with Escape: its list stays shut while the caret is in it. */
 export interface Shut {
   readonly kind: CompletionKind;
   readonly from: number;

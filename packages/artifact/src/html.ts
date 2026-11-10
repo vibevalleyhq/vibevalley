@@ -10,7 +10,7 @@ import { HtmlShellMessage } from "@vibevalley/protocol/schema";
 export const artifactMax = 5 * 1024 * 1024;
 const artifactTitleMax = 80;
 
-/** Why a title, a kind or a hand-in's size is refused, in the owner's words. "" when they are right. */
+/** Why a title, a kind or a hand-in's size is refused, in the user's words. "" when they are right. */
 export function artifactProblem(a: { readonly title?: string; readonly kind?: string; readonly size?: number }): string {
   if (a.title !== undefined) {
     const n = [...a.title.trim()].length;
@@ -120,7 +120,7 @@ const decodeShellMessage = Schema.decodeUnknownOption(HtmlShellMessage);
 const wordsMax = 10_000;
 const contextMax = 64;
 
-/** The words the owner selected, as the message tells of them; undefined when it is no such message. */
+/** The words the user selected, as the message tells of them; undefined when it is no such message. */
 export function selectionOf(data: unknown): HtmlAnchor | undefined {
   const anchor = Option.getOrUndefined(decodeShellMessage(data))?.anchor;
   if (!anchor) return undefined;
@@ -397,7 +397,7 @@ function refusalText(f: HtmlRefusal): string {
 
 const shownMax = 8;
 
-/** Why a page is refused, in the owner's words; "" when it may be kept. */
+/** Why a page is refused, in the user's words; "" when it may be kept. */
 export function htmlProblem(check: HtmlCheck): string {
   if (check.refused.length === 0) return "";
   const shown = check.refused.slice(0, shownMax).map((f) => "\n- " + refusalText(f));

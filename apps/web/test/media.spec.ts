@@ -77,7 +77,7 @@ test("regression: an image is generated, saved, published once and referenced by
   await expect.poll(() => card.getByTestId("media-image").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(256);
   const ready = await api.media.job.get({ id: job.id });
   if (ready.kind !== "image") throw new Error("Expected image task");
-  expect(ready.source).toEqual({ kind: "owner" });
+  expect(ready.source).toEqual({ kind: "user" });
   expect(ready.usage).toEqual({ images: 1, width: 256, height: 256 });
   await expect(card.getByTestId("media-usage")).not.toBeEmpty();
   const downloaded = page.waitForEvent("download");

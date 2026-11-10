@@ -1,7 +1,7 @@
 import { Clock, Duration, Effect, Option, PubSub, Random, Schedule, Schema, Semaphore, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
-import { dayMs, ownerId } from "@vibevalley/protocol";
+import { dayMs, userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
@@ -38,7 +38,7 @@ interface BlockStore {
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
   readonly fill: (id: T.ArtifactId, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
   readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-  /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. */
+  /** A batch of ops from actor (the user, or a helper's profile id), in order, in one transaction. */
   readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
   /** A new block at the end of the top level, as actor; text is inline Markdown (code takes it as it is). */
   readonly append: (
@@ -68,9 +68,9 @@ interface BlockStore {
   readonly follow: (id: T.ArtifactId, after: number) => Stream.Stream<T.ArtifactEvent, ApiError>;
   /** An artifact's suggestions, oldest first. */
   readonly suggestions: (id: T.ArtifactId) => Effect.Effect<T.Suggestion[], ApiError>;
-  /** An agent proposes a change to a block the owner wrote. */
+  /** An agent proposes a change to a block the user wrote. */
   readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError>;
-  /** The owner takes a suggestion, if the block still stands at the rev it was read at. */
+  /** The user takes a suggestion, if the block still stands at the rev it was read at. */
   readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
   readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
   /** The whole list now, then after each change (artifact.suggestion.follow). */
@@ -340,7 +340,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       const block = S.blockId(req.block.trim());
       const now = (yield* blocksOf(artifact)).find((b) => b.id === block);
       if (!now) return yield* Effect.fail(refused(t("server.artifact.op.noBlock", { id: block })));
-      if (actor !== ownerId && now.updatedBy === ownerId) {
+      if (actor !== userId && now.updatedBy === userId) {
         const wanted = req.type?.trim();
         if (wanted !== undefined && !isAppendType(wanted)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
         const attrs: T.BlockAttrs = {};
@@ -384,7 +384,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
     const deleteBlock = Effect.fn("Artifact.deleteBlock")(function* (artifact: T.ArtifactId, actor: string, req: T.BlockDelete) {
       const block = S.blockId(req.block.trim());
       const now = (yield* blocksOf(artifact)).find((b) => b.id === block);
-      if (now && actor !== ownerId && now.updatedBy === ownerId) {
+      if (now && actor !== userId && now.updatedBy === userId) {
         const made = yield* suggest(artifact, actor, { block, baseRev: now.rev, change: { delete: true } });
         return {
           status: "rejected" as const,
@@ -617,7 +617,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
         for (let n = 1; n <= demoPieces; n++) {
           yield* wait(1);
           const [, r] = yield* updateText(artifact, writer, b.id, rev, chars.slice(0, Math.floor((chars.length * n) / demoPieces)).join(""));
-          // The owner wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
+          // The user wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
           if (r?.status !== "applied") break;
           rev = r.rev ?? rev;
         }

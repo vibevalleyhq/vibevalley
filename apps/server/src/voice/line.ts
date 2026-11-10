@@ -28,7 +28,7 @@ export interface Tunnel {
   readonly close: () => void;
 }
 
-/** Why the voice line cannot be had now; the message is the owner's. */
+/** Why the voice line cannot be had now; the message is the user's. */
 export class LineFailed extends Schema.TaggedError<LineFailed, { readonly brand: unique symbol }>()("LineFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),

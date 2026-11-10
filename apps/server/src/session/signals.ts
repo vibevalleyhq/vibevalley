@@ -47,7 +47,7 @@ export interface Returned {
 export interface DeliveryInput {
   readonly trigger: T.RunTrigger;
   readonly envelopeIds: readonly string[];
-  readonly byOwnerComment: boolean;
+  readonly byUserComment: boolean;
 }
 
 /** Everything Session tells, in the order it happened: a helper hired, reported or gone (with the session as it stood

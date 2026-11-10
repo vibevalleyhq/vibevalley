@@ -52,7 +52,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
   };
 
   const deliver = (recipient: string, text: string, rows: readonly DeliveryRow[]): Effect.Effect<Delivered> => {
-    const first = rows.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0];
+    const first = rows.findLast((row) => row.payload.trigger.actor.kind === "user") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0];
     if (!first) return Effect.succeed({ kind: "refused", reason: "empty" });
     return sessions.deliver(recipient, text, {
       trigger:
@@ -60,7 +60,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
           ? { ...first.payload.trigger.meta.trigger, message: first.envelope_id }
           : { kind: "comment", message: first.envelope_id, ...(first.channel_id ? { channel: first.channel_id } : {}) },
       envelopeIds: rows.map((row) => row.envelope_id),
-      byOwnerComment: rows.some((row) => row.payload.trigger.actor.kind === "owner"),
+      byUserComment: rows.some((row) => row.payload.trigger.actor.kind === "user"),
     });
   };
 
@@ -75,7 +75,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         ([scope, allowed]) =>
           Effect.gen(function* () {
             const grouped = rows.filter((row) => row.scope === scope && row.state === "pending");
-            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? allowed[0];
+            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "user") ?? allowed[0];
             if (!primary) return;
             const messages = grouped.map(ports.message);
             yield* Effect.forEach(grouped, (row) => ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now), { discard: true });
