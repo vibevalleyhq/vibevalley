@@ -30,20 +30,18 @@ import { callbackLog } from "#/infra/log.ts";
 import { sameSecret, tidyName, User } from "#/user/user.ts";
 import * as lanQ from "#db/lan.sql.ts";
 
-/** A device's asking gets as long again for the user to answer. */
 const pairingForMs = 2 * 60_000;
 const wrongTries = 5;
 
-/** The header the listener says a device by, to the loopback server; never taken from the device. */
+/** Identifies the authenticated LAN device to the loopback server; never accepted from incoming requests. */
 export const deviceHeader = "x-vibevalley-lan-device";
-/** Set on everything the listener hands on, keyed or not: the loopback server's sign that a request came from outside. */
+/** Marks every forwarded request so the loopback server distinguishes LAN traffic from local loopback callers. */
 export const outsideHeader = "x-vibevalley-outside";
-/** The address the gate saw a request come from, for the user to judge a sign-in by; never taken from the device. */
+/** Peer address seen by the LAN listener; never accepted from incoming requests. */
 export const fromHeader = "x-vibevalley-from";
 
 const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
 
-/** The loopback server could not be reached, or its answer could not be streamed back to the device. */
 class ForwardFailed extends Schema.TaggedError<ForwardFailed, { readonly brand: unique symbol }>()("ForwardFailed", {
   message: Schema.String,
   cause: Schema.Defect(),
@@ -74,19 +72,15 @@ export class Lan extends Context.Service<
     readonly setOpen: (open: boolean) => Effect.Effect<LanStatus, ApiError>;
     readonly startPairing: () => Effect.Effect<LanStatus, ApiError>;
     readonly stopPairing: () => LanStatus;
-    /** What stopPairing would do; nothing changes. */
     readonly previewStopPairing: () => Preview;
-    /** The code is used up either way. */
     readonly answer: (allow: boolean) => Effect.Effect<LanStatus, ApiError>;
     readonly pair: (code: string, name: string) => Effect.Effect<LanPaired, ApiError>;
-    /** Where the loopback server listens, once it does. */
     readonly setUpstream: (address: string) => void;
   }
 >()("@vibevalley/server/lan/lan") {
   static readonly layer = (options?: LanOptions) => Layer.effect(Lan, make(options));
 }
 
-/** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
 function lanAddress(): string {
   let best = "";
   let rank = 3;
@@ -102,7 +96,6 @@ function lanAddress(): string {
   return best;
 }
 
-/** The page's pairing route on the listener; a phone's camera opens it in the browser. */
 const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
 
 const keyOf = (req: IncomingMessage) => {
@@ -115,7 +108,7 @@ const keyOf = (req: IncomingMessage) => {
   return "";
 };
 
-/** Who is asking: the peer, or the first X-Forwarded-For hop when the peer is a proxy on this computer (TLS in front). */
+/** Trusts X-Forwarded-For only when the immediate peer is a local TLS proxy on loopback. */
 const clientOf = (req: IncomingMessage) => {
   const peer = Str.replace(/^::ffff:/u, "")(req.socket.remoteAddress ?? "");
   const forwarded = req.headers["x-forwarded-for"];
@@ -123,14 +116,13 @@ const clientOf = (req: IncomingMessage) => {
   return (peer === "127.0.0.1" || peer === "::1") && first !== "" ? first : peer;
 };
 
-/** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
+/** Stripped so credentials stay at the listener and callers cannot spoof internal headers. */
 const dropped = new Set(["host", "connection", "cookie", "authorization", "origin", "sec-fetch-site", deviceHeader, outsideHeader, fromHeader]);
 
 export const sameOrigin = (headers: Readonly<Record<string, string | string[] | undefined>> & { readonly host?: string | undefined }) =>
   (headers.origin === undefined || headers.origin === `http://${headers.host ?? ""}`) &&
   (headers["sec-fetch-site"] === undefined || headers["sec-fetch-site"] === "same-origin" || headers["sec-fetch-site"] === "none");
 
-/** The endpoints a device may call, the three streams and the files said in the chat; any other request is refused. */
 const remote = new Set([
   ...endpoints.filter((e) => e.can.includes("remote")).map((e) => "POST " + pathOf(e.op)),
   ...[statePath, eventsPath, livePath].map((path) => "GET " + path),
@@ -143,8 +135,6 @@ const loginPath = pathOf("user.login");
 const logoutPath = pathOf("user.logout");
 const passwordPath = pathOf("user.password.set");
 
-/** Let through with no key: pairing, signing in (with the password, or by asking to be approved), and whether there is
- * anything to sign in to. */
 const keyless = new Set([
   "POST " + pathOf("lan.pair"),
   "POST " + loginPath,
@@ -153,38 +143,34 @@ const keyless = new Set([
   "POST " + pathOf("user.approval.collect"),
 ]);
 
-/** A signed-in device is the user everywhere but the password, which is set only at the machine. */
+/** Password changes require loopback access even for signed-in devices. */
 const loginMay = (method: string, path: string) => !(method === "POST" && path === passwordPath);
 
 export interface LanOptions {
   readonly address?: () => string;
-  /** The host the listener binds; every interface when absent. */
   readonly host?: string;
 }
 
 const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
-    // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
     const db = yield* Db;
     const users = yield* User;
     const http = yield* HttpClient.HttpClient;
     const address = options.address ?? lanAddress;
-    // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     const now = () => clock.currentTimeMillisUnsafe();
 
     const lanOpen2 = yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen()));
-    // No row yet is shut.
     const initialOpen = Option.match(lanOpen2, {
       onNone: () => false,
       onSome: (r) => r.open,
     });
     let listener: ListenerState = { _tag: "closed" };
     let pairing: PairingState = { _tag: "idle" };
-    // Opening binds the port after its write: a shut that came in between would find no server yet and leave the one bound after it listening.
+    // Serialize open/shut so a concurrent shut cannot miss an in-flight port bind and leave it listening.
     const opening = yield* Semaphore.make(1);
     let upstream = "";
     /** What cuts each of a device's open connections; forgetting the device cuts them. */
@@ -229,7 +215,6 @@ const make = (options: LanOptions = {}) =>
       res.end(Formatter.formatJson({ _tag: "LanRefused", reason }));
     };
 
-    /** The request handed to the loopback server as it came, the device said; undefined for a method it cannot carry. */
     const send = (req: IncomingMessage, device: string) => {
       const method = req.method;
       if (!HttpMethod.isHttpMethod(method)) return undefined;
@@ -245,12 +230,11 @@ const make = (options: LanOptions = {}) =>
       return http.execute(HttpClientRequest.make(method)(`http://${upstream}${req.url ?? "/"}`, { headers, body })).pipe(Effect.mapError(forwardFailed));
     };
 
-    // HttpOnly, so a script on the page never reads it; Secure when a TLS proxy in front says the device came over https.
+    // HttpOnly hides the key from page scripts; add Secure when a front TLS proxy reports https.
     const keyCookie = (req: IncomingMessage, key: string, maxAge: number) =>
       `${deviceKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict` +
       (req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "");
 
-    /** Signing in or out, answered whole: the key a sign-in gets goes into the cookie as well, and signing out clears it. */
     const signedAnswer = (req: IncomingMessage, res: ServerResponse, device: string, cookieOf: (status: number, body: string) => string | undefined) =>
       Effect.gen(function* () {
         const sent = send(req, device);
@@ -270,7 +254,6 @@ const make = (options: LanOptions = {}) =>
     const signOut = (req: IncomingMessage, res: ServerResponse, device: string) =>
       signedAnswer(req, res, device, (status) => (status < 300 ? keyCookie(req, "", 0) : undefined));
 
-    /** Handed to the loopback server as it came, the device said; the answer streams back. */
     const forward = (req: IncomingMessage, res: ServerResponse, device: string) =>
       Effect.gen(function* () {
         const sent = send(req, device);
@@ -278,9 +261,8 @@ const make = (options: LanOptions = {}) =>
         const answer = yield* sent;
         res.writeHead(answer.status, answer.headers);
         yield* Stream.run(answer.stream, NodeSink.fromWritable({ evaluate: () => res, onError: forwardFailed })).pipe(
-          // A HEAD, a 204 or a 304 has no body to stream.
           Effect.catchTag("HttpClientError", (e) => (e.reason._tag === "EmptyBodyError" ? Effect.sync(() => void res.end()) : Effect.fail(forwardFailed(e)))),
-          // Cut off (the device forgotten, the client gone): the answer under way ends with it, or a stream would stay open.
+          // Destroy the response on interrupt so revoked devices or disconnected clients do not leave streams open.
           Effect.onInterrupt(() => Effect.sync(() => void res.destroy())),
         );
       });
@@ -306,7 +288,7 @@ const make = (options: LanOptions = {}) =>
         const may = device.came === "login" ? loginMay : remoteMay;
         if (!may(req.method ?? "GET", path)) return refuseHttp(res, 403, t("server.lan.notRemote"));
         const d = device.id;
-        // Not held with the device's connections: signing out revokes the device, and that cuts what is held.
+        // Skip tracking in conns: signOut revokes the device, which would interrupt its own response before clearing the cookie.
         if (path === logoutPath) return yield* signOut(req, res, d);
         const mine = held(d);
         return yield* Effect.withFiber((fiber) => {
@@ -330,14 +312,13 @@ const make = (options: LanOptions = {}) =>
       res.on("close", () => fiber.interruptUnsafe());
     };
 
-    /** The page's WebSocket from a paired device. forgetting the device or shutting ends it. */
     const tunnel = (req: IncomingMessage, client: Socket, head: Buffer) => {
       const refuse = (status: string) => void client.end(`HTTP/1.1 ${status}\r\nconnection: close\r\n\r\n`);
       if (!upstream) return refuse("503 Service Unavailable");
       if (new URL(req.url ?? "/", "http://lan").pathname !== rpcPath) return refuse("404 Not Found");
       const d = deviceOf(req)?.id;
       if (!d) return refuse("401 Unauthorized");
-      // Forwarding removes the browser origin: only this listener can check it.
+      // Forwarding strips Origin, so check it here before upgrading.
       if (!sameOrigin(req.headers)) return refuse("403 Forbidden");
       const [host, port] = [upstream.slice(0, upstream.lastIndexOf(":")), Number(upstream.slice(upstream.lastIndexOf(":") + 1))];
       const lines = [`GET ${req.url ?? rpcPath} HTTP/1.1`, `host: ${upstream}`, "connection: Upgrade", `${outsideHeader}: 1`, `${deviceHeader}: ${d}`];
@@ -361,7 +342,6 @@ const make = (options: LanOptions = {}) =>
       }
     };
 
-    // A port taken is said in the status; the farm runs on.
     const listen = Effect.callback<void>((resume) => {
       if (listener._tag === "listening") return resume(Effect.void);
       const s = createServer(guard);
@@ -385,7 +365,7 @@ const make = (options: LanOptions = {}) =>
       const current = listener._tag === "listening" ? listener.server : undefined;
       listener = { _tag: "closed" };
       if (!current) return Effect.void;
-      // An upgraded socket is no longer the server's to close.
+      // Upgraded WebSocket sockets are detached from http.Server and must be destroyed explicitly.
       for (const mine of conns.values()) for (const cut of mine) cut();
       current.closeAllConnections();
       return Effect.callback<void>((resume) => void current.close(() => resume(Effect.void))).pipe(
@@ -472,8 +452,6 @@ const make = (options: LanOptions = {}) =>
         logs.info(`vibevalley: lan access: "${name}" questions to pair`);
         const allow = yield* Effect.callback<boolean>((resume) => {
           approval.answer = (a) => resume(Effect.succeed(a));
-          // Cut short (the time ran out, or the request went away): unless the user has answered or a new pairing
-          // replaced it.
           return Effect.sync(() => {
             if (pairing === approval) pairing = { _tag: "idle" };
           });

@@ -6,7 +6,6 @@ import { compareText, or, spelled } from "#/base/search.ts";
 
 const isTop = (c: Channel) => c.type !== "thread";
 
-/** As the sidebar lists them, the server's order: the default first, then by position (the unplaced after), then by id. */
 const bySidebar = (a: Channel, b: Channel) => {
   if (a.default !== b.default) return a.default ? -1 : 1;
   const pa = a.position ?? Number.MAX_SAFE_INTEGER;
@@ -22,12 +21,10 @@ export const archivedOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).toSorted((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
 
 interface ChannelGroup {
-  /** None for the channels in no group, which come first. */
   readonly category?: string;
   readonly channels: readonly Channel[];
 }
 
-/** The sidebar's groups in the order their first channel comes. */
 export function groupsOf(channels: readonly Channel[]): ChannelGroup[] {
   const loose = channels.filter((c) => !c.category);
   const named = new Map<string, Channel[]>();
@@ -35,7 +32,6 @@ export function groupsOf(channels: readonly Channel[]): ChannelGroup[] {
   return [...(loose.length > 0 || named.size === 0 ? [{ channels: loose }] : []), ...[...named].map(([category, cs]) => ({ category, channels: cs }))];
 }
 
-/** A channel's threads, newest message first; archived ones only when asked. */
 export const threadsIn = (chat: Chat | undefined, channel: Channel, archived = false): Channel[] =>
   (chat?.channels.filter((c) => c.type === "thread" && c.parent === channel.id && (c.archived !== undefined) === archived) ?? []).toSorted(
     (a, b) => (b.last?.at ?? b.at) - (a.last?.at ?? a.at),
@@ -46,7 +42,6 @@ export function pointedAt(path: string): number | undefined {
   return m ? Number(m[1]) : undefined;
 }
 
-/** The channel a channel is in: itself, or a thread's channel; the default when none is given. */
 export function topOf(chat: Chat | undefined, c: Channel | undefined) {
   if (!c) return defaultOf(chat);
   if (isTop(c)) return c;
@@ -56,7 +51,6 @@ export function topOf(chat: Chat | undefined, c: Channel | undefined) {
 export const directsOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "direct") ?? []).toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-/** A direct channel is named by its peer, which the server puts in its title. */
 export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? c.title : (c?.name ?? ""));
 
 export const channelLabel = (c: Channel | undefined) => (c?.type === "direct" ? channelName(c) : `#${channelName(c)}`);
@@ -65,7 +59,6 @@ export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" :
 
 export const messagePath = (c: Channel | undefined, number: number) => `${chatPath(c)}?m=${number}`;
 
-/** Where a thread's parent message is: its channel's, or the general's for a thread without one. */
 export function parentAt(chat: Chat | undefined, thread: Channel) {
   if (thread.type !== "thread" || thread.rootNumber === undefined) return undefined;
   const channel = thread.parent ?? defaultOf(chat)?.id;
@@ -79,7 +72,7 @@ export interface LinkedMessage {
 
 const farmLink = /https?:\/\/([^/\s]+)\/chat(?:\/([0-9a-f-]{36}))?\?m=(\d+)/gu;
 
-/** The farm messages a text links to, once each, at most three: a link to a channel the chat knows, from any address the farm is reached at (a phone has its own). */
+/** Extracts up to 3 distinct internal chat message links; accepts explicit channel ids from any LAN/local host. */
 export function linkedMessages(text: string, chat: Chat | undefined, host: string): LinkedMessage[] {
   const out: LinkedMessage[] = [];
   for (const m of text.matchAll(farmLink)) {
@@ -94,7 +87,6 @@ export const unreadIn = (c: Channel) => c.unread ?? 0;
 
 export const unreadTotal = (chat: Chat | undefined) => (chat?.channels ?? []).reduce((n, c) => n + unreadIn(c), 0);
 
-/** The number a receipt for this channel carries, or undefined with nothing unread. */
 export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : undefined);
 
 export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
@@ -102,10 +94,8 @@ export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
 
 const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => xs?.findLast(test);
 
-/** One thread per issue, kept across the sessions that work it. */
 export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);
 
-/** The one way from a session to its thread: through its issue; a session sent for no issue has a talk thread of its own. */
 export function sessionThreadOf(chat: Chat | undefined, session: Session) {
   if (session.issue) return issueThreadOf(chat, session.issue);
   return findLast(chat?.channels, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
@@ -117,7 +107,6 @@ export function threadOwnerOf<S extends Session>(thread: Channel, sessions: read
       return findLast(sessions, (h) => h.issue === thread.subjectId);
     case "talk":
       return sessions.find((h) => h.id === thread.subjectId);
-    // Only issues and talks have a user.
     default:
       return undefined;
   }
@@ -128,7 +117,6 @@ const head = (text: string) => {
   return flat.length > 24 ? flat.slice(0, 24) : flat;
 };
 
-/** Named by the issue, so the name holds after its sessions leave. */
 export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Session[] = []) {
   switch (thread.subjectKind) {
     case "issue": {
@@ -146,25 +134,20 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
   }
 }
 
-/** A page of a channel read at a time (features/channel/follow.ts). */
 export const chatPage = 50;
 
 interface FeedItem {
   message: ChatMessage;
-  /** The thread hanging under this message. */
   thread?: Channel;
-  /** Same sender as the row before, within five minutes on the same day: no header of its own. */
+  /** True when grouped under the previous message's sender header (same day, within 5 minutes, non-reply). */
   continues: boolean;
-  /** Set on the first row of a day. */
   day?: string;
 }
 
-/** A sender's messages this close together share one header. */
 const runMs = 5 * 60000;
 
 const senderOf = (m: ChatMessage) => (m.kind === "notice" ? "" : m.from);
 
-/** filter keeps the messages containing it, in any case. */
 export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], filter = "", now = new Date()): FeedItem[] {
   const threads = new Map<string, Channel>();
   for (const c of chat?.channels ?? []) if (c.type === "thread" && c.root) threads.set(c.root, c);
@@ -178,7 +161,6 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
     const item: FeedItem = {
       message: m,
       ...(thread ? { thread } : {}),
-      // A reply shows who says it above the line it answers.
       continues:
         !!before &&
         m.replyTo === undefined &&
@@ -196,7 +178,6 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
   });
 }
 
-/** An orchestrator's dots in a channel: one is thinking or writing its answer there, as the server says. */
 export function orchestratorTyping(
   state: SpaceState | undefined,
   channel: Channel | undefined,
@@ -221,7 +202,6 @@ function dayLabel(at: number, now = new Date()) {
   return t("web.base.time.monthDay", { month: d.getMonth() + 1, day: d.getDate() });
 }
 
-/** 12-hour, two digits: 03:07 PM. */
 export function workbenchClock(at: number) {
   const d = new Date(Math.round(at));
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
@@ -230,19 +210,16 @@ export function workbenchClock(at: number) {
 
 export interface SwitchTarget {
   readonly kind: "channel" | "direct" | "thread" | "profile" | "note" | "notes";
-  /** The channel's id. a profile's id for one with no direct channel yet. */
+  /** Channel id, or profile id when no direct channel exists yet. */
   readonly id: string;
   readonly label: string;
-  /** Where it is or what picking it does: a channel's group, a thread's channel. */
   readonly hint: string;
   readonly unread: number;
-  /** When it was last talked in, newest first among equals. */
   readonly at: number;
 }
 
 const switchMax = 12;
 
-/** The places for what is typed: `#` keeps channels and threads, `@` direct channels and profiles. */
 export function switchTargets(
   chat: Chat | undefined,
   query: string,
@@ -273,7 +250,7 @@ export function switchTargets(
       .filter((p) => !peers.has(`profile:${p.id}`))
       .map((p): SwitchTarget => ({ kind: "profile", id: p.id, label: `@${p.name}`, hint: t("web.channel.switcher.newDirect"), unread: 0, at: 0 })),
   ];
-  // ＃ and ＠ are what a Chinese input method types for # and @.
+  // Normalize full-width Chinese IME `#` and `@` prefixes.
   const typed = query.trim().toLowerCase().replace(/^＃/u, "#").replace(/^＠/u, "@");
   const only = typed.startsWith("#") ? "hash" : typed.startsWith("@") ? "at" : undefined;
   const words = only ? typed.slice(1) : typed;

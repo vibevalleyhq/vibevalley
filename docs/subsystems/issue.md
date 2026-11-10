@@ -11,13 +11,13 @@
 | 层级 | 字段 | 取值与名称 | 来源 |
 |---|---|---|---|
 | 流程状态 | `status` | `backlog` 备选、`todo` 待办、`in_progress` 处理中、`in_review` 待验收、`done` 已完成、`canceled` 已取消 | 用户设置存库；`in_progress` 与 `in_review` 从在场 `Session` 或 `lastRun` 派生 |
-| 展示阶段 | `stage.state` | `refining` 草稿、`queued` 排队、`working` 在做、`asking` 等你回答、`reviewing` 等你验收、`stuck` 卡住了、`done` 已完成、`canceled` 已取消 | `issueStageOf` 实时计算 |
+| 展示阶段 | `stage.state` | `draft` 草稿、`queued` 排队、`working` 在做、`asking` 等你回答、`reviewing` 等你验收、`stuck` 卡住了、`done` 已完成、`canceled` 已取消 | `issueStageOf` 实时计算 |
 | 受阻原因 | `stage.stuck` | `conflict` 有冲突、`failed` 没做成、`interrupted` 停在半路、`quiet` 没动静 | `issueStageOf` 实时计算 |
 | 可执行动作 | `stage.acts`、`lead` | `start` 开工、`answer` 回答、`reject` 打回、`complete` 完成、`acknowledge` 知道了、`resolve` 让它解决冲突、`resume` 接着做、`cure` 接着修、`tell` 带话、`stop` 叫停、`close` 取消、`reopen` 重开 | `issueStageOf` 计算，自带点击后发送的请求参数 |
 | 完成交付 | `delivered` | `merged` 合进主分支、`merged_into_parent` 合进父分支、`pull_request` PR 合入、`submitted` 已提交 PR/MR、`kept` 保留分支、`none` 无代码改动 | 完成关单时由服务端判定 |
 | 取消原因 | `canceled` | `dismissed` 取消、`lost` 工作目录丢失 | 取消关单时写入 |
 | 单轮结局 | `Run.outcome` | `completed` 做完了、`failed` 没做成、`interrupted` 停在半路 | 单次 `Run` 结束时写入 |
-| 会话阶段 | `Session.phase` | `arriving` 刚派出、`working` 在干活、`done` 交回来、`failed` 没做成、`resting` 歇着、`closed` 走了 | 会话生命周期更新 |
+| 会话阶段 | `Session.phase` | `working` 在干活、`done` 交回来、`failed` 没做成、`resting` 歇着、`closed` 走了 | 会话生命周期更新 |
 
 固定术语：帮工提问叫**问题** `questions`，打回意见叫**验收意见** `findings`，待合入内容叫**改动** `changes`，拆出的工单叫**子工单**，仓库并发上限叫**空位**。
 

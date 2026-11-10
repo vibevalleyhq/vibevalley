@@ -18,9 +18,9 @@
 |---|---|
 | `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
 | `apps/server/src/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
-| `apps/server/src/setting/` | `setting.ts`、`saving.ts`、`keys.ts`、`memorySources.ts`、`voice.ts` |
+| `apps/server/src/setting/` | `setting.ts`、`provider.ts`（`bindingOf`）、`readiness.ts`、`memorySources.ts`、`voice.ts` |
 | `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
-| `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`） |
+| `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`、`Readiness.tsx`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`setting.get`、`setting.validate`、`setting.update`）。
 
@@ -60,9 +60,12 @@
 
 - **设置优先于配置，按需实时读取**：`deepseekApiKey()` 与 `agora()` 优先取 `settings.json`，为空时回退 `ServerConfig`，保存后立即生效。
 - **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
-- **密钥不出服务端，损坏文件保留备份**：
-  - `setting.get` 对密钥仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
+- **密钥在内存里为 `Redacted`，不出服务端，损坏文件保留备份**：
+  - `settings.json` 在磁盘上是普通字符串，读进内存经 `Schema.RedactedFromValue(Schema.String)` 封成 `Redacted`（启动配置的钥匙用 `Config.Redacted` 读），日志与序列化出不来，只在发请求处取明文；`setting.get` 仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
   - `settings.json` 以 `0600` 权限经临时文件原子改名写入；启动时若文件损坏，改名为 `settings.json.unreadable-<毫秒>` 备份并从空设置启动。
+- **每个功能的准备状态由服务端统一计算（`SettingsStatus.readiness`）**：
+  - `setting/readiness.ts`（复用 `setting/provider.ts` 的 `bindingOf`）为 11 项功能（`orchestrator`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`dictation`、`live`、`vision`、`call`）给出 `{ ready: true }` 或 `{ ready: false, missing }`。
+  - 页面钥匙集中在 `/settings/accounts`（「账号与钥匙」：DeepSeek、MOSS 连接与模型、声网），各功能页只绑账号模型并在顶部用 `Readiness` 指路；输入框 `/imagegen` 在生图未就绪时直接打开对应设置，不发给助手。
 - **语音设置只存差异**：`settings.json` 的 `voice` 字段仅保存与 `defaultVoice()` 不同的覆盖项。
 - **统一输出脱敏（`redact`）**：所有日志与外部记忆出站文本均经 `base/redact.ts` 将私钥、`sk-*`、`ghp_*`、JWT、`hb_*` 及敏感键值对替换为 `[redacted]`。
 
@@ -78,11 +81,12 @@
 
 ### 供应商配置
 
-Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置与供应商修改共用一把锁，完整覆盖读、写盘与内存替换。`SettingsStatus` 只给出 `dictationReady`、`mossReady` 等本机配置状态；连接及脱敏凭据经 Provider 接口读取。版本冲突、用途引用和密钥更新语义见 [AI 服务](docs/subsystems/provider.md)。
+Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置与供应商修改共用一把锁，完整覆盖读、写盘与内存替换。`SettingsStatus.readiness` 给出各功能的就绪与缺项；连接及脱敏凭据经 Provider 接口读取。版本冲突、用途引用和密钥更新语义见 [AI 服务](docs/subsystems/provider.md)。
 
 ## 为什么这样
 
-- **静态配置与动态设置分离**：`vibevalley.yaml` 供开发者手写并保留注释；`settings.json` 由程序原子写入图形界面保存的密钥与偏好，互不覆盖。
+- **静态配置与动态设置分离，两类钥匙内存统一 `Redacted`**：`vibevalley.yaml` 只在启动时读一次（`Config.Redacted`），`settings.json` 在运行期由界面原子更新（`Schema.RedactedFromValue`），互不覆盖且明文不进日志。
+- **准备状态由服务端算一份，钥匙放一页**：连接启用、凭据与用途绑定规则只在 `bindingOf` 和 `readiness.ts` 写一次，避免页面再推一份或等发出去才报错；三家钥匙收在「账号与钥匙」一页，避免四处翻找。
 - **单一 `ServerConfig` 入口与统一 `redact` 出口**：禁止业务模块直接读 `process.env`；日志与外部记忆共用同一套脱敏规则，防止密钥外泄。
 
 ## 怎么验证

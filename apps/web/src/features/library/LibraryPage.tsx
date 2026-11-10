@@ -31,8 +31,6 @@ import { Rail } from "./Rail.tsx";
 import { knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles, useWidth } from "./Tiles.tsx";
 
 const styles = stylex.create({
-  // The rail and the inspector run the page's height beside the bar and the files; on a phone the bar is on top, the
-  // filters under it, and the inspector a sheet over the files.
   page: {
     position: "relative",
     display: "grid",
@@ -53,7 +51,7 @@ const styles = stylex.create({
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: "var(--color-line)",
-    // The page's one bar, as high as the head other pages have (app/Shell.tsx's 66px desk).
+    // Matches app/Shell.tsx's 66px desktop header.
     minHeight: 66,
     paddingBlock: "calc(var(--spacing) * 2)",
     paddingInline: "calc(var(--spacing) * 4)",
@@ -86,7 +84,7 @@ const styles = stylex.create({
   sliderIndicator: { height: "100%", borderRadius: "calc(infinity * 1px)", backgroundColor: "var(--color-muted)" },
   sliderThumb: {
     position: "absolute",
-    // Half its own height above the middle: the slider writes the thumb's translate itself, for its left.
+    // Base UI Slider writes translate for horizontal position, so center vertically via top.
     top: "calc(50% - var(--spacing) * 1.5)",
     width: "calc(var(--spacing) * 3)",
     height: "calc(var(--spacing) * 3)",
@@ -104,7 +102,7 @@ const styles = stylex.create({
     minHeight: 0,
     flex: 1,
     flexDirection: "column",
-    // The same gap as the tiles' (Tiles.tsx's tileGap): StyleX reads only this file's constants.
+    // Must match tileGap in Tiles.tsx (StyleX requires a file-local literal).
     gap: 12,
     overflowY: "auto",
     padding: "calc(var(--spacing) * 4)",
@@ -113,7 +111,6 @@ const styles = stylex.create({
   hidden: { display: "none" },
   emptyHow: { maxWidth: "calc(var(--spacing) * 96)", color: "var(--color-muted)" },
   emptyActions: { display: "flex", justifyContent: "center", gap: "calc(var(--spacing) * 2)" },
-  // The landing place while files are dragged over the page.
   drop: {
     position: "absolute",
     inset: "calc(var(--spacing) * 2)",
@@ -143,9 +140,6 @@ const tileMax = 280;
 
 const hasFiles = (e: DragEvent) => Arr.contains(Array.from(e.dataTransfer?.types ?? []), "Files");
 
-/** The library (/library): every kept file, Eagle-like. The rail filters, the middle is the files in justified rows,
- * the inspector shows the one picked. ?make= opens the generate dialog on a form, ?understand=<attachment id> the
- * understanding of one file. */
 export function LibraryPage() {
   const core = useCore();
   const agents = useAgents();
@@ -162,7 +156,6 @@ export function LibraryPage() {
   const [looking, setLooking] = createSignal<number>();
   const [dragging, setDragging] = createSignal(false);
   const [seen, setSeen] = createSignal<ReadonlyMap<string, Seen>>(new Map());
-  // What fails is said in a toast: the files' area holds only files.
   const act = createAct();
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
   const all = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
@@ -172,7 +165,6 @@ export function LibraryPage() {
   const ids = createMemo(() => Arr.map(list(), (item) => item.attachment.id));
   const counts = createMemo(() => countsOf({ items: all(), where: where(), kind: kind() }));
   const area = useWidth();
-  // The scroller's width less its padding on both sides.
   const inner = () => Math.max(0, area.width() - 2 * 16);
   const rows = createMemo(() => {
     const known = seen();
@@ -205,14 +197,12 @@ export function LibraryPage() {
         Option.getOrElse(() => id),
       ),
   };
-  // A job that finishes adds a file: the list is read again when the count of finished ones changes.
   createEffect(
     () => Arr.filter(jobs(), (job) => job.phase === "ready").length,
     (n, was) => {
       if (was !== undefined && n !== was) void items.refetch();
     },
   );
-  // What was picked and has gone (removed, filtered out) is not picked any more.
   createEffect(
     () => ids(),
     (now) => {
@@ -331,7 +321,6 @@ export function LibraryPage() {
       setAsking(false);
     }
   };
-  // A file pasted anywhere on the page goes in, unless a field takes the paste for its words.
   onSettled(() => {
     const paste = (e: ClipboardEvent) => {
       const files = Array.from(e.clipboardData?.files ?? []);
@@ -441,7 +430,6 @@ export function LibraryPage() {
         data-testid="library-grid"
         onKeyDown={onKey}
         onClick={(e) => {
-          // A click between the tiles lets go of what was picked.
           if (e.target === e.currentTarget) {
             setPicked([]);
             setAnchor(undefined);
@@ -487,7 +475,7 @@ export function LibraryPage() {
               onSeen={(id, s) =>
                 setSeen((was) => {
                   const had = was.get(id);
-                  // A picture loaded again tells what is known already: no new map, no new layout.
+                  // Skip map copy and re-layout when dimensions/duration match what was already recorded.
                   if (had !== undefined && knows({ had, learnt: s })) return was;
                   const next = new Map(was);
                   next.set(id, { ...had, ...s });

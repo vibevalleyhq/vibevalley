@@ -4,38 +4,30 @@ import { messageOf } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { fileBlob, writeOnce } from "#/infra/files.ts";
 
-/** Bytes that could not be stored or read; message says why, in the file system's words. */
 export class StorageError extends Schema.TaggedError<StorageError, { readonly brand: unique symbol }>()("StorageError", {
   message: Schema.String,
 }) {}
 
 const failed = (cause: unknown) => StorageError.make({ message: messageOf(cause) });
 
-/** Where the farm's bytes live, apart from what a file is (Attachment says that): keyed by their sha256, written once.
- * One implementation now, the home directory's disk; object storage would be another layer of this same service. */
 export class Storage extends Context.Service<
   Storage,
   {
-    /** The bytes under key; a key already kept is left as it is. */
     readonly put: (key: string, bytes: Uint8Array) => Effect.Effect<void, StorageError>;
-    /** Streamed bytes under key, published only once all of them are written: a cancelled put leaves nothing at the key. */
+    /** Publishes atomically once complete; cancelled streams leave nothing at `key`. */
     readonly putStream: <E>(key: string, source: Stream.Stream<Uint8Array, E>) => Effect.Effect<void, StorageError | E>;
-    /** A file already written on this machine (under scratch) kept under key: moved, or linked when retain. */
     readonly adopt: (key: string, file: string, retain?: boolean) => Effect.Effect<void, StorageError>;
-    /** The bytes, as a disk-backed Blob of the given media type. */
     readonly open: (key: string, type: string) => Effect.Effect<Blob, StorageError>;
     readonly stream: (key: string) => Stream.Stream<Uint8Array, StorageError>;
     readonly exists: (key: string) => Effect.Effect<boolean, StorageError>;
     readonly size: (key: string) => Effect.Effect<number, StorageError>;
     readonly delete: (key: string) => Effect.Effect<void, StorageError>;
-    /** Where writers stage a file before adopt; on the local disk it shares the kept files' disk, so adopting is a rename. */
     readonly scratch: string;
     /** The local implementation's: where the bytes are on this machine, for what must hand a path on (an HTTP file
      * response, a helper's envelope, a vendor upload). Another implementation would have to download first. */
     readonly pathOf: (key: string) => string;
   }
 >()("@vibevalley/server/storage/storage") {
-  /** The home directory's attachments/ on this machine's disk. */
   static readonly layer = Layer.effect(
     Storage,
     Effect.gen(function* () {
@@ -43,7 +35,7 @@ export class Storage extends Context.Service<
       const fs = yield* FileSystem.FileSystem;
       const { join } = yield* Path.Path;
       const root = join(config.home, "attachments");
-      // Inside root so a staged file is renamed into place; kept files are named by their sha256, never "staging".
+      // Shares root's filesystem so adopt() is an atomic rename; content keys are 64-hex sha256, never "staging".
       const scratch = join(root, "staging");
       const pathOf = (key: string) => join(root, key);
 
@@ -56,7 +48,6 @@ export class Storage extends Context.Service<
           Effect.mapError(failed),
         ),
         putStream: Effect.fn("Storage.putStream")(function* <E>(key: string, source: Stream.Stream<Uint8Array, E>) {
-          // The bytes go to a temporary file first and are renamed under the key only when all are written.
           const temporary = yield* Effect.gen(function* () {
             yield* fs.makeDirectory(scratch, { recursive: true, mode: 0o700 });
             const directory = yield* fs.makeTempDirectoryScoped({ directory: scratch, prefix: ".put-" });

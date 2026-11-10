@@ -20,21 +20,18 @@ import { commandNameables, commandOf, runCommand, typedCommand } from "./command
 import { followed, useMessage } from "./follow";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./mentions";
 
-/** A line as it is said: everything the server takes but its key, which is the intent's. */
 export type Said = Omit<SayRequest, "sendKey">;
 
 const arrived = (key: string, messages: readonly Pick<ChatMessage, "sendKey">[]) => messages.some((m) => m.sendKey === key);
 
 export const chatSay = defineIntent<Said, void>({
   send: (body, key) => api.channel.message.send({ ...body, sendKey: key }),
-  // The channel is followed while the line is kept, so its copy is seen even after the window that sent it closed.
   confirmed: (_frame, intent) => arrived(intent.key, followed.get(intent.input.id).messages),
   watch: (body, changed) => followed.subscribe(body.id, changed),
   whileLost: "queue",
   timeoutMs: 20_000,
 });
 
-/** A line sent and not yet in its channel. */
 interface PendingLine {
   readonly key: string;
   readonly text: string;
@@ -42,7 +39,6 @@ interface PendingLine {
   readonly reason?: string;
 }
 
-/** The lines said in a channel that its messages do not have yet, oldest first. */
 export function pendingLines(
   says: readonly Intent<Said, void>[],
   channel: string | undefined,
@@ -57,28 +53,19 @@ export function pendingLines(
 }
 
 export interface ComposerWays {
-  /** Every routing field of the next message; its text and retry identity belong to the composer. */
   readonly target: () => Omit<SayRequest, "text" | "sendKey">;
-  /** The page's lines on their way (useIntents(chatSay)). */
   readonly says: Intents<Said, void>;
-  /** The words the box starts with: a draft kept from before. */
   readonly initial?: string;
   readonly failed: (reason: string) => void;
-  /** What a slash command came to, in words (commands.ts); a failed one goes to failed. */
   readonly told?: (say: string) => void;
-  /** A slash command that opens a place (/dm): the window goes there. */
   readonly opened?: (path: string) => void;
-  /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
-  /** Once a line is on its way: what it carried beside its words (a reply, files) is in the line now. */
   readonly sent?: () => void;
 }
 
-/** What a chat box reads from an input method's full-width marks (base/typedMarks.ts): 、 first is a command, ＠ names
- * someone. */
+/** Normalized from full-width IME marks (`、` -> `/`, `＠` -> `@`) via `base/typedMarks.ts`. */
 export const chatMarks: readonly Mark[] = ["/", "@"];
 
-/** Where a menu was asked for: a command (/ first in the box) or a name (@), by where it starts. */
 interface Trigger {
   readonly kind: "command" | "name";
   readonly start: number;
@@ -88,8 +75,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
-  /** The menu: open; away while the box has not the focus; or shut by Escape at one trigger (a command or a name, where it
-   * starts), which it stays for while the caret is in that trigger. */
+  // `shut` suppresses the autocomplete popup only while the caret stays inside the dismissed trigger span.
   const [menu, setMenu] = createSignal<{ readonly _tag: "open" } | { readonly _tag: "away" } | { readonly _tag: "shut"; readonly at: Trigger }>({
     _tag: "open",
   });
@@ -98,7 +84,6 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   onSettled(() => () => {
     disposed = true;
   });
-  // A slash command is an Act: busy until it ends, and while the state stream is lost it is refused, not sent.
   const commanding = createAct((reason) => {
     if (!disposed) ways.failed(reason);
   });
@@ -111,11 +96,8 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
 
   const orchestrators = useOrchestrators();
   const settings = useQuery(settingsQuery);
-  /** What is set up, for the commands that need it (/imagegen); unknown while the settings are on their way. */
   const readiness = () => ready(settings, undefined)?.readiness;
-  /** The orchestrator in the place the next line goes to. */
   const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
-  // A command (/ first in the box) is offered anywhere; no one else is in a direct channel to be named.
   const hidden = (kind: Trigger["kind"], found: { readonly start: number } | undefined) => {
     const m = menu();
     return m._tag === "away" || (m._tag === "shut" && found !== undefined && m.at.kind === kind && m.at.start === found.start);
@@ -157,14 +139,12 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     if (!t) return;
     const next = insertName(text(), caret(), t.start, n.token);
     edit(next.text, next.caret);
-    // The box's new value is written now, not a frame later: a key typed in between would land where the old caret
-    // was, and the caret put back after it.
+    // Flush DOM updates synchronously before `setSelectionRange` so rapid keystrokes do not land at the stale caret.
     flush();
     input()?.focus();
     input()?.setSelectionRange(next.caret, next.caret);
   };
 
-  // A line that is a command runs it: the box empties once it went through, and keeps the line when it did not.
   const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
     setSending(true);
     try {
@@ -184,7 +164,6 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
     if (!body.text && !((body.attachments?.length ?? 0) !== 0)) return;
-    // The default channel when the target names none: the line is kept, and followed, by the channel it is in.
     const said = { ...body, id: channelOf(body.id)?.id ?? body.id };
     edit("", 0);
     ways.sent?.();
@@ -193,7 +172,6 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   };
 
   const onKey = (e: Pick<KeyboardEvent, "key" | "isComposing" | "shiftKey" | "preventDefault" | "stopPropagation">) => {
-    // Enter that picks a word in an input method neither sends nor names.
     if (e.isComposing) return;
     const list = offered();
     if (list.length > 0) {
@@ -209,7 +187,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
         return;
       }
       if (e.key === "Escape") {
-        // The menu closes, not the window around it.
+        // Stop propagation so Escape closes only the autocomplete menu, not an enclosing dialog.
         e.preventDefault();
         e.stopPropagation();
         const c = commandTyping();
@@ -235,23 +213,19 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     choose,
     send,
     onKey,
-    /** The caret moves without typing too (arrow keys, a click): the @ menu follows it. */
     follow: (e: Event) => {
       if (!(e.currentTarget instanceof HTMLTextAreaElement)) return;
       setCaret(e.currentTarget.selectionStart);
       moved(e.currentTarget.value, e.currentTarget.selectionStart);
     },
-    /** The menu closes when the box loses the focus and comes back with it. */
     blur: () => setMenu({ _tag: "away" }),
     focus: () => setMenu((m) => (m._tag === "away" ? { _tag: "open" } : m)),
     canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     here,
-    /** The place's orchestrator is in a round the user may stop. */
     stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),
   };
 }
 
-/** What the user is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. */
 const DraftSchema = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   reply: Schema.optionalKey(Schema.Struct({ id: Schema.String, number: Schema.Int })),
@@ -283,7 +257,6 @@ export const drafts = {
   clear: (channel: string) => put(channel, () => none),
 };
 
-/** The message a channel's draft answers, as it is now; undefined when there is none, or it was deleted. */
 export function useReplying(channel: Accessor<string | undefined>): Accessor<ChatMessage | undefined> {
   const at = createMemo(
     () => {
@@ -300,12 +273,11 @@ export function useReplying(channel: Accessor<string | undefined>): Accessor<Cha
   };
 }
 
-/** The message the user is changing in place, one at a time across the page (↑ in an empty box picks the last). */
 const editing = defineAtom<string | undefined>(undefined);
 export const editingId = editing.get;
 export const setEditingId = editing.set;
 
-/** fetch over XMLHttpRequest, which tells how much of the body has gone up. */
+/** Uses XMLHttpRequest instead of `fetch` to report upload byte progress. */
 const sending =
   (progress: (sent: number, total: number) => void): typeof fetch =>
   (url, init) =>
@@ -322,7 +294,6 @@ const sending =
       xhr.send(body);
     });
 
-/** A file uploaded for a message; progress is told in whole percents as it goes up. */
 async function upload(file: File, progress: (percent: number) => void = () => {}): Promise<Attachment> {
   const data = await attachmentData(file);
   const api = new VibeValleyApi(
@@ -344,7 +315,6 @@ let lastUpload = 0;
 
 export const uploadsIn = (channel: string | undefined) => uploads.get().filter((u) => u.channel === channel);
 
-/** Files picked, pasted or dropped: each goes up in turn and joins the channel's draft. */
 export async function attachFiles(channel: string, files: readonly File[], failed: (reason: string) => void) {
   for (const file of files) {
     const key = ++lastUpload;

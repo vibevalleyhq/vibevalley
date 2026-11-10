@@ -12,35 +12,27 @@ import { Db } from "#/infra/db.ts";
 import { Storage } from "#/storage/storage.ts";
 import * as q from "#db/attachment.sql.ts";
 
-/** A kept file as it is read back: where its bytes are, and what it is. */
 export interface KeptFile {
   readonly path: string;
   readonly type: string;
   readonly name: string;
 }
 
-/** The files the farm keeps, once each by their sha256: what a message says, a media job made, an artifact's page and
- * the library holds. What a file is (name, type, size) is here; where its bytes live is Storage's. */
 export class Attachment extends Context.Service<
   Attachment,
   {
     readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
-    /** Bytes made here (an artifact's version), kept like an upload; the caller holds its own size limit. */
+    /** Enforces no size limit; callers enforce their own. */
     readonly keep: (bytes: Uint8Array, name: string, type: string) => Effect.Effect<T.Attachment, ApiError>;
-    /** A file already written under staging and hashed by its writer (media's streamed inputs and results): moved
-     * (or linked, when retain) into place and recorded. No size limit here: media holds its own quota. */
+    /** Enforces no size limit; media inputs hold their own streaming quota. */
     readonly keepStaged: (
       staged: { readonly path: string; readonly hash: string; readonly size: number; readonly name: string; readonly type: string },
       retain?: boolean,
     ) => Effect.Effect<T.Attachment, ApiError>;
-    /** Where streamed writers stage a file before keepStaged: on the same disk as the kept files, so a move is a rename. */
     readonly staging: string;
     readonly get: (id: string) => Effect.Effect<KeptFile | undefined>;
-    /** Each id's attachment, once each; one not kept fails Missing. */
     readonly of: (ids: readonly string[]) => Effect.Effect<T.Attachment[], ApiError>;
-    /** An attachment's bytes, whole (an artifact's page). */
     readonly bytes: (id: string) => Effect.Effect<Uint8Array, ApiError>;
-    /** Where an attachment's bytes are on this machine, kept or not (Storage.pathOf: the local disk's). */
     readonly pathOf: (id: string) => string;
   }
 >()("@vibevalley/server/attachment/attachment") {
@@ -91,7 +83,7 @@ const make = Effect.gen(function* () {
     keep,
     keepStaged: Effect.fn("Attachment.keepStaged")(function* (staged, retain = false) {
       yield* Effect.gen(function* () {
-        // A kept file whose bytes no longer match its key (changed on disk) is replaced, not trusted.
+        // Re-verify existing file hash so corrupted bytes on disk are replaced rather than trusted.
         if ((yield* storage.exists(staged.hash)) && (yield* sha256Of(staged.hash)) === staged.hash) return;
         yield* storage.adopt(staged.hash, staged.path, retain);
       }).pipe(Effect.mapError(unkept));

@@ -24,14 +24,19 @@
 
 ## 模型和不变量
 
-- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`（频道消息的触发带上它自己的 id）、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。`unreadSummary` 统一读取未读摘要。
+- **工单与频道找帮工只经 Mailbox 一道门**：
+  - `receive`：收 `Trigger`（将已落库的触发按串/订阅、频道听众或指定帮工路由）或 `Hire`（腾位置、开帮工并在同一事务内执行调用方的 `hiring` 回调、登记初始信封 `Envelope` 并立即唤醒）。
+  - `withdraw`：撤回一个帮工、一封信或一张工单的待投递；退回重投（`handBack`）与帮工拒收退回工单池（`decline`）语义相反，独立保留。
+  - `triggersOf` 与 `queuedTriggers`：分别读取单张工单与全部排队工单池内等待的触发；`deliveriesOf`、`waitingOn`、`isRouted` 与 `unreadSummary` 提供投递与未读只读查询。
+  - `news`：向外发布 `Handed`（交给当值助手）、`Consumed`（模型已收下）与 `Braked`（空唤醒熔断）。
+- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`、`recordChannelTrigger`、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。
 - **跨模块入口由检查限定**：外部只导入 `mailbox.ts` 服务或 `payload.ts`、`envelope.ts`、`prompts.ts` 共享契约。共享契约不能导入数据库、基础设施或模块内部实现；`modules.test.ts` 同时检查直接导入、重导出与字面量动态导入。
 - **来源先落库，投递行与路由回执同事务提交**：
   - 上游经 Mailbox 记录 `Trigger`，来源游标可与它在同一事务内提交；提交后再调用 `Mailbox.receive`。
   - `Mailbox` 在同一事务内写入 `mailbox_delivery` 并更新 `mailbox_trigger` 的路由回执；中途崩溃时于重启后重放。
-- **至少投递一次，真实入模才算消费（`consumed`）**：
-  - 投递交给会话时标为 `handed`；仅当 `Session.news` 传来 `Consumed` 回执时才标为 `consumed`。
-  - 若回合结束、会话关闭或服务重启时仍未收到回执，`handed` 自动退回 `pending` 重新投递。
+- **至少投递一次，按 `launch` 对账，真实入模才算消费（`consumed`）**：
+  - 投递交给会话时标为 `handed` 并记下当次农机进程连接号 `launch`（`${id}#n`，一次连接可跨多轮 `Run`）；仅当 `Session.news` 传来 `Consumed` 回执时才标为 `consumed`。
+  - 若回合结束、进程重连、会话关闭或服务重启时仍未收到回执，`handed` 按 `launch` 自动退回 `pending` 重新投递。
 - **两级缓冲（工单蓄水池 Tier 1 → 会话信箱 Tier 2）**：
   - 发往工单的输入先匹配 `mailbox_subscription` 进入 `mailbox_issue`。
   - 工单排队或处于等待用户状态时，自动输入保持 `held`（同一工单仅留最新一条 cron 输入）。
@@ -57,6 +62,7 @@
 ## 为什么这样
 
 - **集中管理 `mailbox_trigger` 与 `mailbox_delivery`，消除双写失步**。触发记录与投递状态统一收归 Mailbox 层，保证下层不写上层表且缓存与数据库严格一致。
+- **工单和频道只经 Mailbox 找帮工，门上按问题分动词**。把腾位置、开帮工、直说、撤回和消费通知收进 Mailbox 一道门，使 `Session` 的投递与招人入口不再暴露给上层，同时避免将工单、频道、信箱和帮工合并成巨型模块；`triggersOf` 与 `queuedTriggers` 筛法和排序不同，保持独立方法名而不硬凑标签参数。
 - **受众计算与投递控制解耦**。频道只回答「谁在场、关注了哪个串」，工单蓄水、优先级、三道刹车和重试统一在 Mailbox 执行。
 
 ## 怎么验证

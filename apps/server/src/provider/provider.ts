@@ -52,7 +52,6 @@ import {
   type VoiceDesignRequest,
 } from "./vendors.ts";
 
-/** An account bound to draw, as it was when a task was asked for, and the call that draws. */
 export interface BoundImage {
   readonly connection: string;
   readonly revision: number;
@@ -60,19 +59,17 @@ export interface BoundImage {
   readonly run: Effect.Effect<GeneratedImage, ImageFailure>;
 }
 
-/** How a vendor draws: a request checked against one of its models, as the call to make later with the key. */
 type ImageCall = (
   model: string,
   request: ImageRequest,
 ) => Effect.Effect<(key: string) => Effect.Effect<GeneratedImage, ImageFailure, HttpClient.HttpClient>, "invalid">;
 
-/** MOSS draws: its own answer read as an image, and its own failures as whether one can have been made. */
 const mossDraw = Effect.fnUntraced(
   function* (key: string, prepared: unknown) {
     const result = yield* generateMossImage(key, prepared);
     return { url: result.url, usage: { images: result.usage.generated_images, width: result.usage.output_width, height: result.usage.output_height } };
   },
-  // Not sent is refused too: nothing was asked of the vendor, so nothing can have been made or paid for.
+  // NotSent means nothing reached the vendor, so nothing can have been billed.
   Effect.catchTag("MossImageError", (error) => Effect.fail(ImageFailure.make({ outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected" }))),
 );
 
@@ -91,20 +88,14 @@ const mossImage: ImageCall = Effect.fnUntraced(function* (model, request) {
   return (key: string) => mossDraw(key, prepared);
 });
 
-/** The vendor an account is of, by the adapter it names. */
 type Adapter = ProviderSettings["connections"][number]["adapter"];
 
-/** How each vendor draws, by adapter; one with no image use has none. */
 const imageCalls: Record<Adapter, ImageCall | undefined> = { moss: mossImage };
 
-/** What an account can be asked, with its key, the account's model and the Provider's own HttpClient sealed in; every
- * answer is in the capability's own shapes (vendors.ts). */
 export interface Calls {
   readonly speech: {
-    /** Whether the model takes the request, and a stream only from a model that streams; nothing is sent. */
     readonly check: (request: SpeechRequest & { readonly streaming: boolean }) => Effect.Effect<void, InvalidRequest>;
     readonly generate: (request: SpeechRequest) => Effect.Effect<GeneratedAudio, AudioFailure>;
-    /** Starts the speech as a task the vendor runs; its ID, to ask after with `tasks.get`. */
     readonly createTask: (request: SpeechRequest) => Effect.Effect<string, AudioFailure>;
     readonly stream: (request: SpeechRequest) => Stream.Stream<SpeechEvent, AudioFailure>;
   };
@@ -117,7 +108,6 @@ export interface Calls {
     readonly createTask: (request: VoiceDesignRequest) => Effect.Effect<string, AudioFailure>;
   };
   readonly transcription: {
-    /** Whether the model takes the request, and a stream only from a model that streams; nothing is sent. */
     readonly check: (request: TranscriptionRequest & { readonly streaming: boolean }) => Effect.Effect<void, InvalidRequest>;
     readonly createTask: (request: TranscriptionRequest) => Effect.Effect<string, AudioFailure>;
     readonly stream: (request: TranscriptionRequest) => Stream.Stream<TranscriptionEvent, AudioFailure>;
@@ -127,30 +117,25 @@ export interface Calls {
     readonly ask: (request: UnderstandingRequest) => Effect.Effect<T.MediaUnderstandingResult, UnderstandingFailure>;
   };
   readonly voices: { readonly clone: (request: CloneRequest) => Effect.Effect<T.MediaAudioVoice, AudioFailure> };
-  /** Audio tasks of any kind, by the ID their creation gave. */
   readonly tasks: { readonly get: (id: string) => Effect.Effect<AudioTask, AudioFailure> };
   readonly files: {
     readonly upload: (file: FileUpload) => Effect.Effect<UploadedFile, FileFailure>;
-    /** Deletes the vendor's copy; one already gone counts as deleted. */
+    /** 404 counts as already deleted. */
     readonly delete: (id: string) => Effect.Effect<void, FileFailure>;
   };
-  /** A realtime line (Live, Vision) to the account's model, through the given transport or the vendor's own. */
   readonly realtime: {
     readonly connect: (on: RealtimeEvents, transport?: RealtimeTransport) => RealtimeLink;
-    /** The text with the key taken out: what the vendor sends back may echo it. */
+    /** Strips the key from echoed vendor error text. */
     readonly redact: (text: string) => string;
     readonly verify: (transport?: RealtimeTransport) => Effect.Effect<RealtimeCheck>;
   };
 }
 
-/** The bound dictation model, and how to make its transcriber for one recording's format; the key is sealed in. */
 export interface Dictation {
   readonly model: string;
   readonly transcriber: (format: TranscriptionFormat) => Effect.Effect<Effect.Success<ReturnType<typeof transcriptionModel>>, never, Scope.Scope>;
 }
 
-/** An account as it was when it was bound: the connection, the settings revision, the model, and the key's
- * fingerprint (a stored task keeps it to tell later whether the account still has the key it started with). */
 export interface Account extends Calls {
   readonly connection: string;
   readonly revision: number;
@@ -162,7 +147,7 @@ const fingerprint = (key: string) => createHash("sha256").update(key).digest("he
 
 const audioFailure = (error: Effect.Error<ReturnType<typeof getMossAudioTask>>) =>
   AudioFailure.make({
-    // Not sent is refused too: nothing was asked of the vendor, so nothing can have been made or paid for.
+    // NotSent means nothing reached the vendor, so nothing can have been billed.
     outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected",
     retryable:
       error.reason === "Network" || error.reason === "Timeout" || (error.reason === "HttpStatus" && (error.status === 429 || (error.status ?? 0) >= 500)),
@@ -210,8 +195,6 @@ interface CallSite {
   readonly model: string;
 }
 
-/** A call to a vendor as the farm sees it: through the Provider's HttpClient, in a span, its log lines marked with the
- * vendor, the call, the account and the model, and its failure logged once (an interruption is not one). */
 const vendorCall =
   (http: HttpClient.HttpClient, site: CallSite) =>
   (what: string) =>
@@ -224,7 +207,6 @@ const vendorCall =
       Effect.withSpan(`Provider.${site.vendor}.${what}`, { attributes: { vendor: site.vendor, connection: site.connection, model: site.model } }),
     );
 
-/** vendorCall for a streamed answer. */
 const vendorStream =
   (http: HttpClient.HttpClient, site: CallSite) =>
   (what: string) =>
@@ -239,7 +221,6 @@ const vendorStream =
       Stream.withSpan(`Provider.${site.vendor}.${what}`, { attributes: { vendor: site.vendor, connection: site.connection, model: site.model } }),
     );
 
-/** MOSS's flash models are the ones that stream speech. */
 const mossStreamingSpeech: ReadonlySet<string> = new Set(["moss-tts-1.5-flash", "moss-tts-1.5-flash-2026-06-26"]);
 
 const mossCalls =
@@ -310,7 +291,6 @@ const mossCalls =
         check: (request) =>
           prepareMossTranscription(transcript(request)).pipe(
             Effect.mapError(() => InvalidRequest.make()),
-            // MOSS streams transcripts only from its diarizing models.
             Effect.flatMap(() =>
               request.streaming && !Str.startsWith("moss-transcribe-diarize-pro")(model) ? Effect.fail(InvalidRequest.make()) : Effect.void,
             ),
@@ -411,24 +391,16 @@ export class Provider extends Context.Service<
     readonly status: () => T.ProviderStatus;
     readonly update: (input: T.ProviderUpdate) => Effect.Effect<T.ProviderStatus, Refused>;
     readonly voices: (input: T.ProviderVoiceRequest) => Effect.Effect<T.ProviderVoiceListing, Refused>;
-    /** A stored task's account again, by its connection, with its model: the calls with the key it has now, at the
-     * current revision. Compare `fingerprint` with the one the task kept to tell whether the key changed. */
+    /** Rebinds by stored connection ID; compare `fingerprint` against the task's snapshot to detect key rotation. */
     readonly account: (stored: { readonly connection: string; readonly model: string }) => Effect.Effect<Account, Refused>;
-    /** The account bound to speak, as it is now. */
     readonly speech: () => Effect.Effect<Account, Refused>;
     readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, Refused>;
-    /** The dictation the user set: a model of an account's, or their own compatible endpoint. */
     readonly dictation: () => Effect.Effect<Dictation, Refused>;
-    /** Image generation, whichever vendor the bound account is of: the request checked against the bound model, and
-     * the account as it is now (a queued task keeps it), with the call to run later. */
     readonly image: (request: ImageRequest) => Effect.Effect<BoundImage, Refused>;
-    /** The account bound to understand images and video, as it is now. */
     readonly understanding: () => Effect.Effect<Account, Refused>;
-    /** The account bound for each audio use, as it is now. */
     readonly speakers: () => Effect.Effect<Account, Refused>;
     readonly voiceDesign: () => Effect.Effect<Account, Refused>;
     readonly transcription: () => Effect.Effect<Account, Refused>;
-    /** The account bound for each realtime line, as it is now. */
     readonly vision: () => Effect.Effect<Account, Refused>;
     readonly live: () => Effect.Effect<Account, Refused>;
   }
@@ -544,7 +516,7 @@ const make = Effect.gen(function* () {
       if (call === undefined || vendors[adapter].image?.models.includes(bound.model) !== true)
         return yield* Effect.fail<Refused>({ _tag: "Refused", reason: t("server.provider.imageModel") });
       const run = yield* call(bound.model, request).pipe(Effect.mapError((): Refused => ({ _tag: "Refused", reason: t("server.media.invalid") })));
-      // The key as it is now: a task queued with it keeps it, whatever the account has later.
+      // Capture the key now so rotating the account later does not alter a queued task.
       return {
         connection: bound.connection.id,
         revision: config.revision,

@@ -26,15 +26,11 @@ import { inCny, price, type Rate, spending } from "./price.ts";
 import { quotaOf } from "./quota.ts";
 import { dbTodoStores, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
-/** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;
 const usageEveryMs = 5 * 60_000;
-/** Several runs share one read. */
 const usageAfterRunMs = 20_000;
-/** A busy session spends every few seconds: the pages hear of it a moment later, with whatever else was spent. */
 const spendPushAfterMs = 3_000;
 
-/** Dispatch eligibility with the runtime state that explains it. */
 interface Assessment {
   readonly agent: T.Agent;
   readonly info: T.RuntimeInfo | undefined;
@@ -44,10 +40,8 @@ interface Assessment {
 
 export const usable = (a: Assessment) => a.agent.enabled && a.blocking.length === 0;
 
-/** What a session needs once the profile's choices and the runtime's defaults are reconciled. */
 export interface Resolved {
   readonly runtime: OarRuntime;
-  /** The installation the last probe found, when it was probed with the binary the settings name now. */
   readonly installation?: AvailableInstallation;
   readonly binPath: string;
   readonly model: string;
@@ -58,24 +52,19 @@ export interface Resolved {
 export class Runtime extends Context.Service<
   Runtime,
   {
-    /** Answers at once: a runtime not looked at yet comes as checking, and its probe's answer follows as a runtime event. */
+    /** Returns immediately with `checking` placeholders while background probes run. */
     readonly list: () => Effect.Effect<T.RuntimeInfo[]>;
     readonly refresh: (id: string) => Effect.Effect<T.RuntimeInfo | undefined>;
     readonly info: (id: string) => Effect.Effect<T.RuntimeInfo | undefined>;
     readonly update: (id: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeInfo | undefined, ApiError>;
-    /** The profile's problems as it would be dispatched now. */
     readonly problemsOf: (agent: T.Agent) => Effect.Effect<T.AgentProblem[]>;
     readonly assess: (agent: T.Agent) => Effect.Effect<Assessment>;
-    /** Every profile, and whether it can be sent now. */
     readonly candidates: Effect.Effect<Candidate[]>;
-    /** Who the farm sends for a task now: chooseAgent over the candidates. */
     readonly choose: (brief: string, named: string, picked: string) => Effect.Effect<T.Agent | undefined>;
-    /** Validates the effective options on every opening; availability and spending only gate new work. */
     readonly resolve: (agent: T.Agent) => Effect.Effect<Resolved, ApiError>;
     readonly runtime: (id: string) => OarRuntime | undefined;
     readonly quote: (id: string, model: string) => Rate | undefined;
     readonly spend: (id: string, cny: number) => void;
-    /** Reads the runtime's quota a little after a run, several runs sharing one read. */
     readonly usageSoon: (id: string) => void;
   }
 >()("@vibevalley/server/runtime/runtime") {
@@ -88,7 +77,6 @@ export class Runtime extends Context.Service<
         const keys = yield* Setting;
         const time = yield* timeHere;
         const service = yield* Llm;
-        // It reads the DeepSeek key each session, so one saved meanwhile is used.
         const own = vibevalleyRuntimeOf({
           home: () => config.home,
           llm: (model) => modelClient(model, keys.deepseekApiKey, service),
@@ -101,35 +89,28 @@ export class Runtime extends Context.Service<
     );
 }
 
-/** What reads a runtime's account usage; tests put their own. */
 type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
 
 export interface RuntimeOptions {
-  /** The runtimes; oar's defaults when none. */
   registry?: RuntimeRegistry;
-  /** Answers a probe without asking the runtime: tests never ask this machine's runtimes. */
   probe?: (id: string) => Promise<T.RuntimeInfo>;
   usageOf?: UsageOf;
-  /** The background reads (the first probe of every runtime, the quota every five minutes); off in tests. */
   background?: boolean;
 }
 
-/** The farm's runtimes: oar's and those the farm adds (VibeValley's own agent, DeepSeek Harness); one added with oar's id takes its place. */
 export function registryOf(extra: readonly OarRuntime[] = []) {
   const added = new Set(extra.map((r) => r.id));
   return new RuntimeRegistry([...defaultRuntimes.list().filter((r) => !added.has(r.id)), ...extra]);
 }
 
-/** One accepted probe owns both what is shown and the installation later reads of its usage use. */
 interface Observation {
   info: T.RuntimeInfo;
   found?: AvailableInstallation;
   read: number;
-  /** The info holds words (why a runtime is unsupported, its quota): one probed in another language is probed again. */
   locale?: Locale;
 }
 
-/** oar's installation probes take the binary from OAR_<ID>_BIN in their env overlay. An empty path looks on PATH, ignoring the host's variable. */
+/** Empty `binPath` overrides host env to search `PATH`. */
 export function probeInstallation(runtime: OarRuntime, binPath: string): Promise<InstallationSnapshot> {
   if (!runtime.installation) return Promise.resolve({ kind: "not_found" });
   return runtime.installation({ env: { [`OAR_${runtime.id.toUpperCase()}_BIN`]: binPath } });
@@ -152,7 +133,6 @@ function fromOar(usage: Awaited<ReturnType<NonNullable<OarRuntime["accountUsage"
   };
 }
 
-/** An oar read, given up on after probeTimeoutMs of real time: fallback then, and when it fails. */
 const oarRead = <A, B>(read: () => Promise<A>, fallback: B): Effect.Effect<A | B> =>
   Effect.promise(() => withinRealTime<A | B>(read(), probeTimeoutMs, fallback));
 
@@ -175,8 +155,6 @@ const defaultUsageOf: UsageOf = async (_id, runtime, found) => {
   return usage ? fromOar(usage) : null;
 };
 
-/** Only what is there. */
-
 const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
@@ -184,10 +162,8 @@ const make = (options: RuntimeOptions = {}) =>
     const core = yield* Core;
     const store = yield* Agent;
     const registry = options.registry ?? registryOf();
-    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const forkHere = yield* FiberSet.makeRuntime();
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
-    /** null when the read fails. */
     const usageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) =>
       !options.usageOf && id === "pi"
         ? piBalance(fs, settings)
@@ -196,14 +172,11 @@ const make = (options: RuntimeOptions = {}) =>
             () => null,
           );
 
-    /** pi's own default model, read again whenever pi is looked at: what a quote for pi's default prices. */
     const readPiDefault = piSettings(fs);
     let piDefault: PiDefault = yield* readPiDefault;
-    /** Runtimes being looked at again in a new language: one probe each, the old words shown until it lands. */
     const relabeling = new Set<string>();
-    /** Each full probe's number, per runtime: a usage read merges into the probe it read from, only while that one is held. */
     const probes = new Map<string, number>();
-    /** Runtimes with a probe out: a refresh's is not in the cache until it lands, so a list that finds nothing held asks for none of its own while one is out. */
+    // Track in-flight `Cache.refresh` calls so concurrent `list()` calls do not spawn duplicate probes before the cache populates.
     const probing = new Map<string, number>();
     const out = <A, E>(id: string, e: Effect.Effect<A, E>) =>
       Effect.suspend(() => {
@@ -217,10 +190,8 @@ const make = (options: RuntimeOptions = {}) =>
           }),
         );
       });
-    /** Usage reads asked and the latest one taken, per runtime: an older answer arriving late does not undo a newer. */
     const usageAsked = new Map<string, number>();
     const usageTaken = new Map<string, number>();
-    // The waits started from spend and usageSoon: one fiber per key, all ended with the service.
     const timers = yield* FiberMap.make<string>();
     const later = yield* FiberMap.runtime(timers)();
     let closed = false;
@@ -241,14 +212,12 @@ const make = (options: RuntimeOptions = {}) =>
       return { ...out, stop: moneyStop(out), quota: quotaOf(out.usage) };
     }
 
-    /** What the runtime takes: seeds.json's support, with what it refuses taken from the adapter and the farm's policy laid over it. */
     function support(id: string) {
       const f = supportOf(id);
       const refused: Record<string, string> = { ...registry.get(id)?.refusedSessionOptions, ...f.refused };
       return { ...f, refused };
     }
 
-    /** What a probe found, as the farm shows it: its preset, support and today's spend laid over. */
     const shown = (next: Observation): Observation => {
       const id = next.info.id;
       return { ...next, info: withSpend({ ...next.info, preset: presetOf(id), support: support(id) }), locale: currentLocale() };
@@ -347,13 +316,11 @@ const make = (options: RuntimeOptions = {}) =>
 
     const known = (id: string) => runtimeIds().includes(id);
 
-    // One probe per runtime at a time, shared by whoever asks meanwhile.
     const cache = yield* Cache.makeWith(
       (id: string) =>
         Effect.gen(function* () {
           const read = (probes.get(id) ?? 0) + 1;
           probes.set(id, read);
-          // The settings are the farm's own, whatever stands in for the machine.
           const customProbe = options.probe;
           const next = customProbe
             ? yield* Effect.map(
@@ -368,7 +335,6 @@ const make = (options: RuntimeOptions = {}) =>
       { capacity: 64, timeToLive: (exit) => (Exit.isFailure(exit) ? 0 : Infinity) },
     );
     const held = (id: string) => Effect.map(Cache.getSuccess(cache, id), Option.getOrUndefined);
-    /** The observation held, laid over again (a new total spent, a usage read) and told. */
     const keep = (next: Observation) =>
       Effect.gen(function* () {
         const kept = shown(next);
@@ -390,12 +356,12 @@ const make = (options: RuntimeOptions = {}) =>
     const refreshUsage = Effect.fnUntraced(function* (id: string) {
       const runtime = registry.get(id);
       const before = yield* held(id);
-      // A runtime switched off is not asked: claude's reading, for one, calls its API every time.
+      // Skip disabled runtimes because quota checks can hit rate-limited vendor APIs (e.g. Claude).
       if (closed || !runtime || !before?.found || !before.info.settings.enabled) return;
       const asked = (usageAsked.get(id) ?? 0) + 1;
       usageAsked.set(id, asked);
       const usage = yield* usageOf(id, runtime, before.found, before.info.settings);
-      // Kept unless a newer full probe replaced the one it read from, or a usage read asked later already landed.
+      // Drop stale quota results superseded by a newer full probe (`read`) or a newer `refreshUsage` (`asked`).
       const now = yield* held(id);
       if (closed || !now || now.read !== before.read || (usageTaken.get(id) ?? 0) > asked) return;
       usageTaken.set(id, asked);
@@ -406,13 +372,12 @@ const make = (options: RuntimeOptions = {}) =>
     const each = (f: (id: string) => Effect.Effect<unknown>) =>
       Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id), { log: "Warn" }), { concurrency: 4, discard: true });
 
-    // In the background, so the first page load does not wait on every runtime.
     if (options.background ?? true)
       yield* Effect.forkScoped(
         Effect.andThen(each(refresh), each(refreshUsage).pipe(Effect.repeat(Schedule.spaced(usageEveryMs)), Effect.delay(usageEveryMs))),
       );
 
-    // A saved setting applies before its probe finishes; checks and resolution read the same current settings.
+    // Overlay live `store.settings` onto cached probe results so newly saved settings apply before re-probe completes.
     const configuration = (id: string) =>
       Effect.map(info(id), (observed) => {
         const settings = store.settings(id);
@@ -432,7 +397,6 @@ const make = (options: RuntimeOptions = {}) =>
         return yield* Effect.forEach(runtimeIds(), (id) =>
           Effect.gen(function* () {
             const hit = yield* held(id);
-            // Shown as it was until the probe in the new language lands.
             if (hit && hit.locale !== currentLocale() && !closed && !relabeling.has(id)) {
               relabeling.add(id);
               emit(
@@ -443,7 +407,6 @@ const make = (options: RuntimeOptions = {}) =>
               );
             }
             if (hit) return withSpend(hit.info);
-            // In the service's own fiber set: one probe however many lists ask, and none outlives the service.
             if (!closed && !probing.has(id)) emit(Effect.ignoreCause(out(id, Cache.get(cache, id)), { log: "Warn" }));
             return {
               id,
@@ -505,7 +468,6 @@ const make = (options: RuntimeOptions = {}) =>
       },
       spend: (id, cny) => {
         if (closed || !daily.spend(id, cny)) return;
-        // The runtime's new total is pushed once per window.
         later(
           `push:${id}`,
           Effect.delay(
@@ -521,5 +483,3 @@ const make = (options: RuntimeOptions = {}) =>
       },
     });
   });
-
-/** The farm's: VibeValley's own agent among them, unless options name the runtimes. */

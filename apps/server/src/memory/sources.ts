@@ -22,7 +22,6 @@ import {
   termsOf,
 } from "./recall.ts";
 
-/** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
 export interface RecalledLine {
   readonly id: string;
   readonly line: string;
@@ -32,7 +31,6 @@ export interface RecalledLine {
 interface Abilities {
   readonly list: boolean;
   readonly forget: boolean;
-  /** It wants whole runs (EverOS), in addition to explicit notes. */
   readonly transcripts: boolean;
 }
 
@@ -42,7 +40,6 @@ export interface EndedSession {
   readonly repo: string;
 }
 
-/** Why a source did not answer: a service down, a bad answer, stopped. */
 export class SourceError extends Schema.TaggedError<SourceError, { readonly brand: unique symbol }>()("SourceError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -50,15 +47,10 @@ export class SourceError extends Schema.TaggedError<SourceError, { readonly bran
 
 export const sourceError = (e: unknown) => SourceError.make({ message: messageOf(e), cause: e });
 
-/** Interrupting one of its operations ends it: a source outside the farm aborts its request. */
 export interface Source {
-  /** Prefixes the ids of the memories it gives, except the local one's. */
   readonly name: string;
-  /** Configured and ready, by config alone: undefined, or why not. */
   readonly unavailable: () => string | undefined;
-  /** Lets go of what it holds; an operation that starts after it fails. */
   readonly stop: Effect.Effect<void>;
-  /** What the agent should recall as a run starts, best first. */
   readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[], SourceError>;
   readonly syncTurn: (run: FinishedRun) => Effect.Effect<void, SourceError>;
   readonly sessionEnded: (s: EndedSession) => Effect.Effect<void, SourceError>;
@@ -80,18 +72,16 @@ export const sourceLife = (name: string) => {
       Effect.suspend(() =>
         Deferred.isDoneUnsafe(stopped) ? Effect.fail(why) : Effect.raceFirst(e, Effect.andThen(Deferred.await(stopped), Effect.fail(why))),
       ),
-    /** True the first time. */
     stop: Deferred.succeed(stopped, undefined),
   };
 };
 
-/** How long a source outside the farm may take to answer a read: a run waiting on it is the user waiting. */
 export const prefetchTimeoutMs = 2_000;
 /** A write goes in the background, so it may take longer; one that hangs still must not hold the queue for ever. */
 const writeTimeoutMs = 30_000;
 const writeQueue = 256;
 
-/** The local source: the memory table, picked by recall.ts. Nothing is marked recalled here: the caller marks those it keeps. */
+/** Does not mark memories recalled; the caller records only lines that fit its prompt budget. */
 export function localSource(m: MemoryStore, profiles: () => string[]): Source {
   const said = <A, E>(e: Effect.Effect<A, E>) => Effect.mapError(e, sourceError);
   return {
@@ -138,10 +128,8 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
   };
 }
 
-/** The local source's ids go as they are; another's carry its name: name:id. */
 const idOf = (one: Source, id: string) => (one.name === localName || id === "" ? id : `${one.name}:${id}`);
 
-/** Which source an id is from, and the id as that source knows it. */
 function user(all: readonly [Source, ...Source[]], id: string): [Source, string] {
   const colon = id.indexOf(":");
   if (colon >= 0) {
@@ -151,7 +139,6 @@ function user(all: readonly [Source, ...Source[]], id: string): [Source, string]
   return [all[0], id];
 }
 
-/** The cue as one source gets it: only its own ids to skip, as it knows them. */
 function cueFor(one: Source, cue: RecallCue): RecallCue {
   if (!cue.skip || cue.skip.size === 0) return cue;
   const skip = new Set<string>();
@@ -163,7 +150,7 @@ function cueFor(one: Source, cue: RecallCue): RecallCue {
   return { ...cue, skip };
 }
 
-/** Takes the groups best first, one from each in turn (their scores do not compare), leaving out what is nearly one taken. */
+/** Round-robin across sources (scores are not comparable across backends), dropping near-duplicates (`>= 0.8` likeness). */
 export function interleave<T>(groups: readonly (readonly T[])[], text: (item: T) => string, keep: (item: T) => boolean): T[] {
   const out: T[] = [];
   const seen: Set<string>[] = [];
@@ -185,7 +172,6 @@ export function interleave<T>(groups: readonly (readonly T[])[], text: (item: T)
   }
 }
 
-/** One source's lines go as it gave them; several are taken in turns, the same line once, within the count and characters. */
 export function mergeRecalled(groups: readonly (readonly RecalledLine[])[]): RecalledLine[] {
   const some = groups.filter((g) => g.length > 0);
   if (some.length <= 1) return [...(some[0] ?? [])];
@@ -204,36 +190,29 @@ export function mergeRecalled(groups: readonly (readonly RecalledLine[])[]): Rec
   );
 }
 
-/** At most ms on the service's Clock: past it, the operation is interrupted and fails. */
 const within = <A>(e: Effect.Effect<A, SourceError>, ms: number) =>
   Effect.timeoutOrElse(e, { duration: ms, orElse: () => Effect.fail(SourceError.make({ message: "timed out" })) });
 
-/** The sources as one setting made them. Its scope holds what it does: the operations still going and the writer. */
 interface Generation {
   readonly all: readonly [Source, ...Source[]];
   readonly off: T.MemorySourceInfo[];
   readonly scope: Scope.Closeable;
   readonly operations: FiberSet.FiberSet;
-  /** Background writes, in order, taken by the writer. */
   readonly writes: Queue.Queue<Effect.Effect<void>, Cause.Done>;
   readonly writer: Fiber.Fiber<void>;
-  /** Once retired: why (what an operation it cut short says, so it is set before anything is interrupted), and done
-   * once it has stopped. */
+  /** Assigned before `Scope.close` so interrupted fibers observe the retirement reason. */
   retired?: { readonly why: string; readonly done: Deferred.Deferred<void> };
 }
 
-/** What the sources run on: nothing made yet, a generation for the settings it was made for, or stopped for good. */
 type Held =
   | { readonly _tag: "none" }
   | { readonly _tag: "on"; readonly configs: readonly MemorySourceConfig[]; readonly gen: Generation }
   | { readonly _tag: "stopped" };
 
-/** Owns source generations and every accepted operation, including retirement and shutdown. */
 interface Sources {
   readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[][]>;
   readonly list: (agent: string) => Effect.Effect<{ memories: T.Memory[]; sources: T.MemorySourceInfo[] }>;
   readonly search: (query: SearchQuery) => Effect.Effect<(SourceSearch & { source: string })[]>;
-  /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
   readonly forgetProblem: (id: string) => Effect.Effect<string | undefined>;
   readonly forget: (agent: string, id: string) => Effect.Effect<void, SourceError>;
   readonly add: (note: Note) => Effect.Effect<void>;
@@ -249,14 +228,11 @@ interface SourcesOptions {
   readonly timeoutMs?: number;
 }
 
-/** Made in the memory service's make: the sources stop with it, the writes still waiting given a moment to go first. */
 export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, never, Scope.Scope> =>
   Effect.gen(function* () {
     const { local, configured, build } = options;
     const timeoutMs = options.timeoutMs ?? prefetchTimeoutMs;
-    // A generation retired goes on stopping on the service's fibers, with its services (its logger, its Clock).
     const forkHere = yield* FiberSet.makeRuntime();
-    /** Every generation not yet stopped, the current one among them, for the service's end. */
     const generations = new Set<Generation>();
     const held = yield* SynchronizedRef.make<Held>({ _tag: "none" });
 
@@ -268,7 +244,6 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       g.retired = { why, done };
       forkHere(
         Effect.gen(function* () {
-          // Interrupts the writer, the writes still waiting, and every operation going.
           yield* Scope.close(g.scope, Exit.void);
           yield* Effect.forEach(
             outside(g),
@@ -328,7 +303,6 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       }),
     );
 
-    /** An operation of the generation's: retiring it interrupts the operation, which then fails with why. */
     const leased = <A>(g: Generation, operation: Effect.Effect<A, SourceError>): Effect.Effect<A, SourceError> =>
       Effect.flatMap(FiberSet.run(g.operations, operation), (fiber) =>
         Fiber.join(fiber).pipe(
@@ -393,7 +367,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         return one.can.forget ? undefined : t("server.memory.forgetThere", { source: sourceLabel(one.name) });
       });
 
-    // The writes still waiting go first, for a moment; then every generation is retired and the local source stopped.
+    // Drain pending background writes briefly before retiring active generations.
     yield* Effect.addFinalizer(() =>
       Effect.gen(function* () {
         yield* SynchronizedRef.set(held, { _tag: "stopped" });

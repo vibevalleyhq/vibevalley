@@ -1,58 +1,33 @@
-# Agent Note: 网页 Artifact 分种类：slides、motion 先做
+# Agent Note: 网页 Artifact 的 motion 动画时间轴与导出视频
 
 Status: proposed
 
 ## Problem
 
-网页 Artifact（`html`）现在只有一种：帮工交上来一整页，页面放进沙箱给你看，能划词改字。要做幻灯片或一段动画，帮工每次都从零手写一整页 HTML，结果两种问题：
-
-- **看的人不好用**：幻灯片没有翻页、演讲者模式和导出，动画没有播放条和时间轴，全看帮工这一次有没有想到去写。
-- **每次都不一样**：排版、配色、键盘操作每篇各写一套，和工作台不像同一个东西，还费 token。
+网页 Artifact（[Artifact](docs/subsystems/artifact.md)）已上线 `display` 字段（`page`、`slides`、`motion`）、`?shell=1` 的 `vv` 消息约定与 `slides` 幻灯片放映/打印，但 `display: "motion"` 尚未实现时间轴驱动与视频导出：帮工交上来的动画页缺少统一的播放条、逐帧定位与导出进[素材库](docs/subsystems/library.md)的能力。
 
 ## Proposal
 
-**HTML 优先，种类是一份约定。** 每种 Artifact 还是一个 HTML 文件，存法不变：按稿存成附件、在沙箱里看、版本、卡片、评论、在聊天旁边打开都照旧。种类只规定两件事：这页按什么规矩写，外面的壳给什么控制。
+复用现有的 `@vibevalley/artifact/shell` `postMessage` 通道（`HtmlShellMessage` / `HtmlShellCommand`），补齐 `motion` 运行时与工作台控制条：
 
-- `Artifact` 加字段 `kind`：`page`（今天的整页，没有约定）、`slides`、`motion`。只对 `body: "html"` 有意义；`blocks`（一起写的文档）不变。建的时候定，之后能改（同一稿换个看法）。
-- 帮工的 `artifact.create` 工具多一个 `kind`，每个种类的写法和一份起手模板写进工具描述或助手的 skill，样式默认用工作台的设计令牌（把令牌以 CSS 变量的形式注进沙箱）。
-
-**页面和壳之间一个很小的消息约定。** 沙箱里的页面和壳之间只走 `postMessage`。消息形状写在 `packages/artifact`，两边共用，页面这边由我们注进沙箱的一小段脚本（`vv` 运行时）实现，帮工不用自己写。
-
-- 页面报：`ready`（种类、页数或时长）、`at`（现在在第几页、第几秒）。
-- 壳叫：`goto(页)`、`seek(秒)`、`play`、`pause`、`print`。
-- 来自页面的消息只当作「显示状态」读，不能叫壳做任何对外的事（不能发消息、不能调接口）。沙箱照旧：不连网，库只从允许的 CDN 加载。
-
-**slides。**
-
-- 写法：一页一个 `<section>`，演讲备注写在 `<aside class="notes">`，可选的版式用 class 标（`title`、`two-col`、`image`、`quote`）。运行时负责排成一页一屏、按比例缩放（16:9）。
-- 壳给：翻页（←/→、空格、点击）、缩略图条、全屏放映、演讲者模式（下一页、备注、计时，开第二个窗口）、导出 PDF（运行时把每个 `section` 排成一页纸，壳调浏览器打印）。
-
-**motion。**
-
-- 写法：页面自己画（允许 GSAP 这类库，从允许的 CDN 加载），时间轴交给运行时：注册 `vv.timeline(duration, (t) => …)` 或交给它一个 GSAP timeline，`seek(t)` 必须能跳到任意一刻画出同样的画面。
-- 壳给：播放、暂停、拖动时间轴、逐帧前后、循环；导出视频：壳逐帧 `seek` 并截下画面，用浏览器的 `MediaRecorder`（或 WebCodecs）编成 webm/mp4，存进素材库，来路是「生成的」，指向这篇 Artifact 的这一稿。
-
-**顺序。** 先做壳和消息约定（`page` 也走它，报 `ready`），再做 slides，最后 motion。每步单独提交，做完把仍然成立的写进 `docs/subsystems/artifact.md`，删掉本 Note。
-
-不做：dashboard / chart（以后同一套约定再加一种）、pptx 导出、在页面里所见即所得地排版幻灯片（改字照旧用划词改字）。
+1. **确定性时间轴注册（`vv.timeline`）**：
+   - 沙箱运行时暴露 `vv.timeline(duration, renderAt)`（并兼容直接传入 GSAP timeline，从白名单 CDN 加载），向外壳上报 `ready`（含总时长 `duration`）与当前时刻 `at`。
+   - 响应外壳的 `play`、`pause` 与 `seek(t)`：任意时刻 `seek(t)` 必须确定性画出同一帧画面；不符合约定的页面平滑退回普通 `page` 显示。
+2. **外壳播放控制与浏览器录屏导出**：
+   - 工作台 `MotionControls` 提供播放/暂停、进度条拖动、逐帧前后步进与循环开关；新增助手与帮工的 `motion` 起手模板与技能说明。
+   - 点击「导出视频」时，外壳按固定帧率逐帧 `seek(t)` 截取画面，在浏览器内用 `WebCodecs` / `MediaRecorder` 编码为 `webm`（或 `mp4`，初版限 60 秒以内），作为「生成的」条目存入素材库并记录来源指向该 Artifact 的当前稿。
 
 ## Alternatives considered
 
-- **每种一份 Markdown，由我们的渲染器画（像 Marp、Slidev）。** 统一、省 token，但表达力被渲染器限死：要一页特别的排版、一段动画，就得等我们加功能。帮工写 HTML 最熟，HTML 优先，约定只规定壳要读的那几样。
-- **每种一份 JSON（幻灯片的每一页、动画的每个关键帧）。** 排得更精确，但帮工写长 JSON 容易错，也难以逐字改。
-- **不定约定，让帮工在页面里自己写翻页和播放条。** 就是今天的样子：每篇一套，导出做不了，因为壳不知道页面有几页、多长。
-- **动画导出在服务端用无头浏览器录。** 要在服务端带一个浏览器；先用页面里的录制，够用再说。
+- **用自定义 JSON 关键帧格式代替 HTML**：帮工手写长 JSON 易错且表达力受限；保持 HTML 优先、只约定 `seek(t)` 时间轴即可复用成熟动画库。
+- **在服务端带无头浏览器录屏**：增加服务端体积与打包复杂度；浏览器内逐帧驱动编码已满足短动画导出。
 
 ## Acceptance criteria
 
-- 帮工建一篇 `slides`：在聊天旁边和 Artifact 页都能翻页、看缩略图、全屏放映、开演讲者模式看备注；导出 PDF 一页一张。改 `kind` 为 `page` 看到的是原来的整页。
-- 帮工建一篇 `motion`：能播放、暂停、拖动、逐帧；导出视频后素材库里多一个「生成的」视频，来路指向这篇 Artifact 的这一稿。
-- 沙箱不变：页面发来的消息只改壳的显示，伪造的消息不能让壳做别的事；CSP 和白名单检查照旧（`check.ts` 的测试）。
-- 测试：消息约定的形状和校验（`packages/artifact`）；slides 的分页、缩放、打印排版，motion 的 `seek` 确定性（同一时刻两次截图一样）用 Playwright 测；按 `data-testid`、每页一次 axe。工具描述和模板跟着 `kind` 走（`tool.test.ts`）。
-- 文档：`docs/subsystems/artifact.md` 写上种类、消息约定和壳；用语表加 slides、motion 的叫法。
+- `display: "motion"` 的网页 Artifact 在聊天旁栏与 `/artifacts` 页均可播放、暂停、拖动时间轴与逐帧步进；切回 `page` 显示原整页。
+- 导出视频后[素材库](docs/subsystems/library.md)新增对应视频文件，来源指向该 Artifact 版本；超过时长上限时明确提示。
+- Playwright 测试验证同一 `t` 两次 `seek(t)` 画面一致、控件可访问性通过 axe；更新 [Artifact](docs/subsystems/artifact.md) 后删除本 Note。
 
 ## Risks
 
-- **帮工不照约定写。** 起手模板加工具描述；运行时对不合约定的页面退回 `page` 的显示，不报错。真模型的表现用助手评测看（花钱，先问用户）。
-- **导出视频慢或不稳定。** 逐帧截图加编码受浏览器限制；先只支持较短的动画（比如 60 秒以内），超了就说清楚。
-- **沙箱被消息约定绕开。** 壳只认约定里的几种消息、只用来改显示；不把任何接口或密钥交给页面。
+- DOM 动画（非单 `<canvas>`）在浏览器内逐帧光栅化受限于页面绘制方式，需规定导出目标容器（`<canvas>` 或 `<svg>` 优先）并对不支持录制的页面给出明确提示。

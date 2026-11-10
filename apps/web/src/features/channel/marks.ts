@@ -11,7 +11,6 @@ import { type Followed, followed, useFollowed } from "./follow";
 import { newestUnread } from "./places";
 
 export interface ReactionMark {
-  /** The message's channel: the copy that shows the reaction is followed there. */
   readonly channel: string;
   readonly id: ChatMessage["id"];
   readonly emoji: string;
@@ -22,7 +21,6 @@ export interface PinMark {
   readonly channel: string;
   readonly id: ChatMessage["id"];
   readonly on: boolean;
-  /** When it was pressed: the pin's time until the server's copy has its own. */
   readonly at: number;
 }
 
@@ -37,7 +35,7 @@ export const reactionSet = defineIntent<ReactionMark, ChatMessage>({
     return m !== undefined && reacted(m, i.input.emoji) === i.input.on;
   },
   watch: (r, changed) => followed.subscribe(r.channel, changed),
-  // A set: sent again once the stream is back, it changes nothing more than the first would have.
+  // Idempotent set: safe to replay on reconnect.
   whileLost: "queue",
   timeoutMs: 20_000,
 });
@@ -71,7 +69,7 @@ export interface ReadMark {
   readonly number: number;
 }
 
-/** The server puts read just before the message (never below 0): settled once the frame's read is there or before. */
+/** Server sets read to number - 1 (clamped at 0). */
 const unreadUpTo = (number: number) => Math.max(0, number - 1);
 
 const readMark = defineIntent<ReadMark, void>({
@@ -90,11 +88,10 @@ export const unreadMark = defineIntent<ReadMark, void>({
 
 const sameChannel = (a: ReadMark, b: ReadMark) => a.channel === b.channel;
 
-// Channels the user marked unread while looking at them: they stay unread until the user leaves and comes back.
+// Channels marked unread while open stay unread until the user navigates away.
 const held = defineAtom<ReadonlySet<string>>(new Set());
 const release = (channel: string) => held.update((h) => new Set([...h].filter((c) => c !== channel)));
 
-/** The user's read in a channel goes back to just before this message, and the shown list leaves it so. */
 export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say: (reason: string) => void) {
   held.update((h) => new Set([...h, mark.channel]));
   setMark(intents, mark, sameChannel, (reason) => {
@@ -103,7 +100,6 @@ export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say
   });
 }
 
-/** A channel with the user's mark unread on its way laid over its read; the same object with none. */
 export function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[]): Channel {
   const mark = unreads.findLast((u) => u.input.channel === c.id);
   if (mark === undefined) return c;
@@ -111,7 +107,6 @@ export function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[
   return (c.read ?? 0) <= read ? c : { ...c, read };
 }
 
-/** A shown channel is read: the newest unread number goes to the server once it is drawn; `say` tells a refusal. */
 export function useMarkRead(channel: Accessor<Channel | undefined>, say: (reason: string) => void) {
   const reads = useIntents(readMark);
   createEffect(
@@ -124,7 +119,7 @@ export function useMarkRead(channel: Accessor<Channel | undefined>, say: (reason
     () => {
       const c = channel();
       const number = c && !held.get().has(c.id) ? newestUnread(c) : undefined;
-      // A string, so the same channel and number again is equal and posts nothing.
+      // Return a primitive key so Solid skips re-running when channel and number are unchanged.
       return c && number !== undefined ? `${c.id}\n${number}` : undefined;
     },
     (read) => {
@@ -152,10 +147,6 @@ export const notifySet = defineIntent<NotifyMark, void>({
   timeoutMs: 20_000,
 });
 
-/**
- * A mark set again before the first showed replaces it (sendReplacing); a failed one is let go and said, so the user
- * sees the server's state again and why.
- */
 export function setMark<I, R>(intents: Intents<I, R>, input: I, same: (a: I, b: I) => boolean, say: (reason: string) => void) {
   void sendReplacing(intents, input, same).done.then((end) => {
     if (end?.phase !== "failed") return;
@@ -178,7 +169,6 @@ function withReaction(m: ChatMessage, emoji: string, on: boolean): ChatMessage {
   return { ...m, reactions };
 }
 
-/** The messages with the user's reactions and pins on their way laid over them; a message with none is the same object. */
 export function markedMessages(
   messages: readonly ChatMessage[],
   reactions: readonly Intent<ReactionMark, ChatMessage>[],
@@ -197,7 +187,6 @@ export function markedMessages(
   });
 }
 
-/** A channel's messages while it is shown, with the user's reactions and pins on their way. */
 export function useMarkedFollowed(id: Accessor<string | undefined>): Accessor<Followed> {
   const said = useFollowed(id);
   const reactions = useIntents(reactionSet);
@@ -215,7 +204,6 @@ interface ChannelMarks {
   readonly unreads: readonly Intent<ReadMark, void>[];
 }
 
-/** A channel with the user's archive, notify and unread choices on their way laid over it; the same object with none. */
 export function markedChannel(c: Channel, marks: ChannelMarks): Channel {
   let shown = markedRead(c, marks.unreads);
   const archive = marks.archives.findLast((a) => a.input.id === c.id);
@@ -228,13 +216,11 @@ export function markedChannel(c: Channel, marks: ChannelMarks): Channel {
   return shown;
 }
 
-/** The frame's chat with the user's channel marks on their way; the same object with none. */
 function markedChat(chat: Chat | undefined, marks: ChannelMarks): Chat | undefined {
   if (!chat || (marks.archives.length === 0 && marks.notifies.length === 0 && marks.unreads.length === 0)) return chat;
   return { ...chat, channels: chat.channels.map((c) => markedChannel(c, marks)) };
 }
 
-/** The chat as the chat page shows it: the frame's, with the user's channel marks on their way. */
 export function useMarkedChat() {
   const core = useCore();
   const archives = useIntents(archiveSet);
@@ -243,6 +229,5 @@ export function useMarkedChat() {
   return () => markedChat(core()?.chat, { archives: archives.list(), notifies: notifies.list(), unreads: unreads.list() });
 }
 
-/** A choice on its way, for a control to draw (Select's state). */
 export const markState = <I>(intents: readonly Intent<I, unknown>[], is: (input: I) => boolean): "pending" | undefined =>
   intents.some((i) => is(i.input) && i.phase !== "failed") ? "pending" : undefined;

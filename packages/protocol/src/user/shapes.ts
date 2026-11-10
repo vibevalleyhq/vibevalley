@@ -1,7 +1,7 @@
-/** The cookie a browser keeps its device key in; the gate takes it as it takes the Bearer header. */
+/** Accepted alongside Authorization: Bearer at the LAN gate. */
 export const deviceKeyCookie = "vibevalley_device_key";
 
-/** paired: let in at the gate by the user's nod, and only to what a remote device may do; login: signed in with the password. */
+/** paired: remote-only endpoints approved at the LAN gate; login: password/approval sign-in (all endpoints except password change). */
 export type DeviceCame = "paired" | "login";
 
 export interface UserDevice {
@@ -13,13 +13,10 @@ export interface UserDevice {
 }
 
 export interface UserStatus {
-  /** What the user is called; "" until set, and never told to a caller at the gate without a key. */
+  /** "" until set; withheld from unauthenticated LAN requests. */
   name: string;
-  /** Whether a password is set: without one, nobody signs in from outside. */
   password: boolean;
-  /** The request came from this machine, not through the gate. */
   here: boolean;
-  /** The device the request came from, when it came through the gate with a key. */
   device?: UserDevice;
 }
 
@@ -33,39 +30,34 @@ export interface UserPasswordRequest {
 
 export interface UserLoginRequest {
   password: string;
-  /** What to call this device in the device list. */
   device: string;
 }
 
 export interface UserLogin {
   device: string;
-  /** Shown once: only its hash is kept. */
+  /** Returned once; the server stores only its hash. */
   key: string;
 }
 
-/** A device asking to be signed in, waiting for the user to approve it on a page that already holds a key. */
 export interface Approval {
   id: string;
-  /** What the asking device shows, for the user to match on the page. */
   code: string;
   name: string;
-  /** The address it asked from, for the user to tell their own terminal from someone else's; "" for this computer. */
+  /** "" when requested from loopback. */
   from: string;
   askedAt: number;
   expiresAt: number;
 }
 
 export interface ApprovalCreateRequest {
-  /** What to call the asking device in the device list. */
   name: string;
 }
 
 export interface ApprovalCreated {
   code: string;
-  /** Only the asking device holds it: what it collects its key with. */
   claim: string;
   expiresAt: number;
-  /** Seconds to wait between collecting tries. */
+  /** Polling interval in seconds. */
   every: number;
 }
 
@@ -74,9 +66,8 @@ export interface ApprovalCollectRequest {
 }
 
 export interface ApprovalCollected {
-  /** Absent while it waits; the device's key once the user approved it, given once. */
   login?: UserLogin;
-  /** It asked again too soon (RFC 8628's slow_down): the seconds to wait from now on. */
+  /** Updated polling interval in seconds on slow_down (RFC 8628). */
   every?: number;
 }
 

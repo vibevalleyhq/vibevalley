@@ -28,19 +28,15 @@ const idsOf = jsonOf(Schema.mutable(Schema.Array(Schema.String)));
 const resultsOf = jsonOf(Schema.mutable(Schema.Array(S.BlockOpResult)));
 const changeOf = jsonOf(S.SuggestionChange);
 
-/** The demo's three sections, each a heading and three paragraphs in the catalog. */
 const demoSections = [0, 1, 2] as const;
 type DemoSection = (typeof demoSections)[number];
 const demoParagraphs = (section: DemoSection) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section}.paragraphs.${p}`));
+
 interface BlockStore {
-  /** Every live block (no tombstones), in order. */
   readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.Block[], ApiError>;
-  /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
   readonly fill: (id: T.ArtifactId, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
   readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-  /** A batch of ops from actor (the user, or a helper's profile id), in order, in one transaction. */
   readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
-  /** A new block at the end of the top level, as actor; text is inline Markdown (code takes it as it is). */
   readonly append: (
     id: T.ArtifactId,
     actor: string,
@@ -48,7 +44,6 @@ interface BlockStore {
     attrs: T.BlockAttrs,
     text: string,
   ) => Effect.Effect<[T.Block | undefined, T.BlockOpResult | undefined], ApiError>;
-  /** A block's whole text written against baseRev, as actor; text is inline Markdown (code takes it as it is). */
   readonly updateText: (
     id: T.ArtifactId,
     actor: string,
@@ -56,31 +51,20 @@ interface BlockStore {
     baseRev: number,
     text: string,
   ) => Effect.Effect<[T.Block | undefined, T.BlockOpResult | undefined], ApiError>;
-  /** A block of one of the kinds an agent writes, inserted where the caller says (artifact.block.create); refused for another kind. */
   readonly insertBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
-  /** A block's words, type or attrs against the rev it was read at (artifact.block.update): a newer rev on changed words comes back as a conflict, not an error. */
   readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
-  /** A block and its children put in their tombstones (artifact.block.delete). */
   readonly deleteBlock: (id: T.ArtifactId, actor: string, req: T.BlockDelete) => Effect.Effect<T.BlockOpResult, ApiError>;
-  /** What deleting a block would do, for a dry run. */
   readonly previewDeleteBlock: (id: T.ArtifactId, req: T.BlockDelete) => Effect.Effect<T.Preview, ApiError>;
-  /** Each batch after seq, then each from now on (artifact.follow). */
   readonly follow: (id: T.ArtifactId, after: number) => Stream.Stream<T.ArtifactEvent, ApiError>;
-  /** An artifact's suggestions, oldest first. */
   readonly suggestions: (id: T.ArtifactId) => Effect.Effect<T.Suggestion[], ApiError>;
-  /** An agent proposes a change to a block the user wrote. */
   readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError>;
-  /** The user takes a suggestion, if the block still stands at the rev it was read at. */
   readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
   readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
-  /** The whole list now, then after each change (artifact.suggestion.follow). */
   readonly suggestionStream: (id: T.ArtifactId) => Stream.Stream<T.SuggestionEvent, ApiError>;
-  /** Starts the demo and returns at once (demo.ts). */
   readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   readonly demoRunning: () => boolean;
 }
 
-/** The block kinds an agent appends; the editor has more (dividers, images), which an agent does not write. */
 const appendTypes: readonly T.BlockType[] = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
 const isAppendType = (type: string): type is T.BlockType => isOneOf(appendTypes, type);
 
@@ -90,7 +74,6 @@ const blockOf = (r: qb.ArtifactBlocksResult): T.Block =>
     artifactId: S.artifactId(r.artifact_id),
     ...(r.parent_id !== null ? { parentId: S.blockId(r.parent_id) } : {}),
     orderKey: r.order_key,
-    // Written only through BlockOp, whose type the wire decodes as a BlockType.
     type: r.type,
     attrs: attrsOf(r.attrs),
     text: storedSpans(r.spans) ?? [],
@@ -106,17 +89,13 @@ const blockIn = (ack: T.BlockAck, id: string) => ack.blocks.find((b) => b.id ===
 
 /** How long a batch is kept to answer it again, and a block's text to merge a stale update against. */
 const keptDays = 30;
-
-/** How long the demo waits between pieces. */
 const demoTickMs = 1000;
 
-/** found: the artifact's row, failing when there is none or it is not a blocks one. */
 export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.ArtifactResult, ApiError>) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
-    // Every batch that commits, for pages following an artifact; the database is the catch-up, this is only the live tail.
     const changes = yield* scopedPubSub<{ readonly artifact: T.ArtifactId; readonly ack: T.BlockAck }>();
     const suggestionChanges = yield* scopedPubSub<{ readonly artifactId: T.ArtifactId; readonly suggestions: T.Suggestion[] }>();
     yield* Effect.forkScoped(
@@ -138,7 +117,6 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       return ordered(blocksOf2);
     });
 
-    /** A batch already taken: its results then, its blocks now. */
     const again = Effect.fn("BlockStore.again")(function* (id: T.ArtifactId, seen: qc.ArtifactChangeByBatchResult) {
       if (seen.artifact_id !== id) return yield* Effect.fail(refused(t("server.artifact.otherArtifact", { batch: seen.batch_id })));
       const ids = idsOf(seen.block_ids);
@@ -163,13 +141,13 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
             const now = yield* Clock.currentTimeMillis;
             const blocksOf2 = yield* blocksOf(id);
             const p = new Page(id, actor, now, blocksOf2);
-            // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
+            // Preload base revisions and existing block ids into maps because `Page.apply` runs synchronously.
             const revisions = new Map<string, T.TextSpan[]>();
             for (const op of body.ops) {
               if (op.op !== "update_text" && op.op !== "split_block") continue;
               const b = p.find(op.blockId);
               if (!b || op.baseRev > b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
-              // An earlier op in this batch can advance rev without changing this text.
+              // Earlier ops in the same batch may advance `rev` without altering spans.
               if (op.baseRev === b.rev) {
                 revisions.set(`${b.id}@${op.baseRev}`, b.text);
                 continue;
@@ -416,8 +394,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       Stream.unwrap(
         Effect.gen(function* () {
           yield* found(id);
-          // Subscribed before the missed batches are read, so nothing that commits in between is lost; anything both have
-          // is dropped by seq.
+          // Subscribe before reading the DB catch-up window, then deduplicate live events by `seq`.
           const live = yield* PubSub.subscribe(changes);
           const missed = yield* db.run(qc.artifactChangesAfter({ artifact_id: id, seq: after, n: catchUpMax + 1 }));
           if (missed.length > catchUpMax) return Stream.succeed<T.ArtifactEvent>({ _tag: "Reset" });
@@ -575,7 +552,6 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
     });
 
     let demoOn = false;
-    /** About ticks of the tick, a bit more or less so the writers interleave. */
     const wait = (ticks: number) => Effect.flatMap(Random.next, (r) => Effect.sleep(ticks * (1 + demoJitter * (2 * r - 1)) * demoTickMs));
 
     /** Inserts b at the end of the top level, or at the end of a section; the key is picked under the batch lock, so two writers cannot pick the same place. */
@@ -586,7 +562,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       at?: { headings: string[]; section: number },
     ) {
       const blocksOf2 = yield* blocksOf(artifact);
-      // Tombstones too: their keys still hold their places.
+      // Include tombstones so new `orderKey`s do not collide with soft-deleted siblings.
       const top = new Page(artifact, writer, 0, blocksOf2).children("");
       let after = top.at(-1)?.orderKey ?? "";
       let before = "";
@@ -608,7 +584,6 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       return inserted.rev;
     }, lock.withPermits(1));
 
-    /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
     const demoWrite = Effect.fn("BlockStore.demoWrite")(function* (artifact: T.ArtifactId, writer: string, headings: string[], section: DemoSection) {
       for (const text of demoParagraphs(section)) {
         const b: Omit<T.BlockInput, "orderKey"> = { id: S.blockId(newId()), type: "paragraph", attrs: {}, text: [] };
@@ -617,7 +592,6 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
         for (let n = 1; n <= demoPieces; n++) {
           yield* wait(1);
           const [, r] = yield* updateText(artifact, writer, b.id, rev, chars.slice(0, Math.floor((chars.length * n) / demoPieces)).join(""));
-          // The user wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
           if (r?.status !== "applied") break;
           rev = r.rev ?? rev;
         }
@@ -662,7 +636,6 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       if (writers.length === 0) return yield* Effect.fail(refused(t("server.artifact.noWriter"), [lookIn.agent]));
       if (demoOn) return yield* Effect.fail(refused(t("server.artifact.demoRunning")));
       demoOn = true;
-      // The demo lives as long as the service: stopping the farm stops it.
       yield* Effect.forkIn(runDemo(id, writers), scope);
     });
 

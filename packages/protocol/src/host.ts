@@ -11,51 +11,42 @@ export interface Notice {
 }
 export const Notice: Schema.Codec<Notice> = Schema.Struct({ title: Schema.String, body: Schema.String });
 
-/** The farm at a glance, where the host keeps one (the menu bar's tray): a short title and a line each. */
 export interface TraySummary {
   readonly title: string;
   readonly lines: readonly string[];
 }
 export const TraySummary: Schema.Codec<TraySummary> = Schema.Struct({ title: Schema.String, lines: Schema.Array(Schema.String) });
 
-/** A key the host hears while another program is in front. */
 export interface Shortcut {
-  /** In Electron's accelerator notation (Alt+Shift+Space). */
+  /** Electron accelerator notation (e.g. `Alt+Shift+Space`). */
   readonly accelerator: string;
-  /** Calls `fn` each time it is pressed; returns how to stop. */
   readonly on: (fn: () => void) => () => void;
 }
 
-/** What a call hears: the orchestrator's arrival and leaving, its captions, both sides' levels (0..100), a trouble, and
- * that the token is about to run out. */
 export interface RtcEvents {
   readonly joined: () => void;
   readonly left: () => void;
   readonly stream: (text: string) => void;
+  /** Audio levels are `0..100`. */
   readonly levels: (mine: number, theirs: number) => void;
   readonly problem: (text: string) => void;
   readonly expiring: () => void;
 }
 
-/** One call's line: joined with the grant, the microphone published with echo cancellation and noise suppression. */
 export interface RtcLine {
   readonly mute: (on: boolean) => Promise<void>;
   readonly renew: (token: string) => Promise<void>;
   readonly leave: () => Promise<void>;
 }
 
-/** Joins a call; it fails with why (no microphone, Agora said no). */
-/** grant: the server's for the call (voice.session). */
 export type Rtc = (grant: AgoraGrant, events: RtcEvents) => Promise<RtcLine>;
 
-/** The farm's picture in art pixels and how much of it may be cut off on each side when it is scaled by a whole number: the page frames the farm by it, and the desktop keeps its window at a size the farm fills. */
+/** Art-pixel dimensions and max fractional crop per edge when integer-scaled. */
 export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, down: 0.08 } } as const;
 
-/** Why an update cannot put itself in place. or the release has no build for this Mac. */
 export const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
 export type UpdateManual = (typeof UpdateManualValues)[number];
 
-/** The desktop's own updates (apps/desktop src/update.ts). version is the running one's. */
 export type UpdateState =
   | { readonly _tag: "idle"; readonly version: string }
   | { readonly _tag: "checking"; readonly version: string }
@@ -73,14 +64,12 @@ export const UpdateState: Schema.Codec<UpdateState> = Schema.Union([
   Schema.TaggedStruct("failed", { version: Schema.String, why: Schema.String }),
 ]);
 
-/** The host updating itself: watch hears the state now and each change after; install restarts into the new version. */
 export interface Updates {
   readonly watch: (fn: (state: UpdateState) => void) => () => void;
   readonly check: () => Promise<void>;
   readonly install: () => Promise<void>;
 }
 
-/** The app's command line in ~/.local/bin (Install CLI, apps/desktop src/commandLine.ts): link is where it goes. */
 export interface CommandLineState {
   readonly command: string;
   readonly link: string;
@@ -114,60 +103,39 @@ export const Opening: Schema.Codec<Opening> = Schema.Struct({
 });
 
 export interface Host {
-  /** For logs and the about box only. */
   readonly name: "desktop" | "mobile" | "browser";
-  /** A system notification; absent where there are none. */
   readonly notify?: (notice: Notice) => Promise<void>;
-  /** The tray's title and lines; absent where there is no tray. */
   readonly tray?: (summary: TraySummary) => Promise<void>;
-  /** The key that starts and ends a call to the orchestrator from anywhere; absent where there is none. */
   readonly voiceShortcut?: Shortcut;
-  /** A call the host carries itself (the phone's, which goes on with the screen locked); absent: the page joins with
-   * Agora's web SDK. */
+  /** Native RTC transport that survives screen lock; omit to fall back to Agora Web SDK. */
   readonly rtc?: Rtc;
-  /** The window has no title bar of its own and the page reaches its top edge. absent: the window has its own. */
+  /** Inset for frameless windows; omit when the OS draws the title bar. */
   readonly titleBar?: { readonly top: number; readonly left: number };
-  /** Told the language the page speaks when it loads, so the host's own words (the tray's menu, the island, its dialogs) match. */
   readonly locale?: (locale: Locale) => void;
-  /** Shows a file or folder on this machine in the system's file manager; absent where the host cannot. */
   readonly reveal?: (path: string) => void;
-  /** Told the theme the page chose, so the host's own parts (menus, scroll bars, the title strip) follow; absent where the
-   * host draws nothing of its own. */
   readonly theme?: (theme: ThemeChoice) => void;
-  /** Keeps the host's opening visible across page navigation; terminal phases uncover the page. */
+  /** Terminal phases uncover the page. */
   readonly opening?: (opening: Opening) => Promise<void>;
-  /** The app's own updates; absent where the host is not updated from here (a browser tab, the phone's store app). */
   readonly update?: Updates;
-  /** Installing the app's command line; absent where there is none to install (a browser tab, the app from the
-   * repository). */
   readonly commandLine?: CommandLine;
 }
 
-/** Light, dark, or as the system is. */
 export const ThemeChoiceValues = ["light", "dark", "system"] as const;
 export type ThemeChoice = (typeof ThemeChoiceValues)[number];
 export const ThemeChoice: Schema.Codec<ThemeChoice> = Schema.Literals(ThemeChoiceValues);
 
-// The only way between the page and a shell's own world is a property on window.
 declare global {
   interface Window {
-    /** The desktop's preload sets it (contextBridge). */
     vibevalleyHost?: Host;
-    /** React Native's WebView sets it in the phone's shell. */
     ReactNativeWebView?: { postMessage(text: string): void };
-    /** The page sets it for the phone's shell to call with each message for it (mobileBridge). */
     vibevalleyFromHost?: (message: unknown) => void;
   }
 }
 
-/** The property a host's preload sets on window. */
 export const hostKey = "vibevalleyHost" satisfies keyof Window;
 
-/** The key the desktop hears while another program is in front, in Electron's accelerator notation: main registers it,
- * the page shows it (Host.voiceShortcut). */
 export const desktopVoiceShortcut = "Alt+Shift+Space";
 
-/** The desktop's preload asks Electron's main (apps/desktop). reveal takes only a path on this machine. */
 export const desktopBridge = {
   notify: call({ input: Notice, output: Schema.Void }),
   tray: call({ input: TraySummary, output: Schema.Void }),
@@ -176,7 +144,7 @@ export const desktopBridge = {
   theme: call({ input: ThemeChoice, output: Schema.Void }),
   opening: call({ input: Opening, output: Schema.Void }),
   updateState: call({ input: Schema.Void, output: UpdateState }),
-  // Both wait for a download.
+  // Unbounded: blocks while downloading an update.
   updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
   updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
   cliState: call({ input: Schema.Void, output: CommandLineState }),
@@ -186,8 +154,6 @@ export const desktopBridge = {
   update: push(UpdateState),
 };
 
-/** Which app this is and how it is: what `vibevalley app status` says. server: its farm's address, absent while it is not
- * up. */
 const DesktopStatus = Schema.Struct({
   name: Schema.String,
   version: Schema.String,
@@ -195,7 +161,6 @@ const DesktopStatus = Schema.Struct({
   server: Schema.optionalKey(Schema.String),
 });
 
-/** The desktop app's command line asks it (`vibevalley app …`, apps/server src/cli/app.ts) over a socket in its farm's home (apps/desktop src/control.ts). */
 export const desktopControl = {
   status: call({ input: Schema.Void, output: DesktopStatus }),
   open: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
@@ -206,7 +171,7 @@ export const desktopControl = {
   updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
 };
 
-/** Every call and push of the page's to the desktop, and whether the command line can do it too or only the page can: a call added without saying which does not compile, so the desktop's abilities do not grow past its command line unnoticed. */
+/** Exhaustive map forcing every new `desktopBridge` member to declare whether CLI control may invoke it. */
 export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control" | "page">> = {
   notify: "page",
   tray: "page",
@@ -226,11 +191,9 @@ export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control"
 
 const Line = { line: Schema.Finite };
 
-/** The phone's page asks its shell (apps/mobile); a call's events come back as pushes, each with the line it is for. */
 export const mobileBridge = {
-  // The first one asks the person for permission.
+  // First call awaits OS notification permission prompt.
   notify: call({ input: Notice, output: Schema.Void, timeoutMs: Infinity }),
-  // Joining goes over the network to Agora.
   rtcJoin: call({ input: Schema.Struct({ ...Line, grant: AgoraGrantSchema }), output: Schema.Void, timeoutMs: 60_000 }),
   rtcMute: call({ input: Schema.Struct({ ...Line, on: Schema.Boolean }), output: Schema.Void }),
   rtcRenew: call({ input: Schema.Struct({ ...Line, token: Schema.String }), output: Schema.Void }),
@@ -243,10 +206,8 @@ export const mobileBridge = {
   rtcExpiring: push(Schema.Struct(Line)),
 };
 
-/** The function on window the phone's shell calls with each message for the page. */
 export const fromNativeKey = "vibevalleyFromHost" satisfies keyof Window;
 
-/** The phone's host over its bridge. Only the current line hears its events. */
 export function mobileHost(link: Link): Host {
   const native = connect(mobileBridge, link);
   let next = 1;
@@ -261,7 +222,6 @@ export function mobileHost(link: Link): Host {
   return {
     name: "mobile",
     notify: (notice) => native.call.notify(notice),
-    // The phone's shell speaks the phone's language (apps/mobile words.ts). Files on the phone are not the farm's.
     rtc: async (grant, on) => {
       const line = next++;
       active = { line, events: on };

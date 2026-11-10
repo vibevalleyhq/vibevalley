@@ -61,7 +61,7 @@
   - 报告先同步写入 `session.pending_report`，回合结束时转为 `sessionReported` 并清空。
   - PR 在途或 `prSubmit=true` 时结束后进 `resting` 并释放槽位；仅 `prSubmit=false` 才进 `done`。
 - **真实消费回执**：Mailbox 投递在模型真正消费输入时才经 `Session.news` 的 `Consumed` 标为 `consumed`；回合结束或中断时未消费的 `handed` 一律退回 `pending`。
-- **触发来源（`RunTrigger`）**：分 `issue`、`comment`、`cron`、`refining` 和 `runtime`；执行中途插入的话记入当前 `Run.heard`，不另开新 `Run`。
+- **触发来源（`RunTrigger`）**：分 `issue`、`comment`、`cron`、`refine` 和 `runtime`；执行中途插入的话记入当前 `Run.heard`，不另开新 `Run`。
 
 ### 容量上限、轨迹与花费
 
@@ -110,7 +110,8 @@
 ## 为什么这样
 
 - **用 `Executor` 隔离进程资源，用纯函数表达领域规则**：防止启动中断或关闭失败时泄漏子进程或重用脏目录；事件映射与汇报解析保持纯函数以便快速单测。
-- **区分 `Session`、`Run` 与 oar 会话三层**：`Session` 代表跨轮次工作现场，`Run` 记单轮触发与花费，底层 oar 会话可随时替换而不丢工单归属。
+- **区分 `Session`、`Run`、进程连接 `launch` 与 oar 会话**：`Session` 代表跨轮次工作现场，`Run` 记单轮触发与花费，内存 `launch`（`${id}#n`）标识一次底层连接以便重连时退回未确认投递，底层 oar 会话可随时替换而不丢工单归属。
+- **一条 `Session.news` 广播全部会话动静**：招人、汇报、离场、消费/退回回执与启动阶段变化统一走单条带 `_tag` 的流，取代多条平行事件流。
 - **不做命令级权限确认，靠工作目录与回环监听划边界**：放弃将权限请求做成地里杂草逐条批准（会让帮工停在命令上等人，与无人值守冲突）。
 - **显式传递农机 `binPath`，不写进程环境变量**：避免多配置并发时互相覆盖 `process.env`。
 - **轨迹单存文件，重启停在 `resting` 不自动重跑**：避免高频工具输出撑大 `SpaceState`，也避免重启后自动重跑外部 shell 命令导致重复副作用。

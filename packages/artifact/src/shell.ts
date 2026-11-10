@@ -7,8 +7,7 @@ import * as S from "@vibevalley/protocol/schema";
 export const ShellThemeValues = ["light", "dark"] as const;
 export type ShellTheme = (typeof ShellThemeValues)[number];
 
-// The workbench's colours (apps/web/src/style.css, its --wb-* values) and type, as variables a page may use: what the
-// runtime draws uses them, and a page that wants to look like the workbench can too. Keep them in step with style.css.
+// Keep in sync with --wb-* tokens in apps/web/src/style.css.
 const themeVariables: Record<ShellTheme, string> = {
   light:
     "color-scheme:light;--vv-page:#fcfcfb;--vv-side:#f6f5f3;--vv-ink:#1c1917;--vv-muted:#5e5852;--vv-faint:#716a64;--vv-line:#1c191714;--vv-accent:#4d7a2a;--vv-leaf:#74a046;--vv-wheat:#e5a93c;--vv-berry:#a83a2c;--vv-water:#2f6fa8;",
@@ -69,8 +68,6 @@ const selectionScript = String.raw`(() => {
   });
 })();`;
 
-// The vv runtime: it lays the page out for its display, tells the shell what it is (ready) and where it is (at), and
-// does what the shell asks (goto, seek, play, pause). It only ever posts to its parent and only listens to its parent.
 const runtimeScript = String.raw`(config) => {
   const say = (message) => parent.postMessage(Object.assign({ vibevalley: message.kind }, message.body), "*");
   const commands = {};
@@ -84,8 +81,6 @@ const runtimeScript = String.raw`(config) => {
   const asked = new URLSearchParams(location.search);
   const displays = {
     page: () => say({ kind: "ready", body: { display: "page" } }),
-    // One <section> a slide, at 1280 x 720 scaled to fit; notes in its <aside class="notes">. ?at= opens on a slide,
-    // ?still=1 is a thumbnail (no keys, no clicks), ?print=1 lays every slide on its own page and prints.
     slides: () => {
       const all = Array.from(document.querySelectorAll("section")).filter((s) => !s.parentElement || !s.parentElement.closest("section"));
       if (all.length === 0) return displays.page();
@@ -142,7 +137,7 @@ const runtimeScript = String.raw`(config) => {
   else start();
 }`;
 
-// A slide is drawn at 1280 x 720 and scaled to the frame. Everything is under :where(), so a deck's own styles win.
+// Zero-specificity :where() selectors let deck-authored CSS override defaults.
 const slideStyles = String.raw`
 :where(html.vv-slides),:where(html.vv-slides) :where(body){margin:0;height:100%;overflow:hidden;background:var(--vv-side);color:var(--vv-ink);font-family:var(--vv-font-sans);-webkit-font-smoothing:antialiased}
 :where(html.vv-slides) :where(section){position:absolute;left:50%;top:50%;width:1280px;height:720px;box-sizing:border-box;padding:80px 112px;display:none;flex-direction:column;justify-content:center;gap:28px;background:var(--vv-page);transform:translate(-50%,-50%) scale(var(--vv-scale,1));transform-origin:center;overflow:hidden}
@@ -178,39 +173,31 @@ const slideStyles = String.raw`
 
 const displayStyles: Record<ArtifactDisplay, string> = { page: "", slides: slideStyles, motion: "" };
 
-/** The page as the workbench shows it: the runtime and the selection after everything else, so they run once the page's
- * own text is there. Their styles use :where(), so whatever the page says of the same elements wins. */
 export const withShell = (shown: { readonly page: string; readonly display: ArtifactDisplay; readonly theme: ShellTheme }) => `${shown.page}
 <style>:root{${themeVariables[shown.theme]}${typeVariables}}${displayStyles[shown.display]}</style>
 <script>${selectionScript}</script>
 <script>(${runtimeScript})({ display: "${shown.display}" })</script>
 `;
 
-/** The workbench's view of a version. The display and theme are in the address because a version's response is cached for
- * good: the same version shown another way, or in the other theme, is another response. The server reads the display from
- * the artifact, not from here. */
+/** Includes `display` and `theme` in the query string because version responses are cached immutable. */
 export const shellPath = (
   id: string,
   version: number,
   display: ArtifactDisplay = "page",
   theme: ShellTheme = "light",
-  /** A slide to open on; still: a thumbnail that takes no keys or clicks; print: the deck laid out to print. */
   more: { readonly at?: number; readonly still?: boolean; readonly print?: boolean } = {},
 ) =>
   `${artifactPath(id, version)}?shell=1&display=${display}&theme=${theme}${more.at === undefined ? "" : `&at=${more.at}`}${more.still === true ? "&still=1" : ""}${more.print === true ? "&print=1" : ""}`;
 
-/** The theme a shell request asks for; light when it names none it knows. */
 export const shellThemeOf = (asked: string | null): ShellTheme => (asked === "dark" ? "dark" : "light");
 
 const decodeShellMessage = Schema.decodeUnknownOption(S.HtmlShellMessage);
 
-/** What a page's message says, when it is one of the protocol's; undefined for anything else. */
 export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => Option.getOrUndefined(decodeShellMessage(data));
 
 const wordsMax = 10_000;
 const contextMax = 64;
 
-/** The words the user selected, as the message tells of them; undefined when it is no such message. */
 export function selectionOf(data: unknown): HtmlAnchor | undefined {
   const message = shellMessageOf(data);
   if (message?.vibevalley !== "selection") return undefined;

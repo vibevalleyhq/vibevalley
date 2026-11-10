@@ -21,17 +21,16 @@ const passwordMin = 8;
 const requestForMs = 10 * 60_000;
 const requestsAtOnce = 5;
 const collectEverySeconds = 2;
-/** RFC 8628's slow_down: a collect this much sooner than asked waits five seconds more from then on. */
+/** RFC 8628 `slow_down`: polling too early adds 5s permanently to that request's interval. */
 const slowDownSeconds = 5;
 const collectSlack = 0.8;
-/** A key nobody has used for this long is taken back: a lost laptop's key does not stay good for ever. */
 const idleForMs = 90 * 24 * 3600_000;
-/** Every device key starts so: secret scanners (and people) can tell one in a leaked file or log. */
+/** Prefix recognized by secret scanners. */
 const keyPrefix = "vvk_";
-// No vowels and no look-alikes (0/O, 1/I): a code read off a terminal is typed or matched without slips or words.
+// Omit vowels and 0/O/1/I look-alikes to avoid accidental words and transcription slips.
 const codeLetters = "BCDFGHJKLMNPQRSTVWXZ";
 
-// OWASP's floor for scrypt; a sign-in waits for it, which is what makes guessing slow.
+// OWASP scrypt floor; sign-in blocks on derivation to throttle guessing.
 const cost = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
 const hashLength = 64;
 
@@ -49,17 +48,15 @@ interface Request extends T.Approval {
   lastCollect: number;
 }
 
-/** XXXX-XXXX from codeLetters; randomBytes' bias over 20 letters is far too small to matter for a ten-minute code. */
 const requestCode = () => {
   const letters = Array.from(randomBytes(8), (b) => codeLetters[b % codeLetters.length] ?? "B");
   return Arr.join(Arr.take(letters, 4), "") + "-" + Arr.join(Arr.drop(letters, 4), "");
 };
 
-/** The person a request is for: on this machine, or through the gate as one of their devices. */
 export interface Caller {
   readonly here: boolean;
   readonly device?: string;
-  /** The address the gate saw it come from; absent on this machine. */
+  /** Remote address observed at the LAN gate; absent on loopback. */
   readonly from?: string;
 }
 
@@ -68,25 +65,20 @@ export class User extends Context.Service<
   {
     readonly status: (caller: Caller) => T.UserStatus;
     readonly rename: (name: string) => Effect.Effect<T.UserStatus, ApiError>;
-    /** Refused through the gate: only someone at this machine sets the password. */
+    /** Local callers only; refused through the LAN gate. */
     readonly setPassword: (caller: Caller, password: string) => Effect.Effect<T.UserStatus, ApiError>;
     readonly login: (password: string, device: string) => Effect.Effect<T.UserLogin, ApiError>;
     readonly logout: (caller: Caller) => Effect.Effect<void, ApiError>;
-    /** A device the user let in at the gate; its key, shown once. */
     readonly pair: (name: string) => Effect.Effect<T.UserLogin>;
     readonly devices: () => T.UserDevice[];
-    /** The device a key is, noting that it was seen. */
+    /** Updates `lastSeen` and revokes keys idle past `idleForMs`. */
     readonly byKey: (key: string) => T.UserDevice | undefined;
     readonly revoke: (id: string) => Effect.Effect<T.UserDevice[], ApiError>;
-    /** What revoke would do, refused as it would be; nothing changes. */
     readonly previewRevoke: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    /** A device asking to be signed in; refused while too many already wait. */
     readonly request: (caller: Caller, name: string) => Effect.Effect<T.ApprovalCreated, ApiError>;
-    /** The asking device's key once approved, given once; nothing while it waits. */
     readonly collect: (claim: string) => Effect.Effect<T.ApprovalCollected, ApiError>;
     readonly requests: () => T.Approval[];
     readonly answerRequest: (id: string, allow: boolean) => Effect.Effect<T.Approval[], ApiError>;
-    /** Each revoked device's id: what holds its connections cuts them. */
     readonly revoked: Stream.Stream<string>;
   }
 >()("@vibevalley/server/user/user") {
@@ -104,7 +96,6 @@ export const sameSecret =
   (given: string): boolean =>
     given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
 
-/** A name as given, its runs of space made one and cut at 40 characters; "" when nothing is left. */
 export const tidyName = (given: string) => Arr.join(Arr.take(Array.from(Arr.join(Arr.filter(Str.split(given, /\s+/u), Str.isNonEmpty), " ")), 40), "");
 
 const derive = (password: string, salt: Buffer, length: number, costs: { readonly N: number; readonly r: number; readonly p: number }) =>
@@ -121,7 +112,7 @@ const hashPassword = (password: string) =>
     return Arr.join(["scrypt", String(cost.N), String(cost.r), String(cost.p), salt.toString("base64url"), out.toString("base64url")], ":");
   });
 
-/** A stored hash written with other costs still checks: they are read from it. */
+/** Reads N/r/p from the stored hash so cost upgrades do not invalidate existing passwords. */
 const checkPassword = (password: string, stored: string) =>
   Effect.gen(function* () {
     const [kind, n, r, p, salt = "", want = ""] = Str.split(stored, ":");
@@ -140,7 +131,7 @@ const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const now = () => clock.currentTimeMillisUnsafe();
   const revokes = yield* scopedPubSub<string>();
-  // Sign-ins check one at a time, so the wrong-try count cannot be raced past.
+  // Serialize sign-ins so concurrent attempts cannot race past `wrongTries`.
   const signing = yield* Semaphore.make(1);
 
   const account = yield* db.one(accountQ.userAccount());
@@ -162,7 +153,7 @@ const make = Effect.gen(function* () {
     });
   }
 
-  // Kept in memory only: a restart drops every waiting request, and the asking device asks again.
+  // In-memory only: restarts drop pending approvals and callers request a new code.
   const waiting = new Map<string, Request>();
   const live = () => {
     for (const [id, r] of waiting) if (r.expiresAt <= now()) waiting.delete(id);
@@ -178,7 +169,7 @@ const make = Effect.gen(function* () {
 
   const status = (caller: Caller): T.UserStatus => {
     const device = caller.device !== undefined ? devices.get(caller.device) : undefined;
-    // A caller at the gate with no key learns only whether it can sign in.
+    // Unauthenticated callers at the gate do not learn the user's name.
     const seen = caller.here || device !== undefined;
     return { name: seen ? name : "", password: passwordHash !== undefined, here: caller.here, ...(device !== undefined ? { device: shown(device) } : {}) };
   };
@@ -212,7 +203,6 @@ const make = Effect.gen(function* () {
       { discard: true },
     );
   });
-  // At start, then daily; the gate also refuses an idle key the moment it is used (byKey).
   yield* Effect.forkScoped(Effect.repeat(takeBackIdle(), Schedule.spaced("1 day")));
 
   return User.of({
@@ -311,7 +301,7 @@ const make = Effect.gen(function* () {
         r.every += slowDownSeconds;
         return { every: r.every };
       }
-      // The device is made when its key is collected: an approval nobody collects leaves no device behind.
+      // Persist the device only on collection so abandoned approvals leave no row behind.
       waiting.delete(r.id);
       return { login: yield* addDevice(r.name, "login") };
     }),

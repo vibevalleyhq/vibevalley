@@ -2,15 +2,14 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（33 篇）
+## proposed（28 篇）
 
 ### feature
 
-- 2026-11-10 [网页 Artifact 分种类：slides、motion 先做](.agents/notes/proposed/feature/2026-11-10-html-artifact-kinds.md)
-- 2026-11-09 [设置按功能分，钥匙放一处，没准备好就指路](.agents/notes/proposed/feature/2026-11-09-settings-by-feature.md)
-- 2026-11-09 [频道里用 /imagegen 生图](.agents/notes/proposed/feature/2026-11-09-imagegen-in-channels.md)
+- 2026-11-11 [用户和帮工的名字由人定](.agents/notes/proposed/feature/2026-11-11-names-people-set.md)
+- 2026-11-10 [网页 Artifact 的 motion 动画时间轴与导出视频](.agents/notes/proposed/feature/2026-11-10-html-artifact-kinds.md)
 - 2026-11-04 [网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
-- 2026-10-27 [自己的实时模型经本机 WebSocket 接电话，其余照旧走声网](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
+- 2026-10-27 [通用 OpenAI Realtime 模型经本机 WebSocket 接电话与通话通道拆分](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
 - 2026-10-22 [记忆树：接真数据与手艺播种](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [助手给用户报告：早报、仓库健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)
 - 2026-10-21 [助手的授权：按动作分档，跨轮的同意记下来](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)
@@ -23,11 +22,8 @@
 ### architecture
 
 - 2026-11-10 [一个服务端管多台机器，库换成 Postgres](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
-- 2026-11-09 [工单和频道经 Mailbox 一道门找到帮工](.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md)
-- 2026-11-09 [能力不认供应商，供应商是适配器](.agents/notes/proposed/architecture/2026-11-09-capabilities-and-vendors.md)
-- 2026-11-08 [显式状态机分层体系、Effect v4 原语与全链路错误契约](.agents/notes/proposed/architecture/2026-11-08-explicit-state-machines-and-error-contracts.md)
+- 2026-11-10 [收敛概念、契约表面与跨模块链路](.agents/notes/proposed/architecture/2026-11-10-converge-concepts-and-chains.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
-- 2026-11-06 [Space 隔离单元（repos、worktrees、pkm）与 VibeValley 自举开发全链路收敛步骤](.agents/notes/proposed/architecture/2026-11-06-space-isolation-and-self-hosting.md)
 - 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
 - 2026-11-06 [边界与 Schema 约束准则、扫描脚本与全仓收敛清单](.agents/notes/proposed/architecture/2026-11-06-schema-at-boundaries.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），用户用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
@@ -39,7 +35,6 @@
 
 ### process
 
-- 2026-11-10 [概念表：关键名词由结构认定，逐个批准，名字由它们拼出](.agents/notes/proposed/process/2026-11-10-vocabulary-of-concepts.md)
 - 2026-10-30 [白皮书里还没做的：骨架、重复 lint、流切片、常驻集合和体检，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
 - 2026-10-29 [给仓库做体检：跨区共改、模块深度与代码存活率读数](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)
 - 2026-10-25 [PR Review：日常评审看证据，同题比较再评分](.agents/notes/proposed/process/2026-10-25-pr-review-scoring.md)

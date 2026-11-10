@@ -24,7 +24,6 @@ import { tokensOf, usageText } from "./report.ts";
 import type { RunStore } from "./session.ts";
 import type { SessionIdentity } from "./signals.ts";
 
-/** The input a caller waited on was not taken; cause is whatever stopped it, a defect included. */
 export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly brand: unique symbol }>()("NotAnswered", {
   message: Schema.String,
   cause: Schema.Defect(),
@@ -36,7 +35,7 @@ type CallerState =
   | { readonly _tag: "ended"; readonly kept: readonly string[] }
   | { readonly _tag: "failed"; readonly kept: readonly string[]; readonly failure: Cause.Cause<NotAnswered> };
 
-/** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before. */
+/** Streams one turn's text to an in-process caller; superseded when a newer input joins the run. */
 export class Caller {
   private state: CallerState = { _tag: "buffering", kept: [] };
 
@@ -110,14 +109,11 @@ export class Caller {
   );
 }
 
-/** Why the agent did not start: the model missing a key, or the host closing. The message is what the user reads. */
 class CannotStart extends Schema.TaggedError<CannotStart, { readonly brand: unique symbol }>()("CannotStart", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** An input as the host keeps it: its route (kept in the transcript), and in process only the run it starts and the
- * caller waiting on its words. */
 export interface Hosted<R> {
   readonly route: R;
   readonly run: RunInput;
@@ -126,58 +122,43 @@ export interface Hosted<R> {
 
 export interface HostOptions<R> {
   readonly session: SessionIdentity;
-  /** The custom message type its inputs are kept under in its transcript. */
   readonly inputType: string;
   readonly home: string;
   readonly cwd: string;
   readonly instructions: string;
-  /** Asked when the agent starts: a model missing a key throws, and the input that started it says why. */
+  /** Invoked lazily on first input; throws when the model key is missing. */
   readonly llm: () => ModelClient;
-  /** The tools; each reads the route of the input taken last. */
   readonly tools: (current: () => R) => Tool[];
-  /** The folders of the skills it may load (<folder>/<name>/SKILL.md); none when absent. */
   readonly skills?: readonly string[];
   readonly wakeSoon?: (withinMs: number) => boolean;
-  /** The route before any input is taken. */
   readonly first: R;
-  /** Words are not said for this route (the caller still gets them). */
+  /** Suppresses `say` while still streaming tokens to `caller`. */
   readonly quiet: (route: R) => boolean;
-  /** Where words go: each of the model's answers in full, as one message; the caller has them as they grow. */
   readonly say: (route: R, text: string, run: string) => Effect.Effect<void>;
-  /** route: the input it works for, once it has taken one in this run; its words go there. */
   readonly channel: (route: R) => string | undefined;
-  /** The agent started, or folded its conversation: what the model saw before is gone from it. */
+  /** Invoked when the brain starts or compacts so stale prompt state can be reset. */
   readonly fresh: () => void;
-  /** The run an input found in the transcript after a restart goes on with: its issue and trigger, from its route. */
   readonly restored: (route: R) => RunInput;
-  /** How many events its log keeps; 0 keeps them all. */
+  /** 0 retains all events. */
   readonly keepEvents?: number;
   readonly toolStart: (tool: string, args: unknown) => ToolStart;
 }
 
-/** What makes an input's text once it is its turn. heard: the messages the text tells of, recorded on the run. */
 export type Build<E> = (busy: boolean, memoryNews: string) => Effect.Effect<{ readonly text: string; readonly heard?: readonly string[] }, E>;
 
 type Submitted = { readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string };
 
 export interface AgentHost<R> {
-  /** The input taken last: its route is where words go now. */
   readonly current: () => Hosted<R>;
-  /** The run a restart cut off is in the transcript. */
   readonly unfinished: Effect.Effect<boolean>;
-  /** now joins the run under way. otherwise the input waits until the run would stop. */
+  /** `now: true` steers into the active run; `false` queues until the active run settles. */
   readonly submit: <E>(build: Build<E>, input: Hosted<R>, now: boolean) => Effect.Effect<Submitted, E>;
-  /** The run the last start was cut off in goes on, with the input it was taking, within maxAgeMs. */
   readonly resume: (maxAgeMs: number) => Effect.Effect<void>;
-  /** The inputs waiting are dropped with the run. */
   readonly stop: Effect.Effect<void>;
-  /** Waits for the input being built, closes the agent and follows its last events; every call waits for the one close. */
   readonly close: Effect.Effect<void>;
-  /** The turn that took step on of the log, kept as an eval case with what it should have done. */
   readonly markWrong: (on: number, want: string, model: string, tools: readonly string[]) => Effect.Effect<{ id: string; file: string }, ApiError>;
 }
 
-/** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at the latest. */
 const encodePretty = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
 
 export const makeHost = <R>(
@@ -194,16 +175,14 @@ export const makeHost = <R>(
     const local = new WeakMap<BrainMessage, Hosted<R>>();
     let input: Hosted<R> = { route: o.first, run: { by: { kind: "" } } };
     let toCaller = 0;
-    /** An answer is being written: its words have begun and it is not yet said. */
     let open = false;
     let prefixChanged: string[] = [];
     let closing = false;
     let closer: Fiber.Fiber<void> | undefined;
     let brain: { readonly brain: Brain; readonly scope: Scope.Closeable; readonly following: Fiber.Fiber<void> } | undefined;
-    /** Held from building an input to handing it over, so that each input's text follows the one before. */
+    // Serializes input construction and brain delivery so transcript entries preserve arrival order.
     const inputs = yield* Semaphore.make(1);
     const stopped = () => t("server.session.host.stopped", { label: o.session.name });
-    /** Every line this host logs says whose it is. */
     const own = Effect.annotateLogs({ agent: o.session.id });
     const log = (text: string) => own(Effect.logError(`vibevalley: ${text}`));
 
@@ -222,7 +201,6 @@ export const makeHost = <R>(
       return { ok: false, why: stopped(), run: "" };
     };
 
-    // The caller (a call's line, the local chat/completions) gets the words as they grow.
     const activity = Effect.fn("Session.activity")(function* (action: T.SessionAction, route?: R) {
       const id = sessionId(o.session.id);
       const session = core.session(id);
@@ -258,11 +236,9 @@ export const makeHost = <R>(
         const wrote = open;
         open = false;
         if (text && !o.quiet(at.route)) yield* o.say(at.route, text, inProcess.currentRun());
-        // The run goes on (its tools, another answer) until it settles.
         if (wrote) yield* activity("thinking", at.route);
       });
 
-    // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
     const settled = (aborted: boolean) =>
       Effect.suspend(() => {
         if (aborted && !closing) journal.note("run/error", t("server.session.log.stoppedByUser"));
@@ -272,7 +248,6 @@ export const makeHost = <R>(
         return Effect.void;
       });
 
-    // An answer that failed before any token came has none to tell.
     const noteUsage = (u: Usage | undefined) => {
       if (!u || (u.input === 0 && u.cacheRead === 0 && u.output === 0)) return;
       const changed = prefixChanged;
@@ -301,16 +276,13 @@ export const makeHost = <R>(
             if (isHosted(e.message, o.inputType)) {
               // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
               const next = local.get(e.message) ?? { route: e.message.details as R, run: { by: { kind: "" } } };
-              // An input that joins the run takes the words from here on.
               if (input.caller && input.caller !== next.caller) input.caller.end();
               input = next;
               toCaller = 0;
-              // It works for this input from here on, wherever the run began.
               yield* activity("thinking", next.route);
             }
             return;
           case "agent_start":
-            // The input it starts on is taken next (message_start), and says where.
             return yield* activity("thinking");
           case "message_update": {
             if (e.message.role !== "assistant") return;
@@ -345,7 +317,7 @@ export const makeHost = <R>(
         }
       });
 
-    // Started on first use: loading it is not free, and a farm without a model works otherwise. Only ever under inputs.
+    // Lazily initialized under `inputs` semaphore so startup succeeds even before model keys are configured.
     const start = Effect.gen(function* () {
       if (brain) return brain.brain;
       if (closing) return yield* CannotStart.make({ message: stopped() });
@@ -436,7 +408,7 @@ export const makeHost = <R>(
       );
 
     const closeOnce = Effect.gen(function* () {
-      // The input being built finishes first (and is not delivered), then the agent closes and its last events are followed.
+      // Wait for any in-flight `submit` under `inputs` to see `closing = true` before tearing down the brain scope.
       yield* inputs.withPermits(1)(Effect.void);
       const b = brain;
       if (b) {
@@ -448,8 +420,7 @@ export const makeHost = <R>(
 
     const close = Effect.gen(function* () {
       closing = true;
-      // On the owner's scope, not the first caller's fiber: a caller that is interrupted stops waiting, and the close
-      // goes on for every other caller (the owner closing waits for it too).
+      // Fork in `owner` rather than the caller's fiber so interrupting one caller does not abort shutdown for others.
       closer ??= yield* Effect.forkIn(closeOnce, owner, { uninterruptible: true });
       yield* Fiber.await(closer);
     });
@@ -504,7 +475,6 @@ export const makeHost = <R>(
 
 const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.role === "custom" && m.customType === inputType;
 
-/** The input that began the turn asked. the message puts what the user adds before them). */
 function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;
@@ -515,7 +485,7 @@ function turnAt(lines: readonly BrainMessage[], text: string, time: number, inpu
   return at;
 }
 
-/** What followed an input until the next one, without the compactions written after a run. */
+/** Excludes `compactionSummary` entries appended after the turn settled. */
 function turnOf(rest: readonly BrainMessage[], inputType: string): BrainMessage[] {
   const out: BrainMessage[] = [];
   for (const m of rest) {

@@ -49,10 +49,8 @@ import { mossInstructions, noticeLine, onCallLine } from "./prompts.ts";
 
 export { agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, tunnelAnswers, vendorsFor, voiceAgentUid, voiceUnknown };
 
-/** The Agora credentials as Agora's token signer and REST client take them. */
 const plainAgora = (c: AgoraCredentials) => ({ appId: c.appId, appCertificate: Redacted.value(c.appCertificate) });
 
-/** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
   Effect.callback<void>((resume) => {
     if (signal.aborted) return resume(Effect.void);
@@ -91,7 +89,6 @@ const mapTranscriptionFailure = (e: AudioFailure | TranscriptionFailed): ApiErro
   }
 };
 
-/** A grant is issued with its token, starting while its call is being set up, and on once a call owns it. */
 type GrantPhase = { readonly _tag: "issued" } | { readonly _tag: "starting" } | { readonly _tag: "on"; readonly agent: string };
 
 type Grant =
@@ -107,8 +104,7 @@ type Grant =
       phase: GrantPhase;
     };
 
-/** The MOSS Live line a call speaks through: waiting (pieces held, its link maybe open but not yet set up), ready once the
- * session is updated, closed for good. A call and the page's relay share it, so it is one object whose phase moves on. */
+/** Shared between the call and the page relay; queues commentary in `pending` until `session.updated` arrives. */
 type MossPhase =
   | { readonly _tag: "waiting"; readonly link?: RealtimeLink; readonly pending: string[] }
   | { readonly _tag: "ready"; readonly link: RealtimeLink }
@@ -118,7 +114,6 @@ interface MossLine {
 }
 const waitingLine = (): MossLine => ({ phase: { _tag: "waiting", pending: [] } });
 
-/** A call's agent session: what it says goes through it, with the session's own ConvoAI token. */
 type CallSession = ReturnType<ReturnType<typeof agentFor>["createSession"]>;
 
 interface Call {
@@ -129,11 +124,9 @@ interface Call {
   readonly session?: CallSession | undefined;
   readonly say: (piece: string) => Effect.Effect<void, CallStepFailed>;
   readonly release: () => void;
-  /** A quick/realtime model answers on its own, so its words reach the default channel through `said` and the user's reach `heard`. */
+  /** True when an external realtime model answers directly, so transcripts must be mirrored via heard/said. */
   readonly quick: boolean;
-  /** Said at every pickup; not worth keeping in the chat. */
   readonly greeting: string;
-  /** Aborted once the call is ending: what it still does checks this, and its requests are cut. */
   readonly life: AbortController;
 }
 const ending = (call: Call) => call.life.signal.aborted;
@@ -147,22 +140,17 @@ export class Voice extends Context.Service<
   {
     readonly session: () => Effect.Effect<AgoraGrant, ApiError>;
     readonly renew: (channel: string, uid: string) => Effect.Effect<AgoraGrant, ApiError>;
-    /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
     readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
     readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
-    /** What the user said on a call: the orchestrator overhears it when Agora's model or MOSS answers. */
     readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
-    /** The relay without a call id: the one call on. */
     readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
     readonly said: (agentId: string, text: string) => Effect.Effect<void, ApiError>;
     readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
-    /** A credential check must not capture or send audio. */
+    /** Must not capture or transmit audio. */
     readonly verifyMoss: () => Effect.Effect<Validation>;
     readonly mossLine: () => Effect.Effect<RealtimeLine, ApiError>;
     readonly visionLine: () => Effect.Effect<RealtimeLine, ApiError>;
-    /** The keys of the lines open now, by call. */
     readonly lines: () => number;
-    /** Words read out on the call that is on, queued after what is being said; false when no call is on. */
     readonly speak: (text: string) => Effect.Effect<boolean>;
   }
 >()("@vibevalley/server/voice/voice") {
@@ -170,23 +158,17 @@ export class Voice extends Context.Service<
 }
 
 export interface VoiceOptions {
-  /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
-  /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
   readonly tunnel?: (port: number) => Effect.Effect<Tunnel, LineFailed>;
-  /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
-  /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
   readonly moss?: RealtimeTransport;
 }
 
-/** Something to tell on the call: updates, and what rang when the call answers a ring. */
 interface Told {
   readonly texts: readonly string[];
   readonly ring?: string | undefined;
 }
 
-/** Everything that waited, as one: the texts in the order they came, and the latest ring. */
 const mergedTold = (all: readonly Told[]) => ({ texts: all.flatMap((t) => t.texts), ring: all.findLast((t) => t.ring)?.ring });
 
 const make = (options: VoiceOptions = {}) =>
@@ -205,7 +187,6 @@ const make = (options: VoiceOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     const runHere: Run = yield* FiberSet.makeRuntimePromise();
     const now = () => clock.currentTimeMillisUnsafe();
-    /** A bound account's realtime line, through the transport this Voice was given. */
     const lineOf = (account: Account) => ({ connect: (on: RealtimeEvents) => account.realtime.connect(on, options.moss), redact: account.realtime.redact });
 
     const grants = new Map<string, Grant>();
@@ -215,12 +196,11 @@ const make = (options: VoiceOptions = {}) =>
     let stopped = false;
     const keyOf = (channel: string, uid: string) => channel + "\u0000" + uid;
 
-    // Pending grants have the same validity as their signed token; active calls own their grant until stop.
+    // Active calls retain their grant until stop, even past token expiry.
     const prune = () => {
       for (const [k, g] of grants) if (g.phase._tag === "issued" && g.expires <= now()) grants.delete(k);
     };
 
-    // Asked each time: credentials saved from the title screen work without a restart.
     const creds = () => {
       const c = settings.agora();
       return c ? Effect.succeed(c) : Effect.fail(unavailable(t("server.voice.noAgora"), "call"));
@@ -265,7 +245,7 @@ const make = (options: VoiceOptions = {}) =>
 
     const liveCall = () => [...calls].find(([, c]) => !ending(c))?.[0];
 
-    // Queued after what is being said (APPEND): never over the user; the user may talk over it.
+    // APPEND priority queues behind current speech without interrupting the user.
     const speakOn = Effect.fnUntraced(
       function* (agentId: string, text: string) {
         const call = calls.get(agentId);
@@ -627,7 +607,7 @@ const make = (options: VoiceOptions = {}) =>
               );
               if (!acquired) {
                 const writer = yield* page.writer;
-                // The writer waits for reader acquisition, including when refusing an upgraded socket.
+                // Socket.writer blocks until page.reader has been acquired, even when closing immediately.
                 yield* page.reader.pipe(
                   Effect.andThen(() => writer.write(new Socket.CloseEvent(1013, "Live session already open"))),
                   Effect.ignore({ log: "Debug" }),
@@ -651,7 +631,7 @@ const make = (options: VoiceOptions = {}) =>
                 onPageText: (data) => {
                   const decoded = decodeMossFrame(data);
                   if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
-                  // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
+                  // Inject persona and ask_orchestrator tool when a farm MOSS call is active.
                   const v = settings.voice();
                   if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !ending(c))) return data;
                   toolsEnabled = true;
