@@ -43,7 +43,7 @@ Status: proposed
 
 | 步 | 状态 | 提交 | 做了什么 |
 |---|---|---|---|
-| 1 Postgres | 完成 | 本步的提交 | 表结构与查询改成 Postgres 方言：时间 `double precision`（不用 `bigint`，Postgres 的驱动把它当字符串交回）、触发器改 plpgsql、全文搜索换成 `term_vector`/`term_query` 加 GIN 索引、JSON 文本列在查询里 `::jsonb`、`authorization` 加引号（保留字）、`channel.root_id` 的外键建完表再加。`scripts/pg-generate.ts` 让 PGlite 对每条查询做 Parse 和 Describe，参数与结果列的类型是 Postgres 说的，结果列来自哪张表哪一列也是它说的（`tableID`、`columnID`），只剩「算出来的列会不会为空」和取值集合靠查询里的记号。驱动二选一：`database.url`（`@effect/sql-pg`，按密钥读，空库才建表、记下哈希，别的一律拒绝启动），否则 PGlite 在 `db` 目录；内存库从每个进程建一次的模板拷一份（新起一个约 0.7 秒，拷一份约 0.1 秒）。服务端测试只开一半的核：PGlite 吃 CPU，开满时最重的几个媒体测试会等过超时。测试里手写的 SQLite 触发器都换成共用的 `refuse`/`allow`（plpgsql）；几个测试原来靠 SQLite 下碰巧的先后（外发消息的顺序、消费后才挂的 👀），改成等那件事本身 |
+| 1 Postgres | 完成，CI 上的真 Postgres 未做 | `f94e225de` | 表结构与查询改成 Postgres 方言：时间 `double precision`（不用 `bigint`，Postgres 的驱动把它当字符串交回）、触发器改 plpgsql、全文搜索换成 `term_vector`/`term_query` 加 GIN 索引、JSON 文本列在查询里 `::jsonb`、`authorization` 加引号（保留字）、`channel.root_id` 的外键建完表再加。`scripts/pg-generate.ts` 让 PGlite 对每条查询做 Parse 和 Describe，参数与结果列的类型是 Postgres 说的，结果列来自哪张表哪一列也是它说的（`tableID`、`columnID`），只剩「算出来的列会不会为空」和取值集合靠查询里的记号。驱动二选一：`database.url`（`@effect/sql-pg`，按密钥读，空库才建表、记下哈希，别的一律拒绝启动），否则 PGlite 在 `db` 目录；内存库从每个进程建一次的模板拷一份（新起一个约 0.7 秒，拷一份约 0.1 秒）。服务端测试只开一半的核：PGlite 吃 CPU，开满时最重的几个媒体测试会等过超时。测试里手写的 SQLite 触发器都换成共用的 `refuse`/`allow`（plpgsql）；几个测试原来靠 SQLite 下碰巧的先后（外发消息的顺序、消费后才挂的 👀），改成等那件事本身。手动在一个真的 Postgres（本机临时起的集群）上验过：空库建表并记下哈希，重启认得出，已有别的表的库拒绝启动。还没做：CI 在真 Postgres 上跑服务端测试，要给每座测试农场建一个自己的空库 |
 
 ## Alternatives considered
 
