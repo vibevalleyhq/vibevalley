@@ -49,3 +49,39 @@ it("regression: connection facts update only their server and reset only their s
     false,
   ]);
 });
+
+it("pure doing updates during a working phase leave issues untouched", () => {
+  const session: Session = {
+    id: sessionId("w1"),
+    role: "worker",
+    name: "worker",
+    agent: "lab",
+    runtime: "codex",
+    brief: "work",
+    issue: "t1",
+    hiredAt: 1,
+    runs: 1,
+    phase: { _tag: "working", since: 10, doing: { action: "thinking", label: "" } },
+    refining: false,
+  };
+  const issue = {
+    id: "t1",
+    status: "in_progress",
+    deliver: "change",
+    createdAt: 1,
+    questions: [],
+    findings: [],
+    assignments: [{ id: "a1", agent: "lab", assignedAt: 1, executions: [{ id: "e1", executor: "w1", startedAt: 1 }] }],
+    stage: { state: "working", since: 10, acts: [] },
+    moves: [],
+  } as unknown as Issue;
+  const initial = { ...emptySpaceState(), sessions: [session], issues: [issue] };
+  const [next, changed] = reduce(initial, {
+    type: "sessionPhaseChanged",
+    at: 20,
+    id: session.id,
+    phase: { _tag: "working", since: 10, doing: { action: "read_file", label: "src/app.ts" } },
+  });
+  expect(changed).toBe(true);
+  expect(next.issues).toBe(initial.issues);
+});

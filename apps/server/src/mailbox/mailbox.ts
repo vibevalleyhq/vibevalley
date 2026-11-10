@@ -302,12 +302,18 @@ export class Mailbox extends Context.Service<
       });
 
       const dropSession = (session: string, why: string) =>
-        Effect.gen(function* () {
-          yield* db.run(qd.dropOpen({ session_id: session, dropped_why: why }));
-          open.dropped(session);
-          reach.left(session);
-          breaker.reset(session);
-        });
+        db.inTx(
+          Effect.gen(function* () {
+            yield* db.run(qd.dropOpen({ session_id: session, dropped_why: why }));
+            yield* db.afterCommit(
+              Effect.sync(() => {
+                open.dropped(session);
+                reach.left(session);
+                breaker.reset(session);
+              }),
+            );
+          }),
+        );
       const record = Effect.fn("Mailbox.record")(function* (event: SourceEvent) {
         if (event.selfEcho === true) return undefined;
         return yield* journal.recordTrigger(event);
@@ -367,8 +373,12 @@ export class Mailbox extends Context.Service<
         }),
         news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
         handBack: Effect.fn("Mailbox.handBack")(function* (session, envelope) {
-          yield* db.run(qd.rollbackOne({ session_id: session, envelope_id: envelope }));
-          open.handedBackOne(session, envelope);
+          yield* db.inTx(
+            Effect.gen(function* () {
+              yield* db.run(qd.rollbackOne({ session_id: session, envelope_id: envelope }));
+              yield* db.afterCommit(Effect.sync(() => open.handedBackOne(session, envelope)));
+            }),
+          );
         }, writtenLocked),
         withdraw: Effect.fn("Mailbox.withdraw")(function* (what) {
           switch (what._tag) {
@@ -376,10 +386,16 @@ export class Mailbox extends Context.Service<
               return yield* writtenLocked(dropSession(what.session, what.why));
             case "Envelope":
               return yield* writtenLocked(
-                Effect.gen(function* () {
-                  const rows = yield* db.run(qd.dropOpenOf({ message_id: what.envelope }));
-                  for (const row of rows) open.remove(row.session_id, what.envelope);
-                }),
+                db.inTx(
+                  Effect.gen(function* () {
+                    const rows = yield* db.run(qd.dropOpenOf({ message_id: what.envelope }));
+                    yield* db.afterCommit(
+                      Effect.sync(() => {
+                        for (const row of rows) open.remove(row.session_id, what.envelope);
+                      }),
+                    );
+                  }),
+                ),
               );
             case "Issue":
               return yield* work.retireDispatches(what.issue, what.at);
@@ -418,13 +434,21 @@ export class Mailbox extends Context.Service<
         handBack: api.handBack,
         hand: work.hand,
         consume: Effect.fn("Mailbox.consume")(function* (session, envelope, at) {
-          yield* db.run(qd.consumeDelivery({ session_id: session, envelope_id: envelope, consumed_at: at }));
-          open.remove(session, envelope);
+          yield* db.inTx(
+            Effect.gen(function* () {
+              yield* db.run(qd.consumeDelivery({ session_id: session, envelope_id: envelope, consumed_at: at }));
+              yield* db.afterCommit(Effect.sync(() => open.remove(session, envelope)));
+            }),
+          );
         }, writtenLocked),
         returnHanded: Effect.fn("Mailbox.returnHanded")(function* (session) {
-          const rows = yield* db.run(qd.rollbackHanded({ session_id: session }));
-          open.handedBack(session);
-          return rows.map((row) => row.envelope_id);
+          return yield* db.inTx(
+            Effect.gen(function* () {
+              const rows = yield* db.run(qd.rollbackHanded({ session_id: session }));
+              yield* db.afterCommit(Effect.sync(() => open.handedBack(session)));
+              return rows.map((row) => row.envelope_id);
+            }),
+          );
         }, writtenLocked),
         breakerSpoke: (session) => breaker.spoke(session),
         breakerFailed: (session) => breaker.failed(session),

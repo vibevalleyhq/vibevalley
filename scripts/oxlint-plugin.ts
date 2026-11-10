@@ -914,6 +914,64 @@ const atomDoor = defineRule({
   },
 });
 
+const isSubpath = (spec: string, prefix: string) => spec === prefix || spec.startsWith(`${prefix}/`);
+
+const unstableEffectDoor = defineRule({
+  meta: {
+    messages: {
+      unstable: says(
+        "`{{source}}` is an unstable or experimental Effect subpath whose API may change on a minor bump",
+        "keep it inside `apps/server/src/infra/` or `apps/web/src/state/` and expose a small stable helper there",
+        "docs/subsystems/foundation.md",
+      ),
+      rpc: says(
+        "`{{source}}` wires the RPC transport directly outside the farm's typed client and server doors",
+        "declare contracts in `packages/protocol/src/rpc.ts`, serve in `apps/server/src/http/`, and call via `apps/web/src/infra/`",
+        "docs/subsystems/foundation.md",
+      ),
+      observability: says(
+        "`{{source}}` configures telemetry exporters outside the server's bootstrap door",
+        "keep OTLP wiring in `apps/server/src/main.ts` or `apps/server/src/infra/`, and trace calls with `Effect.fn` or `Metric`",
+        "docs/subsystems/foundation.md",
+      ),
+      cli: says(
+        "`{{source}}` pulls command-line parsing into code that is not a CLI entrypoint",
+        "keep `effect/cli` inside `apps/cli/src/` and `apps/server/src/chat/`",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    const raw = context.filename.replaceAll("\\", "/");
+    const file = raw.startsWith("/") ? raw : `/${raw}`;
+    const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
+      if (typeof spec !== "string" || !spec.startsWith("effect/")) return;
+      if (isSubpath(spec, "effect/unstable") || isSubpath(spec, "effect/experimental")) {
+        if (!file.includes("/apps/server/src/infra/") && !file.includes("/apps/web/src/state/"))
+          context.report({ node, messageId: "unstable", data: { source: spec } });
+        return;
+      }
+      if (isSubpath(spec, "effect/rpc")) {
+        if (!file.endsWith("/packages/protocol/src/rpc.ts") && !file.includes("/apps/server/src/http/") && !file.includes("/apps/web/src/infra/"))
+          context.report({ node, messageId: "rpc", data: { source: spec } });
+        return;
+      }
+      if (isSubpath(spec, "effect/observability")) {
+        if (!file.endsWith("/apps/server/src/main.ts") && !file.includes("/apps/server/src/infra/"))
+          context.report({ node, messageId: "observability", data: { source: spec } });
+        return;
+      }
+      if (isSubpath(spec, "effect/cli") && !file.includes("/apps/cli/src/") && !file.includes("/apps/server/src/chat/"))
+        context.report({ node, messageId: "cli", data: { source: spec } });
+    };
+    return {
+      ImportDeclaration: (node) => check(node, node.source.value),
+      ExportNamedDeclaration: (node) => check(node, node.source?.value),
+      ExportAllDeclaration: (node) => check(node, node.source.value),
+    };
+  },
+});
+
 const solidStores = new Set(["createSignal", "createStore"]);
 
 const pageStore = defineRule({
@@ -1475,6 +1533,7 @@ export default definePlugin({
     "scoped-fibers": scopedFibers,
     "yield-in-loop": yieldInLoop,
     "atom-door": atomDoor,
+    "unstable-effect-door": unstableEffectDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,
     "act-door": actDoor,

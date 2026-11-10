@@ -8,10 +8,19 @@ import { isOnDuty, sessionOf, withSession } from "#/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
+/** Pure `doing` or `spent` updates during an active run never change any issue's status, stage or moves. */
+const phaseAffectsIssue = (before: T.Phase, after: T.Phase): boolean =>
+  !(before._tag === "working" && after._tag === "working" && before.since === after.since && before.quietSince === after.quietSince);
+
 /** A fact that changes nothing says so (false), and is not sent. facts about sessions not on the farm change nothing. */
 export function reduce(state: T.SpaceState, fact: T.Fact): [T.SpaceState, boolean] {
   const [next, changed] = fold(state, fact);
-  return changed && (next.issues !== state.issues || next.sessions !== state.sessions) ? [withIssueStatuses(next), true] : [next, changed];
+  if (!changed) return [next, false];
+  if (fact.type === "sessionPhaseChanged") {
+    const before = sessionOf(state, fact.id);
+    if (before && !phaseAffectsIssue(before.phase, fact.phase)) return [next, true];
+  }
+  return next.issues !== state.issues || next.sessions !== state.sessions ? [withIssueStatuses(next), true] : [next, true];
 }
 
 function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {

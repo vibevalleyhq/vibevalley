@@ -66,27 +66,10 @@ export const issueTools = Effect.gen(function* () {
   const issue = yield* Issue;
   const mailbox = yield* Mailbox;
 
-  // The orchestrator may name a session by its id, its name, or words that contain its name.
-  const findSession = (key: string) => {
-    const all = run.hired();
-    return all.find((session) => session.id === key) ?? all.find((session) => session.name === key) ?? all.find((session) => key.includes(session.name));
-  };
-
-  // The orchestrator names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
+  // Resolves `#41`, `41`, an issue id, or the name or id of a helper working it via Issue.get / Issue.idOf.
   const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<T.Issue, string> {
     const k = key.trim().replace(/^#/u, "");
-    const all = yield* issue.list();
-    if (/^\d+$/u.test(k)) {
-      const byNumber = all.find((item) => item.number === Number(k));
-      if (!byNumber) return yield* Effect.fail(answers.noIssueNumber(k));
-      return byNumber;
-    }
-    const byId = all.find((item) => item.id === k);
-    if (byId) return byId;
-    const session = findSession(k);
-    const of = session?.issue ? all.find((item) => item.id === session.issue) : undefined;
-    if (!of) return yield* Effect.fail(answers.noIssueOrAgent(k));
-    return of;
+    return yield* issue.get(key).pipe(Effect.mapError(() => (/^\d+$/u.test(k) ? answers.noIssueNumber(k) : answers.noIssueOrAgent(k))));
   });
 
   const withIssue = <E>(key: string, f: (issue: T.Issue) => Effect.Effect<string, E>) =>

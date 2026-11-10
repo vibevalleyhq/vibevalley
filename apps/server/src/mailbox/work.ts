@@ -149,25 +149,31 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           return [{ input, row }];
         });
       });
-      const committed = yield* db.inTx(
-        Effect.forEach(entries, ({ input, row }) =>
-          Effect.gen(function* () {
-            if (input.prepare && !(yield* input.prepare)) return undefined;
-            if (input.previous) yield* db.run(qd.dropReassigned({ session_id: input.previous, envelope_id: input.trigger.id }));
-            const added = yield* db.run(writeDelivery({ session: input.session, row }));
-            yield* input.commit;
-            const receipt = yield* db.run(markRoute({ session: input.session, row }));
-            return { input, row, added, receipt };
-          }),
-        ),
+      yield* db.inTx(
+        Effect.gen(function* () {
+          const committed = yield* Effect.forEach(entries, ({ input, row }) =>
+            Effect.gen(function* () {
+              if (input.prepare && !(yield* input.prepare)) return undefined;
+              if (input.previous) yield* db.run(qd.dropReassigned({ session_id: input.previous, envelope_id: input.trigger.id }));
+              const added = yield* db.run(writeDelivery({ session: input.session, row }));
+              yield* input.commit;
+              const receipt = yield* db.run(markRoute({ session: input.session, row }));
+              return { input, row, added, receipt };
+            }),
+          );
+          yield* db.afterCommit(
+            Effect.sync(() => {
+              for (const entry of committed) {
+                if (!entry) continue;
+                received(entry.receipt);
+                if (entry.input.previous) open.remove(entry.input.previous, entry.input.trigger.id);
+                for (const added of entry.added) stored(entry.input.session, { ...entry.row, position: added.position });
+                if (entry.input.trigger.actor.kind === "user" && entry.row.wakes) breaker.reset(entry.input.session);
+              }
+            }),
+          );
+        }),
       );
-      for (const entry of committed) {
-        if (!entry) continue;
-        received(entry.receipt);
-        if (entry.input.previous) open.remove(entry.input.previous, entry.input.trigger.id);
-        for (const added of entry.added) stored(entry.input.session, { ...entry.row, position: added.position });
-        if (entry.input.trigger.actor.kind === "user" && entry.row.wakes) breaker.reset(entry.input.session);
-      }
       return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "" };
     }, writtenLocked);
 
@@ -190,27 +196,37 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         created_at: at,
         payload: triggerPayload(trigger, session.issue),
       }));
-      const committed = yield* db
+      yield* db
         .attemptTx(
-          Effect.forEach(rows, (row) =>
-            Effect.gen(function* () {
-              if (session.issue) yield* qi.holdIssueTrigger({ trigger_id: row.envelope_id, issue_id: session.issue, created_at: at });
-              const added = yield* writeDelivery({ session: session.id, row });
-              yield* qd.markHanded({ session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
-              if (session.issue) yield* qi.forwardIssueInput({ trigger_id: row.envelope_id, session_id: session.id });
-              const receipt = yield* markRoute({ session: session.id, row });
-              return { added, receipt, row };
-            }),
-          ),
+          Effect.gen(function* () {
+            const committed = yield* Effect.forEach(rows, (row) =>
+              Effect.gen(function* () {
+                if (session.issue) yield* qi.holdIssueTrigger({ trigger_id: row.envelope_id, issue_id: session.issue, created_at: at });
+                const added = yield* writeDelivery({ session: session.id, row });
+                yield* qd.markHanded({ session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
+                if (session.issue) yield* qi.forwardIssueInput({ trigger_id: row.envelope_id, session_id: session.id });
+                const receipt = yield* markRoute({ session: session.id, row });
+                return { added, receipt, row };
+              }),
+            );
+            yield* db.afterCommit(
+              Effect.sync(() => {
+                for (const entry of committed) received(entry.receipt);
+                for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
+              }),
+            );
+          }),
         )
         .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
-      for (const entry of committed) received(entry.receipt);
-      for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
     }, writtenLocked);
 
     const hand = Effect.fn("Mailbox.hand")(function* (session: string, envelope: string, launch: string, at: number) {
-      yield* db.run(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
-      open.handed(session, envelope, launch);
+      yield* db.inTx(
+        Effect.gen(function* () {
+          yield* db.run(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
+          yield* db.afterCommit(Effect.sync(() => open.handed(session, envelope, launch)));
+        }),
+      );
     }, writtenLocked);
 
     const registerTalk = Effect.fn("Mailbox.registerTalk")(function* (session: string, launch: string, at: number, rows: readonly TalkRow[]) {
@@ -244,22 +260,28 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           return row;
         }),
       );
-      const committed = yield* db
+      yield* db
         .attemptTx(
-          Effect.forEach(prepared, (row) =>
-            Effect.gen(function* () {
-              const added = yield* writeDelivery({ session, row });
-              yield* qd.markHanded({ session_id: session, envelope_id: row.envelope_id, launch, handed_at: at });
-              const receipt = yield* markRoute({ session, row });
-              return { row, added, receipt };
-            }),
-          ),
+          Effect.gen(function* () {
+            const committed = yield* Effect.forEach(prepared, (row) =>
+              Effect.gen(function* () {
+                const added = yield* writeDelivery({ session, row });
+                yield* qd.markHanded({ session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
+                const receipt = yield* markRoute({ session, row });
+                return { row, added, receipt };
+              }),
+            );
+            yield* db.afterCommit(
+              Effect.sync(() => {
+                for (const entry of committed) {
+                  received(entry.receipt);
+                  for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
+                }
+              }),
+            );
+          }),
         )
         .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
-      for (const entry of committed) {
-        received(entry.receipt);
-        for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
-      }
     }, writtenLocked);
 
     const subscribe = Effect.fn("Mailbox.subscribe")(function* (issue: string, threads: readonly string[]) {

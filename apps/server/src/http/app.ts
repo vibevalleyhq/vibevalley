@@ -48,6 +48,24 @@ const ready = (listening: (address: string) => Effect.Effect<void>) =>
     }),
   );
 
+const served = (
+  config: ServerConfig["Service"],
+  listening: (address: string) => Effect.Effect<void>,
+  options: ServiceOptions,
+) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const server = yield* HttpServer.HttpServer;
+      const boundPort = server.address._tag === "TcpAddress" ? server.address.port : config.port;
+      // Resolve ephemeral port 0 before building services so restored sessions and LAN forwarding never see :0.
+      const resolved = boundPort === config.port ? config : { ...config, port: boundPort };
+      return HttpRouter.serve(routes(resolved), { disableListenLog: true, disableLogger: true }).pipe(
+        Layer.merge(ready(listening)),
+        Layer.provideMerge(services(resolved, options)),
+      );
+    }),
+  );
+
 /** port 0 is a free one. */
 export const app = (
   config: ServerConfig["Service"],
@@ -56,11 +74,9 @@ export const app = (
   options: ServiceOptions = {},
 ) => {
   const server = createServer();
-  return HttpRouter.serve(routes(config), { disableListenLog: true, disableLogger: true }).pipe(
-    Layer.merge(ready(listening)),
+  return served(config, listening, options).pipe(
     // Stopping waits for every socket to close, and an event stream whose client has gone keeps its socket until its next write: every connection is closed first, before the server's own close.
     Layer.merge(Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections())))),
-    Layer.provideMerge(services(config, options)),
     Layer.provide(NodeHttpServer.layer(() => server, { host: "127.0.0.1", port })),
   );
 };

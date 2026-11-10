@@ -150,6 +150,51 @@ export function withIssue(all: readonly T.Issue[] | undefined, t: T.Issue): T.Is
   return next.toSorted(issueOrder);
 }
 
+interface StatusLookup {
+  readonly sessions: ReadonlyMap<string, T.Session>;
+  readonly refining: ReadonlyMap<string, T.IssueRefining>;
+  readonly children: ReadonlyMap<string, readonly T.Issue[]>;
+}
+
+function lookupOf(state: T.SpaceState): StatusLookup {
+  const sessions = new Map<string, T.Session>();
+  const refining = new Map<string, T.IssueRefining>();
+  for (const h of state.sessions) {
+    sessions.set(h.id, h);
+    if (h.refining && h.issue !== undefined && !refining.has(h.issue)) refining.set(h.issue, { session: h.id, name: h.name });
+  }
+  const children = new Map<string, T.Issue[]>();
+  for (const item of state.issues) {
+    if (item.parent === undefined) continue;
+    const list = children.get(item.parent);
+    if (list) list.push(item);
+    else children.set(item.parent, [item]);
+  }
+  return { sessions, refining, children };
+}
+
+function statusWithLookup(t: T.Issue, lookup: StatusLookup): T.IssueStatus {
+  if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
+  const active = latestSessionIdOf(t);
+  if (active && lookup.sessions.get(active)?.phase._tag === "working") return "in_progress";
+  const children = lookup.children.get(t.id);
+  if (children && children.length > 0) {
+    const statuses = children.map((child) => statusWithLookup(child, lookup));
+    if (statuses.every((status) => status === "done" || status === "canceled")) return "in_review";
+    if (statuses.some((status) => status !== "backlog")) return "in_progress";
+  }
+  const latestSession = latestSessionIdOf(t);
+  if (latestSession !== undefined) {
+    const h = lookup.sessions.get(latestSession);
+    if (!h) return "todo";
+    const unfinished = t.questions.length > 0 || h.lastRun?.outcome !== "completed" || (t.deliver === "answer" && !h.lastRun.answer);
+    return isBusy(h) || awaitsFeedback(t, h) || unfinished ? "in_progress" : "in_review";
+  }
+  if (t.queuedAt !== undefined) return "todo";
+  if (t.lastRun) return t.lastRun.endedAt === undefined || t.lastRun.outcome !== "completed" || t.questions.length > 0 ? "in_progress" : "in_review";
+  return t.queuedAt !== undefined ? "todo" : "backlog";
+}
+
 export function issueRefiningOf(t: T.Issue, state: T.SpaceState): T.IssueRefining | undefined {
   const h = state.sessions.find((h) => h.refining && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
@@ -157,11 +202,14 @@ export function issueRefiningOf(t: T.Issue, state: T.SpaceState): T.IssueRefinin
 
 /** The same array when none changed. */
 export function withIssueStatuses(state: T.SpaceState): T.SpaceState {
+  if (state.issues.length === 0) return state;
+  const lookup = lookupOf(state);
   let next: T.Issue[] | undefined;
   state.issues.forEach((t, i) => {
-    const status = issueStatusOf(t, state);
-    const drafting = issueRefiningOf(t, state);
-    const stage = issueStageIn(omitUndefined({ ...t, status, refining: drafting }), state);
+    const status = statusWithLookup(t, lookup);
+    const drafting = lookup.refining.get(t.id);
+    const last = latestSessionIdOf(t);
+    const stage = issueStageOf(omitUndefined({ ...t, status, refining: drafting }), last === undefined ? undefined : lookup.sessions.get(last));
     // The moves read the stage: a round that failed is not completed, from the moment it fails.
     const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, stage }));
     if (status === t.status && same(drafting, t.refining) && same(stage, t.stage) && same(moves, t.moves)) return;

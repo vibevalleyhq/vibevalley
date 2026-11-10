@@ -71,7 +71,11 @@ export const issueLifecycle = Effect.gen(function* () {
       if (!row) return yield* Effect.fail(missing(t("server.issue.issueNumbered", { n: number }), [lookIn.issue]));
       return row.id;
     }
-    return worked.issueOf(r) ?? r;
+    const bySession = worked.issueOf(r);
+    if (bySession) return bySession;
+    const hired = core.state().sessions.filter((s) => s.role === "worker");
+    const byName = hired.find((s) => s.name === r) ?? hired.find((s) => s.name !== "" && r.includes(s.name));
+    return byName?.issue ?? r;
   });
 
   const get = Effect.fn("Issue.get")(function* (ref: string): Effect.fn.Return<T.Issue, ApiError> {
@@ -142,7 +146,7 @@ export const issueLifecycle = Effect.gen(function* () {
         return yield* Effect.fail(refused(t("server.issue.dependencies.invalid")));
     }
     const at = yield* Clock.currentTimeMillis;
-    const assignment = yield* db.attemptTx(
+    yield* db.attemptTx(
       Effect.gen(function* () {
         yield* q.addIssue(
           issueRow(
@@ -162,11 +166,15 @@ export const issueLifecycle = Effect.gen(function* () {
             cron,
           ),
         );
-        return yield* assignTo(id, req.agent ?? (parent ? assignedAgentOf(parent) : undefined), at);
+        const assignment = yield* assignTo(id, req.agent ?? (parent ? assignedAgentOf(parent) : undefined), at);
+        yield* db.afterCommit(
+          Effect.gen(function* () {
+            worked.changed(assignment.changed);
+            yield* publish(id);
+          }),
+        );
       }),
     );
-    worked.changed(assignment.changed);
-    yield* publish(id);
     return yield* get(id);
   });
 
@@ -179,12 +187,54 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* core.apply({ type: "issueRemoved", id: issueId(id) });
   });
 
+  const rankStep = 1024;
+  const rankBound = 2_000_000_000;
+
   const place = Effect.fn("Issue.place")(function* (id: string, before: string) {
-    const order: string[] = (yield* everyIssue).filter((item) => executionsOf(item).length === 0 && item.id !== id).map((item) => item.id);
-    const at = order.indexOf(before);
-    order.splice(at < 0 ? order.length : at, 0, id);
-    yield* db.inTx(Effect.forEach(order, (each, rank) => db.run(q.placeIssue({ rank, id: each })), { discard: true }));
-    yield* Effect.forEach(order, (each) => publish(each), { discard: true });
+    const unsentIssues = (yield* everyIssue).filter((item) => executionsOf(item).length === 0);
+    const from = unsentIssues.findIndex((item) => item.id === id);
+    const moving = from >= 0 ? unsentIssues[from] : undefined;
+    if (!moving) return;
+    const rest = unsentIssues.filter((item) => item.id !== id);
+    const rawAt = rest.findIndex((item) => item.id === before);
+    const at = rawAt < 0 ? rest.length : rawAt;
+    if (at === from) return;
+    const prev = at > 0 ? rest[at - 1] : undefined;
+    const next = at < rest.length ? rest[at] : undefined;
+    const prevRank = prev === undefined ? undefined : (prev.rank ?? 0);
+    const nextRank = next === undefined ? undefined : (next.rank ?? 0);
+    let singleRank: number | undefined;
+    if (prevRank === undefined && nextRank !== undefined) {
+      const r = nextRank - rankStep;
+      if (r >= -rankBound) singleRank = r;
+    } else if (prevRank !== undefined && nextRank === undefined) {
+      const r = prevRank + rankStep;
+      if (r <= rankBound) singleRank = r;
+    } else if (prevRank !== undefined && nextRank !== undefined && nextRank - prevRank >= 2) {
+      singleRank = Math.trunc((prevRank + nextRank) / 2);
+    }
+    if (singleRank !== undefined) {
+      yield* db.inTx(
+        Effect.gen(function* () {
+          yield* db.run(q.placeIssue({ rank: singleRank, id }));
+          yield* db.afterCommit(publish(id));
+        }),
+      );
+      return;
+    }
+    const ordered = [...rest];
+    ordered.splice(at, 0, moving);
+    const changed = ordered.flatMap((item, index) => {
+      const target = (index + 1) * rankStep;
+      return (item.rank ?? 0) === target ? [] : [{ id: item.id, rank: target }];
+    });
+    if (changed.length === 0) return;
+    yield* db.inTx(
+      Effect.gen(function* () {
+        yield* Effect.forEach(changed, (each) => db.run(q.placeIssue(each)), { discard: true });
+        yield* db.afterCommit(Effect.forEach(changed, (each) => publish(each.id), { discard: true }));
+      }),
+    );
   });
 
   const saveEdit = Effect.fn("Issue.saveEdit")(function* (
@@ -202,7 +252,7 @@ export const issueLifecycle = Effect.gen(function* () {
     },
   ) {
     const at = yield* Clock.currentTimeMillis;
-    const assignment = yield* db.run(
+    yield* db.run(
       db.attemptTx(
         Effect.gen(function* () {
           yield* q.editIssue({
@@ -215,13 +265,17 @@ export const issueLifecycle = Effect.gen(function* () {
             id,
           });
           if (fields.clearQuestions === true) yield* q.setIssueQuestions({ id, questions: null });
-          return yield* assignTo(id, fields.agent, at);
+          const assignment = yield* assignTo(id, fields.agent, at);
+          yield* db.afterCommit(
+            Effect.gen(function* () {
+              worked.changed(assignment.changed);
+              if (fields.before === undefined) yield* publish(id);
+            }),
+          );
         }),
       ),
     );
-    worked.changed(assignment.changed);
     if (fields.before !== undefined) yield* place(id, fields.before);
-    else yield* publish(id);
   });
 
   const saveRefinement = Effect.fn("Issue.saveRefinement")(function* (
@@ -320,10 +374,10 @@ export const issueLifecycle = Effect.gen(function* () {
         if (isLatestAnswer && outcome === "completed") {
           yield* db.run(q.setIssueAnswer({ id: issue, answer: jsonOrNull(answer, answer !== undefined) }));
         }
+        yield* db.afterCommit(publish(issue));
       }),
     );
     if (isLatestAnswer) yield* sessions.discardWork(sessionId);
-    yield* publish(issue);
     return issue;
   });
 
@@ -340,16 +394,16 @@ export const issueLifecycle = Effect.gen(function* () {
         if (item.reviewedAt !== undefined) {
           yield* db.run(q.reviewIssue({ id, reviewed_at: null, findings: jsonOrNull(item.findings, item.findings.length > 0) }));
         }
+        yield* db.afterCommit(publish(id));
       }),
     );
-    yield* publish(id);
   });
 
   const withdrawDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
 
   /** The issue already owns its number and workplace before its session starts. */
   const recordHiredStart = Effect.fn("Issue.recordHiredStart")(function* (id: string, session: T.Session) {
-    const linked = yield* db
+    yield* db
       .attemptTx(
         Effect.gen(function* () {
           yield* q.reopenIssue({ id });
@@ -361,13 +415,16 @@ export const issueLifecycle = Effect.gen(function* () {
             started_at: session.hiredAt,
           });
           yield* withdrawDispatches(id, session.hiredAt);
-          return { assignment, execution };
+          yield* db.afterCommit(
+            Effect.gen(function* () {
+              worked.changed(assignment.changed);
+              worked.executed(id, execution);
+              yield* publish(id);
+            }),
+          );
         }),
       )
       .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
-    worked.changed(linked.assignment.changed);
-    worked.executed(id, linked.execution);
-    yield* publish(id);
   });
 
   const recordOnDutyStart = Effect.fn("Issue.recordOnDutyStart")(function* (
@@ -378,7 +435,7 @@ export const issueLifecycle = Effect.gen(function* () {
   ) {
     const assignedAt = yield* Clock.currentTimeMillis;
     let dispatch: Trigger | undefined;
-    const linked = yield* db.run(
+    yield* db.run(
       db.attemptTx(
         Effect.gen(function* () {
           if (isClosed(issue.status)) yield* q.reopenIssue({ id: issue.id });
@@ -402,14 +459,17 @@ export const issueLifecycle = Effect.gen(function* () {
               meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
               at: assignedAt,
             });
-          return { assignment, execution };
+          yield* db.afterCommit(
+            Effect.gen(function* () {
+              worked.changed(assignment.changed);
+              worked.executed(issue.id, execution);
+              yield* publish(issue.id);
+            }),
+          );
         }),
       ),
     );
     if (dispatch) yield* mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`));
-    worked.changed(linked.assignment.changed);
-    worked.executed(issue.id, linked.execution);
-    yield* publish(issue.id);
   });
 
   const setQueued = Effect.fn("Issue.setQueued")(function* (id: string, queued: boolean, channel: string, by?: T.RunTrigger, source?: Trigger) {
@@ -421,6 +481,7 @@ export const issueLifecycle = Effect.gen(function* () {
         if (!queued) {
           yield* withdrawDispatches(id, at);
           yield* db.run(q.unqueueIssue({ id }));
+          yield* db.afterCommit(publish(id));
           return;
         }
         const changed = yield* db.run(q.queueIssue({ at, id }));
@@ -436,10 +497,10 @@ export const issueLifecycle = Effect.gen(function* () {
             meta: { ingressRecipient: assignedAgentOf(item) ?? "", issue: id, trigger: by ?? { kind: "issue" }, dispatch: true },
             at,
           });
+        yield* db.afterCommit(publish(id));
       }),
     );
     if (dispatch) yield* mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`));
-    yield* publish(id);
     return yield* get(id);
   });
 
@@ -447,18 +508,18 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* unsent(id);
     const now = yield* Clock.currentTimeMillis;
     yield* db.inTx(
-      Effect.all(
-        [
-          withdrawDispatches(id, now),
-          db.run(q.unqueueIssue({ id })),
-          db.run(q.cancelIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: "dismissed", id })),
-        ],
-        {
-          discard: true,
-        },
-      ),
+      Effect.gen(function* () {
+        yield* Effect.all(
+          [
+            withdrawDispatches(id, now),
+            db.run(q.unqueueIssue({ id })),
+            db.run(q.cancelIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: "dismissed", id })),
+          ],
+          { discard: true },
+        );
+        yield* db.afterCommit(publish(id));
+      }),
     );
-    yield* publish(id);
   });
 
   const savePullRequest = Effect.fn("Issue.savePullRequest")(function* (id: string, pr: T.PullRequest) {
@@ -468,16 +529,16 @@ export const issueLifecycle = Effect.gen(function* () {
 
   const finishPullRequest = Effect.fn("Issue.finishPullRequest")(function* (issue: T.Issue, state: T.PullRequestState) {
     yield* db.inTx(
-      Effect.andThen(
-        db.run(
+      Effect.gen(function* () {
+        yield* db.run(
           state === "closed"
             ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: yield* Clock.currentTimeMillis })
             : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: yield* Clock.currentTimeMillis }),
-        ),
-        db.run(Effect.flatMap(jsonText({ ...issue.pullRequest, state }), (text) => q.setIssuePullRequest({ id: issue.id, pull_request: text }))),
-      ),
+        );
+        yield* db.run(Effect.flatMap(jsonText({ ...issue.pullRequest, state }), (text) => q.setIssuePullRequest({ id: issue.id, pull_request: text })));
+        yield* db.afterCommit(publish(issue.id));
+      }),
     );
-    yield* publish(issue.id);
   });
 
   const saveSplit = Effect.fn("Issue.saveSplit")(function* (
@@ -489,7 +550,7 @@ export const issueLifecycle = Effect.gen(function* () {
   ) {
     const at = yield* Clock.currentTimeMillis;
     const dispatches: Trigger[] = [];
-    const assignments = yield* db
+    yield* db
       .attemptTx(
         Effect.gen(function* () {
           const current = yield* q.getIssue({ id });
@@ -505,7 +566,7 @@ export const issueLifecycle = Effect.gen(function* () {
               criteria: current.criteria,
               deliver: current.deliver,
             });
-          return yield* Effect.forEach(rows, (row) =>
+          const assignments = yield* Effect.forEach(rows, (row) =>
             Effect.gen(function* () {
               yield* q.addIssue(issueRow(row.id, row.req, parentMandate, at));
               const triggerRecorded = yield* mailbox.recordTrigger({
@@ -524,6 +585,13 @@ export const issueLifecycle = Effect.gen(function* () {
               return yield* assignTo(row.id, row.req.agent, at);
             }),
           );
+          yield* db.afterCommit(
+            Effect.gen(function* () {
+              for (const assignment of assignments) worked.changed(assignment.changed);
+              yield* Effect.forEach(rows, (row) => publish(row.id), { discard: true });
+              yield* publish(id);
+            }),
+          );
         }),
       )
       .pipe(
@@ -533,12 +601,9 @@ export const issueLifecycle = Effect.gen(function* () {
           NoSuchElementError: () => Effect.fail(missing(t("server.issue.issueRef", { ref: id }), [lookIn.issue])),
         }),
       );
-    for (const assignment of assignments) worked.changed(assignment.changed);
     yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`)), {
       discard: true,
     });
-    yield* Effect.forEach(rows, (row) => publish(row.id), { discard: true });
-    yield* publish(id);
   });
 
   const completeChild = Effect.fn("Issue.completeChild")(function* (childId: string, constraints: T.IssueConstraints | undefined) {
@@ -546,9 +611,9 @@ export const issueLifecycle = Effect.gen(function* () {
       Effect.gen(function* () {
         if (constraints) yield* db.run(Effect.flatMap(jsonText(constraints), (text) => q.setIssueConstraints({ id: childId, constraints: text })));
         yield* db.run(q.completeIssue({ closed_at: yield* Clock.currentTimeMillis, delivered: "merged_into_parent", id: childId }));
+        yield* db.afterCommit(publish(childId));
       }),
     );
-    yield* publish(childId);
   });
 
   return {

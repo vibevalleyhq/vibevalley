@@ -225,14 +225,11 @@ export function viewOf(state: T.SpaceState): T.FarmView {
     const was = latest.get(key);
     if (!was || h.hiredAt >= was.hiredAt) latest.set(key, h);
   }
+  const issuesById = new Map<string, T.Issue>();
+  for (const item of state.issues) issuesById.set(item.id, item);
   const plots: Record<string, T.PlotView> = {};
   const plays = state.plays ?? {};
-  for (const [key, h] of latest)
-    plots[key] = plotOf(
-      h,
-      state.issues.find((item) => item.id === h.issue),
-      playOf(plays, h.id),
-    );
+  for (const [key, h] of latest) plots[key] = plotOf(h, h.issue === undefined ? undefined : issuesById.get(h.issue), playOf(plays, h.id));
   const played: Record<string, T.SessionPlayView> = {};
   for (const h of state.sessions) {
     const play = plays[h.id] ?? emptyPlay();

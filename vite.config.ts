@@ -547,6 +547,11 @@ export default defineConfig({
         rules: { "vibevalley/atom-door": "error" },
       },
       {
+        // Unstable and transport-specific Effect subpaths stay behind their adapter doors (scripts/oxlint-plugin.ts, unstable-effect-door).
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: { "vibevalley/unstable-effect-door": "error" },
+      },
+      {
         // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/oxlint-plugin.ts, page-store).
         files: ["apps/web/src/features/**", "apps/web/src/farm/**", "apps/web/src/ui/**"],
         excludeFiles: ["apps/web/src/**/*.test.ts"],

@@ -860,4 +860,50 @@ describe("issues", () => {
       expect(got!.missingSessions).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
+
+  it.effect("reordering one unsent issue updates only that row in constant queries, and resolves issues by active helper name", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
+      const core = yield* Core;
+      const created: T.Issue[] = [];
+      for (let n = 1; n <= 20; n++) created.push(yield* issues.add({ title: `card-${n}`, repo: "demo" }));
+      const first = created[0]!;
+      const fifth = created[4]!;
+      const last = created[19]!;
+
+      const beforeMove = (yield* Metric.value(dbQueries)).count;
+      yield* issues.edit(last.id, { before: first.id }, user);
+      const moveQueries = (yield* Metric.value(dbQueries)).count - beforeMove;
+      expect(moveQueries).toBeLessThanOrEqual(8);
+      expect((yield* issues.list()).slice(0, 2).map((i) => i.id)).toEqual([last.id, first.id]);
+
+      yield* issues.edit(first.id, { before: fifth.id }, user);
+      const orderAfterMiddle = (yield* issues.list()).map((i) => i.id);
+      expect(orderAfterMiddle.indexOf(first.id)).toBe(orderAfterMiddle.indexOf(fifth.id) - 1);
+
+      yield* issues.edit(last.id, { before: "" }, user);
+      expect((yield* issues.list()).at(-1)?.id).toBe(last.id);
+
+      yield* core.apply({
+        type: "sessionChanged",
+        session: {
+          id: sessionId("helper-1"),
+          role: "worker",
+          name: "阿麦",
+          agent: "lab",
+          runtime: "pi",
+          brief: "work",
+          repo: "demo",
+          issue: fifth.id,
+          hiredAt: 1,
+          runs: 1,
+          phase: { _tag: "working", since: 1, doing: { action: "thinking", label: "" } },
+          refining: false,
+        },
+      });
+      expect((yield* issues.get("阿麦")).id).toBe(fifth.id);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
 });

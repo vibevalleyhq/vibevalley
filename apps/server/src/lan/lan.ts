@@ -24,7 +24,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { messageOf } from "#/base/errors.ts";
 import { code as newCode } from "#/base/ids.ts";
-import { hostName, ServerConfig } from "#/infra/config.ts";
+import { hostName, serverAddress, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { callbackLog } from "#/infra/log.ts";
 import { sameSecret, tidyName, User } from "#/user/user.ts";
@@ -172,7 +172,7 @@ const make = (options: LanOptions = {}) =>
     let pairing: PairingState = { _tag: "idle" };
     // Serialize open/shut so a concurrent shut cannot miss an in-flight port bind and leave it listening.
     const opening = yield* Semaphore.make(1);
-    let upstream = "";
+    let upstream = config.port > 0 ? serverAddress(config) : "";
     /** What cuts each of a device's open connections; forgetting the device cuts them. */
     const conns = new Map<string, Set<() => void>>();
     const held = (device: string) => {

@@ -83,6 +83,45 @@ describe("the database", () => {
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
+  it.effect("afterCommit runs once the outermost transaction commits, and drops hooks from rolled-back savepoints or transactions", () =>
+    Effect.gen(function* () {
+      const db = yield* Db;
+      const seen: string[] = [];
+      yield* db.inTx(
+        Effect.gen(function* () {
+          yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
+          yield* db.afterCommit(Effect.sync(() => void seen.push("outer")));
+          yield* Effect.exit(
+            db.attemptTx(
+              Effect.gen(function* () {
+                yield* addUserDevice({ id: "rolled", name: "回滚", came: "paired", key_hash: "b", added_at: 2 });
+                yield* db.afterCommit(Effect.sync(() => void seen.push("rolled")));
+                return yield* Effect.fail("abort-inner");
+              }),
+            ),
+          );
+          yield* db.inTx(
+            Effect.gen(function* () {
+              yield* db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "c", added_at: 3 }));
+              yield* db.afterCommit(Effect.sync(() => void seen.push("inner")));
+            }),
+          );
+          expect(seen).toEqual([]);
+        }),
+      );
+      expect(seen).toEqual(["outer", "inner"]);
+      yield* Effect.exit(
+        db.inTx(
+          Effect.gen(function* () {
+            yield* db.afterCommit(Effect.sync(() => void seen.push("aborted-outer")));
+            return yield* Effect.fail("abort-outer");
+          }),
+        ),
+      );
+      expect(seen).toEqual(["outer", "inner"]);
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
+  );
+
   it.effect("every farm in memory has a database of its own, numbered from the start", () => {
     const farm = Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

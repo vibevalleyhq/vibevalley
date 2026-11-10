@@ -47,11 +47,22 @@ function gathered(state: T.SpaceState): Unworded[] {
   const chat = state.chat;
   const general = defaultOf(chat)?.id;
   const out: Unworded[] = [];
+  const issuesById = new Map<string, T.Issue>();
+  const childrenByParent = new Map<string, T.Issue[]>();
+  for (const item of state.issues) {
+    issuesById.set(item.id, item);
+    if (item.parent !== undefined) {
+      const list = childrenByParent.get(item.parent);
+      if (list) list.push(item);
+      else childrenByParent.set(item.parent, [item]);
+    }
+  }
+  const sessionIds = new Set(state.sessions.map((item) => item.id));
   // The channel is the session's or the default one; a farm without channels has neither.
   const push = (e: Omit<Unworded, "channel"> & { readonly channel: string | undefined }) => out.push(omitUndefined(e));
   for (const h of state.sessions) {
     if (isOnDuty(h)) continue;
-    const want = wantOf(h, state);
+    const want = wantOf(h, issuesById);
     if (!want) continue;
     const channel = h.channel ?? general;
     const from: T.InboxFrom = { kind: "session", id: h.id, name: h.name, agent: h.agent };
@@ -95,7 +106,7 @@ function gathered(state: T.SpaceState): Unworded[] {
         });
         break;
       case "conflict": {
-        const files = (state.issues.find((issue) => issue.id === h.issue)?.conflict?.files ?? []).length;
+        const files = (h.issue === undefined ? undefined : issuesById.get(h.issue)?.conflict?.files)?.length ?? 0;
         push({
           item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.inbox.conflictFiles", { files }), at, target },
           channel,
@@ -121,9 +132,9 @@ function gathered(state: T.SpaceState): Unworded[] {
     const conflicted = issue.stage.state === "stuck" && issue.stage.stuck === "conflict";
     if (issue.stage.state !== "reviewing" && !conflicted) continue;
     const session = latestSessionIdOf(issue);
-    if (session && state.sessions.some((item) => item.id === session)) continue;
-    const children = state.issues.filter((item) => item.parent === issue.id);
-    if (children.length === 0) continue;
+    if (session && sessionIds.has(session)) continue;
+    const children = childrenByParent.get(issue.id);
+    if (!children || children.length === 0) continue;
     const at = Math.max(issue.createdAt, ...children.map((item) => item.closedAt ?? item.createdAt));
     push({
       item: {
@@ -175,8 +186,9 @@ type Want =
   | { readonly kind: "quiet"; readonly since: number };
 
 /** What a session questions of the user. Its issue's stage says it, the one the issue page and the phone both read. */
-function wantOf(h: T.Session, state: T.SpaceState): Want | undefined {
-  const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && latestSessionIdOf(item) === h.id);
+function wantOf(h: T.Session, issuesById: ReadonlyMap<string, T.Issue>): Want | undefined {
+  const candidate = h.issue === undefined ? undefined : issuesById.get(h.issue);
+  const issue = candidate && latestSessionIdOf(candidate) === h.id ? candidate : undefined;
   if (!issue) {
     const need = needOf(h);
     switch (need?.kind) {

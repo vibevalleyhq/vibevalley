@@ -404,6 +404,29 @@ tester.run("atom-door", rule("atom-door"), {
   ],
 });
 
+tester.run("unstable-effect-door", rule("unstable-effect-door"), {
+  valid: [
+    { code: 'import { Effect } from "effect";', filename: "/repo/apps/server/src/issue/issue.ts" },
+    { code: 'import * as X from "effect/unstable/ai";', filename: "/repo/apps/server/src/infra/ai.ts" },
+    { code: 'import * as X from "effect/experimental";', filename: page("state/atom.ts") },
+    { code: 'import { Rpc, RpcGroup } from "effect/rpc";', filename: "/repo/packages/protocol/src/rpc.ts" },
+    { code: 'import { RpcServer } from "effect/rpc";', filename: "/repo/apps/server/src/http/rpc.ts" },
+    { code: 'import { RpcClient } from "effect/rpc";', filename: page("infra/gateway.ts") },
+    { code: 'import { Otlp } from "effect/observability";', filename: "/repo/apps/server/src/main.ts" },
+    { code: 'import { Otlp } from "effect/observability";', filename: "/repo/apps/server/src/infra/telemetry.ts" },
+    { code: 'import { Command } from "effect/cli";', filename: "/repo/apps/cli/src/main.ts" },
+    { code: 'import { Command } from "effect/cli";', filename: "/repo/apps/server/src/chat/main.ts" },
+  ],
+  invalid: [
+    { code: 'import * as X from "effect/unstable/ai";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "unstable" }] },
+    { code: 'import * as X from "effect/experimental";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "unstable" }] },
+    { code: 'import { RpcClient } from "effect/rpc";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "rpc" }] },
+    { code: 'export * from "effect/rpc";', filename: "/repo/packages/protocol/src/api.ts", errors: [{ messageId: "rpc" }] },
+    { code: 'import { Otlp } from "effect/observability";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "observability" }] },
+    { code: 'import { Command } from "effect/cli";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "cli" }] },
+  ],
+});
+
 tester.run("page-store", rule("page-store"), {
   valid: [
     { code: "function Box() { const [open, setOpen] = createSignal(false); }", filename: page("features/channel/Composer.tsx") },

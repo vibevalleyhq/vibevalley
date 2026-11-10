@@ -49,7 +49,7 @@ export class Issue extends Context.Service<
     readonly stop: (id: string) => Effect.Effect<void, ApiError>;
     readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Effect.Effect<T.Preview, ApiError>;
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    /** Resolves `#41`, `41`, an issue id, or the id of a session that worked it. */
+    /** Resolves `#41`, `41`, an issue id, or the name or id of a helper or session that worked it. */
     readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
     readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
     readonly changes: (id: string, by: Actor) => Effect.Effect<T.Changes, ApiError>;
