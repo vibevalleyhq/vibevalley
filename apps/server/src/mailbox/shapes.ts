@@ -1,8 +1,8 @@
-import type { AgentRole } from "../agent/shapes";
-import type { QuotedBlock } from "../artifact/shapes";
-import type { ChannelType } from "../channel/shapes";
-import type { IssueId } from "../common/shapes";
-import type { RunTrigger } from "../session/shapes";
+import type { AgentRole, ChannelType, IssueId, QuotedBlock, RunTrigger } from "@vibevalley/protocol";
+
+import type { CardAttachment, CompactCard, ParentPreview } from "#/base/clip.ts";
+
+export type { CardAttachment, CompactCard, ParentPreview };
 
 export const TriggerSourceValues = ["workbench", "channel", "connector", "voice", "github", "cron", "patrol"] as const;
 export type TriggerSource = (typeof TriggerSourceValues)[number];
@@ -13,8 +13,8 @@ export type TriggerActorKind = (typeof TriggerActorKindValues)[number];
 export const TriggerAddressingValues = ["direct", "mention", "thread_owner", "unaddressed"] as const;
 export type TriggerAddressing = (typeof TriggerAddressingValues)[number];
 
-export const TriggerKindValues = ["ci", "review", "comment"] as const;
-export type TriggerKind = (typeof TriggerKindValues)[number];
+export const GithubTriggerEventValues = ["ci", "review", "comment"] as const;
+export type GithubTriggerEvent = (typeof GithubTriggerEventValues)[number];
 
 export const VoiceModeValues = ["dictated", "conversation", "api"] as const;
 /** "conversation": on a call. */
@@ -26,29 +26,6 @@ export interface TriggerActor {
   /** The agent's role, when kind is agent. */
   readonly role?: AgentRole;
   readonly name?: string;
-}
-
-export interface CardAttachment {
-  readonly id: string;
-  readonly name: string;
-  readonly mimeType: string;
-  readonly readUri: string;
-}
-
-export interface ParentPreview {
-  readonly id: string;
-  readonly from: string;
-  readonly preview: string;
-  readonly readUri: string;
-}
-
-export interface CompactCard {
-  readonly summary: string;
-  readonly totalChars: number;
-  readonly truncated: boolean;
-  readonly readUri: string;
-  readonly attachments?: readonly CardAttachment[];
-  readonly parentPreview?: ParentPreview;
 }
 
 export interface TriggerContext {
@@ -73,7 +50,7 @@ export interface TriggerMeta {
   readonly cron?: string;
   readonly repo?: string;
   readonly pr?: number;
-  readonly kind?: TriggerKind;
+  readonly kind?: GithubTriggerEvent;
   readonly head?: string;
   readonly fingerprint?: string;
   readonly failed?: boolean;

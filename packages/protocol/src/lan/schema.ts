@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import type * as T from "../shapes";
+import type * as T from "./shapes";
 
 export const LanPaired: Codec<T.LanPaired> = Schema.Struct({
   device: Schema.String,

@@ -4,7 +4,7 @@ import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
 import { Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const AchievementCategory: Codec<T.AchievementCategory> = Schema.Literals(T.AchievementCategoryValues);
 
@@ -34,7 +34,7 @@ export const AchievementStanding: Codec<T.AchievementStanding> = Schema.Struct({
 
 export const PlayAction: Codec<T.PlayAction> = Schema.Struct({ at: Schema.Finite, ...doingFields });
 
-export const PlayActionView: Codec<T.PlayActionView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
+const PlayActionView: Codec<T.PlayActionView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
 
 const playFields = {
   station: Schema.Finite,
@@ -66,7 +66,7 @@ export const AgentTally: Codec<T.AgentTally> = Schema.Struct({
   failed: Schema.Finite,
 });
 
-export const ProgressTitle: Codec<T.ProgressTitle> = Schema.Struct({
+const ProgressTitle: Codec<T.ProgressTitle> = Schema.Struct({
   id: Schema.String,
   tier: Schema.Finite,
 });
@@ -122,12 +122,12 @@ export const GameEffectReward: Codec<T.GameEffectReward> = Schema.Struct({
   streak: Schema.Finite,
 });
 
-export const GameEffectPenalty: Codec<T.GameEffectPenalty> = Schema.Struct({
+const GameEffectPenalty: Codec<T.GameEffectPenalty> = Schema.Struct({
   kind: Schema.Literal("penalty"),
   sessionId: SessionId,
 });
 
-export const GameEffectLevelUp: Codec<T.GameEffectLevelUp> = Schema.Struct({
+const GameEffectLevelUp: Codec<T.GameEffectLevelUp> = Schema.Struct({
   kind: Schema.Literal("levelUp"),
   level: Schema.Finite,
 });
@@ -145,7 +145,7 @@ export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Stru
 
 export const GameEffect: Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
 
-export const LedgerEntryHarvested: Codec<T.LedgerEntryHarvested> = Schema.Struct({
+const LedgerEntryHarvested: Codec<T.LedgerEntryHarvested> = Schema.Struct({
   kind: Schema.Literal("harvested"),
   at: Schema.Finite,
   session: SessionId,
@@ -157,32 +157,32 @@ export const LedgerEntryHarvested: Codec<T.LedgerEntryHarvested> = Schema.Struct
   runs: Schema.Finite,
 });
 
-export const LedgerEntryFailed: Codec<T.LedgerEntryFailed> = Schema.Struct({
+const LedgerEntryFailed: Codec<T.LedgerEntryFailed> = Schema.Struct({
   kind: Schema.Literal("failed"),
   at: Schema.Finite,
   session: SessionId,
   agent: Schema.optionalKey(Schema.String),
 });
 
-export const LedgerEntryConflicted: Codec<T.LedgerEntryConflicted> = Schema.Struct({
+const LedgerEntryConflicted: Codec<T.LedgerEntryConflicted> = Schema.Struct({
   kind: Schema.Literal("conflicted"),
   at: Schema.Finite,
   session: SessionId,
 });
 
-export const LedgerEntryTold: Codec<T.LedgerEntryTold> = Schema.Struct({
+const LedgerEntryTold: Codec<T.LedgerEntryTold> = Schema.Struct({
   kind: Schema.Literal("told"),
   at: Schema.Finite,
   session: SessionId,
 });
 
-export const LedgerEntryReviewed: Codec<T.LedgerEntryReviewed> = Schema.Struct({
+const LedgerEntryReviewed: Codec<T.LedgerEntryReviewed> = Schema.Struct({
   kind: Schema.Literal("reviewed"),
   at: Schema.Finite,
   session: SessionId,
 });
 
-export const LedgerEntryFamily: Codec<T.LedgerEntryFamily> = Schema.Struct({
+const LedgerEntryFamily: Codec<T.LedgerEntryFamily> = Schema.Struct({
   kind: Schema.Literal("family"),
   at: Schema.Finite,
   issue: IssueId,
@@ -190,40 +190,40 @@ export const LedgerEntryFamily: Codec<T.LedgerEntryFamily> = Schema.Struct({
   parallel: Schema.Boolean,
 });
 
-export const LedgerEntryHandoff: Codec<T.LedgerEntryHandoff> = Schema.Struct({
+const LedgerEntryHandoff: Codec<T.LedgerEntryHandoff> = Schema.Struct({
   kind: Schema.Literal("handoff"),
   at: Schema.Finite,
   session: SessionId,
   to: Schema.String,
 });
 
-export const LedgerEntryCalled: Codec<T.LedgerEntryCalled> = Schema.Struct({
+const LedgerEntryCalled: Codec<T.LedgerEntryCalled> = Schema.Struct({
   kind: Schema.Literal("called"),
   at: Schema.Finite,
   session: SessionId,
 });
 
-export const LedgerEntryHired: Codec<T.LedgerEntryHired> = Schema.Struct({
+const LedgerEntryHired: Codec<T.LedgerEntryHired> = Schema.Struct({
   kind: Schema.Literal("hired"),
   at: Schema.Finite,
   session: SessionId,
   agent: Schema.optionalKey(Schema.String),
 });
 
-export const LedgerEntryMomentKind: Codec<T.LedgerEntryMomentKind> = Schema.Literals(T.LedgerEntryMomentKindValues);
+const LedgerEntryMomentKind: Codec<T.LedgerEntryMomentKind> = Schema.Literals(T.LedgerEntryMomentKindValues);
 
-export const LedgerEntryMoment: Codec<T.LedgerEntryMoment> = Schema.Struct({
+const LedgerEntryMoment: Codec<T.LedgerEntryMoment> = Schema.Struct({
   kind: LedgerEntryMomentKind,
   at: Schema.Finite,
 });
 
-export const LedgerEntryLevel: Codec<T.LedgerEntryLevel> = Schema.Struct({
+const LedgerEntryLevel: Codec<T.LedgerEntryLevel> = Schema.Struct({
   kind: Schema.Literal("level"),
   at: Schema.Finite,
   level: Schema.Finite,
 });
 
-export const LedgerEntryTitled: Codec<T.LedgerEntryTitled> = Schema.Struct({
+const LedgerEntryTitled: Codec<T.LedgerEntryTitled> = Schema.Struct({
   kind: Schema.Literal("titled"),
   at: Schema.Finite,
   achievement: Schema.optionalKey(Schema.String),

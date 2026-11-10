@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 
 import * as T from "@vibevalley/protocol";
 
+import { TriggerSourceValues } from "../apps/server/src/mailbox/shapes.ts";
+
 const root = resolve(import.meta.dirname, "..");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
 const boundaryDocs = "docs/subsystems/foundation.md#边界审计";
@@ -70,7 +72,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "session.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
   { column: "session.closed", protocol: "SessionCloseValues", values: T.SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
-  { column: "mailbox_delivery.source", protocol: "TriggerSourceValues", values: T.TriggerSourceValues },
+  { column: "mailbox_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
   { column: "cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "memory.kind", protocol: "MemoryKindValues", values: T.MemoryKindValues },
   { column: "memory.author", protocol: "ActorKindValues", values: T.ActorKindValues },

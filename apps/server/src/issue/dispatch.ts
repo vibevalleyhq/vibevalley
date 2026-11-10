@@ -12,6 +12,7 @@ import type { Due } from "#/cron/cron.ts";
 import { causeMessage } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox, type Received } from "#/mailbox/mailbox.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import { issueBranch, Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";
@@ -133,7 +134,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
-    const send = (issue: T.Issue, agent: T.Agent, repo: string, channel: string, by?: T.RunTrigger, inputs: readonly T.Trigger[] = []) =>
+    const send = (issue: T.Issue, agent: T.Agent, repo: string, channel: string, by?: T.RunTrigger, inputs: readonly Trigger[] = []) =>
       Effect.flatMap(hire(agent, issueBrief(issue), repo, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}) }), (hired) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed"))),
       );
@@ -157,7 +158,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       channel: string,
       by?: T.RunTrigger,
       said?: string,
-      inputs: readonly T.Trigger[] = [],
+      inputs: readonly Trigger[] = [],
     ): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
       const queued = inputs.length > 0 || mine._tag === "None" ? undefined : yield* mailbox.triggersOf(id);
@@ -252,7 +253,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       channel: string,
       by: T.RunTrigger = { kind: "comment" },
       to?: T.Agent,
-      inputs: readonly T.Trigger[] = [],
+      inputs: readonly Trigger[] = [],
     ) {
       const issue = yield* get(id);
       if (issue.delivered === "merged_into_parent") return yield* Effect.fail(refused(t("server.issue.mergedChildRetry")));
@@ -278,7 +279,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       return hired.session.id;
     });
 
-    const scheduled = Effect.fn("Issue.scheduled")(function* (due: Due, input: T.Trigger) {
+    const scheduled = Effect.fn("Issue.scheduled")(function* (due: Due, input: Trigger) {
       const s = due.cron;
       const channel = yield* chat.topOf(s.channel);
       const by: T.RunTrigger = { kind: "cron", cron: s.id, message: input.id, ...(due.missed ? { missed: true } : {}) };

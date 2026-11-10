@@ -7,6 +7,7 @@ import type { ChannelAudience } from "#/mailbox/envelope.ts";
 
 import type { Recipient, DeliveryReason } from "./brakes.ts";
 import type { ChannelHearers } from "./envelope.ts";
+import type { Trigger, TriggerActorKind, TriggerSource } from "./shapes.ts";
 import type { OutboundDelivery } from "./work.ts";
 
 /** The issue holds its mailbox until the user answers: it asks, is stuck, or waits for the user's verdict. */
@@ -52,7 +53,7 @@ export function whoHears(input: ChannelAudience): Recipient[] {
   return deliveries;
 }
 
-export function channelRecipients(trigger: T.Trigger, input: ChannelHearers): OutboundDelivery[] {
+export function channelRecipients(trigger: Trigger, input: ChannelHearers): OutboundDelivery[] {
   const candidates = input.addressed ? [{ recipient: input.addressed, reason: "addressed" as const, wakes: true }] : whoHears(input.audience);
   return candidates.map((delivery) => ({
     trigger,
@@ -78,7 +79,7 @@ export type Urgency = (typeof UrgencyValues)[number];
 
 export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" | "review" | "ci_failed" | "report_attention" | "report_progress" | "ambient";
 
-export function triggerEvent(trigger: Pick<T.Trigger, "actor" | "source" | "meta" | "addressed">): DeliveryEvent {
+export function triggerEvent(trigger: Pick<Trigger, "actor" | "source" | "meta" | "addressed">): DeliveryEvent {
   if (trigger.actor.kind === "user") return "conversation";
   switch (trigger.source) {
     case "github":
@@ -97,8 +98,8 @@ export function triggerEvent(trigger: Pick<T.Trigger, "actor" | "source" | "meta
 }
 
 interface UrgencyInput {
-  readonly source: T.TriggerSource;
-  readonly actor: T.TriggerActorKind;
+  readonly source: TriggerSource;
+  readonly actor: TriggerActorKind;
   readonly recipient: T.AgentRole;
   readonly event: DeliveryEvent;
   readonly canSteer: boolean;

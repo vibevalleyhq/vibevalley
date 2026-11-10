@@ -99,32 +99,12 @@ export type Fact =
   | FactMediaChanged;
 
 /** Told apart by `type`. */
-export type ServerEvent = Fact | ServerEventSnapshot | ServerEventStep | ServerEventNotice | ServerEventRuntime;
+export type ServerEvent = Fact | ServerEventSnapshot | LiveEvent;
 
 export interface ServerEventSnapshot {
   type: "snapshot";
   at: number;
   state: SpaceState;
-}
-
-export interface ServerEventStep {
-  type: "event";
-  at: number;
-  id: string;
-  activity: SessionEvent;
-}
-
-export interface ServerEventNotice {
-  type: "notice";
-  at: number;
-  level: NoticeLevel;
-  text: string;
-}
-
-export interface ServerEventRuntime {
-  type: "runtime";
-  at: number;
-  info: RuntimeInfo;
 }
 
 /** Told apart by `type`. */

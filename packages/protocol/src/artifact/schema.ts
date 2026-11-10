@@ -2,11 +2,11 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/schema";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBodyValues);
 
-export const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
+const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
 
 export const ArtifactDisplay: Codec<T.ArtifactDisplay> = Schema.Literals(T.ArtifactDisplayValues);
 
@@ -192,7 +192,7 @@ export const ArtifactMarkdown: Codec<T.ArtifactMarkdown> = Schema.Struct({
   markdown: Schema.String,
 });
 
-export const BlockOpInsertBlock: Codec<T.BlockOpInsertBlock> = Schema.Struct({
+const BlockOpInsertBlock: Codec<T.BlockOpInsertBlock> = Schema.Struct({
   op: Schema.Literal("insert_block"),
   block: BlockInput,
 });
@@ -204,14 +204,14 @@ export const BlockOpUpdateText: Codec<T.BlockOpUpdateText> = Schema.Struct({
   text: Schema.mutable(Schema.Array(TextSpan)),
 });
 
-export const BlockOpSetAttrs: Codec<T.BlockOpSetAttrs> = Schema.Struct({
+const BlockOpSetAttrs: Codec<T.BlockOpSetAttrs> = Schema.Struct({
   op: Schema.Literal("set_attrs"),
   blockId: BlockId,
   attrs: BlockAttrs,
   unset: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
-export const BlockOpSetType: Codec<T.BlockOpSetType> = Schema.Struct({
+const BlockOpSetType: Codec<T.BlockOpSetType> = Schema.Struct({
   op: Schema.Literal("set_type"),
   blockId: BlockId,
   type: BlockType,
@@ -225,12 +225,12 @@ export const BlockOpMoveBlock: Codec<T.BlockOpMoveBlock> = Schema.Struct({
   orderKey: Schema.String,
 });
 
-export const BlockOpDeleteBlock: Codec<T.BlockOpDeleteBlock> = Schema.Struct({
+const BlockOpDeleteBlock: Codec<T.BlockOpDeleteBlock> = Schema.Struct({
   op: Schema.Literal("delete_block"),
   blockId: BlockId,
 });
 
-export const BlockOpRestoreBlock: Codec<T.BlockOpRestoreBlock> = Schema.Struct({
+const BlockOpRestoreBlock: Codec<T.BlockOpRestoreBlock> = Schema.Struct({
   op: Schema.Literal("restore_block"),
   blockId: BlockId,
 });
@@ -313,7 +313,7 @@ export const ArtifactEvent: Codec<T.ArtifactEvent> = Schema.Union([
   Schema.TaggedStruct("Reset", {}),
 ]);
 
-export const SuggestionStatus: Codec<T.SuggestionStatus> = Schema.Literals(T.SuggestionStatusValues);
+const SuggestionStatus: Codec<T.SuggestionStatus> = Schema.Literals(T.SuggestionStatusValues);
 
 export const SuggestionChange: Codec<T.SuggestionChange> = Schema.Struct({
   text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),

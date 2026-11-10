@@ -11,6 +11,7 @@ import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import { Repo } from "#/repo/repo.ts";
 import { RepoError } from "#/repo/workplace.ts";
 import * as q from "#db/ingress_github.sql.ts";
@@ -239,7 +240,7 @@ const finishedChecks = new Set(["COMPLETED", "SUCCESS", "FAILURE", "ERROR"]);
 /** The Actions job id in a check's details URL, or "" for a check that is not an Actions job. */
 export const actionsJobOf = (url: string) => /\/job\/(\d+)/u.exec(url)?.[1] ?? "";
 
-export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, ApiError | Schema.SchemaError>) =>
+export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<Trigger | undefined, ApiError | Schema.SchemaError>) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const mailbox = yield* Mailbox;

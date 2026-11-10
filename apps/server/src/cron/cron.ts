@@ -18,6 +18,7 @@ import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import * as q from "#db/cron.sql.ts";
 
 import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
@@ -120,7 +121,7 @@ const make = Effect.gen(function* () {
       });
     });
 
-  const handle = (due: Due, trigger: T.Trigger) =>
+  const handle = (due: Due, trigger: Trigger) =>
     Effect.gen(function* () {
       const s = due.cron;
       const thread = `cron:${s.id}`;

@@ -1,11 +1,13 @@
 import { Array as Arr, Formatter, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, userId, VoiceModeValues } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "#/base/json.ts";
+
+import { type TriggerActorKind, type TriggerContext, VoiceModeValues } from "./shapes.ts";
 
 const IngressSourceValues = ["issue", "cron", "patrol", "connector", "voice", "github"] as const;
 
@@ -78,7 +80,7 @@ export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind
 };
 
 /** External GitHub collaborators, bots, and CI map to "system". */
-export const actorKindOf = (kind: T.TriggerActorKind): T.ActorKind => {
+export const actorKindOf = (kind: TriggerActorKind): T.ActorKind => {
   switch (kind) {
     case "user":
     case "agent":
@@ -124,7 +126,7 @@ export interface Picked {
   readonly repo?: string;
 }
 
-export interface Envelope extends T.TriggerContext {
+export interface Envelope extends TriggerContext {
   readonly id: string;
   readonly originTrigger?: string;
   readonly from: string;

@@ -14,6 +14,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Machine } from "#/machine/machine.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Repo } from "#/repo/repo.ts";
 import { type Merged, type MergeFailure, type RepoError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/repo/workplace.ts";
@@ -45,7 +46,7 @@ export interface Hired {
 }
 
 export interface HireOptions {
-  readonly inputs?: readonly T.Trigger[];
+  readonly inputs?: readonly Trigger[];
   /** Base branch to fork from; "" uses the repo's main branch. */
   readonly base?: string;
   readonly worktree?: boolean;

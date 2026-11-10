@@ -14,6 +14,7 @@ import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort } from "#/infra/log.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import { Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { type Hired, type HireOptions, type SessionNews, Session } from "#/session/session.ts";
@@ -41,7 +42,7 @@ export class Issue extends Context.Service<
     readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Effect.Effect<T.Issue, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
-    readonly scheduled: (due: Due, input: T.Trigger) => Effect.Effect<T.Issue, ApiError>;
+    readonly scheduled: (due: Due, input: Trigger) => Effect.Effect<T.Issue, ApiError>;
     readonly split: (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) => Effect.Effect<string, ApiError>;
     readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<T.Issue, ApiError>;
     readonly stop: (id: string) => Effect.Effect<void, ApiError>;

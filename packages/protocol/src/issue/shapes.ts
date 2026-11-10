@@ -38,7 +38,7 @@ export interface IssueMandate {
 }
 
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
-export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
+type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
 
 export interface IssueReportMemory {
   text: string;

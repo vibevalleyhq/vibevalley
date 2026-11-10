@@ -6,21 +6,23 @@ import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
-import { actorKindOf } from "#/mailbox/envelope.ts";
-import type { Handed, Envelope } from "#/mailbox/envelope.ts";
+import { actorKindOf, type Envelope, type Handed } from "#/mailbox/envelope.ts";
 
-export type InputContext = T.TriggerContext;
+import * as MS from "./schema.ts";
+import type { Trigger, TriggerActor, TriggerAddressing, TriggerContext, TriggerMeta, TriggerSource } from "./shapes.ts";
+
+export type InputContext = TriggerContext;
 export interface DeliveryPayload {
   readonly note?: string;
-  readonly trigger: T.Trigger;
+  readonly trigger: Trigger;
   readonly context: InputContext;
   readonly channelType: T.ChannelType;
 }
 
 const Payload: Schema.Codec<DeliveryPayload, S.Wire<DeliveryPayload>> = Schema.Struct({
   note: Schema.optionalKey(Schema.String),
-  trigger: S.Trigger,
-  context: S.TriggerContext,
+  trigger: MS.Trigger,
+  context: MS.TriggerContext,
   channelType: S.ChannelType,
 });
 export const readPayload = Schema.decodeUnknownSync(Schema.fromJsonString(Payload));
@@ -28,22 +30,22 @@ export const readPayload = Schema.decodeUnknownSync(Schema.fromJsonString(Payloa
 export interface TriggerInput {
   /** A channel message's own id, so its trigger and its deliveries share it; otherwise made from source and key. */
   readonly id?: string;
-  readonly source: T.TriggerSource;
+  readonly source: TriggerSource;
   /** What makes this occurrence unique within its source: the same key is the same trigger. */
   readonly key: string;
-  readonly actor: T.TriggerActor;
+  readonly actor: TriggerActor;
   readonly text: string;
   readonly threads: readonly string[];
-  readonly addressed: T.TriggerAddressing;
+  readonly addressed: TriggerAddressing;
   readonly replyChannel?: string;
   readonly replyTo?: string;
-  readonly picked?: T.Trigger["picked"];
-  readonly meta?: Omit<T.TriggerMeta, "issue"> & { readonly issue?: string };
+  readonly picked?: Trigger["picked"];
+  readonly meta?: Omit<TriggerMeta, "issue"> & { readonly issue?: string };
   readonly at: number;
   readonly data?: unknown;
 }
 
-export const triggerOf = (input: TriggerInput): T.Trigger => {
+export const triggerOf = (input: TriggerInput): Trigger => {
   const id =
     input.id ??
     createHash("sha256")
@@ -66,7 +68,7 @@ export const triggerOf = (input: TriggerInput): T.Trigger => {
 };
 
 export interface TriggerResource {
-  readonly trigger: T.Trigger;
+  readonly trigger: Trigger;
   readonly payload: { readonly text: string; readonly data: unknown };
 }
 
@@ -79,7 +81,7 @@ export interface KnownGitHubEvent {
 
 export const deliveryScope = (channel: string, issue?: string) => (issue ? `issue:${issue}` : `channel:${channel}`);
 
-export function triggerPayload(trigger: T.Trigger, issue?: string, note?: string): DeliveryPayload {
+export function triggerPayload(trigger: Trigger, issue?: string, note?: string): DeliveryPayload {
   const { issue: _sourceIssue, inputContext, channelType, ...sourceMeta } = trigger.meta;
   const meta = trigger.meta;
   return {
@@ -122,7 +124,7 @@ export function inputContext({ id: _id, from: _from, fromKind: _kind, name: _nam
   return context;
 }
 
-export const orchestratorSource = (source: T.TriggerSource): Handed["source"] => {
+export const orchestratorSource = (source: TriggerSource): Handed["source"] => {
   switch (source) {
     case "cron":
     case "patrol":

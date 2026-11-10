@@ -1,7 +1,7 @@
 import { Brand, Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const IssueId: Codec<T.IssueId> = Schema.String.pipe(Schema.brand("IssueId"));
 export const SessionId: Codec<T.SessionId> = Schema.String.pipe(Schema.brand("SessionId"));

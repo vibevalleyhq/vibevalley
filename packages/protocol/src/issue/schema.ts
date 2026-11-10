@@ -4,7 +4,7 @@ import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Conflict } from "../repo/schema";
 import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
-import * as T from "../shapes";
+import * as T from "./shapes";
 import { IssueReportMemoryScopeValues } from "./shapes";
 
 export const Delivery: Codec<T.Delivery> = Schema.Literals(T.DeliveryValues);

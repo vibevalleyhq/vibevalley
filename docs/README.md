@@ -123,7 +123,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 工作目录 | working folder | `Workplace`（`workdir`） | 帮工干活的目录：仓库目录或工单的 worktree；VibeValley 自己的是 `VIBEVALLEY_WORK_ROOT` | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 一张工单的一种触发：到点开它的一轮，派给帮工或助手 | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 要你处理的事，从核心状态现算 | 通知（指 Inbox 时）、来电（农场的皮里用） |
-| 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `ServerEventNotice`） | VibeValley 一闪而过地告诉你一句：信息、警告或出错；不进 Inbox | |
+| 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `LiveEventNotice`） | VibeValley 一闪而过地告诉你一句：信息、警告或出错；不进 Inbox | |
 | 巡查 | patrol | `patrolStep`（`Inbox.patrol`） | 定时看 Inbox，放久了叫醒助手 | |
 | 通话 | call | `VoiceCall`（`voice.call.*`） | 和助手打电话 | |
 | 听写 | dictation | dictation（`Dictation`） | 说话变成输入框里的字 | |

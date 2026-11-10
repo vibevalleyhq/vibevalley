@@ -11,6 +11,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import type { Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import type { TriggerInput, TriggerResource } from "#/mailbox/payload.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import type { RepoError } from "#/repo/workplace.ts";
 
 import { githubInputs, type GitHubPullIngress } from "./github.ts";
@@ -34,10 +35,10 @@ export class Ingress extends Context.Service<
   {
     readonly user: (input: UserInput) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
     readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
-    readonly accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError | ApiError>;
+    readonly accept: (event: SourceEvent) => Effect.Effect<Trigger | undefined, Schema.SchemaError | ApiError>;
     readonly refreshGitHub: Effect.Effect<void>;
     readonly githubSnapshot: (repo: string, pr: number) => Effect.Effect<GitHubPullIngress, RepoError>;
-    readonly record: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, ApiError>;
+    readonly record: (event: SourceEvent) => Effect.Effect<Trigger | undefined, ApiError>;
     readonly read: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
   }
 >()("@vibevalley/server/ingress/ingress") {

@@ -2,7 +2,7 @@ import { Schema } from "effect";
 
 import { Look } from "../agent/schema";
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const RuntimeQuota: Codec<T.RuntimeQuota> = Schema.Struct({
   left: Schema.optionalKey(Schema.Finite),
@@ -25,24 +25,24 @@ export const RuntimeSupport: Codec<T.RuntimeSupport> = Schema.Struct({
   inProcess: Schema.Boolean,
 });
 
-export const Via: Codec<T.Via> = Schema.Literals(T.ViaValues);
+const Via: Codec<T.Via> = Schema.Literals(T.ViaValues);
 
-export const InstallationAvailable: Codec<T.InstallationAvailable> = Schema.Struct({
+const InstallationAvailable: Codec<T.InstallationAvailable> = Schema.Struct({
   status: Schema.Literal("available"),
   via: Via,
   command: Schema.String,
   version: Schema.NullOr(Schema.String),
 });
 
-export const InstallationNotFound: Codec<T.InstallationNotFound> = Schema.Struct({
+const InstallationNotFound: Codec<T.InstallationNotFound> = Schema.Struct({
   status: Schema.Literal("not_found"),
 });
 
-export const InstallationChecking: Codec<T.InstallationChecking> = Schema.Struct({
+const InstallationChecking: Codec<T.InstallationChecking> = Schema.Struct({
   status: Schema.Literal("checking"),
 });
 
-export const InstallationUnsupported: Codec<T.InstallationUnsupported> = Schema.Struct({
+const InstallationUnsupported: Codec<T.InstallationUnsupported> = Schema.Struct({
   status: Schema.Literal("unsupported"),
   reason: Schema.String,
 });
@@ -67,24 +67,24 @@ export const Balance: Codec<T.Balance> = Schema.Struct({
   amount: Schema.Finite,
 });
 
-export const AccountUsageOk: Codec<T.AccountUsageOk> = Schema.Struct({
+const AccountUsageOk: Codec<T.AccountUsageOk> = Schema.Struct({
   status: Schema.Literal("ok"),
   subscription: Schema.NullOr(Schema.String),
   windows: Schema.mutable(Schema.Array(UsageWindow)),
 });
 
-export const AccountUsageBalance: Codec<T.AccountUsageBalance> = Schema.Struct({
+const AccountUsageBalance: Codec<T.AccountUsageBalance> = Schema.Struct({
   status: Schema.Literal("balance"),
   provider: Schema.String,
   available: Schema.Boolean,
   balances: Schema.mutable(Schema.Array(Balance)),
 });
 
-export const AccountUsageLoginRequired: Codec<T.AccountUsageLoginRequired> = Schema.Struct({
+const AccountUsageLoginRequired: Codec<T.AccountUsageLoginRequired> = Schema.Struct({
   status: Schema.Literal("login_required"),
 });
 
-export const AccountUsageUnavailable: Codec<T.AccountUsageUnavailable> = Schema.Struct({
+const AccountUsageUnavailable: Codec<T.AccountUsageUnavailable> = Schema.Struct({
   status: Schema.Literal("unavailable"),
   reason: Schema.String,
 });

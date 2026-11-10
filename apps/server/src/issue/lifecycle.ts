@@ -13,6 +13,7 @@ import { Core } from "#/core/core.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
+import type { Trigger } from "#/mailbox/shapes.ts";
 import { issueBranch, Repo } from "#/repo/repo.ts";
 import { NotRecorded, Session } from "#/session/session.ts";
 import * as q from "#db/issue.sql.ts";
@@ -376,7 +377,7 @@ export const issueLifecycle = Effect.gen(function* () {
     input?: { readonly text: string; readonly by: T.RunTrigger },
   ) {
     const assignedAt = yield* Clock.currentTimeMillis;
-    let dispatch: T.Trigger | undefined;
+    let dispatch: Trigger | undefined;
     const linked = yield* db.run(
       db.attemptTx(
         Effect.gen(function* () {
@@ -411,10 +412,10 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* publish(issue.id);
   });
 
-  const setQueued = Effect.fn("Issue.setQueued")(function* (id: string, queued: boolean, channel: string, by?: T.RunTrigger, source?: T.Trigger) {
+  const setQueued = Effect.fn("Issue.setQueued")(function* (id: string, queued: boolean, channel: string, by?: T.RunTrigger, source?: Trigger) {
     const item = yield* unsent(id);
     const at = yield* Clock.currentTimeMillis;
-    let dispatch: T.Trigger | undefined;
+    let dispatch: Trigger | undefined;
     yield* db.inTx(
       Effect.gen(function* () {
         if (!queued) {
@@ -487,7 +488,7 @@ export const issueLifecycle = Effect.gen(function* () {
     rows: readonly { readonly id: T.IssueId; readonly req: T.IssueRequest }[],
   ) {
     const at = yield* Clock.currentTimeMillis;
-    const dispatches: T.Trigger[] = [];
+    const dispatches: Trigger[] = [];
     const assignments = yield* db
       .attemptTx(
         Effect.gen(function* () {

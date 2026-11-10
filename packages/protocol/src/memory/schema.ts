@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import type { Codec } from "../codec";
 import { ActorKind, SessionId } from "../common/schema";
 import { MemorySourceInfo } from "../setting/schema";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const RecallPreview: Codec<T.RecallPreview> = Schema.Struct({
   lines: Schema.mutable(Schema.Array(Schema.String)),

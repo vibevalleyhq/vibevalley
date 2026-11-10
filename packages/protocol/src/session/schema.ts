@@ -1,8 +1,9 @@
 import { Schema } from "effect";
 
+import { AgentRoleValues } from "../agent/shapes";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const SessionAction: Codec<T.SessionAction> = Schema.Literals(T.SessionActionValues);
 
@@ -21,19 +22,19 @@ const workingFields = {
   retry: Schema.optionalKey(Retry),
 };
 
-export const PhaseWorking: Codec<T.PhaseWorking> = Schema.TaggedStruct("working", { ...workingFields, doing: Doing });
+const PhaseWorking: Codec<T.PhaseWorking> = Schema.TaggedStruct("working", { ...workingFields, doing: Doing });
 
-export const PhaseWorkingView: Codec<T.PhaseWorkingView> = Schema.TaggedStruct("working", { ...workingFields, doing: DoingView });
+const PhaseWorkingView: Codec<T.PhaseWorkingView> = Schema.TaggedStruct("working", { ...workingFields, doing: DoingView });
 
-export const PhaseDone: Codec<T.PhaseDone> = Schema.TaggedStruct("done", {});
+const PhaseDone: Codec<T.PhaseDone> = Schema.TaggedStruct("done", {});
 
-export const PhaseFailed: Codec<T.PhaseFailed> = Schema.TaggedStruct("failed", {});
+const PhaseFailed: Codec<T.PhaseFailed> = Schema.TaggedStruct("failed", {});
 
 export const PhaseResting: Codec<T.PhaseResting> = Schema.TaggedStruct("resting", {});
 
 export const SessionClose: Codec<T.SessionClose> = Schema.Literals(T.SessionCloseValues);
 
-export const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
+const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
   at: Schema.Finite,
   closed: SessionClose,
 });
@@ -65,7 +66,7 @@ export const ToolConnection: Codec<T.ToolConnection> = Schema.Struct({
 
 const sessionFields = {
   id: SessionId,
-  role: Schema.Literals(T.AgentRoleValues),
+  role: Schema.Literals(AgentRoleValues),
   name: Schema.String,
   agent: Schema.String,
   runtime: Schema.String,

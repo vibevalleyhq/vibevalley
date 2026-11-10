@@ -4,7 +4,7 @@ import { selfTools } from "@vibevalley/agent/self";
 import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
+import type { OrchestratorEval } from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
 import { Agent, modelClient, noDeepSeekKey } from "#/agent/agent.ts";
@@ -26,7 +26,7 @@ import { Pkm } from "#/pkm/pkm.ts";
 import { Repo } from "#/repo/repo.ts";
 import { runtimeLabel } from "#/runtime/presets.ts";
 import { Runtime } from "#/runtime/runtime.ts";
-import { type AgentHost, type Caller, type NotAnswered } from "#/session/host.ts";
+import { type AgentHost, type NotAnswered } from "#/session/host.ts";
 import { type NotRecorded, Session } from "#/session/session.ts";
 import { Setting } from "#/setting/setting.ts";
 import { answers as toolAnswers, channelLine } from "#/tool/prompts.ts";
@@ -45,29 +45,14 @@ const resumeWithinMs = 30 * 60_000;
 
 export type Pick = Picked;
 
-interface Route {
+interface HostContext {
   readonly channel: string;
   readonly envelope: string;
   readonly agent?: string;
-  readonly quiet?: boolean;
   readonly source: Source;
   readonly issue?: string;
   /** True when user-authored messages are in the batch; required by `actsForUser` for issue mutations. */
   readonly user?: boolean;
-}
-
-interface Intake {
-  readonly envelopes: readonly string[];
-  readonly to?: string;
-  readonly source: Source;
-  readonly line: string;
-  readonly channel: string;
-  readonly agent?: string;
-  readonly user?: boolean;
-  readonly issue?: string;
-  readonly envelope?: string;
-  readonly by?: RunTrigger;
-  readonly caller?: Caller;
 }
 
 export class Orchestrator extends Context.Service<
@@ -110,7 +95,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     const scope = yield* Effect.scope;
 
-    const toolsFor = (id: string) => (current: () => Route) =>
+    const toolsFor = (id: string) => (current: () => HostContext) =>
       tool.orchestrator(() => {
         const at = current();
         return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.user ?? false) };
@@ -119,7 +104,7 @@ const make = (options: OrchestratorOptions = {}) =>
     interface Instance {
       readonly id: string;
       readonly home: string;
-      readonly host: AgentHost<Route>;
+      readonly host: AgentHost<HostContext>;
       /** What it last said it cannot start for, per channel: said once, not to every line, until it starts. */
       readonly cannot: Map<string, string>;
       shown: string;
@@ -153,7 +138,7 @@ const make = (options: OrchestratorOptions = {}) =>
             cannot: new Map(),
             shown: "",
             host: yield* run
-              .host<Route>({
+              .host<HostContext>({
                 session: {
                   id,
                   role: "orchestrator",
@@ -172,9 +157,9 @@ const make = (options: OrchestratorOptions = {}) =>
                 skills: [orchestratorSkills],
                 wakeSoon,
                 first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
-                quiet: (r) => r.quiet ?? false,
+                quiet: () => false,
                 say: (r, text, runId) => chat.post({ _tag: "Run", from: id, channel: r.channel, text: text, run: runId }),
-                channel: (r) => (r.quiet === true ? undefined : r.channel),
+                channel: (r) => r.channel,
                 fresh: () => {
                   me.shown = "";
                 },
@@ -246,63 +231,10 @@ const make = (options: OrchestratorOptions = {}) =>
         digest.length === 0 ? ["", []] : [situationWords.news(orchestratorEnvelopeLines(digest)), digest.map((m) => m.id)],
       );
 
-    const recall = (i: Intake) =>
-      i.source !== "user" || i.line.trim().length < 4
+    const recall = (source: Source, line: string) =>
+      source !== "user" || line.trim().length < 4
         ? Effect.succeed("")
-        : Effect.map(notes.search({ text: head(i.line, 200), limit: notesRecalled }), (hits) => situationWords.recalled(hits.map(toolAnswers.pkm.hit)));
-
-    const taking = (i: Intake) =>
-      Effect.gen(function* () {
-        const me = yield* target(i.to);
-        const rule = intake[i.source];
-        const asked = rule.head + i.line;
-        const route: Route = {
-          channel: i.channel,
-          envelope: i.envelope ?? "",
-          ...(i.agent ? { agent: i.agent } : {}),
-          source: i.source,
-          ...(i.issue ? { issue: i.issue } : {}),
-          ...(i.user === true ? { user: true } : {}),
-        };
-        const taken = yield* me.host.submit(
-          (busy, memoryNews) =>
-            Effect.gen(function* () {
-              const [heard, ids] = yield* news(me);
-              const now = yield* Clock.currentTimeMillis;
-              const text = [situationWords.now(localeMinute(now)), yield* situationNow(me, busy, i.channel), memoryNews, yield* recall(i), heard, asked]
-                .filter((p) => p !== "")
-                .join("\n\n");
-              return { text, heard: [...new Set([...ids, ...i.envelopes])] };
-            }),
-          {
-            route,
-            run: { ...(i.issue ? { issue: i.issue } : {}), by: { ...(i.by ?? { kind: rule.trigger }), channel: i.channel }, asked },
-            ...(i.caller ? { caller: i.caller } : {}),
-          },
-          rule.now,
-        );
-        if (taken.ok) {
-          me.cannot.clear();
-          return true;
-        }
-        const words = taken.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: taken.why });
-        const again = me.cannot.get(i.channel) === words;
-        me.cannot.set(i.channel, words);
-        if (!again) yield* chat.post({ _tag: "Run", from: me.id, channel: i.channel, text: words, run: taken.run });
-        return false;
-      });
-
-    const take = (i: Intake): Effect.Effect<boolean> =>
-      taking(i).pipe(
-        Effect.catchCause((cause) =>
-          Effect.as(
-            Effect.sync(() => i.caller?.fail(Cause.squash(cause))).pipe(
-              Effect.andThen(Effect.logError(`vibevalley: the orchestrator could not take ${i.source}: ${Cause.pretty(cause)}`)),
-            ),
-            false,
-          ),
-        ),
-      );
+        : Effect.map(notes.search({ text: head(line, 200), limit: notesRecalled }), (hits) => situationWords.recalled(hits.map(toolAnswers.pkm.hit)));
 
     const pickedNote = (picked: Pick) => {
       let note = "";
@@ -320,6 +252,8 @@ const make = (options: OrchestratorOptions = {}) =>
         const response = n.messages.findLast((message) => message.responsePort);
         const voice = n.messages.findLast((message) => message.voiceMode);
         const caller = response?.responsePort ? responses.take(response.responsePort) : undefined;
+        const source: Source = n.source ?? (fromPerson ? "user" : "chat");
+        const rule = intake[source];
         const line = n.source
           ? n.messages.map((message) => message.text.replace(new RegExp(`^@${n.agent}\\s*`, "u"), "")).join("\n")
           : voice?.voiceMode === "dictated"
@@ -331,24 +265,65 @@ const make = (options: OrchestratorOptions = {}) =>
                 : fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
                   ? pickedNote(picked) + lineWords.user(n.messages.map((m) => m.text).join("\n"))
                   : pickedNote(picked) + lineWords.chat(n.target, orchestratorEnvelopeLines(n.messages));
-        return take({
-          envelopes: n.messages.map((message) => message.id),
-          to: n.agent,
-          source: n.source ?? (fromPerson ? "user" : "chat"),
-          line,
-          channel: n.channel,
-          ...(picked.agent ? { agent: picked.agent } : {}),
-          envelope:
-            n.messages.findLast((message) => message.from === userId)?.originTrigger ??
-            n.messages.findLast((message) => message.from === userId)?.id ??
-            n.messages.at(-1)?.originTrigger ??
-            n.messages.at(-1)?.id ??
-            "",
-          user,
-          ...(n.issue ? { issue: n.issue } : {}),
-          ...(n.by ? { by: n.by } : {}),
-          ...(caller ? { caller } : {}),
+        const asked = rule.head + line;
+        const envelopes = n.messages.map((message) => message.id);
+        const envelope =
+          n.messages.findLast((message) => message.from === userId)?.originTrigger ??
+          n.messages.findLast((message) => message.from === userId)?.id ??
+          n.messages.at(-1)?.originTrigger ??
+          n.messages.at(-1)?.id ??
+          "";
+        return Effect.gen(function* () {
+          const me = yield* target(n.agent);
+          const taken = yield* me.host.submit(
+            (busy, memoryNews) =>
+              Effect.gen(function* () {
+                const [heard, ids] = yield* news(me);
+                const now = yield* Clock.currentTimeMillis;
+                const text = [
+                  situationWords.now(localeMinute(now)),
+                  yield* situationNow(me, busy, n.channel),
+                  memoryNews,
+                  yield* recall(source, line),
+                  heard,
+                  asked,
+                ]
+                  .filter((p) => p !== "")
+                  .join("\n\n");
+                return { text, heard: [...new Set([...ids, ...envelopes])] };
+              }),
+            {
+              route: {
+                channel: n.channel,
+                envelope,
+                ...(picked.agent ? { agent: picked.agent } : {}),
+                source,
+                ...(n.issue ? { issue: n.issue } : {}),
+                ...(user ? { user: true } : {}),
+              },
+              run: { ...(n.issue ? { issue: n.issue } : {}), by: { ...(n.by ?? { kind: rule.trigger }), channel: n.channel }, asked },
+              ...(caller ? { caller } : {}),
+            },
+            rule.now,
+          );
+          if (taken.ok) {
+            me.cannot.clear();
+            return true;
+          }
+          const words = taken.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: taken.why });
+          const again = me.cannot.get(n.channel) === words;
+          me.cannot.set(n.channel, words);
+          if (!again) yield* chat.post({ _tag: "Run", from: me.id, channel: n.channel, text: words, run: taken.run });
+          return false;
         }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.as(
+              Effect.sync(() => caller?.fail(Cause.squash(cause))).pipe(
+                Effect.andThen(Effect.logError(`vibevalley: the orchestrator could not take ${source}: ${Cause.pretty(cause)}`)),
+              ),
+              false,
+            ),
+          ),
           Effect.tap((taken) => (taken ? Effect.void : Effect.forEach(n.messages, (message) => mailbox.handBack(n.agent, message.id), { discard: true }))),
         );
       });

@@ -66,8 +66,9 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "fact for something that is not a fact of the core state",
-    pattern: /\b(RuntimeFacts|runtimeFacts|FactsCard|ChannelRouteFact|RowFacts|rowFacts|SideEvent\w*|eventFacts|FactContext|unknownFacts)\b/u,
-    says: "a fact is only a change to the core state: RuntimeSupport (runtimeSupport, supportOf), ChannelRouteInput, RowKeys, ServerEvent, reactionTo and ReactionContext (session/reaction.ts)",
+    pattern:
+      /\b(RuntimeFacts|runtimeFacts|FactsCard|ChannelRouteFact|RowFacts|rowFacts|SideEvent\w*|eventFacts|FactContext|unknownFacts|ServerEventStep|ServerEventNotice|ServerEventRuntime|TriggerKind|TriggerKindValues)\b/u,
+    says: "a fact is only a change to the core state: RuntimeSupport (runtimeSupport, supportOf), ChannelRouteInput, RowKeys, ServerEvent (Fact | ServerEventSnapshot | LiveEvent), reactionTo and ReactionContext (session/reaction.ts)",
   },
   {
     name: "a toggle, now an explicit set",

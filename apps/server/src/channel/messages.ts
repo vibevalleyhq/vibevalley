@@ -5,6 +5,7 @@ import type * as T from "@vibevalley/protocol";
 import { compareText, or } from "#/base/order.ts";
 import { type ChannelHearers, type Meta, metaOf, speakerOf, targetOf, channelType } from "#/mailbox/envelope.ts";
 import type { InputContext, TriggerInput } from "#/mailbox/payload.ts";
+import type { TriggerActor, TriggerSource } from "#/mailbox/shapes.ts";
 
 import { chatNamed } from "./mentions.ts";
 
@@ -112,7 +113,7 @@ export function parseSearch(text: string): SearchQuery {
   };
 }
 
-const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, T.TriggerSource> = {
+const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, TriggerSource> = {
   issue: "workbench",
   cron: "cron",
   patrol: "patrol",
@@ -121,7 +122,7 @@ const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, T.TriggerSourc
   github: "github",
 };
 
-const actorOf = (participant: string, id: string, name: string): T.TriggerActor => {
+const actorOf = (participant: string, id: string, name: string): TriggerActor => {
   const { fromKind, fromRole } = speakerOf(participant);
   return { kind: fromKind, id, name, ...(fromRole !== undefined ? { role: fromRole } : {}) };
 };

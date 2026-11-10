@@ -1,14 +1,13 @@
 import { Effect, Schema } from "effect";
 
-import type * as T from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
-
 import { type ApiError, refused } from "#/base/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import * as q from "#db/mailbox_trigger.sql.ts";
 
 import { type KnownGitHubEvent, type TriggerInput, type TriggerResource, triggerOf } from "./payload.ts";
+import * as S from "./schema.ts";
+import type { Trigger } from "./shapes.ts";
 
 const Payload = Schema.Struct({ text: Schema.String, data: Schema.Unknown });
 const encodeTrigger = Schema.encodeEffect(Schema.fromJsonString(S.Trigger));
@@ -25,7 +24,7 @@ export const triggerJournal = Effect.gen(function* () {
 
   // No routing or new fiber here: the source cursor and this record must share the caller's transaction.
   const keep = Effect.fnUntraced(
-    function* (trigger: T.Trigger, key: string, payload: TriggerResource["payload"]) {
+    function* (trigger: Trigger, key: string, payload: TriggerResource["payload"]) {
       yield* db.attempt(
         q.recordTrigger({
           id: trigger.id,
@@ -57,7 +56,7 @@ export const triggerJournal = Effect.gen(function* () {
       }));
     }),
     replayCronTriggers: Effect.fn("Mailbox.replayCronTriggers")(function* (
-      consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>,
+      consume: (trigger: Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>,
     ) {
       let after = 0;
       while (true) {

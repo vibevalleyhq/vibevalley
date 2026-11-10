@@ -103,7 +103,7 @@ export const MediaUnderstandingPhaseValues = [
 ] as const;
 export type MediaUnderstandingPhase = (typeof MediaUnderstandingPhaseValues)[number];
 export const MediaCleanupValues = ["pending", "running", "done", "blocked", "unknown"] as const;
-export type MediaCleanup = (typeof MediaCleanupValues)[number];
+type MediaCleanup = (typeof MediaCleanupValues)[number];
 
 export interface MediaUnderstandingResult {
   model: string;

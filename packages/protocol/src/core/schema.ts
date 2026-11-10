@@ -20,7 +20,7 @@ import {
   SessionEvent,
   SessionView,
 } from "../session/schema";
-import * as T from "../shapes";
+import * as T from "./shapes";
 import { CallState, FactCallChanged } from "../voice/schema";
 
 const spaceFields = {
@@ -91,25 +91,27 @@ export const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
   state: SpaceState,
 });
 
-export const ServerEventStep: Codec<T.ServerEventStep> = Schema.Struct({
+const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
   type: Schema.Literal("event"),
   at: Schema.Finite,
   id: Schema.String,
   activity: SessionEvent,
 });
 
-export const ServerEventNotice: Codec<T.ServerEventNotice> = Schema.Struct({
+export const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
   type: Schema.Literal("notice"),
   at: Schema.Finite,
   level: NoticeLevel,
   text: Schema.String,
 });
 
-export const ServerEventRuntime: Codec<T.ServerEventRuntime> = Schema.Struct({
+const LiveEventRuntime: Codec<T.LiveEventRuntime> = Schema.Struct({
   type: Schema.Literal("runtime"),
   at: Schema.Finite,
   info: RuntimeInfo,
 });
+
+export const LiveEvent: Codec<T.LiveEvent> = Schema.Union([LiveEventSession, LiveEventNotice, LiveEventRuntime]);
 
 export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactCallChanged,
@@ -132,29 +134,7 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactMachineChanged,
   FactMediaChanged,
   ServerEventSnapshot,
-  ServerEventStep,
-  ServerEventNotice,
-  ServerEventRuntime,
+  LiveEventSession,
+  LiveEventNotice,
+  LiveEventRuntime,
 ]);
-
-export const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
-  type: Schema.Literal("event"),
-  at: Schema.Finite,
-  id: Schema.String,
-  activity: SessionEvent,
-});
-
-export const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
-  type: Schema.Literal("notice"),
-  at: Schema.Finite,
-  level: NoticeLevel,
-  text: Schema.String,
-});
-
-export const LiveEventRuntime: Codec<T.LiveEventRuntime> = Schema.Struct({
-  type: Schema.Literal("runtime"),
-  at: Schema.Finite,
-  info: RuntimeInfo,
-});
-
-export const LiveEvent: Codec<T.LiveEvent> = Schema.Union([LiveEventSession, LiveEventNotice, LiveEventRuntime]);

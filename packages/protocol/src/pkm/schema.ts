@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes";
 
 const pkmProps = Schema.Record(Schema.String, Schema.String);
@@ -165,7 +165,7 @@ export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: S
 
 export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
 
-export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
+const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
   slug: Schema.String,
   title: Schema.String,
   days: Schema.Int,
@@ -175,7 +175,7 @@ export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
   done: Schema.Int,
 });
 
-export const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
+const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
   block: Schema.String,
   page: Schema.String,
   body: Schema.String,

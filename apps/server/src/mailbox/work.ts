@@ -3,7 +3,6 @@ import { Clock, Effect, Schema } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
@@ -23,6 +22,8 @@ import type { InsertDelivery, TalkRow } from "./mailbox.ts";
 import { readPayload, deliveryScope, triggerPayload } from "./payload.ts";
 import { handbackWords, releasedInputWords } from "./prompts.ts";
 import { waitsForHuman, type DeliveryEvent, type Urgency, triggerEvent, urgencyOf } from "./routing.ts";
+import * as S from "./schema.ts";
+import type { Trigger } from "./shapes.ts";
 
 export interface OutboundDelivery {
   readonly urgency?: Urgency;
@@ -32,7 +33,7 @@ export interface OutboundDelivery {
   readonly deliveryId?: string;
   readonly note?: string;
   readonly prepare?: Effect.Effect<boolean>;
-  readonly trigger: T.Trigger;
+  readonly trigger: Trigger;
   readonly session: string;
   readonly issue?: string;
   readonly previous?: string;
@@ -170,10 +171,10 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "" };
     }, writtenLocked);
 
-    const registerInitialInputs = Effect.fn("Mailbox.registerInitialInputs")(function* (session: T.Session, launch: string, inputs: readonly T.Trigger[]) {
+    const registerInitialInputs = Effect.fn("Mailbox.registerInitialInputs")(function* (session: T.Session, launch: string, inputs: readonly Trigger[]) {
       const at = yield* Clock.currentTimeMillis;
       const fallback = yield* defaultChannel;
-      const destination = (trigger: T.Trigger) => trigger.replyChannel ?? session.channel ?? fallback;
+      const destination = (trigger: Trigger) => trigger.replyChannel ?? session.channel ?? fallback;
       const rows: DeliveryDraft[] = inputs.map((trigger) => ({
         envelope_id: trigger.id,
         scope: deliveryScope(destination(trigger), session.issue),
@@ -278,7 +279,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
 
     const retire = Effect.fn("Mailbox.returnIssueInput")(function* (
       issue: T.Issue,
-      trigger: T.Trigger,
+      trigger: Trigger,
       session: string | null,
       reason: string,
       unreadOnly: boolean,
@@ -383,7 +384,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     });
 
     const receive = Effect.fn("Mailbox.receive")(function* (
-      trigger: T.Trigger,
+      trigger: Trigger,
       audience?: readonly OutboundDelivery[],
     ): Effect.fn.Return<ChannelRouteResult | undefined, ApiError> {
       const existing = yield* db.one(qi.existingIssueInput({ trigger_id: trigger.id }));

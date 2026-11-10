@@ -1,5 +1,27 @@
-import type { CardAttachment, CompactCard, ParentPreview } from "@vibevalley/protocol";
 import { oneLine, slice } from "@vibevalley/protocol/rules";
+
+export interface CardAttachment {
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  readonly readUri: string;
+}
+
+export interface ParentPreview {
+  readonly id: string;
+  readonly from: string;
+  readonly preview: string;
+  readonly readUri: string;
+}
+
+export interface CompactCard {
+  readonly summary: string;
+  readonly totalChars: number;
+  readonly truncated: boolean;
+  readonly readUri: string;
+  readonly attachments?: readonly CardAttachment[];
+  readonly parentPreview?: ParentPreview;
+}
 
 /** s on one line and trimmed, at most max units with the ellipsis. */
 export const clip = (s: string, max: number) => {

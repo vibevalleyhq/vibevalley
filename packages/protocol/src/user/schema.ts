@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import type * as T from "../shapes";
+import type * as T from "./shapes";
 
 export const UserDevice: Codec<T.UserDevice> = Schema.Struct({
   id: Schema.String,

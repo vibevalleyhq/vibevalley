@@ -1,28 +1,26 @@
 import { Schema } from "effect";
 
-import { QuotedBlock } from "../artifact/schema";
-import { ChannelType } from "../channel/schema";
-import type { Codec } from "../codec";
-import { IssueId } from "../common/schema";
-import { RunTrigger } from "../session/schema";
-import * as T from "../shapes";
-import { TriggerAddressingValues, TriggerKindValues, VoiceModeValues } from "./shapes";
+import { AgentRoleValues } from "@vibevalley/protocol";
+import { ChannelType, IssueId, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
 
-const CardAttachmentSchema: Codec<T.CardAttachment> = Schema.Struct({
+import type * as T from "./shapes.ts";
+import { GithubTriggerEventValues, TriggerActorKindValues, TriggerAddressingValues, TriggerSourceValues, VoiceModeValues } from "./shapes.ts";
+
+const CardAttachmentSchema: Schema.Codec<T.CardAttachment, Wire<T.CardAttachment>> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   mimeType: Schema.String,
   readUri: Schema.String,
 });
 
-const ParentPreviewSchema: Codec<T.ParentPreview> = Schema.Struct({
+const ParentPreviewSchema: Schema.Codec<T.ParentPreview, Wire<T.ParentPreview>> = Schema.Struct({
   id: Schema.String,
   from: Schema.String,
   preview: Schema.String,
   readUri: Schema.String,
 });
 
-export const CompactCard: Codec<T.CompactCard> = Schema.Struct({
+export const CompactCard: Schema.Codec<T.CompactCard, Wire<T.CompactCard>> = Schema.Struct({
   summary: Schema.String,
   totalChars: Schema.Finite,
   truncated: Schema.Boolean,
@@ -31,7 +29,7 @@ export const CompactCard: Codec<T.CompactCard> = Schema.Struct({
   parentPreview: Schema.optionalKey(ParentPreviewSchema),
 });
 
-export const TriggerContext: Codec<T.TriggerContext> = Schema.Struct({
+export const TriggerContext: Schema.Codec<T.TriggerContext, Wire<T.TriggerContext>> = Schema.Struct({
   number: Schema.Int,
   target: Schema.String,
   replyTo: Schema.optionalKey(Schema.Int),
@@ -45,7 +43,7 @@ export const TriggerContext: Codec<T.TriggerContext> = Schema.Struct({
   voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
-export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
+export const TriggerMeta: Schema.Codec<T.TriggerMeta, Wire<T.TriggerMeta>> = Schema.Struct({
   issue: Schema.optionalKey(IssueId),
   ingressRecipient: Schema.optionalKey(Schema.String),
   trigger: Schema.optionalKey(RunTrigger),
@@ -53,7 +51,7 @@ export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
   cron: Schema.optionalKey(Schema.String),
   repo: Schema.optionalKey(Schema.String),
   pr: Schema.optionalKey(Schema.Int),
-  kind: Schema.optionalKey(Schema.Literals(TriggerKindValues)),
+  kind: Schema.optionalKey(Schema.Literals(GithubTriggerEventValues)),
   head: Schema.optionalKey(Schema.String),
   fingerprint: Schema.optionalKey(Schema.String),
   failed: Schema.optionalKey(Schema.Boolean),
@@ -66,13 +64,13 @@ export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
   voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
-export const Trigger: Codec<T.Trigger> = Schema.Struct({
+export const Trigger: Schema.Codec<T.Trigger, Wire<T.Trigger>> = Schema.Struct({
   id: Schema.String,
-  source: Schema.Literals(T.TriggerSourceValues),
+  source: Schema.Literals(TriggerSourceValues),
   actor: Schema.Struct({
-    kind: Schema.Literals(T.TriggerActorKindValues),
+    kind: Schema.Literals(TriggerActorKindValues),
     id: Schema.String,
-    role: Schema.optionalKey(Schema.Literals(T.AgentRoleValues)),
+    role: Schema.optionalKey(Schema.Literals(AgentRoleValues)),
     name: Schema.optionalKey(Schema.String),
   }),
   addressed: Schema.Literals(TriggerAddressingValues),

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const AgentProblemLevel: Codec<T.AgentProblemLevel> = Schema.Literals(T.AgentIssueLevelValues);
 
@@ -13,7 +13,7 @@ export const AgentProblem: Codec<T.AgentProblem> = Schema.Struct({
 
 export const PersonaMode: Codec<T.PersonaMode> = Schema.Literals(T.PersonaModeValues);
 
-export const MCPServerStdio: Codec<T.MCPServerStdio> = Schema.Struct({
+const MCPServerStdio: Codec<T.MCPServerStdio> = Schema.Struct({
   type: Schema.Literal("stdio"),
   name: Schema.String,
   command: Schema.String,
@@ -21,7 +21,7 @@ export const MCPServerStdio: Codec<T.MCPServerStdio> = Schema.Struct({
   env: Schema.Record(Schema.String, Schema.String),
 });
 
-export const MCPServerHTTP: Codec<T.MCPServerHTTP> = Schema.Struct({
+const MCPServerHTTP: Codec<T.MCPServerHTTP> = Schema.Struct({
   type: Schema.Literal("http"),
   name: Schema.String,
   url: Schema.String,
@@ -50,7 +50,7 @@ export const Look: Codec<T.Look> = Schema.Struct({
   eye: Schema.String,
 });
 
-export const AgentFrom: Codec<T.AgentFrom> = Schema.Struct({ template: Schema.String, version: Schema.Finite });
+const AgentFrom: Codec<T.AgentFrom> = Schema.Struct({ template: Schema.String, version: Schema.Finite });
 
 export const Agent: Codec<T.Agent> = Schema.Struct({
   id: Schema.String,

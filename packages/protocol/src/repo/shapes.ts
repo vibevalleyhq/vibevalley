@@ -122,7 +122,7 @@ export interface SubmitBranch {
 export const PublishPlatformValues = ["github", "gitlab"] as const;
 export type PublishPlatform = (typeof PublishPlatformValues)[number];
 export const BranchCheckValues = ["preview", "passed", "not-run"] as const;
-export type BranchCheck = (typeof BranchCheckValues)[number];
+type BranchCheck = (typeof BranchCheckValues)[number];
 
 export interface BranchPublication {
   readonly platform: PublishPlatform;

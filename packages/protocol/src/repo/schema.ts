@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,

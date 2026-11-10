@@ -15,7 +15,7 @@ export const MediaAudioAccountRequest = Schema.Struct({
   connection: Schema.NonEmptyString,
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }) satisfies Codec<T.MediaAudioAccountRequest>;
-export const MediaAudioKind: Codec<T.MediaAudioKind> = Schema.Literals(T.MediaAudioKindValues);
+const MediaAudioKind: Codec<T.MediaAudioKind> = Schema.Literals(T.MediaAudioKindValues);
 const SpeakersFields = {
   ...MediaAudioAccountRequest.fields,
   speakers: Schema.mutable(Schema.Array(Schema.Struct({ id: SpeakerId, voice: VoiceId })).check(Schema.isMinLength(1), Schema.isMaxLength(100))),

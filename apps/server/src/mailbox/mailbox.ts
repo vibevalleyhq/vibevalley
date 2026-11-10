@@ -2,7 +2,6 @@ import { Array as Arr, Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { type ApiError, refused, missing, lookIn } from "#/base/errors.ts";
@@ -35,6 +34,8 @@ import { inputOf, orchestratorSource, deliveryScope, type InputContext, type Tri
 import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
 import { channelRecipients, waitsForHuman } from "./routing.ts";
+import * as S from "./schema.ts";
+import type { Trigger } from "./shapes.ts";
 import { triggerJournal } from "./triggers.ts";
 import { makeWorkMailbox } from "./work.ts";
 
@@ -49,7 +50,7 @@ const readUserRoutes = Schema.decodeUnknownSync(Schema.Array(RoutePosition));
 
 export interface QueuedInput {
   readonly issue: string;
-  readonly trigger: T.Trigger;
+  readonly trigger: Trigger;
 }
 
 export interface TalkRow {
@@ -58,7 +59,7 @@ export interface TalkRow {
 }
 
 export type Arrival =
-  | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelHearers | { readonly session: string } }
+  | { readonly _tag: "Trigger"; readonly trigger: Trigger; readonly to?: ChannelHearers | { readonly session: string } }
   | {
       readonly _tag: "Hire";
       readonly agent: T.Agent;
@@ -66,7 +67,7 @@ export type Arrival =
       /** Empty for a direct conversation. */
       readonly where: string;
       readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
-      readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly T.Trigger[] };
+      readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly Trigger[] };
       /** Runs inside the session hire transaction before the session is visible. */
       readonly hiring: (session: T.Session, launch: string, at: number) => Effect.Effect<void, NotRecorded>;
     };
@@ -95,12 +96,12 @@ export type DeliveryNews =
 export class Mailbox extends Context.Service<
   Mailbox,
   {
-    readonly recordTrigger: (input: TriggerInput) => Effect.Effect<T.Trigger, ApiError>;
+    readonly recordTrigger: (input: TriggerInput) => Effect.Effect<Trigger, ApiError>;
     readonly readTrigger: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
     readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
-    readonly replayCronTriggers: (consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
+    readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
     readonly unreadSummary: (participant: string, channel: string) => Effect.Effect<UnreadRow[]>;
-    readonly triggersOf: (issue: string) => Effect.Effect<readonly T.Trigger[]>;
+    readonly triggersOf: (issue: string) => Effect.Effect<readonly Trigger[]>;
     /** Dispatches first, then routed order. */
     readonly queuedTriggers: Effect.Effect<readonly QueuedInput[]>;
     readonly isRouted: (trigger: string) => Effect.Effect<boolean>;
@@ -230,7 +231,7 @@ export class Mailbox extends Context.Service<
       );
 
       let start: Effect.Effect<void> = Effect.void;
-      const route = Effect.fn("Mailbox.receive")(function* (trigger: T.Trigger, to?: ChannelHearers | { readonly session: string }) {
+      const route = Effect.fn("Mailbox.receive")(function* (trigger: Trigger, to?: ChannelHearers | { readonly session: string }) {
         const audience =
           to === undefined
             ? undefined

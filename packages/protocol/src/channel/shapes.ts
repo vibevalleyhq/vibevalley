@@ -102,7 +102,7 @@ export interface ChannelUnread {
   latest?: string;
 }
 
-export interface ChannelLast {
+interface ChannelLast {
   from: string;
   name: string;
   text: string;
@@ -123,12 +123,12 @@ export interface Chat {
 /** `Reset` is emitted when the subscriber falls too far behind to catch up incrementally. */
 export type ChannelEvent = ChannelMessage | ChannelReset;
 
-export interface ChannelMessage {
+interface ChannelMessage {
   _tag: "Message";
   message: ChatMessage;
 }
 
-export interface ChannelReset {
+interface ChannelReset {
   _tag: "Reset";
 }
 

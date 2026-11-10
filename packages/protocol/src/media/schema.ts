@@ -97,7 +97,7 @@ export const MediaUnderstandingAuthorizationRequest = Schema.Struct({
   ...MediaUnderstandingRequest.fields,
   channel: Schema.NonEmptyString,
 }) satisfies Codec<T.MediaUnderstandingAuthorizationRequest>;
-export const MediaUnderstandingAuthorization: Codec<T.MediaUnderstandingAuthorization> = Schema.Struct({
+const MediaUnderstandingAuthorization: Codec<T.MediaUnderstandingAuthorization> = Schema.Struct({
   channel: Schema.NonEmptyString,
   expiresAt: Schema.Finite,
 });
