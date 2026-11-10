@@ -123,6 +123,30 @@ tester.run("no-hex-color", rule("no-hex-color"), {
       code: `${stylexImport} sx.create({card: {'::before': {color: '#abc', content: '"#abc"'}}})`,
       errors: [{ messageId: "hex" }],
     },
+    {
+      code: "const v = <span style={{ background: active ? '#74a046' : 'var(--color-page)' }} />",
+      filename: "a.tsx",
+      errors: [{ messageId: "hex" }],
+    },
+    {
+      code: "const v = <div style={{ 'box-shadow': `2px 2px 0 0 #3a2a1899` }} />",
+      filename: "a.tsx",
+      errors: [{ messageId: "hex" }],
+    },
+  ],
+});
+
+tester.run("stylex-only", rule("stylex-only"), {
+  valid: [
+    { code: `${stylexImport} const s = sx.create({ box: { display: 'flex' } }); const v = <div {...sx.attrs(s.box)} />`, filename: "a.tsx" },
+    { code: "const v = <div {...styleProps(styles.box)} />", filename: "a.tsx" },
+    { code: "const appearance = { class: ['markdown', composed.class] }; const v = <div {...appearance} />", filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "const v = <div class='flex gap-2' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
+    { code: "const v = <Popup class={sx.attrs(styles.popup).class} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
+    { code: "const v = <div className='card' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
+    { code: "const v = <div classList={{ open: true }} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
   ],
 });
 

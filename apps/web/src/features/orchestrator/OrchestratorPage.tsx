@@ -14,7 +14,7 @@ import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   orchestratorOfA: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
@@ -30,9 +30,6 @@ const variantStyles = stylex.create({
   orchestratorOfA2: {
     textDecorationLine: "underline",
   },
-});
-
-const viewStyles = stylex.create({
   headDiv: {
     display: "flex",
     alignItems: "center",
@@ -90,9 +87,6 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 4)",
   },
-});
-
-const styles = stylex.create({
   tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "calc(var(--spacing) * 2)" },
 });
 
@@ -134,19 +128,19 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   const at = () => (shown().some((t) => t.id === props.tab) ? props.tab : "memory");
   const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.orchestrator ?? "farmer"));
   const head = () => (
-    <div {...stylex.attrs(viewStyles.headDiv)}>
-      <span {...stylex.attrs(viewStyles.headSpan)}>
+    <div {...stylex.attrs(styles.headDiv)}>
+      <span {...stylex.attrs(styles.headSpan)}>
         <OrchestratorFace size={64} agent={props.agent} />
       </span>
-      <div {...stylex.attrs(viewStyles.headDiv2)}>
-        <A href="/agents" {...stylex.attrs(variantStyles.orchestratorOfA)}>
+      <div {...stylex.attrs(styles.headDiv2)}>
+        <A href="/agents" {...stylex.attrs(styles.orchestratorOfA)}>
           {t("web.orchestrator.orchestrator.all")}
         </A>
-        <h1 {...stylex.attrs(viewStyles.headH1)}>{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
-        <p {...stylex.attrs(viewStyles.headP)}>
+        <h1 {...stylex.attrs(styles.headH1)}>{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
+        <p {...stylex.attrs(styles.headP)}>
           {t("web.orchestrator.orchestrator.intro")}
           {look() ? t("web.orchestrator.orchestrator.look", { name: look()?.name ?? "" }) : ""}{" "}
-          <A href={`/agents/${encodeURIComponent(props.agent)}`} {...stylex.attrs(variantStyles.orchestratorOfA2)}>
+          <A href={`/agents/${encodeURIComponent(props.agent)}`} {...stylex.attrs(styles.orchestratorOfA2)}>
             {t("web.orchestrator.orchestrator.profile")}
           </A>
         </p>
@@ -166,10 +160,10 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   return (
     <Switch>
       <Match when={at() === "trajectory"}>
-        <div {...stylex.attrs(viewStyles.orchestratorOfDiv)}>
+        <div {...stylex.attrs(styles.orchestratorOfDiv)}>
           {head()}
           {bar()}
-          <div {...stylex.attrs(viewStyles.orchestratorOfDiv2)}>
+          <div {...stylex.attrs(styles.orchestratorOfDiv2)}>
             <TrajectoryLog
               id={props.agent}
               asked={t("web.orchestrator.orchestrator.heard")}
@@ -182,8 +176,8 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
         </div>
       </Match>
       <Match when={at() !== "trajectory"}>
-        <div {...stylex.attrs(viewStyles.orchestratorOfDiv3)}>
-          <div {...stylex.attrs(viewStyles.orchestratorOfDiv4)}>
+        <div {...stylex.attrs(styles.orchestratorOfDiv3)}>
+          <div {...stylex.attrs(styles.orchestratorOfDiv4)}>
             {head()}
             {bar()}
             <Switch>

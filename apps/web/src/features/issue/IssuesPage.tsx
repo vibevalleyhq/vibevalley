@@ -36,7 +36,7 @@ import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   issueViewButton: {
     marginBottom: "calc(var(--spacing) * 3)",
     display: "inline-flex",
@@ -78,9 +78,6 @@ const recipeStyles = stylex.create({
       "@container (width>=760px)": "center",
     },
   },
-});
-
-const viewStyles = stylex.create({
   issuesPage: {
     position: "relative",
     display: "flex",
@@ -133,13 +130,13 @@ const viewStyles = stylex.create({
     paddingTop: "calc(var(--spacing) * 3)",
     paddingBottom: "calc(var(--spacing) * 10)",
   },
-  toolbarDiv: {
+  toolbarDiv2: {
     containerType: "inline-size",
     paddingInline: "calc(var(--spacing) * 3)",
     paddingTop: "calc(var(--spacing) * 3)",
     paddingBottom: "calc(var(--spacing) * 2.5)",
   },
-  toolbarDiv2: {
+  toolbarDiv22: {
     display: "flex",
     minWidth: "0",
     flex: "1",
@@ -303,14 +300,14 @@ export function IssuesPage(props: { rest: string }) {
 
   // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
-    <div data-testid="issues-page" {...stylex.attrs(viewStyles.issuesPage)}>
+    <div data-testid="issues-page" {...stylex.attrs(styles.issuesPage)}>
       <Show
         when={id()}
         keyed
         fallback={
           <>
             <Show when={history.error()}>
-              <p {...stylex.attrs(viewStyles.issuesPageP)}>
+              <p {...stylex.attrs(styles.issuesPageP)}>
                 {t("web.issue.page.historyUnread")}
                 {reasonOf(history.error())}
               </p>
@@ -402,13 +399,13 @@ function Detail(props: {
   return (
     <Switch>
       <Match when={!card() && !props.known}>
-        <p {...stylex.attrs(viewStyles.detailP)}>{t("web.issue.reading")}</p>
+        <p {...stylex.attrs(styles.detailP)}>{t("web.issue.reading")}</p>
       </Match>
       <Match when={!card()}>
         {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
         <div>
-          <h1 {...stylex.attrs(viewStyles.detailH1)}>{t("web.issue.page.notFound")}</h1>
-          <p {...stylex.attrs(viewStyles.detailP2)}>{t("web.issue.page.notFoundLine", { id: props.id })}</p>
+          <h1 {...stylex.attrs(styles.detailH1)}>{t("web.issue.page.notFound")}</h1>
+          <p {...stylex.attrs(styles.detailP2)}>{t("web.issue.page.notFoundLine", { id: props.id })}</p>
         </div>
       </Match>
       <Match when={shows("todo")} keyed>
@@ -431,8 +428,8 @@ function Detail(props: {
       <Match when={shows("missing")} keyed>
         {() => (
           <div>
-            <h1 {...stylex.attrs(viewStyles.detailH12)}>{cardOf("missing").issue.title}</h1>
-            <p {...stylex.attrs(viewStyles.detailP3)}>{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
+            <h1 {...stylex.attrs(styles.detailH12)}>{cardOf("missing").issue.title}</h1>
+            <p {...stylex.attrs(styles.detailP3)}>{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
           </div>
         )}
       </Match>
@@ -464,9 +461,9 @@ function IssueView(props: { onBack: () => void; children: JSX.Element }) {
     return () => document.removeEventListener("keydown", esc);
   });
   return (
-    <div {...stylex.attrs(viewStyles.issueViewDiv)}>
-      <div data-testid="issue" {...stylex.attrs(viewStyles.issue)}>
-        <button type="button" data-testid="issue-close" onClick={() => props.onBack()} {...stylex.attrs(recipeStyles.issueViewButton)}>
+    <div {...stylex.attrs(styles.issueViewDiv)}>
+      <div data-testid="issue" {...stylex.attrs(styles.issue)}>
+        <button type="button" data-testid="issue-close" onClick={() => props.onBack()} {...stylex.attrs(styles.issueViewButton)}>
           <Icon name="back" size={14} />
           {t("web.issue.page.backToBoard")}
         </button>
@@ -489,10 +486,10 @@ function Toolbar(props: {
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
     // Narrow, the views go on their own line above the filters, at the right where the Display panel opens leftwards.
-    <div {...stylex.attrs(viewStyles.toolbarDiv)}>
-      <div {...stylex.attrs(recipeStyles.toolbarDiv)}>
-        <div {...stylex.attrs(viewStyles.toolbarDiv2)}>
-          <label {...stylex.attrs(viewStyles.toolbarLabel)}>
+    <div {...stylex.attrs(styles.toolbarDiv2)}>
+      <div {...stylex.attrs(styles.toolbarDiv)}>
+        <div {...stylex.attrs(styles.toolbarDiv22)}>
+          <label {...stylex.attrs(styles.toolbarLabel)}>
             <Icon name="search" size={14} />
             <input
               data-testid="issue-search"
@@ -500,7 +497,7 @@ function Toolbar(props: {
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
               placeholder={t("web.issue.page.find")}
               aria-label={t("web.issue.page.findLabel")}
-              {...stylex.attrs(viewStyles.issueSearch)}
+              {...stylex.attrs(styles.issueSearch)}
             />
           </label>
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
@@ -527,13 +524,13 @@ function Toolbar(props: {
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
           <Show when={filterAny(props.filter)}>
-            <span {...stylex.attrs(viewStyles.toolbarSpan)}>{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
-            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} {...stylex.attrs(viewStyles.filterClear)}>
+            <span {...stylex.attrs(styles.toolbarSpan)}>{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
+            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} {...stylex.attrs(styles.filterClear)}>
               {t("web.issue.page.clear")}
             </button>
           </Show>
         </div>
-        <div {...stylex.attrs(viewStyles.toolbarDiv3)}>
+        <div {...stylex.attrs(styles.toolbarDiv3)}>
           <Segmented
             label={t("web.issue.page.view")}
             testid="issue-view"

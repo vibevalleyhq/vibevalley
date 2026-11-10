@@ -15,28 +15,19 @@ import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
 
-const recipeStyles5 = stylex.create({
-  treePageDiv: {
+const styles = stylex.create({
+  homeCorner: {
     position: "absolute",
     top: "calc(var(--spacing) * 3)",
     left: "calc(var(--spacing) * 3)",
   },
-  treePageDivVariant1Case1: {
-    display: null,
-  },
-  treePageDivVariant1Case2: {
+  hidden: {
     display: "none",
   },
-});
-
-const recipeStyles4 = stylex.create({
   treePageFilters: {
     minWidth: "220px",
     flex: "1",
   },
-});
-
-const recipeStyles3 = stylex.create({
   treePageDiv: {
     position: "fixed",
     inset: "0",
@@ -47,9 +38,6 @@ const recipeStyles3 = stylex.create({
     WebkitUserSelect: "none",
     userSelect: "none",
   },
-});
-
-const recipeStyles2 = stylex.create({
   treePagePxWindow: {
     position: "absolute",
     top: "calc(var(--spacing) * 3)",
@@ -57,10 +45,7 @@ const recipeStyles2 = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-});
-
-const recipeStyles = stylex.create({
-  treePageDiv: {
+  treePageDiv2: {
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     lineHeight: "1.4286",
@@ -68,7 +53,7 @@ const recipeStyles = stylex.create({
     letterSpacing: "var(--tracking-normal)",
     fontSynthesis: "none",
   },
-  treePageDiv2: {
+  treePageDiv22: {
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     lineHeight: "1.3333",
@@ -95,9 +80,6 @@ const recipeStyles = stylex.create({
     letterSpacing: "var(--tracking-normal)",
     fontSynthesis: "none",
   },
-});
-
-const viewStyles = stylex.create({
   controls: {
     position: "absolute",
     display: "flex",
@@ -110,7 +92,7 @@ const viewStyles = stylex.create({
   skyControls: { insetInline: "calc(var(--spacing) * 3)", bottom: "calc(var(--spacing) * 3)", marginInline: "auto", maxWidth: "760px" },
   narrowControls: { insetInline: "calc(var(--spacing) * 2)", top: "calc(52% - 56px)" },
   groundControls: { bottom: "calc(var(--spacing) * 3)", left: "calc(var(--spacing) * 3)" },
-  treePageDiv: {
+  treePageDiv3: {
     position: "absolute",
     top: "calc(var(--spacing) * 3)",
     right: "calc(var(--spacing) * 3)",
@@ -172,7 +154,7 @@ export function TreePage() {
 
   // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div data-theme="light" {...stylex.attrs(recipeStyles3.treePageDiv)} data-testid="memory-tree">
+    <div data-theme="light" {...stylex.attrs(styles.treePageDiv)} data-testid="memory-tree">
       <Scene
         tree={tree}
         filter={filter()}
@@ -207,30 +189,30 @@ export function TreePage() {
           />
         }
       >
-        <PxWindow styles={[recipeStyles2.treePagePxWindow]}>
-          <div {...stylex.attrs(recipeStyles.treePageDiv)}>{t("web.tree.sky")}</div>
-          <div {...stylex.attrs(recipeStyles.treePageDiv2)}>{t("web.tree.skyHint")}</div>
+        <PxWindow styles={[styles.treePagePxWindow]}>
+          <div {...stylex.attrs(styles.treePageDiv2)}>{t("web.tree.sky")}</div>
+          <div {...stylex.attrs(styles.treePageDiv22)}>{t("web.tree.skyHint")}</div>
         </PxWindow>
-        <div {...stylex.attrs(viewStyles.treePageDiv)}>
+        <div {...stylex.attrs(styles.treePageDiv3)}>
           <PxButton icon="icon-tree" data-testid="tree-back" onClick={() => lookUp(false)}>
             {t("web.tree.back")}
           </PxButton>
         </div>
       </Show>
-      <div {...stylex.attrs(recipeStyles5.treePageDiv, sky() ? recipeStyles5.treePageDivVariant1Case2 : recipeStyles5.treePageDivVariant1Case1)}>
+      <div {...stylex.attrs(styles.homeCorner, sky() && styles.hidden)}>
         <PxButton icon="icon-map" data-testid="tree-home" onClick={home}>
           {t("web.tree.farm")}
         </PxButton>
       </div>
       <PxWindow
-        styles={[viewStyles.controls, sky() ? viewStyles.skyControls : narrow() ? viewStyles.narrowControls : viewStyles.groundControls]}
+        styles={[styles.controls, sky() ? styles.skyControls : narrow() ? styles.narrowControls : styles.groundControls]}
         style={sky() || narrow() ? undefined : { width: `${Math.min(520, area().w - 24)}px` }}
       >
         <Show when={sky()}>
-          <Filters tree={tree} filter={filter()} setFilter={setFilter} styles={[recipeStyles4.treePageFilters]} />
+          <Filters tree={tree} filter={filter()} setFilter={setFilter} styles={[styles.treePageFilters]} />
         </Show>
-        <label {...stylex.attrs(viewStyles.treePageLabel)}>
-          <span {...stylex.attrs(recipeStyles.treePageSpan)}>{t("web.tree.earliest")}</span>
+        <label {...stylex.attrs(styles.treePageLabel)}>
+          <span {...stylex.attrs(styles.treePageSpan)}>{t("web.tree.earliest")}</span>
           <input
             type="range"
             min="0"
@@ -239,9 +221,9 @@ export function TreePage() {
             value={until()}
             aria-label={t("web.tree.past")}
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
-            {...stylex.attrs(viewStyles.treePageInput)}
+            {...stylex.attrs(styles.treePageInput)}
           />
-          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} {...stylex.attrs(recipeStyles.treePageSpan2)}>
+          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} {...stylex.attrs(styles.treePageSpan2)}>
             {until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}
           </span>
         </label>

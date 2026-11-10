@@ -100,20 +100,20 @@ export function MoreMenu(props: {
         data-key={props.dataKey}
         aria-label={props.label}
         title={props.label}
-        class={stylex.attrs(styles.trigger).class}
+        {...stylex.attrs(styles.trigger)}
       >
         <Icon name={props.icon ?? "more"} size={16} />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner {...positionerAttrs()} side={props.side ?? "bottom"} align="end">
-          <Menu.Popup aria-label={props.label} class={stylex.attrs(styles.popup, props.side === "top" ? styles.above : styles.below).class}>
+          <Menu.Popup aria-label={props.label} {...stylex.attrs(styles.popup, props.side === "top" ? styles.above : styles.below)}>
             <For each={props.items}>
               {(item) => (
                 <>
                   <Show when={item.danger}>
-                    <Menu.Separator class={stylex.attrs(styles.separator).class} />
+                    <Menu.Separator {...stylex.attrs(styles.separator)} />
                   </Show>
-                  <Menu.Item data-key={item.key} onClick={() => item.onSelect()} class={stylex.attrs(styles.item, item.danger === true && styles.danger).class}>
+                  <Menu.Item data-key={item.key} onClick={() => item.onSelect()} {...stylex.attrs(styles.item, item.danger === true && styles.danger)}>
                     <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} styles={item.danger !== true && styles.icon} />}</Show>
                     {item.label}
                   </Menu.Item>

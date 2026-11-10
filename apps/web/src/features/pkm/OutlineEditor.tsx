@@ -120,7 +120,7 @@ const outlineStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   rowDiv: {
     minHeight: "calc(var(--spacing) * 6)",
     cursor: "text",
@@ -129,19 +129,16 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "calc(var(--spacing) * 6)",
   },
-  rowDivVariant1Case1: {
+  rowDivPrimary: {
     textDecorationLine: null,
     WebkitTextDecorationColor: null,
     textDecorationColor: null,
   },
-  rowDivVariant1Case2: {
+  rowDivSecondary: {
     textDecorationLine: "line-through",
     WebkitTextDecorationColor: "var(--wb-faint)",
     textDecorationColor: "var(--wb-faint)",
   },
-});
-
-const viewStyles = stylex.create({
   expandedChevron: {
     position: "absolute",
   },
@@ -394,13 +391,13 @@ export function Row(props: {
             aria-hidden="true"
             data-testid="pkm-drop"
             data-at={at()}
-            {...stylex.attrs(viewStyles.dropLine, at() === "before" ? viewStyles.dropBefore : viewStyles.dropAfter)}
+            {...stylex.attrs(styles.dropLine, at() === "before" ? styles.dropBefore : styles.dropAfter)}
             style={{ left: `${(props.block.depth + (at() === "inside" ? 2 : 1)) * indentPx}px` }}
           />
         )}
       </Show>
       <For each={Array.from({ length: props.block.depth }, (_, i) => i)}>
-        {(i) => <span aria-hidden="true" {...stylex.attrs(viewStyles.rowSpan)} style={{ left: `${i * indentPx + 9}px` }} />}
+        {(i) => <span aria-hidden="true" {...stylex.attrs(styles.rowSpan)} style={{ left: `${i * indentPx + 9}px` }} />}
       </For>
       <button
         type="button"
@@ -412,11 +409,11 @@ export function Row(props: {
         onDragStart={(e) => props.onDrag(e)}
         onDragEnd={() => props.onDragEnd()}
         onClick={() => props.onToggle()}
-        {...stylex.attrs(viewStyles.pkmBullet)}
+        {...stylex.attrs(styles.pkmBullet)}
       >
         <span {...styleProps([outlineStyles.bullet, props.parent && (props.folded ? outlineStyles.foldedBullet : outlineStyles.expandedBullet)])} />
         <Show when={props.parent && !props.folded}>
-          <Icon name="choose" size={12} styles={viewStyles.expandedChevron} />
+          <Icon name="choose" size={12} styles={styles.expandedChevron} />
         </Show>
       </button>
       <Show when={props.block.marker && markerLook[props.block.marker]}>
@@ -435,7 +432,7 @@ export function Row(props: {
           </button>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.rowBody, done() && viewStyles.rowDone)}>
+      <div {...stylex.attrs(styles.rowBody, done() && styles.rowDone)}>
         <Show
           when={props.focus}
           fallback={
@@ -449,9 +446,9 @@ export function Row(props: {
               // A Shift+click picks blocks; it does not select the words between.
               onMouseDown={(e) => e.shiftKey && e.preventDefault()}
               onKeyDown={(e) => e.key === "Enter" && props.onOpen("end", false)}
-              {...stylex.attrs(recipeStyles.rowDiv, done() ? recipeStyles.rowDivVariant1Case2 : recipeStyles.rowDivVariant1Case1)}
+              {...stylex.attrs(styles.rowDiv, done() ? styles.rowDivSecondary : styles.rowDivPrimary)}
             >
-              <Show when={props.block.body} fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{"\u00a0"}</span>}>
+              <Show when={props.block.body} fallback={<span {...stylex.attrs(styles.rowSpan2)}>{"\u00a0"}</span>}>
                 <Body text={props.block.body} refs={props.refs} />
               </Show>
             </div>
@@ -465,7 +462,7 @@ export function Row(props: {
           href={`#comment-${props.block.id}`}
           data-testid="pkm-bubble"
           aria-label={t("web.pkm.comments.count", { n: props.comments })}
-          {...stylex.attrs(viewStyles.pkmBubble)}
+          {...stylex.attrs(styles.pkmBubble)}
         >
           <Icon name="thread" size={10} />
           {props.comments}
@@ -667,7 +664,7 @@ export function Editor(props: {
     return () => props.onWriting(undefined);
   });
   return (
-    <div {...stylex.attrs(viewStyles.editorDiv)}>
+    <div {...stylex.attrs(styles.editorDiv)}>
       <textarea
         ref={(t) => (el = t)}
         data-testid="pkm-editor"
@@ -712,10 +709,10 @@ export function Editor(props: {
           e.preventDefault();
           hand(a);
         }}
-        {...stylex.attrs(viewStyles.pkmEditor)}
+        {...stylex.attrs(styles.pkmEditor)}
       />
       <Show when={choices().length > 0}>
-        <ul role="listbox" data-testid="pkm-complete" {...stylex.attrs(viewStyles.pkmComplete)}>
+        <ul role="listbox" data-testid="pkm-complete" {...stylex.attrs(styles.pkmComplete)}>
           <For each={choices()} keyed={(c) => c.key}>
             {(c, i) => (
               <li
@@ -727,10 +724,10 @@ export function Editor(props: {
                   e.preventDefault();
                   c().pick();
                 }}
-                {...stylex.attrs(viewStyles.editorLi)}
+                {...stylex.attrs(styles.editorLi)}
               >
-                <span {...stylex.attrs(viewStyles.editorSpan)}>{c().label}</span>
-                <Show when={c().hint}>{(h) => <span {...stylex.attrs(viewStyles.editorSpan2)}>{h()}</span>}</Show>
+                <span {...stylex.attrs(styles.editorSpan)}>{c().label}</span>
+                <Show when={c().hint}>{(h) => <span {...stylex.attrs(styles.editorSpan2)}>{h()}</span>}</Show>
               </li>
             )}
           </For>
@@ -752,7 +749,7 @@ export function Toolbar(props: { writing: Writing }) {
     { id: "link", icon: "link", label: t("web.pkm.toolbar.link"), run: () => props.writing.insert("[[]]", 2) },
   ];
   return (
-    <div role="toolbar" aria-label={t("web.pkm.toolbar.label")} data-testid="pkm-toolbar" {...stylex.attrs(viewStyles.pkmToolbar)}>
+    <div role="toolbar" aria-label={t("web.pkm.toolbar.label")} data-testid="pkm-toolbar" {...stylex.attrs(styles.pkmToolbar)}>
       <For each={tools}>
         {(tool) => (
           <button
@@ -762,7 +759,7 @@ export function Toolbar(props: { writing: Writing }) {
             // The box keeps the focus, so the keyboard stays up.
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => tool.run()}
-            {...stylex.attrs(viewStyles.toolbarButton)}
+            {...stylex.attrs(styles.toolbarButton)}
           >
             <Icon name={tool.icon} size={16} />
           </button>

@@ -7,7 +7,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Button } from "./Button";
 import { styleProps } from "./positioner";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   tokensStoriesSpan: {
     width: "calc(var(--spacing) * 10)",
     height: "calc(var(--spacing) * 10)",
@@ -36,9 +36,6 @@ const recipeStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--wb-accent)",
   },
-});
-
-const viewStyles = stylex.create({
   colour: (value: string) => ({ backgroundColor: value }),
   radius: (value: string) => ({ borderRadius: value }),
   shadow: (value: string) => ({ boxShadow: value }),
@@ -108,7 +105,7 @@ const viewStyles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-bark-500)",
   },
-  tokensStoriesSpan: {
+  tokensStoriesSpan3: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
@@ -125,7 +122,7 @@ const viewStyles = stylex.create({
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 3)",
   },
-  tokensStoriesSpan2: {
+  tokensStoriesSpan22: {
     width: "calc(var(--spacing) * 16)",
     flexShrink: "0",
   },
@@ -210,11 +207,11 @@ const eases: [string, string][] = [
 ];
 
 function Name(props: { children: string }) {
-  return <span {...stylex.attrs(viewStyles.nameSpan)}>{props.children}</span>;
+  return <span {...stylex.attrs(styles.nameSpan)}>{props.children}</span>;
 }
 
 function Grid(props: { children: JSX.Element }) {
-  return <div {...stylex.attrs(viewStyles.gridDiv)}>{props.children}</div>;
+  return <div {...stylex.attrs(styles.gridDiv)}>{props.children}</div>;
 }
 
 /** cubic-bezier(a, b, c, d) as its four numbers. */
@@ -233,16 +230,16 @@ function Curve(props: { name: string; styles: stylex.StyleXStyles }) {
   });
   const y = (v: number) => 44 - v * 32;
   return (
-    <div {...stylex.attrs(viewStyles.curveDiv)}>
-      <span ref={(el) => (probe = el)} {...styleProps([viewStyles.hidden, props.styles])} />
-      <svg viewBox="0 0 48 56" {...stylex.attrs(viewStyles.curveSvg)} aria-hidden="true">
+    <div {...stylex.attrs(styles.curveDiv)}>
+      <span ref={(el) => (probe = el)} {...styleProps([styles.hidden, props.styles])} />
+      <svg viewBox="0 0 48 56" {...stylex.attrs(styles.curveSvg)} aria-hidden="true">
         <rect x="8" y="12" width="32" height="32" fill="none" stroke="currentColor" />
         <Show when={p()}>
           {(c) => (
             <path
               d={`M8 ${y(0)} C${8 + c()[0] * 32} ${y(c()[1])} ${8 + c()[2] * 32} ${y(c()[3])} 40 ${y(1)}`}
               fill="none"
-              {...stylex.attrs(viewStyles.ease)}
+              {...stylex.attrs(styles.ease)}
               stroke-width="2"
               data-testid="ease"
             />
@@ -259,11 +256,11 @@ export default stories({
   stories: {
     Colour: story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.tokensStoriesDiv)}>
+        <div {...stylex.attrs(styles.tokensStoriesDiv)}>
           <For each={colours}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(viewStyles.tokensStoriesDiv2)}>
-                <span {...styleProps([viewStyles.swatch, viewStyles.colour(appearance)])} />
+              <div {...stylex.attrs(styles.tokensStoriesDiv2)}>
+                <span {...styleProps([styles.swatch, styles.colour(appearance)])} />
                 <Name>{name}</Name>
               </div>
             )}
@@ -274,14 +271,14 @@ export default stories({
     "Pixel palette": story({
       note: "像素皮的颜色不跟主题走。",
       render: () => (
-        <div data-theme="light" {...stylex.attrs(viewStyles.tokensStoriesDiv3)}>
+        <div data-theme="light" {...stylex.attrs(styles.tokensStoriesDiv3)}>
           <For each={palette}>
             {([name, list]) => (
-              <div {...stylex.attrs(viewStyles.tokensStoriesDiv2)}>
-                <div {...stylex.attrs(viewStyles.tokensStoriesDiv4)}>
-                  <For each={list}>{(appearance) => <span {...styleProps([viewStyles.pixelSwatch, viewStyles.colour(appearance)])} />}</For>
+              <div {...stylex.attrs(styles.tokensStoriesDiv2)}>
+                <div {...stylex.attrs(styles.tokensStoriesDiv4)}>
+                  <For each={list}>{(appearance) => <span {...styleProps([styles.pixelSwatch, styles.colour(appearance)])} />}</For>
                 </div>
-                <span {...stylex.attrs(viewStyles.tokensStoriesSpan)}>{name}</span>
+                <span {...stylex.attrs(styles.tokensStoriesSpan3)}>{name}</span>
               </div>
             )}
           </For>
@@ -291,14 +288,14 @@ export default stories({
     Type: story({
       args: { sample: "工单派给帮工，用户看改动 Ship it" },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.tokensStoriesDiv5)}>
+        <div {...stylex.attrs(styles.tokensStoriesDiv5)}>
           <For each={sizes}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(viewStyles.tokensStoriesDiv6)}>
-                <span {...stylex.attrs(viewStyles.tokensStoriesSpan2)}>
+              <div {...stylex.attrs(styles.tokensStoriesDiv6)}>
+                <span {...stylex.attrs(styles.tokensStoriesSpan22)}>
                   <Name>{name}</Name>
                 </span>
-                <span {...styleProps([viewStyles.typeSample, appearance])}>{a.sample}</span>
+                <span {...styleProps([styles.typeSample, appearance])}>{a.sample}</span>
               </div>
             )}
           </For>
@@ -310,16 +307,16 @@ export default stories({
         <Grid>
           <For each={radii}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(viewStyles.curveDiv)}>
-                <span {...styleProps([viewStyles.shape, viewStyles.radius(appearance)])} />
+              <div {...stylex.attrs(styles.curveDiv)}>
+                <span {...styleProps([styles.shape, styles.radius(appearance)])} />
                 <Name>{name}</Name>
               </div>
             )}
           </For>
           <For each={shadows}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(viewStyles.curveDiv)}>
-                <span {...styleProps([viewStyles.shape, viewStyles.raised, viewStyles.shadow(appearance)])} />
+              <div {...stylex.attrs(styles.curveDiv)}>
+                <span {...styleProps([styles.shape, styles.raised, styles.shadow(appearance)])} />
                 <Name>{name}</Name>
               </div>
             )}
@@ -332,17 +329,17 @@ export default stories({
         const [replay, setReplay] = createSignal(0);
         return (
           <Grid>
-            <For each={eases}>{([name, appearance]) => <Curve name={name} styles={viewStyles.timing(appearance)} />}</For>
+            <For each={eases}>{([name, appearance]) => <Curve name={name} styles={styles.timing(appearance)} />}</For>
             {/* Keyed by the count, so each press mounts them again and they play again. */}
             <For each={[replay()]}>
               {() => (
-                <div {...stylex.attrs(viewStyles.tokensStoriesDiv7)}>
-                  <div {...stylex.attrs(viewStyles.curveDiv)}>
-                    <span {...stylex.attrs(recipeStyles.tokensStoriesSpan)} />
+                <div {...stylex.attrs(styles.tokensStoriesDiv7)}>
+                  <div {...stylex.attrs(styles.curveDiv)}>
+                    <span {...stylex.attrs(styles.tokensStoriesSpan)} />
                     <Name>pop-in</Name>
                   </div>
-                  <div {...stylex.attrs(viewStyles.curveDiv)}>
-                    <span {...stylex.attrs(recipeStyles.tokensStoriesSpan2)} />
+                  <div {...stylex.attrs(styles.curveDiv)}>
+                    <span {...stylex.attrs(styles.tokensStoriesSpan2)} />
                     <Name>fade-in</Name>
                   </div>
                 </div>

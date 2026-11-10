@@ -31,7 +31,7 @@ import { toast } from "#/ui/toasts.ts";
 
 import { DeepseekForm } from "./DeepseekForm";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   sourceMarkSpan: {
     display: "block",
     width: "calc(var(--spacing) * 2)",
@@ -56,15 +56,9 @@ const recipeStyles = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--wb-faint)",
   },
-});
-
-const variantStyles = stylex.create({
   sourceFieldTextInput: {
     fontFamily: "var(--font-mono)",
   },
-});
-
-const viewStyles = stylex.create({
   memoryFormForm: {
     display: "flex",
     flexDirection: "column",
@@ -255,7 +249,7 @@ function MemoryForm(props: { status: SettingsStatus }) {
 
   return (
     <form
-      {...stylex.attrs(viewStyles.memoryFormForm)}
+      {...stylex.attrs(styles.memoryFormForm)}
       onSubmit={(e) => {
         e.preventDefault();
         if (!busy() && dirty()) void submit();
@@ -272,7 +266,7 @@ function MemoryForm(props: { status: SettingsStatus }) {
           busy={busy()}
           onSave={() => void submit()}
           onUndo={undo}
-          left={<Show when={error()}>{(e) => <p {...stylex.attrs(viewStyles.memoryFormP)}>{e()}</p>}</Show>}
+          left={<Show when={error()}>{(e) => <p {...stylex.attrs(styles.memoryFormP)}>{e()}</p>}</Show>}
         />
       </Show>
     </form>
@@ -295,16 +289,16 @@ function SourceMark(props: { draft: SourceDraft }) {
         data-state={!props.draft.saved ? "unset" : props.draft.saved.enabled ? "on" : "off"}
         aria-label={text()}
         tabindex={0}
-        {...stylex.attrs(viewStyles.sourceMark)}
+        {...stylex.attrs(styles.sourceMark)}
       >
         <span
           {...stylex.attrs(
-            recipeStyles.sourceMarkSpan,
+            styles.sourceMarkSpan,
             !props.draft.saved
-              ? recipeStyles.sourceMarkSpanState3
+              ? styles.sourceMarkSpanState3
               : props.draft.saved.enabled
-                ? recipeStyles.sourceMarkSpanState2
-                : recipeStyles.sourceMarkSpanState,
+                ? styles.sourceMarkSpanState2
+                : styles.sourceMarkSpanState,
           )}
         />
       </span>
@@ -316,10 +310,10 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
   const label = () => sourceLabels[props.draft.kind];
   return (
     <div data-testid="source" data-key={props.draft.kind}>
-      <div {...stylex.attrs(viewStyles.sourceFieldDiv)}>
-        <span {...stylex.attrs(viewStyles.sourceFieldSpan)}>{label()}</span>
+      <div {...stylex.attrs(styles.sourceFieldDiv)}>
+        <span {...stylex.attrs(styles.sourceFieldSpan)}>{label()}</span>
         <SourceMark draft={props.draft} />
-        <span {...stylex.attrs(viewStyles.sourceFieldSpan2)} />
+        <span {...stylex.attrs(styles.sourceFieldSpan2)} />
         <Toggle
           label={t("web.setting.source.enabled")}
           ariaLabel={t("web.setting.source.enable", { label: label() })}
@@ -336,11 +330,11 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
         />
       </div>
       <Show when={props.draft.open}>
-        <div {...stylex.attrs(viewStyles.sourceFieldDiv2)}>
+        <div {...stylex.attrs(styles.sourceFieldDiv2)}>
           <TextInput
             data-testid="source-address"
             aria-label={t("web.setting.source.address", { label: label() })}
-            styles={variantStyles.sourceFieldTextInput}
+            styles={styles.sourceFieldTextInput}
             placeholder={sourceAddress[props.draft.kind]}
             value={props.draft.url}
             onInput={(e) => props.set({ url: e.currentTarget.value })}
@@ -367,7 +361,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
               onInput={(e) => props.set({ user: e.currentTarget.value })}
             />
           </Show>
-          <div {...stylex.attrs(viewStyles.sourceFieldDiv3)}>
+          <div {...stylex.attrs(styles.sourceFieldDiv3)}>
             <Toggle
               label={t("web.setting.source.read")}
               tip={t("web.setting.source.readHint")}
@@ -410,26 +404,26 @@ export function GitHub() {
     return act.run(async () => setRefreshed(await api.github.refresh()));
   };
   return (
-    <div {...stylex.attrs(viewStyles.gitHubDiv)}>
+    <div {...stylex.attrs(styles.gitHubDiv)}>
       <Pick fallback={<Quiet>{status.error() ? t("web.base.form.unreachable", { why: reasonOf(status.error()) }) : t("web.base.form.asking")}</Quiet>}>
         <Match when={now()}>
           {(s) => (
             <SettingsGroup>
               <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason}>
                 <Icon name={s().installed ? "check" : "cross"} size={16} />
-                <span {...stylex.attrs(viewStyles.gitHubSpan)}>{s().installed ? s().version : t("web.setting.github.noGh")}</span>
+                <span {...stylex.attrs(styles.gitHubSpan)}>{s().installed ? s().version : t("web.setting.github.noGh")}</span>
                 <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
               </SettingRow>
               <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")}>
                 <Icon name={s().loggedIn ? "check" : "warn"} size={16} />
-                <span {...stylex.attrs(viewStyles.gitHubSpan2)}>{s().loggedIn ? s().account : t("web.setting.github.notLoggedIn")}</span>
+                <span {...stylex.attrs(styles.gitHubSpan2)}>{s().loggedIn ? s().account : t("web.setting.github.notLoggedIn")}</span>
               </SettingRow>
             </SettingsGroup>
           )}
         </Match>
       </Pick>
       <Show when={error()}>
-        <p {...stylex.attrs(viewStyles.gitHubP)}>{error()}</p>
+        <p {...stylex.attrs(styles.gitHubP)}>{error()}</p>
       </Show>
     </div>
   );

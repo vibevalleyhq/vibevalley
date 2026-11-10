@@ -66,7 +66,7 @@ const sidebarStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   sidebarDiv: {
     marginInline: "calc(var(--spacing) * -2)",
     display: "flex",
@@ -88,9 +88,6 @@ const recipeStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBottom: "calc(var(--spacing) * 2)",
   },
-});
-
-const viewStyles = stylex.create({
   sidebarRoot: {
     display: "flex",
     minHeight: "0",
@@ -166,7 +163,7 @@ const viewStyles = stylex.create({
     flex: "1",
     textAlign: "left",
   },
-  sidebarDiv: {
+  sidebarDiv2: {
     display: "flex",
     flexDirection: "column",
     gap: "1px",
@@ -244,35 +241,35 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
       return next;
     });
   return (
-    <div {...stylex.attrs(viewStyles.sidebarRoot)}>
-      <button type="button" data-testid="pkm-find" onClick={() => notesSearch.open()} {...stylex.attrs(viewStyles.sidebarButton)}>
+    <div {...stylex.attrs(styles.sidebarRoot)}>
+      <button type="button" data-testid="pkm-find" onClick={() => notesSearch.open()} {...stylex.attrs(styles.sidebarButton)}>
         <Icon name="search" size={14} />
-        <span {...stylex.attrs(viewStyles.sidebarSpan)}>{t("web.pkm.list.find")}</span>
+        <span {...stylex.attrs(styles.sidebarSpan)}>{t("web.pkm.list.find")}</span>
       </button>
-      <div {...stylex.attrs(viewStyles.sidebarDiv)}>
+      <div {...stylex.attrs(styles.sidebarDiv2)}>
         <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} {...styleProps(row(props.slug === undefined))}>
-          <Icon name="calendar" size={14} styles={props.slug === undefined ? viewStyles.sidebarIconActive : viewStyles.sidebarIconFaint} />
-          <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{t("web.pkm.list.today")}</span>
+          <Icon name="calendar" size={14} styles={props.slug === undefined ? styles.sidebarIconActive : styles.sidebarIconFaint} />
+          <span {...stylex.attrs(styles.sidebarSpan2)}>{t("web.pkm.list.today")}</span>
         </A>
         <Radar />
       </div>
-      <Show when={props.error}>{(e) => <p {...stylex.attrs(viewStyles.sidebarP)}>{reasonOf(e())}</p>}</Show>
-      <div {...stylex.attrs(recipeStyles.sidebarDiv)} data-testid="pkm-list">
+      <Show when={props.error}>{(e) => <p {...stylex.attrs(styles.sidebarP)}>{reasonOf(e())}</p>}</Show>
+      <div {...stylex.attrs(styles.sidebarDiv)} data-testid="pkm-list">
         <For each={tierOrder.filter((tier) => tier !== "journal" && listed(tier).length > 0)}>
           {(tier) => (
-            <section data-testid="pkm-tier" data-key={tier} {...stylex.attrs(viewStyles.sidebarDiv)}>
+            <section data-testid="pkm-tier" data-key={tier} {...stylex.attrs(styles.sidebarDiv2)}>
               <button
                 type="button"
                 aria-expanded={shut().has(tier) ? "false" : "true"}
                 onClick={() => toggle(tier)}
-                {...stylex.attrs(viewStyles.tierHeading, tierHeading)}
+                {...stylex.attrs(styles.tierHeading, tierHeading)}
               >
                 {tierLabel(tier)}
                 {/* Folded, the arrow stays to say so; open, it comes only when pointed at. */}
-                <Icon name={shut().has(tier) ? "next" : "choose"} size={10} styles={!shut().has(tier) && viewStyles.expandedTierIcon} />
+                <Icon name={shut().has(tier) ? "next" : "choose"} size={10} styles={!shut().has(tier) && styles.expandedTierIcon} />
               </button>
               <Show when={!shut().has(tier)}>
-                <ul {...stylex.attrs(viewStyles.sidebarDiv)}>
+                <ul {...stylex.attrs(styles.sidebarDiv2)}>
                   <For each={listed(tier)} keyed={(p) => p.slug}>
                     {(p) => (
                       <li>
@@ -283,9 +280,9 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
                           aria-current={p().slug === props.slug ? "page" : undefined}
                           {...styleProps([row(p().slug === props.slug), sidebarStyles.nested])}
                         >
-                          <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{p().title}</span>
+                          <span {...stylex.attrs(styles.sidebarSpan3)}>{p().title}</span>
                           <Show when={p().open > 0}>
-                            <span {...stylex.attrs(viewStyles.sidebarSpan4)} title={t("web.pkm.list.open", { n: p().open })}>
+                            <span {...stylex.attrs(styles.sidebarSpan4)} title={t("web.pkm.list.open", { n: p().open })}>
                               {p().open}
                             </span>
                           </Show>
@@ -325,15 +322,15 @@ function Radar() {
       onClick={() => props.click()}
       {...styleProps([row(props.open === true), sidebarStyles.toggle])}
     >
-      <Icon name={props.icon} size={14} styles={viewStyles.sidebarIconFaint} />
-      <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{props.label}</span>
+      <Icon name={props.icon} size={14} styles={styles.sidebarIconFaint} />
+      <span {...stylex.attrs(styles.sidebarSpan2)}>{props.label}</span>
       <span {...styleProps([sidebarStyles.count, props.tone ?? sidebarStyles.faint])}>{props.n}</span>
     </button>
   );
   return (
     <Show when={ready(radar, undefined)}>
       {(r) => (
-        <div data-testid="pkm-radar" {...stylex.attrs(viewStyles.pkmRadar)}>
+        <div data-testid="pkm-radar" {...stylex.attrs(styles.pkmRadar)}>
           <Show when={r().inbox > 0}>
             {look({
               icon: "inbox",
@@ -354,13 +351,13 @@ function Radar() {
             })}
           </Show>
           <Show when={which() === "stale"}>
-            <ul {...stylex.attrs(viewStyles.sidebarDiv)}>
+            <ul {...stylex.attrs(styles.sidebarDiv2)}>
               <For each={r().stale} keyed={(s) => s.slug}>
                 {(s) => (
                   <li>
                     <A href={pkmHref(s().slug)} {...styleProps([row(false), sidebarStyles.nested])}>
-                      <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{s().title}</span>
-                      <span {...stylex.attrs(viewStyles.radarSpan)}>{t("web.pkm.radar.days", { n: s().days })}</span>
+                      <span {...stylex.attrs(styles.sidebarSpan3)}>{s().title}</span>
+                      <span {...stylex.attrs(styles.radarSpan)}>{t("web.pkm.radar.days", { n: s().days })}</span>
                     </A>
                   </li>
                 )}
@@ -380,13 +377,13 @@ function Radar() {
             })}
           </Show>
           <Show when={which() === "overdue"}>
-            <ul {...stylex.attrs(viewStyles.sidebarDiv)}>
+            <ul {...stylex.attrs(styles.sidebarDiv2)}>
               <For each={r().overdue} keyed={(o) => o.block}>
                 {(o) => (
                   <li>
-                    <A href={pkmHref(o().page, o().block)} {...stylex.attrs(viewStyles.radarA)}>
-                      <span {...stylex.attrs(viewStyles.radarSpan2)}>{o().plain}</span>
-                      <span {...stylex.attrs(viewStyles.radarSpan3)}>{o().deadline}</span>
+                    <A href={pkmHref(o().page, o().block)} {...stylex.attrs(styles.radarA)}>
+                      <span {...stylex.attrs(styles.radarSpan2)}>{o().plain}</span>
+                      <span {...stylex.attrs(styles.radarSpan3)}>{o().deadline}</span>
                     </A>
                   </li>
                 )}

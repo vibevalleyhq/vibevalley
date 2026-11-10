@@ -9,7 +9,7 @@ import { Icon } from "#/ui/Icon.tsx";
 import { issueMove, issueMoveOf } from "./moves";
 import type { PendingWords } from "./write";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   actLinesButton: {
     display: "inline-flex",
     width: "calc(var(--spacing) * 6)",
@@ -33,9 +33,6 @@ const recipeStyles = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
   actLinesSpan: {
     minWidth: "0",
     flex: "1",
@@ -43,10 +40,10 @@ const variantStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  actLinesSpanVariant: {
+  actLinesSpanTone: {
     color: "var(--color-berry)",
   },
-  actLinesSpanVariant2: {
+  actLinesSpanAlt: {
     color: "var(--color-muted)",
   },
   actLinesSpan2: {
@@ -54,9 +51,6 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-});
-
-const viewStyles = stylex.create({
   actLinesDiv: {
     marginBottom: "calc(var(--spacing) * 4)",
     display: "flex",
@@ -70,7 +64,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  actLinesSpan: {
+  actLinesSpan3: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -91,17 +85,17 @@ export function ActLines(props: {
 
   return (
     <Show when={move() !== undefined || (props.words ?? []).length > 0}>
-      <div {...stylex.attrs(viewStyles.actLinesDiv)}>
+      <div {...stylex.attrs(styles.actLinesDiv)}>
         <Show when={move()}>
           {(m) => (
             <div
               data-testid="issue-move"
               data-state={m().state}
               aria-busy={m().state === "moving" ? "true" : undefined}
-              {...stylex.attrs(viewStyles.issueMove)}
+              {...stylex.attrs(styles.issueMove)}
             >
               <span
-                {...stylex.attrs(variantStyles.actLinesSpan, m().state === "failed" ? variantStyles.actLinesSpanVariant : variantStyles.actLinesSpanVariant2)}
+                {...stylex.attrs(styles.actLinesSpan, m().state === "failed" ? styles.actLinesSpanTone : styles.actLinesSpanAlt)}
                 title={m().reason}
               >
                 {m().state === "moving" ? t("web.issue.acts.moving") : (m().reason ?? t("web.issue.board.moveFailed"))}
@@ -113,7 +107,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.board.retryMove")}
                   title={t("web.issue.board.retryMove")}
                   onClick={() => void moves.retry(untrack(m).key)}
-                  {...stylex.attrs(recipeStyles.actLinesButton)}
+                  {...stylex.attrs(styles.actLinesButton)}
                 >
                   <Icon name="retry" size={14} />
                 </button>
@@ -123,7 +117,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.board.putBack")}
                   title={t("web.issue.board.putBack")}
                   onClick={() => moves.drop(untrack(m).key)}
-                  {...stylex.attrs(recipeStyles.actLinesButton)}
+                  {...stylex.attrs(styles.actLinesButton)}
                 >
                   <Icon name="close" size={14} />
                 </button>
@@ -133,10 +127,10 @@ export function ActLines(props: {
         </Show>
         <For each={props.words ?? []} keyed={(w) => w.key}>
           {(w) => (
-            <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(viewStyles.issueMove)}>
-              <span {...stylex.attrs(viewStyles.actLinesSpan)}>{w().text}</span>
+            <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(styles.issueMove)}>
+              <span {...stylex.attrs(styles.actLinesSpan3)}>{w().text}</span>
               <span
-                {...stylex.attrs(variantStyles.actLinesSpan2, w().state === "failed" ? variantStyles.actLinesSpanVariant : variantStyles.actLinesSpanVariant2)}
+                {...stylex.attrs(styles.actLinesSpan2, w().state === "failed" ? styles.actLinesSpanTone : styles.actLinesSpanAlt)}
                 title={w().reason}
               >
                 {w().state === "sending" ? t("web.issue.acts.sending") : (w().reason ?? t("web.issue.acts.notSaid"))}
@@ -148,7 +142,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.acts.sayAgain")}
                   title={t("web.issue.acts.sayAgain")}
                   onClick={() => props.onSayAgain?.(untrack(w).key)}
-                  {...stylex.attrs(recipeStyles.actLinesButton)}
+                  {...stylex.attrs(styles.actLinesButton)}
                 >
                   <Icon name="retry" size={14} />
                 </button>
@@ -158,7 +152,7 @@ export function ActLines(props: {
                   aria-label={t("web.issue.acts.takeBack")}
                   title={t("web.issue.acts.takeBack")}
                   onClick={() => props.onTakeBack?.(untrack(w).key)}
-                  {...stylex.attrs(recipeStyles.actLinesButton)}
+                  {...stylex.attrs(styles.actLinesButton)}
                 >
                   <Icon name="close" size={14} />
                 </button>

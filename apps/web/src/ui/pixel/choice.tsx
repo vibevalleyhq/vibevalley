@@ -9,7 +9,7 @@ import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
 import { pxStyle } from "./style";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   pickChevron: { rotate: "90deg" },
   pxSegmentedButton: {
     height: "calc(var(--spacing) * 7)",
@@ -51,7 +51,7 @@ const recipeStyles2 = stylex.create({
       ":disabled": ".35",
     },
   },
-  pxSegmentedButtonVariant1Case1: {
+  pxSegmentedButtonPrimary: {
     color: "var(--color-bark-800)",
     backgroundColor: {
       default: null,
@@ -61,7 +61,7 @@ const recipeStyles2 = stylex.create({
       },
     },
   },
-  pxSegmentedButtonVariant1Case2: {
+  pxSegmentedButtonSecondary: {
     color: "var(--color-bark-900)",
     backgroundColor: "var(--color-leaf-500)",
   },
@@ -83,9 +83,6 @@ const recipeStyles2 = stylex.create({
   pxPickSpanState3: {
     color: "var(--color-bark-600)",
   },
-});
-
-const recipeStyles = stylex.create({
   pxPickPxWindow: {
     position: "absolute",
     top: "100%",
@@ -110,9 +107,6 @@ const recipeStyles = stylex.create({
       "@starting-style": "0",
     },
   },
-});
-
-const viewStyles = stylex.create({
   pxSegmented: {
     flexWrap: "wrap",
     gap: "var(--spacing)",
@@ -263,7 +257,7 @@ export function PxSegmented<T extends string | number | boolean>(props: {
     <div
       role="group"
       aria-label={props.label}
-      {...stylex.attrs(viewStyles.pxSegmented, (props.block ?? true) ? viewStyles.pxSegmentedBlock : viewStyles.pxSegmentedInline)}
+      {...stylex.attrs(styles.pxSegmented, (props.block ?? true) ? styles.pxSegmentedBlock : styles.pxSegmentedInline)}
     >
       <For each={props.options}>
         {(o) => (
@@ -274,8 +268,8 @@ export function PxSegmented<T extends string | number | boolean>(props: {
             disabled={o.disabled}
             onClick={() => props.onChange(o.value)}
             {...stylex.attrs(
-              recipeStyles2.pxSegmentedButton,
-              o.value === props.value ? recipeStyles2.pxSegmentedButtonVariant1Case2 : recipeStyles2.pxSegmentedButtonVariant1Case1,
+              styles.pxSegmentedButton,
+              o.value === props.value ? styles.pxSegmentedButtonSecondary : styles.pxSegmentedButtonPrimary,
             )}
           >
             {o.label}
@@ -326,7 +320,7 @@ export function PxPick(props: {
   };
 
   return (
-    <div ref={(el) => (wrap = el)} {...stylex.attrs(viewStyles.pxPickDiv)}>
+    <div ref={(el) => (wrap = el)} {...stylex.attrs(styles.pxPickDiv)}>
       <button
         id={props.id}
         data-testid={props.testid}
@@ -358,16 +352,16 @@ export function PxPick(props: {
           else return;
           e.preventDefault();
         }}
-        {...stylex.attrs(pxStyle.sm, pxStyle.ring, pxStyle.focus, viewStyles.pxPickButton)}
+        {...stylex.attrs(pxStyle.sm, pxStyle.ring, pxStyle.focus, styles.pxPickButton)}
       >
-        <span {...stylex.attrs(viewStyles.pxPickValue, current().value === "" ? viewStyles.pxPickPlaceholder : viewStyles.pxPickSelected)}>
+        <span {...stylex.attrs(styles.pxPickValue, current().value === "" ? styles.pxPickPlaceholder : styles.pxPickSelected)}>
           {current().label}
         </span>
-        <SpriteIcon name="button-next" size={12} styles={recipeStyles2.pickChevron} />
+        <SpriteIcon name="button-next" size={12} styles={styles.pickChevron} />
       </button>
       <Show when={open()}>
-        <PxWindow styles={[recipeStyles.pxPickPxWindow]}>
-          <ul id={listId} role="listbox" aria-label={props.label} {...stylex.attrs(viewStyles.pxPickUl)}>
+        <PxWindow styles={[styles.pxPickPxWindow]}>
+          <ul id={listId} role="listbox" aria-label={props.label} {...stylex.attrs(styles.pxPickUl)}>
             <For each={items()}>
               {(o, i) => (
                 <li
@@ -381,22 +375,22 @@ export function PxPick(props: {
                     e.preventDefault();
                     pick(o.value);
                   }}
-                  {...stylex.attrs(viewStyles.pxPickLi, i() === highlight() && viewStyles.pxPickLiActive)}
+                  {...stylex.attrs(styles.pxPickLi, i() === highlight() && styles.pxPickLiActive)}
                 >
                   <span
                     {...stylex.attrs(
-                      recipeStyles2.pxPickSpan,
+                      styles.pxPickSpan,
                       o.value === ""
-                        ? recipeStyles2.pxPickSpanState3
+                        ? styles.pxPickSpanState3
                         : o.value === props.value
-                          ? recipeStyles2.pxPickSpanState2
-                          : recipeStyles2.pxPickSpanState,
+                          ? styles.pxPickSpanState2
+                          : styles.pxPickSpanState,
                     )}
                   >
                     {o.label}
                   </span>
                   <Show when={o.detail}>
-                    <span {...stylex.attrs(pxStyle.xs, viewStyles.pxPickDetail)}>{o.detail}</span>
+                    <span {...stylex.attrs(pxStyle.xs, styles.pxPickDetail)}>{o.detail}</span>
                   </Show>
                 </li>
               )}
@@ -423,18 +417,18 @@ export function PxSwitchField(props: {
       aria-checked={aria(props.checked)}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
-      {...stylex.attrs(pxStyle.focus, viewStyles.pxSwitchButton)}
+      {...stylex.attrs(pxStyle.focus, styles.pxSwitchButton)}
     >
       {/* The inner line is the padding: the 20 px thumb travels 16 px. */}
-      <span {...stylex.attrs(viewStyles.pxSwitchTrack, props.checked ? viewStyles.pxSwitchTrackOn : viewStyles.pxSwitchTrackOff)}>
-        <span {...stylex.attrs(pxStyle.drop, viewStyles.pxSwitchThumb, props.checked && viewStyles.pxSwitchThumbOn)} />
+      <span {...stylex.attrs(styles.pxSwitchTrack, props.checked ? styles.pxSwitchTrackOn : styles.pxSwitchTrackOff)}>
+        <span {...stylex.attrs(pxStyle.drop, styles.pxSwitchThumb, props.checked && styles.pxSwitchThumbOn)} />
       </span>
-      <span {...stylex.attrs(viewStyles.pxSwitchText)}>
+      <span {...stylex.attrs(styles.pxSwitchText)}>
         <PxTip tip={props.tip} styles={pxStyle.sm}>
           {props.label}
         </PxTip>
         <Show when={props.hint}>
-          <span {...stylex.attrs(pxStyle.fine, viewStyles.pxSwitchHint)}>{props.hint}</span>
+          <span {...stylex.attrs(pxStyle.fine, styles.pxSwitchHint)}>{props.hint}</span>
         </Show>
       </span>
     </button>

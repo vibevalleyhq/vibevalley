@@ -177,7 +177,7 @@ const sceneStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   heroDiv: {
     position: "absolute",
     inset: "0",
@@ -543,9 +543,6 @@ const recipeStyles = stylex.create({
     userSelect: "none",
     imageRendering: "pixelated",
   },
-});
-
-const viewStyles = stylex.create({
   layer: { position: "absolute", inset: 0 },
   framingLayer: { pointerEvents: "none" },
   framingImage: {
@@ -563,7 +560,7 @@ const viewStyles = stylex.create({
     height: "200svh",
     minHeight: "1120px",
   },
-  heroDiv: {
+  heroDiv4: {
     containerType: "size",
     position: "sticky",
     top: "0",
@@ -573,7 +570,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     backgroundColor: "var(--color-dusk)",
   },
-  heroDiv2: {
+  heroDiv22: {
     containerType: "size",
     position: "absolute",
     top: "50%",
@@ -582,7 +579,7 @@ const viewStyles = stylex.create({
     width: "max(108cqw,162cqh)",
     translate: "calc(calc(1 / 2 * 100%) * -1) calc(calc(1 / 2 * 100%) * -1)",
   },
-  heroImg: {
+  heroImg8: {
     position: "absolute",
     inset: "0",
     width: "100%",
@@ -590,7 +587,7 @@ const viewStyles = stylex.create({
     maxWidth: "none",
     imageRendering: "pixelated",
   },
-  heroSpan: {
+  heroSpan3: {
     clipPath: "inset(50%)",
     whiteSpace: "nowrap",
     borderWidth: "0",
@@ -601,7 +598,7 @@ const viewStyles = stylex.create({
     position: "absolute",
     overflow: "hidden",
   },
-  heroSpan2: {
+  heroSpan22: {
     marginTop: "calc(var(--spacing) * 2.5)",
     display: "block",
     fontSize: "var(--text-2xl)",
@@ -609,7 +606,7 @@ const viewStyles = stylex.create({
     color: "var(--color-wheat)",
     textShadow: "2px 2px 0 var(--color-bark-900)",
   },
-  heroDiv3: {
+  heroDiv32: {
     position: "absolute",
     bottom: {
       default: "calc(var(--spacing) * 5)",
@@ -633,7 +630,7 @@ const viewStyles = stylex.create({
       "@media (width>=48rem)": "clamp(16px,4vw,40px)",
     },
   },
-  heroSpan3: {
+  heroSpan32: {
     display: {
       default: "none",
       "@media (width>=48rem)": "inline",
@@ -690,6 +687,7 @@ const viewStyles = stylex.create({
     willChange: "transform",
   },
 });
+
 const hourVisibility = stylex.create({
   morning: { opacity: "var(--scene-morning-opacity, 0)" },
   day: { opacity: "var(--scene-day-opacity, 0)" },
@@ -878,25 +876,25 @@ export default function Hero(props: Props) {
   return (
     <>
       {/* Two screens high: the scene holds on the first screen of scrolling, and goes up off the screen on the second. */}
-      <section ref={root.set} id="top" aria-label={props.copy.name} {...stylex.attrs(viewStyles.heroSection)}>
-        <div onPointerMove={point} onPointerLeave={leave} {...stylex.attrs(viewStyles.heroDiv)}>
+      <section ref={root.set} id="top" aria-label={props.copy.name} {...stylex.attrs(styles.heroSection)}>
+        <div onPointerMove={point} onPointerLeave={leave} {...stylex.attrs(styles.heroDiv4)}>
           {/* The scene keeps its 3:2 and covers the hero, a little bigger, so the layers have room to part. */}
-          <div aria-hidden="true" {...stylex.attrs(viewStyles.heroDiv2)}>
+          <div aria-hidden="true" {...stylex.attrs(styles.heroDiv22)}>
             <Layer lag={0.5} zoom={1.06} origin="62% 60%" point={16} hero={root} px={px} py={py}>
-              <div {...stylex.attrs(recipeStyles.heroDiv)}>
+              <div {...stylex.attrs(styles.heroDiv)}>
                 <img
                   data-scene="morning"
                   data-src={props.backgrounds.morning}
                   src={props.backgrounds.morning}
                   alt=""
                   draggable={false}
-                  {...stylex.attrs(recipeStyles.heroImg)}
+                  {...stylex.attrs(styles.heroImg)}
                 />
                 <Comes hour="day" src={props.backgrounds.day} hero={root} />
                 <Comes hour="evening" src={props.backgrounds.evening} hero={root} />
                 <Comes hour="night" src={props.backgrounds.night} hero={root} />
                 <noscript>
-                  <img src={props.backgrounds.morning} alt="" {...stylex.attrs(viewStyles.heroImg)} />
+                  <img src={props.backgrounds.morning} alt="" {...stylex.attrs(styles.heroImg8)} />
                 </noscript>
                 {PUFFS.map((p, i) => {
                   const s = sprite(p.sprite, p.scale);
@@ -906,7 +904,7 @@ export default function Hero(props: Props) {
                       alt=""
                       draggable={false}
                       fetchpriority="low"
-                      {...stylex.attrs(recipeStyles.heroImg2)}
+                      {...stylex.attrs(styles.heroImg2)}
                       style={{
                         "--x0": pct(CHIMNEY.x),
                         "--y0": pct(CHIMNEY.y),
@@ -951,7 +949,7 @@ export default function Hero(props: Props) {
                     data-src={props.art[farmers[s].name]}
                     alt=""
                     draggable={false}
-                    {...stylex.attrs(recipeStyles.heroImg3)}
+                    {...stylex.attrs(styles.heroImg3)}
                   />
                   {s === "night" && <span {...stylex.attrs(sceneStyles.lantern)} />}
                 </div>
@@ -967,7 +965,7 @@ export default function Hero(props: Props) {
                     alt=""
                     draggable={false}
                     fetchpriority="low"
-                    {...stylex.attrs(recipeStyles.heroImg4)}
+                    {...stylex.attrs(styles.heroImg4)}
                     style={{
                       top: pct(c.y),
                       width: pct(s.w),
@@ -984,7 +982,7 @@ export default function Hero(props: Props) {
                   const s = sprite(seed.sprite, 0.22);
                   return (
                     <span
-                      {...stylex.attrs(recipeStyles.heroSpan)}
+                      {...stylex.attrs(styles.heroSpan)}
                       style={{
                         "--x0": pct(seed.from),
                         width: pct(s.w),
@@ -997,7 +995,7 @@ export default function Hero(props: Props) {
                         alt=""
                         draggable={false}
                         fetchpriority="low"
-                        {...stylex.attrs(recipeStyles.heroImg5)}
+                        {...stylex.attrs(styles.heroImg5)}
                         style={{
                           "animation-delay": `${seed.delay}s`,
                         }}
@@ -1014,7 +1012,7 @@ export default function Hero(props: Props) {
                     alt=""
                     draggable={false}
                     fetchpriority="low"
-                    {...stylex.attrs(recipeStyles.heroImg6)}
+                    {...stylex.attrs(styles.heroImg6)}
                     style={{
                       "--lean": `${p.lean}deg`,
                       left: pct(p.x - s.w / 2),
@@ -1028,22 +1026,22 @@ export default function Hero(props: Props) {
             </Layer>
           </div>
           {/* In front of the camera, ahead of the page: the frame's plants, pushed out past the corners as the camera goes in. */}
-          <Layer lag={-0.08} zoom={1.3} origin="50% 50%" point={64} hero={root} px={px} py={py} styles={viewStyles.framingLayer}>
+          <Layer lag={-0.08} zoom={1.3} origin="50% 50%" point={64} hero={root} px={px} py={py} styles={styles.framingLayer}>
             {FRAME.map((f) => (
-              <img src={props.frame[f]} alt="" aria-hidden="true" draggable={false} {...domAttrs(viewStyles.framingImage, framingStyles[f])} />
+              <img src={props.frame[f]} alt="" aria-hidden="true" draggable={false} {...domAttrs(styles.framingImage, framingStyles[f])} />
             ))}
           </Layer>
 
           {/* The shade stays while the words change. */}
           <div aria-hidden="true" {...stylex.attrs(sceneStyles.shade)} />
           <div ref={words.set} {...stylex.attrs(sceneStyles.words)}>
-            <div {...stylex.attrs(recipeStyles.heroDiv2, sceneStyles.interactive)}>
+            <div {...stylex.attrs(styles.heroDiv2, sceneStyles.interactive)}>
               <h1 {...stylex.attrs(sceneStyles.title)}>
-                <span {...stylex.attrs(viewStyles.heroSpan)}>{props.copy.name}</span>
+                <span {...stylex.attrs(styles.heroSpan3)}>{props.copy.name}</span>
                 <span aria-hidden="true">
                   {[...props.copy.name].map((ch, i) => (
                     <span
-                      {...stylex.attrs(recipeStyles.heroSpan2)}
+                      {...stylex.attrs(styles.heroSpan2)}
                       style={{
                         "animation-delay": `${i * stagger}ms`,
                       }}
@@ -1052,11 +1050,11 @@ export default function Hero(props: Props) {
                     </span>
                   ))}
                 </span>
-                <span {...stylex.attrs(viewStyles.heroSpan2)}>{props.copy.aka}</span>
+                <span {...stylex.attrs(styles.heroSpan22)}>{props.copy.aka}</span>
               </h1>
             </div>
             <p
-              {...stylex.attrs(recipeStyles.heroP, sceneStyles.interactive)}
+              {...stylex.attrs(styles.heroP, sceneStyles.interactive)}
               style={{
                 "animation-delay": `${after}ms`,
               }}
@@ -1064,7 +1062,7 @@ export default function Hero(props: Props) {
               {props.copy.tagline}
             </p>
             <p
-              {...stylex.attrs(recipeStyles.heroP2, sceneStyles.interactive)}
+              {...stylex.attrs(styles.heroP2, sceneStyles.interactive)}
               style={{
                 "animation-delay": `${after + 90}ms`,
               }}
@@ -1080,7 +1078,7 @@ export default function Hero(props: Props) {
               {props.copy.lead}
             </p>
             <div
-              {...stylex.attrs(recipeStyles.heroDiv3, sceneStyles.interactive)}
+              {...stylex.attrs(styles.heroDiv3, sceneStyles.interactive)}
               style={{
                 "animation-delay": `${after + 270}ms`,
               }}
@@ -1096,8 +1094,8 @@ export default function Hero(props: Props) {
             <Line verse={props.copy.verses[h]} at={SAYS[h]} stays={h === "night"} hero={root} />
           ))}
 
-          <div role="group" aria-label={props.copy.hours} {...stylex.attrs(viewStyles.heroDiv3)}>
-            <span {...stylex.attrs(viewStyles.heroSpan3)}>{props.copy.hours}</span>
+          <div role="group" aria-label={props.copy.hours} {...stylex.attrs(styles.heroDiv32)}>
+            <span {...stylex.attrs(styles.heroSpan32)}>{props.copy.hours}</span>
             {SCENES.map((s) => (
               <button
                 type="button"
@@ -1110,9 +1108,9 @@ export default function Hero(props: Props) {
               </button>
             ))}
           </div>
-          <a ref={hint.set} href="#parade" {...stylex.attrs(viewStyles.heroA)}>
+          <a ref={hint.set} href="#parade" {...stylex.attrs(styles.heroA)}>
             {props.copy.scroll}
-            <img src={props.hint} alt="" {...stylex.attrs(recipeStyles.heroImg7)} />
+            <img src={props.hint} alt="" {...stylex.attrs(styles.heroImg7)} />
           </a>
         </div>
       </section>
@@ -1125,7 +1123,7 @@ function Comes(props: { hour: Exclude<Scene, "morning">; src: string; hero: Elem
   const ref = createScrollAnimation<HTMLImageElement>(props.hero, HOLDING, () => [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }], {
     still: true,
   });
-  return <img ref={ref.set} data-scene={props.hour} data-src={props.src} alt="" draggable={false} {...stylex.attrs(recipeStyles.comesImg)} />;
+  return <img ref={ref.set} data-scene={props.hour} data-src={props.src} alt="" draggable={false} {...stylex.attrs(styles.comesImg)} />;
 }
 function Line(props: { verse: string[]; at: [number, number, number, number]; stays: boolean; hero: ElementRef<HTMLElement> }) {
   const [a, b, c, d] = props.at;
@@ -1146,10 +1144,10 @@ function Line(props: { verse: string[]; at: [number, number, number, number]; st
         },
   ]);
   return (
-    <div ref={seen.set} {...stylex.attrs(viewStyles.lineDiv)}>
+    <div ref={seen.set} {...stylex.attrs(styles.lineDiv)}>
       <p ref={rise.set} {...stylex.attrs(sceneStyles.verse)}>
         {props.verse.map((half) => (
-          <span {...stylex.attrs(viewStyles.lineSpan)}>{half}</span>
+          <span {...stylex.attrs(styles.lineSpan)}>{half}</span>
         ))}
       </p>
     </div>
@@ -1174,16 +1172,16 @@ function Layer(props: {
   const x = readMotion(props.px);
   const y = readMotion(props.py);
   return (
-    <div ref={away.set} {...domAttrs(viewStyles.layer, props.styles)}>
+    <div ref={away.set} {...domAttrs(styles.layer, props.styles)}>
       <div
         ref={closer.set}
-        {...stylex.attrs(viewStyles.layerDiv)}
+        {...stylex.attrs(styles.layerDiv)}
         style={{
           "transform-origin": props.origin,
         }}
       >
         <div
-          {...stylex.attrs(viewStyles.layerDiv2)}
+          {...stylex.attrs(styles.layerDiv2)}
           style={{
             transform: `translate(${reducedMotion() ? 0 : -x() * props.point}px, ${reducedMotion() ? 0 : -y() * props.point * 0.6}px)`,
           }}
@@ -1243,7 +1241,7 @@ function Dog(props: { scene: Scene; art: Readonly<Record<string, string>> }) {
       draggable={false}
       onPointerEnter={() => setNoticed(true)}
       onPointerLeave={() => setNoticed(false)}
-      {...stylex.attrs(recipeStyles.dogImg)}
+      {...stylex.attrs(styles.dogImg)}
       style={{
         left: pct(PET.x),
         bottom: pct(1 - PET.bottom),

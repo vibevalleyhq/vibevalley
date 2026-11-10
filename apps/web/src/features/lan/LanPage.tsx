@@ -14,7 +14,7 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { Qr } from "#/ui/Qr.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   lanPageSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
@@ -30,16 +30,13 @@ const recipeStyles = stylex.create({
     WebkitUserSelect: "all",
     userSelect: "all",
   },
-});
-
-const viewStyles = stylex.create({
   lanPageDiv: {
     display: "flex",
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 3)",
   },
-  lanPageSpan: {
+  lanPageSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: "var(--color-muted)",
@@ -52,7 +49,7 @@ const viewStyles = stylex.create({
     display: "flex",
     gap: "calc(var(--spacing) * 3)",
   },
-  lanPageSpan2: {
+  lanPageSpan22: {
     width: "calc(var(--spacing) * 18)",
     flexShrink: "0",
     fontSize: "var(--text-sm)",
@@ -134,7 +131,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
   },
-  pairingP: {
+  pairingP2: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
@@ -169,11 +166,11 @@ export function LanPage() {
   const keep = (status: LanStatus) => client.setData(lanQuery(), () => ({ value: status }));
   const s = () => ready(status, undefined);
   return (
-    <div {...stylex.attrs(viewStyles.lanPageDiv)}>
+    <div {...stylex.attrs(styles.lanPageDiv)}>
       <Card
         title={t("web.lan.lan.section.label")}
         action={
-          <Show when={s()}>{(s) => <span {...stylex.attrs(viewStyles.lanPageSpan)}>{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>
+          <Show when={s()}>{(s) => <span {...stylex.attrs(styles.lanPageSpan2)}>{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>
         }
       >
         <Show when={s()} fallback={<Quiet>{status.error() ? reasonOf(status.error()) : t("web.base.form.asking")}</Quiet>}>
@@ -183,7 +180,7 @@ export function LanPage() {
                 when={s().open}
                 fallback={
                   <>
-                    <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.intro")}</p>
+                    <p {...stylex.attrs(styles.lanPageP)}>{t("web.lan.lan.intro")}</p>
                     <div>
                       <Button
                         tone="primary"
@@ -197,16 +194,16 @@ export function LanPage() {
                   </>
                 }
               >
-                <div {...stylex.attrs(viewStyles.lanPageDiv2)}>
-                  <span {...stylex.attrs(viewStyles.lanPageSpan2)}>{t("web.lan.lan.address")}</span>
-                  <span data-testid="lan-url" {...stylex.attrs(recipeStyles.lanPageSpan)}>
+                <div {...stylex.attrs(styles.lanPageDiv2)}>
+                  <span {...stylex.attrs(styles.lanPageSpan22)}>{t("web.lan.lan.address")}</span>
+                  <span data-testid="lan-url" {...stylex.attrs(styles.lanPageSpan)}>
                     {s().url ?? "—"}
                   </span>
                 </div>
                 <Show
                   when={s().pairing}
                   fallback={
-                    <div {...stylex.attrs(viewStyles.lanPageDiv3)}>
+                    <div {...stylex.attrs(styles.lanPageDiv3)}>
                       <Button
                         tone="primary"
                         data-testid="lan-add"
@@ -229,13 +226,13 @@ export function LanPage() {
                 </Show>
               </Show>
               <Show when={s().problem}>
-                <p {...stylex.attrs(viewStyles.lanPageP2)}>{s().problem}</p>
+                <p {...stylex.attrs(styles.lanPageP2)}>{s().problem}</p>
               </Show>
-              <ul {...stylex.attrs(viewStyles.lanPageUl)}>
+              <ul {...stylex.attrs(styles.lanPageUl)}>
                 <For each={notes}>
                   {(n) => (
-                    <li {...stylex.attrs(viewStyles.lanPageLi)}>
-                      <span {...stylex.attrs(viewStyles.lanPageSpan3)} aria-hidden="true" />
+                    <li {...stylex.attrs(styles.lanPageLi)}>
+                      <span {...stylex.attrs(styles.lanPageSpan3)} aria-hidden="true" />
                       {t(`web.lan.lan.notes.${n}`)}
                     </li>
                   )}
@@ -267,17 +264,17 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
     <Show
       when={props.pairing.asking}
       fallback={
-        <div data-testid="pairing" data-left={left()} {...stylex.attrs(viewStyles.pairing)}>
-          <div data-testid="pairing-qr" {...stylex.attrs(viewStyles.pairingQr)}>
+        <div data-testid="pairing" data-left={left()} {...stylex.attrs(styles.pairing)}>
+          <div data-testid="pairing-qr" {...stylex.attrs(styles.pairingQr)}>
             <Qr text={props.pairing.link} label={t("web.lan.lan.qr")} />
           </div>
-          <div {...stylex.attrs(viewStyles.pairingDiv)}>
-            <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.scan")}</p>
-            <p data-testid="pairing-link" {...stylex.attrs(recipeStyles.pairingP)}>
+          <div {...stylex.attrs(styles.pairingDiv)}>
+            <p {...stylex.attrs(styles.lanPageP)}>{t("web.lan.lan.scan")}</p>
+            <p data-testid="pairing-link" {...stylex.attrs(styles.pairingP)}>
               {props.pairing.link}
             </p>
-            <p {...stylex.attrs(viewStyles.pairingP)}>{t("web.lan.lan.left", { s: left() })}</p>
-            <div {...stylex.attrs(viewStyles.pairingDiv2)}>
+            <p {...stylex.attrs(styles.pairingP2)}>{t("web.lan.lan.left", { s: left() })}</p>
+            <div {...stylex.attrs(styles.pairingDiv2)}>
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
                 {t("web.lan.lan.copy")}
               </Button>
@@ -293,9 +290,9 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
       }
     >
       {(asking) => (
-        <div {...stylex.attrs(viewStyles.pairingDiv3)}>
-          <p {...stylex.attrs(viewStyles.lanPageP)}>{t("web.lan.lan.asking", { name: asking() })}</p>
-          <div {...stylex.attrs(viewStyles.pairingDiv4)}>
+        <div {...stylex.attrs(styles.pairingDiv3)}>
+          <p {...stylex.attrs(styles.lanPageP)}>{t("web.lan.lan.asking", { name: asking() })}</p>
+          <div {...stylex.attrs(styles.pairingDiv4)}>
             <Button
               tone="primary"
               disabled={props.act.busy()}

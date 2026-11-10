@@ -88,16 +88,13 @@ const trajectoryStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   toolDetailPre: {
     fontFamily: "var(--font-mono)",
     whiteSpace: "pre-wrap",
     WebkitUserSelect: "text",
     userSelect: "text",
   },
-});
-
-const recipeStyles = stylex.create({
   rowSpan: {
     width: "calc(var(--spacing) * 15)",
     flexShrink: "0",
@@ -124,11 +121,11 @@ const recipeStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-medium)",
   },
-  rowSpanVariant1Case1: {
+  rowSpanPrimary: {
     width: "calc(var(--spacing) * 22)",
     marginLeft: null,
   },
-  rowSpanVariant1Case2: {
+  rowSpanSecondary: {
     width: "78px",
     marginLeft: "calc(var(--spacing) * 2.5)",
   },
@@ -140,37 +137,28 @@ const recipeStyles = stylex.create({
     justifyContent: "space-between",
     paddingLeft: "calc(var(--spacing) * 2)",
   },
-});
-
-const variantStyles3 = stylex.create({
   rowIcon: {
     marginTop: "var(--spacing)",
     marginRight: "var(--spacing)",
   },
-});
-
-const variantStyles2 = stylex.create({
   trajectoryTextInput: {
     width: {
       default: "calc(var(--spacing) * 36)",
       "@media (width>=40rem)": "calc(var(--spacing) * 56)",
     },
   },
-});
-
-const variantStyles = stylex.create({
   rowDiv: {
     borderRadius: "var(--radius-md)",
     paddingBlock: "3px",
     paddingRight: "calc(var(--spacing) * 2)",
   },
-  rowDivVariant: {
+  rowDivTone: {
     backgroundColor: {
       default: "var(--color-wheat)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 35%, transparent)",
     },
   },
-  rowDivVariant2: {
+  rowDivAlt: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -179,16 +167,16 @@ const variantStyles = stylex.create({
       },
     },
   },
-  rowSpan: {
+  rowSpan3: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  rowSpanVariant: {
+  rowSpanTone: {
     color: "var(--color-berry)",
   },
-  rowSpanVariant2: {},
+  rowSpanAlt: {},
   toolLineSpan: {
     fontFamily: "var(--font-mono)",
   },
@@ -202,12 +190,9 @@ const variantStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 1.5)",
     textAlign: "left",
   },
-  trajectoryListButtonVariant: {
+  trajectoryListButtonTone: {
     backgroundColor: "var(--color-selected)",
   },
-});
-
-const viewStyles = stylex.create({
   headSpan: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -266,20 +251,20 @@ const viewStyles = stylex.create({
     alignItems: "flex-start",
     textAlign: "left",
   },
-  rowSpan: {
+  rowSpan4: {
     width: "calc(var(--spacing) * 2)",
     flexShrink: "0",
   },
-  rowSpan2: {
+  rowSpan22: {
     display: "block",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  rowSpan3: {
+  rowSpan32: {
     whiteSpace: "pre-wrap",
   },
-  rowSpan4: {
+  rowSpan42: {
     flexShrink: "0",
     paddingTop: "calc(var(--spacing) * .5)",
     paddingLeft: "calc(var(--spacing) * 2)",
@@ -287,7 +272,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-faint)",
   },
-  toolLineSpan: {
+  toolLineSpan2: {
     fontFamily: "var(--font-mono)",
     color: "var(--color-muted)",
   },
@@ -304,7 +289,7 @@ const viewStyles = stylex.create({
   toolDetailSpan: {
     color: "var(--color-muted)",
   },
-  waterfallViewDiv: {
+  waterfallViewDiv2: {
     display: "flex",
   },
   waterfallViewSpan: {
@@ -312,7 +297,7 @@ const viewStyles = stylex.create({
     lineHeight: "1",
     color: "var(--color-muted)",
   },
-  waterfallViewDiv2: {
+  waterfallViewDiv22: {
     position: "relative",
     minWidth: "0",
     flex: "1",
@@ -497,7 +482,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
   const now = useNow();
   const head = () =>
     props.title ? (
-      <span {...stylex.attrs(viewStyles.headSpan)} title={props.about}>
+      <span {...stylex.attrs(styles.headSpan)} title={props.about}>
         {props.title}
       </span>
     ) : undefined;
@@ -505,7 +490,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
     <Show
       when={steps().length > 0}
       fallback={
-        <div {...stylex.attrs(viewStyles.trajectoryLogDiv)}>
+        <div {...stylex.attrs(styles.trajectoryLogDiv)}>
           {head()}
           <Quiet>{props.empty ?? t("web.session.trajectory.quiet")}</Quiet>
         </div>
@@ -592,14 +577,14 @@ export function Trajectory(props: {
   const toggle = (n: number) => setOpen((o) => (o.has(n) ? new Set([...o].filter((x) => x !== n)) : new Set([...o, n])));
 
   return (
-    <div {...stylex.attrs(viewStyles.trajectoryDiv)}>
-      <div {...stylex.attrs(viewStyles.trajectoryDiv2)}>
-        <div {...stylex.attrs(viewStyles.trajectoryDiv3)}>{props.head}</div>
+    <div {...stylex.attrs(styles.trajectoryDiv)}>
+      <div {...stylex.attrs(styles.trajectoryDiv2)}>
+        <div {...stylex.attrs(styles.trajectoryDiv3)}>{props.head}</div>
         <TextInput
           data-testid="trajectory-search"
           aria-label={t("web.session.trajectory.search")}
           placeholder={t("web.session.trajectory.searchHint")}
-          styles={variantStyles2.trajectoryTextInput}
+          styles={styles.trajectoryTextInput}
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
@@ -609,13 +594,13 @@ export function Trajectory(props: {
         end={end()}
         colorOf={(seq) => {
           const s = bySeq().get(seq);
-          return s ? spanColor(s) : "#9b7550";
+          return s ? spanColor(s) : "var(--color-bark-400)";
         }}
         onPick={show}
       />
       <div
         ref={(el) => (scroller = el)}
-        {...stylex.attrs(viewStyles.trajectoryDiv4)}
+        {...stylex.attrs(styles.trajectoryDiv4)}
         onScroll={(e) => {
           const el = e.currentTarget;
           atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
@@ -624,7 +609,7 @@ export function Trajectory(props: {
         <Show
           when={rows().length > 0}
           fallback={
-            <p data-testid="steps-empty" {...stylex.attrs(viewStyles.stepsEmpty)}>
+            <p data-testid="steps-empty" {...stylex.attrs(styles.stepsEmpty)}>
               {t("web.session.trajectory.noMatch")}
             </p>
           }
@@ -660,7 +645,7 @@ export function Trajectory(props: {
           </For>
         </Show>
       </div>
-      <p {...stylex.attrs(viewStyles.trajectoryP)}>{summaryText(summaryOf(props.steps, end()))}</p>
+      <p {...stylex.attrs(styles.trajectoryP)}>{summaryText(summaryOf(props.steps, end()))}</p>
     </div>
   );
 }
@@ -676,28 +661,28 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
       ref={(el) => props.refTo(el)}
       data-testid="step"
       data-type={step().type}
-      {...stylex.attrs(variantStyles.rowDiv, props.marked ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}
+      {...stylex.attrs(styles.rowDiv, props.marked ? styles.rowDivTone : styles.rowDivAlt)}
     >
       <button
         type="button"
         aria-label={`${props.spec.tag} ${oneLine(step().text).trim()}`}
         aria-expanded={aria(props.open)}
         onClick={() => props.onToggle()}
-        {...stylex.attrs(viewStyles.rowButton)}
+        {...stylex.attrs(styles.rowButton)}
       >
-        <span {...stylex.attrs(recipeStyles.rowSpan)}>{props.spec.gutter}</span>
+        <span {...stylex.attrs(styles.rowSpan)}>{props.spec.gutter}</span>
         <span
-          {...stylex.attrs(recipeStyles.rowSpan2, sub() ? recipeStyles.rowSpanVariant1Case2 : recipeStyles.rowSpanVariant1Case1)}
+          {...stylex.attrs(styles.rowSpan2, sub() ? styles.rowSpanSecondary : styles.rowSpanPrimary)}
           style={{ background: sub() && fill().startsWith("#") ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
         >
           {props.spec.tag}
         </span>
-        <span {...stylex.attrs(viewStyles.rowSpan)} />
+        <span {...stylex.attrs(styles.rowSpan4)} />
         <Show when={failed() && tool()}>
-          <Icon name="cross" size={12} styles={[variantStyles3.rowIcon]} />
+          <Icon name="cross" size={12} styles={[styles.rowIcon]} />
         </Show>
-        <span {...stylex.attrs(variantStyles.rowSpan, failed() ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
-          <Switch fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{oneLine(step().text).trim()}</span>}>
+        <span {...stylex.attrs(styles.rowSpan3, failed() ? styles.rowSpanTone : styles.rowSpanAlt)}>
+          <Switch fallback={<span {...stylex.attrs(styles.rowSpan22)}>{oneLine(step().text).trim()}</span>}>
             <Match when={tool()}>
               <ToolLine step={step()} />
             </Match>
@@ -705,12 +690,12 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
               <Markdown text={step().text} />
             </Match>
             <Match when={props.open}>
-              <span {...stylex.attrs(viewStyles.rowSpan3)}>{step().text}</span>
+              <span {...stylex.attrs(styles.rowSpan32)}>{step().text}</span>
             </Match>
           </Switch>
         </span>
         <Show when={props.spec.when}>
-          <span {...stylex.attrs(viewStyles.rowSpan4)}>{props.spec.when}</span>
+          <span {...stylex.attrs(styles.rowSpan42)}>{props.spec.when}</span>
         </Show>
       </button>
       <Show when={props.open && tool()}>
@@ -725,15 +710,15 @@ function ToolLine(props: { step: SessionEvent }) {
   const args = () => oneLine(props.step.input ?? "").trim();
   const out = () => oneLine(props.step.output ?? "").trim();
   return (
-    <span {...stylex.attrs(viewStyles.rowSpan2)}>
+    <span {...stylex.attrs(styles.rowSpan22)}>
       {farmToolText(props.step.text) ?? props.step.text}
       <Show when={args()}>
-        <span {...stylex.attrs(viewStyles.toolLineSpan)}> {args()}</span>
+        <span {...stylex.attrs(styles.toolLineSpan2)}> {args()}</span>
       </Show>
       {" → "}
       <Switch
         fallback={
-          <span {...stylex.attrs(variantStyles.toolLineSpan, props.step.ok === false ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
+          <span {...stylex.attrs(styles.toolLineSpan, props.step.ok === false ? styles.rowSpanTone : styles.rowSpanAlt)}>
             {out()}
           </span>
         }
@@ -748,8 +733,8 @@ function ToolLine(props: { step: SessionEvent }) {
 function ToolDetail(props: { step: SessionEvent }) {
   const input = () => readableInput(props.step);
   return (
-    <div {...stylex.attrs(viewStyles.toolDetailDiv)}>
-      <span {...stylex.attrs(viewStyles.toolDetailSpan)}>
+    <div {...stylex.attrs(styles.toolDetailDiv)}>
+      <span {...stylex.attrs(styles.toolDetailSpan)}>
         {[
           ...(props.step.tool ? [t("web.session.trajectory.tool", { name: props.step.tool })] : []),
           props.step.ok === undefined
@@ -760,19 +745,19 @@ function ToolDetail(props: { step: SessionEvent }) {
         ].join(" · ")}
       </span>
       <Show when={input()}>
-        <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.input")}</span>
-        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{input()}</pre>
+        <span {...stylex.attrs(styles.toolDetailSpan)}>{t("web.session.trajectory.input")}</span>
+        <pre {...stylex.attrs(styles.toolDetailPre)}>{input()}</pre>
       </Show>
-      <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.output")}</span>
+      <span {...stylex.attrs(styles.toolDetailSpan)}>{t("web.session.trajectory.output")}</span>
       <Show
         when={props.step.output}
         fallback={
-          <span {...stylex.attrs(viewStyles.toolDetailSpan)}>
+          <span {...stylex.attrs(styles.toolDetailSpan)}>
             {props.step.ok === undefined ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}
           </span>
         }
       >
-        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{props.step.output}</pre>
+        <pre {...stylex.attrs(styles.toolDetailPre)}>{props.step.output}</pre>
       </Show>
     </div>
   );
@@ -823,18 +808,18 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
         width: Math.max(2, at(r, span.end) - left),
         top: lanes.indexOf(span.lane) * (lane + gap),
         label: `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`,
-        color: span.lane === "asked" ? "#e5a93c" : span.lane === "model" ? "#74a046" : props.colorOf(span.seq),
+        color: span.lane === "asked" ? "var(--color-wheat)" : span.lane === "model" ? "var(--color-leaf)" : props.colorOf(span.seq),
       };
     });
   });
   return (
-    <div {...stylex.attrs(viewStyles.waterfallViewDiv)} style={{ height: `${lane * 3 + gap * 2}px` }}>
-      <div {...stylex.attrs(recipeStyles.waterfallViewDiv)}>
-        <For each={lanes}>{(l) => <span {...stylex.attrs(viewStyles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
+    <div {...stylex.attrs(styles.waterfallViewDiv2)} style={{ height: `${lane * 3 + gap * 2}px` }}>
+      <div {...stylex.attrs(styles.waterfallViewDiv)}>
+        <For each={lanes}>{(l) => <span {...stylex.attrs(styles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
       </div>
-      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.waterfallViewDiv2)}>
+      <div ref={(el) => (box = el)} {...stylex.attrs(styles.waterfallViewDiv22)}>
         <For each={[0, 1, 2]}>
-          {(i) => <div {...stylex.attrs(viewStyles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
+          {(i) => <div {...stylex.attrs(styles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
         </For>
         <For each={bars()} keyed={false}>
           {(b) => (
@@ -879,14 +864,14 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
         </button>
       </Show>
       <Show when={props.file}>
-        <div title={props.file} {...stylex.attrs(viewStyles.markableDiv)}>
+        <div title={props.file} {...stylex.attrs(styles.markableDiv)}>
           <Icon name="bug" size={12} />
           {t("web.session.trajectory.marked")}
         </div>
       </Show>
       <Show when={writing()}>
         <form
-          {...stylex.attrs(viewStyles.markableForm)}
+          {...stylex.attrs(styles.markableForm)}
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -901,10 +886,10 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
             value={want()}
             onInput={(e) => setWant(e.currentTarget.value)}
           />
-          <button type="submit" data-testid="mark-submit" disabled={busy() || !want().trim()} {...stylex.attrs(viewStyles.markSubmit)}>
+          <button type="submit" data-testid="mark-submit" disabled={busy() || !want().trim()} {...stylex.attrs(styles.markSubmit)}>
             {t("web.base.write")}
           </button>
-          <button type="button" disabled={busy()} onClick={() => setWriting(false)} {...stylex.attrs(viewStyles.markableButton)}>
+          <button type="button" disabled={busy()} onClick={() => setWriting(false)} {...stylex.attrs(styles.markableButton)}>
             {t("web.base.form.never")}
           </button>
         </form>
@@ -933,8 +918,8 @@ export function TrajectoryList(props: { agent: string }) {
     <Show when={list()} fallback={<Quiet>{heads.error() ? reasonOf(heads.error()) : t("web.base.reading")}</Quiet>}>
       {(all) => (
         <Show when={all().length > 0} fallback={<Quiet>{t("web.session.trajectory.neverSent")}</Quiet>}>
-          <div {...stylex.attrs(viewStyles.trajectoryListDiv)}>
-            <ul aria-label={t("web.session.trajectory.sent")} {...stylex.attrs(viewStyles.trajectoryListUl)}>
+          <div {...stylex.attrs(styles.trajectoryListDiv)}>
+            <ul aria-label={t("web.session.trajectory.sent")} {...stylex.attrs(styles.trajectoryListUl)}>
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
                   const ended = () => {
@@ -954,22 +939,22 @@ export function TrajectoryList(props: { agent: string }) {
                         aria-current={h().id === open()?.id ? "true" : undefined}
                         onClick={() => setPicked(h().id)}
                         {...stylex.attrs(
-                          variantStyles.trajectoryListButton,
-                          h().id === open()?.id ? variantStyles.trajectoryListButtonVariant : variantStyles.rowDivVariant2,
+                          styles.trajectoryListButton,
+                          h().id === open()?.id ? styles.trajectoryListButtonTone : styles.rowDivAlt,
                         )}
                       >
-                        <span {...stylex.attrs(viewStyles.trajectoryListSpan)}>
-                          <span {...stylex.attrs(viewStyles.trajectoryListSpan2)}>{h().name}</span>
+                        <span {...stylex.attrs(styles.trajectoryListSpan)}>
+                          <span {...stylex.attrs(styles.trajectoryListSpan2)}>{h().name}</span>
                           <Show when={h().repo}>
-                            <span {...stylex.attrs(viewStyles.trajectoryListSpan3)}>{h().repo}</span>
+                            <span {...stylex.attrs(styles.trajectoryListSpan3)}>{h().repo}</span>
                           </Show>
                           <Show when={ended() === undefined}>
-                            <span {...stylex.attrs(viewStyles.trajectoryListSpan4)}>{t("web.session.trajectory.here")}</span>
+                            <span {...stylex.attrs(styles.trajectoryListSpan4)}>{t("web.session.trajectory.here")}</span>
                           </Show>
                         </span>
-                        <span {...stylex.attrs(viewStyles.trajectoryListSpan3)}>{sentText()}</span>
+                        <span {...stylex.attrs(styles.trajectoryListSpan3)}>{sentText()}</span>
                         <Show when={h().brief}>
-                          <span {...stylex.attrs(viewStyles.trajectoryListSpan5)}>{oneLine(h().brief).trim()}</span>
+                          <span {...stylex.attrs(styles.trajectoryListSpan5)}>{oneLine(h().brief).trim()}</span>
                         </Show>
                       </button>
                     </li>
@@ -977,7 +962,7 @@ export function TrajectoryList(props: { agent: string }) {
                 }}
               </For>
             </ul>
-            <div {...stylex.attrs(viewStyles.trajectoryListDiv2)}>
+            <div {...stylex.attrs(styles.trajectoryListDiv2)}>
               <Show when={open()} fallback={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>

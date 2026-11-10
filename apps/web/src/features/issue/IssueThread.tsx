@@ -15,15 +15,12 @@ import { Markdown } from "#/ui/Markdown.tsx";
 
 import { SheetLabel } from "./Sheet";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   issueThreadMarkdown: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     overflowWrap: "break-word",
   },
-});
-
-const viewStyles = stylex.create({
   issueThreadP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -74,7 +71,7 @@ export function IssueThread(props: { issue: string }) {
   return (
     <section data-testid="issue-conversation" aria-label={t("web.issue.conversation.title")}>
       <SheetLabel>{t("web.issue.conversation.title")}</SheetLabel>
-      <Show when={feed().error}>{(error) => <p {...stylex.attrs(viewStyles.issueThreadP)}>{error()}</p>}</Show>
+      <Show when={feed().error}>{(error) => <p {...stylex.attrs(styles.issueThreadP)}>{error()}</p>}</Show>
       <Show when={thread() && feed().ready && !feed().complete}>
         <Button
           disabled={act.busy()}
@@ -86,16 +83,16 @@ export function IssueThread(props: { issue: string }) {
           {t("web.issue.conversation.older")}
         </Button>
       </Show>
-      <Show when={feed().messages.length > 0} fallback={<p {...stylex.attrs(viewStyles.issueThreadP2)}>{t("web.issue.conversation.empty")}</p>}>
-        <div {...stylex.attrs(viewStyles.issueThreadDiv)}>
+      <Show when={feed().messages.length > 0} fallback={<p {...stylex.attrs(styles.issueThreadP2)}>{t("web.issue.conversation.empty")}</p>}>
+        <div {...stylex.attrs(styles.issueThreadDiv)}>
           <For each={feed().messages.filter((message) => message.deleted === undefined)}>
             {(message) => (
-              <article data-testid="issue-message" {...stylex.attrs(viewStyles.issueMessage)}>
-                <div {...stylex.attrs(viewStyles.issueThreadDiv2)}>
-                  <span {...stylex.attrs(viewStyles.issueThreadSpan)}>{message.name}</span>
+              <article data-testid="issue-message" {...stylex.attrs(styles.issueMessage)}>
+                <div {...stylex.attrs(styles.issueThreadDiv2)}>
+                  <span {...stylex.attrs(styles.issueThreadSpan)}>{message.name}</span>
                   <time>{wallClockText(message.at)}</time>
                 </div>
-                <Markdown styles={variantStyles.issueThreadMarkdown} text={message.text} />
+                <Markdown styles={styles.issueThreadMarkdown} text={message.text} />
               </article>
             )}
           </For>

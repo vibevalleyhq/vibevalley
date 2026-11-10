@@ -22,7 +22,7 @@ import { issueMove, issueMoveOf, sendMove } from "./moves";
 import type { CriterionRow } from "./overview";
 import { Property } from "./Sheet";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   workLogSpan: {
     width: "calc(var(--spacing) * 12)",
     flexShrink: "0",
@@ -36,38 +36,29 @@ const recipeStyles2 = stylex.create({
   workLogSpanState3: {
     color: "var(--wb-berry)",
   },
-});
-
-const recipeStyles = stylex.create({
   storySpan: {
     minWidth: "0",
     flex: "1",
     overflowWrap: "break-word",
   },
-  storySpanVariant1Case1: {
+  storySpanPrimary: {
     color: null,
   },
-  storySpanVariant1Case2: {
+  storySpanSecondary: {
     color: "var(--color-berry)",
   },
-  storySpanVariant2Case1: {
+  storySpanStateA: {
     fontWeight: null,
   },
-  storySpanVariant2Case2: {
+  storySpanStateB: {
     fontWeight: "var(--font-weight-semibold)",
   },
-});
-
-const variantStyles2 = stylex.create({
   criteriaIcon: {
     marginTop: "calc(var(--spacing) * .5)",
     flexShrink: "0",
   },
-});
-
-const variantStyles = stylex.create({
   criteriaSpan: {},
-  criteriaSpanVariant: {
+  criteriaSpanTone: {
     color: "var(--color-muted)",
   },
   runsSpan: {
@@ -80,7 +71,7 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  workLogSpan: {
+  workLogSpan2: {
     WebkitLineClamp: "3",
     WebkitBoxOrient: "vertical",
     display: "-webkit-box",
@@ -93,9 +84,6 @@ const variantStyles = stylex.create({
     overflowWrap: "break-word",
     whiteSpace: "pre-wrap",
   },
-});
-
-const viewStyles = stylex.create({
   checklistControl: { marginTop: "calc(var(--spacing) * 0.5)" },
   questionDiv: {
     marginTop: "calc(var(--spacing) * 2.5)",
@@ -120,7 +108,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  criteriaSpan: {
+  criteriaSpan2: {
     marginTop: "var(--spacing)",
     width: "calc(var(--spacing) * 3)",
     height: "calc(var(--spacing) * 3)",
@@ -130,7 +118,7 @@ const viewStyles = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--color-line)",
   },
-  criteriaSpan2: {
+  criteriaSpan22: {
     minWidth: "0",
     flex: "1",
   },
@@ -147,12 +135,12 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  storySpan: {
+  storySpan2: {
     width: "calc(var(--spacing) * 16)",
     flexShrink: "0",
     color: "var(--color-muted)",
   },
-  storySpan2: {
+  storySpan22: {
     color: "var(--color-muted)",
   },
   runsP: {
@@ -173,7 +161,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  runsSpan: {
+  runsSpan2: {
     width: "calc(var(--spacing) * 20)",
     flexShrink: "0",
     color: "var(--color-muted)",
@@ -202,7 +190,7 @@ const viewStyles = stylex.create({
     },
     paddingBlock: "var(--spacing)",
   },
-  workLogSpan: {
+  workLogSpan3: {
     width: "calc(var(--spacing) * 14)",
     flexShrink: "0",
     color: "var(--color-faint)",
@@ -271,10 +259,10 @@ const viewStyles = stylex.create({
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
   return (
-    <div {...stylex.attrs(viewStyles.questionDiv)}>
+    <div {...stylex.attrs(styles.questionDiv)}>
       <div>{props.ask.question}</div>
       <Show when={props.ask.options.length}>
-        <div {...stylex.attrs(viewStyles.questionDiv2)} role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
+        <div {...stylex.attrs(styles.questionDiv2)} role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
           <For each={props.ask.options}>
             {(o) => (
               <Button data-testid="answer-option" data-key={o} disabled={props.busy} onClick={() => props.onPick(o)}>
@@ -306,10 +294,10 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
       return n;
     });
   return (
-    <ul {...stylex.attrs(viewStyles.criteriaUl)}>
+    <ul {...stylex.attrs(styles.criteriaUl)}>
       <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
-          <li {...stylex.attrs(viewStyles.criteriaLi)}>
+          <li {...stylex.attrs(styles.criteriaLi)}>
             <Show when={props.checking}>
               <Checkbox
                 testid="criterion-tick"
@@ -317,18 +305,18 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
                 label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
-                styles={viewStyles.checklistControl}
+                styles={styles.checklistControl}
               />
             </Show>
-            <Show when={r().result} fallback={<span {...stylex.attrs(viewStyles.criteriaSpan)} title={t("web.issue.detail.unsaid")} />}>
-              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} styles={[variantStyles2.criteriaIcon]} />}
+            <Show when={r().result} fallback={<span {...stylex.attrs(styles.criteriaSpan2)} title={t("web.issue.detail.unsaid")} />}>
+              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} styles={[styles.criteriaIcon]} />}
             </Show>
-            <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
-              <span {...stylex.attrs(variantStyles.criteriaSpan, ticked().has(i()) ? variantStyles.criteriaSpanVariant : variantStyles.criteriaSpan)}>
+            <span {...stylex.attrs(styles.criteriaSpan22)}>
+              <span {...stylex.attrs(styles.criteriaSpan, ticked().has(i()) ? styles.criteriaSpanTone : styles.criteriaSpan)}>
                 {r().text}
               </span>
               <Show when={r().proof}>
-                <span {...stylex.attrs(viewStyles.criteriaSpan3)}>{r().proof}</span>
+                <span {...stylex.attrs(styles.criteriaSpan3)}>{r().proof}</span>
               </Show>
             </span>
           </li>
@@ -341,20 +329,20 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
 /** The milestones, newest first: when, who, what. */
 export function Story(props: { milestones: Milestone[] }) {
   return (
-    <ol {...stylex.attrs(viewStyles.criteriaUl)}>
+    <ol {...stylex.attrs(styles.criteriaUl)}>
       <For each={props.milestones}>
         {(m) => (
-          <li data-testid="milestone" data-kind={m.kind} {...stylex.attrs(viewStyles.milestone)}>
-            <span {...stylex.attrs(viewStyles.storySpan)}>{wallClockText(m.at)}</span>
+          <li data-testid="milestone" data-kind={m.kind} {...stylex.attrs(styles.milestone)}>
+            <span {...stylex.attrs(styles.storySpan2)}>{wallClockText(m.at)}</span>
             <span
               {...stylex.attrs(
-                recipeStyles.storySpan,
-                m.kind === "failed" || m.kind === "rejected" ? recipeStyles.storySpanVariant1Case2 : recipeStyles.storySpanVariant1Case1,
-                m.kind === "asked" ? recipeStyles.storySpanVariant2Case2 : recipeStyles.storySpanVariant2Case1,
+                styles.storySpan,
+                m.kind === "failed" || m.kind === "rejected" ? styles.storySpanSecondary : styles.storySpanPrimary,
+                m.kind === "asked" ? styles.storySpanStateB : styles.storySpanStateA,
               )}
             >
               <Show when={m.who}>
-                <span {...stylex.attrs(viewStyles.storySpan2)}>{m.who} · </span>
+                <span {...stylex.attrs(styles.storySpan22)}>{m.who} · </span>
               </Show>
               {plainText(m.text)}
             </span>
@@ -374,17 +362,17 @@ export function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(query, []);
   const now = () => Date.now();
   return (
-    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(viewStyles.runsP)}>{t("web.issue.detail.noRuns")}</p>}>
+    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(styles.runsP)}>{t("web.issue.detail.noRuns")}</p>}>
       <div>
-        <div {...stylex.attrs(viewStyles.runsDiv)}>{t("web.issue.detail.runCount", { n: runs().length })}</div>
+        <div {...stylex.attrs(styles.runsDiv)}>{t("web.issue.detail.runCount", { n: runs().length })}</div>
         <For each={[...runs()].toReversed()}>
           {(r) => (
-            <div {...stylex.attrs(viewStyles.runsDiv2)}>
-              <span {...stylex.attrs(viewStyles.runsSpan)}>{wallClockText(r.startedAt)}</span>
-              <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
+            <div {...stylex.attrs(styles.runsDiv2)}>
+              <span {...stylex.attrs(styles.runsSpan2)}>{wallClockText(r.startedAt)}</span>
+              <span {...stylex.attrs(styles.criteriaSpan22)}>
                 {runText(r, now(), tookText)}
                 <Show when={r.summary}>
-                  <span {...stylex.attrs(variantStyles.runsSpan)}>{r.summary}</span>
+                  <span {...stylex.attrs(styles.runsSpan)}>{r.summary}</span>
                 </Show>
               </span>
             </div>
@@ -416,24 +404,24 @@ const stepWord: Partial<Record<SessionEvent["type"], string>> = {
 export function WorkLog(props: { steps: SessionEvent[] }) {
   const shown = () => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240);
   return (
-    <ol {...stylex.attrs(viewStyles.workLogOl)}>
+    <ol {...stylex.attrs(styles.workLogOl)}>
       <For each={shown()}>
         {(e) => (
-          <li {...stylex.attrs(viewStyles.workLogLi)}>
-            <span {...stylex.attrs(viewStyles.workLogSpan)}>{wallClockText(e.time)}</span>
+          <li {...stylex.attrs(styles.workLogLi)}>
+            <span {...stylex.attrs(styles.workLogSpan3)}>{wallClockText(e.time)}</span>
             <span
               {...stylex.attrs(
-                recipeStyles2.workLogSpan,
+                styles.workLogSpan,
                 e.type === "run/error"
-                  ? recipeStyles2.workLogSpanState3
+                  ? styles.workLogSpanState3
                   : e.type === "tool/call"
-                    ? recipeStyles2.workLogSpanState2
-                    : recipeStyles2.workLogSpanState,
+                    ? styles.workLogSpanState2
+                    : styles.workLogSpanState,
               )}
             >
               {stepWord[e.type]}
             </span>
-            <span {...stylex.attrs(variantStyles.workLogSpan)}>{e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}</span>
+            <span {...stylex.attrs(styles.workLogSpan2)}>{e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}</span>
           </li>
         )}
       </For>
@@ -456,17 +444,17 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   };
   return (
     <div>
-      <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv)}>
-        <h1 {...stylex.attrs(viewStyles.orchestratorIssueDetailH1)}>{props.issue.title}</h1>
-        <span {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan)}>{tagText(props.issue)}</span>
+      <div {...stylex.attrs(styles.orchestratorIssueDetailDiv)}>
+        <h1 {...stylex.attrs(styles.orchestratorIssueDetailH1)}>{props.issue.title}</h1>
+        <span {...stylex.attrs(styles.orchestratorIssueDetailSpan)}>{tagText(props.issue)}</span>
       </div>
-      <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv2)}>
+      <div {...stylex.attrs(styles.orchestratorIssueDetailDiv2)}>
         <ActLines issue={props.issue.id} />
       </div>
       <Show when={props.issue.stage.acts.length > 0}>
-        <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv3)}>
+        <div {...stylex.attrs(styles.orchestratorIssueDetailDiv3)}>
           <Show when={props.issue.stage.state === "stuck"}>
-            <span {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan2)}>{t("web.issue.detail.orchestratorStuck")}</span>
+            <span {...stylex.attrs(styles.orchestratorIssueDetailSpan2)}>{t("web.issue.detail.orchestratorStuck")}</span>
           </Show>
           <For each={props.issue.stage.acts}>
             {(a) => (
@@ -477,11 +465,11 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           </For>
         </div>
       </Show>
-      <div {...stylex.attrs(viewStyles.orchestratorIssueDetailDiv4)}>
+      <div {...stylex.attrs(styles.orchestratorIssueDetailDiv4)}>
         <Property label={t("web.issue.detail.who")}>{t("web.issue.orchestrator")}</Property>
         <Show when={props.issue.description}>
           <Property label={t("web.issue.detail.job")}>
-            <span {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan3)}>{props.issue.description}</span>
+            <span {...stylex.attrs(styles.orchestratorIssueDetailSpan3)}>{props.issue.description}</span>
           </Property>
         </Show>
         <Show when={props.issue.cron}>
@@ -491,7 +479,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
         <Property label={t("web.issue.detail.answer")}>{t("web.issue.detail.answered")}</Property>
       </div>
-      <h2 {...stylex.attrs(viewStyles.orchestratorIssueDetailH2)}>{t("web.issue.detail.runs")}</h2>
+      <h2 {...stylex.attrs(styles.orchestratorIssueDetailH2)}>{t("web.issue.detail.runs")}</h2>
       <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
     </div>
   );
@@ -501,15 +489,15 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
 export function AnswerView(props: { answer: IssueAnswer }) {
   const list = (head: string, lines: readonly string[]) => (
     <Show when={lines.length > 0}>
-      <div {...stylex.attrs(viewStyles.listDiv)}>
-        <div {...stylex.attrs(viewStyles.listDiv2)}>{head}</div>
-        <For each={lines}>{(l) => <div {...stylex.attrs(viewStyles.listDiv3)}>· {l}</div>}</For>
+      <div {...stylex.attrs(styles.listDiv)}>
+        <div {...stylex.attrs(styles.listDiv2)}>{head}</div>
+        <For each={lines}>{(l) => <div {...stylex.attrs(styles.listDiv3)}>· {l}</div>}</For>
       </div>
     </Show>
   );
   return (
     <div>
-      <p {...stylex.attrs(viewStyles.orchestratorIssueDetailSpan3)}>{props.answer.conclusion}</p>
+      <p {...stylex.attrs(styles.orchestratorIssueDetailSpan3)}>{props.answer.conclusion}</p>
       {list(t("web.issue.detail.evidence"), props.answer.evidence)}
       {list(t("web.issue.detail.unsure"), props.answer.unsure)}
       {list(t("web.issue.detail.next"), props.answer.next)}

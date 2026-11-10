@@ -20,11 +20,10 @@ import { Achievements } from "./Achievements";
 import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
-import { tint } from "./rows";
 import { SowForm, WaterForm } from "./SeedForms";
 
-const recipeStyles = stylex.create({
-  tileButton: {
+const styles = stylex.create({
+  tile: {
     display: "flex",
     width: "100%",
     flexDirection: "column",
@@ -41,7 +40,7 @@ const recipeStyles = stylex.create({
       ":disabled": ".5",
     },
   },
-  tileButtonVariant1Case1: {
+  tileIdle: {
     borderColor: "transparent",
     backgroundColor: {
       default: null,
@@ -51,22 +50,19 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  tileButtonVariant1Case2: {
+  tileChosen: {
     borderColor: "var(--color-leaf-500)",
-    backgroundColor: null,
+    backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 60%, var(--color-cream-50))",
   },
-});
-
-const viewStyles = stylex.create({
-  orchestratorLooksDiv: {
+  column: {
     display: "flex",
     flexDirection: "column",
   },
-  orchestratorLooksP: {
+  lead: {
     fontSize: "13px",
     color: "var(--color-bark-900)",
   },
-  orchestratorLooksDiv2: {
+  looksGrid: {
     marginTop: "calc(var(--spacing) * 3)",
     display: "grid",
     gridTemplateColumns: {
@@ -75,49 +71,49 @@ const viewStyles = stylex.create({
     },
     gap: "calc(var(--spacing) * 2.5)",
   },
-  orchestratorLooksSpan: {
+  lookPreview: {
     height: "calc(var(--spacing) * 28)",
   },
-  orchestratorLooksSpan2: {
+  tileName: {
     marginTop: "calc(var(--spacing) * 1.5)",
     fontSize: "13px",
   },
-  orchestratorLooksSpan3: {
+  tileBlurb: {
     textAlign: "center",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  orchestratorLooksP2: {
+  petsHeading: {
     marginTop: "calc(var(--spacing) * 2)",
     fontSize: "13px",
   },
-  orchestratorLooksDiv3: {
+  petsRow: {
     marginTop: "calc(var(--spacing) * 2)",
     display: "flex",
     gap: "calc(var(--spacing) * 2.5)",
   },
-  orchestratorLooksDiv4: {
+  petSlot: {
     flex: "1",
     backgroundColor: "var(--color-cream-100)",
   },
-  orchestratorLooksSpan4: {
+  petPreview: {
     height: "calc(var(--spacing) * 16)",
   },
-  orchestratorLooksSpan5: {
+  petDrawing: {
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  shopP: {
+  shopText: {
     fontSize: "13px",
     color: "var(--color-bark-800)",
   },
-  shopDiv: {
+  shopGrid: {
     marginTop: "calc(var(--spacing) * 3)",
     display: "grid",
     gridTemplateColumns: "repeat(2,minmax(0,1fr))",
     gap: "calc(var(--spacing) * 2)",
   },
-  shopDiv2: {
+  shopCard: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
@@ -125,15 +121,15 @@ const viewStyles = stylex.create({
     padding: "calc(var(--spacing) * 2.5)",
     opacity: ".8",
   },
-  shopSpan: {
+  shopBody: {
     minWidth: "0",
     flex: "1",
   },
-  shopSpan2: {
+  shopName: {
     display: "block",
     fontSize: "13px",
   },
-  shopSpan3: {
+  shopNote: {
     display: "block",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -256,8 +252,7 @@ function Tile(props: { item: string; chosen: boolean; ready: boolean; onClick: (
       aria-pressed={aria(props.chosen)}
       disabled={!props.ready}
       onClick={() => props.onClick()}
-      {...stylex.attrs(recipeStyles.tileButton, props.chosen ? recipeStyles.tileButtonVariant1Case2 : recipeStyles.tileButtonVariant1Case1)}
-      style={{ background: props.chosen ? tint("#b4cb7c", 0.6) : undefined }}
+      {...stylex.attrs(styles.tile, props.chosen ? styles.tileChosen : styles.tileIdle)}
     >
       {props.children}
     </button>
@@ -282,37 +277,37 @@ function OrchestratorLooks() {
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
-    <div {...stylex.attrs(viewStyles.orchestratorLooksDiv)}>
-      <p {...stylex.attrs(viewStyles.orchestratorLooksP)}>{t("web.farm.panel.pickLook")}</p>
-      <div {...stylex.attrs(viewStyles.orchestratorLooksDiv2)}>
+    <div {...stylex.attrs(styles.column)}>
+      <p {...stylex.attrs(styles.lead)}>{t("web.farm.panel.pickLook")}</p>
+      <div {...stylex.attrs(styles.looksGrid)}>
         <For each={orchestratorLooks}>
           {(look) => (
             <Tile item={look.id} chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
-              <span {...stylex.attrs(viewStyles.orchestratorLooksSpan)}>
+              <span {...stylex.attrs(styles.lookPreview)}>
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
                 </Show>
               </span>
-              <span {...stylex.attrs(viewStyles.orchestratorLooksSpan2)}>{look.name}</span>
-              <span {...stylex.attrs(viewStyles.orchestratorLooksSpan3)}>{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
+              <span {...stylex.attrs(styles.tileName)}>{look.name}</span>
+              <span {...stylex.attrs(styles.tileBlurb)}>{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
             </Tile>
           )}
         </For>
       </div>
-      <p {...stylex.attrs(viewStyles.orchestratorLooksP2)}>{t("web.farm.panel.pets")}</p>
-      <div {...stylex.attrs(viewStyles.orchestratorLooksDiv3)}>
+      <p {...stylex.attrs(styles.petsHeading)}>{t("web.farm.panel.pets")}</p>
+      <div {...stylex.attrs(styles.petsRow)}>
         <For each={pets}>
           {(p) => (
-            <div {...stylex.attrs(viewStyles.orchestratorLooksDiv4)}>
+            <div {...stylex.attrs(styles.petSlot)}>
               <Tile item={p} chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
-                <span {...stylex.attrs(viewStyles.orchestratorLooksSpan4)}>
+                <span {...stylex.attrs(styles.petPreview)}>
                   <Show when={has(`${p}-awake`)}>
                     <SpriteIcon name={`${p}-awake`} size={64} />
                   </Show>
                 </span>
-                <span {...stylex.attrs(viewStyles.orchestratorLooksSpan2)}>{petName[p]}</span>
+                <span {...stylex.attrs(styles.tileName)}>{petName[p]}</span>
                 <Show when={!has(`${p}-awake`)}>
-                  <span {...stylex.attrs(viewStyles.orchestratorLooksSpan5)}>{t("web.farm.panel.drawing")}</span>
+                  <span {...stylex.attrs(styles.petDrawing)}>{t("web.farm.panel.drawing")}</span>
                 </Show>
               </Tile>
             </div>
@@ -333,19 +328,19 @@ const shop = [
 function Shop() {
   const core = useCore();
   return (
-    <div {...stylex.attrs(viewStyles.orchestratorLooksDiv)}>
-      <p {...stylex.attrs(viewStyles.shopP)}>{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
-      <div {...stylex.attrs(viewStyles.shopDiv)}>
+    <div {...stylex.attrs(styles.column)}>
+      <p {...stylex.attrs(styles.shopText)}>{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
+      <div {...stylex.attrs(styles.shopGrid)}>
         <For each={shop}>
           {(item) => (
-            <div {...stylex.attrs(viewStyles.shopDiv2)}>
+            <div {...stylex.attrs(styles.shopCard)}>
               <SpriteIcon name={item.icon} size={36} />
-              <span {...stylex.attrs(viewStyles.shopSpan)}>
-                <span {...stylex.attrs(viewStyles.shopSpan2)}>{item.name}</span>
-                <span {...stylex.attrs(viewStyles.shopSpan3)}>{item.note}</span>
+              <span {...stylex.attrs(styles.shopBody)}>
+                <span {...stylex.attrs(styles.shopName)}>{item.name}</span>
+                <span {...stylex.attrs(styles.shopNote)}>{item.note}</span>
               </span>
               <SpriteIcon name="icon-coin" size={16} />
-              <span {...stylex.attrs(viewStyles.shopP)}>{item.price}</span>
+              <span {...stylex.attrs(styles.shopText)}>{item.price}</span>
             </div>
           )}
         </For>

@@ -20,7 +20,6 @@ import { aria, useNow } from "#/base/dom.tsx";
 import { tookText, wallClockText } from "#/base/format.ts";
 import { playBedFx } from "#/farm/commands.ts";
 import { farmGroup } from "#/farm/interaction.stylex.ts";
-import { tint } from "#/farm/panels/rows.tsx";
 import { farm, farmActWords, overlayOf, useFarm } from "#/farm/store.ts";
 import { useVillage } from "#/farm/world/load.ts";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "#/farm/world/plots.ts";
@@ -53,7 +52,7 @@ import { castPrefix, outfitLabel, speciesLabel } from "#/ui/cast.ts";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   emptyCriterion: { height: "calc(var(--spacing) * 2.5)", width: "calc(var(--spacing) * 2.5)", borderStyle: "solid", borderWidth: "2px" },
   criterion: {
     display: "flex",
@@ -105,15 +104,12 @@ const recipeStyles2 = stylex.create({
     WebkitUserSelect: "text",
     userSelect: "text",
   },
-});
-
-const recipeStyles = stylex.create({
   plotDetailP: {
     fontSize: "13px",
     lineHeight: "1.5",
     color: "var(--color-bark-800)",
   },
-  issueBodySpan: {
+  issueBodySpan2: {
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
@@ -128,7 +124,7 @@ const recipeStyles = stylex.create({
     whiteSpace: "pre-wrap",
     color: "var(--color-bark-800)",
   },
-  issueBodySpan2: {
+  issueBodySpan22: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -152,10 +148,10 @@ const recipeStyles = stylex.create({
     fontSize: "13px",
     lineHeight: "1.5",
   },
-  issueBodyPVariant1Case1: {
+  issueBodyPPrimary: {
     color: "var(--color-bark-800)",
   },
-  issueBodyPVariant1Case2: {
+  issueBodyPSecondary: {
     color: "var(--color-berry)",
   },
   issueBodyP5: {
@@ -174,33 +170,27 @@ const recipeStyles = stylex.create({
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-});
-
-const variantStyles = stylex.create({
   issueBodyDiv: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
   },
-  issueBodySpan: {
+  issueBodySpan3: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  issueBodySpanVariant: {
+  issueBodySpanTone: {
     color: "var(--color-berry)",
   },
-  issueBodySpanVariant2: {
+  issueBodySpanAlt: {
     color: "var(--color-bark-600)",
   },
-  issueBodySpan2: {},
-});
-
-const viewStyles = stylex.create({
-  issueBodyDiv: {
+  issueBodySpan23: {},
+  issueBodyDiv2: {
     display: "flex",
     flexDirection: {
       default: "column",
@@ -212,7 +202,7 @@ const viewStyles = stylex.create({
       "@media (width>=40rem)": "flex-start",
     },
   },
-  issueBodyDiv2: {
+  issueBodyDiv22: {
     display: "flex",
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 2)",
@@ -229,11 +219,35 @@ const viewStyles = stylex.create({
     marginTop: "var(--spacing)",
     fontSize: "13px",
   },
+  issueStuck: {
+    color: "var(--color-berry-500)",
+  },
+  issueActive: {
+    color: "var(--color-bark-700)",
+  },
   issueBodyDiv3: {
     marginTop: "calc(var(--spacing) * 3)",
     padding: "calc(var(--spacing) * 3)",
   },
-  issueBodyP: {
+  askBerry: {
+    backgroundColor: "color-mix(in srgb, var(--color-berry-500) 30%, var(--color-cream-50))",
+  },
+  askWheat: {
+    backgroundColor: "color-mix(in srgb, var(--color-wheat) 30%, var(--color-cream-50))",
+  },
+  askWater: {
+    backgroundColor: "color-mix(in srgb, var(--color-water-500) 30%, var(--color-cream-50))",
+  },
+  askLeaf: {
+    backgroundColor: "color-mix(in srgb, var(--color-leaf-500) 30%, var(--color-cream-50))",
+  },
+  askFaint: {
+    backgroundColor: "color-mix(in srgb, var(--color-cream-300) 30%, var(--color-cream-50))",
+  },
+  askMuted: {
+    backgroundColor: "color-mix(in srgb, var(--color-bark-400) 30%, var(--color-cream-50))",
+  },
+  issueBodyP6: {
     fontSize: "14px",
   },
   issueBodyDiv4: {
@@ -268,7 +282,7 @@ const viewStyles = stylex.create({
     display: "flex",
     flexDirection: "column",
   },
-  issueBodyP2: {
+  issueBodyP22: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -276,7 +290,7 @@ const viewStyles = stylex.create({
     fontSize: "11px",
     color: "var(--color-bark-800)",
   },
-  issueBodyP3: {
+  issueBodyP32: {
     fontSize: "13px",
     whiteSpace: "pre-wrap",
     color: "var(--color-bark-800)",
@@ -287,11 +301,11 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  issueBodySpan: {
+  issueBodySpan4: {
     fontSize: "12px",
     color: "var(--color-leaf-700)",
   },
-  issueBodyP4: {
+  issueBodyP42: {
     fontFamily: "var(--font-mono)",
     fontSize: "12.5px",
     color: "var(--color-bark-800)",
@@ -338,7 +352,7 @@ const viewStyles = stylex.create({
     height: "calc(var(--spacing) * 36)",
     imageRendering: "pixelated",
   },
-  asideP: {
+  asideP2: {
     marginTop: "calc(var(--spacing) * 2)",
     fontSize: "13px",
   },
@@ -348,7 +362,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * .5)",
   },
-  criteriaSpan: {
+  criteriaSpan2: {
     marginTop: "calc(var(--spacing) * .5)",
     display: "flex",
     height: "calc(var(--spacing) * 4)",
@@ -357,7 +371,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  criteriaSpan2: {
+  criteriaSpan22: {
     minWidth: "0",
     flex: "1",
   },
@@ -387,7 +401,14 @@ const viewStyles = stylex.create({
   },
 });
 
-const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
+const askTones: Record<string, stylex.StyleXStyles> = {
+  berry: styles.askBerry,
+  wheat: styles.askWheat,
+  water: styles.askWater,
+  leaf: styles.askLeaf,
+  faint: styles.askFaint,
+  muted: styles.askMuted,
+};
 
 /** The plot's issue while the store says so (the inspect layer). */
 const labelOf = <K extends string>(labels: Record<K, string>, values: readonly K[], word: string) => (isOneOf(values, word) ? labels[word] : word);
@@ -423,7 +444,7 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
   };
   const hasThread = () => issueThreadOf(core()?.chat, id()) !== undefined;
   return (
-    <Show when={issue()} fallback={<p {...stylex.attrs(recipeStyles.plotDetailP)}>{t("web.farm.plot.unread")}</p>}>
+    <Show when={issue()} fallback={<p {...stylex.attrs(styles.plotDetailP)}>{t("web.farm.plot.unread")}</p>}>
       {(i) => (
         <IssueBody
           issue={i()}
@@ -535,21 +556,20 @@ function IssueBody(props: {
   const boxShown = () => state() === "asking" || state() === "canceled" || box() !== undefined;
 
   return (
-    <div {...stylex.attrs(viewStyles.issueBodyDiv)}>
+    <div {...stylex.attrs(styles.issueBodyDiv2)}>
       <Aside session={s().head} agent={agent()} />
-      <div {...stylex.attrs(variantStyles.issueBodyDiv)}>
-        <div {...stylex.attrs(viewStyles.issueBodyDiv2)}>
-          <span {...stylex.attrs(recipeStyles.issueBodySpan)}>#{props.issue.number}</span>
-          <h3 {...stylex.attrs(viewStyles.issueBodyH3)} title={s().title}>
+      <div {...stylex.attrs(styles.issueBodyDiv)}>
+        <div {...stylex.attrs(styles.issueBodyDiv22)}>
+          <span {...stylex.attrs(styles.issueBodySpan2)}>#{props.issue.number}</span>
+          <h3 {...stylex.attrs(styles.issueBodyH3)} title={s().title}>
             {s().title}
           </h3>
           <Show when={s().repo}>
-            <span {...stylex.attrs(recipeStyles.issueBodySpan)}>{s().repo}</span>
+            <span {...stylex.attrs(styles.issueBodySpan2)}>{s().repo}</span>
           </Show>
         </div>
         <p
-          {...stylex.attrs(viewStyles.issueNow)}
-          style={{ color: s().stage.state === "stuck" ? tones.berry : "#5a3d26" }}
+          {...stylex.attrs(styles.issueNow, s().stage.state === "stuck" ? styles.issueStuck : styles.issueActive)}
           aria-label={t("web.farm.plot.now")}
           data-testid="issue-now"
           data-state={s().stage.state}
@@ -560,22 +580,21 @@ function IssueBody(props: {
         <Show when={s().ask}>
           {(ask) => (
             <div
-              {...stylex.attrs(viewStyles.issueBodyDiv3)}
-              style={{ background: tint(tones[ask().tone] ?? "#c8a46e", 0.3) }}
+              {...styleProps([styles.issueBodyDiv3, askTones[ask().tone] ?? styles.askFaint])}
               aria-label={t("web.farm.plot.yours")}
               role="region"
             >
-              <p {...stylex.attrs(viewStyles.issueBodyP)}>{ask().head}</p>
+              <p {...stylex.attrs(styles.issueBodyP6)}>{ask().head}</p>
               <Show when={ask().line}>
-                <p {...stylex.attrs(recipeStyles.issueBodyP)}>{ask().line}</p>
+                <p {...stylex.attrs(styles.issueBodyP)}>{ask().line}</p>
               </Show>
               <Show when={state() === "asking"}>
                 <For each={props.issue.questions}>
                   {(q) => (
-                    <div {...stylex.attrs(viewStyles.issueBodyDiv4)}>
-                      <p {...stylex.attrs(recipeStyles.plotDetailP)}>{q.question}</p>
+                    <div {...stylex.attrs(styles.issueBodyDiv4)}>
+                      <p {...stylex.attrs(styles.plotDetailP)}>{q.question}</p>
                       <Show when={q.options.length}>
-                        <div {...stylex.attrs(viewStyles.issueBodyDiv5)} role="group" aria-label={t("web.farm.plot.answerTo", { question: q.question })}>
+                        <div {...stylex.attrs(styles.issueBodyDiv5)} role="group" aria-label={t("web.farm.plot.answerTo", { question: q.question })}>
                           <For each={q.options}>
                             {(o) => (
                               <PxButton size="sm" disabled={busy()} onClick={() => void acts.send("answer", o).then((ok) => ok && acts.setText(""))}>
@@ -593,7 +612,7 @@ function IssueBody(props: {
           )}
         </Show>
         <Show when={boxShown()}>
-          <div {...stylex.attrs(viewStyles.issueBodyDiv4)}>
+          <div {...stylex.attrs(styles.issueBodyDiv4)}>
             <PxTextArea
               value={text()}
               onChange={setText}
@@ -624,11 +643,11 @@ function IssueBody(props: {
         </Show>
         <Show when={move()}>
           {(m) => (
-            <div data-testid="issue-move" data-state={m().state} {...stylex.attrs(viewStyles.issueMove)}>
+            <div data-testid="issue-move" data-state={m().state} {...stylex.attrs(styles.issueMove)}>
               <span
                 {...stylex.attrs(
-                  variantStyles.issueBodySpan,
-                  m().state === "failed" ? variantStyles.issueBodySpanVariant : variantStyles.issueBodySpanVariant2,
+                  styles.issueBodySpan3,
+                  m().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt,
                 )}
                 title={m().reason}
               >
@@ -647,12 +666,12 @@ function IssueBody(props: {
         </Show>
         <For each={acts.words()} keyed={(w) => w.key}>
           {(w) => (
-            <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(viewStyles.issueMove)}>
-              <span {...stylex.attrs(recipeStyles.issueBodySpan2)}>{w().text}</span>
+            <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(styles.issueMove)}>
+              <span {...stylex.attrs(styles.issueBodySpan22)}>{w().text}</span>
               <span
                 {...stylex.attrs(
-                  variantStyles.issueBodySpan2,
-                  w().state === "failed" ? variantStyles.issueBodySpanVariant : variantStyles.issueBodySpanVariant2,
+                  styles.issueBodySpan23,
+                  w().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt,
                 )}
                 title={w().reason}
               >
@@ -669,7 +688,7 @@ function IssueBody(props: {
             </div>
           )}
         </For>
-        <div {...stylex.attrs(viewStyles.issueBodyDiv6)}>
+        <div {...stylex.attrs(styles.issueBodyDiv6)}>
           <Show when={s().ask && s().lead} keyed>
             {(lead) => button(lead, () => true)}
           </Show>
@@ -682,31 +701,31 @@ function IssueBody(props: {
 
         <FarmSection title={s().criteria.length > 0 ? t("web.farm.plot.progressMet", { met: s().met, of: s().criteria.length }) : t("web.farm.plot.progress")}>
           <Show when={s().doing}>
-            <p {...stylex.attrs(recipeStyles.issueBodyP2)}>{s().doing}</p>
+            <p {...stylex.attrs(styles.issueBodyP2)}>{s().doing}</p>
           </Show>
           <Show when={s().inFamily}>
-            <p {...stylex.attrs(recipeStyles.issueBodySpan)}>{s().parentText}</p>
+            <p {...stylex.attrs(styles.issueBodySpan2)}>{s().parentText}</p>
           </Show>
           <Show
             when={s().criteria.length > 0}
-            fallback={<p {...stylex.attrs(recipeStyles.issueBodySpan)}>{t("web.farm.plot.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
+            fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
           >
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
           <Show when={s().openFindings.length > 0}>
-            <div {...stylex.attrs(viewStyles.issueBodyDiv7)}>
-              <For each={s().openFindings}>{(f) => <p {...stylex.attrs(recipeStyles.issueBodyP3)}>{t("web.farm.plot.rejected", { text: f.text })}</p>}</For>
+            <div {...stylex.attrs(styles.issueBodyDiv7)}>
+              <For each={s().openFindings}>{(f) => <p {...stylex.attrs(styles.issueBodyP3)}>{t("web.farm.plot.rejected", { text: f.text })}</p>}</For>
             </div>
           </Show>
         </FarmSection>
 
-        <div {...stylex.attrs(viewStyles.issueBodyDiv8)}>
+        <div {...stylex.attrs(styles.issueBodyDiv8)}>
           <Show when={props.issue.deliver === "answer" ? props.issue.answer : undefined}>
             {(a) => (
               <FarmSection title={t("web.farm.plot.conclusion")}>
-                <p {...stylex.attrs(recipeStyles.plotDetailP)}>{a().conclusion}</p>
-                <For each={a().evidence}>{(l) => <p {...stylex.attrs(recipeStyles.issueBodySpan)}>{t("web.farm.plot.evidence", { line: l })}</p>}</For>
-                <For each={a().next}>{(l) => <p {...stylex.attrs(recipeStyles.issueBodySpan)}>{t("web.farm.plot.next", { line: l })}</p>}</For>
+                <p {...stylex.attrs(styles.plotDetailP)}>{a().conclusion}</p>
+                <For each={a().evidence}>{(l) => <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.evidence", { line: l })}</p>}</For>
+                <For each={a().next}>{(l) => <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.next", { line: l })}</p>}</For>
               </FarmSection>
             )}
           </Show>
@@ -715,25 +734,25 @@ function IssueBody(props: {
               <Show
                 when={changed()}
                 fallback={
-                  <p {...stylex.attrs(recipeStyles.plotDetailP)}>{changes.status() === "pending" ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>
+                  <p {...stylex.attrs(styles.plotDetailP)}>{changes.status() === "pending" ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>
                 }
               >
                 {(c) => (
-                  <div {...stylex.attrs(viewStyles.issueBodyDiv9)}>
-                    <p {...stylex.attrs(recipeStyles.plotDetailP)}>{changesLine(c())}</p>
+                  <div {...stylex.attrs(styles.issueBodyDiv9)}>
+                    <p {...stylex.attrs(styles.plotDetailP)}>{changesLine(c())}</p>
                     <Show when={c().conflicts.length > 0}>
-                      <p {...stylex.attrs(recipeStyles.issueBodyP3)}>{t("web.farm.plot.conflict", { base: c().base, files: list(c().conflicts) })}</p>
+                      <p {...stylex.attrs(styles.issueBodyP3)}>{t("web.farm.plot.conflict", { base: c().base, files: list(c().conflicts) })}</p>
                     </Show>
-                    <div {...stylex.attrs(viewStyles.issueBodyDiv7)}>
+                    <div {...stylex.attrs(styles.issueBodyDiv7)}>
                       <For each={c().files.slice(0, 12)}>
                         {(f) => (
-                          <p {...stylex.attrs(viewStyles.issueBodyP2)}>
+                          <p {...stylex.attrs(styles.issueBodyP22)}>
                             {f.path} +{Math.round(f.added)} -{Math.round(f.removed)}
                           </p>
                         )}
                       </For>
                       <Show when={c().files.length > 12}>
-                        <p {...stylex.attrs(recipeStyles.issueBodySpan)}>{t("web.farm.plot.moreFiles", { n: c().files.length - 12 })}</p>
+                        <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.moreFiles", { n: c().files.length - 12 })}</p>
                       </Show>
                     </div>
                   </div>
@@ -745,7 +764,7 @@ function IssueBody(props: {
             <Show
               when={timeline()}
               fallback={
-                <p {...stylex.attrs(recipeStyles.issueBodySpan)}>{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>
+                <p {...stylex.attrs(styles.issueBodySpan2)}>{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>
               }
             >
               {(line) => (
@@ -754,8 +773,8 @@ function IssueBody(props: {
                     <Row label={wallClockText(m.at)}>
                       <p
                         {...stylex.attrs(
-                          recipeStyles.issueBodyP4,
-                          m.kind === "failed" || m.kind === "rejected" ? recipeStyles.issueBodyPVariant1Case2 : recipeStyles.issueBodyPVariant1Case1,
+                          styles.issueBodyP4,
+                          m.kind === "failed" || m.kind === "rejected" ? styles.issueBodyPSecondary : styles.issueBodyPPrimary,
                         )}
                       >
                         {m.who ? `${m.who} · ` : ""}
@@ -768,7 +787,7 @@ function IssueBody(props: {
             </Show>
           </Fold>
           <Fold label={t("web.farm.plot.steps")}>
-            <Show when={steps().length > 0} fallback={<p {...stylex.attrs(recipeStyles.issueBodySpan)}>{noStepsText(s().head)}</p>}>
+            <Show when={steps().length > 0} fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{noStepsText(s().head)}</p>}>
               <WorkLog steps={steps()} now={now()} working={state() === "working"} />
             </Show>
           </Fold>
@@ -776,23 +795,23 @@ function IssueBody(props: {
             <Runs issue={props.issue.id} version={`${sessionIdsOf(props.issue).length}:${s().head.runs}:${s().head.phase._tag}`} />
           </Fold>
           <Fold label={t("web.farm.plot.details")}>
-            <div {...stylex.attrs(viewStyles.issueBodyDiv9)}>
+            <div {...stylex.attrs(styles.issueBodyDiv9)}>
               <Show when={s().description}>
                 <Row label={t("web.farm.plot.job")}>
-                  <p {...stylex.attrs(viewStyles.issueBodyP3)}>{s().description}</p>
+                  <p {...stylex.attrs(styles.issueBodyP32)}>{s().description}</p>
                 </Row>
               </Show>
               <Row label={t("web.farm.plot.who")}>
-                <p {...stylex.attrs(recipeStyles.plotDetailP)}>{s().whoLine}</p>
+                <p {...stylex.attrs(styles.plotDetailP)}>{s().whoLine}</p>
               </Row>
               <Show when={s().crewLine}>
                 <Row label={t("web.farm.plot.crew")}>
-                  <p {...stylex.attrs(recipeStyles.plotDetailP)}>{s().crewLine}</p>
+                  <p {...stylex.attrs(styles.plotDetailP)}>{s().crewLine}</p>
                 </Row>
               </Show>
               <Show when={!s().inFamily}>
                 <Row label={t("web.farm.plot.deliver")}>
-                  <div {...stylex.attrs(viewStyles.plotDeliver)} data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
+                  <div {...stylex.attrs(styles.plotDeliver)} data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
                     <For each={DeliverableValues}>
                       {(d) => (
                         <PxButton
@@ -806,31 +825,31 @@ function IssueBody(props: {
                       )}
                     </For>
                     <Show when={props.issue.reviewedAt}>
-                      {(at) => <span {...stylex.attrs(viewStyles.issueBodySpan)}>{t("web.farm.plot.reviewed", { clock: wallClockText(at()) })}</span>}
+                      {(at) => <span {...stylex.attrs(styles.issueBodySpan4)}>{t("web.farm.plot.reviewed", { clock: wallClockText(at()) })}</span>}
                     </Show>
                   </div>
                 </Row>
               </Show>
               <Show when={s().resolvedFindings.length > 0}>
                 <Row label={t("web.farm.plot.weeded")}>
-                  <For each={s().resolvedFindings}>{(f) => <p {...stylex.attrs(recipeStyles.issueBodyP5)}>{t("web.farm.plot.weed", { text: f.text })}</p>}</For>
+                  <For each={s().resolvedFindings}>{(f) => <p {...stylex.attrs(styles.issueBodyP5)}>{t("web.farm.plot.weed", { text: f.text })}</p>}</For>
                 </Row>
               </Show>
               <Show when={agent()?.model}>
                 <Row label={t("web.farm.plot.model")}>
-                  <p {...stylex.attrs(recipeStyles.plotDetailP)}>{agent()!.model}</p>
+                  <p {...stylex.attrs(styles.plotDetailP)}>{agent()!.model}</p>
                 </Row>
               </Show>
               <Show when={s().head.branch}>
                 <Row label={t("web.farm.plot.branch")}>
-                  <p {...stylex.attrs(viewStyles.issueBodyP4)}>{s().head.branch}</p>
+                  <p {...stylex.attrs(styles.issueBodyP42)}>{s().head.branch}</p>
                 </Row>
               </Show>
               <Show when={s().head.worktree}>
                 {(tree) => (
                   <Row label="worktree">
-                    <div {...stylex.attrs(viewStyles.issueBodyDiv10)}>
-                      <span {...stylex.attrs(recipeStyles2.issueBodySpan)}>{tree()}</span>
+                    <div {...stylex.attrs(styles.issueBodyDiv10)}>
+                      <span {...stylex.attrs(styles.issueBodySpan)}>{tree()}</span>
                       <PxButton size="sm" onClick={() => void navigator.clipboard.writeText(tree())}>
                         {t("web.farm.plot.copyPath")}
                       </PxButton>
@@ -839,22 +858,22 @@ function IssueBody(props: {
                 )}
               </Show>
               <Row label={t("web.farm.plot.opened")}>
-                <p {...stylex.attrs(recipeStyles.plotDetailP)}>{wallClockText(props.issue.createdAt)}</p>
+                <p {...stylex.attrs(styles.plotDetailP)}>{wallClockText(props.issue.createdAt)}</p>
               </Row>
               <Show when={props.issue.closedAt}>
                 {(at) => (
                   <Row label={t("web.farm.plot.closed")}>
-                    <p {...stylex.attrs(recipeStyles.plotDetailP)}>{wallClockText(at())}</p>
+                    <p {...stylex.attrs(styles.plotDetailP)}>{wallClockText(at())}</p>
                   </Row>
                 )}
               </Show>
               <Row label={t("web.farm.plot.history")}>
-                <p {...stylex.attrs(recipeStyles.plotDetailP)}>{s().historyLine}</p>
+                <p {...stylex.attrs(styles.plotDetailP)}>{s().historyLine}</p>
               </Row>
               <Row label={t("web.farm.plot.took")}>
-                <p {...stylex.attrs(recipeStyles.plotDetailP)}>{s().usedLine(steps(), now())}</p>
+                <p {...stylex.attrs(styles.plotDetailP)}>{s().usedLine(steps(), now())}</p>
               </Row>
-              <div {...stylex.attrs(viewStyles.issueBodyDiv11)}>
+              <div {...stylex.attrs(styles.issueBodyDiv11)}>
                 <Show when={props.onThread}>
                   <PxButton size="sm" onClick={() => props.onThread?.()}>
                     {t("web.farm.plot.thread")}
@@ -895,16 +914,16 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
     return p && a ? a.get(`${p}-down`) : undefined;
   };
   return (
-    <div {...stylex.attrs(viewStyles.asideDiv)}>
-      <div {...stylex.attrs(viewStyles.asideDiv2)}>
-        <Show when={crop()}>{(c) => <img src={c().url} alt="" {...stylex.attrs(viewStyles.asideImg)} />}</Show>
-        <Show when={figure()}>{(f) => <img src={f().url} alt="" {...stylex.attrs(viewStyles.asideImg2)} />}</Show>
+    <div {...stylex.attrs(styles.asideDiv)}>
+      <div {...stylex.attrs(styles.asideDiv2)}>
+        <Show when={crop()}>{(c) => <img src={c().url} alt="" {...stylex.attrs(styles.asideImg)} />}</Show>
+        <Show when={figure()}>{(f) => <img src={f().url} alt="" {...stylex.attrs(styles.asideImg2)} />}</Show>
       </div>
-      <p {...stylex.attrs(viewStyles.asideP)}>{cropLabel[plot().crop]}</p>
-      <p {...stylex.attrs(recipeStyles.asideP)}>
+      <p {...stylex.attrs(styles.asideP2)}>{cropLabel[plot().crop]}</p>
+      <p {...stylex.attrs(styles.asideP)}>
         {labelOf(speciesLabel, SpeciesValues, kind()[0] ?? "")} · {labelOf(outfitLabel, OutfitValues, kind()[1] ?? "")}
       </p>
-      <p {...stylex.attrs(recipeStyles.issueBodySpan)}>
+      <p {...stylex.attrs(styles.issueBodySpan2)}>
         {t("web.farm.plot.where", { plot: stationOfSession(props.session, frames.frame?.view.plays) + 1, round: Math.round(props.session.runs) })}
       </p>
     </div>
@@ -923,18 +942,18 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const [ticked, setTicked] = createSignal<ReadonlySet<number>>(new Set());
   const mark = (r: CriterionRow) => (r.result ? <SpriteIcon name={resultMark[r.result].icon} size={14} label={resultMark[r.result].label} /> : undefined);
   return (
-    <div {...stylex.attrs(viewStyles.issueBodyDiv9)}>
+    <div {...stylex.attrs(styles.issueBodyDiv9)}>
       <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
           <Show
             when={props.checking}
             fallback={
-              <div {...stylex.attrs(viewStyles.criteriaDiv)}>
-                <span {...stylex.attrs(viewStyles.criteriaSpan)}>{mark(r()) ?? <span {...styleProps(recipeStyles2.emptyCriterion)} />}</span>
-                <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
-                  <span {...stylex.attrs(recipeStyles.plotDetailP)}>{r().text}</span>
+              <div {...stylex.attrs(styles.criteriaDiv)}>
+                <span {...stylex.attrs(styles.criteriaSpan2)}>{mark(r()) ?? <span {...styleProps(styles.emptyCriterion)} />}</span>
+                <span {...stylex.attrs(styles.criteriaSpan22)}>
+                  <span {...stylex.attrs(styles.plotDetailP)}>{r().text}</span>
                   <Show when={r().proof}>
-                    <span {...stylex.attrs(recipeStyles.criteriaSpan)}>{r().proof}</span>
+                    <span {...stylex.attrs(styles.criteriaSpan)}>{r().proof}</span>
                   </Show>
                 </span>
               </div>
@@ -947,18 +966,18 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
               aria-pressed={aria(ticked().has(i()))}
               aria-label={r().text}
               onClick={() => setTicked((was) => (was.has(i()) ? new Set([...was].filter((x) => x !== i())) : new Set([...was, i()])))}
-              {...styleProps([farmGroup, recipeStyles2.criterion])}
+              {...styleProps([farmGroup, styles.criterion])}
             >
-              <span {...styleProps(recipeStyles2.criterionBox)}>
+              <span {...styleProps(styles.criterionBox)}>
                 <Show when={ticked().has(i())}>
                   <SpriteIcon name="mark-check" size={12} label={t("web.farm.plot.ticked")} />
                 </Show>
               </span>
-              <span {...stylex.attrs(viewStyles.criteriaSpan)}>{mark(r())}</span>
-              <span {...stylex.attrs(viewStyles.criteriaSpan2)}>
-                <span {...stylex.attrs(recipeStyles.plotDetailP)}>{r().text}</span>
+              <span {...stylex.attrs(styles.criteriaSpan2)}>{mark(r())}</span>
+              <span {...stylex.attrs(styles.criteriaSpan22)}>
+                <span {...stylex.attrs(styles.plotDetailP)}>{r().text}</span>
                 <Show when={r().proof}>
-                  <span {...stylex.attrs(recipeStyles.criteriaSpan)}>{r().proof}</span>
+                  <span {...stylex.attrs(styles.criteriaSpan)}>{r().proof}</span>
                 </Show>
               </span>
             </button>
@@ -972,15 +991,15 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
 function Fold(props: { label: string; children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   return (
-    <div {...stylex.attrs(viewStyles.foldDiv)}>
-      <button type="button" data-testid="fold" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...styleProps([farmGroup, recipeStyles2.fold])}>
-        <SpriteIcon name="button-next" size={12} styles={open() && recipeStyles2.foldOpen} />
-        <span {...styleProps(recipeStyles2.foldLabel)}>{props.label}</span>
+    <div {...stylex.attrs(styles.foldDiv)}>
+      <button type="button" data-testid="fold" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...styleProps([farmGroup, styles.fold])}>
+        <SpriteIcon name="button-next" size={12} styles={open() && styles.foldOpen} />
+        <span {...styleProps(styles.foldLabel)}>{props.label}</span>
       </button>
       {/* Mounted with the dialog and only hidden while folded. */}
-      <div {...stylex.attrs(viewStyles.foldDiv2)} hidden={!open()}>
-        <Errored fallback={<p {...stylex.attrs(viewStyles.foldP)}>{t("web.farm.unread")}</p>}>
-          <Loading fallback={<p {...stylex.attrs(viewStyles.foldP)}>{t("web.farm.reading")}</p>}>{props.children}</Loading>
+      <div {...stylex.attrs(styles.foldDiv2)} hidden={!open()}>
+        <Errored fallback={<p {...stylex.attrs(styles.foldP)}>{t("web.farm.unread")}</p>}>
+          <Loading fallback={<p {...stylex.attrs(styles.foldP)}>{t("web.farm.reading")}</p>}>{props.children}</Loading>
         </Errored>
       </div>
     </div>
@@ -989,9 +1008,9 @@ function Fold(props: { label: string; children: JSX.Element }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.rowDiv)}>
-      <span {...stylex.attrs(viewStyles.rowSpan)}>{props.label}</span>
-      <div {...stylex.attrs(viewStyles.criteriaSpan2)}>{props.children}</div>
+    <div {...stylex.attrs(styles.rowDiv)}>
+      <span {...stylex.attrs(styles.rowSpan)}>{props.label}</span>
+      <div {...stylex.attrs(styles.criteriaSpan22)}>{props.children}</div>
     </div>
   );
 }
@@ -1005,13 +1024,13 @@ function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(runsQuery, []);
   const now = useNow();
   return (
-    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(recipeStyles.issueBodySpan)}>{t("web.farm.plot.noRuns")}</p>}>
+    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.noRuns")}</p>}>
       <FarmSection title={t("web.farm.plot.runs")}>
-        <p {...stylex.attrs(recipeStyles.issueBodySpan)}>{t("web.farm.plot.runCount", { n: runs().length })}</p>
+        <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.runCount", { n: runs().length })}</p>
         <For each={[...runs()].toReversed()} keyed={(r) => r.id}>
           {(r) => (
             <Row label={wallClockText(r().startedAt)}>
-              <p {...stylex.attrs(recipeStyles.plotDetailP)}>{runText(r(), now(), tookText)}</p>
+              <p {...stylex.attrs(styles.plotDetailP)}>{runText(r(), now(), tookText)}</p>
             </Row>
           )}
         </For>

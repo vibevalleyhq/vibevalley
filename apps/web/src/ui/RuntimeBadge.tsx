@@ -5,20 +5,24 @@ import type { RuntimeInfo } from "@vibevalley/protocol";
 
 import { ready, useRuntimes, useSprites } from "#/infra/query.ts";
 
-const viewStyles = stylex.create({
-  badge: {
+import { styleProps } from "./positioner";
+
+const styles = stylex.create({
+  badge: (size: number) => ({
     position: "absolute",
     right: "calc(var(--spacing) * -0.5)",
     bottom: "calc(var(--spacing) * -0.5)",
     zIndex: "10",
     display: "inline-flex",
+    width: size,
+    height: size,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-xs)",
     backgroundColor: "var(--color-cream-50)",
     boxShadow: "0 0 0 1px currentcolor",
-  },
-  runtimeBadgeImg: {
+  }),
+  img: {
     height: "100%",
     width: "100%",
     objectFit: "contain",
@@ -40,15 +44,8 @@ export function RuntimeBadge(props: { runtime: string; size: number }) {
     return name in ready(sprites, {}) ? name : "icon-wrench";
   };
   return (
-    <span
-      {...stylex.attrs(viewStyles.badge)}
-      style={{ width: `${props.size}px`, height: `${props.size}px` }}
-      role="img"
-      aria-label={label()}
-      title={label()}
-      data-runtime={props.runtime}
-    >
-      <img src={`/pixel/${icon()}.png`} alt="" draggable="false" {...stylex.attrs(viewStyles.runtimeBadgeImg)} />
+    <span {...styleProps(styles.badge(props.size))} role="img" aria-label={label()} title={label()} data-runtime={props.runtime}>
+      <img src={`/pixel/${icon()}.png`} alt="" draggable="false" {...stylex.attrs(styles.img)} />
     </span>
   );
 }

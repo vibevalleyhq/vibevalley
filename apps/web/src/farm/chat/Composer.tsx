@@ -17,7 +17,7 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { createPixelAct, SpriteIcon, toasts } from "#/ui/pixel/index.ts";
 import { typeMarks } from "#/ui/typedMarks.ts";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   farmComposerDiv: {
     position: "absolute",
     right: "calc(var(--spacing) * 2)",
@@ -42,18 +42,15 @@ const recipeStyles = stylex.create({
     textAlign: "left",
     fontSize: "12px",
   },
-  farmComposerButtonVariant1Case1: {
+  farmComposerButtonPrimary: {
     backgroundColor: null,
   },
-  farmComposerButtonVariant1Case2: {
+  farmComposerButtonSecondary: {
     backgroundColor: {
       default: "var(--color-px-leaf-hover)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 40%, transparent)",
     },
   },
-});
-
-const viewStyles = stylex.create({
   pickChipSpan: {
     marginRight: "var(--spacing)",
     display: "flex",
@@ -120,7 +117,7 @@ const viewStyles = stylex.create({
     cursor: "pointer",
     padding: "calc(var(--spacing) * .5)",
   },
-  farmComposerDiv: {
+  farmComposerDiv2: {
     position: "relative",
     display: "flex",
     alignItems: "flex-end",
@@ -135,7 +132,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     color: "var(--color-bark-500)",
   },
-  farmComposerDiv2: {
+  farmComposerDiv22: {
     display: "flex",
     minHeight: "calc(var(--spacing) * 11)",
     minWidth: "0",
@@ -183,17 +180,17 @@ function PickChip(props: { named: boolean }) {
   return (
     <Show when={pick() !== "auto" && agent()?.enabled === true ? agent() : undefined}>
       {(a) => (
-        <span {...stylex.attrs(viewStyles.pickChipSpan)} title={t("web.farm.chat.sendTo", { name: a().name })}>
+        <span {...stylex.attrs(styles.pickChipSpan)} title={t("web.farm.chat.sendTo", { name: a().name })}>
           <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={26} />
           <Show when={props.named}>
-            <span {...stylex.attrs(viewStyles.pickChipSpan2)}>{t("web.farm.chat.sendTo", { name: a().name })}</span>
+            <span {...stylex.attrs(styles.pickChipSpan2)}>{t("web.farm.chat.sendTo", { name: a().name })}</span>
           </Show>
           <button
             type="button"
             data-testid="unpick"
             aria-label={t("web.farm.chat.anyone")}
             onClick={() => setPick("auto")}
-            {...stylex.attrs(viewStyles.unpick)}
+            {...stylex.attrs(styles.unpick)}
           >
             <SpriteIcon name="button-close" size={12} />
           </button>
@@ -245,11 +242,11 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
   };
 
   return (
-    <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(viewStyles.composer)}>
+    <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(styles.composer)}>
       <Show when={replying()}>
         {(m) => (
-          <div data-testid="replying" data-key={m().number} {...stylex.attrs(viewStyles.replying)}>
-            <span {...stylex.attrs(viewStyles.farmComposerSpan)}>
+          <div data-testid="replying" data-key={m().number} {...stylex.attrs(styles.replying)}>
+            <span {...stylex.attrs(styles.farmComposerSpan)}>
               {m().text ? t("web.farm.chat.replyToText", { name: m().name, text: m().text }) : t("web.farm.chat.replyTo", { name: m().name })}
             </span>
             <button
@@ -257,16 +254,16 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
               data-testid="cancel-reply"
               aria-label={t("web.farm.chat.actions.cancelReply")}
               onClick={() => drafts.reply(m().channel, undefined)}
-              {...stylex.attrs(viewStyles.cancelReply)}
+              {...stylex.attrs(styles.cancelReply)}
             >
               <SpriteIcon name="button-close" size={12} />
             </button>
           </div>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.farmComposerDiv)}>
+      <div {...stylex.attrs(styles.farmComposerDiv2)}>
         <Show when={box.offered().length > 0}>
-          <div {...stylex.attrs(recipeStyles.farmComposerDiv)} role="listbox" aria-label={t("web.farm.chat.who")}>
+          <div {...stylex.attrs(styles.farmComposerDiv)} role="listbox" aria-label={t("web.farm.chat.who")}>
             <For each={box.offered()} keyed={(n) => n.token}>
               {(n, i) => (
                 <button
@@ -276,18 +273,18 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => box.choose(n())}
                   {...stylex.attrs(
-                    recipeStyles.farmComposerButton,
-                    i() === box.active() ? recipeStyles.farmComposerButtonVariant1Case2 : recipeStyles.farmComposerButtonVariant1Case1,
+                    styles.farmComposerButton,
+                    i() === box.active() ? styles.farmComposerButtonSecondary : styles.farmComposerButtonPrimary,
                   )}
                 >
-                  <span {...stylex.attrs(viewStyles.farmComposerSpan2)}>{n().name}</span>
-                  <span {...stylex.attrs(viewStyles.farmComposerSpan3)}>{n().note}</span>
+                  <span {...stylex.attrs(styles.farmComposerSpan2)}>{n().name}</span>
+                  <span {...stylex.attrs(styles.farmComposerSpan3)}>{n().note}</span>
                 </button>
               )}
             </For>
           </div>
         </Show>
-        <div {...stylex.attrs(viewStyles.farmComposerDiv2)}>
+        <div {...stylex.attrs(styles.farmComposerDiv22)}>
           <Show when={!props.thread}>
             <PickChip named />
           </Show>
@@ -305,7 +302,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
             onKeyUp={box.follow}
             onClick={box.follow}
             onKeyDown={box.onKey}
-            {...stylex.attrs(viewStyles.composerInput)}
+            {...stylex.attrs(styles.composerInput)}
           />
           <Show when={box.stoppable()}>
             <button
@@ -314,7 +311,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
               aria-label={t("web.farm.chat.stop")}
               title={t("web.farm.chat.stopHint")}
               onClick={() => void stop()}
-              {...stylex.attrs(viewStyles.stop)}
+              {...stylex.attrs(styles.stop)}
             >
               <SpriteIcon name="button-stop" size={24} />
             </button>
@@ -326,7 +323,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
             aria-label={t("web.farm.chat.send")}
             disabled={!box.canSend()}
             onClick={() => void box.send()}
-            {...stylex.attrs(viewStyles.send)}
+            {...stylex.attrs(styles.send)}
           >
             <SpriteIcon name="button-send" size={20} />
           </button>

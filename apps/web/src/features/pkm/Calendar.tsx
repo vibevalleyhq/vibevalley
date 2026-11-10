@@ -18,7 +18,7 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   monthButton: {
     position: "relative",
     marginInline: "auto",
@@ -33,13 +33,13 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  monthButtonVariant1Case1: {
+  monthButtonPrimary: {
     color: "var(--color-faint)",
   },
-  monthButtonVariant1Case2: {
+  monthButtonSecondary: {
     color: "var(--color-ink)",
   },
-  monthButtonVariant2Case1: {
+  monthButtonStateA: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -49,19 +49,16 @@ const recipeStyles = stylex.create({
     },
     fontWeight: null,
   },
-  monthButtonVariant2Case2: {
+  monthButtonStateB: {
     backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  monthButtonVariant3Case1: {
+  monthButtonModeA: {
     boxShadow: null,
   },
-  monthButtonVariant3Case2: {
+  monthButtonModeB: {
     boxShadow: "0 0 0 1px var(--color-accent)",
   },
-});
-
-const viewStyles = stylex.create({
   pkmCalendar: {
     display: "flex",
     flexDirection: "column",
@@ -131,13 +128,13 @@ const unfolded = defineStored("pkm.calendar", Schema.Boolean, true);
 /** open: the day of the journal open, if one is. */
 export function Calendar(props: { pages: readonly PkmPageSummary[]; open: string | undefined }) {
   return (
-    <section data-testid="pkm-calendar" aria-label={t("web.pkm.calendar.label")} {...stylex.attrs(viewStyles.pkmCalendar)}>
+    <section data-testid="pkm-calendar" aria-label={t("web.pkm.calendar.label")} {...stylex.attrs(styles.pkmCalendar)}>
       <button
         type="button"
         data-testid="pkm-calendar-fold"
         aria-expanded={unfolded.get() ? "true" : "false"}
         onClick={() => unfolded.update((open) => !open)}
-        {...stylex.attrs(viewStyles.pkmCalendarFold)}
+        {...stylex.attrs(styles.pkmCalendarFold)}
       >
         <Icon name={unfolded.get() ? "choose" : "expand"} size={12} />
         {t("web.pkm.calendar.label")}
@@ -172,20 +169,20 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
     });
   };
   return (
-    <div {...stylex.attrs(viewStyles.pkmCalendar)}>
-      <div {...stylex.attrs(viewStyles.monthDiv)}>
-        <span data-testid="pkm-calendar-month" data-year={month().year} data-month={month().month + 1} {...stylex.attrs(viewStyles.monthSpan)}>
+    <div {...stylex.attrs(styles.pkmCalendar)}>
+      <div {...stylex.attrs(styles.monthDiv)}>
+        <span data-testid="pkm-calendar-month" data-year={month().year} data-month={month().month + 1} {...stylex.attrs(styles.monthSpan)}>
           {monthTitle(month().year, month().month)}
         </span>
         <IconButton icon="previous" size={12} label={t("web.pkm.calendar.previous")} testid="pkm-calendar-previous" onClick={() => shift(-1)} />
         <IconButton icon="next" size={12} label={t("web.pkm.calendar.next")} testid="pkm-calendar-next" onClick={() => shift(1)} />
       </div>
-      <div {...stylex.attrs(viewStyles.monthDiv2)}>
+      <div {...stylex.attrs(styles.monthDiv2)}>
         <For each={weekdayNames()}>{(name) => <span>{name}</span>}</For>
       </div>
       <For each={monthWeeks(month().year, month().month)}>
         {(week) => (
-          <div {...stylex.attrs(viewStyles.monthDiv3)}>
+          <div {...stylex.attrs(styles.monthDiv3)}>
             <For each={week}>
               {(d) => (
                 <button
@@ -198,16 +195,16 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
                   disabled={act.busy()}
                   onClick={() => go(d.day)}
                   {...stylex.attrs(
-                    recipeStyles.monthButton,
-                    d.inMonth ? recipeStyles.monthButtonVariant1Case2 : recipeStyles.monthButtonVariant1Case1,
-                    d.day === props.open ? recipeStyles.monthButtonVariant2Case2 : recipeStyles.monthButtonVariant2Case1,
-                    d.day === today() ? recipeStyles.monthButtonVariant3Case2 : recipeStyles.monthButtonVariant3Case1,
+                    styles.monthButton,
+                    d.inMonth ? styles.monthButtonSecondary : styles.monthButtonPrimary,
+                    d.day === props.open ? styles.monthButtonStateB : styles.monthButtonStateA,
+                    d.day === today() ? styles.monthButtonModeB : styles.monthButtonModeA,
                   )}
                 >
                   {Number(d.day.slice(8))}
-                  <span {...stylex.attrs(viewStyles.monthSpan2)}>{dayTitle(d.day, today())}</span>
+                  <span {...stylex.attrs(styles.monthSpan2)}>{dayTitle(d.day, today())}</span>
                   <Show when={journals().has(d.day)}>
-                    <span aria-hidden="true" {...stylex.attrs(viewStyles.monthSpan3)} />
+                    <span aria-hidden="true" {...stylex.attrs(styles.monthSpan3)} />
                   </Show>
                 </button>
               )}

@@ -13,7 +13,7 @@ import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";
 import { toneVar } from "./Marks";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   issueSheetAside: {
     display: "flex",
     flexDirection: "column",
@@ -74,9 +74,6 @@ const recipeStyles2 = stylex.create({
     color: "var(--wb-ink)",
     fontWeight: "var(--font-weight-semibold)",
   },
-});
-
-const recipeStyles = stylex.create({
   issueSheetDiv: {
     marginTop: "calc(var(--spacing) * 4)",
     display: "flex",
@@ -93,38 +90,32 @@ const recipeStyles = stylex.create({
       "@container (width>=760px)": "flex-start",
     },
   },
-});
-
-const variantStyles2 = stylex.create({
   foldIcon: {
     transitionProperty: "transform,translate,scale,rotate",
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: "var(--default-transition-duration)",
   },
-  foldIconVariant: {
+  foldIconTone: {
     rotate: "90deg",
   },
-  foldIconVariant2: {},
-});
-
-const variantStyles = stylex.create({
+  foldIconAlt: {},
   stagesDiv: {
     display: "flex",
     alignItems: "center",
   },
-  stagesDivVariant: {
+  stagesDivTone: {
     flex: "1",
   },
-  stagesDivVariant2: {},
+  stagesDivAlt: {},
   stagesDiv2: {
     marginInline: "calc(var(--spacing) * 2)",
     height: "1px",
     flex: "1",
   },
-  stagesDivVariant3: {
+  stagesDivAccent: {
     backgroundColor: "var(--color-leaf)",
   },
-  stagesDivVariant4: {
+  stagesDivMuted: {
     backgroundColor: "var(--color-line)",
   },
   stagesSpan: {
@@ -132,12 +123,9 @@ const variantStyles = stylex.create({
     height: "calc(var(--spacing) * 2)",
     borderRadius: "2147483647px",
   },
-  stagesSpanVariant: {
+  stagesSpanTone: {
     backgroundColor: "var(--color-wheat)",
   },
-});
-
-const viewStyles = stylex.create({
   note: {
     borderRadius: "var(--radius-lg)",
     paddingInline: "calc(var(--spacing) * 3.5)",
@@ -145,10 +133,10 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  issueSheetDiv: {
+  issueSheetDiv2: {
     containerType: "inline-size",
   },
-  issueSheetDiv2: {
+  issueSheetDiv22: {
     display: "flex",
     minWidth: "0",
     flex: "1",
@@ -246,13 +234,13 @@ const viewStyles = stylex.create({
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
-  stagesDiv: {
+  stagesDiv3: {
     display: "flex",
     alignItems: "center",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  stagesSpan: {
+  stagesSpan2: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 1.5)",
@@ -263,11 +251,11 @@ const viewStyles = stylex.create({
 /** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right. */
 export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; side: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.issueSheetDiv)}>
+    <div {...stylex.attrs(styles.issueSheetDiv2)}>
       {props.heading}
-      <div {...stylex.attrs(recipeStyles.issueSheetDiv)}>
-        <div {...stylex.attrs(viewStyles.issueSheetDiv2)}>{props.main}</div>
-        <aside {...stylex.attrs(recipeStyles2.issueSheetAside)}>{props.side}</aside>
+      <div {...stylex.attrs(styles.issueSheetDiv)}>
+        <div {...stylex.attrs(styles.issueSheetDiv22)}>{props.main}</div>
+        <aside {...stylex.attrs(styles.issueSheetAside)}>{props.side}</aside>
       </div>
     </div>
   );
@@ -276,9 +264,9 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
 /** A label and its value, the label in a narrow muted column. */
 export function Property(props: { label: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.propertyDiv)}>
-      <span {...stylex.attrs(viewStyles.propertySpan)}>{props.label}</span>
-      <div {...stylex.attrs(viewStyles.propertyDiv2)}>{props.children}</div>
+    <div {...stylex.attrs(styles.propertyDiv)}>
+      <span {...stylex.attrs(styles.propertySpan)}>{props.label}</span>
+      <div {...stylex.attrs(styles.propertyDiv2)}>{props.children}</div>
     </div>
   );
 }
@@ -287,17 +275,17 @@ export function Property(props: { label: string; children: JSX.Element }) {
 export function Fold(props: { label: string; summary?: string | undefined; open?: boolean; leading?: JSX.Element; children: JSX.Element }) {
   const [open, setOpen] = createSignal(untrack(() => props.open ?? false));
   return (
-    <div {...stylex.attrs(viewStyles.foldDiv)}>
-      <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.foldButton)}>
-        <Icon name="expand" size={10} styles={[variantStyles2.foldIcon, open() ? variantStyles2.foldIconVariant : variantStyles2.foldIconVariant2]} />
+    <div {...stylex.attrs(styles.foldDiv)}>
+      <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...stylex.attrs(styles.foldButton)}>
+        <Icon name="expand" size={10} styles={[styles.foldIcon, open() ? styles.foldIconTone : styles.foldIconAlt]} />
         {props.leading}
-        <span {...stylex.attrs(viewStyles.foldSpan)}>{props.label}</span>
+        <span {...stylex.attrs(styles.foldSpan)}>{props.label}</span>
         <Show when={props.summary}>
-          <span {...stylex.attrs(viewStyles.foldSpan2)}>{props.summary}</span>
+          <span {...stylex.attrs(styles.foldSpan2)}>{props.summary}</span>
         </Show>
       </button>
       {/* Mounted with the page and only hidden while folded. */}
-      <div {...stylex.attrs(viewStyles.foldDiv2)} hidden={!open()}>
+      <div {...stylex.attrs(styles.foldDiv2)} hidden={!open()}>
         {props.children}
       </div>
     </div>
@@ -308,27 +296,27 @@ export function Fold(props: { label: string; summary?: string | undefined; open?
 export function More(props: { children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   return (
-    <div {...stylex.attrs(viewStyles.moreDiv)}>
-      <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.moreButton)}>
-        <Icon name="expand" size={10} styles={[variantStyles2.foldIconVariant2, open() ? variantStyles2.foldIconVariant : variantStyles2.foldIconVariant2]} />
+    <div {...stylex.attrs(styles.moreDiv)}>
+      <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(styles.moreButton)}>
+        <Icon name="expand" size={10} styles={[styles.foldIconAlt, open() ? styles.foldIconTone : styles.foldIconAlt]} />
         {open() ? t("web.issue.sheet.less") : t("web.issue.sheet.more")}
       </button>
       <Show when={open()}>
-        <div {...stylex.attrs(viewStyles.moreDiv)}>{props.children}</div>
+        <div {...stylex.attrs(styles.moreDiv)}>{props.children}</div>
       </Show>
     </div>
   );
 }
 
 export function SheetLabel(props: { children: JSX.Element }) {
-  return <div {...stylex.attrs(viewStyles.sheetLabelDiv)}>{props.children}</div>;
+  return <div {...stylex.attrs(styles.sheetLabelDiv)}>{props.children}</div>;
 }
 
 /** A tinted box: the status, a conflict, nothing to merge. */
 export function Note(props: { tone?: Tone; children: JSX.Element; styles?: stylex.StyleXStyles }) {
   return (
     <div
-      {...styleProps([viewStyles.note, props.styles], {
+      {...styleProps([styles.note, props.styles], {
         background: props.tone ? `color-mix(in srgb, ${toneVar(props.tone)} 16%, transparent)` : "var(--color-hover)",
       })}
     >
@@ -341,25 +329,25 @@ export function Note(props: { tone?: Tone; children: JSX.Element; styles?: style
 export function Stages(props: { at: Stage }) {
   const ati = () => stages.indexOf(props.at);
   return (
-    <div {...stylex.attrs(viewStyles.stagesDiv)} aria-label={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
+    <div {...stylex.attrs(styles.stagesDiv3)} aria-label={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
       <For each={stages}>
         {(s, i) => (
-          <div {...stylex.attrs(variantStyles.stagesDiv, i() > 0 ? variantStyles.stagesDivVariant : variantStyles.stagesDivVariant2)}>
+          <div {...stylex.attrs(styles.stagesDiv, i() > 0 ? styles.stagesDivTone : styles.stagesDivAlt)}>
             <Show when={i() > 0}>
-              <div {...stylex.attrs(variantStyles.stagesDiv2, i() <= ati() ? variantStyles.stagesDivVariant3 : variantStyles.stagesDivVariant4)} />
+              <div {...stylex.attrs(styles.stagesDiv2, i() <= ati() ? styles.stagesDivAccent : styles.stagesDivMuted)} />
             </Show>
-            <span {...stylex.attrs(viewStyles.stagesSpan)}>
+            <span {...stylex.attrs(styles.stagesSpan2)}>
               <Show
                 when={i() < ati()}
                 fallback={
-                  <span {...stylex.attrs(variantStyles.stagesSpan, s === props.at ? variantStyles.stagesSpanVariant : variantStyles.stagesDivVariant4)} />
+                  <span {...stylex.attrs(styles.stagesSpan, s === props.at ? styles.stagesSpanTone : styles.stagesDivMuted)} />
                 }
               >
                 <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s] })} />
               </Show>
               <span
                 {...stylex.attrs(
-                  s === props.at ? recipeStyles2.stagesSpanState3 : i() < ati() ? recipeStyles2.stagesSpanState2 : recipeStyles2.stagesSpanState,
+                  s === props.at ? styles.stagesSpanState3 : i() < ati() ? styles.stagesSpanState2 : styles.stagesSpanState,
                 )}
               >
                 {stageLabel[s]}

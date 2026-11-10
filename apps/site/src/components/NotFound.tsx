@@ -19,7 +19,7 @@ const sceneStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   notFoundImg: {
     width: "102px",
     animationName: "scratch",
@@ -38,9 +38,6 @@ const recipeStyles = stylex.create({
     textWrap: "pretty",
     color: "var(--color-bark-800)",
   },
-});
-
-const viewStyles = stylex.create({
   notFoundMain: {
     width: "min(560px,100%)",
     borderStyle: "solid",
@@ -60,7 +57,7 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  notFoundImg: {
+  notFoundImg2: {
     width: "204px",
     imageRendering: "pixelated",
   },
@@ -71,19 +68,19 @@ const viewStyles = stylex.create({
 
 export default function NotFound() {
   return (
-    <main {...stylex.attrs(viewStyles.notFoundMain)}>
-      <div aria-hidden="true" {...stylex.attrs(viewStyles.notFoundDiv)}>
-        <img {...stylex.attrs(viewStyles.notFoundImg)} src={pixelArt("plot-dry")} alt="" />
-        <img {...stylex.attrs(recipeStyles.notFoundImg)} src={pixelArt("dog-scratch")} alt="" />
+    <main {...stylex.attrs(styles.notFoundMain)}>
+      <div aria-hidden="true" {...stylex.attrs(styles.notFoundDiv)}>
+        <img {...stylex.attrs(styles.notFoundImg2)} src={pixelArt("plot-dry")} alt="" />
+        <img {...stylex.attrs(styles.notFoundImg)} src={pixelArt("dog-scratch")} alt="" />
       </div>
       {[zh, en].map((copy, index) => (
         <section lang={copy.lang} {...stylex.attrs(index > 0 && sceneStyles.translation)}>
           {index === 0 ? (
-            <h1 {...stylex.attrs(viewStyles.notFoundH1)}>{copy.lost.title}</h1>
+            <h1 {...stylex.attrs(styles.notFoundH1)}>{copy.lost.title}</h1>
           ) : (
-            <h2 {...stylex.attrs(viewStyles.notFoundH1)}>{copy.lost.title}</h2>
+            <h2 {...stylex.attrs(styles.notFoundH1)}>{copy.lost.title}</h2>
           )}
-          <p {...stylex.attrs(recipeStyles.notFoundP)}>{copy.lost.text}</p>
+          <p {...stylex.attrs(styles.notFoundP)}>{copy.lost.text}</p>
           <PixelLink primary href={copy.home} hreflang={copy.lang}>
             {copy.lost.home}
           </PixelLink>

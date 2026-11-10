@@ -7,7 +7,7 @@ import { PxButton } from "./button";
 import { PxTextArea, PxTextInput } from "./field";
 import { storyFrame } from "./story.stylex";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   baseStoriesPxCard: {
     width: "calc(var(--spacing) * 72)",
   },
@@ -21,6 +21,11 @@ const recipeStyles = stylex.create({
   baseStoriesPxFrame: {
     width: "calc(var(--spacing) * 56)",
   },
+  composedWindow: (width: number) => ({ width, marginLeft: "12px", padding: "calc(var(--spacing) * 3)" }),
+  composedControl: (marginLeft: number) => ({ marginLeft, maxWidth: "240px" }),
+  baseStoriesDiv: {
+    padding: "calc(var(--spacing) * 3)",
+  },
 });
 
 const papers = stylex.create({
@@ -31,14 +36,6 @@ const papers = stylex.create({
 
 const paperChoices: Record<string, stylex.StyleXStyles<{ backgroundColor?: string }>> = papers;
 
-const viewStyles = stylex.create({
-  composedWindow: (width: number) => ({ width, marginLeft: "12px", padding: "calc(var(--spacing) * 3)" }),
-  composedControl: (marginLeft: number) => ({ marginLeft, maxWidth: "240px" }),
-  baseStoriesDiv: {
-    padding: "calc(var(--spacing) * 3)",
-  },
-});
-
 export default stories({
   title: "组件/像素/base",
   themes: ["light"],
@@ -47,13 +44,13 @@ export default stories({
     Composition: story({
       args: { width: 300, indent: 4, border: true, value: "", well: false, mono: false, disabled: false, reading: false },
       render: (a, set) => (
-        <PxWindow testid="pixel-window-composition" border={a.border} styles={viewStyles.composedWindow(a.width)} style={{ "margin-top": "8px" }}>
+        <PxWindow testid="pixel-window-composition" border={a.border} styles={styles.composedWindow(a.width)} style={{ "margin-top": "8px" }}>
           <PxTextInput
             testid="pixel-input-composition"
             label="名字"
             value={a.value}
             onChange={(value) => set({ value })}
-            styles={viewStyles.composedControl(a.indent)}
+            styles={styles.composedControl(a.indent)}
             well={a.well}
             mono={a.mono}
             disabled={a.disabled}
@@ -63,7 +60,7 @@ export default stories({
             label="说明"
             value={a.value}
             onChange={(value) => set({ value })}
-            styles={viewStyles.composedControl(a.indent)}
+            styles={styles.composedControl(a.indent)}
             reading={a.reading}
             mono={a.mono}
             disabled={a.disabled}
@@ -77,9 +74,9 @@ export default stories({
     Card: story({
       args: { title: "今天的收成", aside: "3 块地" },
       render: (a) => (
-        <PxCard title={a.title} aside={a.aside} styles={[recipeStyles.baseStoriesPxCard]}>
+        <PxCard title={a.title} aside={a.aside} styles={[styles.baseStoriesPxCard]}>
           <p>两块熟了，一块缺肥。</p>
-          <DashedLine styles={[recipeStyles.baseStoriesDashedLine]} />
+          <DashedLine styles={[styles.baseStoriesDashedLine]} />
           <PxButton tone="primary" onClick={() => undefined}>
             去看看
           </PxButton>
@@ -89,7 +86,7 @@ export default stories({
     Window: story({
       args: { border: true },
       render: (a) => (
-        <PxWindow border={a.border} styles={[recipeStyles.baseStoriesPxWindow]}>
+        <PxWindow border={a.border} styles={[styles.baseStoriesPxWindow]}>
           窗子里的纸
         </PxWindow>
       ),
@@ -98,8 +95,8 @@ export default stories({
       args: { paper: "bg-cream-50" },
       controls: { paper: { kind: "choice", options: ["bg-cream-50", "bg-cream-100", "bg-lcd-paper"] } },
       render: (a) => (
-        <PxFrame paper={paperChoices[a.paper]} styles={[recipeStyles.baseStoriesPxFrame]}>
-          <div {...stylex.attrs(viewStyles.baseStoriesDiv)}>框里的东西离边 2 像素</div>
+        <PxFrame paper={paperChoices[a.paper]} styles={[styles.baseStoriesPxFrame]}>
+          <div {...stylex.attrs(styles.baseStoriesDiv)}>框里的东西离边 2 像素</div>
         </PxFrame>
       ),
     }),

@@ -64,7 +64,7 @@ const memoryStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   archivePanelPre: {
     maxHeight: "calc(var(--spacing) * 96)",
     overflowY: "auto",
@@ -79,9 +79,6 @@ const recipeStyles2 = stylex.create({
     WebkitUserSelect: "text",
     userSelect: "text",
   },
-});
-
-const recipeStyles = stylex.create({
   memoryPanelDiv: {
     display: "flex",
     overflow: "hidden",
@@ -140,15 +137,9 @@ const recipeStyles = stylex.create({
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
   },
-});
-
-const variantStyles2 = stylex.create({
   writeNoteTextInput: {
     fontFamily: "var(--font-mono)",
   },
-});
-
-const variantStyles = stylex.create({
   pillButton: {
     height: "calc(var(--spacing) * 6)",
     cursor: "pointer",
@@ -157,11 +148,11 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  pillButtonVariant: {
+  pillButtonTone: {
     backgroundColor: "var(--color-ink)",
     color: "var(--color-page)",
   },
-  pillButtonVariant2: {
+  pillButtonAlt: {
     backgroundColor: {
       default: "var(--color-hover)",
       "@media (hover:hover)": {
@@ -171,22 +162,19 @@ const variantStyles = stylex.create({
     },
   },
   sourcesSpan: {},
-  sourcesSpanVariant: {
+  sourcesSpanTone: {
     color: "var(--color-accent)",
   },
-  sourcesSpanVariant2: {
+  sourcesSpanAlt: {
     color: "var(--color-berry)",
   },
   memoryItemSpan: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  memoryItemSpanVariant: {
+  memoryItemSpanTone: {
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   sectionSection: {
     display: "flex",
     flexDirection: "column",
@@ -210,7 +198,7 @@ const viewStyles = stylex.create({
   sectionSpan2: {
     flex: "1",
   },
-  memoryPanelDiv: {
+  memoryPanelDiv2: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 4)",
@@ -225,7 +213,7 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     backgroundColor: "var(--color-leaf)",
   },
-  memoryPanelDiv2: {
+  memoryPanelDiv22: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * .5)",
@@ -253,7 +241,7 @@ const viewStyles = stylex.create({
     flexWrap: "wrap",
     gap: "var(--spacing)",
   },
-  sourcesSpan: {
+  sourcesSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
@@ -338,7 +326,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * .5)",
   },
-  memoryItemSpan: {
+  memoryItemSpan2: {
     display: "flex",
     flexWrap: "wrap",
     columnGap: "calc(var(--spacing) * 2)",
@@ -346,7 +334,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  memoryItemSpan2: {
+  memoryItemSpan22: {
     color: "var(--color-warn-ink)",
   },
 });
@@ -389,15 +377,15 @@ function createForget(agent: () => string) {
 /** A titled part of a panel, its count beside the title. */
 function Section(props: { title: string; count?: number; aside?: JSX.Element; testid?: string; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} {...stylex.attrs(viewStyles.sectionSection)}>
-      <header {...stylex.attrs(viewStyles.sectionHeader)}>
-        <h3 {...stylex.attrs(viewStyles.sectionH3)}>{props.title}</h3>
+    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} {...stylex.attrs(styles.sectionSection)}>
+      <header {...stylex.attrs(styles.sectionHeader)}>
+        <h3 {...stylex.attrs(styles.sectionH3)}>{props.title}</h3>
         <Show when={props.count !== undefined}>
-          <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.count}</span>
+          <span {...stylex.attrs(styles.sectionSpan)}>{props.count}</span>
         </Show>
-        <span {...stylex.attrs(viewStyles.sectionSpan2)} />
+        <span {...stylex.attrs(styles.sectionSpan2)} />
         <Show when={props.aside}>
-          <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.aside}</span>
+          <span {...stylex.attrs(styles.sectionSpan)}>{props.aside}</span>
         </Show>
       </header>
       {props.children}
@@ -418,7 +406,7 @@ function Pill(props: { label: string; on: boolean; onClick: () => void }) {
       type="button"
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(variantStyles.pillButton, props.on ? variantStyles.pillButtonVariant : variantStyles.pillButtonVariant2)}
+      {...stylex.attrs(styles.pillButton, props.on ? styles.pillButtonTone : styles.pillButtonAlt)}
     >
       {props.label}
     </button>
@@ -449,8 +437,8 @@ export function MemoryPanel(props: { agent: string }) {
           ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");
   return (
-    <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-      <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.intro")}</p>
+    <div {...stylex.attrs(styles.memoryPanelDiv2)}>
+      <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.intro")}</p>
       <Show when={sources().size > 1}>
         <Sources sources={[...sources().values()]} />
       </Show>
@@ -458,15 +446,15 @@ export function MemoryPanel(props: { agent: string }) {
         <Show when={done().length > 0} fallback={<Quiet>{t("web.memory.memory.noIssues")}</Quiet>}>
           <For each={done()} keyed={(m) => m.id}>
             {(m) => (
-              <div {...stylex.attrs(recipeStyles.memoryPanelDiv)}>
-                <span {...stylex.attrs(viewStyles.memoryPanelSpan)} />
-                <div {...stylex.attrs(viewStyles.memoryPanelDiv2)}>
-                  <span {...stylex.attrs(viewStyles.memoryPanelSpan2)}>
-                    <span {...stylex.attrs(viewStyles.memoryPanelSpan3)}>{sessionNameOf(m().session)}</span>
+              <div {...stylex.attrs(styles.memoryPanelDiv)}>
+                <span {...stylex.attrs(styles.memoryPanelSpan)} />
+                <div {...stylex.attrs(styles.memoryPanelDiv22)}>
+                  <span {...stylex.attrs(styles.memoryPanelSpan2)}>
+                    <span {...stylex.attrs(styles.memoryPanelSpan3)}>{sessionNameOf(m().session)}</span>
                     <span>{m().repo ?? t("web.memory.memory.allRepos")}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
-                  <span {...stylex.attrs(viewStyles.memoryPanelSpan4)}>{m().text}</span>
+                  <span {...stylex.attrs(styles.memoryPanelSpan4)}>{m().text}</span>
                 </div>
               </div>
             )}
@@ -477,7 +465,7 @@ export function MemoryPanel(props: { agent: string }) {
       <WriteNote agent={props.agent} withRepo />
       <Section title={t("web.memory.memory.notes")} count={notes().length}>
         <Show when={repos().length > 0}>
-          <div {...stylex.attrs(viewStyles.memoryPanelDiv3)}>
+          <div {...stylex.attrs(styles.memoryPanelDiv3)}>
             <For
               each={[["", t("web.memory.memory.all")] as const, [everywhere, t("web.memory.memory.allRepos")] as const, ...repos().map((p) => [p, p] as const)]}
             >
@@ -536,9 +524,9 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
     <Section title={t("web.memory.memory.sources")} count={props.sources.filter((s) => s.on).length}>
       <For each={props.sources}>
         {(s) => (
-          <div {...stylex.attrs(recipeStyles.sourcesDiv)}>
-            <span {...stylex.attrs(viewStyles.sourcesSpan)}>{s.label}</span>
-            <span {...stylex.attrs(variantStyles.sourcesSpan, s.on ? variantStyles.sourcesSpanVariant : variantStyles.sourcesSpanVariant2)}>
+          <div {...stylex.attrs(styles.sourcesDiv)}>
+            <span {...stylex.attrs(styles.sourcesSpan2)}>{s.label}</span>
+            <span {...stylex.attrs(styles.sourcesSpan, s.on ? styles.sourcesSpanTone : styles.sourcesSpanAlt)}>
               {s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}
             </span>
             <Show when={s.on}>
@@ -551,7 +539,7 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
           </div>
         )}
       </For>
-      <p {...stylex.attrs(viewStyles.sectionSpan)}>{t("web.memory.memory.sourcesNote")}</p>
+      <p {...stylex.attrs(styles.sectionSpan)}>{t("web.memory.memory.sourcesNote")}</p>
     </Section>
   );
 }
@@ -580,7 +568,7 @@ function RecallPreview(props: { agent: string }) {
           : undefined
       }
     >
-      <div {...stylex.attrs(viewStyles.recallPreviewDiv)}>
+      <div {...stylex.attrs(styles.recallPreviewDiv)}>
         <Select
           styles={selectStyles.scope}
           label={t("web.memory.memory.where")}
@@ -597,7 +585,7 @@ function RecallPreview(props: { agent: string }) {
         />
       </div>
       <Show when={lines().length > 0} fallback={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
-        <p {...stylex.attrs(recipeStyles.recallPreviewP)}>{lines().join("\n")}</p>
+        <p {...stylex.attrs(styles.recallPreviewP)}>{lines().join("\n")}</p>
       </Show>
     </Section>
   );
@@ -612,8 +600,8 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
   return (
     <Show when={view()} fallback={<Quiet>{t("web.memory.memory.orchestratorReading")}</Quiet>}>
       {(v) => (
-        <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-          <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
+        <div {...stylex.attrs(styles.memoryPanelDiv2)}>
+          <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
           <WriteNote agent={props.agent} />
           <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
             <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
@@ -654,10 +642,10 @@ export function ArchivePanel(props: { agent: string }) {
   const data = () => ready(listing, undefined);
   const hits = () => data()?.hits ?? [];
   return (
-    <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-      <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.archiveIntro")}</p>
+    <div {...stylex.attrs(styles.memoryPanelDiv2)}>
+      <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.archiveIntro")}</p>
       <form
-        {...stylex.attrs(viewStyles.archivePanelForm)}
+        {...stylex.attrs(styles.archivePanelForm)}
         onSubmit={(e) => {
           e.preventDefault();
           if (query().trim()) setAsked(query().trim());
@@ -677,11 +665,11 @@ export function ArchivePanel(props: { agent: string }) {
         <Section title={t("web.memory.memory.found")} count={hits().length}>
           <For each={hits()}>
             {(h) => (
-              <div {...stylex.attrs(recipeStyles.archivePanelDiv)}>
-                <span {...stylex.attrs(viewStyles.archivePanelSpan)}>
+              <div {...stylex.attrs(styles.archivePanelDiv)}>
+                <span {...stylex.attrs(styles.archivePanelSpan)}>
                   {h.file}:{Math.round(h.line)}
                 </span>
-                <span {...stylex.attrs(viewStyles.memoryPanelSpan4)}>{h.text}</span>
+                <span {...stylex.attrs(styles.memoryPanelSpan4)}>{h.text}</span>
               </div>
             )}
           </For>
@@ -693,20 +681,20 @@ export function ArchivePanel(props: { agent: string }) {
             <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
                 {(f) => (
-                  <div {...stylex.attrs(recipeStyles.archivePanelDiv2)}>
+                  <div {...stylex.attrs(styles.archivePanelDiv2)}>
                     <button
                       type="button"
                       aria-expanded={aria(open()?.name === f().name)}
                       onClick={() => void show(f().name)}
-                      {...stylex.attrs(viewStyles.archivePanelButton)}
+                      {...stylex.attrs(styles.archivePanelButton)}
                     >
-                      <span {...stylex.attrs(viewStyles.archivePanelSpan2)}>{f().name}</span>
-                      <span {...stylex.attrs(viewStyles.sectionSpan)}>
+                      <span {...stylex.attrs(styles.archivePanelSpan2)}>{f().name}</span>
+                      <span {...stylex.attrs(styles.sectionSpan)}>
                         {ago(f().at, now())} · {t("web.memory.memory.chars", { n: Math.round(f().chars) })}
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
-                      <pre {...stylex.attrs(recipeStyles2.archivePanelPre)}>{open()?.text}</pre>
+                      <pre {...stylex.attrs(styles.archivePanelPre)}>{open()?.text}</pre>
                     </Show>
                   </div>
                 )}
@@ -742,8 +730,8 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
     if (done === true) setText("");
   };
   return (
-    <div {...stylex.attrs(viewStyles.writeNoteDiv)}>
-      <span {...stylex.attrs(viewStyles.writeNoteSpan)}>{t("web.memory.memory.note")}</span>
+    <div {...stylex.attrs(styles.writeNoteDiv)}>
+      <span {...stylex.attrs(styles.writeNoteSpan)}>{t("web.memory.memory.note")}</span>
       <TextArea
         data-testid="note-input"
         aria-label={t("web.memory.memory.note")}
@@ -752,11 +740,11 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
-      <div {...stylex.attrs(viewStyles.writeNoteDiv2)}>
-        <Show when={props.withRepo} fallback={<span {...stylex.attrs(viewStyles.sectionSpan2)} />}>
+      <div {...stylex.attrs(styles.writeNoteDiv2)}>
+        <Show when={props.withRepo} fallback={<span {...stylex.attrs(styles.sectionSpan2)} />}>
           <TextInput
             aria-label={t("web.memory.memory.repo")}
-            styles={variantStyles2.writeNoteTextInput}
+            styles={styles.writeNoteTextInput}
             placeholder={t("web.memory.memory.repoHint")}
             list="memory-repos"
             value={repo()}
@@ -773,12 +761,12 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
       <Show
         when={error()}
         fallback={
-          <span {...stylex.attrs(viewStyles.writeNoteSpan2)}>
+          <span {...stylex.attrs(styles.writeNoteSpan2)}>
             {props.withRepo === true ? t("web.memory.memory.noteHintRepo") : t("web.memory.memory.noteHint")}
           </span>
         }
       >
-        <span {...stylex.attrs(viewStyles.writeNoteSpan3)}>{error()}</span>
+        <span {...stylex.attrs(styles.writeNoteSpan3)}>{error()}</span>
       </Show>
     </div>
   );
@@ -792,14 +780,14 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
       {...styleProps([stylex.defaultMarker(), memoryStyles.card])}
       data-faded={props.faded === true ? "" : undefined}
     >
-      <div {...stylex.attrs(viewStyles.memoryItemDiv)}>
-        <span {...stylex.attrs(variantStyles.memoryItemSpan, !(props.faded !== true) ? variantStyles.memoryItemSpanVariant : variantStyles.sourcesSpan)}>
+      <div {...stylex.attrs(styles.memoryItemDiv)}>
+        <span {...stylex.attrs(styles.memoryItemSpan, !(props.faded !== true) ? styles.memoryItemSpanTone : styles.sourcesSpan)}>
           {props.memory.text}
         </span>
-        <span {...stylex.attrs(viewStyles.memoryItemSpan)}>
+        <span {...stylex.attrs(styles.memoryItemSpan2)}>
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>
-            <span {...stylex.attrs(viewStyles.memoryItemSpan2)}>{props.warning}</span>
+            <span {...stylex.attrs(styles.memoryItemSpan22)}>{props.warning}</span>
           </Show>
         </span>
       </div>

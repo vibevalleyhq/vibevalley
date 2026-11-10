@@ -18,7 +18,7 @@ import { useIssues, useNameOf } from "./history";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   rowSpan: {
     display: {
       default: "none",
@@ -33,10 +33,10 @@ const recipeStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  rowSpanVariant1Case1: {
+  rowSpanPrimary: {
     display: null,
   },
-  rowSpanVariant1Case2: {
+  rowSpanSecondary: {
     display: {
       default: "none",
       "@container (width>=640px)": "inline",
@@ -67,16 +67,10 @@ const recipeStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-});
-
-const variantStyles2 = stylex.create({
   issueListIcon: {},
-  issueListIconVariant: {
+  issueListIconTone: {
     rotate: "90deg",
   },
-});
-
-const variantStyles = stylex.create({
   rowDiv: {
     display: "flex",
     height: "38px",
@@ -86,10 +80,10 @@ const variantStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     paddingInline: "calc(var(--spacing) * 2.5)",
   },
-  rowDivVariant: {
+  rowDivTone: {
     backgroundColor: "var(--color-selected)",
   },
-  rowDivVariant2: {
+  rowDivAlt: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -98,9 +92,6 @@ const variantStyles = stylex.create({
       },
     },
   },
-});
-
-const viewStyles = stylex.create({
   issueListDiv: {
     containerType: "inline-size",
     minHeight: "0",
@@ -150,13 +141,13 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  rowSpan: {
+  rowSpan4: {
     display: "flex",
     width: "calc(var(--spacing) * 3.5)",
     flexShrink: "0",
     justifyContent: "center",
   },
-  rowSpan2: {
+  rowSpan22: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -165,7 +156,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  rowSpan3: {
+  rowSpan32: {
     display: "flex",
     width: "18px",
     flexShrink: "0",
@@ -206,7 +197,7 @@ export function IssueList(props: {
 
   return (
     <Show when={!props.loading} fallback={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
-      <div {...stylex.attrs(viewStyles.issueListDiv)}>
+      <div {...stylex.attrs(styles.issueListDiv)}>
         <For each={groupRows(props.cards, props.grouping, rowKeys)} keyed={(g) => g.key}>
           {(g) => {
             const groupLane = () => g().lane;
@@ -251,23 +242,23 @@ export function IssueList(props: {
               }
             };
             return (
-              <section aria-label={label()} data-testid="issue-group" data-key={g().key} {...stylex.attrs(viewStyles.issueGroup)}>
+              <section aria-label={label()} data-testid="issue-group" data-key={g().key} {...stylex.attrs(styles.issueGroup)}>
                 {/* A head of words on the page, not a bar: its line under it sets the group off. */}
-                <header {...stylex.attrs(viewStyles.issueListHeader)}>
+                <header {...stylex.attrs(styles.issueListHeader)}>
                   <button
                     type="button"
                     onClick={() => fold(g().key)}
                     aria-label={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
-                    {...stylex.attrs(viewStyles.issueListButton)}
+                    {...stylex.attrs(styles.issueListButton)}
                   >
                     <Icon
                       name="expand"
                       size={10}
-                      styles={[variantStyles2.issueListIcon, !isFolded() ? variantStyles2.issueListIconVariant : variantStyles2.issueListIcon]}
+                      styles={[styles.issueListIcon, !isFolded() ? styles.issueListIconTone : styles.issueListIcon]}
                     />
                     {icon()}
-                    <span {...stylex.attrs(viewStyles.issueListSpan)}>{label()}</span>
-                    <span {...stylex.attrs(viewStyles.issueListSpan2)}>{g().rows.length}</span>
+                    <span {...stylex.attrs(styles.issueListSpan)}>{label()}</span>
+                    <span {...stylex.attrs(styles.issueListSpan2)}>{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
                     <IconButton icon="add" label={t("web.issue.list.writeIn", { group: label() })} onClick={() => add(g())} />
@@ -329,37 +320,37 @@ function Row(props: {
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onOpen(props.card.id);
       }}
-      {...stylex.attrs(variantStyles.rowDiv, props.selected ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}
+      {...stylex.attrs(styles.rowDiv, props.selected ? styles.rowDivTone : styles.rowDivAlt)}
     >
-      <span {...stylex.attrs(viewStyles.rowSpan)}>
+      <span {...stylex.attrs(styles.rowSpan4)}>
         <Show when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
           {(pr) => <PriorityMark priority={pr()} size={13} />}
         </Show>
       </span>
-      <span {...stylex.attrs(recipeStyles.rowSpan)}>{look().number}</span>
-      <span {...stylex.attrs(viewStyles.rowSpan)}>
+      <span {...stylex.attrs(styles.rowSpan)}>{look().number}</span>
+      <span {...stylex.attrs(styles.rowSpan4)}>
         <Show when={props.groupStatus === undefined || (look().status !== props.groupStatus && !(props.groupStatus === "todo" && look().status === "backlog"))}>
           <StatusMark status={look().status} tone={look().statusTone} size={13} />
         </Show>
       </span>
-      <span {...stylex.attrs(viewStyles.rowSpan2)}>{look().title}</span>
+      <span {...stylex.attrs(styles.rowSpan22)}>{look().title}</span>
       <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
       <For each={look().flags}>
         {(f, i) => (
-          <span {...stylex.attrs(i() > 0 ? recipeStyles.rowSpanVariant1Case2 : recipeStyles.rowSpanVariant1Case1)}>
+          <span {...stylex.attrs(i() > 0 ? styles.rowSpanSecondary : styles.rowSpanPrimary)}>
             <FlagChip text={f.text} tone={f.tone} />
           </span>
         )}
       </For>
       <Show when={props.showRepo}>
-        <span {...stylex.attrs(recipeStyles.rowSpan2)}>{repo()}</span>
+        <span {...stylex.attrs(styles.rowSpan2)}>{repo()}</span>
       </Show>
-      <span {...stylex.attrs(viewStyles.rowSpan3)}>
+      <span {...stylex.attrs(styles.rowSpan32)}>
         <Show when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
           <CardFace card={props.card} size={18} />
         </Show>
       </span>
-      <span {...stylex.attrs(recipeStyles.rowSpan3)}>{ago(rowKeys(props.card).updatedAt, now())}</span>
+      <span {...stylex.attrs(styles.rowSpan3)}>{ago(rowKeys(props.card).updatedAt, now())}</span>
     </div>
   );
 }

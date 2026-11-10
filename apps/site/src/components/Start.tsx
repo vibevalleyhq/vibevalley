@@ -22,15 +22,12 @@ const sceneStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   startSpan: {
     color: "var(--color-wheat)",
     WebkitUserSelect: "none",
     userSelect: "none",
   },
-});
-
-const viewStyles = stylex.create({
   startImg: {
     width: "calc(var(--spacing) * 12)",
     height: "calc(var(--spacing) * 12)",
@@ -115,7 +112,7 @@ const viewStyles = stylex.create({
     color: "var(--color-cream-50)",
     boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-bark-600)",
   },
-  startSpan: {
+  startSpan2: {
     display: "block",
   },
   startP3: {
@@ -171,6 +168,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
   },
 });
+
 interface Props {
   copy: Pick<Copy, "start" | "safety">;
   commands: string[];
@@ -187,28 +185,28 @@ export default function Start(props: Props) {
     <>
       <Section ref={root.set} id="start" alt title={props.copy.start.title}>
         <div data-reveal role="note" {...stylex.attrs(sceneStyles.warning)}>
-          <img loading="lazy" src={props.icons.warn} alt="" {...stylex.attrs(viewStyles.startImg)} />
+          <img loading="lazy" src={props.icons.warn} alt="" {...stylex.attrs(styles.startImg)} />
           <div>
-            <h3 {...stylex.attrs(viewStyles.startH3)}>{props.copy.safety.title}</h3>
-            <p {...stylex.attrs(viewStyles.startP)}>{props.copy.safety.text}</p>
-            <p {...stylex.attrs(viewStyles.startP2)}>{props.copy.safety.wip}</p>
+            <h3 {...stylex.attrs(styles.startH3)}>{props.copy.safety.title}</h3>
+            <p {...stylex.attrs(styles.startP)}>{props.copy.safety.text}</p>
+            <p {...stylex.attrs(styles.startP2)}>{props.copy.safety.wip}</p>
           </div>
         </div>
-        <div {...stylex.attrs(viewStyles.startDiv)}>
-          <div data-reveal {...stylex.attrs(viewStyles.startDiv2)}>
-            <h3 {...stylex.attrs(viewStyles.startH32)}>{props.copy.start.needs}</h3>
-            <ul {...stylex.attrs(viewStyles.startUl)}>
+        <div {...stylex.attrs(styles.startDiv)}>
+          <div data-reveal {...stylex.attrs(styles.startDiv2)}>
+            <h3 {...stylex.attrs(styles.startH32)}>{props.copy.start.needs}</h3>
+            <ul {...stylex.attrs(styles.startUl)}>
               {props.copy.start.list.map((item) => (
-                <li {...stylex.attrs(viewStyles.startLi)}>
-                  <img loading="lazy" src={props.icons.check} alt="" {...stylex.attrs(viewStyles.startImg2)} />
+                <li {...stylex.attrs(styles.startLi)}>
+                  <img loading="lazy" src={props.icons.check} alt="" {...stylex.attrs(styles.startImg2)} />
                   {item}
                 </li>
               ))}
             </ul>
           </div>
-          <div data-reveal {...stylex.attrs(viewStyles.startDiv2)}>
-            <div {...stylex.attrs(viewStyles.startDiv3)}>
-              <h3 {...stylex.attrs(viewStyles.startH32)}>{props.copy.start.build}</h3>
+          <div data-reveal {...stylex.attrs(styles.startDiv2)}>
+            <div {...stylex.attrs(styles.startDiv3)}>
+              <h3 {...stylex.attrs(styles.startH32)}>{props.copy.start.build}</h3>
               <CopyButton
                 text={props.commands.join("\n")}
                 icon={props.icons.copy}
@@ -217,17 +215,17 @@ export default function Start(props: Props) {
                 done={props.copy.start.copied}
               />
             </div>
-            <pre {...stylex.attrs(viewStyles.startPre)}>
+            <pre {...stylex.attrs(styles.startPre)}>
               {props.commands.map((c) => (
-                <span {...stylex.attrs(viewStyles.startSpan)}>
-                  <span {...stylex.attrs(recipeStyles.startSpan)}>$ </span>
+                <span {...stylex.attrs(styles.startSpan2)}>
+                  <span {...stylex.attrs(styles.startSpan)}>$ </span>
                   {c}
                 </span>
               ))}
             </pre>
-            <p {...stylex.attrs(viewStyles.startP3)}>
+            <p {...stylex.attrs(styles.startP3)}>
               {props.copy.start.more}{" "}
-              <a href={props.readme} {...stylex.attrs(viewStyles.startA)}>
+              <a href={props.readme} {...stylex.attrs(styles.startA)}>
                 {props.copy.start.readme}
               </a>
             </p>
@@ -262,7 +260,7 @@ function CopyButton(props: { text: string; icon: string; check: string; label: s
       data-testid="copy-commands"
       data-copied={copied() ? "true" : "false"}
       onClick={() => void copy()}
-      {...stylex.attrs(viewStyles.copyCommands)}
+      {...stylex.attrs(styles.copyCommands)}
     >
       <Presence
         value={copied() ? "done" : "copy"}
@@ -272,13 +270,13 @@ function CopyButton(props: { text: string; icon: string; check: string; label: s
         transition={{ duration: 0.2, ease: steps(3) }}
       >
         {(value, ref) => (
-          <span ref={ref} {...stylex.attrs(viewStyles.copyButtonSpan)}>
-            <img src={value === "done" ? props.check : props.icon} alt="" {...stylex.attrs(viewStyles.copyButtonImg)} />
+          <span ref={ref} {...stylex.attrs(styles.copyButtonSpan)}>
+            <img src={value === "done" ? props.check : props.icon} alt="" {...stylex.attrs(styles.copyButtonImg)} />
             {value === "done" ? props.done : props.label}
           </span>
         )}
       </Presence>
-      <span {...stylex.attrs(viewStyles.copyButtonSpan2)} aria-live="polite">
+      <span {...stylex.attrs(styles.copyButtonSpan2)} aria-live="polite">
         {copied() ? props.done : ""}
       </span>
     </button>

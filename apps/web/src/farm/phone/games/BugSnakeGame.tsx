@@ -21,8 +21,13 @@ import {
   steerBugSnake,
 } from "./bugSnake";
 
-const recipeStyles = stylex.create({
-  bugSnakeGameDiv: {
+const cell = 6;
+const zoom = 3;
+const width = bugSnakeWidth * cell;
+const height = bugSnakeHeight * cell;
+
+const styles = stylex.create({
+  overlay: {
     position: "absolute",
     inset: "0",
     display: "grid",
@@ -33,10 +38,7 @@ const recipeStyles = stylex.create({
     },
     textAlign: "center",
   },
-});
-
-const variantStyles = stylex.create({
-  bugSnakeGameDiv: {
+  root: {
     display: "flex",
     minHeight: "0",
     flex: "1",
@@ -45,51 +47,47 @@ const variantStyles = stylex.create({
     paddingInline: "var(--spacing)",
     paddingTop: "calc(var(--spacing) * 3)",
   },
-});
-
-const viewStyles = stylex.create({
-  bugSnakeGameDiv: {
+  topRow: {
     display: "flex",
     width: "100%",
     paddingInline: "calc(var(--spacing) * 2)",
   },
-  bugSnakeGameSpan: {
+  bestScore: {
     marginLeft: "auto",
     fontVariantNumeric: "tabular-nums",
   },
-  bugSnakeGameDiv2: {
+  subRow: {
     marginTop: "var(--spacing)",
     display: "flex",
     width: "100%",
     paddingInline: "calc(var(--spacing) * 2)",
     fontVariantNumeric: "tabular-nums",
   },
-  bugSnakeGameSpan2: {
+  score: {
     marginLeft: "auto",
   },
-  bugSnakeGameDiv3: {
+  fieldFrame: {
     position: "relative",
     marginTop: "calc(var(--spacing) * 2)",
+    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
   },
-  bugSnakeGameCanvas: {
+  canvas: {
     display: "block",
+    width: width * zoom,
+    height: height * zoom,
     imageRendering: "pixelated",
   },
-  bugSnakeGameP: {
+  help: {
     marginTop: "auto",
     marginBottom: "calc(var(--spacing) * 2)",
     textAlign: "center",
     lineHeight: "1.625",
+    color: "var(--color-lcd-dark)",
   },
 });
 
 const game = kept<BugSnake | undefined>(undefined);
 const best = kept(0);
-
-const cell = 6;
-const zoom = 3;
-const width = bugSnakeWidth * cell;
-const height = bugSnakeHeight * cell;
 
 /** The head looking right; the other ways are it turned. */
 const head = [" #### ", "####.#", "######", "######", "####.#", " #### "];
@@ -192,29 +190,28 @@ export function BugSnakeGame() {
 
   const score = () => g()?.score ?? 0;
   return (
-    <div {...stylex.attrs(variantStyles.bugSnakeGameDiv)}>
-      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv)}>
+    <div {...stylex.attrs(styles.root)}>
+      <div {...stylex.attrs(styles.topRow)}>
         <span>{t("web.farm.phone.game.bugs")}</span>
-        <span {...stylex.attrs(viewStyles.bugSnakeGameSpan)}>
+        <span {...stylex.attrs(styles.bestScore)}>
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv2)}>
+      <div {...stylex.attrs(styles.subRow)}>
         <span>{t("web.farm.phone.bugs.tally", { seeds: g()?.eaten ?? 0, bugs: g()?.bugs ?? 0 })}</span>
-        <span {...stylex.attrs(viewStyles.bugSnakeGameSpan2)}>{five(score())}</span>
+        <span {...stylex.attrs(styles.score)}>{five(score())}</span>
       </div>
-      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv3)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(styles.fieldFrame)}>
         <canvas
           ref={(el) => (canvas = el)}
           width={width}
           height={height}
           role="img"
           aria-label={t("web.farm.phone.bugs.field")}
-          {...stylex.attrs(viewStyles.bugSnakeGameCanvas)}
-          style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
+          {...stylex.attrs(styles.canvas)}
         />
         <Show when={!g() || g()!.over !== undefined || !playing()}>
-          <div {...stylex.attrs(recipeStyles.bugSnakeGameDiv)}>
+          <div {...stylex.attrs(styles.overlay)}>
             <span>
               {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />
@@ -227,7 +224,7 @@ export function BugSnakeGame() {
           </div>
         </Show>
       </div>
-      <p {...stylex.attrs(viewStyles.bugSnakeGameP)} style={{ color: lcd.dark }}>
+      <p {...stylex.attrs(styles.help)}>
         {t("web.farm.phone.bugs.help")}
         <br />
         {t("web.farm.phone.bugs.help2")}

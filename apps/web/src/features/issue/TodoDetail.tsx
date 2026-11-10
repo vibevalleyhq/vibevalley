@@ -25,34 +25,25 @@ import { IssueThread } from "./IssueThread";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   todoDetailNote: {
     marginTop: "calc(var(--spacing) * 2)",
     padding: "calc(var(--spacing) * 2.5)",
   },
-});
-
-const variantStyles2 = stylex.create({
   todoDetailTextArea: {
     marginTop: "calc(var(--spacing) * 2.5)",
   },
-});
-
-const variantStyles = stylex.create({
   todoDetailSpan: {
     width: "calc(var(--spacing) * 2)",
     height: "calc(var(--spacing) * 2)",
     borderRadius: "2147483647px",
   },
-  todoDetailSpanVariant: {
+  todoDetailSpanTone: {
     backgroundColor: "var(--color-wheat)",
   },
-  todoDetailSpanVariant2: {
+  todoDetailSpanAlt: {
     backgroundColor: "var(--color-water)",
   },
-});
-
-const viewStyles = stylex.create({
   unqueueAction: { marginTop: "calc(var(--spacing) * 1.5)" },
   parentIssue: {
     marginBottom: "calc(var(--spacing) * 2)",
@@ -175,7 +166,7 @@ const viewStyles = stylex.create({
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
   },
-  todoDetailSpan: {
+  todoDetailSpan2: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
@@ -352,13 +343,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     <div>
       <Show when={props.item.parent}>
         {(parent) => (
-          <button type="button" data-testid="parent-issue" {...stylex.attrs(viewStyles.parentIssue)} onClick={() => props.onDone(parent())}>
+          <button type="button" data-testid="parent-issue" {...stylex.attrs(styles.parentIssue)} onClick={() => props.onDone(parent())}>
             {t("web.issue.family.parent")}
           </button>
         )}
       </Show>
       <Show when={backlog()}>
-        <div {...stylex.attrs(viewStyles.todoDetailDiv)}>
+        <div {...stylex.attrs(styles.todoDetailDiv)}>
           <Stages at="talk" />
         </div>
       </Show>
@@ -368,7 +359,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         onInput={(e) => edit({ title: e.currentTarget.value })}
         placeholder={t("web.issue.todo.titleHint")}
         aria-label={t("web.issue.todo.title")}
-        {...stylex.attrs(viewStyles.issueTitle)}
+        {...stylex.attrs(styles.issueTitle)}
       />
     </div>
   );
@@ -383,14 +374,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Show when={backlog()}>
         <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
         <Note tone={drafting() ? "water" : "wheat"}>
-          <div {...stylex.attrs(viewStyles.todoDetailDiv2)}>{said()[0]}</div>
-          <div {...stylex.attrs(viewStyles.todoDetailDiv3)}>{said()[1]}</div>
+          <div {...stylex.attrs(styles.todoDetailDiv2)}>{said()[0]}</div>
+          <div {...stylex.attrs(styles.todoDetailDiv3)}>{said()[1]}</div>
           <For each={questions()}>
             {(a) => (
-              <div {...stylex.attrs(viewStyles.todoDetailDiv4)}>
+              <div {...stylex.attrs(styles.todoDetailDiv4)}>
                 <div>· {a.question}</div>
                 <Show when={a.options.length}>
-                  <div {...stylex.attrs(viewStyles.todoDetailDiv5)} role="group" aria-label={t("web.issue.todo.answerTo", { question: a.question })}>
+                  <div {...stylex.attrs(styles.todoDetailDiv5)} role="group" aria-label={t("web.issue.todo.answerTo", { question: a.question })}>
                     <For each={a.options}>
                       {(o) => (
                         <Button disabled={busy()} onClick={() => setWord(o)}>
@@ -405,7 +396,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </For>
         </Note>
         <TextArea
-          styles={variantStyles2.todoDetailTextArea}
+          styles={styles.todoDetailTextArea}
           rows={2}
           value={word()}
           onInput={(e) => setWord(e.currentTarget.value)}
@@ -418,7 +409,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
           aria-label={t("web.issue.todo.whatLabel")}
         />
-        <div {...stylex.attrs(viewStyles.todoDetailDiv6)}>
+        <div {...stylex.attrs(styles.todoDetailDiv6)}>
           <Show when={backlog()}>
             <Button
               tone={written() ? "primary" : "plain"}
@@ -444,7 +435,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         fallback={
           <>
             {talk}
-            <button type="button" data-testid="issue-write-own" onClick={() => setOwn(true)} {...stylex.attrs(viewStyles.issueWriteOwn)}>
+            <button type="button" data-testid="issue-write-own" onClick={() => setOwn(true)} {...stylex.attrs(styles.issueWriteOwn)}>
               {t("web.issue.todo.writeOwn")}
             </button>
           </>
@@ -457,9 +448,9 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           rows={6}
           placeholder={t("web.issue.todo.descriptionHint")}
           aria-label={t("web.issue.todo.description")}
-          {...stylex.attrs(viewStyles.issueDescription)}
+          {...stylex.attrs(styles.issueDescription)}
         />
-        <div {...stylex.attrs(viewStyles.todoDetailDiv7)}>
+        <div {...stylex.attrs(styles.todoDetailDiv7)}>
           <Fold
             label={t("web.issue.todo.criteria")}
             summary={
@@ -488,8 +479,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const side = (
     <>
       <Property label={t("web.issue.todo.status")}>
-        <span {...stylex.attrs(viewStyles.todoDetailSpan)}>
-          <span {...stylex.attrs(variantStyles.todoDetailSpan, backlog() ? variantStyles.todoDetailSpanVariant : variantStyles.todoDetailSpanVariant2)} />
+        <span {...stylex.attrs(styles.todoDetailSpan2)}>
+          <span {...stylex.attrs(styles.todoDetailSpan, backlog() ? styles.todoDetailSpanTone : styles.todoDetailSpanAlt)} />
           {backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
         </span>
       </Property>
@@ -513,7 +504,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
         />
       </Property>
-      <button type="button" onClick={() => setNewRepo(true)} {...stylex.attrs(viewStyles.todoDetailButton)}>
+      <button type="button" onClick={() => setNewRepo(true)} {...stylex.attrs(styles.todoDetailButton)}>
         {repos().length === 0 ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}
       </button>
       <Property label={t("web.issue.todo.priority")}>
@@ -539,18 +530,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </More>
       <Show when={queued()}>
         {(at) => (
-          <Note tone="water" styles={[recipeStyles.todoDetailNote]}>
+          <Note tone="water" styles={[styles.todoDetailNote]}>
             <div>{t("web.issue.todo.inQueue", { ago: ago(at(), Date.now()) })}</div>
-            <Button styles={viewStyles.unqueueAction} disabled={busy()} onClick={() => void unqueue()}>
+            <Button styles={styles.unqueueAction} disabled={busy()} onClick={() => void unqueue()}>
               {t("web.issue.todo.unqueue")}
             </Button>
           </Note>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.todoDetailDiv8)}>
+      <div {...stylex.attrs(styles.todoDetailDiv8)}>
         <ActLines issue={props.item.id} />
       </div>
-      <div {...stylex.attrs(viewStyles.todoDetailDiv9)}>
+      <div {...stylex.attrs(styles.todoDetailDiv9)}>
         <Show when={edited()}>
           <Button
             data-testid="issue-save"
@@ -603,7 +594,7 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
         placeholder={t("web.issue.todo.repoHint")}
         aria-label={t("web.issue.todo.repoName")}
       />
-      <div {...stylex.attrs(viewStyles.newRepoDialogDiv)}>
+      <div {...stylex.attrs(styles.newRepoDialogDiv)}>
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
         <Button tone="primary" disabled={!name().trim() || act.busy()} onClick={() => void make()}>
           {t("web.issue.todo.create")}

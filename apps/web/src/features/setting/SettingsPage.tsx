@@ -23,7 +23,7 @@ import { GeneralPage } from "./GeneralPage";
 import { Readiness } from "./Readiness.tsx";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   settingsPageDiv: {
     minHeight: "0",
     minWidth: "0",
@@ -42,9 +42,6 @@ const recipeStyles = stylex.create({
     overflowY: "auto",
     padding: "calc(var(--spacing) * 5)",
   },
-});
-
-const variantStyles = stylex.create({
   sectionLinkA: {
     display: "flex",
     alignItems: "center",
@@ -55,12 +52,12 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  sectionLinkAVariant: {
+  sectionLinkATone: {
     backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-ink)",
   },
-  sectionLinkAVariant2: {
+  sectionLinkAAlt: {
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -76,10 +73,7 @@ const variantStyles = stylex.create({
       },
     },
   },
-});
-
-const viewStyles = stylex.create({
-  settingsPageDiv: {
+  settingsPageDiv2: {
     display: "flex",
     height: "100%",
     minHeight: "0",
@@ -114,7 +108,7 @@ const viewStyles = stylex.create({
       "@media (width>=48rem)": "1px",
     },
   },
-  settingsPageDiv2: {
+  settingsPageDiv22: {
     display: {
       default: "none",
       "@media (width>=48rem)": "block",
@@ -192,14 +186,14 @@ export function SettingsPage(props: { rest: string }) {
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
         <SettingsSearch value={q}>
-          <div {...stylex.attrs(viewStyles.settingsPageDiv)}>
+          <div {...stylex.attrs(styles.settingsPageDiv2)}>
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              {...stylex.attrs(viewStyles.settingsNav)}
+              {...stylex.attrs(styles.settingsNav)}
               style={{ "--pane-w": `${navWidth()}px` }}
             >
-              <div {...stylex.attrs(viewStyles.settingsPageDiv2)}>
+              <div {...stylex.attrs(styles.settingsPageDiv22)}>
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
               </div>
               <TextInput
@@ -213,8 +207,8 @@ export function SettingsPage(props: { rest: string }) {
               <For each={groups}>
                 {(g) => (
                   <Show when={shown(g).length > 0}>
-                    <div {...stylex.attrs(viewStyles.settingsPageDiv3)}>
-                      <span {...stylex.attrs(viewStyles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
+                    <div {...stylex.attrs(styles.settingsPageDiv3)}>
+                      <span {...stylex.attrs(styles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
                       <For each={shown(g)}>{(s) => <SectionLink section={s} current={s === section()} />}</For>
                     </div>
                   </Show>
@@ -222,13 +216,13 @@ export function SettingsPage(props: { rest: string }) {
               </For>
               <For each={shown("about")}>
                 {(s) => (
-                  <div {...stylex.attrs(viewStyles.settingsPageDiv4)}>
+                  <div {...stylex.attrs(styles.settingsPageDiv4)}>
                     <SectionLink section={s} current={s === section()} />
                   </div>
                 )}
               </For>
             </nav>
-            <div {...stylex.attrs(recipeStyles.settingsPageDiv)}>
+            <div {...stylex.attrs(styles.settingsPageDiv)}>
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />
@@ -308,7 +302,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       href={`/settings/${props.section.id}`}
       data-key={props.section.id}
       aria-current={props.current ? "page" : undefined}
-      {...stylex.attrs(variantStyles.sectionLinkA, props.current ? variantStyles.sectionLinkAVariant : variantStyles.sectionLinkAVariant2)}
+      {...stylex.attrs(styles.sectionLinkA, props.current ? styles.sectionLinkATone : styles.sectionLinkAAlt)}
     >
       <Icon name={props.section.icon} size={16} />
       {props.section.label}

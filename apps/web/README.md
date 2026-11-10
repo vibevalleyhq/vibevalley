@@ -126,10 +126,10 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
     compares one frame with the one before (sounds, the canvas, the phone's calls) reads `rawFrame()`; the UI reads the
     store, reconciled by id, which updates only what changed.
   - A component runs once: what changes on its own (the window's size, the time) needs a signal (`useViewport`, `useNow`).
-- **Styles** use StyleX with the existing CSS tokens in `src/style.css`; typed composition and native-style ownership follow
-  [vv-stylex](.agents/skills/vv-stylex/SKILL.md). Reset, fonts and owned rich-text descendants remain in CSS imported through
-  the host stylesheet. Source ownership and build outputs are checked by `vp run migration:inventory`; the complete
-  comparison and host gate follows [migration acceptance](.agents/skills/vv-stylex/references/migration.md#运行最终验收).
+- **Styles** use StyleX with the CSS tokens in `src/style.css`; typed composition and native-style ownership follow
+  [vv-stylex](.agents/skills/vv-stylex/SKILL.md). Reset, fonts, `[data-window-drag]` and owned rich-text descendants remain in CSS imported through
+  the host stylesheet (`@layer theme, base, components, stylex`). JSX markup attaches styles only via `stylex.attrs` / `styleProps`
+  (lint: `vibevalley/stylex-only`, `vibevalley/no-hex-color`, `vibevalley/design-tokens`).
   Comments are in English, only for what the code cannot say.
 
 ## Commands

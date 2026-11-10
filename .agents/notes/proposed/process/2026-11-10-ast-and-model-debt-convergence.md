@@ -6,7 +6,7 @@ Status: proposed
 
 截至 2026-11-10，仓库在推进大批量迁移与向发布态过渡时存在 5 处存量工程张力：
 
-- **StyleX 迁移脚手架膨胀与机械样式名残留**：`scripts/` 下维护了 20 余个 `style-migration*.ts` 临时脚本（其中 [style-migration-reviews.ts](scripts/style-migration-reviews.ts) 单文件 56 KB），仓库仍剩约 2,020 个旧类 token（分布在 107 个文件）与 18 个样式接口检出项。自动转换产出的 `recipeStyles2`、`variantStyles2` 与 `messageBodyDivVariant1Case2` 等机械键名掩盖了组件状态语义。
+- **StyleX 迁移脚手架膨胀与机械样式名残留**：`scripts/` 下维护了 20 余个 `style-migration*.ts` 临时脚本（其中 `scripts/style-migration-reviews.ts` 单文件 56 KB），仓库仍剩约 2,020 个旧类 token（分布在 107 个文件）与 18 个样式接口检出项。自动转换产出的 `recipeStyles2`、`variantStyles2` 与 `messageBodyDivVariant1Case2` 等机械键名掩盖了组件状态语义。
 - **跨异步隐式状态机与手工回滚布尔群漏检**：[practice-audit.ts](scripts/practice-audit.ts) 的 `loose-flags` 仅检查单个函数体顶层的 `let x = false` 与 `createSignal(false)`，未覆盖类字段包（如 `VoiceCall`）及跨异步边界的手工回滚标志（如 [session.ts](apps/server/src/session/session.ts) 中的 `committed`、`released`、`registeredRow`）。
 - **局部逃生口与静默吞错堆积**：[health.ratchet.json](scripts/health.ratchet.json) 记录 `web: farm` 存有 60 处 `nonNull`（`!`）断言、`web: features/voice` 存有 6 处 `swallowed`；[practice.ratchet.json](scripts/practice.ratchet.json) 记录 `apps/server` 存有 34 处 `swallow-without-record` 与 25 处 `failure-without-reason`。
 - **Effect 不稳定 API 散落业务模块**：[effect.ratchet.json](scripts/effect.ratchet.json) 记录 `apiStabilityLeak` 在 `apps/server` 有 116 处、`apps/cli` 有 35 处、`apps/web` 有 26 处、`packages/provider` 有 21 处。升级 `effect` 次版本时，变更会直接穿透至业务层。

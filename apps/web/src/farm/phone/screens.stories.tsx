@@ -7,28 +7,25 @@ import { stories, story } from "@vibevalley/stories";
 import type { CallPhase } from "#/features/voice/index.ts";
 import { storyFrame } from "#/ui/pixel/story.stylex.ts";
 
-import { lcd } from "./lcd";
 import { OrchestratorLine, RingingScreen } from "./screens";
 
-const viewStyles = stylex.create({
-  screenDiv: {
+const styles = stylex.create({
+  screen: {
     display: "flex",
     height: "25rem",
     width: "calc(var(--spacing) * 60)",
     flexDirection: "column",
+    backgroundColor: "var(--color-lcd-paper)",
     padding: "2px",
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
+    color: "var(--color-lcd-ink)",
   },
 });
 
 /** The handset's screen, without the handset: the farm's store and the room are not here. */
 function Screen(props: { children: JSX.Element }) {
-  return (
-    <div {...stylex.attrs(viewStyles.screenDiv)} style={{ background: lcd.paper, color: lcd.ink }}>
-      {props.children}
-    </div>
-  );
+  return <div {...stylex.attrs(styles.screen)}>{props.children}</div>;
 }
 
 const ring = (kind: InboxKind, label: string, text: string): InboxItem => ({

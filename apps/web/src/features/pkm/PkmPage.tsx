@@ -18,7 +18,7 @@ import { Opened } from "./PageView";
 import { Sidebar } from "./Sidebar";
 import { refreshVault, usePkmVault } from "./vault";
 
-const variantStyles2 = stylex.create({
+const styles = stylex.create({
   daysA: {
     display: "inline-flex",
     alignItems: "center",
@@ -43,9 +43,6 @@ const variantStyles2 = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
   pkmPageNav: {
     minHeight: "0",
     flexShrink: "0",
@@ -66,10 +63,10 @@ const variantStyles = stylex.create({
       "@media (width>=64rem)": "1px",
     },
   },
-  pkmPageNavVariant: {
+  pkmPageNavTone: {
     display: "flex",
   },
-  pkmPageNavVariant2: {
+  pkmPageNavAlt: {
     display: {
       default: "none",
       "@media (width>=64rem)": "flex",
@@ -95,9 +92,6 @@ const variantStyles = stylex.create({
       "@media (width>=80rem)": "flex-start",
     },
   },
-});
-
-const viewStyles = stylex.create({
   pkmPageDiv: {
     display: "flex",
     height: "100%",
@@ -107,7 +101,7 @@ const viewStyles = stylex.create({
       "@media (width>=64rem)": "row",
     },
   },
-  daysDiv: {
+  daysDiv2: {
     marginInline: "auto",
     display: "flex",
     width: "100%",
@@ -118,7 +112,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
   },
-  daysDiv2: {
+  daysDiv22: {
     display: {
       default: null,
       "@media (width>=64rem)": "none",
@@ -176,15 +170,15 @@ export function PkmPage(props: { rest: string }) {
   const pages = () => ready(vault, undefined)?.pages ?? [];
   const nav = () => search().has("nav");
   return (
-    <div {...stylex.attrs(viewStyles.pkmPageDiv)}>
+    <div {...stylex.attrs(styles.pkmPageDiv)}>
       <nav
         aria-label={t("web.pkm.list.label")}
         data-testid="pkm-nav"
-        {...stylex.attrs(variantStyles.pkmPageNav, nav() ? variantStyles.pkmPageNavVariant : variantStyles.pkmPageNavVariant2)}
+        {...stylex.attrs(styles.pkmPageNav, nav() ? styles.pkmPageNavTone : styles.pkmPageNavAlt)}
       >
         <Sidebar slug={slug()} pages={pages()} error={vault.error} />
       </nav>
-      <main {...stylex.attrs(variantStyles.pkmPageMain, nav() ? variantStyles.pkmPageNavVariant2 : variantStyles.pkmPageNavVariant)}>
+      <main {...stylex.attrs(styles.pkmPageMain, nav() ? styles.pkmPageNavAlt : styles.pkmPageNavTone)}>
         <Show when={slug()} fallback={<Days pages={pages()} />}>
           {(s) => <Keyed key={s()}>{() => <Opened slug={s()} pages={pages()} point={search().get("b") ?? undefined} />}</Keyed>}
         </Show>
@@ -224,10 +218,10 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
       .toSorted((a, b) => (b.day ?? "").localeCompare(a.day ?? ""))
       .slice(0, daysShown);
   return (
-    <div data-testid="pkm-days" aria-busy={act.busy() ? "true" : "false"} {...stylex.attrs(variantStyles.daysDiv)}>
-      <div {...stylex.attrs(viewStyles.daysDiv)}>
-        <div {...stylex.attrs(viewStyles.daysDiv2)}>
-          <A href="/pkm?nav" {...stylex.attrs(variantStyles2.daysA)}>
+    <div data-testid="pkm-days" aria-busy={act.busy() ? "true" : "false"} {...stylex.attrs(styles.daysDiv)}>
+      <div {...stylex.attrs(styles.daysDiv2)}>
+        <div {...stylex.attrs(styles.daysDiv22)}>
+          <A href="/pkm?nav" {...stylex.attrs(styles.daysA)}>
             <Icon name="calendar" size={14} />
             {t("web.pkm.list.label")}
           </A>
@@ -237,7 +231,7 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
           {(p) => <Opened slug={p().slug} pages={props.pages} compact />}
         </For>
       </div>
-      <aside aria-label={t("web.pkm.rail.label")} {...stylex.attrs(viewStyles.daysAside)}>
+      <aside aria-label={t("web.pkm.rail.label")} {...stylex.attrs(styles.daysAside)}>
         <Calendar pages={props.pages} open={today()} />
       </aside>
     </div>

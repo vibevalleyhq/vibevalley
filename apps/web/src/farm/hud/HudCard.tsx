@@ -1,26 +1,31 @@
 import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 
-import { CardColors } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
-const viewStyles = stylex.create({
-  hudCardOuter: {
+const styles = stylex.create({
+  outer: {
     display: "inline-block",
     paddingRight: "calc(var(--spacing) * .5)",
     paddingBottom: "calc(var(--spacing) * .5)",
   },
-  hudCardBox: {
+  box: {
     boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
     gap: "var(--spacing)",
     borderStyle: "solid",
     borderWidth: "2px",
+    borderColor: "var(--color-bark-850)",
+    backgroundColor: "var(--color-glow-soft)",
     paddingInline: "calc(var(--spacing) * 2)",
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
+    color: "var(--color-bark-850)",
+    boxShadow: "var(--shadow-px-shade)",
   },
-  hudCardBright: {
+  height: (height: number) => ({ height }),
+  bright: {
     filter: "brightness(110%)",
   },
 });
@@ -28,17 +33,8 @@ const viewStyles = stylex.create({
 /** A wooden card the height of the HUD's row, an icon and words. */
 export function HudCard(props: { height?: number; bright?: boolean; children: JSX.Element }) {
   return (
-    <span {...stylex.attrs(viewStyles.hudCardOuter)}>
-      <span
-        {...stylex.attrs(viewStyles.hudCardBox, props.bright === true && viewStyles.hudCardBright)}
-        style={{
-          height: props.height !== undefined ? `${props.height}px` : undefined,
-          background: CardColors.paper,
-          "border-color": CardColors.ink,
-          color: CardColors.ink,
-          "box-shadow": "2px 2px 0 0 #3a2a1899",
-        }}
-      >
+    <span {...stylex.attrs(styles.outer)}>
+      <span {...styleProps([styles.box, props.bright === true && styles.bright, props.height !== undefined && styles.height(props.height)])}>
         {props.children}
       </span>
     </span>

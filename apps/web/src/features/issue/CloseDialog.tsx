@@ -93,7 +93,7 @@ const changeStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   fileRowButton: {
     display: "flex",
     width: "100%",
@@ -131,49 +131,34 @@ const recipeStyles2 = stylex.create({
     },
     cursor: "pointer",
   },
-});
-
-const recipeStyles = stylex.create({
   patchDiv: {
     paddingInline: "calc(var(--spacing) * 2)",
   },
-  patchDivVariant1Case1: {
+  patchDivPrimary: {
     backgroundColor: {
       default: "var(--color-leaf)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 20%, transparent)",
     },
     color: "var(--color-accent)",
   },
-  patchDivVariant1Case2: {
+  patchDivSecondary: {
     backgroundColor: {
       default: "var(--color-berry)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 10%, transparent)",
     },
     color: "var(--color-berry)",
   },
-  patchDivVariant1Case3: {
+  patchDivTertiary: {
     backgroundColor: null,
     color: "var(--color-water)",
   },
-  patchDivVariant1Case4: {
+  patchDivQuaternary: {
     backgroundColor: null,
     color: null,
   },
-});
-const recipeStylesChoices1 = {
-  added: recipeStyles.patchDivVariant1Case1,
-  removed: recipeStyles.patchDivVariant1Case2,
-  hunk: recipeStyles.patchDivVariant1Case3,
-  plain: recipeStyles.patchDivVariant1Case4,
-};
-
-const variantStyles2 = stylex.create({
   reopenDialogTextArea: {
     marginTop: "calc(var(--spacing) * 4)",
   },
-});
-
-const variantStyles = stylex.create({
   fileRowSpan: {
     minWidth: "0",
     flex: "1",
@@ -184,13 +169,10 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  fileRowSpanVariant: {
+  fileRowSpanTone: {
     color: "var(--color-berry)",
   },
-  fileRowSpanVariant2: {},
-});
-
-const viewStyles = stylex.create({
+  fileRowSpanAlt: {},
   doneAction: { marginTop: "calc(var(--spacing) * 4)" },
   closeIssueDialogP: {
     fontSize: "var(--text-base)",
@@ -321,7 +303,7 @@ const viewStyles = stylex.create({
   plusMinusSpan: {
     color: "var(--color-accent)",
   },
-  fileRowSpan: {
+  fileRowSpan2: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-berry)",
@@ -352,6 +334,13 @@ const viewStyles = stylex.create({
   },
 });
 
+const toneChoices1 = {
+  added: styles.patchDivPrimary,
+  removed: styles.patchDivSecondary,
+  hunk: styles.patchDivTertiary,
+  plain: styles.patchDivQuaternary,
+};
+
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
@@ -367,14 +356,14 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
     <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
       <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} lane={props.lane} onDone={props.onClose} />}>
         <div>
-          <p {...stylex.attrs(viewStyles.closeIssueDialogP)}>
+          <p {...stylex.attrs(styles.closeIssueDialogP)}>
             {working()
               ? t("web.issue.close.working", { who: props.session?.name ?? props.issue.title })
               : acts().includes("complete")
                 ? t("web.issue.close.completable", { who: props.session?.name ?? props.issue.title })
                 : t("web.issue.close.notCompletable", { who: props.session?.name ?? props.issue.title })}
           </p>
-          <div {...stylex.attrs(viewStyles.closeIssueDialogDiv)}>
+          <div {...stylex.attrs(styles.closeIssueDialogDiv)}>
             <Show when={acts().includes("complete")}>
               <Button tone="primary" data-testid="review-changes" onClick={() => setReviewing(true)}>
                 {t("web.issue.close.review")}
@@ -429,18 +418,18 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
   return (
     <Switch>
       <Match when={changes.status() === "pending"}>
-        <p {...stylex.attrs(viewStyles.changesReviewP)}>{t("web.issue.changes.reading")}</p>
+        <p {...stylex.attrs(styles.changesReviewP)}>{t("web.issue.changes.reading")}</p>
       </Match>
       <Match when={changes.error()}>
         {(error) => (
           <div>
             <Note tone="berry">
-              <span {...stylex.attrs(viewStyles.changesReviewSpan)}>
+              <span {...stylex.attrs(styles.changesReviewSpan)}>
                 {t("web.issue.changes.unreadable")}
                 {reasonOf(error())}
               </span>
             </Note>
-            <Button styles={viewStyles.doneAction} onClick={() => props.onDone()}>
+            <Button styles={styles.doneAction} onClick={() => props.onDone()}>
               {t("web.issue.later")}
             </Button>
           </div>
@@ -450,36 +439,36 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
         {(c) => {
           const empty = () => nothingChanged(c());
           return (
-            <div {...stylex.attrs(viewStyles.changesReviewDiv)}>
+            <div {...stylex.attrs(styles.changesReviewDiv)}>
               <ChangesHead changes={c()} />
               <Show
                 when={c().conflicts.length > 0}
                 fallback={
                   <Show when={empty()}>
                     <Note>
-                      <span {...stylex.attrs(viewStyles.changesReviewSpan2)}>{t("web.issue.changes.none")}</span>
+                      <span {...stylex.attrs(styles.changesReviewSpan2)}>{t("web.issue.changes.none")}</span>
                     </Note>
                   </Show>
                 }
               >
                 <Note tone="berry">
-                  <div {...stylex.attrs(viewStyles.changesReviewDiv2)}>{t("web.issue.changes.conflict", { base: c().base })}</div>
-                  <div {...stylex.attrs(viewStyles.changesReviewDiv3)}>
-                    <For each={c().conflicts}>{(f) => <span {...stylex.attrs(viewStyles.changesReviewSpan3)}>{f}</span>}</For>
+                  <div {...stylex.attrs(styles.changesReviewDiv2)}>{t("web.issue.changes.conflict", { base: c().base })}</div>
+                  <div {...stylex.attrs(styles.changesReviewDiv3)}>
+                    <For each={c().conflicts}>{(f) => <span {...stylex.attrs(styles.changesReviewSpan3)}>{f}</span>}</For>
                   </div>
-                  <div {...stylex.attrs(viewStyles.changesReviewDiv4)}>{t("web.issue.changes.resolveHow", { base: c().base })}</div>
+                  <div {...stylex.attrs(styles.changesReviewDiv4)}>{t("web.issue.changes.resolveHow", { base: c().base })}</div>
                 </Note>
               </Show>
               <Show when={c().behind > 0 && c().conflicts.length === 0}>
-                <p {...stylex.attrs(viewStyles.changesReviewP2)}>{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</p>
+                <p {...stylex.attrs(styles.changesReviewP2)}>{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</p>
               </Show>
               <Show when={c().uncommitted.length > 0}>
                 <Note tone="wheat">
                   <div>{t("web.issue.changes.uncommitted", { n: c().uncommitted.length })}</div>
-                  <div {...stylex.attrs(viewStyles.changesReviewDiv3)}>
+                  <div {...stylex.attrs(styles.changesReviewDiv3)}>
                     <For each={c().uncommitted}>
                       {(f) => (
-                        <span {...stylex.attrs(viewStyles.changesReviewSpan4)}>
+                        <span {...stylex.attrs(styles.changesReviewSpan4)}>
                           {changeKind(f.status).mark} {f.path}
                         </span>
                       )}
@@ -487,7 +476,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
                   </div>
                 </Note>
               </Show>
-              <div {...stylex.attrs(viewStyles.changesReviewDiv5)}>
+              <div {...stylex.attrs(styles.changesReviewDiv5)}>
                 <Show when={acts().includes("complete")}>
                   <Button tone="primary" data-act="complete" onClick={() => void take()}>
                     {t("shared.act.complete")}
@@ -501,7 +490,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
                 <Button onClick={() => props.onDone()}>{t("web.issue.later")}</Button>
               </div>
               <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-                <p {...stylex.attrs(viewStyles.changesReviewP2)}>{t("web.issue.changes.moved")}</p>
+                <p {...stylex.attrs(styles.changesReviewP2)}>{t("web.issue.changes.moved")}</p>
               </Show>
               <ChangesBody changes={c()} />
             </div>
@@ -515,16 +504,16 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
 export function ChangesHead(props: { changes: Changes }) {
   const counts = () => lineCounts(props.changes);
   return (
-    <div {...stylex.attrs(viewStyles.changesHeadDiv)}>
-      <span {...stylex.attrs(viewStyles.changesHeadSpan)}>
+    <div {...stylex.attrs(styles.changesHeadDiv)}>
+      <span {...stylex.attrs(styles.changesHeadSpan)}>
         {t("web.issue.task.repo")} {props.changes.repo}
       </span>
       <Show when={props.changes.branch}>
-        <span {...stylex.attrs(viewStyles.changesHeadSpan2)}>
+        <span {...stylex.attrs(styles.changesHeadSpan2)}>
           {props.changes.branch} → {props.changes.base}
         </span>
       </Show>
-      <span {...stylex.attrs(viewStyles.changesReviewP2)}>
+      <span {...stylex.attrs(styles.changesReviewP2)}>
         {t("web.issue.changes.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}
       </span>
       <Show when={props.changes.files.length > 0}>
@@ -541,13 +530,13 @@ export function ChangesBody(props: { changes: Changes }) {
     <>
       <Show when={props.changes.commits.length > 0}>
         <section>
-          <h3 {...stylex.attrs(viewStyles.changesBodyH3)}>{t("web.issue.changes.commits", { n: props.changes.commits.length })}</h3>
+          <h3 {...stylex.attrs(styles.changesBodyH3)}>{t("web.issue.changes.commits", { n: props.changes.commits.length })}</h3>
           <For each={props.changes.commits}>
             {(m) => (
-              <div {...stylex.attrs(viewStyles.changesBodyDiv)}>
-                <span {...stylex.attrs(viewStyles.changesBodySpan)}>{m.hash}</span>
-                <span {...stylex.attrs(viewStyles.changesBodySpan2)}>{m.subject}</span>
-                <span {...stylex.attrs(viewStyles.changesBodySpan3)}>{ago(m.at, now)}</span>
+              <div {...stylex.attrs(styles.changesBodyDiv)}>
+                <span {...stylex.attrs(styles.changesBodySpan)}>{m.hash}</span>
+                <span {...stylex.attrs(styles.changesBodySpan2)}>{m.subject}</span>
+                <span {...stylex.attrs(styles.changesBodySpan3)}>{ago(m.at, now)}</span>
               </div>
             )}
           </For>
@@ -555,7 +544,7 @@ export function ChangesBody(props: { changes: Changes }) {
       </Show>
       <Show when={props.changes.files.length > 0}>
         <section>
-          <h3 {...stylex.attrs(viewStyles.changesBodyH3)}>{t("web.issue.changes.files", { n: props.changes.files.length })}</h3>
+          <h3 {...stylex.attrs(styles.changesBodyH3)}>{t("web.issue.changes.files", { n: props.changes.files.length })}</h3>
           <div {...styleProps(changeStyles.files)}>
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={props.changes.conflicts.includes(f.path)} />}</For>
           </div>
@@ -567,8 +556,8 @@ export function ChangesBody(props: { changes: Changes }) {
 
 function PlusMinus(props: { added: number; removed: number }) {
   return (
-    <span {...stylex.attrs(viewStyles.changesHeadSpan2)}>
-      <span {...stylex.attrs(viewStyles.plusMinusSpan)}>+{props.added}</span> <span {...stylex.attrs(viewStyles.changesReviewSpan)}>−{props.removed}</span>
+    <span {...stylex.attrs(styles.changesHeadSpan2)}>
+      <span {...stylex.attrs(styles.plusMinusSpan)}>+{props.added}</span> <span {...stylex.attrs(styles.changesReviewSpan)}>−{props.removed}</span>
     </span>
   );
 }
@@ -589,14 +578,14 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         aria-expanded={hasPatch() ? aria(open()) : undefined}
         onClick={() => setOpen(!open())}
         {...stylex.attrs(
-          recipeStyles2.fileRowButton,
+          styles.fileRowButton,
           hasPatch()
             ? open()
-              ? recipeStyles2.fileRowButtonState4
-              : recipeStyles2.fileRowButtonState3
+              ? styles.fileRowButtonState4
+              : styles.fileRowButtonState3
             : open()
-              ? recipeStyles2.fileRowButtonState2
-              : recipeStyles2.fileRowButtonState,
+              ? styles.fileRowButtonState2
+              : styles.fileRowButtonState,
         )}
       >
         <span title={kind().label} {...styleProps([changeStyles.kind, kindLook[props.file.status] ?? changeStyles.unknown])}>
@@ -604,14 +593,14 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
         </span>
         <span
           title={props.file.path}
-          {...stylex.attrs(variantStyles.fileRowSpan, props.conflict ? variantStyles.fileRowSpanVariant : variantStyles.fileRowSpanVariant2)}
+          {...stylex.attrs(styles.fileRowSpan, props.conflict ? styles.fileRowSpanTone : styles.fileRowSpanAlt)}
         >
           {props.file.path}
         </span>
         <Show when={props.conflict}>
-          <span {...stylex.attrs(viewStyles.fileRowSpan)}>{t("web.issue.changes.conflictMark")}</span>
+          <span {...stylex.attrs(styles.fileRowSpan2)}>{t("web.issue.changes.conflictMark")}</span>
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span {...stylex.attrs(viewStyles.changesBodySpan)}>{t("web.issue.changes.binary")}</span>}>
+        <Show when={props.file.added >= 0} fallback={<span {...stylex.attrs(styles.changesBodySpan)}>{t("web.issue.changes.binary")}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>
@@ -646,13 +635,13 @@ function Patch(props: { text: string; path: string }) {
       .slice(0, i)
       .filter((l) => patchMarkOf(l) !== "hunk").length;
   return (
-    <pre {...stylex.attrs(viewStyles.patchPre)}>
+    <pre {...stylex.attrs(styles.patchPre)}>
       <For each={lines()}>
         {(line, i) => {
           const mark = patchMarkOf(line);
           const coloured = () => (mark === "hunk" ? undefined : tokens()?.[row(i())]);
           return (
-            <div {...stylex.attrs(recipeStyles.patchDiv, recipeStylesChoices1[mark])}>
+            <div {...stylex.attrs(styles.patchDiv, toneChoices1[mark])}>
               <Show when={coloured()} fallback={line || " "}>
                 {(toks) => (
                   <>
@@ -683,17 +672,17 @@ export function ReopenDialog(props: { issue: Issue; lane?: Lane | undefined; onC
   };
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.reopen.title")}>
-      <p {...stylex.attrs(viewStyles.closeIssueDialogP)}>{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</p>
+      <p {...stylex.attrs(styles.closeIssueDialogP)}>{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</p>
       <TextArea
         ref={autofocus()}
-        styles={variantStyles2.reopenDialogTextArea}
+        styles={styles.reopenDialogTextArea}
         rows={3}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
         placeholder={t("web.issue.reopen.what")}
         aria-label={t("web.issue.reopen.whatLabel")}
       />
-      <div {...stylex.attrs(viewStyles.reopenDialogDiv)}>
+      <div {...stylex.attrs(styles.reopenDialogDiv)}>
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
         <Button tone="primary" onClick={() => reopen()}>
           {t("web.issue.reopen.reopen")}

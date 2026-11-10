@@ -18,8 +18,9 @@ const config: KnipConfig = {
       entry: ["scripts/*.ts"],
       project: ["scripts/**/*.ts"],
       // Named by tools, not imports: effect-tsgo runs in vite.config.ts's effect:check, effect is the version it checks
-      // against, and tsconfig.base.json names the editor plugin @effect/language-service.
-      ignoreDependencies: ["@effect/tsgo", "effect", "@effect/language-service"],
+      // against, tsconfig.base.json names the editor plugin @effect/language-service, and lightningcss/parse5 stay in the
+      // root catalog until the next lockfile prune.
+      ignoreDependencies: ["@effect/tsgo", "effect", "@effect/language-service", "lightningcss", "parse5"],
     },
     "apps/server": {
       // main.ts and chat.ts run through vpx (`vp run start`, `vp run chat`, the desktop app and the e2e), which knip does
@@ -36,15 +37,11 @@ const config: KnipConfig = {
     "apps/web": {
       entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
       project: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
-      // src/style.css's @import "tailwindcss": knip reads no stylesheets.
-      ignoreDependencies: ["tailwindcss"],
     },
     "apps/site": {
       // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
       entry: ["src/{App,Document}.tsx", "src/lib/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
-      // The stylesheet imports Tailwind.
-      ignoreDependencies: ["tailwindcss"],
     },
     "apps/desktop": {
       entry: ["src/main.ts", "src/preload.ts", "scripts/*.ts", "test/**/*.ts"],

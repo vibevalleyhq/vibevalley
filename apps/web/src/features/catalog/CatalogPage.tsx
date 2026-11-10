@@ -20,7 +20,7 @@ import { Tabs } from "#/ui/Tabs.tsx";
 import { CursorTile, Detail, fitScale, type Ground, grounds, groundStyle, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   layoutDiv: {
     display: "flex",
     height: "100%",
@@ -60,9 +60,6 @@ const recipeStyles2 = stylex.create({
       "@media (width>=80rem)": "auto",
     },
   },
-});
-
-const recipeStyles = stylex.create({
   spritesSpan: {
     position: "absolute",
     top: "calc(var(--spacing) * .5)",
@@ -77,17 +74,11 @@ const recipeStyles = stylex.create({
     lineHeight: "14px",
     color: "var(--color-paper)",
   },
-});
-
-const variantStyles2 = stylex.create({
   searchTextInput: {
     minWidth: "calc(var(--spacing) * 48)",
     flex: "1",
   },
-});
-
-const variantStyles = stylex.create({
-  layoutDiv: {
+  layoutDiv3: {
     display: "flex",
     minWidth: "0",
     flex: "1",
@@ -110,11 +101,11 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  spritesButtonVariant: {
+  spritesButtonTone: {
     backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  spritesButtonVariant2: {
+  spritesButtonAlt: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -144,12 +135,9 @@ const variantStyles = stylex.create({
       ":focus-visible": "var(--color-focus)",
     },
   },
-  spritesButtonVariant3: {
+  spritesButtonAccent: {
     backgroundColor: "var(--color-selected)",
   },
-});
-
-const viewStyles = stylex.create({
   catalogPageDiv: {
     height: "100%",
   },
@@ -158,7 +146,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
   },
-  layoutDiv: {
+  layoutDiv4: {
     flexShrink: "0",
     borderBottomStyle: {
       default: "solid",
@@ -217,7 +205,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  spritesSpan: {
+  spritesSpan2: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -230,7 +218,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  spritesSpan2: {
+  spritesSpan22: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
@@ -338,7 +326,7 @@ export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" || props.rest === "sounds" ? props.rest : "sprites");
   const tabs = () => <Tabs label={t("web.catalog.shelves")} value={shelf()} items={shelfTabs.map((s) => ({ value: s.id, label: s.label, href: s.to }))} />;
   return (
-    <div {...stylex.attrs(viewStyles.catalogPageDiv)}>
+    <div {...stylex.attrs(styles.catalogPageDiv)}>
       <Switch fallback={<Sprites id={props.rest ? decodeURIComponent(props.rest) : undefined} tabs={tabs()} />}>
         <Match when={shelf() === "cursors"}>
           <Cursors tabs={tabs()} />
@@ -354,7 +342,7 @@ export function CatalogPage(props: { rest: string }) {
 /** The column every shelf has, so switching shelves never moves the picker: the page's side column (Layout). */
 function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.columnDiv)}>
+    <div {...stylex.attrs(styles.columnDiv)}>
       {props.tabs}
       {props.children}
     </div>
@@ -364,23 +352,23 @@ function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
 function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.Element }) {
   return (
     // The shelves are the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
-    <div {...stylex.attrs(recipeStyles2.layoutDiv)}>
-      <div {...stylex.attrs(viewStyles.layoutDiv)}>{props.left}</div>
+    <div {...stylex.attrs(styles.layoutDiv)}>
+      <div {...stylex.attrs(styles.layoutDiv4)}>{props.left}</div>
       <Show when={props.right}>
-        <div {...stylex.attrs(recipeStyles2.layoutDiv2)}>{props.right}</div>
+        <div {...stylex.attrs(styles.layoutDiv2)}>{props.right}</div>
       </Show>
-      <div {...stylex.attrs(variantStyles.layoutDiv)}>{props.children}</div>
+      <div {...stylex.attrs(styles.layoutDiv3)}>{props.children}</div>
     </div>
   );
 }
 
 function Search(props: { query: string; onChange: (q: string) => void; placeholder: string; ground?: Ground; onGround?: (g: Ground) => void }) {
   return (
-    <div {...stylex.attrs(viewStyles.searchDiv)}>
+    <div {...stylex.attrs(styles.searchDiv)}>
       <TextInput
         data-testid="catalog-search"
         aria-label={t("web.catalog.find")}
-        styles={variantStyles2.searchTextInput}
+        styles={styles.searchTextInput}
         placeholder={props.placeholder}
         value={props.query}
         onInput={(e) => props.onChange(e.currentTarget.value)}
@@ -427,10 +415,10 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
       data-key={b.id}
       aria-pressed={aria(shelf() === b.id)}
       onClick={() => setShelf(b.id)}
-      {...stylex.attrs(variantStyles.spritesButton, shelf() === b.id ? variantStyles.spritesButtonVariant : variantStyles.spritesButtonVariant2)}
+      {...stylex.attrs(styles.spritesButton, shelf() === b.id ? styles.spritesButtonTone : styles.spritesButtonAlt)}
     >
-      <span {...stylex.attrs(viewStyles.shelfButtonSpan)}>{b.label}</span>
-      <span {...stylex.attrs(viewStyles.shelfButtonSpan2)}>{b.count}</span>
+      <span {...stylex.attrs(styles.shelfButtonSpan)}>{b.label}</span>
+      <span {...stylex.attrs(styles.shelfButtonSpan2)}>{b.count}</span>
     </button>
   );
   return (
@@ -439,11 +427,11 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
         <Layout
           left={
             <Column tabs={props.tabs}>
-              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" {...stylex.attrs(viewStyles.catalogShelves)}>
+              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" {...stylex.attrs(styles.catalogShelves)}>
                 <ShelfButton id="all" label={t("web.catalog.all")} count={pics().length} />
                 <For each={present()}>{(s) => <ShelfButton id={s.id} label={s.label} count={counts().get(s.id) ?? 0} />}</For>
               </nav>
-              <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.count", { n: pics().length })}</p>
+              <p {...stylex.attrs(styles.spritesP)}>{t("web.catalog.count", { n: pics().length })}</p>
             </Column>
           }
           right={
@@ -463,15 +451,15 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                 <Show when={groups().length > 0}>
                   <Card
                     title={`${s.label} · ${groups().reduce((n, g) => n + g.pictures.length, 0)}`}
-                    action={<span {...stylex.attrs(viewStyles.spritesSpan)}>{s.hint}</span>}
+                    action={<span {...stylex.attrs(styles.spritesSpan2)}>{s.hint}</span>}
                   >
                     <For each={groups()}>
                       {(g) => (
-                        <div {...stylex.attrs(viewStyles.spritesDiv)}>
+                        <div {...stylex.attrs(styles.spritesDiv)}>
                           <Show when={g.label}>
-                            <span {...stylex.attrs(viewStyles.spritesSpan2)}>{g.label}</span>
+                            <span {...stylex.attrs(styles.spritesSpan22)}>{g.label}</span>
                           </Show>
-                          <div {...stylex.attrs(viewStyles.spritesDiv2)}>
+                          <div {...stylex.attrs(styles.spritesDiv2)}>
                             <For each={g.pictures}>
                               {(p) => (
                                 <button
@@ -483,17 +471,17 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                   aria-current={selected()?.name === p.name ? "true" : undefined}
                                   onClick={() => router.navigate(`/catalog/${encodeURIComponent(p.name)}`)}
                                   {...stylex.attrs(
-                                    variantStyles.spritesButton2,
-                                    selected()?.name === p.name ? variantStyles.spritesButtonVariant3 : variantStyles.spritesButtonVariant2,
+                                    styles.spritesButton2,
+                                    selected()?.name === p.name ? styles.spritesButtonAccent : styles.spritesButtonAlt,
                                   )}
                                 >
-                                  <span {...styleProps([viewStyles.spritesSpan3, groundStyle(ground())])}>
+                                  <span {...styleProps([styles.spritesSpan3, groundStyle(ground())])}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
-                                      <span {...stylex.attrs(recipeStyles.spritesSpan)}>{t("web.catalog.moves")}</span>
+                                      <span {...stylex.attrs(styles.spritesSpan)}>{t("web.catalog.moves")}</span>
                                     </Show>
                                   </span>
-                                  <span {...stylex.attrs(viewStyles.spritesSpan4)}>{p.name}</span>
+                                  <span {...stylex.attrs(styles.spritesSpan4)}>{p.name}</span>
                                 </button>
                               )}
                             </For>
@@ -526,15 +514,15 @@ function Cursors(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.cursorsIntro")}</p>
+          <p {...stylex.attrs(styles.spritesP)}>{t("web.catalog.cursorsIntro")}</p>
         </Column>
       }
     >
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.cursorsFind")} ground={ground()} onGround={setGround} />
       <Card title={t("web.catalog.cursors", { n: all()?.length ?? 0 })}>
-        <p {...stylex.attrs(viewStyles.cursorsP)}>{t("web.catalog.cursorsNote")}</p>
+        <p {...stylex.attrs(styles.cursorsP)}>{t("web.catalog.cursorsNote")}</p>
         <Show when={data() !== null} fallback={<Quiet>{t("web.catalog.noCursors")}</Quiet>}>
-          <div {...stylex.attrs(viewStyles.cursorsDiv)}>
+          <div {...stylex.attrs(styles.cursorsDiv)}>
             <For each={all() ?? []}>{([name, hot]) => <CursorTile name={name} hx={hot.hx} hy={hot.hy} ground={ground()} />}</For>
           </div>
         </Show>
@@ -553,15 +541,15 @@ function Sounds(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.soundsIntro")}</p>
+          <p {...stylex.attrs(styles.spritesP)}>{t("web.catalog.soundsIntro")}</p>
         </Column>
       }
     >
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.soundsFind")} />
       <Card>
-        <p {...stylex.attrs(viewStyles.cursorsP)}>
-          {t("web.catalog.soundsRecipes")} <code {...stylex.attrs(viewStyles.soundsCode)}>apps/web/src/ui/pixel/sound.ts</code>
-          {t("web.catalog.soundsMusic")} <code {...stylex.attrs(viewStyles.soundsCode)}>design/music/suno-prompts.md</code>
+        <p {...stylex.attrs(styles.cursorsP)}>
+          {t("web.catalog.soundsRecipes")} <code {...stylex.attrs(styles.soundsCode)}>apps/web/src/ui/pixel/sound.ts</code>
+          {t("web.catalog.soundsMusic")} <code {...stylex.attrs(styles.soundsCode)}>design/music/suno-prompts.md</code>
           {t("web.catalog.period")}
         </p>
       </Card>
@@ -571,7 +559,7 @@ function Sounds(props: { tabs: JSX.Element }) {
           return (
             <Show when={names().length > 0}>
               <Card title={g.title}>
-                <div {...stylex.attrs(viewStyles.soundsDiv)}>
+                <div {...stylex.attrs(styles.soundsDiv)}>
                   <For each={names()}>
                     {(name) => (
                       <button
@@ -580,11 +568,11 @@ function Sounds(props: { tabs: JSX.Element }) {
                         data-key={name}
                         aria-label={t("web.catalog.playSound", { name: SOUND_LABEL[name] })}
                         onClick={() => playSound(name)}
-                        {...stylex.attrs(viewStyles.sound)}
+                        {...stylex.attrs(styles.sound)}
                       >
                         <Icon name="play" size={16} />
-                        <span {...stylex.attrs(viewStyles.soundsSpan)}>{SOUND_LABEL[name]}</span>
-                        <span {...stylex.attrs(viewStyles.soundsSpan2)}>{name}</span>
+                        <span {...stylex.attrs(styles.soundsSpan)}>{SOUND_LABEL[name]}</span>
+                        <span {...stylex.attrs(styles.soundsSpan2)}>{name}</span>
                       </button>
                     )}
                   </For>

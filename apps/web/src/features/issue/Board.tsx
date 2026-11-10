@@ -61,7 +61,7 @@ const cardStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   issueBoardDiv: {
     marginBottom: "calc(var(--spacing) * 2)",
     display: {
@@ -83,20 +83,20 @@ const recipeStyles = stylex.create({
     paddingTop: "calc(var(--spacing) * 1.5)",
     paddingBottom: "calc(var(--spacing) * 2)",
   },
-  laneViewSectionVariant1Case1: {
+  laneViewSectionPrimary: {
     display: {
       default: "none",
       "@container (width>=700px)": "flex",
     },
   },
-  laneViewSectionVariant1Case2: {
+  laneViewSectionSecondary: {
     display: "flex",
   },
-  laneViewSectionVariant2Case1: {
+  laneViewSectionStateA: {
     borderColor: "transparent",
     backgroundColor: "var(--color-hover)",
   },
-  laneViewSectionVariant2Case2: {
+  laneViewSectionStateB: {
     borderColor: "var(--color-leaf)",
     backgroundColor: {
       default: "var(--color-leaf)",
@@ -146,10 +146,7 @@ const recipeStyles = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
-  issueBoardDiv: {
+  issueBoardDiv2: {
     containerType: "inline-size",
     display: "flex",
     minHeight: "0",
@@ -173,10 +170,10 @@ const variantStyles = stylex.create({
     borderStyle: "dashed",
     borderWidth: "1px",
   },
-  laneViewDivVariant: {
+  laneViewDivTone: {
     borderColor: "var(--color-leaf)",
   },
-  laneViewDivVariant2: {
+  laneViewDivAlt: {
     borderColor: "var(--color-line)",
   },
   cardViewDiv: {
@@ -190,9 +187,6 @@ const variantStyles = stylex.create({
     fontWeight: "var(--font-weight-medium)",
     overflowWrap: "break-word",
   },
-});
-
-const viewStyles = stylex.create({
   olderLinkButton: {
     marginInline: "auto",
     display: "block",
@@ -209,7 +203,7 @@ const viewStyles = stylex.create({
       },
     },
   },
-  issueBoardDiv: {
+  issueBoardDiv3: {
     display: "flex",
     minHeight: "0",
     flex: "1",
@@ -239,13 +233,13 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-faint)",
   },
-  cardViewDiv: {
+  cardViewDiv2: {
     marginBottom: "var(--spacing)",
     height: "calc(var(--spacing) * .5)",
     borderRadius: "2147483647px",
     backgroundColor: "var(--color-leaf)",
   },
-  cardViewDiv2: {
+  cardViewDiv22: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -311,7 +305,7 @@ const viewStyles = stylex.create({
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
 export function OlderLink(props: { hidden: number; onClick: () => void }) {
   return (
-    <button type="button" onClick={() => props.onClick()} {...stylex.attrs(viewStyles.olderLinkButton)}>
+    <button type="button" onClick={() => props.onClick()} {...stylex.attrs(styles.olderLinkButton)}>
       {props.hidden > 0 ? t("web.issue.board.earlier", { n: props.hidden }) : t("web.issue.board.recent")}
     </button>
   );
@@ -349,8 +343,8 @@ export function IssueBoard(props: BoardProps) {
   const [dragging, setDragging] = createSignal<BoardCard>();
   const drag: Drag = { dragging, setDragging: (c) => setDragging(() => c) };
   return (
-    <div {...stylex.attrs(variantStyles.issueBoardDiv)}>
-      <div {...stylex.attrs(recipeStyles.issueBoardDiv)}>
+    <div {...stylex.attrs(styles.issueBoardDiv2)}>
+      <div {...stylex.attrs(styles.issueBoardDiv)}>
         <Segmented
           label={t("web.issue.board.whichLane")}
           block
@@ -359,7 +353,7 @@ export function IssueBoard(props: BoardProps) {
           options={lanes.map((l) => ({ value: l, label: `${laneLabel[l]} ${props.cards.filter((c) => c.lane === l).length}` }))}
         />
       </div>
-      <div {...stylex.attrs(viewStyles.issueBoardDiv)}>
+      <div {...stylex.attrs(styles.issueBoardDiv3)}>
         <For each={lanes}>
           {(l) => <LaneView board={props} lane={l} shownNarrow={l === lane()} cards={props.cards.filter((c) => c.lane === l)} drag={drag} />}
         </For>
@@ -401,15 +395,15 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
         props.drag.setDragging(undefined);
       }}
       {...stylex.attrs(
-        recipeStyles.laneViewSection,
-        props.shownNarrow ? recipeStyles.laneViewSectionVariant1Case2 : recipeStyles.laneViewSectionVariant1Case1,
-        over() ? recipeStyles.laneViewSectionVariant2Case2 : recipeStyles.laneViewSectionVariant2Case1,
+        styles.laneViewSection,
+        props.shownNarrow ? styles.laneViewSectionSecondary : styles.laneViewSectionPrimary,
+        over() ? styles.laneViewSectionStateB : styles.laneViewSectionStateA,
       )}
     >
-      <header {...stylex.attrs(viewStyles.laneViewHeader)}>
+      <header {...stylex.attrs(styles.laneViewHeader)}>
         <StatusMark status={laneStatus[props.lane]} />
-        <h2 {...stylex.attrs(viewStyles.laneViewH2)}>{laneLabel[props.lane]}</h2>
-        <span {...stylex.attrs(viewStyles.laneViewSpan)}>{head()}</span>
+        <h2 {...stylex.attrs(styles.laneViewH2)}>{laneLabel[props.lane]}</h2>
+        <span {...stylex.attrs(styles.laneViewSpan)}>{head()}</span>
         <Hint text={emptyText[props.lane]} />
       </header>
       <Show when={props.lane === "todo"}>
@@ -418,13 +412,13 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
           data-testid="issue-new"
           onClick={() => p().onNew()}
           aria-label={t("web.issue.new.title")}
-          {...stylex.attrs(recipeStyles.laneViewButton)}
+          {...stylex.attrs(styles.laneViewButton)}
         >
           <Icon name="add" size={14} />
           {t("web.issue.new.card")}
         </button>
       </Show>
-      <div {...stylex.attrs(variantStyles.laneViewDiv)}>
+      <div {...stylex.attrs(styles.laneViewDiv)}>
         <Switch
           fallback={
             <>
@@ -449,13 +443,13 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
           }
         >
           <Match when={p().loading}>
-            <p {...stylex.attrs(viewStyles.laneViewP)}>{t("web.issue.reading")}</p>
+            <p {...stylex.attrs(styles.laneViewP)}>{t("web.issue.reading")}</p>
           </Match>
           {/* The todo lane has its placeholder card: no second empty box under it. */}
           <Match when={props.cards.length === 0 && props.lane !== "todo"}>
             <div
               data-testid="lane-empty"
-              {...stylex.attrs(variantStyles.laneViewDiv2, over() ? variantStyles.laneViewDivVariant : variantStyles.laneViewDivVariant2)}
+              {...stylex.attrs(styles.laneViewDiv2, over() ? styles.laneViewDivTone : styles.laneViewDivAlt)}
             />
           </Match>
         </Switch>
@@ -509,7 +503,7 @@ function CardView(props: {
       }}
     >
       <Show when={before()}>
-        <div {...stylex.attrs(viewStyles.cardViewDiv)} />
+        <div {...stylex.attrs(styles.cardViewDiv2)} />
       </Show>
       <div
         role="button"
@@ -547,12 +541,12 @@ function CardView(props: {
         ])}
       >
         <Show when={where()}>
-          <div {...stylex.attrs(viewStyles.cardViewDiv2)}>{where()}</div>
+          <div {...stylex.attrs(styles.cardViewDiv22)}>{where()}</div>
         </Show>
-        <div {...stylex.attrs(variantStyles.cardViewDiv)}>{look().title}</div>
+        <div {...stylex.attrs(styles.cardViewDiv)}>{look().title}</div>
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <Show when={marks()}>
-          <div data-testid="card-marks" {...stylex.attrs(viewStyles.cardMarks)}>
+          <div data-testid="card-marks" {...stylex.attrs(styles.cardMarks)}>
             <Show when={showsStatus()}>
               <StatusMark status={look().status} tone={look().statusTone} size={13} />
             </Show>
@@ -567,8 +561,8 @@ function CardView(props: {
       </div>
       <Show when={props.card.move?.state === "failed" ? props.card.move : undefined}>
         {(m) => (
-          <div data-testid="move-failed" {...stylex.attrs(viewStyles.moveFailed)}>
-            <span {...stylex.attrs(viewStyles.cardViewSpan)} title={m().reason}>
+          <div data-testid="move-failed" {...stylex.attrs(styles.moveFailed)}>
+            <span {...stylex.attrs(styles.cardViewSpan)} title={m().reason}>
               {m().reason ?? t("web.issue.board.moveFailed")}
             </span>
             <button
@@ -577,7 +571,7 @@ function CardView(props: {
               aria-label={t("web.issue.board.retryMove")}
               title={t("web.issue.board.retryMove")}
               onClick={() => props.onRetry(props.card)}
-              {...stylex.attrs(viewStyles.moveRetry)}
+              {...stylex.attrs(styles.moveRetry)}
             >
               <Icon name="retry" size={14} />
             </button>
@@ -587,7 +581,7 @@ function CardView(props: {
               aria-label={t("web.issue.board.putBack")}
               title={t("web.issue.board.putBack")}
               onClick={() => props.onPutBack(props.card)}
-              {...stylex.attrs(viewStyles.moveRetry)}
+              {...stylex.attrs(styles.moveRetry)}
             >
               <Icon name="undo" size={14} />
             </button>
@@ -599,5 +593,5 @@ function CardView(props: {
 }
 
 export function EmptyNote(props: { children: JSX.Element }) {
-  return <p {...stylex.attrs(viewStyles.emptyNoteP)}>{props.children}</p>;
+  return <p {...stylex.attrs(styles.emptyNoteP)}>{props.children}</p>;
 }

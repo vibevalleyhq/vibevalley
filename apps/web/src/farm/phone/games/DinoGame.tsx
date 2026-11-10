@@ -11,8 +11,8 @@ import { styleProps } from "#/ui/positioner.ts";
 
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 
-const variantStyles = stylex.create({
-  dinoGameDiv: {
+const styles = stylex.create({
+  root: {
     display: "flex",
     minHeight: "0",
     flex: "1",
@@ -21,48 +21,50 @@ const variantStyles = stylex.create({
     paddingInline: "var(--spacing)",
     paddingTop: "calc(var(--spacing) * 3)",
   },
-});
-
-const viewStyles = stylex.create({
-  dinoGameDiv: {
+  topRow: {
     display: "flex",
     width: "100%",
     paddingInline: "var(--spacing)",
   },
-  dinoGameSpan: {
+  bestScore: {
     marginLeft: "auto",
     fontVariantNumeric: "tabular-nums",
   },
-  dinoGameDiv2: {
+  scoreRow: {
     marginTop: "var(--spacing)",
     width: "100%",
     paddingInline: "var(--spacing)",
     textAlign: "right",
     fontVariantNumeric: "tabular-nums",
   },
-  dinoGameDiv3: {
+  roadFrame: {
     position: "relative",
     marginTop: "calc(var(--spacing) * 2)",
+    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
   },
-  dinoGameCanvas: {
+  canvas: (zoom: number) => ({
     display: "block",
+    width: dinoWidth * zoom,
+    height: dinoHeight * zoom,
     imageRendering: "pixelated",
-  },
-  dinoGameDiv4: {
+  }),
+  overlay: {
     position: "absolute",
     inset: "0",
     display: "grid",
     placeItems: "center",
     textAlign: "center",
   },
-  dinoGameSpan2: {
+  banner: {
+    backgroundColor: "var(--color-lcd-paper)",
     paddingInline: "calc(var(--spacing) * 2)",
   },
-  dinoGameP: {
+  help: {
     marginTop: "auto",
     marginBottom: "calc(var(--spacing) * 2)",
     textAlign: "center",
     lineHeight: "1.625",
+    color: "var(--color-lcd-dark)",
   },
 });
 
@@ -206,27 +208,26 @@ export function DinoGame(props: { big?: boolean }) {
     return now ? dinoScore(now) : 0;
   };
   return (
-    <div {...stylex.attrs(variantStyles.dinoGameDiv)}>
-      <div {...stylex.attrs(viewStyles.dinoGameDiv)}>
+    <div {...stylex.attrs(styles.root)}>
+      <div {...stylex.attrs(styles.topRow)}>
         <span>{t("web.farm.phone.game.dino")}</span>
-        <span {...stylex.attrs(viewStyles.dinoGameSpan)}>
+        <span {...stylex.attrs(styles.bestScore)}>
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div {...stylex.attrs(viewStyles.dinoGameDiv2)}>{five(score())}</div>
-      <div {...stylex.attrs(viewStyles.dinoGameDiv3)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(styles.scoreRow)}>{five(score())}</div>
+      <div {...stylex.attrs(styles.roadFrame)}>
         <canvas
           ref={(el) => (canvas = el)}
           width={dinoWidth}
           height={dinoHeight}
           role="img"
           aria-label={t("web.farm.phone.dino.road")}
-          {...stylex.attrs(viewStyles.dinoGameCanvas)}
-          style={{ width: `${dinoWidth * zoom()}px`, height: `${dinoHeight * zoom()}px` }}
+          {...styleProps(styles.canvas(zoom()))}
         />
         <Show when={!playing()}>
-          <div {...stylex.attrs(viewStyles.dinoGameDiv4)}>
-            <span {...stylex.attrs(viewStyles.dinoGameSpan2)} style={{ background: lcd.paper }}>
+          <div {...stylex.attrs(styles.overlay)}>
+            <span {...stylex.attrs(styles.banner)}>
               {d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
               <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", { what: d()?.over === true ? t("web.farm.phone.again") : t("web.farm.phone.start") })}
@@ -235,7 +236,7 @@ export function DinoGame(props: { big?: boolean }) {
           </div>
         </Show>
       </div>
-      <p {...stylex.attrs(viewStyles.dinoGameP)} style={{ color: lcd.dark }}>
+      <p {...stylex.attrs(styles.help)}>
         {t("web.farm.phone.dino.help")}
         <br />
         {t("web.farm.phone.dino.help2")}

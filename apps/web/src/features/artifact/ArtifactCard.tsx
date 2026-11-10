@@ -13,7 +13,7 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   artifactCardA: {
     marginTop: "var(--spacing)",
     display: "flex",
@@ -38,9 +38,6 @@ const recipeStyles = stylex.create({
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: ".12s",
   },
-});
-
-const viewStyles = stylex.create({
   artifactCardSpan: {
     display: "flex",
     width: "calc(var(--spacing) * 9)",
@@ -123,14 +120,14 @@ export function ArtifactCard(props: { card: Card }) {
       data-key={props.card.id}
       data-version={props.card.version}
       aria-label={t("web.artifact.card.open", { title: props.card.title })}
-      {...stylex.attrs(recipeStyles.artifactCardA)}
+      {...stylex.attrs(styles.artifactCardA)}
     >
-      <span {...stylex.attrs(viewStyles.artifactCardSpan)}>
+      <span {...stylex.attrs(styles.artifactCardSpan)}>
         <Icon name={bodyIcon[props.card.body]} size={20} />
       </span>
-      <span {...stylex.attrs(viewStyles.artifactCardSpan2)}>
-        <span {...stylex.attrs(viewStyles.artifactCardSpan3)}>{props.card.title}</span>
-        <span {...stylex.attrs(viewStyles.artifactCardSpan4)}>
+      <span {...stylex.attrs(styles.artifactCardSpan2)}>
+        <span {...stylex.attrs(styles.artifactCardSpan3)}>{props.card.title}</span>
+        <span {...stylex.attrs(styles.artifactCardSpan4)}>
           {kindLabel(props.card)}
           <Show when={props.card.body === "html"}> · {t("web.artifact.card.version", { version: props.card.version })}</Show>
           <Show when={props.card.note}>{(note) => <> · {note()}</>}</Show>

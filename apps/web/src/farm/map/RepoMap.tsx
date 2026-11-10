@@ -47,7 +47,7 @@ import {
   spotText,
 } from "./islands";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   enterIsland: { cursor: "pointer" },
   repoMapArt: {
     pointerEvents: "none",
@@ -64,9 +64,6 @@ const recipeStyles = stylex.create({
     marginInline: "auto",
     display: "block",
   },
-});
-
-const variantStyles = stylex.create({
   islandDetailSpan: {
     display: "flex",
     minWidth: "0",
@@ -82,9 +79,6 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   art: { maxWidth: "none", imageRendering: "pixelated" },
   repoMapDiv: {
     display: "flex",
@@ -258,7 +252,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  islandDetailSpan: {
+  islandDetailSpan3: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     fontWeight: "var(--font-weight-semibold)",
@@ -280,7 +274,7 @@ const viewStyles = stylex.create({
       },
     },
   },
-  islandDetailSpan2: {
+  islandDetailSpan22: {
     display: "flex",
     alignItems: "center",
     gap: "var(--spacing)",
@@ -289,7 +283,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  islandDetailSpan3: {
+  islandDetailSpan32: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -366,9 +360,9 @@ function RepoMap() {
   const tally = () => mapTally(islands());
   const stray = () => homeless(core()?.sessions ?? []);
   return (
-    <div {...stylex.attrs(viewStyles.repoMapDiv)}>
-      <div {...stylex.attrs(viewStyles.repoMapDiv2)}>
-        <span {...stylex.attrs(viewStyles.repoMapSpan)}>
+    <div {...stylex.attrs(styles.repoMapDiv)}>
+      <div {...stylex.attrs(styles.repoMapDiv2)}>
+        <span {...stylex.attrs(styles.repoMapSpan)}>
           {[
             t("web.farm.map.islands", { n: islands().length }),
             t("web.farm.map.peopled", { n: tally().peopled }),
@@ -376,7 +370,7 @@ function RepoMap() {
             ...(tally().queued > 0 ? [t("web.farm.map.queued", { n: tally().queued })] : []),
           ].join(" · ")}
         </span>
-        <span {...stylex.attrs(viewStyles.repoMapSpan2)}>
+        <span {...stylex.attrs(styles.repoMapSpan2)}>
           <For
             each={
               [
@@ -387,7 +381,7 @@ function RepoMap() {
             }
           >
             {([icon, words]) => (
-              <span {...stylex.attrs(viewStyles.repoMapSpan3)}>
+              <span {...stylex.attrs(styles.repoMapSpan3)}>
                 <SpriteIcon name={icon} size={18} />
                 {words}
               </span>
@@ -395,19 +389,19 @@ function RepoMap() {
           </For>
         </span>
       </div>
-      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.repoMapDiv3)}>
+      <div ref={(el) => (box = el)} {...stylex.attrs(styles.repoMapDiv3)}>
         <Grid />
         <Show when={atlas()}>{(a) => <Clouds atlas={a()} />}</Show>
         <Show when={atlas()?.has("map-compass") === true && width() >= 700 ? atlas() : undefined}>
-          {(a) => <Art sp={a().get("map-compass")} scale={1.5} styles={[recipeStyles.repoMapArt]} />}
+          {(a) => <Art sp={a().get("map-compass")} scale={1.5} styles={[styles.repoMapArt]} />}
         </Show>
-        <div {...stylex.attrs(viewStyles.repoMapDiv4)}>
+        <div {...stylex.attrs(styles.repoMapDiv4)}>
           <Switch
             fallback={
               // Keyed by the atlas, loaded once: a plain value, so the islands' queries never read a closed branch.
               <Show when={atlas()} keyed>
                 {(a) => (
-                  <div {...stylex.attrs(viewStyles.repoMapDiv5)} style={{ gap: `${gap}px` }}>
+                  <div {...stylex.attrs(styles.repoMapDiv5)} style={{ gap: `${gap}px` }}>
                     <For each={islands()} keyed={(i) => i.repo}>
                       {(i) => (
                         <div style={{ width: `${cell().w * scale()}px` }}>
@@ -442,9 +436,9 @@ function RepoMap() {
 /** A dashed line every 64 px, as the parchment's grid. */
 function Grid() {
   return (
-    <div {...stylex.attrs(viewStyles.gridDiv)}>
-      <div {...styleProps([viewStyles.gridDiv2, viewStyles.gridColumns])} />
-      <div {...styleProps([viewStyles.gridDiv2, viewStyles.gridRows])} />
+    <div {...stylex.attrs(styles.gridDiv)}>
+      <div {...styleProps([styles.gridDiv2, styles.gridColumns])} />
+      <div {...styleProps([styles.gridDiv2, styles.gridRows])} />
     </div>
   );
 }
@@ -467,13 +461,13 @@ function Clouds(props: { atlas: SpriteAtlas }) {
       {(cloud) => {
         const span = () => (box?.clientWidth ?? 800) + cloud().w * 4;
         return (
-          <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.gridDiv)}>
+          <div ref={(el) => (box = el)} {...stylex.attrs(styles.gridDiv)}>
             <For each={clouds}>
               {([y, from, speed]) => (
                 <Art
                   sp={cloud()}
                   scale={2}
-                  styles={[recipeStyles.cloudsArt]}
+                  styles={[styles.cloudsArt]}
                   style={{
                     left: `${Math.round(((from * span() + t() * speed) % span()) - cloud().w * 4)}px`,
                     top: `${Math.round(y * (box?.clientHeight ?? 600))}px`,
@@ -494,7 +488,7 @@ function Art(props: { sp: SpriteInfo; scale: number; styles?: stylex.StyleXStyle
       src={props.sp.url}
       alt=""
       draggable="false"
-      {...styleProps([viewStyles.art, props.styles], { width: `${props.sp.w * props.scale}px`, height: `${props.sp.h * props.scale}px`, ...props.style })}
+      {...styleProps([styles.art, props.styles], { width: `${props.sp.w * props.scale}px`, height: `${props.sp.h * props.scale}px`, ...props.style })}
     />
   );
 }
@@ -514,7 +508,7 @@ function Placed(props: {
     <Show
       when={props.onClick}
       fallback={
-        <span title={props.tip} aria-label={props.label} {...stylex.attrs(viewStyles.placedSpan)} style={style()}>
+        <span title={props.tip} aria-label={props.label} {...stylex.attrs(styles.placedSpan)} style={style()}>
           {props.children}
         </span>
       }
@@ -525,7 +519,7 @@ function Placed(props: {
           title={props.tip}
           aria-label={props.label ?? props.tip}
           onClick={() => onClick()()}
-          {...stylex.attrs(viewStyles.placedButton)}
+          {...stylex.attrs(styles.placedButton)}
           style={style()}
         >
           {props.children}
@@ -555,17 +549,17 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   const gate = () => ({ x: yard().left + yard().width / 2, y: yard().top + yard().height + down() });
   const sacks = () => props.island.queued.slice(0, 3);
   return (
-    <div {...stylex.attrs(viewStyles.islandViewDiv)}>
-      <div {...stylex.attrs(viewStyles.islandViewDiv2)} style={{ width: `${pic().w * s()}px`, height: `${props.cellHeight * s()}px` }}>
+    <div {...stylex.attrs(styles.islandViewDiv)}>
+      <div {...stylex.attrs(styles.islandViewDiv2)} style={{ width: `${pic().w * s()}px`, height: `${props.cellHeight * s()}px` }}>
         <button
           type="button"
           data-testid="island"
           data-key={props.island.repo}
           aria-label={t("shared.join.labeled", { label: props.island.repo, text: islandText(props.island) })}
           onClick={open}
-          {...stylex.attrs(viewStyles.island)}
+          {...stylex.attrs(styles.island)}
         >
-          <Art sp={pic()} scale={s()} styles={[recipeStyles.islandViewArt]} />
+          <Art sp={pic()} scale={s()} styles={[styles.islandViewArt]} />
         </button>
         <For each={props.island.spots} keyed={false}>
           {(spot, i) => {
@@ -601,7 +595,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                         </Placed>
                         <Show when={taken().plot.badge}>
                           {(badge) => (
-                            <span {...stylex.attrs(viewStyles.islandViewSpan)} style={{ left: `${foot().x * s()}px`, top: `${(foot().y - 3) * s()}px` }}>
+                            <span {...stylex.attrs(styles.islandViewSpan)} style={{ left: `${foot().x * s()}px`, top: `${(foot().y - 3) * s()}px` }}>
                               <PixelCard
                                 paper={badgeColors[badge().tone][0]}
                                 ink={badgeColors[badge().tone][1]}
@@ -657,7 +651,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   <Art sp={sack()} scale={s()} />
                 </Placed>
                 <Show when={i() === sacks().length - 1 && props.island.queued.length > sacks().length}>
-                  <span {...stylex.attrs(viewStyles.islandViewSpan2)} style={{ left: `${(foot().x + 6) * s()}px`, top: `${(foot().y - 20) * s()}px` }}>
+                  <span {...stylex.attrs(styles.islandViewSpan2)} style={{ left: `${(foot().x + 6) * s()}px`, top: `${(foot().y - 20) * s()}px` }}>
                     <PixelCard padX={3} padY={0} rows={[[{ kind: "words", text: `+${props.island.queued.length - sacks().length}`, size: 10 }]]} />
                   </span>
                 </Show>
@@ -672,7 +666,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
         data-key={props.island.repo}
         onClick={enter}
         aria-label={t("web.farm.map.enter", { repo: props.island.repo })}
-        {...styleProps(recipeStyles.enterIsland)}
+        {...styleProps(styles.enterIsland)}
       >
         <PixelCard
           center
@@ -695,11 +689,11 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
 function Homeless(props: { sessions: Session[] }) {
   const router = useRouter();
   return (
-    <div {...stylex.attrs(viewStyles.homelessDiv)}>
-      <span {...stylex.attrs(viewStyles.homelessSpan)}>{t("web.farm.map.homeless")}</span>
+    <div {...stylex.attrs(styles.homelessDiv)}>
+      <span {...stylex.attrs(styles.homelessSpan)}>{t("web.farm.map.homeless")}</span>
       <For each={props.sessions}>
         {(h) => (
-          <button type="button" onClick={() => go(router.navigate, h.id)} {...stylex.attrs(viewStyles.homelessButton)}>
+          <button type="button" onClick={() => go(router.navigate, h.id)} {...stylex.attrs(styles.homelessButton)}>
             <AgentFace agentId={h.agent} runtime={h.runtime} size={20} />
             {h.name}
           </button>
@@ -711,8 +705,8 @@ function Homeless(props: { sessions: Session[] }) {
 
 function NoRepos() {
   return (
-    <div {...stylex.attrs(viewStyles.noReposDiv)}>
-      <p {...stylex.attrs(viewStyles.noReposP)}>{t("web.farm.map.sea")}</p>
+    <div {...stylex.attrs(styles.noReposDiv)}>
+      <p {...stylex.attrs(styles.noReposP)}>{t("web.farm.map.sea")}</p>
     </div>
   );
 }
@@ -751,8 +745,8 @@ function SowHere(props: { repo: string; onDone: () => void }) {
     });
   };
   return (
-    <div {...stylex.attrs(viewStyles.sowHereDiv)}>
-      <p {...stylex.attrs(viewStyles.noReposP)}>{t("web.farm.map.sowIntro", { repo: props.repo })}</p>
+    <div {...stylex.attrs(styles.sowHereDiv)}>
+      <p {...stylex.attrs(styles.noReposP)}>{t("web.farm.map.sowIntro", { repo: props.repo })}</p>
       <TextArea
         ref={autofocus()}
         aria-label={t("web.farm.map.job")}
@@ -761,7 +755,7 @@ function SowHere(props: { repo: string; onDone: () => void }) {
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
-      <div {...stylex.attrs(viewStyles.sowHereDiv2)}>
+      <div {...stylex.attrs(styles.sowHereDiv2)}>
         <Button disabled={busy() || !text().trim()} onClick={() => void write()}>
           {t("web.farm.map.todo")}
         </Button>
@@ -790,13 +784,13 @@ function IslandDetail(props: { island: Island }) {
   const taken = () => props.island.spots.flatMap((s) => (s.kind === "taken" ? [s] : []));
   const open = () => openOf(props.island);
   return (
-    <Card title={props.island.repo} action={<span {...stylex.attrs(viewStyles.noReposP)}>{islandText(props.island)}</span>}>
-      <div {...stylex.attrs(viewStyles.islandDetailDiv)}>
+    <Card title={props.island.repo} action={<span {...stylex.attrs(styles.noReposP)}>{islandText(props.island)}</span>}>
+      <div {...stylex.attrs(styles.islandDetailDiv)}>
         <SpriteIcon name={`plot-${growth().crop}`} size={36} />
-        <p {...stylex.attrs(viewStyles.noReposP)}>{growthText()}</p>
+        <p {...stylex.attrs(styles.noReposP)}>{growthText()}</p>
       </div>
-      <div {...stylex.attrs(viewStyles.islandDetailDiv2)}>
-        <span {...stylex.attrs(viewStyles.islandDetailSpan)}>{t("web.farm.map.worktrees", { n: taken().length })}</span>
+      <div {...stylex.attrs(styles.islandDetailDiv2)}>
+        <span {...stylex.attrs(styles.islandDetailSpan3)}>{t("web.farm.map.worktrees", { n: taken().length })}</span>
         <Show when={taken().length > 0} fallback={<Quiet>{t("web.farm.map.noHelpers")}</Quiet>}>
           <For each={taken()}>
             {(slot) => (
@@ -804,16 +798,16 @@ function IslandDetail(props: { island: Island }) {
                 type="button"
                 onClick={() => go(router.navigate, slot.session.id)}
                 aria-label={t("shared.join.labeled", { label: slot.session.name, text: phaseText(slot.session, now()) })}
-                {...stylex.attrs(viewStyles.islandDetailButton)}
+                {...stylex.attrs(styles.islandDetailButton)}
               >
                 <AgentFace agentId={slot.session.agent} runtime={slot.session.runtime} size={32} />
-                <span {...stylex.attrs(variantStyles.islandDetailSpan)}>
-                  <span {...stylex.attrs(viewStyles.repoMapSpan)}>{slot.session.name}</span>
-                  <span {...stylex.attrs(variantStyles.islandDetailSpan2)}>{phaseText(slot.session, now())}</span>
+                <span {...stylex.attrs(styles.islandDetailSpan)}>
+                  <span {...stylex.attrs(styles.repoMapSpan)}>{slot.session.name}</span>
+                  <span {...stylex.attrs(styles.islandDetailSpan2)}>{phaseText(slot.session, now())}</span>
                   <Show when={slot.session.branch}>
-                    <span {...stylex.attrs(viewStyles.islandDetailSpan2)}>
+                    <span {...stylex.attrs(styles.islandDetailSpan22)}>
                       <SpriteIcon name="icon-branch" size={14} />
-                      <span {...stylex.attrs(viewStyles.islandDetailSpan3)}>{slot.session.branch}</span>
+                      <span {...stylex.attrs(styles.islandDetailSpan32)}>{slot.session.branch}</span>
                     </span>
                   </Show>
                 </span>
@@ -823,9 +817,9 @@ function IslandDetail(props: { island: Island }) {
           </For>
         </Show>
       </div>
-      <div {...stylex.attrs(viewStyles.islandDetailDiv3)}>
+      <div {...stylex.attrs(styles.islandDetailDiv3)}>
         <SpriteIcon name={open() > 0 ? "map-stake" : "plot-locked"} size={24} />
-        <p {...stylex.attrs(viewStyles.noReposP)}>
+        <p {...stylex.attrs(styles.noReposP)}>
           {!props.island.summary
             ? t("web.farm.map.noMore")
             : open() > 0
@@ -836,19 +830,19 @@ function IslandDetail(props: { island: Island }) {
         </p>
       </div>
       <Show when={props.island.queued.length > 0}>
-        <div {...stylex.attrs(viewStyles.islandDetailDiv4)}>
-          <span {...stylex.attrs(viewStyles.islandDetailSpan)}>{t("web.farm.map.queue", { n: props.island.queued.length })}</span>
+        <div {...stylex.attrs(styles.islandDetailDiv4)}>
+          <span {...stylex.attrs(styles.islandDetailSpan3)}>{t("web.farm.map.queue", { n: props.island.queued.length })}</span>
           <For each={props.island.queued}>
             {(item) => (
-              <div {...stylex.attrs(viewStyles.islandDetailDiv3)}>
+              <div {...stylex.attrs(styles.islandDetailDiv3)}>
                 <SpriteIcon name="map-sack" size={20} />
-                <span {...stylex.attrs(viewStyles.islandDetailSpan4)}>{item.title}</span>
+                <span {...stylex.attrs(styles.islandDetailSpan4)}>{item.title}</span>
                 <button
                   type="button"
                   title={t("web.farm.map.see")}
                   aria-label={t("web.farm.map.see")}
                   onClick={() => go(router.navigate, item.id)}
-                  {...stylex.attrs(viewStyles.islandDetailButton2)}
+                  {...stylex.attrs(styles.islandDetailButton2)}
                 >
                   <SpriteIcon name="button-open" size={14} />
                 </button>

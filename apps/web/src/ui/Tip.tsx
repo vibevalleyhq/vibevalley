@@ -47,7 +47,7 @@ function Bubble(props: { text: string }) {
   return (
     <Tooltip.Portal>
       <Tooltip.Positioner {...positionerAttrs()} sideOffset={6}>
-        <Tooltip.Popup class={stylex.attrs(styles.bubble).class}>{props.text}</Tooltip.Popup>
+        <Tooltip.Popup {...stylex.attrs(styles.bubble)}>{props.text}</Tooltip.Popup>
       </Tooltip.Positioner>
     </Tooltip.Portal>
   );
@@ -56,7 +56,7 @@ function Bubble(props: { text: string }) {
 export function Tip(props: { text: string; children: JSX.Element }) {
   return (
     <Tooltip.Root delay={delay}>
-      <Tooltip.Trigger render="span" class={stylex.attrs(styles.trigger).class}>
+      <Tooltip.Trigger render="span" {...stylex.attrs(styles.trigger)}>
         {props.children}
       </Tooltip.Trigger>
       <Bubble text={props.text} />
@@ -73,7 +73,7 @@ export function Hint(props: { text: string; icon?: IconName }) {
         render="span"
         tabindex={0}
         // A form of ten fields should not read as ten marks: help stays out of the way.
-        class={stylex.attrs(styles.hint).class}
+        {...stylex.attrs(styles.hint)}
       >
         <Icon name={props.icon ?? "info"} size={12} />
       </Tooltip.Trigger>

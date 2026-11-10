@@ -11,8 +11,8 @@ import { styleProps } from "#/ui/positioner.ts";
 
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 
-const recipeStyles = stylex.create({
-  blocksGameDiv: {
+const styles = stylex.create({
+  overlay: {
     position: "absolute",
     inset: "0",
     display: "grid",
@@ -23,55 +23,52 @@ const recipeStyles = stylex.create({
     },
     textAlign: "center",
   },
-});
-
-const variantStyles = stylex.create({
-  blocksGameDiv: {
+  root: {
     display: "flex",
     minHeight: "0",
     flex: "1",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingTop: "calc(var(--spacing) * 2)",
   },
-  blocksGameDivVariant: {
+  rootBig: {
     gap: "calc(var(--spacing) * 4)",
   },
-  blocksGameDivVariant2: {
+  rootCompact: {
     gap: "calc(var(--spacing) * 2)",
   },
-  blocksGameDiv2: {
+  sidebar: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
   },
-});
-
-const viewStyles = stylex.create({
-  blocksGameDiv: {
+  wellFrame: {
     position: "relative",
     flexShrink: "0",
     alignSelf: "flex-start",
+    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
   },
-  blocksGameCanvas: {
+  canvas: {
     display: "block",
     imageRendering: "pixelated",
   },
-  blocksGameP: {
+  help: {
     marginTop: "auto",
     marginBottom: "var(--spacing)",
     lineHeight: "1.625",
+    color: "var(--color-lcd-dark)",
   },
   nextSvg: {
     marginTop: "var(--spacing)",
     display: "block",
+    backgroundColor: "var(--color-lcd-light)",
     padding: "var(--spacing)",
   },
-  statDiv: {
+  statRow: {
     display: "flex",
   },
-  statSpan: {
+  statValue: {
     marginLeft: "auto",
     fontVariantNumeric: "tabular-nums",
   },
@@ -184,19 +181,19 @@ export function BlocksGame(props: { big?: boolean }) {
     <div
       data-testid="blocks"
       data-state={!g() ? "ready" : g()!.over ? "over" : playing() ? "playing" : "paused"}
-      {...stylex.attrs(variantStyles.blocksGameDiv, props.big === true ? variantStyles.blocksGameDivVariant : variantStyles.blocksGameDivVariant2)}
+      {...stylex.attrs(styles.root, props.big === true ? styles.rootBig : styles.rootCompact)}
     >
-      <div {...stylex.attrs(viewStyles.blocksGameDiv)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(styles.wellFrame)}>
         <canvas
           ref={(el) => (canvas = el)}
           width={blocksWidth * cell()}
           height={blocksHeight * cell()}
-          {...stylex.attrs(viewStyles.blocksGameCanvas)}
+          {...stylex.attrs(styles.canvas)}
           aria-label={t("web.farm.phone.blocks.well")}
           role="img"
         />
         <Show when={!g() || g()!.over || !playing()}>
-          <div {...stylex.attrs(recipeStyles.blocksGameDiv)}>
+          <div {...stylex.attrs(styles.overlay)}>
             <span>
               {g()?.over === true ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
@@ -207,13 +204,13 @@ export function BlocksGame(props: { big?: boolean }) {
           </div>
         </Show>
       </div>
-      <div {...stylex.attrs(variantStyles.blocksGameDiv2)}>
+      <div {...stylex.attrs(styles.sidebar)}>
         <Next kind={g()?.next} />
         <Stat label={t("web.farm.phone.blocks.score")} value={g()?.score ?? 0} />
         <Stat label={t("web.farm.phone.blocks.lines")} value={g()?.lines ?? 0} />
         <Stat label={t("web.farm.phone.blocks.level")} value={g()?.level ?? 1} />
         <Stat label={t("web.farm.phone.blocks.best")} value={Math.max(top(), g()?.score ?? 0)} />
-        <p {...stylex.attrs(viewStyles.blocksGameP)} style={{ color: lcd.dark }}>
+        <p {...stylex.attrs(styles.help)}>
           {t("web.farm.phone.blocks.help")}
           <br />
           {t("web.farm.phone.blocks.help2")}
@@ -230,15 +227,7 @@ function Next(props: { kind: PieceKind | undefined }) {
   return (
     <div>
       <span>{t("web.farm.phone.blocks.next")}</span>
-      <svg
-        width={36}
-        height={20}
-        viewBox="0 0 4 2"
-        shape-rendering="crispEdges"
-        {...stylex.attrs(viewStyles.nextSvg)}
-        style={{ background: lcd.light }}
-        aria-hidden="true"
-      >
+      <svg width={36} height={20} viewBox="0 0 4 2" shape-rendering="crispEdges" {...stylex.attrs(styles.nextSvg)} aria-hidden="true">
         <For each={cells()}>{([x, y]) => <rect x={x} y={y === 0 ? 0 : 1} width={0.9} height={0.9} fill={lcd.ink} />}</For>
       </svg>
     </div>
@@ -247,9 +236,9 @@ function Next(props: { kind: PieceKind | undefined }) {
 
 function Stat(props: { label: string; value: number }) {
   return (
-    <div {...stylex.attrs(viewStyles.statDiv)}>
+    <div {...stylex.attrs(styles.statRow)}>
       <span>{props.label}</span>
-      <span {...stylex.attrs(viewStyles.statSpan)}>{props.value}</span>
+      <span {...stylex.attrs(styles.statValue)}>{props.value}</span>
     </div>
   );
 }

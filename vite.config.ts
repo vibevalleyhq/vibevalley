@@ -70,13 +70,6 @@ export default defineConfig({
         "vpx scripts/primitives.ts --check",
       ],
       "notes:verify": "vpx scripts/agent-notes.ts",
-      "migration:inventory": { command: "vpx scripts/style-migration.ts", cache: false },
-      "migration:visual:static": { command: "vpx scripts/style-migration-static.ts", cache: false },
-      "migration:visual": { command: "vpx scripts/style-migration-visual.ts", cache: false },
-      "migration:behavior": { command: "vpx scripts/style-migration-behavior.ts", cache: false },
-      "migration:live": { command: "vpx scripts/style-migration-live.ts", cache: false },
-      "migration:host": { command: "vpx scripts/style-migration-host.ts", cache: false },
-      "migration:verify": { command: "vpx scripts/style-migration-verify.ts", cache: false },
       "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
       "site:build": { command: "vp run --filter @vibevalley/site build", cache: false },
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
@@ -447,6 +440,13 @@ export default defineConfig({
         files: ["apps/web/src/**"],
         excludeFiles: ["apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
         rules: { "vibevalley/no-hex-color": "error" },
+      },
+      {
+        // Component and story markup attaches styles exclusively through StyleX (`stylex.attrs` / `styleProps` / `domAttrs`),
+        // never raw JSX `class`, `className`, or `classList` attributes.
+        files: ["apps/web/src/**", "apps/site/src/**", "packages/stories/src/**"],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
+        rules: { "vibevalley/stylex-only": "error" },
       },
       {
         // Page tests find elements by data-testid and state attributes, not by the interface's words

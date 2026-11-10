@@ -16,7 +16,7 @@ import { Empty } from "#/ui/layout.tsx";
 import { chatPath, sessionThreadOf } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   sessionsDiv: {
     display: "flex",
     alignItems: "center",
@@ -38,31 +38,22 @@ const recipeStyles = stylex.create({
     backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 3)",
   },
-  cronCardDivVariant1Case1: {
+  cronCardDivPrimary: {
     borderStyle: "solid",
   },
-  cronCardDivVariant1Case2: {
+  cronCardDivSecondary: {
     borderStyle: "dashed",
   },
-});
-
-const variantStyles2 = stylex.create({
   cronCardIcon: {
     marginTop: "calc(var(--spacing) * .5)",
   },
-});
-
-const variantStyles = stylex.create({
-  sessionsDiv: {
+  sessionsDiv2: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
   },
-});
-
-const viewStyles = stylex.create({
-  sessionsDiv: {
+  sessionsDiv3: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 3)",
@@ -101,7 +92,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  cronCardDiv: {
+  cronCardDiv2: {
     display: "flex",
     gap: "calc(var(--spacing) * 2)",
   },
@@ -122,25 +113,25 @@ export function Sessions(props: { channel: Channel }) {
         </Empty>
       }
     >
-      <div {...stylex.attrs(viewStyles.sessionsDiv)}>
+      <div {...stylex.attrs(styles.sessionsDiv3)}>
         <For each={sessions()}>
           {(h) => {
             const thread = () => sessionThreadOf(core()?.chat, h);
             return (
-              <div {...stylex.attrs(recipeStyles.sessionsDiv)}>
+              <div {...stylex.attrs(styles.sessionsDiv)}>
                 <HelperFace agent={h.agent} runtime={h.runtime} size={36} />
-                <div {...stylex.attrs(variantStyles.sessionsDiv)}>
-                  <span {...stylex.attrs(viewStyles.sessionsSpan)}>
-                    <span {...stylex.attrs(viewStyles.sessionsSpan2)}>{h.name}</span>
-                    <span {...stylex.attrs(viewStyles.sessionsSpan3)}>
+                <div {...stylex.attrs(styles.sessionsDiv2)}>
+                  <span {...stylex.attrs(styles.sessionsSpan)}>
+                    <span {...stylex.attrs(styles.sessionsSpan2)}>{h.name}</span>
+                    <span {...stylex.attrs(styles.sessionsSpan3)}>
                       {"  "}@{h.id} {h.repo ?? ""}
                       {h.branch ? ` · ${h.branch}` : ""}
                     </span>
                   </span>
-                  <span {...stylex.attrs(viewStyles.sessionsSpan)}>{h.brief}</span>
-                  <span {...stylex.attrs(viewStyles.sessionsSpan4)}>
+                  <span {...stylex.attrs(styles.sessionsSpan)}>{h.brief}</span>
+                  <span {...stylex.attrs(styles.sessionsSpan4)}>
                     <PhaseGlyph phase={h.phase} />
-                    <span {...stylex.attrs(viewStyles.sessionsSpan5)}>{phaseText(h, now())}</span>
+                    <span {...stylex.attrs(styles.sessionsSpan5)}>{phaseText(h, now())}</span>
                   </span>
                 </div>
                 <Show when={thread()}>
@@ -171,7 +162,7 @@ export function Crons(props: { channel: Channel }) {
         </Empty>
       }
     >
-      <div {...stylex.attrs(viewStyles.sessionsDiv)}>
+      <div {...stylex.attrs(styles.sessionsDiv3)}>
         <For each={crons()}>{(s) => <CronCard s={s} />}</For>
       </div>
     </Show>
@@ -212,26 +203,26 @@ export function CronCard(props: { s: CronView }) {
       data-testid="cron"
       data-key={props.s.id}
       {...stylex.attrs(
-        recipeStyles.cronCardDiv,
-        !(props.s.enabled || props.s.pending) ? recipeStyles.cronCardDivVariant1Case2 : recipeStyles.cronCardDivVariant1Case1,
+        styles.cronCardDiv,
+        !(props.s.enabled || props.s.pending) ? styles.cronCardDivSecondary : styles.cronCardDivPrimary,
       )}
       aria-label={t("web.channel.crons.label", { name: props.s.name })}
     >
-      <Icon name="clock" size={20} styles={[variantStyles2.cronCardIcon]} />
-      <div {...stylex.attrs(variantStyles.sessionsDiv)}>
-        <span {...stylex.attrs(viewStyles.cronCardSpan)}>
-          <span {...stylex.attrs(viewStyles.sessionsSpan2)}>{props.s.name}</span>
-          <span {...stylex.attrs(viewStyles.sessionsSpan3)}>
+      <Icon name="clock" size={20} styles={[styles.cronCardIcon]} />
+      <div {...stylex.attrs(styles.sessionsDiv2)}>
+        <span {...stylex.attrs(styles.cronCardSpan)}>
+          <span {...stylex.attrs(styles.sessionsSpan2)}>{props.s.name}</span>
+          <span {...stylex.attrs(styles.sessionsSpan3)}>
             {"  "}
             {meta()}
           </span>
         </span>
-        <span {...stylex.attrs(viewStyles.cronCardSpan)}>{props.s.text}</span>
+        <span {...stylex.attrs(styles.cronCardSpan)}>{props.s.text}</span>
       </div>
       <Show
         when={props.s.pending}
         fallback={
-          <div {...stylex.attrs(viewStyles.cronCardDiv)}>
+          <div {...stylex.attrs(styles.cronCardDiv2)}>
             <Button
               tone={props.s.enabled ? "primary" : "plain"}
               data-testid="cron-toggle"
@@ -259,7 +250,7 @@ export function CronCard(props: { s: CronView }) {
           </div>
         }
       >
-        <div {...stylex.attrs(viewStyles.cronCardDiv)}>
+        <div {...stylex.attrs(styles.cronCardDiv2)}>
           <Button tone="primary" icon="check" aria-label={t("web.channel.crons.approveWhich", { name: props.s.name })} onClick={() => void setEnabled(true)}>
             {t("web.channel.crons.approve")}
           </Button>

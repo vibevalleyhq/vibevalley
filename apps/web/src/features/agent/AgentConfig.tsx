@@ -33,13 +33,10 @@ import { Tabs } from "#/ui/Tabs.tsx";
 
 import { Labeled } from "./AgentLook";
 
-const variantStyles4 = stylex.create({
+const styles = stylex.create({
   supportIcon: {
     marginTop: "var(--spacing)",
   },
-});
-
-const variantStyles3 = stylex.create({
   configTabsTextInput: {
     fontFamily: "var(--font-mono)",
   },
@@ -51,18 +48,12 @@ const variantStyles3 = stylex.create({
     flex: "1",
     fontFamily: "var(--font-mono)",
   },
-});
-
-const variantStyles2 = stylex.create({
   skillPickerA: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
     textDecorationLine: "underline",
   },
-});
-
-const variantStyles = stylex.create({
   configTabsDiv: {
     display: "flex",
     minHeight: "0",
@@ -89,14 +80,14 @@ const variantStyles = stylex.create({
     padding: "calc(var(--spacing) * 2)",
     textAlign: "left",
   },
-  runtimeChoiceButtonVariant: {
+  runtimeChoiceButtonTone: {
     borderColor: {
       default: "var(--color-ink)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
     },
     backgroundColor: "var(--color-selected)",
   },
-  runtimeChoiceButtonVariant2: {
+  runtimeChoiceButtonAlt: {
     borderColor: "var(--color-line)",
     backgroundColor: {
       default: null,
@@ -107,7 +98,7 @@ const variantStyles = stylex.create({
     },
   },
   runtimeChoiceSpan: {},
-  runtimeChoiceSpanVariant: {
+  runtimeChoiceSpanTone: {
     opacity: ".5",
     filter: "grayscale(100%)",
   },
@@ -118,10 +109,10 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  runtimeChoiceSpanVariant2: {
+  runtimeChoiceSpanAlt: {
     fontWeight: "var(--font-weight-semibold)",
   },
-  runtimeChoiceSpanVariant3: {
+  runtimeChoiceSpanAccent: {
     fontWeight: "var(--font-weight-medium)",
   },
   runtimeChoiceSpan3: {
@@ -131,10 +122,10 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  runtimeChoiceSpanVariant4: {
+  runtimeChoiceSpanMuted: {
     color: "var(--color-muted)",
   },
-  runtimeChoiceSpanVariant5: {
+  runtimeChoiceSpanKind5: {
     color: "var(--color-berry)",
   },
   skillPickerButton: {
@@ -161,10 +152,10 @@ const variantStyles = stylex.create({
     borderWidth: "1px",
     backgroundColor: "var(--color-page)",
   },
-  skillPickerSpanVariant: {
+  skillPickerSpanTone: {
     borderColor: "var(--color-accent)",
   },
-  skillPickerSpanVariant2: {
+  skillPickerSpanAlt: {
     borderColor: {
       default: "var(--color-ink)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 25%, transparent)",
@@ -175,7 +166,7 @@ const variantStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  toolsDivVariant: {
+  toolsDivTone: {
     opacity: ".5",
   },
   inventorySpan: {
@@ -183,14 +174,11 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  inventorySpanVariant: {
+  inventorySpanTone: {
     color: "var(--color-muted)",
     textDecorationLine: "line-through",
   },
-});
-
-const viewStyles = stylex.create({
-  runtimeChoiceSpan: {
+  runtimeChoiceSpan4: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
@@ -203,7 +191,7 @@ const viewStyles = stylex.create({
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
     },
   },
-  runtimeChoiceSpan2: {
+  runtimeChoiceSpan22: {
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
@@ -248,16 +236,16 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  skillPickerSpan: {
+  skillPickerSpan2: {
     display: "flex",
     flexDirection: "column",
   },
-  skillPickerSpan2: {
+  skillPickerSpan22: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
   },
-  toolsDiv: {
+  toolsDiv2: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
@@ -298,7 +286,7 @@ const viewStyles = stylex.create({
       },
     },
   },
-  toolsDiv2: {
+  toolsDiv22: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
@@ -346,7 +334,7 @@ const viewStyles = stylex.create({
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 2)",
   },
-  inventorySpan: {
+  inventorySpan2: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -356,7 +344,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  inventorySpan2: {
+  inventorySpan22: {
     maxWidth: "calc(var(--spacing) * 40)",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -365,9 +353,6 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-});
-
-const styles = stylex.create({
   tabs: {
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
@@ -409,7 +394,7 @@ export function ConfigTabs(props: {
   const envRefused = () => support().refused[sessionEnv];
   const draft = () => props.draft;
   return (
-    <div {...stylex.attrs(variantStyles.configTabsDiv)}>
+    <div {...stylex.attrs(styles.configTabsDiv)}>
       <Tabs
         label={t("web.agent.tabs")}
         value={tab()}
@@ -417,7 +402,7 @@ export function ConfigTabs(props: {
         items={tabs().map(([value, label]) => ({ value, label }))}
         styles={styles.tabs}
       />
-      <div {...stylex.attrs(variantStyles.configTabsDiv2)}>
+      <div {...stylex.attrs(styles.configTabsDiv2)}>
         <Switch>
           <Match when={tab() === "who"}>
             <Labeled label={t("web.agent.name")} tip={t("web.agent.nameTip")} error={props.nameTaken ? t("web.agent.nameTaken") : undefined}>
@@ -470,7 +455,7 @@ export function ConfigTabs(props: {
             <Labeled label={t("web.agent.workdir")} tip={t("web.agent.workdirTip")}>
               <TextInput
                 aria-label={t("web.agent.workdir")}
-                styles={variantStyles3.configTabsTextInput}
+                styles={styles.configTabsTextInput}
                 placeholder={t("web.agent.workdirHint")}
                 value={draft().workdir}
                 onInput={(e) => props.patch({ ...draft(), workdir: e.currentTarget.value })}
@@ -517,8 +502,8 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   };
   return (
     <Labeled label={t("web.agent.machine")} tip={t("web.agent.machineTip")}>
-      <Show when={runtimes().length > 0} fallback={<span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{t("web.agent.readingMachines")}</span>}>
-        <div {...stylex.attrs(viewStyles.runtimeChoiceDiv)}>
+      <Show when={runtimes().length > 0} fallback={<span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{t("web.agent.readingMachines")}</span>}>
+        <div {...stylex.attrs(styles.runtimeChoiceDiv)}>
           <For each={runtimes()}>
             {(info) => {
               const available = () => info.installation.status === "available";
@@ -541,26 +526,26 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   aria-label={info.preset.label}
                   onClick={() => choose(info)}
                   {...stylex.attrs(
-                    variantStyles.runtimeChoiceButton,
-                    active() ? variantStyles.runtimeChoiceButtonVariant : variantStyles.runtimeChoiceButtonVariant2,
+                    styles.runtimeChoiceButton,
+                    active() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt,
                   )}
                 >
-                  <span {...stylex.attrs(variantStyles.runtimeChoiceSpan, !ok() ? variantStyles.runtimeChoiceSpanVariant : variantStyles.runtimeChoiceSpan)}>
+                  <span {...stylex.attrs(styles.runtimeChoiceSpan, !ok() ? styles.runtimeChoiceSpanTone : styles.runtimeChoiceSpan)}>
                     <RuntimeIcon runtime={info.id} size={32} />
                   </span>
-                  <span {...stylex.attrs(viewStyles.runtimeChoiceSpan2)}>
+                  <span {...stylex.attrs(styles.runtimeChoiceSpan22)}>
                     <span
                       {...stylex.attrs(
-                        variantStyles.runtimeChoiceSpan2,
-                        active() ? variantStyles.runtimeChoiceSpanVariant2 : variantStyles.runtimeChoiceSpanVariant3,
+                        styles.runtimeChoiceSpan2,
+                        active() ? styles.runtimeChoiceSpanAlt : styles.runtimeChoiceSpanAccent,
                       )}
                     >
                       {info.preset.label}
                     </span>
                     <span
                       {...stylex.attrs(
-                        variantStyles.runtimeChoiceSpan3,
-                        ok() ? variantStyles.runtimeChoiceSpanVariant4 : variantStyles.runtimeChoiceSpanVariant5,
+                        styles.runtimeChoiceSpan3,
+                        ok() ? styles.runtimeChoiceSpanMuted : styles.runtimeChoiceSpanKind5,
                       )}
                     >
                       {status()}
@@ -624,19 +609,19 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
 function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
   const support = () => supportOf(props.info);
   return (
-    <section {...stylex.attrs(viewStyles.supportSection)}>
-      <h3 {...stylex.attrs(viewStyles.supportH3)}>{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
-      <Show when={props.info} fallback={<span {...stylex.attrs(viewStyles.supportSpan)}>{t("web.agent.readingMachines")}</span>}>
-        <span {...stylex.attrs(viewStyles.supportSpan2)}>
-          <Icon name={support().steer ? "check" : "cross"} size={12} styles={[variantStyles4.supportIcon]} />
+    <section {...stylex.attrs(styles.supportSection)}>
+      <h3 {...stylex.attrs(styles.supportH3)}>{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
+      <Show when={props.info} fallback={<span {...stylex.attrs(styles.supportSpan)}>{t("web.agent.readingMachines")}</span>}>
+        <span {...stylex.attrs(styles.supportSpan2)}>
+          <Icon name={support().steer ? "check" : "cross"} size={12} styles={[styles.supportIcon]} />
           {support().steer ? t("web.agent.steer") : t("web.agent.noSteer")}
         </span>
-        <span {...stylex.attrs(viewStyles.supportSpan)}>{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
+        <span {...stylex.attrs(styles.supportSpan)}>{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
         <For each={Object.entries(support().refused)}>
           {([option, reason]) => (
-            <span {...stylex.attrs(viewStyles.supportSpan3)}>
+            <span {...stylex.attrs(styles.supportSpan3)}>
               {t("web.agent.refuses")}
-              <span {...stylex.attrs(viewStyles.supportSpan4)}>{option}</span>
+              <span {...stylex.attrs(styles.supportSpan4)}>{option}</span>
               {t("web.agent.colon")}
               {reason}
             </span>
@@ -698,12 +683,12 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
         label={t("web.agent.library")}
         tip={t("web.agent.libraryTip")}
         aside={
-          <A href="/settings/skills" {...stylex.attrs(variantStyles2.skillPickerA)}>
+          <A href="/settings/skills" {...stylex.attrs(styles.skillPickerA)}>
             {t("web.agent.manageLibrary")}
           </A>
         }
       >
-        <div {...stylex.attrs(viewStyles.skillPickerDiv)}>
+        <div {...stylex.attrs(styles.skillPickerDiv)}>
           <For each={ready(all, [])}>
             {(s) => {
               const on = () => props.draft.skills.includes(s.id);
@@ -715,26 +700,26 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
                   aria-label={s.name}
                   onClick={() => toggle(s.id)}
                   {...stylex.attrs(
-                    variantStyles.skillPickerButton,
-                    on() ? variantStyles.runtimeChoiceButtonVariant : variantStyles.runtimeChoiceButtonVariant2,
+                    styles.skillPickerButton,
+                    on() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt,
                   )}
                 >
-                  <span {...stylex.attrs(variantStyles.skillPickerSpan, on() ? variantStyles.skillPickerSpanVariant : variantStyles.skillPickerSpanVariant2)}>
+                  <span {...stylex.attrs(styles.skillPickerSpan, on() ? styles.skillPickerSpanTone : styles.skillPickerSpanAlt)}>
                     <Show when={on()}>
                       <Icon name="check" size={12} />
                     </Show>
                   </span>
-                  <span {...stylex.attrs(viewStyles.skillPickerSpan)}>
-                    <span {...stylex.attrs(viewStyles.skillPickerSpan2)}>
+                  <span {...stylex.attrs(styles.skillPickerSpan2)}>
+                    <span {...stylex.attrs(styles.skillPickerSpan22)}>
                       {s.name}
                       <Show when={s.builtIn === true}>
-                        <span data-testid="built-in-mark" {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>
+                        <span data-testid="built-in-mark" {...stylex.attrs(styles.runtimeChoiceSpan4)}>
                           {" · "}
                           {t("web.runtime.library.builtInTag")}
                         </span>
                       </Show>
                     </span>
-                    <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{s.description}</span>
+                    <span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{s.description}</span>
                   </span>
                 </button>
               );
@@ -775,26 +760,26 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         hint={mcpRefused() ?? t("web.agent.mcpHint")}
         error={mcpRefused() && props.draft.mcpServers.length > 0 ? mcpRefused() : undefined}
       >
-        <div {...stylex.attrs(variantStyles.toolsDiv, mcpRefused() ? variantStyles.toolsDivVariant : variantStyles.runtimeChoiceSpan)}>
+        <div {...stylex.attrs(styles.toolsDiv, mcpRefused() ? styles.toolsDivTone : styles.runtimeChoiceSpan)}>
           <For each={props.draft.mcpServers}>
             {(s) => (
-              <div {...stylex.attrs(viewStyles.toolsDiv)}>
-                <span {...stylex.attrs(viewStyles.toolsSpan)}>{s.type}</span>
-                <span {...stylex.attrs(viewStyles.skillPickerSpan2)}>{s.name}</span>
-                <span {...stylex.attrs(viewStyles.toolsSpan2)}>{mcpTarget(s)}</span>
+              <div {...stylex.attrs(styles.toolsDiv2)}>
+                <span {...stylex.attrs(styles.toolsSpan)}>{s.type}</span>
+                <span {...stylex.attrs(styles.skillPickerSpan22)}>{s.name}</span>
+                <span {...stylex.attrs(styles.toolsSpan2)}>{mcpTarget(s)}</span>
                 <button
                   type="button"
                   disabled={!!mcpRefused()}
                   aria-label={t("web.agent.removeNamed", { name: s.name })}
                   onClick={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s.name) })}
-                  {...stylex.attrs(viewStyles.toolsButton)}
+                  {...stylex.attrs(styles.toolsButton)}
                 >
                   {t("web.agent.remove")}
                 </button>
               </div>
             )}
           </For>
-          <div {...stylex.attrs(viewStyles.toolsDiv2)}>
+          <div {...stylex.attrs(styles.toolsDiv22)}>
             <Segmented
               label={t("web.agent.mcpKind")}
               value={type()}
@@ -808,7 +793,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               aria-label={t("web.agent.mcpName")}
               disabled={!!mcpRefused()}
               placeholder={t("web.agent.name")}
-              styles={variantStyles3.toolsTextInput}
+              styles={styles.toolsTextInput}
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
             />
@@ -816,7 +801,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               aria-label={t("web.agent.mcpTarget")}
               disabled={!!mcpRefused()}
               placeholder={type() === "stdio" ? "npx -y @scope/server" : "https://…/mcp"}
-              styles={variantStyles3.toolsTextInput2}
+              styles={styles.toolsTextInput2}
               value={target()}
               onInput={(e) => setTarget(e.currentTarget.value)}
             />
@@ -840,13 +825,13 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         />
         <Show when={!toolsRefused() ? props.runtime?.tools : undefined}>
           {(tools) => (
-            <div {...stylex.attrs(viewStyles.toolsDiv3)}>
+            <div {...stylex.attrs(styles.toolsDiv3)}>
               <For each={tools().filter((tool) => !props.draft.disallowedTools.includes(tool.name))}>
                 {(tool) => (
                   <button
                     type="button"
                     onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool.name] })}
-                    {...stylex.attrs(viewStyles.toolsButton2)}
+                    {...stylex.attrs(styles.toolsButton2)}
                   >
                     + {tool.name}
                   </button>
@@ -867,18 +852,18 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
   return (
     <Switch
       fallback={
-        <ul {...stylex.attrs(viewStyles.inventoryUl)}>
+        <ul {...stylex.attrs(styles.inventoryUl)}>
           <For each={props.entries}>
             {(e) => (
-              <li {...stylex.attrs(viewStyles.inventoryLi)}>
+              <li {...stylex.attrs(styles.inventoryLi)}>
                 <span
-                  {...stylex.attrs(variantStyles.inventorySpan, e.enabled === false ? variantStyles.inventorySpanVariant : variantStyles.runtimeChoiceSpan)}
+                  {...stylex.attrs(styles.inventorySpan, e.enabled === false ? styles.inventorySpanTone : styles.runtimeChoiceSpan)}
                 >
                   {e.name}
                 </span>
-                <span {...stylex.attrs(viewStyles.inventorySpan)}>{e.description}</span>
+                <span {...stylex.attrs(styles.inventorySpan2)}>{e.description}</span>
                 <Show when={e.source}>
-                  <span {...stylex.attrs(viewStyles.inventorySpan2)}>{e.source}</span>
+                  <span {...stylex.attrs(styles.inventorySpan22)}>{e.source}</span>
                 </Show>
               </li>
             )}
@@ -887,10 +872,10 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
       }
     >
       <Match when={!props.entries}>
-        <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{t("web.agent.unreported")}</span>
+        <span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{t("web.agent.unreported")}</span>
       </Match>
       <Match when={props.entries?.length === 0}>
-        <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{t("web.agent.none")}</span>
+        <span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{t("web.agent.none")}</span>
       </Match>
     </Switch>
   );

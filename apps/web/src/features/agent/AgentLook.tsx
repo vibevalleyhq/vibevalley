@@ -13,7 +13,7 @@ import { AgentFace } from "#/ui/Face.tsx";
 import { PoseSprite } from "#/ui/PoseSprite.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   stageSpan: {
     borderRadius: "var(--radius-md)",
     backgroundColor: {
@@ -53,9 +53,6 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-});
-
-const variantStyles = stylex.create({
   tileButton: {
     display: "flex",
     cursor: "pointer",
@@ -69,14 +66,14 @@ const variantStyles = stylex.create({
     paddingTop: "var(--spacing)",
     paddingBottom: "calc(var(--spacing) * 1.5)",
   },
-  tileButtonVariant: {
+  tileButtonTone: {
     borderColor: {
       default: "var(--color-ink)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
     },
     backgroundColor: "var(--color-selected)",
   },
-  tileButtonVariant2: {
+  tileButtonAlt: {
     borderColor: "var(--color-line)",
     backgroundColor: {
       default: null,
@@ -90,15 +87,12 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  tileSpanVariant: {
+  tileSpanTone: {
     fontWeight: "var(--font-weight-semibold)",
   },
-  tileSpanVariant2: {
+  tileSpanAlt: {
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   labeledDiv: {
     display: "flex",
     flexDirection: "column",
@@ -194,16 +188,16 @@ export function Labeled(props: {
   children: JSX.Element;
 }) {
   return (
-    <div {...stylex.attrs(viewStyles.labeledDiv)}>
-      <div {...stylex.attrs(viewStyles.labeledDiv2)}>
-        <span {...stylex.attrs(viewStyles.labeledSpan)}>{props.label}</span>
+    <div {...stylex.attrs(styles.labeledDiv)}>
+      <div {...stylex.attrs(styles.labeledDiv2)}>
+        <span {...stylex.attrs(styles.labeledSpan)}>{props.label}</span>
         <Show when={props.hint ?? props.tip}>{(h) => <Hint text={h()} />}</Show>
-        <span {...stylex.attrs(viewStyles.labeledSpan2)} />
+        <span {...stylex.attrs(styles.labeledSpan2)} />
         {props.aside}
       </div>
       {props.children}
       <Show when={props.error}>
-        <span {...stylex.attrs(viewStyles.labeledSpan3)}>{props.error}</span>
+        <span {...stylex.attrs(styles.labeledSpan3)}>{props.error}</span>
       </Show>
     </div>
   );
@@ -213,14 +207,14 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
   const cast = () => castOf(props.draft.look, props.draft.id);
   const sprites = useSprites();
   return (
-    <div {...stylex.attrs(viewStyles.lookPanelDiv)}>
+    <div {...stylex.attrs(styles.lookPanelDiv)}>
       <div>
         <Button icon="shuffle" onClick={() => props.onChange(randomLook())}>
           {t("web.agent.random")}
         </Button>
       </div>
       <Labeled label={t("web.agent.looksAs")} hint={t("web.agent.looksHint")}>
-        <div {...stylex.attrs(viewStyles.lookPanelDiv2)}>
+        <div {...stylex.attrs(styles.lookPanelDiv2)}>
           <For each={SpeciesValues}>
             {(species) => (
               <Tile active={cast().species === species} label={speciesLabel[species]} onClick={() => props.onChange({ ...props.draft.look, species })}>
@@ -231,7 +225,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
         </div>
       </Labeled>
       <Labeled label={t("web.agent.wears")}>
-        <div {...stylex.attrs(viewStyles.lookPanelDiv2)}>
+        <div {...stylex.attrs(styles.lookPanelDiv2)}>
           <For each={OutfitValues}>
             {(outfit) => {
               const name = () => {
@@ -240,8 +234,8 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
               };
               return (
                 <Tile active={cast().outfit === outfit} label={outfitLabel[outfit]} onClick={() => props.onChange({ ...props.draft.look, outfit })}>
-                  <span {...stylex.attrs(viewStyles.lookPanelSpan)}>
-                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" {...stylex.attrs(viewStyles.lookPanelImg)} />}</Show>
+                  <span {...stylex.attrs(styles.lookPanelSpan)}>
+                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" {...stylex.attrs(styles.lookPanelImg)} />}</Show>
                   </span>
                 </Tile>
               );
@@ -261,10 +255,10 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       aria-label={props.label}
       aria-pressed={aria(props.active)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(variantStyles.tileButton, props.active ? variantStyles.tileButtonVariant : variantStyles.tileButtonVariant2)}
+      {...stylex.attrs(styles.tileButton, props.active ? styles.tileButtonTone : styles.tileButtonAlt)}
     >
       {props.children}
-      <span {...stylex.attrs(variantStyles.tileSpan, props.active ? variantStyles.tileSpanVariant : variantStyles.tileSpanVariant2)}>{props.label}</span>
+      <span {...stylex.attrs(styles.tileSpan, props.active ? styles.tileSpanTone : styles.tileSpanAlt)}>{props.label}</span>
     </button>
   );
 }
@@ -274,20 +268,20 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const crop = () => stagePoses.find((p) => p.pose === props.pose)?.crop ?? "empty";
   return (
-    <div {...stylex.attrs(viewStyles.stageDiv)}>
-      <div {...stylex.attrs(viewStyles.stageDiv2)}>
-        <img src={`/pixel/${cropSprite(crop())}.png`} alt="" {...stylex.attrs(viewStyles.stageImg)} onError={(e) => (e.currentTarget.style.display = "none")} />
-        <div {...stylex.attrs(viewStyles.stageDiv3)}>
+    <div {...stylex.attrs(styles.stageDiv)}>
+      <div {...stylex.attrs(styles.stageDiv2)}>
+        <img src={`/pixel/${cropSprite(crop())}.png`} alt="" {...stylex.attrs(styles.stageImg)} onError={(e) => (e.currentTarget.style.display = "none")} />
+        <div {...stylex.attrs(styles.stageDiv3)}>
           <PoseSprite cast={cast()} pose={props.pose} height={224} />
         </div>
       </div>
-      <div {...stylex.attrs(viewStyles.stageDiv4)}>
-        <span {...stylex.attrs(recipeStyles.stageSpan)}>{props.draft.name || t("web.agent.unnamedAgent")}</span>
+      <div {...stylex.attrs(styles.stageDiv4)}>
+        <span {...stylex.attrs(styles.stageSpan)}>{props.draft.name || t("web.agent.unnamedAgent")}</span>
         <Show when={props.draft.duty}>
-          <span {...stylex.attrs(recipeStyles.stageSpan2)}>{props.draft.duty}</span>
+          <span {...stylex.attrs(styles.stageSpan2)}>{props.draft.duty}</span>
         </Show>
       </div>
-      <span {...stylex.attrs(recipeStyles.stageSpan3)}>
+      <span {...stylex.attrs(styles.stageSpan3)}>
         {speciesLabel[cast().species]} · {outfitLabel[cast().outfit]}
       </span>
     </div>

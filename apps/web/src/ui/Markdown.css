@@ -1,6 +1,6 @@
 @layer components {
   .markdown .mention {
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background-color: var(--color-accent);
     padding-inline: calc(var(--spacing) * 0.5);
     font-weight: var(--font-weight-medium);
@@ -23,7 +23,7 @@
     color: var(--color-muted);
   }
   .markdown code {
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background-color: var(--color-hover);
     padding-inline: var(--spacing);
     font-family: var(--font-mono);
@@ -57,7 +57,7 @@
     padding: calc(var(--spacing) * 3);
   }
   .markdown pre code {
-    background-color: #0000;
+    background-color: transparent;
     padding: 0;
   }
   .markdown table {

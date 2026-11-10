@@ -10,7 +10,7 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   displayMenuPopoverPopup: {
     width: "min(340px,100vw - 24px)",
     transformOrigin: "100% 0",
@@ -31,9 +31,6 @@ const recipeStyles = stylex.create({
     boxShadow: "var(--shadow-float)",
     outlineStyle: "none",
   },
-});
-
-const viewStyles = stylex.create({
   displayMenuDiv: {
     display: "flex",
     alignItems: "center",
@@ -91,9 +88,9 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner {...positionerAttrs()} align="end" sideOffset={6}>
-          <Popover.Popup aria-label={t("web.issue.display.show")} data-testid="display-menu" {...stylex.attrs(recipeStyles.displayMenuPopoverPopup)}>
-            <div {...stylex.attrs(viewStyles.displayMenuDiv)}>
-              <span {...stylex.attrs(viewStyles.displayMenuSpan)}>{t("web.issue.display.group")}</span>
+          <Popover.Popup aria-label={t("web.issue.display.show")} data-testid="display-menu" {...stylex.attrs(styles.displayMenuPopoverPopup)}>
+            <div {...stylex.attrs(styles.displayMenuDiv)}>
+              <span {...stylex.attrs(styles.displayMenuSpan)}>{t("web.issue.display.group")}</span>
               <Segmented
                 label={t("web.issue.display.group")}
                 testid="grouping"
@@ -103,8 +100,8 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
                 options={groupings.map((g) => ({ value: g, label: groupingLabel[g] }))}
               />
             </div>
-            <div {...stylex.attrs(viewStyles.displayMenuDiv2)}>
-              <span {...stylex.attrs(viewStyles.displayMenuSpan)}>{t("web.issue.display.order")}</span>
+            <div {...stylex.attrs(styles.displayMenuDiv2)}>
+              <span {...stylex.attrs(styles.displayMenuSpan)}>{t("web.issue.display.order")}</span>
               <Segmented
                 label={t("web.issue.display.order")}
                 testid="ordering"
@@ -115,14 +112,14 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
               />
             </div>
             <Show when={notes().length > 0}>
-              <p {...stylex.attrs(viewStyles.displayMenuP)}>{notes().join("\n")}</p>
+              <p {...stylex.attrs(styles.displayMenuP)}>{notes().join("\n")}</p>
             </Show>
             <Show when={changed()}>
               <button
                 type="button"
                 data-testid="display-reset"
                 onClick={() => props.onChange({ ...props.look, grouping: defaultLook.grouping, ordering: defaultLook.ordering })}
-                {...stylex.attrs(viewStyles.displayReset)}
+                {...stylex.attrs(styles.displayReset)}
               >
                 {t("web.issue.display.reset")}
               </button>

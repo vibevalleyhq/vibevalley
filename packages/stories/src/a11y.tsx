@@ -2,8 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import type { AxeResults, Result } from "axe-core";
 import { createEffect, createSignal, For, Show } from "solid-js";
 
-const recipeStyles = stylex.create({
-  a11yPanelSection: {
+const styles = stylex.create({
+  panel: {
     maxHeight: "calc(var(--spacing) * 64)",
     flexShrink: "0",
     overflowY: "auto",
@@ -16,22 +16,22 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  a11yPanelDiv: {
+  header: {
     marginBottom: "calc(var(--spacing) * 2)",
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  a11yPanelH2: {
+  heading: {
     fontWeight: "var(--font-weight-semibold)",
   },
-  a11yPanelSpan: {
+  muted: {
     color: "var(--color-muted)",
   },
-  a11yPanelSpan2: {
+  spacer: {
     flex: "1",
   },
-  a11yPanelButton: {
+  rerunButton: {
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -46,35 +46,35 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  a11yPanelUl: {
+  list: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
   },
-  violationLi: {
+  item: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * .5)",
   },
-  violationDiv: {
+  itemHead: {
     display: "flex",
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 2)",
   },
-  violationSpan: {
+  impact: {
     fontFamily: "var(--font-mono)",
   },
-  violationSpanVariant1Case1: {
+  impactSevere: {
     color: "var(--color-berry)",
   },
-  violationSpanVariant1Case3: {
+  impactModerate: {
     color: "var(--color-warn-ink)",
   },
-  violationA: {
+  helpLink: {
     fontWeight: "var(--font-weight-medium)",
     textDecorationLine: "underline",
   },
-  violationCode: {
+  selector: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -84,11 +84,12 @@ const recipeStyles = stylex.create({
     color: "var(--color-muted)",
   },
 });
-const recipeStylesChoices1 = {
-  critical: recipeStyles.violationSpanVariant1Case1,
-  serious: recipeStyles.violationSpanVariant1Case1,
-  moderate: recipeStyles.violationSpanVariant1Case3,
-  minor: recipeStyles.a11yPanelSpan,
+
+const impactTones = {
+  critical: styles.impactSevere,
+  serious: styles.impactSevere,
+  moderate: styles.impactModerate,
+  minor: styles.muted,
 };
 
 export interface Axe {
@@ -137,26 +138,24 @@ export function useAxe(target: () => HTMLElement | undefined, deps: () => unknow
 
 export function A11yPanel(props: { result: AxeResults | undefined; onAgain: () => void }) {
   return (
-    <section data-testid="story-a11y-panel" aria-label="Accessibility" {...stylex.attrs(recipeStyles.a11yPanelSection)}>
-      <div {...stylex.attrs(recipeStyles.a11yPanelDiv)}>
-        <h2 {...stylex.attrs(recipeStyles.a11yPanelH2)}>Accessibility</h2>
-        <span {...stylex.attrs(recipeStyles.a11yPanelSpan)}>WCAG 2 A and AA, over the frames</span>
-        <span {...stylex.attrs(recipeStyles.a11yPanelSpan2)} />
-        <button type="button" {...stylex.attrs(recipeStyles.a11yPanelButton)} onClick={() => props.onAgain()}>
+    <section data-testid="story-a11y-panel" aria-label="Accessibility" {...stylex.attrs(styles.panel)}>
+      <div {...stylex.attrs(styles.header)}>
+        <h2 {...stylex.attrs(styles.heading)}>Accessibility</h2>
+        <span {...stylex.attrs(styles.muted)}>WCAG 2 A and AA, over the frames</span>
+        <span {...stylex.attrs(styles.spacer)} />
+        <button type="button" {...stylex.attrs(styles.rerunButton)} onClick={() => props.onAgain()}>
           Check again
         </button>
       </div>
-      <Show when={props.result} fallback={<p {...stylex.attrs(recipeStyles.a11yPanelSpan)}>Checking…</p>}>
+      <Show when={props.result} fallback={<p {...stylex.attrs(styles.muted)}>Checking…</p>}>
         {(r) => (
           <Show
             when={r().violations.length > 0}
             fallback={
-              <p
-                {...stylex.attrs(recipeStyles.a11yPanelSpan)}
-              >{`Nothing found; ${r().passes.length} rules pass, ${r().incomplete.length} need a look by eye.`}</p>
+              <p {...stylex.attrs(styles.muted)}>{`Nothing found; ${r().passes.length} rules pass, ${r().incomplete.length} need a look by eye.`}</p>
             }
           >
-            <ul {...stylex.attrs(recipeStyles.a11yPanelUl)}>
+            <ul {...stylex.attrs(styles.list)}>
               <For each={r().violations}>{(v) => <Violation v={v} />}</For>
             </ul>
           </Show>
@@ -168,14 +167,14 @@ export function A11yPanel(props: { result: AxeResults | undefined; onAgain: () =
 
 function Violation(props: { v: Result }) {
   return (
-    <li data-testid="story-a11y-issue" data-key={props.v.id} {...stylex.attrs(recipeStyles.violationLi)}>
-      <div {...stylex.attrs(recipeStyles.violationDiv)}>
-        <span {...stylex.attrs(recipeStyles.violationSpan, recipeStylesChoices1[props.v.impact ?? "minor"])}>{props.v.impact}</span>
-        <a href={props.v.helpUrl} target="_blank" rel="noreferrer" {...stylex.attrs(recipeStyles.violationA)}>
+    <li data-testid="story-a11y-issue" data-key={props.v.id} {...stylex.attrs(styles.item)}>
+      <div {...stylex.attrs(styles.itemHead)}>
+        <span {...stylex.attrs(styles.impact, impactTones[props.v.impact ?? "minor"])}>{props.v.impact}</span>
+        <a href={props.v.helpUrl} target="_blank" rel="noreferrer" {...stylex.attrs(styles.helpLink)}>
           {props.v.help}
         </a>
       </div>
-      <For each={props.v.nodes}>{(n) => <code {...stylex.attrs(recipeStyles.violationCode)}>{n.target.join(" ")}</code>}</For>
+      <For each={props.v.nodes}>{(n) => <code {...stylex.attrs(styles.selector)}>{n.target.join(" ")}</code>}</For>
     </li>
   );
 }

@@ -105,7 +105,7 @@ export function Segmented<T extends string>(props: {
       }}
       aria-label={props.label}
       data-testid={props.testid}
-      class={stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted).class}
+      {...stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted)}
     >
       <Show when={thumb()}>
         {(at) => <span aria-hidden="true" {...styleProps([styles.thumb, moved() && styles.moved, styles.place(at().x, at().y, at().w, at().h)])} />}
@@ -117,7 +117,7 @@ export function Segmented<T extends string>(props: {
             data-key={o.value}
             disabled={o.disabled}
             title={o.title}
-            class={stylex.attrs(styles.option, props.block === true && styles.stretched, o.value === props.value ? styles.selected : styles.idle).class}
+            {...stylex.attrs(styles.option, props.block === true && styles.stretched, o.value === props.value ? styles.selected : styles.idle)}
           >
             <Show when={o.icon}>{(name) => <Icon name={name()} size={14} />}</Show>
             {o.label}

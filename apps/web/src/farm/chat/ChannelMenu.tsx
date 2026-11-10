@@ -13,7 +13,7 @@ import { useRouter } from "#/infra/router.ts";
 import { PxButton, PxTextInput, SpriteIcon } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   channelArrow: { rotate: "90deg" },
   channelMenuDiv: {
     position: "absolute",
@@ -35,7 +35,7 @@ const recipeStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 1.5)",
     textAlign: "left",
   },
-  channelItemButtonVariant1Case1: {
+  channelItemButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -44,16 +44,13 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  channelItemButtonVariant1Case2: {
+  channelItemButtonSecondary: {
     backgroundColor: {
       default: "var(--color-px-leaf-soft)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
     },
   },
-});
-
-const viewStyles = stylex.create({
-  channelMenuDiv: {
+  channelMenuDiv2: {
     position: "relative",
     minWidth: "0",
   },
@@ -82,7 +79,7 @@ const viewStyles = stylex.create({
     fontSize: "12px",
     color: "var(--color-berry)",
   },
-  channelMenuDiv2: {
+  channelMenuDiv22: {
     display: "flex",
     maxHeight: "calc(var(--spacing) * 72)",
     flexDirection: "column",
@@ -193,7 +190,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
   const elsewhere = () => [...channels(), ...directs()].filter((c) => c.id !== props.current?.id).reduce((n, c) => n + unreadUnder(chat(), c), 0);
   const close = () => setOpen(false);
   return (
-    <div ref={box} {...stylex.attrs(viewStyles.channelMenuDiv)}>
+    <div ref={box} {...stylex.attrs(styles.channelMenuDiv2)}>
       <button
         type="button"
         data-testid="channel-menu"
@@ -205,27 +202,27 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
           setOpen(!open());
           setMode("list");
         }}
-        {...stylex.attrs(viewStyles.channelMenu)}
+        {...stylex.attrs(styles.channelMenu)}
       >
-        <span {...stylex.attrs(viewStyles.channelMenuSpan)}>{farmChannelLabel(props.current)}</span>
+        <span {...stylex.attrs(styles.channelMenuSpan)}>{farmChannelLabel(props.current)}</span>
         <Show when={elsewhere() > 0}>
-          <span {...stylex.attrs(viewStyles.channelMenuSpan2)}>{elsewhere()}</span>
+          <span {...stylex.attrs(styles.channelMenuSpan2)}>{elsewhere()}</span>
         </Show>
-        <SpriteIcon name="button-next" size={10} styles={recipeStyles.channelArrow} />
+        <SpriteIcon name="button-next" size={10} styles={styles.channelArrow} />
       </button>
       <Show when={open()}>
-        <div {...stylex.attrs(recipeStyles.channelMenuDiv)} role="dialog" aria-label={t("web.farm.chat.channels")} data-testid="channels">
+        <div {...stylex.attrs(styles.channelMenuDiv)} role="dialog" aria-label={t("web.farm.chat.channels")} data-testid="channels">
           <Switch>
             <Match when={mode() === "list"}>
-              <div {...stylex.attrs(viewStyles.channelMenuDiv2)}>
+              <div {...stylex.attrs(styles.channelMenuDiv22)}>
                 <For each={channels()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
                 <Show when={directs().length > 0}>
-                  <p {...stylex.attrs(viewStyles.channelMenuP)}>{t("web.farm.chat.directs")}</p>
+                  <p {...stylex.attrs(styles.channelMenuP)}>{t("web.farm.chat.directs")}</p>
                   <For each={directs()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
                 </Show>
               </div>
-              <div {...stylex.attrs(viewStyles.channelMenuDiv3)}>
-                <button type="button" data-testid="new-channel" onClick={() => setMode("create")} {...stylex.attrs(viewStyles.newChannel)}>
+              <div {...stylex.attrs(styles.channelMenuDiv3)}>
+                <button type="button" data-testid="new-channel" onClick={() => setMode("create")} {...stylex.attrs(styles.newChannel)}>
                   <SpriteIcon name="button-add" size={12} />
                   {t("web.farm.chat.newChannel")}
                 </button>
@@ -233,13 +230,13 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
                   type="button"
                   data-testid="channel-page"
                   onClick={() => router.navigate(chatPath(props.current))}
-                  {...stylex.attrs(viewStyles.newChannel)}
+                  {...stylex.attrs(styles.newChannel)}
                 >
                   <SpriteIcon name="button-open" size={12} />
                   {t("web.farm.chat.pageAndSchedules")}
                 </button>
                 <Show when={props.current?.type === "channel"}>
-                  <button type="button" data-testid="channel-settings" onClick={() => setMode("settings")} {...stylex.attrs(viewStyles.newChannel)}>
+                  <button type="button" data-testid="channel-settings" onClick={() => setMode("settings")} {...stylex.attrs(styles.newChannel)}>
                     <SpriteIcon name="button-settings" size={12} />
                     {t("web.farm.chat.settingsLink")}
                   </button>
@@ -274,16 +271,16 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
         props.onPick();
         farm.showChat(c().default ? undefined : c().id);
       }}
-      {...stylex.attrs(recipeStyles.channelItemButton, here() ? recipeStyles.channelItemButtonVariant1Case2 : recipeStyles.channelItemButtonVariant1Case1)}
+      {...stylex.attrs(styles.channelItemButton, here() ? styles.channelItemButtonSecondary : styles.channelItemButtonPrimary)}
     >
-      <span {...stylex.attrs(viewStyles.channelItemSpan)}>
-        <span {...stylex.attrs(viewStyles.channelItemSpan2)}>{farmChannelLabel(c())}</span>
+      <span {...stylex.attrs(styles.channelItemSpan)}>
+        <span {...stylex.attrs(styles.channelItemSpan2)}>{farmChannelLabel(c())}</span>
         <Show when={line()}>
-          <span {...stylex.attrs(viewStyles.channelItemSpan3)}>{line()}</span>
+          <span {...stylex.attrs(styles.channelItemSpan3)}>{line()}</span>
         </Show>
       </span>
       <Show when={unread() > 0}>
-        <span {...stylex.attrs(viewStyles.channelItemSpan4)}>{unread()}</span>
+        <span {...stylex.attrs(styles.channelItemSpan4)}>{unread()}</span>
       </Show>
     </button>
   );
@@ -291,8 +288,8 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
 
 function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: (() => void) | undefined }) {
   return (
-    <div {...stylex.attrs(viewStyles.formButtonsDiv)}>
-      <button type="button" data-testid="form-back" onClick={() => props.onBack()} {...stylex.attrs(viewStyles.formBack)}>
+    <div {...stylex.attrs(styles.formButtonsDiv)}>
+      <button type="button" data-testid="form-back" onClick={() => props.onBack()} {...stylex.attrs(styles.formBack)}>
         {t("web.farm.chat.back2")}
       </button>
       <PxButton tone="primary" size="sm" data-testid="form-submit" disabled={!props.onSubmit} onClick={props.onSubmit && (() => props.onSubmit?.())}>
@@ -314,9 +311,9 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
     props.onDone();
   };
   return (
-    <div {...stylex.attrs(viewStyles.newChannelDiv)}>
-      <p {...stylex.attrs(viewStyles.newChannelP)}>{t("web.farm.chat.newChannel")}</p>
-      <p {...stylex.attrs(viewStyles.newChannelP2)}>{t("web.farm.chat.newChannelLine")}</p>
+    <div {...stylex.attrs(styles.newChannelDiv)}>
+      <p {...stylex.attrs(styles.newChannelP)}>{t("web.farm.chat.newChannel")}</p>
+      <p {...stylex.attrs(styles.newChannelP2)}>{t("web.farm.chat.newChannelLine")}</p>
       <PxTextInput
         testid="channel-name"
         value={form.name()}
@@ -339,7 +336,7 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
         suggestions={names()}
       />
       <Show when={form.error()}>
-        <p {...stylex.attrs(viewStyles.channelMenuSpan2)}>{form.error()}</p>
+        <p {...stylex.attrs(styles.channelMenuSpan2)}>{form.error()}</p>
       </Show>
       <FormButtons onBack={() => props.onBack()} submit={t("web.farm.chat.open")} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
@@ -355,8 +352,8 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
     if ((await form.save()) !== undefined) props.onDone();
   };
   return (
-    <div {...stylex.attrs(viewStyles.newChannelDiv)}>
-      <p {...stylex.attrs(viewStyles.newChannelP)}>{t("web.farm.chat.settingsOf", { channel: farmChannelLabel(props.channel) })}</p>
+    <div {...stylex.attrs(styles.newChannelDiv)}>
+      <p {...stylex.attrs(styles.newChannelP)}>{t("web.farm.chat.settingsOf", { channel: farmChannelLabel(props.channel) })}</p>
       <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={t("web.farm.chat.what")} label={t("web.farm.chat.description")} />
       <PxTextInput
         value={form.repo()}
@@ -366,7 +363,7 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
         suggestions={names()}
       />
       <Show when={form.error()}>
-        <p {...stylex.attrs(viewStyles.channelMenuSpan2)}>{form.error()}</p>
+        <p {...stylex.attrs(styles.channelMenuSpan2)}>{form.error()}</p>
       </Show>
       <FormButtons onBack={() => props.onBack()} submit={t("web.farm.chat.save")} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>

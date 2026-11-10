@@ -26,7 +26,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   // Floats over the messages just above the box: opening it moves nothing on the page.
   composerDiv: {
     position: "absolute",
@@ -54,17 +54,11 @@ const recipeStyles2 = stylex.create({
     padding: "var(--spacing)",
     boxShadow: "var(--shadow-float)",
   },
-});
-
-const recipeStyles = stylex.create({
   composerDictationKey: {
     width: "calc(var(--spacing) * 7)",
     height: "calc(var(--spacing) * 7)",
     borderRadius: "var(--radius-md)",
   },
-});
-
-const variantStyles2 = stylex.create({
   composerProgressRoot: {
     position: "relative",
     display: "flex",
@@ -90,10 +84,7 @@ const variantStyles2 = stylex.create({
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 20%, transparent)",
     },
   },
-});
-
-const variantStyles = stylex.create({
-  composerDiv: {
+  composerDiv2: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
@@ -102,10 +93,10 @@ const variantStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
   },
-  composerDivVariant: {
+  composerDivTone: {
     backgroundColor: "var(--color-selected)",
   },
-  composerDivVariant2: {},
+  composerDivAlt: {},
   composerButton: {
     display: "inline-flex",
     width: "calc(var(--spacing) * 7)",
@@ -120,7 +111,7 @@ const variantStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
   },
-  composerButtonVariant: {
+  composerButtonTone: {
     borderColor: "var(--color-accent)",
     backgroundColor: {
       default: "var(--color-accent)",
@@ -130,7 +121,7 @@ const variantStyles = stylex.create({
       },
     },
   },
-  composerButtonVariant2: {
+  composerButtonAlt: {
     borderColor: "transparent",
     opacity: ".5",
   },
@@ -141,9 +132,6 @@ const variantStyles = stylex.create({
     flex: "1",
     flexDirection: "column",
   },
-});
-
-const viewStyles = stylex.create({
   composer: {
     position: "relative",
     borderTopStyle: "solid",
@@ -190,7 +178,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-berry)",
   },
-  composerDiv: {
+  composerDiv3: {
     marginBottom: "calc(var(--spacing) * 1.5)",
     display: "flex",
     flexDirection: "column",
@@ -240,7 +228,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  composerDiv2: {
+  composerDiv22: {
     marginBottom: "calc(var(--spacing) * 1.5)",
     display: "flex",
     flexWrap: "wrap",
@@ -253,7 +241,7 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  composerDiv3: {
+  composerDiv32: {
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -472,9 +460,9 @@ export function Composer(props: {
   };
 
   return (
-    <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(viewStyles.composer)}>
+    <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(styles.composer)}>
       <Show when={box.offered().length > 0}>
-        <div role="listbox" aria-label={t("web.channel.composer.who")} data-testid="mentions" {...stylex.attrs(recipeStyles2.composerDiv)}>
+        <div role="listbox" aria-label={t("web.channel.composer.who")} data-testid="mentions" {...stylex.attrs(styles.composerDiv)}>
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
@@ -487,7 +475,7 @@ export function Composer(props: {
                   e.preventDefault();
                   box.choose(n());
                 }}
-                {...stylex.attrs(variantStyles.composerDiv, i() === box.active() ? variantStyles.composerDivVariant : variantStyles.composerDivVariant2)}
+                {...stylex.attrs(styles.composerDiv2, i() === box.active() ? styles.composerDivTone : styles.composerDivAlt)}
               >
                 <Show
                   when={n().session}
@@ -495,7 +483,7 @@ export function Composer(props: {
                     n().orchestrator ? (
                       <OrchestratorFace size={20} agent={n().orchestrator} />
                     ) : (
-                      <span {...stylex.attrs(viewStyles.composerSpan)}>
+                      <span {...stylex.attrs(styles.composerSpan)}>
                         <Show when={n().args !== undefined}>
                           <Icon name="command" size={14} />
                         </Show>
@@ -505,16 +493,16 @@ export function Composer(props: {
                 >
                   {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
-                <span {...stylex.attrs(viewStyles.composerSpan2)}>
+                <span {...stylex.attrs(styles.composerSpan2)}>
                   {n().token}
                   <Show when={n().args !== undefined && n().args !== ""}>
-                    <span {...stylex.attrs(viewStyles.commandArgs)}> {n().args}</span>
+                    <span {...stylex.attrs(styles.commandArgs)}> {n().args}</span>
                   </Show>
                 </span>
                 <Show when={n().session !== undefined || n().args !== undefined}>
-                  <span {...stylex.attrs(viewStyles.composerSpan3)}>{n().name}</span>
+                  <span {...stylex.attrs(styles.composerSpan3)}>{n().name}</span>
                 </Show>
-                <span {...stylex.attrs(viewStyles.composerSpan4)}>{n().note}</span>
+                <span {...stylex.attrs(styles.composerSpan4)}>{n().note}</span>
               </div>
             )}
           </For>
@@ -522,21 +510,21 @@ export function Composer(props: {
       </Show>
       <Show when={problem()}>
         {(p) => (
-          <p role="alert" data-testid="chat-problem" {...stylex.attrs(viewStyles.chatProblem)}>
+          <p role="alert" data-testid="chat-problem" {...stylex.attrs(styles.chatProblem)}>
             {p()}
           </p>
         )}
       </Show>
       <Show when={(props.quoted?.length ?? 0) > 0}>
-        <div {...stylex.attrs(viewStyles.composerDiv)}>
+        <div {...stylex.attrs(styles.composerDiv3)}>
           <For each={props.quoted} keyed={(q) => q.ref.blockId}>
             {(q) => (
-              <div data-testid="quoted-block" data-key={q().ref.blockId} {...stylex.attrs(viewStyles.quotedBlock)}>
+              <div data-testid="quoted-block" data-key={q().ref.blockId} {...stylex.attrs(styles.quotedBlock)}>
                 <Icon name="artifacts" size={12} />
-                <span {...stylex.attrs(viewStyles.composerSpan5)}>{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
+                <span {...stylex.attrs(styles.composerSpan5)}>{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
                 <button
                   type="button"
-                  {...stylex.attrs(viewStyles.quotedBlockRemove)}
+                  {...stylex.attrs(styles.quotedBlockRemove)}
                   data-testid="quoted-block-remove"
                   aria-label={t("web.channel.composer.cancelQuote")}
                   title={t("web.channel.composer.cancelQuote")}
@@ -551,9 +539,9 @@ export function Composer(props: {
       </Show>
       <Show when={replying()}>
         {(m) => (
-          <div data-testid="replying" data-key={m().number} {...stylex.attrs(viewStyles.replying)}>
+          <div data-testid="replying" data-key={m().number} {...stylex.attrs(styles.replying)}>
             <Icon name="reply" size={12} />
-            <span {...stylex.attrs(viewStyles.composerSpan5)}>
+            <span {...stylex.attrs(styles.composerSpan5)}>
               {t("shared.join.labeled", {
                 label: t("web.channel.composer.replying", { name: m().from === userId ? t("web.channel.messages.user") : m().name }),
                 text: m().text,
@@ -561,7 +549,7 @@ export function Composer(props: {
             </span>
             <button
               type="button"
-              {...stylex.attrs(viewStyles.quotedBlockRemove)}
+              {...stylex.attrs(styles.quotedBlockRemove)}
               data-testid="cancel-reply"
               aria-label={t("web.channel.composer.cancelReply")}
               title={t("web.channel.composer.cancelReply")}
@@ -573,21 +561,21 @@ export function Composer(props: {
         )}
       </Show>
       <Show when={draft().files.length > 0 || uploading().length > 0}>
-        <div {...stylex.attrs(viewStyles.composerDiv2)}>
+        <div {...stylex.attrs(styles.composerDiv22)}>
           <For each={draft().files} keyed={(f) => f.id}>
             {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => props.channel && drafts.drop(props.channel.id, f().id)} />}
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (
-              <Progress.Root value={u().percent} aria-label={u().name} {...stylex.attrs(variantStyles2.composerProgressRoot)}>
-                <Progress.Indicator {...stylex.attrs(variantStyles2.composerProgressIndicator)} />
-                <span {...stylex.attrs(viewStyles.composerSpan6)}>{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
+              <Progress.Root value={u().percent} aria-label={u().name} {...stylex.attrs(styles.composerProgressRoot)}>
+                <Progress.Indicator {...stylex.attrs(styles.composerProgressIndicator)} />
+                <span {...stylex.attrs(styles.composerSpan6)}>{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
               </Progress.Root>
             )}
           </For>
         </div>
       </Show>
-      <div {...stylex.attrs(viewStyles.composerDiv3)}>
+      <div {...stylex.attrs(styles.composerDiv32)}>
         <textarea
           ref={(el) => (input = el)}
           value={box.text()}
@@ -610,10 +598,10 @@ export function Composer(props: {
             e.preventDefault();
             attach(files);
           }}
-          {...stylex.attrs(viewStyles.composerInput)}
+          {...stylex.attrs(styles.composerInput)}
         />
         <DictationProblem dictating={dictating} />
-        <div {...stylex.attrs(viewStyles.composerDiv4)}>
+        <div {...stylex.attrs(styles.composerDiv4)}>
           <Show
             when={listening()}
             fallback={
@@ -626,7 +614,7 @@ export function Composer(props: {
                     disabled={props.channel === undefined}
                     aria-label={t("web.channel.composer.mention")}
                     title={t("web.channel.composer.mention")}
-                    {...stylex.attrs(viewStyles.attach)}
+                    {...stylex.attrs(styles.attach)}
                   >
                     <Icon name="mention" size={16} />
                   </button>
@@ -638,16 +626,16 @@ export function Composer(props: {
                   disabled={props.channel === undefined}
                   aria-label={t("web.channel.composer.command")}
                   title={t("web.channel.composer.command")}
-                  {...stylex.attrs(viewStyles.attach)}
+                  {...stylex.attrs(styles.attach)}
                 >
                   <Icon name="command" size={16} />
                 </button>
-                <span {...stylex.attrs(viewStyles.composerSpan8)} />
+                <span {...stylex.attrs(styles.composerSpan8)} />
                 <input
                   ref={(el) => (picker = el)}
                   type="file"
                   multiple
-                  {...stylex.attrs(viewStyles.composerInput2)}
+                  {...stylex.attrs(styles.composerInput2)}
                   aria-hidden="true"
                   tabindex={-1}
                   onChange={(e) => {
@@ -663,7 +651,7 @@ export function Composer(props: {
                   disabled={!props.channel}
                   aria-label={t("web.channel.composer.attach")}
                   title={t("web.channel.composer.attach")}
-                  {...stylex.attrs(viewStyles.attach)}
+                  {...stylex.attrs(styles.attach)}
                 >
                   <Icon name="attach" size={16} />
                 </button>
@@ -677,7 +665,7 @@ export function Composer(props: {
                     aria-label={t("web.channel.emoji.open")}
                     aria-expanded={aria(emoji())}
                     title={t("web.channel.emoji.open")}
-                    {...stylex.attrs(viewStyles.attach)}
+                    {...stylex.attrs(styles.attach)}
                   >
                     <Icon name="react" size={16} />
                   </button>
@@ -697,7 +685,7 @@ export function Composer(props: {
           >
             <DictationBar dictating={dictating} />
           </Show>
-          <DictationKey dictating={dictating} bar surface size={16} styles={[recipeStyles.composerDictationKey]} />
+          <DictationKey dictating={dictating} bar surface size={16} styles={[styles.composerDictationKey]} />
           <Show when={!listening()}>
             <Show when={box.stoppable()}>
               <button
@@ -706,7 +694,7 @@ export function Composer(props: {
                 onClick={() => void stop()}
                 aria-label={t("web.channel.composer.stop")}
                 title={t("web.channel.composer.stopHint")}
-                {...stylex.attrs(viewStyles.stop)}
+                {...stylex.attrs(styles.stop)}
               >
                 <Icon name="stop" size={16} />
               </button>
@@ -718,7 +706,7 @@ export function Composer(props: {
               disabled={!box.canSend()}
               aria-label={t("web.channel.composer.send")}
               title={t("web.channel.composer.sendHint")}
-              {...stylex.attrs(variantStyles.composerButton, box.canSend() ? variantStyles.composerButtonVariant : variantStyles.composerButtonVariant2)}
+              {...stylex.attrs(styles.composerButton, box.canSend() ? styles.composerButtonTone : styles.composerButtonAlt)}
             >
               <Icon name="send" size={16} />
             </button>
@@ -735,7 +723,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   const files = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
   return (
     <div
-      {...stylex.attrs(variantStyles.fileDropDiv)}
+      {...stylex.attrs(styles.fileDropDiv)}
       onDragOver={(e) => {
         if (!files(e) || !props.channel) return;
         e.preventDefault();
@@ -754,7 +742,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
     >
       {props.children}
       <Show when={over()}>
-        <div data-testid="drop-hint" {...stylex.attrs(viewStyles.dropHint)}>
+        <div data-testid="drop-hint" {...stylex.attrs(styles.dropHint)}>
           {t("web.channel.media.drop")}
         </div>
       </Show>

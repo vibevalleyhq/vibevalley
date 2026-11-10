@@ -23,7 +23,7 @@ import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   creatorDiv: {
     display: "flex",
     minHeight: "0",
@@ -43,15 +43,9 @@ const recipeStyles = stylex.create({
       "@media (width>=64rem)": "hidden",
     },
   },
-});
-
-const variantStyles3 = stylex.create({
   problemsIcon: {
     marginTop: "var(--spacing)",
   },
-});
-
-const variantStyles2 = stylex.create({
   agentPageA: {
     textDecorationLine: "underline",
   },
@@ -67,9 +61,6 @@ const variantStyles2 = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
   creatorSpan: {
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
@@ -77,15 +68,15 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  creatorSpanVariant: {
+  creatorSpanTone: {
     backgroundColor: "var(--color-hat)",
     color: "var(--color-bark-900)",
   },
-  creatorSpanVariant2: {
+  creatorSpanAlt: {
     backgroundColor: "var(--color-hover)",
     color: "var(--color-muted)",
   },
-  creatorDiv: {
+  creatorDiv2: {
     display: "flex",
     minHeight: "calc(var(--spacing) * 104)",
     flex: "1",
@@ -105,11 +96,11 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  creatorButtonVariant: {
+  creatorButtonTone: {
     backgroundColor: "var(--color-ink)",
     color: "var(--color-page)",
   },
-  creatorButtonVariant2: {
+  creatorButtonAlt: {
     backgroundColor: {
       default: "var(--color-hover)",
       "@media (hover:hover)": {
@@ -125,15 +116,12 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  problemsLiVariant: {
+  problemsLiTone: {
     color: "var(--color-berry)",
   },
-  problemsLiVariant2: {
+  problemsLiAlt: {
     color: "var(--color-warn-ink)",
   },
-});
-
-const viewStyles = stylex.create({
   agentPageP: {
     padding: "calc(var(--spacing) * 8)",
     fontSize: "var(--text-sm)",
@@ -177,7 +165,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  creatorDiv: {
+  creatorDiv3: {
     display: "flex",
     height: "100%",
     minHeight: "0",
@@ -186,12 +174,12 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBottom: "calc(var(--spacing) * 4)",
   },
-  creatorDiv2: {
+  creatorDiv22: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 3)",
   },
-  creatorButton: {
+  creatorButton2: {
     cursor: "pointer",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -204,12 +192,12 @@ const viewStyles = stylex.create({
       },
     },
   },
-  creatorSpan: {
+  creatorSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  creatorDiv3: {
+  creatorDiv32: {
     minHeight: "0",
     flex: "1",
   },
@@ -323,21 +311,21 @@ export function AgentPage(props: { id: string }) {
     <Switch>
       <Match when={agents.error()}>
         {(e) => (
-          <p {...stylex.attrs(viewStyles.agentPageP)}>
+          <p {...stylex.attrs(styles.agentPageP)}>
             {t("web.agent.noProfiles")}
             {reasonOf(e())}
           </p>
         )}
       </Match>
       <Match when={!loaded() || (isNew() && !ready(runtimes, undefined))}>
-        <p {...stylex.attrs(viewStyles.agentPageP)}>
+        <p {...stylex.attrs(styles.agentPageP)}>
           {isNew() && runtimes.error() ? t("web.agent.noRuntimes", { why: reasonOf(runtimes.error()) }) : t("web.agent.loading")}
         </p>
       </Match>
       <Match when={!isNew() && !saved()}>
-        <p data-testid="agent-missing" {...stylex.attrs(viewStyles.agentPageP)}>
+        <p data-testid="agent-missing" {...stylex.attrs(styles.agentPageP)}>
           {t("web.agent.noSuch")}
-          <A href="/agents" {...stylex.attrs(variantStyles2.agentPageA)}>
+          <A href="/agents" {...stylex.attrs(styles.agentPageA)}>
             {t("web.agent.backToAll")}
           </A>
         </p>
@@ -382,18 +370,18 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   };
 
   const bar = () => (
-    <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(viewStyles.profileBar)}>
-      <A href="/agents" data-testid="back" {...stylex.attrs(variantStyles2.creatorA)}>
+    <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(styles.profileBar)}>
+      <A href="/agents" data-testid="back" {...stylex.attrs(styles.creatorA)}>
         {t("web.agent.all")}
       </A>
-      <span {...stylex.attrs(viewStyles.barSpan)}>/</span>
-      <span {...stylex.attrs(viewStyles.barSpan2)}>
-        <span {...stylex.attrs(viewStyles.barSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
-        <span {...stylex.attrs(variantStyles.creatorSpan, isNew || dirty() ? variantStyles.creatorSpanVariant : variantStyles.creatorSpanVariant2)}>
+      <span {...stylex.attrs(styles.barSpan)}>/</span>
+      <span {...stylex.attrs(styles.barSpan2)}>
+        <span {...stylex.attrs(styles.barSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
+        <span {...stylex.attrs(styles.creatorSpan, isNew || dirty() ? styles.creatorSpanTone : styles.creatorSpanAlt)}>
           {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
         </span>
       </span>
-      <span {...stylex.attrs(viewStyles.barSpan4)}>
+      <span {...stylex.attrs(styles.barSpan4)}>
         <Show when={props.saved}>
           {(saved) => (
             <>
@@ -428,39 +416,39 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
     <Show
       when={!trajectories()}
       fallback={
-        <div {...stylex.attrs(viewStyles.creatorDiv)}>
+        <div {...stylex.attrs(styles.creatorDiv3)}>
           {bar()}
-          <div {...stylex.attrs(viewStyles.creatorDiv2)}>
-            <button type="button" {...stylex.attrs(viewStyles.creatorButton)} onClick={() => setTrajectories(false)}>
+          <div {...stylex.attrs(styles.creatorDiv22)}>
+            <button type="button" {...stylex.attrs(styles.creatorButton2)} onClick={() => setTrajectories(false)}>
               {t("web.agent.backToProfile")}
             </button>
-            <span {...stylex.attrs(viewStyles.creatorSpan)} title={t("web.agent.trajectoriesHint")}>
+            <span {...stylex.attrs(styles.creatorSpan2)} title={t("web.agent.trajectoriesHint")}>
               {t("web.agent.trajectories")}
             </span>
           </div>
-          <div {...stylex.attrs(viewStyles.creatorDiv3)}>
+          <div {...stylex.attrs(styles.creatorDiv32)}>
             <TrajectoryList agent={draft().id} />
           </div>
         </div>
       }
     >
-      <div {...stylex.attrs(viewStyles.creatorDiv4)}>
+      <div {...stylex.attrs(styles.creatorDiv4)}>
         {bar()}
         <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
-        <div {...stylex.attrs(recipeStyles.creatorDiv)}>
-          <div {...stylex.attrs(viewStyles.creatorDiv5)}>
+        <div {...stylex.attrs(styles.creatorDiv)}>
+          <div {...stylex.attrs(styles.creatorDiv5)}>
             <LookPanel draft={draft()} onChange={(look) => setDraft({ ...draft(), look })} />
           </div>
-          <div {...stylex.attrs(variantStyles.creatorDiv)}>
+          <div {...stylex.attrs(styles.creatorDiv2)}>
             <Stage draft={draft()} pose={pose()} />
-            <div {...stylex.attrs(viewStyles.creatorDiv6)}>
+            <div {...stylex.attrs(styles.creatorDiv6)}>
               <For each={stagePoses}>
                 {(p) => (
                   <button
                     type="button"
                     aria-pressed={aria(pose() === p.pose)}
                     onClick={() => setPose(p.pose)}
-                    {...stylex.attrs(variantStyles.creatorButton, pose() === p.pose ? variantStyles.creatorButtonVariant : variantStyles.creatorButtonVariant2)}
+                    {...stylex.attrs(styles.creatorButton, pose() === p.pose ? styles.creatorButtonTone : styles.creatorButtonAlt)}
                   >
                     {p.label}
                   </button>
@@ -468,7 +456,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
               </For>
             </div>
           </div>
-          <div {...stylex.attrs(viewStyles.creatorDiv7)}>
+          <div {...stylex.attrs(styles.creatorDiv7)}>
             <ConfigTabs
               draft={draft()}
               runtime={runtime()}
@@ -505,17 +493,17 @@ function Problems(props: { problems: AgentProblem[] }) {
     <Show
       when={props.problems.length > 0}
       fallback={
-        <p {...stylex.attrs(viewStyles.problemsP)}>
+        <p {...stylex.attrs(styles.problemsP)}>
           <Icon name="check" size={12} />
           {t("web.agent.fine")}
         </p>
       }
     >
-      <ul aria-label={t("web.agent.problems")} {...stylex.attrs(viewStyles.problemsUl)}>
+      <ul aria-label={t("web.agent.problems")} {...stylex.attrs(styles.problemsUl)}>
         <For each={props.problems}>
           {(i) => (
-            <li {...stylex.attrs(variantStyles.problemsLi, i.level === "error" ? variantStyles.problemsLiVariant : variantStyles.problemsLiVariant2)}>
-              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} styles={[variantStyles3.problemsIcon]} />
+            <li {...stylex.attrs(styles.problemsLi, i.level === "error" ? styles.problemsLiTone : styles.problemsLiAlt)}>
+              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} styles={[styles.problemsIcon]} />
               {i.level === "error" ? t("web.agent.cannot") : ""}
               {i.text}
             </li>

@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   emojiPickerDiv: {
     position: "fixed",
     zIndex: 30,
@@ -31,9 +31,6 @@ const recipeStyles = stylex.create({
     color: "var(--wb-ink)",
     boxShadow: "var(--shadow-float)",
   },
-});
-
-const viewStyles = stylex.create({
   emojiPickerP: {
     paddingInline: "var(--spacing)",
     paddingBottom: "var(--spacing)",
@@ -42,7 +39,7 @@ const viewStyles = stylex.create({
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
-  emojiPickerDiv: {
+  emojiPickerDiv2: {
     display: "grid",
     gridTemplateColumns: "repeat(8,minmax(0,1fr))",
     gap: "calc(var(--spacing) * .5)",
@@ -328,13 +325,13 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
         data-testid="emoji-picker"
         aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
-        {...stylex.attrs(recipeStyles.emojiPickerDiv)}
+        {...stylex.attrs(styles.emojiPickerDiv)}
       >
         <For each={groups}>
           {(g) => (
             <section aria-label={groupName(g.id)}>
-              <p {...stylex.attrs(viewStyles.emojiPickerP)}>{groupName(g.id)}</p>
-              <div {...stylex.attrs(viewStyles.emojiPickerDiv)}>
+              <p {...stylex.attrs(styles.emojiPickerP)}>{groupName(g.id)}</p>
+              <div {...stylex.attrs(styles.emojiPickerDiv2)}>
                 <For each={g.emoji}>
                   {(e) => (
                     <button
@@ -344,7 +341,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
                       // Keeps the focus, and with it a box's caret, where it was.
                       onMouseDown={(ev) => ev.preventDefault()}
                       onClick={() => props.onPick(e)}
-                      {...stylex.attrs(viewStyles.emojiPickerButton)}
+                      {...stylex.attrs(styles.emojiPickerButton)}
                     >
                       {e}
                     </button>

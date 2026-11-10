@@ -15,10 +15,11 @@ import { useRouter } from "#/infra/router.ts";
 import { setPick, usePrefs } from "#/state/prefs.ts";
 import { AgentFace } from "#/ui/Face.tsx";
 import { PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { HudCard } from "./HudCard";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   expandArrow: { rotate: "90deg" },
   collapseArrow: { rotate: "-90deg" },
   friendButton: {
@@ -30,7 +31,7 @@ const recipeStyles = stylex.create({
     alignItems: "center",
     paddingBlock: "var(--spacing)",
   },
-  friendButtonVariant1Case1: {
+  friendButtonIdle: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -39,13 +40,13 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  friendButtonVariant1Case2: {
+  friendButtonPicked: {
     backgroundColor: {
       default: "var(--color-px-leaf-wash)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
     },
   },
-  friendDiv: {
+  friendCard: {
     position: "absolute",
     bottom: "100%",
     left: "0",
@@ -57,10 +58,7 @@ const recipeStyles = stylex.create({
     textAlign: "left",
     boxShadow: "var(--shadow-px)",
   },
-});
-
-const variantStyles = stylex.create({
-  friendSpan: {
+  friendName: {
     marginTop: "calc(var(--spacing) * .5)",
     maxWidth: "68px",
     textOverflow: "ellipsis",
@@ -68,16 +66,13 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     fontSize: "12px",
   },
-  friendSpanVariant: {
+  friendNameEnabled: {
     color: "var(--color-bark-900)",
   },
-  friendSpanVariant2: {
+  friendNameDisabled: {
     color: "var(--color-bark-400)",
   },
-});
-
-const viewStyles = stylex.create({
-  staminaSpan: {
+  staminaTrack: {
     display: "flex",
     height: "7px",
     width: "52px",
@@ -85,19 +80,31 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-bark-900)",
     padding: "1px",
   },
-  staminaSpan2: {
+  staminaBar: {
     flex: "1",
+  },
+  staminaLit: {
+    backgroundColor: "var(--color-agent-stage-edge)",
+  },
+  staminaEmpty: {
+    backgroundColor: "var(--color-bark-800)",
   },
   friend: {
     position: "relative",
   },
-  friendSpan: {
+  faceFrame: {
     padding: "calc(var(--spacing) * .5)",
   },
-  friendSpan2: {
+  facePicked: {
+    backgroundColor: "var(--color-leaf-500)",
+  },
+  faceIdle: {
+    backgroundColor: "var(--color-cream-300)",
+  },
+  staminaPlaceholder: {
     height: "7px",
   },
-  friendSpan3: {
+  friendDot: {
     position: "absolute",
     top: "0",
     right: "calc(var(--spacing) * 2.5)",
@@ -107,29 +114,44 @@ const viewStyles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-cream-300)",
   },
-  friendDiv: {
+  dotBug: {
+    backgroundColor: "var(--color-berry-500)",
+  },
+  dotRipe: {
+    backgroundColor: "var(--color-wheat)",
+  },
+  dotBusy: {
+    backgroundColor: "var(--color-leaf-500)",
+  },
+  dotRest: {
+    backgroundColor: "var(--color-cream-300)",
+  },
+  dotAway: {
+    backgroundColor: "transparent",
+  },
+  cardHeader: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 3)",
   },
-  friendDiv2: {
+  cardMeta: {
     minWidth: "0",
   },
-  friendP: {
+  cardTitle: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "16px",
   },
-  friendP2: {
+  cardRuntime: {
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  friendP3: {
+  cardStatus: {
     fontSize: "12px",
     color: "var(--color-bark-800)",
   },
-  friendDiv3: {
+  energyBox: {
     marginTop: "calc(var(--spacing) * 2)",
     display: "flex",
     alignItems: "center",
@@ -138,31 +160,31 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
   },
-  friendDiv4: {
+  energyText: {
     minWidth: "0",
     fontSize: "12px",
   },
-  friendP4: {
+  energyShort: {
     color: "var(--color-bark-800)",
   },
-  friendP5: {
+  energyDetail: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     color: "var(--color-bark-500)",
   },
-  friendP6: {
+  duty: {
     marginTop: "calc(var(--spacing) * 2)",
     fontSize: "13px",
     color: "var(--color-bark-800)",
   },
-  friendDiv5: {
+  cardActions: {
     marginTop: "calc(var(--spacing) * 3)",
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  friendSpan4: {
+  disabledText: {
     fontSize: "13px",
     color: "var(--color-bark-600)",
   },
@@ -170,7 +192,7 @@ const viewStyles = stylex.create({
     pointerEvents: "auto",
     position: "relative",
   },
-  friendsDiv: {
+  popup: {
     position: "absolute",
     bottom: "100%",
     left: "0",
@@ -178,25 +200,28 @@ const viewStyles = stylex.create({
     width: "max-content",
     maxWidth: "min(640px,90vw)",
   },
-  friendsSpan: {
+  list: {
     display: "flex",
     flexWrap: "wrap",
     gap: "var(--spacing)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
   },
-  friendsToggle: {
+  toggle: {
     position: "relative",
     cursor: "pointer",
   },
-  friendsSpan2: {
+  stack: (width: number) => ({
     position: "relative",
     height: "22px",
-  },
-  friendsSpan3: {
+    width,
+  }),
+  stackFace: (left: number, zIndex: number) => ({
     position: "absolute",
     top: "0",
-  },
-  friendsSpan4: {
+    left,
+    zIndex,
+  }),
+  busyCount: {
     display: "flex",
     height: "calc(var(--spacing) * 4)",
     minWidth: "calc(var(--spacing) * 4)",
@@ -208,7 +233,7 @@ const viewStyles = stylex.create({
     lineHeight: "1",
     color: "var(--color-bark-900)",
   },
-  friendsSpan5: {
+  stageDot: {
     position: "absolute",
     top: "calc(var(--spacing) * -1)",
     left: "calc(var(--spacing) * -1)",
@@ -230,12 +255,12 @@ function statusOf(mine: readonly Session[], view: FarmView): FriendStatus {
   return mine.length > 0 ? "rest" : "away";
 }
 
-const status: Record<FriendStatus, { dot: string; label: string }> = {
-  bug: { dot: "#c84a3a", label: t("web.farm.friends.status.bug") },
-  ripe: { dot: "#e5a93c", label: t("web.farm.friends.status.ripe") },
-  busy: { dot: "#74a046", label: t("web.farm.friends.status.busy") },
-  rest: { dot: "#c8a46e", label: t("web.farm.friends.status.rest") },
-  away: { dot: "transparent", label: t("web.farm.friends.status.away") },
+const status: Record<FriendStatus, { dot: stylex.StyleXStyles; label: string }> = {
+  bug: { dot: styles.dotBug, label: t("web.farm.friends.status.bug") },
+  ripe: { dot: styles.dotRipe, label: t("web.farm.friends.status.ripe") },
+  busy: { dot: styles.dotBusy, label: t("web.farm.friends.status.busy") },
+  rest: { dot: styles.dotRest, label: t("web.farm.friends.status.rest") },
+  away: { dot: styles.dotAway, label: t("web.farm.friends.status.away") },
 };
 
 /** Lit segments of `segments`, at least one while anything is left. */
@@ -243,9 +268,9 @@ function Stamina(props: { fill: number; segments?: number }) {
   const segments = () => props.segments ?? 8;
   const lit = () => (props.fill <= 0 ? 0 : Math.max(1, Math.round(props.fill * segments())));
   return (
-    <span {...stylex.attrs(viewStyles.staminaSpan)} aria-hidden="true">
+    <span {...stylex.attrs(styles.staminaTrack)} aria-hidden="true">
       <For each={Array.from({ length: segments() }, (_, i) => i)}>
-        {(i) => <span {...stylex.attrs(viewStyles.staminaSpan2)} style={{ background: i < lit() ? "#7ea64f" : "#46301d" }} />}
+        {(i) => <span {...stylex.attrs(styles.staminaBar, i < lit() ? styles.staminaLit : styles.staminaEmpty)} />}
       </For>
     </span>
   );
@@ -263,64 +288,55 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
   const tally = () => core()?.progress?.agents[props.agent.id];
   const box = useClickAway(open, () => setOpen(false));
   return (
-    <div
-      ref={box}
-      {...stylex.attrs(viewStyles.friend)}
-      data-testid="friend"
-      data-key={props.agent.id}
-      data-state={props.st}
-      data-picked={picked() ? "" : undefined}
-    >
+    <div ref={box} {...stylex.attrs(styles.friend)} data-testid="friend" data-key={props.agent.id} data-state={props.st} data-picked={picked() ? "" : undefined}>
       <button
         type="button"
         data-testid="friend-open"
         aria-label={t("shared.join.and", { a: props.agent.name, b: status[props.st].label })}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
-        {...stylex.attrs(recipeStyles.friendButton, picked() ? recipeStyles.friendButtonVariant1Case2 : recipeStyles.friendButtonVariant1Case1)}
+        {...stylex.attrs(styles.friendButton, picked() ? styles.friendButtonPicked : styles.friendButtonIdle)}
       >
-        <span {...stylex.attrs(viewStyles.friendSpan)} style={{ background: picked() ? "#74a046" : "#c8a46e" }}>
+        <span {...stylex.attrs(styles.faceFrame, picked() ? styles.facePicked : styles.faceIdle)}>
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={46} muted={!props.agent.enabled} />
         </span>
-        <span {...stylex.attrs(variantStyles.friendSpan, props.agent.enabled ? variantStyles.friendSpanVariant : variantStyles.friendSpanVariant2)}>
-          {props.agent.name}
-        </span>
-        <Show when={quota().level !== "unknown"} fallback={<span {...stylex.attrs(viewStyles.friendSpan2)} />}>
+        <span {...stylex.attrs(styles.friendName, props.agent.enabled ? styles.friendNameEnabled : styles.friendNameDisabled)}>{props.agent.name}</span>
+        <Show when={quota().level !== "unknown"} fallback={<span {...stylex.attrs(styles.staminaPlaceholder)} />}>
           <Stamina fill={quota().fill} />
         </Show>
         <Show when={props.st !== "away"}>
-          <span {...stylex.attrs(viewStyles.friendSpan3)} style={{ background: status[props.st].dot }} />
+          <span {...styleProps([styles.friendDot, status[props.st].dot])} />
         </Show>
       </button>
       <Show when={open()}>
-        <div data-testid="friend-card" {...stylex.attrs(recipeStyles.friendDiv)} role="dialog" aria-label={props.agent.name}>
-          <div {...stylex.attrs(viewStyles.friendDiv)}>
+        <div data-testid="friend-card" {...stylex.attrs(styles.friendCard)} role="dialog" aria-label={props.agent.name}>
+          <div {...stylex.attrs(styles.cardHeader)}>
             <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={60} muted={!props.agent.enabled} />
-            <div {...stylex.attrs(viewStyles.friendDiv2)}>
-              <p {...stylex.attrs(viewStyles.friendP)}>{props.agent.name}</p>
-              <p {...stylex.attrs(viewStyles.friendP2)}>
+            <div {...stylex.attrs(styles.cardMeta)}>
+              <p {...stylex.attrs(styles.cardTitle)}>{props.agent.name}</p>
+              <p {...stylex.attrs(styles.cardRuntime)}>
                 {runtime()?.preset.label ?? props.agent.runtime}
                 {props.agent.model ? ` · ${props.agent.model}` : ""}
               </p>
-              <p {...stylex.attrs(viewStyles.friendP3)}>
+              <p {...stylex.attrs(styles.cardStatus)}>
                 {status[props.st].label}
                 {tally() ? t("web.farm.friends.tally", { hired: Math.round(tally()!.hired), harvested: Math.round(tally()!.harvested) }) : ""}
               </p>
             </div>
           </div>
-          <div {...stylex.attrs(viewStyles.friendDiv3)}>
+          <div {...stylex.attrs(styles.energyBox)}>
             <SpriteIcon name={bottleSprite(quota())} size={30} label={quota().text} />
-            <div {...stylex.attrs(viewStyles.friendDiv4)}>
-              <p {...stylex.attrs(viewStyles.friendP4)}>{t("web.farm.friends.energy", { short: quota().short || "—" })}</p>
-              <p {...stylex.attrs(viewStyles.friendP5)} title={quota().text}>
+            <div {...stylex.attrs(styles.energyText)}>
+              <p {...stylex.attrs(styles.energyShort)}>{t("web.farm.friends.energy", { short: quota().short || "—" })}</p>
+              <p {...stylex.attrs(styles.energyDetail)} title={quota().text}>
                 {t("shared.join.labeled", { label: runtime()?.preset.label ?? props.agent.runtime, text: quota().text })}
               </p>
             </div>
           </div>
-          <p {...stylex.attrs(viewStyles.friendP6)}>{props.agent.duty}</p>
-          <div {...stylex.attrs(viewStyles.friendDiv5)}>
-            <div {...stylex.attrs(viewStyles.staminaSpan2)}>
-              <Show when={props.agent.enabled} fallback={<span {...stylex.attrs(viewStyles.friendSpan4)}>{t("web.farm.friends.disabled")}</span>}>
+          <p {...stylex.attrs(styles.duty)}>{props.agent.duty}</p>
+          <div {...stylex.attrs(styles.cardActions)}>
+            <div {...stylex.attrs(styles.staminaBar)}>
+              <Show when={props.agent.enabled} fallback={<span {...stylex.attrs(styles.disabledText)}>{t("web.farm.friends.disabled")}</span>}>
                 <PxButton tone={picked() ? "plain" : "primary"} data-testid="friend-pick" onClick={() => setPick(picked() ? "auto" : props.agent.id)}>
                   {picked() ? t("web.farm.friends.unpick") : t("web.farm.friends.pick")}
                 </PxButton>
@@ -366,12 +382,12 @@ export function Friends(props: { height: number }) {
   const stage = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
   const box = useClickAway(open, () => farm.friendsOpen(false));
   return (
-    <div ref={box} {...stylex.attrs(viewStyles.friends)} aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
+    <div ref={box} {...stylex.attrs(styles.friends)} aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
       <Show when={open()}>
         {/* As wide as the helpers in a row (the button under it is narrower), wrapping only past the cap. */}
-        <div {...stylex.attrs(viewStyles.friendsDiv)}>
+        <div {...stylex.attrs(styles.popup)}>
           <HudCard>
-            <span {...stylex.attrs(viewStyles.friendsSpan)}>
+            <span {...stylex.attrs(styles.list)}>
               <For each={sorted()} keyed={(a) => a.id}>
                 {(a, i) => <Friend agent={a()} st={statuses()[i()]!} />}
               </For>
@@ -385,13 +401,13 @@ export function Friends(props: { height: number }) {
         aria-label={t("web.farm.friends.helpers")}
         aria-expanded={aria(open())}
         onClick={() => farm.friendsOpen(!open())}
-        {...stylex.attrs(viewStyles.friendsToggle)}
+        {...stylex.attrs(styles.toggle)}
       >
         <HudCard height={props.height}>
-          <span {...stylex.attrs(viewStyles.friendsSpan2)} style={{ width: `${sorted().length === 0 ? 0 : 22 + (Math.min(3, sorted().length) - 1) * 12}px` }}>
+          <span {...styleProps(styles.stack(sorted().length === 0 ? 0 : 22 + (Math.min(3, sorted().length) - 1) * 12))}>
             <For each={sorted().slice(0, 3)} keyed={(a) => a.id}>
               {(a, i) => (
-                <span {...stylex.attrs(viewStyles.friendsSpan3)} style={{ left: `${i() * 12}px`, "z-index": 3 - i() }}>
+                <span {...styleProps(styles.stackFace(i() * 12, 3 - i()))}>
                   <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={22} />
                 </span>
               )}
@@ -399,11 +415,11 @@ export function Friends(props: { height: number }) {
           </span>
           <span>{t("web.farm.friends.helpers")}</span>
           <Show when={busy() > 0}>
-            <span {...stylex.attrs(viewStyles.friendsSpan4)}>{busy()}</span>
+            <span {...stylex.attrs(styles.busyCount)}>{busy()}</span>
           </Show>
-          <SpriteIcon name="button-next" size={12} styles={open() ? recipeStyles.collapseArrow : recipeStyles.expandArrow} />
+          <SpriteIcon name="button-next" size={12} styles={open() ? styles.collapseArrow : styles.expandArrow} />
         </HudCard>
-        <Show when={stage()}>{(a) => <span {...stylex.attrs(viewStyles.friendsSpan5)} style={{ background: status[a()].dot }} />}</Show>
+        <Show when={stage()}>{(a) => <span {...styleProps([styles.stageDot, status[a()].dot])} />}</Show>
       </button>
     </div>
   );

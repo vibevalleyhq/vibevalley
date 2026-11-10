@@ -14,7 +14,7 @@ import { dictation, type DictationPhase, insertDictated } from "./dictation";
 
 const recordingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   dictationBarSpan: {
     display: "flex",
     animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
@@ -48,10 +48,7 @@ const recipeStyles = stylex.create({
     borderRadius: "2147483647px",
     backgroundColor: "var(--wb-berry)",
   },
-});
-
-const variantStyles = stylex.create({
-  dictationBarSpan: {
+  dictationBarSpan3: {
     marginInline: "var(--spacing)",
     display: "flex",
     height: "calc(var(--spacing) * 5)",
@@ -62,9 +59,6 @@ const variantStyles = stylex.create({
     justifyContent: "space-between",
     overflow: "hidden",
   },
-});
-
-const viewStyles = stylex.create({
   mark: {
     display: "inline-flex",
     flexShrink: 0,
@@ -99,7 +93,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  dictationBarSpan: {
+  dictationBarSpan4: {
     width: "calc(var(--spacing) * 9)",
     flexShrink: "0",
     fontSize: "var(--text-xs)",
@@ -107,7 +101,7 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
     fontVariantNumeric: "tabular-nums",
   },
-  dictationBarSpan2: {
+  dictationBarSpan22: {
     width: "calc(var(--spacing) * .75)",
     flexShrink: "0",
     borderRadius: "2147483647px",
@@ -116,7 +110,7 @@ const viewStyles = stylex.create({
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 55%, transparent)",
     },
   },
-  dictationBarSpan3: {
+  dictationBarSpan32: {
     display: {
       default: "none",
       "@media (width>=40rem)": "inline",
@@ -338,15 +332,15 @@ export function DictationMark(props: {
       onPointerDown={(e) => props.onPointerDown?.(e)}
       onPointerUp={() => props.onPointerUp?.()}
       {...styleProps([
-        viewStyles.mark,
-        props.state === "unset" && viewStyles.unset,
+        styles.mark,
+        props.state === "unset" && styles.unset,
         props.state === "recording"
           ? props.bar === true
             ? props.surface === true
-              ? viewStyles.recordingSurface
-              : viewStyles.recordingBar
-            : viewStyles.recording
-          : props.surface === true && viewStyles.surface,
+              ? styles.recordingSurface
+              : styles.recordingBar
+            : styles.recording
+          : props.surface === true && styles.surface,
         props.styles,
       ])}
     >
@@ -390,33 +384,33 @@ export function DictationBar(props: { dictating: Dictating }) {
     return () => cancelAnimationFrame(frame);
   });
   return (
-    <div data-testid="dictation-bar" data-state={d().state()} {...stylex.attrs(viewStyles.dictationBar)}>
+    <div data-testid="dictation-bar" data-state={d().state()} {...stylex.attrs(styles.dictationBar)}>
       <Show
         when={listening()}
         fallback={
-          <span {...stylex.attrs(recipeStyles.dictationBarSpan)}>
+          <span {...stylex.attrs(styles.dictationBarSpan)}>
             <Icon name="wait" size={14} />
             {t("web.voice.dictation.transcribing")}
           </span>
         }
       >
-        <span aria-hidden="true" {...stylex.attrs(recipeStyles.dictationBarSpan2)} />
-        <span {...stylex.attrs(viewStyles.dictationBarSpan)} role="timer" aria-label={t("web.voice.dictation.listening")}>
+        <span aria-hidden="true" {...stylex.attrs(styles.dictationBarSpan2)} />
+        <span {...stylex.attrs(styles.dictationBarSpan4)} role="timer" aria-label={t("web.voice.dictation.listening")}>
           {clock(elapsed())}
         </span>
-        <span aria-hidden="true" {...stylex.attrs(variantStyles.dictationBarSpan)}>
+        <span aria-hidden="true" {...stylex.attrs(styles.dictationBarSpan3)}>
           <For each={bars().toReversed()} keyed={false}>
-            {(level) => <span {...stylex.attrs(viewStyles.dictationBarSpan2)} style={{ height: `${Math.max(3, level() * 20)}px` }} />}
+            {(level) => <span {...stylex.attrs(styles.dictationBarSpan22)} style={{ height: `${Math.max(3, level() * 20)}px` }} />}
           </For>
         </span>
-        <span {...stylex.attrs(viewStyles.dictationBarSpan3)}>{t("web.voice.dictation.keys")}</span>
+        <span {...stylex.attrs(styles.dictationBarSpan32)}>{t("web.voice.dictation.keys")}</span>
         <button
           type="button"
           data-testid="dictation-cancel"
           onClick={() => d().cancel()}
           aria-label={t("web.voice.dictation.cancel")}
           title={t("web.voice.dictation.cancel")}
-          {...stylex.attrs(viewStyles.dictationCancel)}
+          {...stylex.attrs(styles.dictationCancel)}
         >
           <Icon name="close" size={16} />
         </button>
@@ -431,17 +425,17 @@ export function DictationProblem(props: { dictating: Dictating }) {
   return (
     <Show when={d().problem()}>
       {(why) => (
-        <div data-testid="dictation-problem" role="status" {...stylex.attrs(viewStyles.dictationProblem)}>
+        <div data-testid="dictation-problem" role="status" {...stylex.attrs(styles.dictationProblem)}>
           <Icon name="warn" size={14} />
-          <span {...stylex.attrs(viewStyles.dictationProblemSpan)} title={why()}>
+          <span {...stylex.attrs(styles.dictationProblemSpan)} title={why()}>
             {why()}
           </span>
-          <button type="button" {...stylex.attrs(viewStyles.dictationProblemButton)} onClick={() => d().toggle()}>
+          <button type="button" {...stylex.attrs(styles.dictationProblemButton)} onClick={() => d().toggle()}>
             {t("web.voice.dictation.again")}
           </button>
           <button
             type="button"
-            {...stylex.attrs(viewStyles.dictationProblemButton2)}
+            {...stylex.attrs(styles.dictationProblemButton2)}
             aria-label={t("web.voice.dictation.dismiss")}
             title={t("web.voice.dictation.dismiss")}
             onClick={() => d().dismiss()}

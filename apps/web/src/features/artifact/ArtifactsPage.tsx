@@ -30,7 +30,7 @@ import type { BlockEditor } from "./editor";
 import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
 
-const recipeStyles3 = stylex.create({
+const styles = stylex.create({
   artifactsPageA: {
     display: "flex",
     alignItems: "flex-start",
@@ -81,9 +81,6 @@ const recipeStyles3 = stylex.create({
       "@media (width>=80rem)": "hidden",
     },
   },
-});
-
-const recipeStyles2 = stylex.create({
   artifactsPageDiv: {
     marginInline: "calc(var(--spacing) * -2)",
     display: "flex",
@@ -104,7 +101,7 @@ const recipeStyles2 = stylex.create({
     overflowY: "auto",
     paddingInline: "calc(var(--spacing) * 2)",
   },
-  shownDiv: {
+  shownDiv2: {
     marginTop: "calc(var(--spacing) * 2)",
     display: "flex",
     animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
@@ -123,9 +120,6 @@ const recipeStyles2 = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-});
-
-const recipeStyles = stylex.create({
   shownButton: {
     display: "flex",
     width: "100%",
@@ -141,7 +135,7 @@ const recipeStyles = stylex.create({
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: ".12s",
   },
-  shownButtonVariant1Case1: {
+  shownButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -150,12 +144,9 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  shownButtonVariant1Case2: {
+  shownButtonSecondary: {
     backgroundColor: "var(--color-selected)",
   },
-});
-
-const variantStyles3 = stylex.create({
   artifactsPageIcon: {
     flexShrink: "0",
     color: "var(--color-muted)",
@@ -165,9 +156,6 @@ const variantStyles3 = stylex.create({
     flexShrink: "0",
     color: "var(--color-muted)",
   },
-});
-
-const variantStyles2 = stylex.create({
   shownA: {
     color: "var(--color-water)",
     textDecorationLine: {
@@ -192,9 +180,6 @@ const variantStyles2 = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
   artifactsPageNav: {
     minHeight: "0",
     flexShrink: "0",
@@ -216,13 +201,13 @@ const variantStyles = stylex.create({
       "@media (width>=64rem)": "1px",
     },
   },
-  artifactsPageNavVariant: {
+  artifactsPageNavTone: {
     display: {
       default: "none",
       "@media (width>=64rem)": "flex",
     },
   },
-  artifactsPageNavVariant2: {
+  artifactsPageNavAlt: {
     display: "flex",
   },
   artifactsPageSpan: {
@@ -232,16 +217,16 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  artifactsPageSpanVariant: {
+  artifactsPageSpanTone: {
     color: {
       default: "var(--color-ink)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 75%, transparent)",
     },
   },
-  artifactsPageSpanVariant2: {
+  artifactsPageSpanAlt: {
     color: "var(--color-muted)",
   },
-  artifactsPageDiv: {
+  artifactsPageDiv2: {
     minHeight: "0",
     minWidth: "0",
     flex: "1",
@@ -263,7 +248,7 @@ const variantStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
   },
-  shownDiv: {
+  shownDiv3: {
     display: "flex",
     minHeight: "0",
     width: "100%",
@@ -271,8 +256,8 @@ const variantStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 3)",
   },
-  shownDivVariant: {},
-  shownDivVariant2: {
+  shownDivTone: {},
+  shownDivAlt: {
     marginInline: "auto",
     maxWidth: "var(--container-3xl)",
   },
@@ -281,17 +266,14 @@ const variantStyles = stylex.create({
     flexDirection: "column",
     gap: "var(--spacing)",
   },
-  shownHeaderVariant: {
+  shownHeaderTone: {
     paddingLeft: {
       default: null,
       "@media (width>=64rem)": "35px",
     },
   },
-});
-
-const viewStyles = stylex.create({
   replyAction: { alignSelf: "flex-end" },
-  artifactsPageDiv: {
+  artifactsPageDiv3: {
     display: "flex",
     height: "100%",
     minHeight: "0",
@@ -300,7 +282,7 @@ const viewStyles = stylex.create({
       "@media (width>=64rem)": "row",
     },
   },
-  artifactsPageDiv2: {
+  artifactsPageDiv22: {
     display: "flex",
     gap: "calc(var(--spacing) * 1.5)",
   },
@@ -378,11 +360,11 @@ const viewStyles = stylex.create({
       },
     },
   },
-  artifactsPageSpan: {
+  artifactsPageSpan2: {
     fontWeight: "var(--font-weight-normal)",
     color: "var(--color-faint)",
   },
-  artifactsPageSpan2: {
+  artifactsPageSpan22: {
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
@@ -417,18 +399,18 @@ const viewStyles = stylex.create({
     fontWeight: "var(--font-weight-semibold)",
     outlineStyle: "none",
   },
-  shownDiv: {
+  shownDiv4: {
     display: {
       default: null,
       "@media (width>=64rem)": "none",
     },
   },
-  shownDiv2: {
+  shownDiv22: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  shownDiv3: {
+  shownDiv32: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
@@ -507,7 +489,7 @@ const viewStyles = stylex.create({
       "@media (width>=80rem)": "1px",
     },
   },
-  shownDiv4: {
+  shownDiv42: {
     display: {
       default: null,
       ":empty": "none",
@@ -602,52 +584,52 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
       return next;
     });
   return (
-    <div {...stylex.attrs(viewStyles.artifactsPageDiv)}>
+    <div {...stylex.attrs(styles.artifactsPageDiv3)}>
       <nav
         aria-label={t("web.artifact.page.list")}
         data-testid="artifact-list"
-        {...stylex.attrs(variantStyles.artifactsPageNav, id() ? variantStyles.artifactsPageNavVariant : variantStyles.artifactsPageNavVariant2)}
+        {...stylex.attrs(styles.artifactsPageNav, id() ? styles.artifactsPageNavTone : styles.artifactsPageNavAlt)}
       >
-        <div {...stylex.attrs(viewStyles.artifactsPageDiv2)}>
-          <label {...stylex.attrs(viewStyles.artifactsPageLabel)}>
-            <Icon name="search" size={14} styles={[variantStyles3.artifactsPageIcon]} />
+        <div {...stylex.attrs(styles.artifactsPageDiv22)}>
+          <label {...stylex.attrs(styles.artifactsPageLabel)}>
+            <Icon name="search" size={14} styles={[styles.artifactsPageIcon]} />
             <input
               data-testid="artifact-search"
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}
               placeholder={t("web.artifact.page.find")}
               aria-label={t("web.artifact.page.find")}
-              {...stylex.attrs(viewStyles.artifactSearch)}
+              {...stylex.attrs(styles.artifactSearch)}
             />
           </label>
           {/* Beside the search, not a green button over the page being read: a new one is not what this page is for. */}
           <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create()} />
         </div>
         <Show when={all.error()}>
-          <p {...stylex.attrs(viewStyles.artifactsPageP)}>{reasonOf(all.error())}</p>
+          <p {...stylex.attrs(styles.artifactsPageP)}>{reasonOf(all.error())}</p>
         </Show>
         <Show when={all.status() === "success" && list().length === 0}>
-          <p {...stylex.attrs(viewStyles.artifactsPageP2)}>{t("web.artifact.page.none")}</p>
+          <p {...stylex.attrs(styles.artifactsPageP2)}>{t("web.artifact.page.none")}</p>
         </Show>
         <Show when={list().length > 0 && shown().length === 0}>
-          <p {...stylex.attrs(viewStyles.artifactsPageP3)}>{t("web.artifact.page.nothingFound")}</p>
+          <p {...stylex.attrs(styles.artifactsPageP3)}>{t("web.artifact.page.nothingFound")}</p>
         </Show>
-        <div {...stylex.attrs(recipeStyles2.artifactsPageDiv)}>
+        <div {...stylex.attrs(styles.artifactsPageDiv)}>
           <For each={groups().filter((g) => g.rows.length > 0)}>
             {(g) => (
-              <section data-testid="artifact-group" data-key={g.key} {...stylex.attrs(viewStyles.artifactGroup)}>
+              <section data-testid="artifact-group" data-key={g.key} {...stylex.attrs(styles.artifactGroup)}>
                 <button
                   type="button"
                   aria-expanded={shut().has(g.key) ? "false" : "true"}
                   onClick={() => toggle(g.key)}
-                  {...stylex.attrs(viewStyles.artifactsPageButton)}
+                  {...stylex.attrs(styles.artifactsPageButton)}
                 >
                   <Icon name={shut().has(g.key) ? "expand" : "choose"} size={12} />
                   {t(`web.artifact.page.group.${g.key}`)}
-                  <span {...stylex.attrs(viewStyles.artifactsPageSpan)}>{g.rows.length}</span>
+                  <span {...stylex.attrs(styles.artifactsPageSpan2)}>{g.rows.length}</span>
                 </button>
                 <Show when={!shut().has(g.key)}>
-                  <ul {...stylex.attrs(viewStyles.artifactGroup)}>
+                  <ul {...stylex.attrs(styles.artifactGroup)}>
                     <For each={g.rows} keyed={(a) => a.id}>
                       {(a) => (
                         <li>
@@ -658,22 +640,22 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
                             data-body={a().body}
                             aria-current={a().id === open() ? "page" : undefined}
                             {...stylex.attrs(
-                              recipeStyles3.artifactsPageA,
+                              styles.artifactsPageA,
                               a().id === id()
-                                ? recipeStyles3.artifactsPageAState3
+                                ? styles.artifactsPageAState3
                                 : a().id === open()
-                                  ? recipeStyles3.artifactsPageAState2
-                                  : recipeStyles3.artifactsPageAState,
+                                  ? styles.artifactsPageAState2
+                                  : styles.artifactsPageAState,
                             )}
                           >
-                            <Icon name={bodyIcon[a().body]} size={16} styles={[variantStyles3.artifactsPageIcon2]} />
-                            <span {...stylex.attrs(viewStyles.artifactsPageSpan2)}>
-                              <span {...stylex.attrs(viewStyles.artifactsPageSpan3)}>{a().title}</span>
+                            <Icon name={bodyIcon[a().body]} size={16} styles={[styles.artifactsPageIcon2]} />
+                            <span {...stylex.attrs(styles.artifactsPageSpan22)}>
+                              <span {...stylex.attrs(styles.artifactsPageSpan3)}>{a().title}</span>
                               {/* On the selected row's darker ground the line takes more ink, to stay readable. */}
                               <span
                                 {...stylex.attrs(
-                                  variantStyles.artifactsPageSpan,
-                                  a().id === open() ? variantStyles.artifactsPageSpanVariant : variantStyles.artifactsPageSpanVariant2,
+                                  styles.artifactsPageSpan,
+                                  a().id === open() ? styles.artifactsPageSpanTone : styles.artifactsPageSpanAlt,
                                 )}
                               >
                                 {a().byName} · {ago(a().updated, now())}
@@ -690,7 +672,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
           </For>
         </div>
       </nav>
-      <div {...stylex.attrs(variantStyles.artifactsPageDiv, id() ? variantStyles.artifactsPageNavVariant2 : variantStyles.artifactsPageNavVariant)}>
+      <div {...stylex.attrs(styles.artifactsPageDiv2, id() ? styles.artifactsPageNavAlt : styles.artifactsPageNavTone)}>
         <Show
           when={open()}
           fallback={
@@ -779,7 +761,7 @@ function Title(props: { artifact: Artifact }) {
         }
       }}
       onBlur={() => void save()}
-      {...stylex.attrs(viewStyles.artifactTitle)}
+      {...stylex.attrs(styles.artifactTitle)}
     />
   );
 }
@@ -839,19 +821,19 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
       data-key={props.artifact.id}
       data-body={props.artifact.body}
       data-version={version()?.version}
-      {...stylex.attrs(recipeStyles3.shownDiv)}
+      {...stylex.attrs(styles.shownDiv)}
     >
-      <section {...stylex.attrs(variantStyles.shownSection)}>
+      <section {...stylex.attrs(styles.shownSection)}>
         {/* A page is shown as wide as there is room; written blocks read in a column. */}
-        <div {...stylex.attrs(variantStyles.shownDiv, html() ? variantStyles.shownDivVariant : variantStyles.shownDivVariant2)}>
-          <div {...stylex.attrs(viewStyles.shownDiv)}>
+        <div {...stylex.attrs(styles.shownDiv3, html() ? styles.shownDivTone : styles.shownDivAlt)}>
+          <div {...stylex.attrs(styles.shownDiv4)}>
             <Button icon="back" onClick={() => router.navigate("/artifacts")}>
               {t("web.artifact.page.all")}
             </Button>
           </div>
           {/* A blocks one's header lines up with its text, past the gutter of faces and author bars (BlocksView). */}
-          <header {...stylex.attrs(variantStyles.shownHeader, html() ? variantStyles.shownDivVariant : variantStyles.shownHeaderVariant)}>
-            <div {...stylex.attrs(viewStyles.shownDiv2)}>
+          <header {...stylex.attrs(styles.shownHeader, html() ? styles.shownDivTone : styles.shownHeaderTone)}>
+            <div {...stylex.attrs(styles.shownDiv22)}>
               <Title artifact={props.artifact} />
               <IconButton
                 icon="thread"
@@ -862,7 +844,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               />
               <MoreMenu label={t("web.artifact.page.more")} testid="artifact-more" items={more()} />
             </div>
-            <div {...stylex.attrs(viewStyles.shownDiv3)}>
+            <div {...stylex.attrs(styles.shownDiv32)}>
               <Show when={html() ? version() : undefined}>
                 {(v) => (
                   <>
@@ -878,7 +860,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                 {(i) => (
                   <>
                     <span aria-hidden="true">·</span>
-                    <A href={`/issues/${i().id}`} data-testid="artifact-issue" {...stylex.attrs(variantStyles2.shownA)}>
+                    <A href={`/issues/${i().id}`} data-testid="artifact-issue" {...stylex.attrs(styles.shownA)}>
                       {t("web.artifact.page.forIssue", { number: i().number })}
                     </A>
                   </>
@@ -889,10 +871,10 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               <div
                 role="group"
                 data-testid="artifact-delete"
-                {...stylex.attrs(recipeStyles2.shownDiv)}
+                {...stylex.attrs(styles.shownDiv2)}
                 onKeyDown={(e) => e.key === "Escape" && setAsking(false)}
               >
-                <span {...stylex.attrs(viewStyles.shownSpan)}>{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>
+                <span {...stylex.attrs(styles.shownSpan)}>{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>
                 <Button
                   tone="danger"
                   icon="delete"
@@ -917,13 +899,13 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                   version={v().version}
                   title={t("web.artifact.page.frame", { title: props.artifact.title, version: v().version })}
                   testId="artifact-frame"
-                  frameStyle={viewStyles.artifactFrame}
-                  rootStyle={viewStyles.artifactFramed}
+                  frameStyle={styles.artifactFrame}
+                  rootStyle={styles.artifactFramed}
                   onFrame={setFrame}
                 />
                 {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}
                 <Show when={rail.get() && v().version === props.artifact.version}>
-                  <p {...stylex.attrs(viewStyles.shownP)}>{t("web.artifact.edit.hint")}</p>
+                  <p {...stylex.attrs(styles.shownP)}>{t("web.artifact.edit.hint")}</p>
                 </Show>
               </>
             )}
@@ -931,17 +913,17 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
         </div>
       </section>
       <Show when={rail.get()}>
-        <aside aria-label={t("web.artifact.page.rail")} data-testid="artifact-rail" {...stylex.attrs(viewStyles.artifactRail)}>
+        <aside aria-label={t("web.artifact.page.rail")} data-testid="artifact-rail" {...stylex.attrs(styles.artifactRail)}>
           {/* The written blocks' open suggestions are drawn here (BlocksView). */}
-          <div ref={setSuggestionsAt} {...stylex.attrs(viewStyles.shownDiv4)} />
+          <div ref={setSuggestionsAt} {...stylex.attrs(styles.shownDiv42)} />
           <Show when={framed()}>
             {(p) => <Keyed key={p().version}>{() => <PageWords artifact={props.artifact} version={p().version} frame={p().frame} />}</Keyed>}
           </Show>
           {/* A list of one says nothing the head does not: the versions show once there is a second. */}
           <Show when={html() && props.artifact.versions.length > 1}>
-            <div {...stylex.attrs(viewStyles.shownDiv5)}>
-              <h2 {...stylex.attrs(viewStyles.shownH2)}>{t("web.artifact.page.versions")}</h2>
-              <ol data-testid="artifact-versions" {...stylex.attrs(viewStyles.artifactGroup)}>
+            <div {...stylex.attrs(styles.shownDiv5)}>
+              <h2 {...stylex.attrs(styles.shownH2)}>{t("web.artifact.page.versions")}</h2>
+              <ol data-testid="artifact-versions" {...stylex.attrs(styles.artifactGroup)}>
                 <For each={[...props.artifact.versions].toReversed()} keyed={(v) => v.version}>
                   {(v) => (
                     <li>
@@ -951,17 +933,17 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                         aria-pressed={v().version === version()?.version ? "true" : "false"}
                         onClick={() => pick(v().version)}
                         {...stylex.attrs(
-                          recipeStyles.shownButton,
-                          v().version === version()?.version ? recipeStyles.shownButtonVariant1Case2 : recipeStyles.shownButtonVariant1Case1,
+                          styles.shownButton,
+                          v().version === version()?.version ? styles.shownButtonSecondary : styles.shownButtonPrimary,
                         )}
                       >
-                        <span {...stylex.attrs(viewStyles.shownSpan2)}>
+                        <span {...stylex.attrs(styles.shownSpan2)}>
                           {t("web.artifact.card.version", { version: v().version })}{" "}
-                          <span {...stylex.attrs(viewStyles.shownSpan3)}>
+                          <span {...stylex.attrs(styles.shownSpan3)}>
                             · {v().byName} · {ago(v().at, now())}
                           </span>
                         </span>
-                        <Show when={v().note}>{(note) => <span {...stylex.attrs(viewStyles.shownSpan4)}>{note()}</span>}</Show>
+                        <Show when={v().note}>{(note) => <span {...stylex.attrs(styles.shownSpan4)}>{note()}</span>}</Show>
                       </button>
                     </li>
                   )}
@@ -972,16 +954,16 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
           <Show
             when={said()}
             fallback={
-              <p data-testid="artifact-unsaid" {...stylex.attrs(viewStyles.shownP)}>
+              <p data-testid="artifact-unsaid" {...stylex.attrs(styles.shownP)}>
                 {t("web.artifact.talk.none")}
               </p>
             }
           >
             {(at) => (
-              <div {...stylex.attrs(viewStyles.shownDiv5)}>
-                <div {...stylex.attrs(viewStyles.shownDiv6)}>
-                  <h2 {...stylex.attrs(viewStyles.shownH2)}>{version() ? t("web.artifact.talk.replyVersion") : t("web.artifact.talk.reply")}</h2>
-                  <A href={messageHref(at())} data-testid="artifact-message" {...stylex.attrs(variantStyles2.shownA2)}>
+              <div {...stylex.attrs(styles.shownDiv5)}>
+                <div {...stylex.attrs(styles.shownDiv6)}>
+                  <h2 {...stylex.attrs(styles.shownH2)}>{version() ? t("web.artifact.talk.replyVersion") : t("web.artifact.talk.reply")}</h2>
+                  <A href={messageHref(at())} data-testid="artifact-message" {...stylex.attrs(styles.shownA2)}>
                     <Icon name="chat" size={12} />
                     {t("web.artifact.talk.atMessage")}
                   </A>
@@ -1013,7 +995,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
   };
   return (
     <form
-      {...stylex.attrs(viewStyles.replyForm)}
+      {...stylex.attrs(styles.replyForm)}
       onSubmit={(e) => {
         e.preventDefault();
         void send();
@@ -1033,7 +1015,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
           }
         }}
       />
-      <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" styles={viewStyles.replyAction}>
+      <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" styles={styles.replyAction}>
         {t("web.artifact.talk.send")}
       </Button>
     </form>

@@ -13,7 +13,7 @@ import { type MemoryItem, type MemoryKind, type MemoryTree, TreeStageValues } fr
 import type { SceneHover } from "./Scene";
 import { type Ties, tiesOf } from "./sky";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   lookUp: { marginTop: "auto", width: "100%" },
   panelPxWindow: {
     position: "absolute",
@@ -23,14 +23,14 @@ const recipeStyles2 = stylex.create({
     overflowY: "auto",
     padding: "calc(var(--spacing) * 4)",
   },
-  panelPxWindowVariant1Case1: {
+  panelPxWindowPrimary: {
     top: "calc(var(--spacing) * 3)",
     right: "calc(var(--spacing) * 3)",
     bottom: "calc(var(--spacing) * 3)",
     insetInline: null,
     height: null,
   },
-  panelPxWindowVariant1Case2: {
+  panelPxWindowSecondary: {
     top: null,
     right: null,
     bottom: "calc(var(--spacing) * 2)",
@@ -45,9 +45,6 @@ const recipeStyles2 = stylex.create({
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-});
-
-const recipeStyles = stylex.create({
   panelH1: {
     fontFamily: "var(--font-pixel)",
     fontSize: "24px",
@@ -164,9 +161,6 @@ const recipeStyles = stylex.create({
     color: "var(--color-leaf-700)",
     fontSynthesis: "none",
   },
-});
-
-const viewStyles = stylex.create({
   filters: { display: "flex", gap: "calc(var(--spacing) * 2)" },
   panelHeader: {
     textAlign: "center",
@@ -198,7 +192,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "var(--spacing)",
   },
-  panelLi: {
+  panelLi2: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
@@ -275,7 +269,7 @@ function tieWords(kind: MemoryKind, ties: Ties): string[] {
 
 export function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: TreeFilter) => void; styles?: stylex.StyleXStyles }) {
   return (
-    <div {...styleProps([viewStyles.filters, props.styles])}>
+    <div {...styleProps([styles.filters, props.styles])}>
       <PxPick
         label={t("web.tree.byHelper")}
         testid="tree-by-helper"
@@ -327,19 +321,19 @@ export function Panel(props: {
   return (
     <PxWindow
       testid="tree-panel"
-      styles={[recipeStyles2.panelPxWindow, props.narrow ? recipeStyles2.panelPxWindowVariant1Case2 : recipeStyles2.panelPxWindowVariant1Case1]}
+      styles={[styles.panelPxWindow, props.narrow ? styles.panelPxWindowSecondary : styles.panelPxWindowPrimary]}
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
-      <header {...stylex.attrs(viewStyles.panelHeader)}>
-        <h1 {...stylex.attrs(recipeStyles.panelH1)}>{t("web.tree.title")}</h1>
-        <p {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.stats", { days: days(), rounds: props.tree.rounds, recalls: props.tree.recalls })}</p>
+      <header {...stylex.attrs(styles.panelHeader)}>
+        <h1 {...stylex.attrs(styles.panelH1)}>{t("web.tree.title")}</h1>
+        <p {...stylex.attrs(styles.panelP)}>{t("web.tree.stats", { days: days(), rounds: props.tree.rounds, recalls: props.tree.recalls })}</p>
       </header>
-      <div {...stylex.attrs(viewStyles.panelDiv)}>
+      <div {...stylex.attrs(styles.panelDiv)}>
         <SpriteIcon name="icon-rings" size={20} />
-        <span {...stylex.attrs(recipeStyles.panelSpan)}>{stageName(props.tree.stage)}</span>
-        <span {...stylex.attrs(recipeStyles.panelSpan2)}>{growth()}</span>
+        <span {...stylex.attrs(styles.panelSpan)}>{stageName(props.tree.stage)}</span>
+        <span {...stylex.attrs(styles.panelSpan2)}>{growth()}</span>
       </div>
-      <div {...stylex.attrs(viewStyles.memoryCounts)} data-testid="memory-counts">
+      <div {...stylex.attrs(styles.memoryCounts)} data-testid="memory-counts">
         <Count icon="icon-leaf" label={t("web.tree.kind.leaf")} n={props.tally.leaf} />
         <Count icon="icon-fruit" label={t("web.tree.kind.fruit")} n={props.tally.fruit} />
         <Count icon="icon-seed" label={t("web.tree.kind.seed")} n={props.tally.seed} />
@@ -352,36 +346,36 @@ export function Panel(props: {
             icon={kindIcon[m().kind]}
             aside={<PxButton size="sm" label={t("web.tree.fold")} icon="button-close" onClick={props.unpick} />}
           >
-            <p {...stylex.attrs(recipeStyles.panelP)}>
+            <p {...stylex.attrs(styles.panelP)}>
               {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")} · {ago(m().at, props.now)}
             </p>
-            <Show when={m().case} fallback={<p {...stylex.attrs(recipeStyles.panelSpan)}>{m().body}</p>}>
+            <Show when={m().case} fallback={<p {...stylex.attrs(styles.panelSpan)}>{m().body}</p>}>
               {(c) => (
-                <dl {...stylex.attrs(viewStyles.panelDl)}>
-                  <dt {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.intent")}</dt>
-                  <dd {...stylex.attrs(recipeStyles.panelSpan)}>{c().intent}</dd>
-                  <dt {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.approach")}</dt>
-                  <dd {...stylex.attrs(recipeStyles.panelSpan)}>{c().approach}</dd>
-                  <dt {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.insight")}</dt>
-                  <dd {...stylex.attrs(recipeStyles.panelSpan)}>{c().insight}</dd>
+                <dl {...stylex.attrs(styles.panelDl)}>
+                  <dt {...stylex.attrs(styles.panelP)}>{t("web.tree.intent")}</dt>
+                  <dd {...stylex.attrs(styles.panelSpan)}>{c().intent}</dd>
+                  <dt {...stylex.attrs(styles.panelP)}>{t("web.tree.approach")}</dt>
+                  <dd {...stylex.attrs(styles.panelSpan)}>{c().approach}</dd>
+                  <dt {...stylex.attrs(styles.panelP)}>{t("web.tree.insight")}</dt>
+                  <dd {...stylex.attrs(styles.panelSpan)}>{c().insight}</dd>
                 </dl>
               )}
             </Show>
-            <p {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.recalled", { n: m().recalled })}</p>
+            <p {...stylex.attrs(styles.panelP)}>{t("web.tree.recalled", { n: m().recalled })}</p>
             <TieList tree={props.tree} item={m()} pick={props.pick} />
           </Section>
         )}
       </Show>
       <Section title={t("web.tree.recent")}>
-        <ul {...stylex.attrs(viewStyles.panelUl)}>
+        <ul {...stylex.attrs(styles.panelUl)}>
           <For each={props.recent}>
             {(m) => (
-              <li {...stylex.attrs(viewStyles.panelLi)}>
+              <li {...stylex.attrs(styles.panelLi2)}>
                 <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName(m.kind)} />
-                <span {...stylex.attrs(recipeStyles.panelSpan3)} title={m.body}>
+                <span {...stylex.attrs(styles.panelSpan3)} title={m.body}>
                   {m.body}
                 </span>
-                <span {...stylex.attrs(recipeStyles.panelSpan4)}>{props.agentName(m.agent)}</span>
+                <span {...stylex.attrs(styles.panelSpan4)}>{props.agentName(m.agent)}</span>
               </li>
             )}
           </For>
@@ -398,11 +392,11 @@ export function Panel(props: {
           </Show>
         }
       >
-        <Show when={showFading()} fallback={<p {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.fadingNote")}</p>}>
-          <ul {...stylex.attrs(viewStyles.panelUl)}>
+        <Show when={showFading()} fallback={<p {...stylex.attrs(styles.panelP)}>{t("web.tree.fadingNote")}</p>}>
+          <ul {...stylex.attrs(styles.panelUl)}>
             <For each={props.fading}>
               {(m) => (
-                <li {...stylex.attrs(recipeStyles.panelLi)} title={m.body}>
+                <li {...stylex.attrs(styles.panelLi)} title={m.body}>
                   {m.body}
                 </li>
               )}
@@ -411,13 +405,13 @@ export function Panel(props: {
         </Show>
       </Section>
       <Section title={t("web.tree.waiting")} icon="icon-seed-gold">
-        <Show when={props.waiting.length > 0} fallback={<p {...stylex.attrs(recipeStyles.panelP)}>{t("web.tree.noSeeds")}</p>}>
-          <ul {...stylex.attrs(viewStyles.panelUl2)}>
+        <Show when={props.waiting.length > 0} fallback={<p {...stylex.attrs(styles.panelP)}>{t("web.tree.noSeeds")}</p>}>
+          <ul {...stylex.attrs(styles.panelUl2)}>
             <For each={props.waiting}>
               {(seed) => (
-                <li {...stylex.attrs(viewStyles.panelLi)}>
+                <li {...stylex.attrs(styles.panelLi2)}>
                   <SpriteIcon name="icon-seed" size={20} />
-                  <span {...stylex.attrs(recipeStyles.panelSpan5)}>{seed.body}</span>
+                  <span {...stylex.attrs(styles.panelSpan5)}>{seed.body}</span>
                   <PxButton size="sm" tone="primary" data-testid="tree-sow" onClick={() => props.onSow(seed)}>
                     {t("web.tree.sow")}
                   </PxButton>
@@ -427,7 +421,7 @@ export function Panel(props: {
           </ul>
         </Show>
       </Section>
-      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" styles={recipeStyles2.lookUp} onClick={props.onLookUp}>
+      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" styles={styles.lookUp} onClick={props.onLookUp}>
         {t("web.tree.lookUp")}
       </PxButton>
     </PxWindow>
@@ -452,15 +446,15 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
   return (
     <For each={groups()}>
       {(g) => (
-        <div {...stylex.attrs(viewStyles.tieListDiv)}>
-          <span {...stylex.attrs(recipeStyles.panelP)}>{g.title}</span>
+        <div {...stylex.attrs(styles.tieListDiv)}>
+          <span {...stylex.attrs(styles.panelP)}>{g.title}</span>
           <For each={g.ids}>
             {(id) => (
               <Show when={find(id)}>
                 {(m) => (
-                  <button type="button" onClick={() => props.pick(m())} {...stylex.attrs(viewStyles.tieListButton)}>
+                  <button type="button" onClick={() => props.pick(m())} {...stylex.attrs(styles.tieListButton)}>
                     <SpriteIcon name={kindIcon[m().kind]} size={14} />
-                    <span {...stylex.attrs(recipeStyles.panelSpan3)}>{m().body}</span>
+                    <span {...stylex.attrs(styles.panelSpan3)}>{m().body}</span>
                   </button>
                 )}
               </Show>
@@ -474,20 +468,20 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
 
 function Count(props: { icon: string; label: string; n: number }) {
   return (
-    <div {...stylex.attrs(viewStyles.countDiv)} title={props.label}>
+    <div {...stylex.attrs(styles.countDiv)} title={props.label}>
       <SpriteIcon name={props.icon} size={20} label={props.label} />
-      <span {...stylex.attrs(recipeStyles.panelSpan)}>{props.n}</span>
+      <span {...stylex.attrs(styles.panelSpan)}>{props.n}</span>
     </div>
   );
 }
 
 function Section(props: { title: string; icon?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section {...stylex.attrs(viewStyles.sectionSection)}>
-      <div {...stylex.attrs(viewStyles.sectionDiv)}>
+    <section {...stylex.attrs(styles.sectionSection)}>
+      <div {...stylex.attrs(styles.sectionDiv)}>
         <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={16} />}</Show>
-        <h2 {...stylex.attrs(recipeStyles.panelSpan)}>{props.title}</h2>
-        <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.aside}</span>
+        <h2 {...stylex.attrs(styles.panelSpan)}>{props.title}</h2>
+        <span {...stylex.attrs(styles.sectionSpan)}>{props.aside}</span>
       </div>
       {props.children}
     </section>
@@ -500,20 +494,20 @@ export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id
   const left = () => Math.min(props.hover.x + 14, window.innerWidth - 270);
   const top = () => Math.min(props.hover.y + 14, window.innerHeight - 110);
   return (
-    <PxWindow styles={[recipeStyles2.tipPxWindow]} style={{ left: `${left()}px`, top: `${top()}px` }}>
-      <div {...stylex.attrs(viewStyles.sectionDiv)}>
+    <PxWindow styles={[styles.tipPxWindow]} style={{ left: `${left()}px`, top: `${top()}px` }}>
+      <div {...stylex.attrs(styles.sectionDiv)}>
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
-        <span {...stylex.attrs(recipeStyles.tipSpan)}>
+        <span {...stylex.attrs(styles.tipSpan)}>
           {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")}
         </span>
       </div>
-      <p {...stylex.attrs(recipeStyles.tipP)}>{m().body}</p>
-      <p {...stylex.attrs(recipeStyles.tipP2)}>
+      <p {...stylex.attrs(styles.tipP)}>{m().body}</p>
+      <p {...stylex.attrs(styles.tipP2)}>
         {ago(m().at, props.now)} · {t("web.tree.recalled", { n: m().recalled })}
         {m().fading ? t("web.tree.aboutToFall") : ""}
       </p>
       <Show when={ties().length > 0}>
-        <p {...stylex.attrs(recipeStyles.tipP3)}>{ties().join(" · ")}</p>
+        <p {...stylex.attrs(styles.tipP3)}>{ties().join(" · ")}</p>
       </Show>
     </PxWindow>
   );

@@ -11,10 +11,11 @@ import { beds } from "#/farm/world/plots.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
 import { achievementsQuery, ready, useQuery } from "#/infra/query.ts";
 import { createPixelAct, numberText, SpriteIcon } from "#/ui/pixel/index.ts";
+import { styleProps } from "#/ui/positioner.ts";
 
-import { tint, Tinted } from "./rows";
+import { Tinted } from "./rows";
 
-const recipeStyles3 = stylex.create({
+const styles = stylex.create({
   medalFrame: { position: "absolute", inset: 0 },
   doneStamp: { position: "absolute", right: "calc(var(--spacing) * -1.5)", bottom: "calc(var(--spacing) * -1)" },
   titlePickerButton: {
@@ -44,9 +45,6 @@ const recipeStyles3 = stylex.create({
       ":disabled": ".6",
     },
   },
-});
-
-const recipeStyles2 = stylex.create({
   standingTinted: {
     display: "flex",
     flexWrap: "wrap",
@@ -58,11 +56,9 @@ const recipeStyles2 = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
+    backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 40%, var(--color-cream-50))",
   },
-});
-
-const recipeStyles = stylex.create({
-  titlePickerDiv: {
+  titlePickerMenu: {
     position: "absolute",
     top: "100%",
     right: "0",
@@ -75,24 +71,20 @@ const recipeStyles = stylex.create({
     padding: "calc(var(--spacing) * 1.5)",
     boxShadow: "var(--shadow-px)",
   },
-});
-
-const variantStyles = stylex.create({
   medalImg: {
     position: "absolute",
     objectFit: "contain",
     imageRendering: "pixelated",
   },
-  medalImgVariant: {
+  medalImgLocked: {
     opacity: ".5",
     filter: "grayscale(100%)",
   },
-  medalImgVariant2: {},
-  titlePickerSpan: {
+  titleItemLabel: {
     flex: "1",
     fontSize: "13px",
   },
-  titlePickerSpanVariant: {
+  titleItemWorn: {
     color: "var(--color-leaf-700)",
   },
   starterImg: {
@@ -101,20 +93,20 @@ const variantStyles = stylex.create({
     objectFit: "contain",
     imageRendering: "pixelated",
   },
-  starterImgVariant: {
+  starterImgPending: {
     opacity: ".6",
   },
-  starterSpan: {
+  starterTitle: {
     display: "block",
     fontSize: "13px",
   },
-  starterSpanVariant: {
+  starterTitleDone: {
     color: "var(--color-bark-800)",
   },
-  starterSpanVariant2: {
+  inkBark900: {
     color: "var(--color-bark-900)",
   },
-  cardSpan: {
+  cardTitle: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -122,45 +114,45 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     fontSize: "13px",
   },
-  cardSpanVariant: {
+  cardTitleLocked: {
     color: "var(--color-bark-600)",
   },
-});
-
-const viewStyles = stylex.create({
-  medalSpan: {
+  medalWrap: (size: number) => ({
     position: "relative",
     display: "inline-block",
     flexShrink: "0",
-  },
-  barSpan: {
+    width: size,
+    height: size,
+  }),
+  barTrack: (height: number) => ({
     display: "block",
+    height,
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-cream-300)",
     backgroundColor: "var(--color-cream-200)",
-  },
-  barSpan2: {
+  }),
+  barFill: {
     display: "block",
     height: "100%",
     backgroundColor: "var(--color-leaf-500)",
   },
-  headingP: {
+  heading: {
     marginBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  achievementsDiv: {
+  page: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 5)",
   },
-  achievementsDiv2: {
+  clearingList: {
     display: "flex",
     flexWrap: "wrap",
     gap: "calc(var(--spacing) * 2)",
   },
-  achievementsSpan: {
+  clearingChip: {
     display: "flex",
     alignItems: "center",
     gap: "var(--spacing)",
@@ -168,7 +160,15 @@ const viewStyles = stylex.create({
     paddingBlock: "var(--spacing)",
     fontSize: "12px",
   },
-  achievementsDiv3: {
+  clearingDone: {
+    backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 70%, var(--color-cream-50))",
+    color: "var(--color-bark-900)",
+  },
+  clearingLocked: {
+    backgroundColor: "var(--color-cream-200)",
+    color: "var(--color-bark-600)",
+  },
+  wallGrid: {
     display: "grid",
     gap: "calc(var(--spacing) * 2)",
     gridTemplateColumns: {
@@ -176,58 +176,58 @@ const viewStyles = stylex.create({
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
     },
   },
-  standingDiv: {
+  standingLevel: {
     display: "flex",
     maxWidth: "280px",
     minWidth: "160px",
     flexDirection: "column",
   },
-  standingDiv2: {
+  standingLevelHead: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "flex-end",
     gap: "calc(var(--spacing) * 2)",
   },
-  standingSpan: {
+  levelNumber: {
     fontSize: "20px",
     color: "var(--color-leaf-700)",
   },
-  standingSpan2: {
+  subtleNote: {
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  standingSpan3: {
+  standingBarWrap: {
     marginTop: "calc(var(--spacing) * 1.5)",
   },
-  standingDiv3: {
+  standingCoins: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  standingP: {
+  coinsValue: {
     fontSize: "20px",
   },
-  titlePickerDiv: {
+  titlePickerWrap: {
     position: "relative",
     marginLeft: "auto",
   },
-  titlePickerSpan: {
+  titlePickerCaption: {
     display: "block",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  titlePickerSpan2: {
+  titlePickerCurrent: {
     display: "block",
     fontSize: "13px",
   },
-  titlePickerP: {
+  titlePickerHeading: {
     paddingInline: "calc(var(--spacing) * 2)",
     paddingTop: "var(--spacing)",
     paddingBottom: "calc(var(--spacing) * 1.5)",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  titlePickerButton: {
+  titleItem: {
     display: "flex",
     width: "100%",
     cursor: "pointer",
@@ -244,7 +244,7 @@ const viewStyles = stylex.create({
       },
     },
   },
-  titlePickerButton2: {
+  titleClearButton: {
     width: "100%",
     cursor: "pointer",
     paddingInline: "calc(var(--spacing) * 2)",
@@ -260,11 +260,11 @@ const viewStyles = stylex.create({
       },
     },
   },
-  starterSpan: {
+  starterDoneText: {
     fontSize: "13px",
     color: "var(--color-bark-800)",
   },
-  starterDiv: {
+  starterGrid: {
     display: "grid",
     gap: "calc(var(--spacing) * 1.5)",
     gridTemplateColumns: {
@@ -272,24 +272,30 @@ const viewStyles = stylex.create({
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
     },
   },
-  starterDiv2: {
+  starterCard: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2.5)",
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-  starterSpan2: {
+  starterCardDone: {
+    backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 35%, var(--color-cream-50))",
+  },
+  starterCardPending: {
+    backgroundColor: "var(--color-cream-100)",
+  },
+  starterIconBox: {
     position: "relative",
     height: "calc(var(--spacing) * 9)",
     width: "calc(var(--spacing) * 9)",
     flexShrink: "0",
   },
-  starterSpan3: {
+  cardBody: {
     minWidth: "0",
     flex: "1",
   },
-  starterSpan4: {
+  starterDetail: {
     display: "block",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -297,57 +303,78 @@ const viewStyles = stylex.create({
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  starterSpan5: {
+  starterReward: {
     display: "flex",
     alignItems: "center",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  cardDiv: {
+  card: {
     display: "flex",
     alignItems: "flex-start",
     gap: "calc(var(--spacing) * 3)",
     padding: "calc(var(--spacing) * 2.5)",
   },
-  cardDiv2: {
+  cardGold: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-px-gold-frame)",
+    backgroundColor: "color-mix(in srgb, var(--color-wheat) 20%, var(--color-cream-50))",
+  },
+  cardPlain: {
+    backgroundColor: "var(--color-cream-100)",
+  },
+  cardHeader: {
     display: "flex",
     alignItems: "center",
   },
-  cardSpan: {
+  pips: {
     display: "flex",
   },
-  cardSpan2: {
+  pip: {
     marginLeft: "var(--spacing)",
     height: "calc(var(--spacing) * 2)",
     width: "calc(var(--spacing) * 2)",
   },
-  cardP: {
+  pipBronze: {
+    backgroundColor: "var(--color-medal-bronze)",
+  },
+  pipSilver: {
+    backgroundColor: "var(--color-medal-silver)",
+  },
+  pipGold: {
+    backgroundColor: "var(--color-wheat)",
+  },
+  pipLocked: {
+    backgroundColor: "var(--color-cream-300)",
+  },
+  cardDetail: {
     marginTop: "calc(var(--spacing) * .5)",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-  cardDiv3: {
+  cardProgress: {
     marginTop: "calc(var(--spacing) * 1.5)",
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  cardSpan3: {
+  cardProgressBar: {
     flex: "1",
   },
-  cardP2: {
+  cardEarned: {
     marginTop: "var(--spacing)",
     fontSize: "12px",
     color: "var(--color-bark-400)",
   },
-  secretsDiv: {
+  secretsCard: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 3)",
     backgroundColor: "var(--color-cream-100)",
     padding: "calc(var(--spacing) * 2.5)",
   },
-  secretsP: {
+  secretsTitle: {
     fontSize: "13px",
     color: "var(--color-bark-600)",
   },
@@ -367,7 +394,11 @@ const categoryText: Record<AchievementCategory, string> = {
   secret: t("web.farm.achievements.category.secret"),
 };
 
-const pip: Record<number, string> = { 1: "#c07a43", 2: "#a9b4bf", 3: "#e5a93c" };
+const pipLook: Record<number, stylex.StyleXStyles> = {
+  1: styles.pipBronze,
+  2: styles.pipSilver,
+  3: styles.pipGold,
+};
 
 const emptyProgress: Progress = { coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], agents: {} };
 
@@ -405,13 +436,13 @@ function Medal(props: { a: Achievement; tier: number; size: number }) {
     return { left: (props.size - e) / 2, top: props.size * top - e / 2, e };
   };
   return (
-    <span {...stylex.attrs(viewStyles.medalSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }}>
-      <SpriteIcon name={frame()} size={props.size} styles={recipeStyles3.medalFrame} />
+    <span {...styleProps(styles.medalWrap(props.size))}>
+      <SpriteIcon name={frame()} size={props.size} styles={styles.medalFrame} />
       <img
         src={`/pixel/emblem-${props.a.id}.png`}
         onError={(ev) => (ev.currentTarget.src = "/pixel/emblem-wreath.png")}
         alt=""
-        {...stylex.attrs(variantStyles.medalImg, !earned() ? variantStyles.medalImgVariant : variantStyles.medalImgVariant2)}
+        {...stylex.attrs(styles.medalImg, !earned() && styles.medalImgLocked)}
         style={{ left: `${place().left}px`, top: `${place().top}px`, width: `${place().e}px`, height: `${place().e}px` }}
       />
     </span>
@@ -425,17 +456,16 @@ function Bar(props: { value: number; max: number; height?: number; label?: strin
       aria-label={props.label}
       aria-valuenow={Math.round(props.value)}
       aria-valuemax={Math.round(props.max)}
-      {...stylex.attrs(viewStyles.barSpan)}
-      style={{ height: `${props.height ?? 8}px` }}
+      {...styleProps(styles.barTrack(props.height ?? 8))}
     >
-      <span {...stylex.attrs(viewStyles.barSpan2)} style={{ width: `${props.max <= 0 ? 0 : Math.min(1, Math.max(0, props.value / props.max)) * 100}%` }} />
+      <span {...stylex.attrs(styles.barFill)} style={{ width: `${props.max <= 0 ? 0 : Math.min(1, Math.max(0, props.value / props.max)) * 100}%` }} />
     </span>
   );
 }
 
 function Heading(props: { text: string; aside?: string | undefined }) {
   return (
-    <p {...stylex.attrs(viewStyles.headingP)}>
+    <p {...stylex.attrs(styles.heading)}>
       {props.text}
       {props.aside && `  ${props.aside}`}
     </p>
@@ -452,20 +482,17 @@ export function Achievements() {
   const st = () => standingsOf(frames.frame?.view.achievements ?? []);
   const of = (c: AchievementCategory) => catalog().filter((a) => a.category === c);
   return (
-    <div {...stylex.attrs(viewStyles.achievementsDiv)}>
+    <div {...stylex.attrs(styles.page)}>
       <Standing catalog={catalog()} />
       <Starter list={of("starter")} st={st()} />
       <div>
         <Heading text={t("web.farm.achievements.clearing")} />
-        <div {...stylex.attrs(viewStyles.achievementsDiv2)}>
+        <div {...stylex.attrs(styles.clearingList)}>
           <For each={beds.filter((b) => b.unlockLevel !== undefined)}>
             {(b) => {
               const done = () => level() >= b.unlockLevel!;
               return (
-                <span
-                  {...stylex.attrs(viewStyles.achievementsSpan)}
-                  style={{ background: done() ? tint("#b4cb7c", 0.7) : "#e2c995", color: done() ? "#2f1f13" : "#67482d" }}
-                >
+                <span {...stylex.attrs(styles.clearingChip, done() ? styles.clearingDone : styles.clearingLocked)}>
                   {t("web.farm.achievements.clearAt", { level: b.unlockLevel! })}
                   <Show when={done()}>
                     <SpriteIcon name="mark-check" size={12} />
@@ -480,7 +507,7 @@ export function Achievements() {
         {(c) => (
           <div>
             <Heading text={`${categoryText[c]} ${of(c).filter((a) => st()(a).tier > 0).length}/${of(c).length}`} />
-            <div {...stylex.attrs(viewStyles.achievementsDiv3)}>
+            <div {...stylex.attrs(styles.wallGrid)}>
               <For each={of(c)}>{(a) => <Card a={a} p={p()} st={st()} />}</For>
             </div>
           </div>
@@ -499,23 +526,23 @@ function Standing(props: { catalog: readonly Achievement[] }) {
   const commits = () => core()?.commits?.total ?? 0;
   const need = () => Math.round(lv().need);
   return (
-    <Tinted styles={[recipeStyles2.standingTinted]}>
-      <div {...stylex.attrs(viewStyles.standingDiv)}>
-        <div {...stylex.attrs(viewStyles.standingDiv2)}>
-          <span {...stylex.attrs(viewStyles.standingSpan)}>Lv.{Math.round(lv().level)}</span>
-          <span {...stylex.attrs(viewStyles.standingSpan2)}>
+    <Tinted styles={styles.standingTinted}>
+      <div {...stylex.attrs(styles.standingLevel)}>
+        <div {...stylex.attrs(styles.standingLevelHead)}>
+          <span {...stylex.attrs(styles.levelNumber)}>Lv.{Math.round(lv().level)}</span>
+          <span {...stylex.attrs(styles.subtleNote)}>
             {t("web.farm.achievements.toLevel", { left: need() - Math.round(lv().xp), total: Math.round(commits()) })}
           </span>
         </div>
-        <span {...stylex.attrs(viewStyles.standingSpan3)}>
+        <span {...stylex.attrs(styles.standingBarWrap)}>
           <Bar value={lv().xp} max={need()} label={t("web.farm.achievements.toNext")} />
         </span>
       </div>
-      <div {...stylex.attrs(viewStyles.standingDiv3)}>
+      <div {...stylex.attrs(styles.standingCoins)}>
         <SpriteIcon name="coins-stack" size={40} />
         <div>
-          <p {...stylex.attrs(viewStyles.standingP)}>{thousands(Math.round(p().coins))}</p>
-          <p {...stylex.attrs(viewStyles.standingSpan2)}>
+          <p {...stylex.attrs(styles.coinsValue)}>{thousands(Math.round(p().coins))}</p>
+          <p {...stylex.attrs(styles.subtleNote)}>
             {p().streak > 1
               ? t("web.farm.achievements.streak", { n: Math.round(p().streak), multiplier: (p().multiplier ?? 1).toFixed(1) })
               : t("web.farm.achievements.coinsOnMerge")}
@@ -542,20 +569,20 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
       .filter((a) => a.wearable)
       .flatMap((a) => a.tiers.flatMap((_, i) => (props.p.unlocked.some((u) => u.id === a.id && u.tier === i + 1) ? [{ a, tier: i + 1 }] : [])));
   return (
-    <div ref={box} {...stylex.attrs(viewStyles.titlePickerDiv)}>
+    <div ref={box} {...stylex.attrs(styles.titlePickerWrap)}>
       <button
         type="button"
         disabled={earned().length === 0}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
-        {...stylex.attrs(recipeStyles3.titlePickerButton)}
+        {...stylex.attrs(styles.titlePickerButton)}
       >
         <Show when={worn() && title() ? { a: worn()!, tier: Math.round(title()!.tier) } : undefined} fallback={<SpriteIcon name="banner-title" size={48} />}>
           {(w) => <Medal a={w().a} tier={w().tier} size={32} />}
         </Show>
         <span>
-          <span {...stylex.attrs(viewStyles.titlePickerSpan)}>{t("web.farm.achievements.title")}</span>
-          <span {...stylex.attrs(viewStyles.titlePickerSpan2)}>
+          <span {...stylex.attrs(styles.titlePickerCaption)}>{t("web.farm.achievements.title")}</span>
+          <span {...stylex.attrs(styles.titlePickerCurrent)}>
             {worn() && title()
               ? tierTitle(worn()!, Math.round(title()!.tier))
               : earned().length > 0
@@ -565,8 +592,8 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
         </span>
       </button>
       <Show when={open()}>
-        <div {...stylex.attrs(recipeStyles.titlePickerDiv)} role="menu" aria-label={t("web.farm.achievements.titles")}>
-          <p {...stylex.attrs(viewStyles.titlePickerP)}>{t("web.farm.achievements.titles")}</p>
+        <div {...stylex.attrs(styles.titlePickerMenu)} role="menu" aria-label={t("web.farm.achievements.titles")}>
+          <p {...stylex.attrs(styles.titlePickerHeading)}>{t("web.farm.achievements.titles")}</p>
           <For each={earned()}>
             {(e) => {
               const on = () => title()?.id === e.a.id && title()?.tier === e.tier;
@@ -578,12 +605,10 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
                     void act.run(() => commands.chooseTitle(e.a.id, e.tier));
                     setOpen(false);
                   }}
-                  {...stylex.attrs(viewStyles.titlePickerButton)}
+                  {...stylex.attrs(styles.titleItem)}
                 >
                   <Medal a={e.a} tier={e.tier} size={28} />
-                  <span {...stylex.attrs(variantStyles.titlePickerSpan, on() ? variantStyles.titlePickerSpanVariant : variantStyles.medalImgVariant2)}>
-                    {tierTitle(e.a, e.tier)}
-                  </span>
+                  <span {...stylex.attrs(styles.titleItemLabel, on() && styles.titleItemWorn)}>{tierTitle(e.a, e.tier)}</span>
                   <Show when={on()}>
                     <SpriteIcon name="mark-check" size={14} label={t("web.farm.achievements.worn")} />
                   </Show>
@@ -599,7 +624,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
                 void act.run(() => commands.chooseTitle());
                 setOpen(false);
               }}
-              {...stylex.attrs(viewStyles.titlePickerButton2)}
+              {...stylex.attrs(styles.titleClearButton)}
             >
               {t("web.farm.achievements.none")}
             </button>
@@ -616,9 +641,9 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
     <Show
       when={!(props.list.length > 0 && done() === props.list.length)}
       fallback={
-        <Tinted color={tint("#b4cb7c", 0.4)} styles={[recipeStyles2.starterTinted]}>
+        <Tinted styles={styles.starterTinted}>
           <SpriteIcon name="emblem-starter" size={28} />
-          <span {...stylex.attrs(viewStyles.starterSpan)}>{t("web.farm.achievements.starterDone")}</span>
+          <span {...stylex.attrs(styles.starterDoneText)}>{t("web.farm.achievements.starterDone")}</span>
         </Tinted>
       }
     >
@@ -627,33 +652,31 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
           text={t("web.farm.achievements.starter", { done: done(), of: props.list.length })}
           aside={props.list[0] ? t("web.farm.achievements.perStarter", { coins: Math.round(props.list[0].tiers[0]?.coins ?? 0) }) : undefined}
         />
-        <div {...stylex.attrs(viewStyles.starterDiv)}>
+        <div {...stylex.attrs(styles.starterGrid)}>
           <For each={props.list}>
             {(a) => {
               const ok = () => props.st(a).tier > 0;
               return (
-                <div {...stylex.attrs(viewStyles.starterDiv2)} style={{ background: ok() ? tint("#b4cb7c", 0.35) : "#eedcb2" }}>
-                  <span {...stylex.attrs(viewStyles.starterSpan2)}>
+                <div {...stylex.attrs(styles.starterCard, ok() ? styles.starterCardDone : styles.starterCardPending)}>
+                  <span {...stylex.attrs(styles.starterIconBox)}>
                     <img
                       src={`/pixel/emblem-${a.id}.png`}
                       onError={(ev) => (ev.currentTarget.src = "/pixel/emblem-wreath.png")}
                       alt=""
-                      {...stylex.attrs(variantStyles.starterImg, !ok() ? variantStyles.starterImgVariant : variantStyles.medalImgVariant2)}
+                      {...stylex.attrs(styles.starterImg, !ok() && styles.starterImgPending)}
                     />
                     <Show when={ok()}>
-                      <SpriteIcon name="stamp-done" size={20} label={t("web.farm.achievements.done")} styles={recipeStyles3.doneStamp} />
+                      <SpriteIcon name="stamp-done" size={20} label={t("web.farm.achievements.done")} styles={styles.doneStamp} />
                     </Show>
                   </span>
-                  <span {...stylex.attrs(viewStyles.starterSpan3)}>
-                    <span {...stylex.attrs(variantStyles.starterSpan, ok() ? variantStyles.starterSpanVariant : variantStyles.starterSpanVariant2)}>
-                      {a.title}
-                    </span>
-                    <span {...stylex.attrs(viewStyles.starterSpan4)} title={a.detail}>
+                  <span {...stylex.attrs(styles.cardBody)}>
+                    <span {...stylex.attrs(styles.starterTitle, ok() ? styles.starterTitleDone : styles.inkBark900)}>{a.title}</span>
+                    <span {...stylex.attrs(styles.starterDetail)} title={a.detail}>
                       {a.detail}
                     </span>
                   </span>
                   <Show when={!ok()}>
-                    <span {...stylex.attrs(viewStyles.starterSpan5)}>
+                    <span {...stylex.attrs(styles.starterReward)}>
                       <SpriteIcon name="icon-coin" size={16} />+{Math.round(a.tiers[0]?.coins ?? 0)}
                     </span>
                   </Show>
@@ -672,35 +695,31 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
   const at = () => (standing().tier > 0 ? reachedAt(props.p, props.a.id, standing().tier) : undefined);
   const unit = () => props.a.unit ?? "";
   return (
-    <div
-      {...stylex.attrs(viewStyles.cardDiv)}
-      style={{ background: standing().tier === 3 ? tint("#e5a93c", 0.2) : "#eedcb2", border: standing().tier === 3 ? "2px solid #e5a93cb3" : undefined }}
-    >
+    <div {...stylex.attrs(styles.card, standing().tier === 3 ? styles.cardGold : styles.cardPlain)}>
       <Medal a={props.a} tier={standing().tier} size={60} />
-      <div {...stylex.attrs(viewStyles.starterSpan3)}>
-        <div {...stylex.attrs(viewStyles.cardDiv2)}>
-          <span {...stylex.attrs(variantStyles.cardSpan, standing().tier > 0 ? variantStyles.starterSpanVariant2 : variantStyles.cardSpanVariant)}>
+      <div {...stylex.attrs(styles.cardBody)}>
+        <div {...stylex.attrs(styles.cardHeader)}>
+          <span {...stylex.attrs(styles.cardTitle, standing().tier > 0 ? styles.inkBark900 : styles.cardTitleLocked)}>
             {tierTitle(props.a, standing().tier < 1 ? 1 : standing().tier)}
           </span>
           <Show when={props.a.tiers.length > 1}>
-            <span {...stylex.attrs(viewStyles.cardSpan)} aria-label={t("web.farm.achievements.tiers", { tier: standing().tier, of: props.a.tiers.length })}>
+            <span {...stylex.attrs(styles.pips)} aria-label={t("web.farm.achievements.tiers", { tier: standing().tier, of: props.a.tiers.length })}>
               <For each={props.a.tiers}>
                 {(tier, i) => (
                   <span
                     title={t("shared.join.labeled", { label: tierText(i() + 1), text: `${numberText(tier.need)} ${unit()}` })}
-                    {...stylex.attrs(viewStyles.cardSpan2)}
-                    style={{ background: i() < standing().tier ? pip[i() + 1] : "#c8a46e" }}
+                    {...styleProps([styles.pip, i() < standing().tier ? (pipLook[i() + 1] ?? styles.pipLocked) : styles.pipLocked])}
                   />
                 )}
               </For>
             </span>
           </Show>
         </div>
-        <p {...stylex.attrs(viewStyles.cardP)}>{props.a.detail}</p>
+        <p {...stylex.attrs(styles.cardDetail)}>{props.a.detail}</p>
         <Show when={standing().next}>
           {(next) => (
-            <div {...stylex.attrs(viewStyles.cardDiv3)}>
-              <span {...stylex.attrs(viewStyles.cardSpan3)}>
+            <div {...stylex.attrs(styles.cardProgress)}>
+              <span {...stylex.attrs(styles.cardProgressBar)}>
                 <Bar
                   value={Math.min(standing().count, next())}
                   max={next()}
@@ -708,7 +727,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
                   label={t("web.farm.achievements.toTier", { tier: tierText(standing().tier + 1) })}
                 />
               </span>
-              <span {...stylex.attrs(viewStyles.standingSpan2)}>
+              <span {...stylex.attrs(styles.subtleNote)}>
                 {standing().count}/{next()} {unit()}
               </span>
             </div>
@@ -716,7 +735,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
         </Show>
         <Show when={at()}>
           {(when) => (
-            <p {...stylex.attrs(viewStyles.cardP2)}>
+            <p {...stylex.attrs(styles.cardEarned)}>
               {props.a.tiers.length > 1 && tierText(standing().tier)
                 ? t("web.farm.achievements.earnedTier", { day: day(when()), tier: tierText(standing().tier) })
                 : t("web.farm.achievements.earned", { day: day(when()) })}
@@ -734,14 +753,14 @@ function Secrets(props: { list: readonly Achievement[]; p: Progress; st: Standin
   return (
     <div>
       <Heading text={`${categoryText.secret} ${found().length}/${props.list.length}`} />
-      <div {...stylex.attrs(viewStyles.achievementsDiv3)}>
+      <div {...stylex.attrs(styles.wallGrid)}>
         <For each={found()}>{(a) => <Card a={a} p={props.p} st={props.st} />}</For>
         <Show when={left() > 0}>
-          <div {...stylex.attrs(viewStyles.secretsDiv)}>
+          <div {...stylex.attrs(styles.secretsCard)}>
             <SpriteIcon name="medal-locked" size={60} />
             <div>
-              <p {...stylex.attrs(viewStyles.secretsP)}>{t("web.farm.achievements.secrets", { n: left() })}</p>
-              <p {...stylex.attrs(viewStyles.standingSpan2)}>{t("web.farm.achievements.secretsLine")}</p>
+              <p {...stylex.attrs(styles.secretsTitle)}>{t("web.farm.achievements.secrets", { n: left() })}</p>
+              <p {...stylex.attrs(styles.subtleNote)}>{t("web.farm.achievements.secretsLine")}</p>
             </div>
           </div>
         </Show>

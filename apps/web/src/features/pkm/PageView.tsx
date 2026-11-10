@@ -25,7 +25,7 @@ import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   propsSpanState: {
     color: "var(--wb-muted)",
   },
@@ -35,9 +35,6 @@ const recipeStyles = stylex.create({
   propsSpanState3: {
     color: "var(--wb-berry)",
   },
-});
-
-const variantStyles2 = stylex.create({
   shownA: {
     textDecorationLine: {
       default: null,
@@ -68,9 +65,6 @@ const variantStyles2 = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
   shownDiv: {
     display: "flex",
     minHeight: "0",
@@ -85,9 +79,6 @@ const variantStyles = stylex.create({
       "@media (width>=80rem)": "flex-start",
     },
   },
-});
-
-const viewStyles = stylex.create({
   pkmDay: {
     display: "flex",
     flexDirection: "column",
@@ -397,9 +388,9 @@ function Shown(props: {
     <Show
       when={!props.compact}
       fallback={
-        <article data-testid="pkm-day" data-key={page().slug} {...stylex.attrs(viewStyles.pkmDay)}>
-          <h2 {...stylex.attrs(viewStyles.shownH2)}>
-            <A href={pkmHref(page().slug)} {...stylex.attrs(variantStyles2.shownA)}>
+        <article data-testid="pkm-day" data-key={page().slug} {...stylex.attrs(styles.pkmDay)}>
+          <h2 {...stylex.attrs(styles.shownH2)}>
+            <A href={pkmHref(page().slug)} {...stylex.attrs(styles.shownA)}>
               {titleFor(page().title, props.summary?.day)}
             </A>
           </h2>
@@ -407,13 +398,13 @@ function Shown(props: {
         </article>
       }
     >
-      <div data-testid="pkm-page" data-key={page().slug} {...stylex.attrs(variantStyles.shownDiv)}>
-        <article {...stylex.attrs(viewStyles.shownArticle)}>
+      <div data-testid="pkm-page" data-key={page().slug} {...stylex.attrs(styles.shownDiv)}>
+        <article {...stylex.attrs(styles.shownArticle)}>
           <Header view={props.view} summary={props.summary} />
           {outline()}
         </article>
         <Show when={rail.get()}>
-          <aside aria-label={t("web.pkm.rail.label")} data-testid="pkm-rail" {...stylex.attrs(viewStyles.pkmRail)}>
+          <aside aria-label={t("web.pkm.rail.label")} data-testid="pkm-rail" {...stylex.attrs(styles.pkmRail)}>
             <Calendar pages={props.pages} open={props.summary?.day} />
             <Comments view={props.view} />
             <Backlinks view={props.view} pages={props.pages} />
@@ -467,14 +458,14 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
     { key: "undo", label: t("web.pkm.page.undo"), icon: "undo", onSelect: () => void undo() },
   ];
   return (
-    <header {...stylex.attrs(viewStyles.pkmDay)}>
-      <div {...stylex.attrs(viewStyles.headerDiv)}>
+    <header {...stylex.attrs(styles.pkmDay)}>
+      <div {...stylex.attrs(styles.headerDiv)}>
         <Button icon="back" onClick={() => router.navigate("/pkm")}>
           {t("web.pkm.list.today")}
         </Button>
       </div>
-      <div {...stylex.attrs(viewStyles.headerDiv2)}>
-        <h1 data-testid="pkm-title" {...stylex.attrs(viewStyles.pkmTitle)}>
+      <div {...stylex.attrs(styles.headerDiv2)}>
+        <h1 data-testid="pkm-title" {...stylex.attrs(styles.pkmTitle)}>
           {titleFor(page().title, props.summary?.day)}
         </h1>
         <Select
@@ -496,7 +487,7 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
       </div>
       <Props view={props.view} />
       <Show when={page().tldr}>
-        <p {...stylex.attrs(viewStyles.headerP)}>{page().tldr}</p>
+        <p {...stylex.attrs(styles.headerP)}>{page().tldr}</p>
       </Show>
     </header>
   );
@@ -526,11 +517,11 @@ function Props(props: { view: PkmPageView }) {
   };
   return (
     <Show when={entries().length > 0}>
-      <div data-testid="pkm-props" {...stylex.attrs(viewStyles.pkmProps)}>
-        <div {...stylex.attrs(viewStyles.propsDiv)}>
+      <div data-testid="pkm-props" {...stylex.attrs(styles.pkmProps)}>
+        <div {...stylex.attrs(styles.propsDiv)}>
           <Show when={value("status")}>
             {(s) => (
-              <span data-testid="pkm-prop" data-key="status" {...stylex.attrs(viewStyles.pkmProp)}>
+              <span data-testid="pkm-prop" data-key="status" {...stylex.attrs(styles.pkmProp)}>
                 <Dot tone={statusTone(s())} />
                 {s()}
               </span>
@@ -542,7 +533,7 @@ function Props(props: { view: PkmPageView }) {
                 data-testid="pkm-prop"
                 data-key="deadline"
                 {...stylex.attrs(
-                  (d().left ?? 1) < 0 ? recipeStyles.propsSpanState3 : (d().left ?? 99) <= 3 ? recipeStyles.propsSpanState2 : recipeStyles.propsSpanState,
+                  (d().left ?? 1) < 0 ? styles.propsSpanState3 : (d().left ?? 99) <= 3 ? styles.propsSpanState2 : styles.propsSpanState,
                 )}
               >
                 <Switch fallback={t("web.pkm.props.deadline", { day: d().day })}>
@@ -555,7 +546,7 @@ function Props(props: { view: PkmPageView }) {
           </Show>
           <For each={["area", "areas"].filter((k) => value(k))}>
             {(k) => (
-              <span data-testid="pkm-prop" data-key={k} {...stylex.attrs(viewStyles.pkmProp2)}>
+              <span data-testid="pkm-prop" data-key={k} {...stylex.attrs(styles.pkmProp2)}>
                 {t("web.pkm.props.area")} <Body text={value(k) ?? ""} refs={props.view.transclusions} />
               </span>
             )}
@@ -567,23 +558,23 @@ function Props(props: { view: PkmPageView }) {
               .filter(Boolean)}
           >
             {(tag) => (
-              <span data-testid="pkm-prop" data-key="tags" {...stylex.attrs(viewStyles.pkmProp3)}>
+              <span data-testid="pkm-prop" data-key="tags" {...stylex.attrs(styles.pkmProp3)}>
                 <Body text={tag.startsWith("#") || tag.startsWith("[[") ? tag : `[[${tag}]]`} refs={props.view.transclusions} />
               </span>
             )}
           </For>
           <Show when={rest().length > 0}>
-            <button type="button" data-testid="pkm-props-more" onClick={() => setAll((a) => !a)} {...stylex.attrs(viewStyles.pkmPropsMore)}>
+            <button type="button" data-testid="pkm-props-more" onClick={() => setAll((a) => !a)} {...stylex.attrs(styles.pkmPropsMore)}>
               {all() ? t("web.pkm.props.fewer") : t("web.pkm.props.more", { n: rest().length })}
             </button>
           </Show>
         </div>
         <Show when={all()}>
-          <dl {...stylex.attrs(viewStyles.propsDl)}>
+          <dl {...stylex.attrs(styles.propsDl)}>
             <For each={rest()} keyed={([k]) => k}>
               {(entry) => (
                 <>
-                  <dt {...stylex.attrs(viewStyles.pkmProp2)}>{entry()[0]}</dt>
+                  <dt {...stylex.attrs(styles.pkmProp2)}>{entry()[0]}</dt>
                   <dd data-testid="pkm-prop" data-key={entry()[0]}>
                     <Body text={entry()[1]} refs={props.view.transclusions} />
                   </dd>
@@ -601,8 +592,8 @@ function Comments(props: { view: PkmPageView }) {
   const bodyOf = (block: string) => props.view.page.blocks.find((b) => b.id === block)?.body ?? "";
   return (
     <Show when={props.view.comments.length > 0}>
-      <section data-testid="pkm-comments" {...stylex.attrs(viewStyles.pkmDay)}>
-        <h2 {...stylex.attrs(viewStyles.commentsH2)}>{t("web.pkm.comments.title", { n: props.view.comments.length })}</h2>
+      <section data-testid="pkm-comments" {...stylex.attrs(styles.pkmDay)}>
+        <h2 {...stylex.attrs(styles.commentsH2)}>{t("web.pkm.comments.title", { n: props.view.comments.length })}</h2>
         <For each={props.view.comments} keyed={(c) => c.id}>
           {(c) => <CommentCard comment={c()} body={bodyOf(c().block)} slug={props.view.page.slug} />}
         </For>
@@ -630,28 +621,28 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
       data-testid="pkm-comment"
       data-key={props.comment.id}
       data-status={props.comment.status}
-      {...stylex.attrs(viewStyles.pkmComment)}
+      {...stylex.attrs(styles.pkmComment)}
     >
       <button
         type="button"
         data-testid="pkm-comment-at"
         onClick={() => router.navigate(pkmHref(props.slug, props.comment.block), { replace: true })}
-        {...stylex.attrs(viewStyles.pkmCommentAt)}
+        {...stylex.attrs(styles.pkmCommentAt)}
       >
         {t("web.pkm.comments.on", { span: props.comment.span ?? props.body })}
       </button>
-      <p {...stylex.attrs(viewStyles.commentCardP)}>{props.comment.body}</p>
+      <p {...stylex.attrs(styles.commentCardP)}>{props.comment.body}</p>
       <Show when={props.comment.suggested}>
         {(s) => (
-          <p data-testid="pkm-diff" {...stylex.attrs(viewStyles.pkmDiff)}>
+          <p data-testid="pkm-diff" {...stylex.attrs(styles.pkmDiff)}>
             <For each={wordDiff(props.body, s())}>
               {(d) => (
                 <Switch fallback={<span>{d.text}</span>}>
                   <Match when={d.kind === "del"}>
-                    <del {...stylex.attrs(viewStyles.commentCardDel)}>{d.text}</del>
+                    <del {...stylex.attrs(styles.commentCardDel)}>{d.text}</del>
                   </Match>
                   <Match when={d.kind === "add"}>
-                    <ins {...stylex.attrs(viewStyles.commentCardIns)}>{d.text}</ins>
+                    <ins {...stylex.attrs(styles.commentCardIns)}>{d.text}</ins>
                   </Match>
                 </Switch>
               )}
@@ -659,7 +650,7 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
           </p>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.commentCardDiv)}>
+      <div {...stylex.attrs(styles.commentCardDiv)}>
         <Show when={props.comment.suggested}>
           <Button tone="primary" icon="check" data-testid="pkm-accept" disabled={act.busy()} onClick={() => void resolve(true)}>
             {t("web.pkm.comments.accept")}
@@ -681,13 +672,13 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
     return b.projects.length + b.journals.length + b.areas.length + b.archives.length;
   };
   return (
-    <section data-testid="pkm-backlinks" {...stylex.attrs(viewStyles.pkmDay)}>
-      <h2 {...stylex.attrs(viewStyles.commentsH2)}>{t("web.pkm.backlinks.title", { n: count() })}</h2>
-      <Show when={count() > 0} fallback={<p {...stylex.attrs(viewStyles.backlinksP)}>{t("web.pkm.backlinks.none")}</p>}>
+    <section data-testid="pkm-backlinks" {...stylex.attrs(styles.pkmDay)}>
+      <h2 {...stylex.attrs(styles.commentsH2)}>{t("web.pkm.backlinks.title", { n: count() })}</h2>
+      <Show when={count() > 0} fallback={<p {...stylex.attrs(styles.backlinksP)}>{t("web.pkm.backlinks.none")}</p>}>
         <For each={backlinkGroups.filter((g) => props.view.backlinks[g].length > 0)}>
           {(g) => (
-            <div {...stylex.attrs(viewStyles.backlinksDiv)}>
-              <h3 {...stylex.attrs(viewStyles.backlinksH3)}>{t(`web.pkm.backlinks.${g}`)}</h3>
+            <div {...stylex.attrs(styles.backlinksDiv)}>
+              <h3 {...stylex.attrs(styles.backlinksH3)}>{t(`web.pkm.backlinks.${g}`)}</h3>
               <For each={props.view.backlinks[g]} keyed={(l) => l.block}>
                 {(l) => <BacklinkRow link={l()} refs={props.view.transclusions} day={props.pages.find((p) => p.slug === l().page)?.day} />}
               </For>
@@ -702,12 +693,12 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
 /** The page and path are the link to the block; the body's own links stay links (an anchor cannot hold another). */
 function BacklinkRow(props: { link: PkmBacklink; refs: PkmPageView["transclusions"]; day: string | undefined }) {
   return (
-    <div data-testid="pkm-backlink" data-key={props.link.block} {...stylex.attrs(viewStyles.pkmBacklink)}>
-      <A href={pkmHref(props.link.page, props.link.block)} data-testid="pkm-backlink-page" {...stylex.attrs(variantStyles2.backlinkRowA)}>
+    <div data-testid="pkm-backlink" data-key={props.link.block} {...stylex.attrs(styles.pkmBacklink)}>
+      <A href={pkmHref(props.link.page, props.link.block)} data-testid="pkm-backlink-page" {...stylex.attrs(styles.backlinkRowA)}>
         {titleFor(props.link.pageTitle, props.day)}
         <Show when={props.link.path}> › {props.link.path}</Show>
       </A>
-      <span {...stylex.attrs(viewStyles.commentCardP)}>
+      <span {...stylex.attrs(styles.commentCardP)}>
         <Body text={props.link.body} refs={props.refs} />
       </span>
     </div>
@@ -719,8 +710,8 @@ function Contents(props: { view: PkmPageView }) {
   const tops = () => props.view.page.blocks.filter((b) => b.depth === 0 && b.body.trim() !== "");
   return (
     <Show when={tops().length >= 3}>
-      <section data-testid="pkm-contents" {...stylex.attrs(viewStyles.backlinksDiv)}>
-        <h2 {...stylex.attrs(viewStyles.commentsH2)}>{t("web.pkm.rail.contents")}</h2>
+      <section data-testid="pkm-contents" {...stylex.attrs(styles.backlinksDiv)}>
+        <h2 {...stylex.attrs(styles.commentsH2)}>{t("web.pkm.rail.contents")}</h2>
         <For each={tops()} keyed={(b) => b.id}>
           {(b) => (
             <div
@@ -729,7 +720,7 @@ function Contents(props: { view: PkmPageView }) {
               data-key={b().id}
               onClick={() => router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
               onKeyDown={(e) => e.key === "Enter" && router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
-              {...stylex.attrs(viewStyles.contentsDiv)}
+              {...stylex.attrs(styles.contentsDiv)}
             >
               {/* A heading's #s come off: the list is one size. */}
               <Body text={(b().body.split("\n")[0] ?? "").replace(/^#+\s*/u, "")} refs={props.view.transclusions} />

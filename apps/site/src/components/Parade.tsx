@@ -17,7 +17,7 @@ const sceneStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   paradeDiv: {
     position: "absolute",
     bottom: "54px",
@@ -51,10 +51,7 @@ const recipeStyles = stylex.create({
     opacity: "0",
     imageRendering: "pixelated",
   },
-});
-
-const viewStyles = stylex.create({
-  paradeDiv: {
+  paradeDiv2: {
     position: "absolute",
     bottom: "108px",
     left: "-10%",
@@ -63,12 +60,12 @@ const viewStyles = stylex.create({
     alignItems: "flex-end",
     gap: "calc(var(--spacing) * 6)",
   },
-  paradeImg: {
+  paradeImg2: {
     width: "102px",
     maxWidth: "none",
     imageRendering: "pixelated",
   },
-  paradeDiv2: {
+  paradeDiv22: {
     position: "absolute",
     bottom: "38px",
     height: "calc(var(--spacing) * 16)",
@@ -87,7 +84,7 @@ const viewStyles = stylex.create({
     alignItems: "flex-end",
     gap: "120px",
   },
-  paradeImg2: {
+  paradeImg22: {
     width: "150px",
     maxWidth: "none",
     imageRendering: "pixelated",
@@ -127,6 +124,7 @@ const viewStyles = stylex.create({
     },
   },
 });
+
 /** While the section crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
 const CROSSING: ["start end", "end start"] = ["start end", "end start"];
 interface Props {
@@ -145,16 +143,16 @@ export default function Parade(props: Props) {
   return (
     <>
       <section ref={ref.set} id="parade" aria-labelledby="parade-title" {...stylex.attrs(sceneStyles.field)}>
-        <div ref={back.set} aria-hidden="true" {...stylex.attrs(viewStyles.paradeDiv)}>
+        <div ref={back.set} aria-hidden="true" {...stylex.attrs(styles.paradeDiv2)}>
           {props.plots.map((src) => (
-            <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.paradeImg)} />
+            <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.paradeImg2)} />
           ))}
         </div>
-        <div aria-hidden="true" {...stylex.attrs(viewStyles.paradeDiv2)} />
+        <div aria-hidden="true" {...stylex.attrs(styles.paradeDiv22)} />
         {props.walkers.map((frames, i) => (
           <div
             aria-hidden="true"
-            {...stylex.attrs(recipeStyles.paradeDiv)}
+            {...stylex.attrs(styles.paradeDiv)}
             style={{
               "animation-duration": `${26 + (i % 3) * 7}s`,
               "animation-delay": `${-i * 5.3}s`,
@@ -165,7 +163,7 @@ export default function Parade(props: Props) {
                 src={src}
                 alt=""
                 loading="lazy"
-                {...stylex.attrs(recipeStyles.paradeImg)}
+                {...stylex.attrs(styles.paradeImg)}
                 style={{
                   "animation-delay": `${j * 0.15}s`,
                 }}
@@ -173,16 +171,16 @@ export default function Parade(props: Props) {
             ))}
           </div>
         ))}
-        <div ref={near.set} aria-hidden="true" {...stylex.attrs(viewStyles.paradeDiv3)}>
+        <div ref={near.set} aria-hidden="true" {...stylex.attrs(styles.paradeDiv3)}>
           {props.front.map((src) => (
-            <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.paradeImg2)} />
+            <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.paradeImg22)} />
           ))}
         </div>
-        <div data-reveal {...stylex.attrs(viewStyles.paradeDiv4)}>
-          <h2 id="parade-title" {...stylex.attrs(viewStyles.paradeH2)}>
+        <div data-reveal {...stylex.attrs(styles.paradeDiv4)}>
+          <h2 id="parade-title" {...stylex.attrs(styles.paradeH2)}>
             {props.copy.title}
           </h2>
-          <p {...stylex.attrs(viewStyles.paradeP)}>{props.copy.text}</p>
+          <p {...stylex.attrs(styles.paradeP)}>{props.copy.text}</p>
         </div>
       </section>
     </>

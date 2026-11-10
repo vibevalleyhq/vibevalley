@@ -9,8 +9,8 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
 
-const variantStyles = stylex.create({
-  sokobanGameDiv: {
+const styles = stylex.create({
+  root: {
     display: "flex",
     minHeight: "0",
     flex: "1",
@@ -19,44 +19,47 @@ const variantStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-});
-
-const viewStyles = stylex.create({
-  sokobanGameDiv: {
+  header: {
     display: "flex",
     justifyContent: "space-between",
   },
-  sokobanGameP: {
+  centered: {
     textAlign: "center",
   },
-  sokobanGameSvg: {
+  board: {
     marginInline: "auto",
     display: "block",
     width: "100%",
     maxWidth: "224px",
   },
-  sokobanGameDiv2: {
+  actions: {
     marginTop: "auto",
     display: "flex",
     justifyContent: "center",
     gap: "calc(var(--spacing) * 3)",
   },
-  sokobanGameButton: {
+  undoButton: {
     cursor: {
       default: "pointer",
       ":disabled": "default",
     },
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
+    boxShadow: "inset 0 0 0 1px var(--color-lcd-ink)",
     opacity: {
       default: null,
       ":disabled": ".4",
     },
   },
-  sokobanGameButton2: {
+  actionButton: {
     cursor: "pointer",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "var(--spacing)",
+    boxShadow: "inset 0 0 0 1px var(--color-lcd-ink)",
+  },
+  help: {
+    textAlign: "center",
+    color: "var(--color-lcd-dark)",
   },
 });
 
@@ -101,17 +104,17 @@ export function SokobanGame() {
   const tiles = () => level().rows.flatMap((row, y) => [...row].map((tile, x) => ({ tile, x, y, p: y * width() + x })));
 
   return (
-    <div {...stylex.attrs(variantStyles.sokobanGameDiv)}>
-      <div {...stylex.attrs(viewStyles.sokobanGameDiv)}>
+    <div {...stylex.attrs(styles.root)}>
+      <div {...stylex.attrs(styles.header)}>
         <span>{t("web.farm.phone.sokoban.title", { level: g().level + 1, of: warehouses.length })}</span>
         <span>{t("web.farm.phone.sokoban.moves", { moves: g().moves, pushes: g().pushes })}</span>
       </div>
-      <p {...stylex.attrs(viewStyles.sokobanGameP)}>{level().name}</p>
+      <p {...stylex.attrs(styles.centered)}>{level().name}</p>
       <svg
         role="img"
         aria-label={t("web.farm.phone.sokoban.board", { placed: placed(), of: g().boxes.length })}
         viewBox={`0 0 ${width() * 16} ${level().rows.length * 16}`}
-        {...stylex.attrs(viewStyles.sokobanGameSvg)}
+        {...stylex.attrs(styles.board)}
         shape-rendering="crispEdges"
       >
         <For each={tiles()} keyed={false}>
@@ -143,31 +146,18 @@ export function SokobanGame() {
           )}
         </For>
       </svg>
-      <p role="status" {...stylex.attrs(viewStyles.sokobanGameP)}>
+      <p role="status" {...stylex.attrs(styles.centered)}>
         {done() ? (last() ? t("web.farm.phone.sokoban.allIn") : t("web.farm.phone.sokoban.done")) : t("web.farm.phone.sokoban.goal")}
       </p>
-      <div {...stylex.attrs(viewStyles.sokobanGameDiv2)}>
-        <button
-          type="button"
-          onClick={undo}
-          disabled={g().history.length === 0}
-          {...stylex.attrs(viewStyles.sokobanGameButton)}
-          style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
-        >
+      <div {...stylex.attrs(styles.actions)}>
+        <button type="button" onClick={undo} disabled={g().history.length === 0} {...stylex.attrs(styles.undoButton)}>
           {t("web.farm.phone.sokoban.undo")}
         </button>
-        <button
-          type="button"
-          onClick={() => (done() ? advance() : restart())}
-          {...stylex.attrs(viewStyles.sokobanGameButton2)}
-          style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
-        >
+        <button type="button" onClick={() => (done() ? advance() : restart())} {...stylex.attrs(styles.actionButton)}>
           A {done() ? (last() ? t("web.farm.phone.sokoban.again") : t("web.farm.phone.sokoban.next")) : t("web.farm.phone.sokoban.restart")}
         </button>
       </div>
-      <p {...stylex.attrs(viewStyles.sokobanGameP)} style={{ color: lcd.dark }}>
-        {t("web.farm.phone.sokoban.help")}
-      </p>
+      <p {...stylex.attrs(styles.help)}>{t("web.farm.phone.sokoban.help")}</p>
     </div>
   );
 }

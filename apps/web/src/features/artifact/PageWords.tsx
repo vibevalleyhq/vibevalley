@@ -15,7 +15,7 @@ import { toast } from "#/ui/toasts.ts";
 import { artifactHref } from "./ArtifactCard";
 import { selectionOf } from "./shell";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   pageWordsBlockquote: {
     WebkitLineClamp: "3",
     WebkitBoxOrient: "vertical",
@@ -29,9 +29,6 @@ const variantStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   artifactWords: {
     display: "flex",
     flexDirection: "column",
@@ -90,12 +87,12 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: H
   };
   return (
     <Show when={picked()}>
-      <div data-testid="artifact-words" {...stylex.attrs(viewStyles.artifactWords)}>
-        <h2 {...stylex.attrs(viewStyles.pageWordsH2)}>{t("web.artifact.edit.title")}</h2>
-        <Show when={latest() ? picked() : undefined} fallback={<p {...stylex.attrs(viewStyles.pageWordsP)}>{t("web.artifact.edit.older")}</p>}>
+      <div data-testid="artifact-words" {...stylex.attrs(styles.artifactWords)}>
+        <h2 {...stylex.attrs(styles.pageWordsH2)}>{t("web.artifact.edit.title")}</h2>
+        <Show when={latest() ? picked() : undefined} fallback={<p {...stylex.attrs(styles.pageWordsP)}>{t("web.artifact.edit.older")}</p>}>
           {(p) => (
             <>
-              <blockquote data-testid="artifact-words-quote" {...stylex.attrs(variantStyles.pageWordsBlockquote)}>
+              <blockquote data-testid="artifact-words-quote" {...stylex.attrs(styles.pageWordsBlockquote)}>
                 {p().exact.trim()}
               </blockquote>
               <TextArea
@@ -109,7 +106,7 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: H
                   if (e.key === "Escape") setPicked(undefined);
                 }}
               />
-              <div {...stylex.attrs(viewStyles.pageWordsDiv)}>
+              <div {...stylex.attrs(styles.pageWordsDiv)}>
                 <Button onClick={() => setPicked(undefined)}>{t("web.base.form.never")}</Button>
                 <Button tone="primary" data-testid="artifact-words-save" disabled={act.busy()} onClick={() => void save()}>
                   {t("web.artifact.edit.save")}

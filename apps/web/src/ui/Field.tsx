@@ -176,17 +176,17 @@ export function Select<V extends string>(props: {
           props.styles,
         ])}
       >
-        <Base.Value class={stylex.attrs(styles.value).class} placeholder={props.placeholder} />
+        <Base.Value {...stylex.attrs(styles.value)} placeholder={props.placeholder} />
         <Icon name="choose" size={12} styles={styles.chevron} />
       </Base.Trigger>
       <Base.Portal>
         <Base.Positioner {...positionerAttrs()} sideOffset={4}>
-          <Base.Popup class={stylex.attrs(styles.popup).class}>
+          <Base.Popup {...stylex.attrs(styles.popup)}>
             <For each={all()}>
               {(o) => (
-                <Base.Item value={o.value} data-key={o.value} disabled={o.disabled} class={stylex.attrs(styles.item).class}>
+                <Base.Item value={o.value} data-key={o.value} disabled={o.disabled} {...stylex.attrs(styles.item)}>
                   <span {...stylex.attrs(styles.value)}>{o.label}</span>
-                  <Base.ItemIndicator class={stylex.attrs(styles.indicator).class}>
+                  <Base.ItemIndicator {...stylex.attrs(styles.indicator)}>
                     <Icon name="ticked" size={14} />
                   </Base.ItemIndicator>
                 </Base.Item>

@@ -152,14 +152,14 @@ const blockStyles = stylex.create({
 
 const writingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
 
-const recipeStyles = stylex.create({
+const viewStyles = stylex.create({
   blockRowSpan: {
     marginTop: "calc(var(--spacing) * .5)",
     marginRight: "calc(var(--spacing) * 2.5)",
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
   },
-  blockRowSpanVariant1Case1: {
+  blockRowSpanPrimary: {
     width: "3px",
     animationName: null,
     animationDuration: null,
@@ -170,7 +170,7 @@ const recipeStyles = stylex.create({
     animationFillMode: null,
     animationPlayState: null,
   },
-  blockRowSpanVariant1Case2: {
+  blockRowSpanSecondary: {
     width: "var(--spacing)",
     animationName: { default: writingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "2s",
@@ -181,9 +181,6 @@ const recipeStyles = stylex.create({
     animationFillMode: "none",
     animationPlayState: "running",
   },
-});
-
-const variantStyles = stylex.create({
   blocksViewArticle: {
     display: "flex",
     minHeight: "0",
@@ -199,15 +196,12 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  blocksViewPVariant: {
+  blocksViewPTone: {
     color: "var(--color-berry)",
   },
-  blocksViewPVariant2: {
+  blocksViewPAlt: {
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   taskCheckbox: { marginTop: "var(--spacing)" },
   blocksViewDiv: {
     minHeight: "0",
@@ -347,12 +341,12 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  blockRowSpan: {
+  blockRowSpan2: {
     width: "22px",
     flexShrink: "0",
     paddingTop: "3px",
   },
-  blockRowSpan2: {
+  blockRowSpan22: {
     flexShrink: "0",
   },
   blockRowDiv: {
@@ -383,7 +377,7 @@ const viewStyles = stylex.create({
 });
 
 /** The user's lines on the attribution bar. */
-const userColor = "#c8a46e";
+const userColor = "var(--color-cream-300)";
 
 /** Who wrote a block last, as the bar beside it shows. */
 function authorColor(updatedBy: string, agent: Agent | undefined) {
@@ -533,7 +527,7 @@ export function BlocksView(props: {
       data-state={(version(), editor.error ? "error" : editor.busy ? "saving" : "saved")}
       data-blocks={(version(), editor.blocks.length)}
       data-writing={(version(), editor.othersWriting) ? "" : undefined}
-      {...stylex.attrs(variantStyles.blocksViewArticle)}
+      {...stylex.attrs(viewStyles.blocksViewArticle)}
     >
       <Show when={props.suggestionsAt} fallback={suggestionsList()}>
         {(at) => <Portal mount={at()}>{suggestionsList()}</Portal>}
@@ -541,8 +535,8 @@ export function BlocksView(props: {
       <p
         role="status"
         {...stylex.attrs(
-          variantStyles.blocksViewP,
-          (version(), editor.error !== undefined) ? variantStyles.blocksViewPVariant : variantStyles.blocksViewPVariant2,
+          viewStyles.blocksViewP,
+          (version(), editor.error !== undefined) ? viewStyles.blocksViewPTone : viewStyles.blocksViewPAlt,
         )}
       >
         {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
@@ -744,7 +738,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       data-writing={r().writing ? "" : undefined}
       {...styleProps([blockRow, blockStyles.row, r().type === "heading" ? blockStyles.headingRow : blockStyles.bodyRow])}
     >
-      <span {...stylex.attrs(viewStyles.blockRowSpan)}>
+      <span {...stylex.attrs(viewStyles.blockRowSpan2)}>
         <Show when={r().showFace}>
           <AgentFace agentId={r().updatedBy} look={props.agent?.look} runtime={props.agent?.runtime} size={18} />
         </Show>
@@ -752,10 +746,10 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       <span
         title={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : t("web.artifact.blocks.wrote", { who: writer() })}
         aria-label={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : undefined}
-        {...stylex.attrs(recipeStyles.blockRowSpan, r().writing ? recipeStyles.blockRowSpanVariant1Case2 : recipeStyles.blockRowSpanVariant1Case1)}
+        {...stylex.attrs(viewStyles.blockRowSpan, r().writing ? viewStyles.blockRowSpanSecondary : viewStyles.blockRowSpanPrimary)}
         style={{ height: `${barHeight(r().type)}px`, background: authorColor(r().updatedBy, props.agent) }}
       />
-      <span {...stylex.attrs(viewStyles.blockRowSpan2)} style={{ width: `${20 * r().depth}px` }} />
+      <span {...stylex.attrs(viewStyles.blockRowSpan22)} style={{ width: `${20 * r().depth}px` }} />
       <div {...stylex.attrs(viewStyles.blockRowDiv)}>
         {/* One shape for every text block: a block that changes type keeps its field, and the field its focus. */}
         <Show

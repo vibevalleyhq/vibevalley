@@ -57,7 +57,7 @@ const sceneStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   harvestImg: {
     width: {
       default: "calc(var(--spacing) * 9)",
@@ -97,9 +97,6 @@ const recipeStyles = stylex.create({
       "@media (prefers-reduced-motion:no-preference)": "running",
     },
   },
-});
-
-const viewStyles = stylex.create({
   harvestDiv: {
     position: "absolute",
     top: "6%",
@@ -110,7 +107,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 5)",
     opacity: ".6",
   },
-  harvestImg: {
+  harvestImg2: {
     width: {
       default: "68px",
       "@media (width>=40rem)": "102px",
@@ -127,7 +124,7 @@ const viewStyles = stylex.create({
     alignItems: "flex-end",
     gap: "calc(var(--spacing) * 6)",
   },
-  harvestImg2: {
+  harvestImg22: {
     width: {
       default: "102px",
       "@media (width>=40rem)": "136px",
@@ -269,6 +266,7 @@ const viewStyles = stylex.create({
     imageRendering: "pixelated",
   },
 });
+
 /** While the band crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
 const CROSSING: ["start end", "end start"] = ["start end", "end start"];
 interface Props {
@@ -288,26 +286,26 @@ export default function Harvest(props: Props) {
   observeVisibility(ref);
   return (
     <section ref={ref.set} id="harvest" aria-labelledby="harvest-title" {...stylex.attrs(sceneStyles.field)}>
-      <div ref={back.set} aria-hidden="true" {...stylex.attrs(viewStyles.harvestDiv)}>
+      <div ref={back.set} aria-hidden="true" {...stylex.attrs(styles.harvestDiv)}>
         {props.rows[0].map((src) => (
-          <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.harvestImg)} />
+          <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.harvestImg2)} />
         ))}
       </div>
-      <div ref={front.set} aria-hidden="true" {...stylex.attrs(viewStyles.harvestDiv2)}>
+      <div ref={front.set} aria-hidden="true" {...stylex.attrs(styles.harvestDiv2)}>
         {props.rows[1].map((src) => (
-          <img loading="lazy" src={src} alt="" {...stylex.attrs(viewStyles.harvestImg2)} />
+          <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.harvestImg22)} />
         ))}
       </div>
       {/* Keep the words readable over the field. */}
       <div aria-hidden="true" {...stylex.attrs(sceneStyles.shade)} />
-      <div {...stylex.attrs(viewStyles.harvestDiv3)}>
-        <div aria-hidden="true" {...stylex.attrs(viewStyles.harvestDiv4)}>
+      <div {...stylex.attrs(styles.harvestDiv3)}>
+        <div aria-hidden="true" {...stylex.attrs(styles.harvestDiv4)}>
           {[0, 1, 2].map((i) => (
             <img
               loading="lazy"
               src={props.coins}
               alt=""
-              {...stylex.attrs(recipeStyles.harvestImg)}
+              {...stylex.attrs(styles.harvestImg)}
               style={{
                 "animation-delay": `${i * -1.6}s`,
               }}
@@ -316,7 +314,7 @@ export default function Harvest(props: Props) {
         </div>
         <h2 id="harvest-title" data-reveal {...stylex.attrs(sceneStyles.title)}>
           {props.copy.title.map((line) => (
-            <span {...stylex.attrs(viewStyles.harvestSpan)}>{line}</span>
+            <span {...stylex.attrs(styles.harvestSpan)}>{line}</span>
           ))}
         </h2>
         <p data-reveal={120} {...stylex.attrs(sceneStyles.description)}>
@@ -335,45 +333,45 @@ function HarvestList(props: {
   };
 }) {
   return (
-    <div data-reveal={240} {...stylex.attrs(viewStyles.harvestListDiv)}>
-      <div {...stylex.attrs(viewStyles.harvestListDiv2)}>
-        <img src={props.icons.harvest} alt="" {...stylex.attrs(viewStyles.harvestListImg)} />
-        <div {...stylex.attrs(viewStyles.harvestListDiv3)}>
-          <p {...stylex.attrs(viewStyles.harvestListP)}>{props.copy.title}</p>
-          <p {...stylex.attrs(viewStyles.harvestListP2)}>{props.copy.job}</p>
+    <div data-reveal={240} {...stylex.attrs(styles.harvestListDiv)}>
+      <div {...stylex.attrs(styles.harvestListDiv2)}>
+        <img src={props.icons.harvest} alt="" {...stylex.attrs(styles.harvestListImg)} />
+        <div {...stylex.attrs(styles.harvestListDiv3)}>
+          <p {...stylex.attrs(styles.harvestListP)}>{props.copy.title}</p>
+          <p {...stylex.attrs(styles.harvestListP2)}>{props.copy.job}</p>
         </div>
       </div>
-      <dl {...stylex.attrs(viewStyles.harvestListDl)}>
-        <div {...stylex.attrs(viewStyles.harvestListDiv4)}>
-          <dt {...stylex.attrs(viewStyles.harvestListDt)}>{props.copy.commits}</dt>
-          <dd {...stylex.attrs(viewStyles.harvestListDd)}>
+      <dl {...stylex.attrs(styles.harvestListDl)}>
+        <div {...stylex.attrs(styles.harvestListDiv4)}>
+          <dt {...stylex.attrs(styles.harvestListDt)}>{props.copy.commits}</dt>
+          <dd {...stylex.attrs(styles.harvestListDd)}>
             <CountUp to={JOB.commits} />
           </dd>
-          <dd {...stylex.attrs(viewStyles.harvestListDd2)}>{props.copy.commits}</dd>
+          <dd {...stylex.attrs(styles.harvestListDd2)}>{props.copy.commits}</dd>
         </div>
-        <div {...stylex.attrs(viewStyles.harvestListDiv4)}>
-          <dt {...stylex.attrs(viewStyles.harvestListDt)}>{props.copy.files}</dt>
-          <dd {...stylex.attrs(viewStyles.harvestListDd)}>
+        <div {...stylex.attrs(styles.harvestListDiv4)}>
+          <dt {...stylex.attrs(styles.harvestListDt)}>{props.copy.files}</dt>
+          <dd {...stylex.attrs(styles.harvestListDd)}>
             <CountUp to={JOB.files} />
           </dd>
-          <dd {...stylex.attrs(viewStyles.harvestListDd2)}>{props.copy.files}</dd>
+          <dd {...stylex.attrs(styles.harvestListDd2)}>{props.copy.files}</dd>
         </div>
-        <div {...stylex.attrs(viewStyles.harvestListDiv4)}>
-          <dt {...stylex.attrs(viewStyles.harvestListDt)}>{props.copy.lines}</dt>
-          <dd {...stylex.attrs(viewStyles.harvestListDd3)}>
-            <span {...stylex.attrs(viewStyles.harvestListSpan)}>
+        <div {...stylex.attrs(styles.harvestListDiv4)}>
+          <dt {...stylex.attrs(styles.harvestListDt)}>{props.copy.lines}</dt>
+          <dd {...stylex.attrs(styles.harvestListDd3)}>
+            <span {...stylex.attrs(styles.harvestListSpan)}>
               +<CountUp to={JOB.plus} />
             </span>{" "}
-            <span {...stylex.attrs(viewStyles.harvestListSpan2)}>
+            <span {...stylex.attrs(styles.harvestListSpan2)}>
               −<CountUp to={JOB.minus} />
             </span>
           </dd>
-          <dd {...stylex.attrs(viewStyles.harvestListDd2)}>{props.copy.lines}</dd>
+          <dd {...stylex.attrs(styles.harvestListDd2)}>{props.copy.lines}</dd>
         </div>
       </dl>
-      <div {...stylex.attrs(viewStyles.harvestListDiv5)}>
-        <span {...stylex.attrs(viewStyles.harvestListSpan3)}>
-          <img src={props.icons.check} alt="" {...stylex.attrs(viewStyles.harvestListImg2)} />
+      <div {...stylex.attrs(styles.harvestListDiv5)}>
+        <span {...stylex.attrs(styles.harvestListSpan3)}>
+          <img src={props.icons.check} alt="" {...stylex.attrs(styles.harvestListImg2)} />
           {props.copy.clean}
         </span>
         <span {...stylex.attrs(sceneStyles.take)}>{props.copy.take}</span>

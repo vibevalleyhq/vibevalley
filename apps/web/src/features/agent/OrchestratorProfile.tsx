@@ -30,7 +30,7 @@ const profileStyles = stylex.create({
   },
 });
 
-const variantStyles2 = stylex.create({
+const styles = stylex.create({
   orchestratorProfileA: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -71,9 +71,6 @@ const variantStyles2 = stylex.create({
       ":is([data-checked])": "var(--color-selected)",
     },
   },
-});
-
-const variantStyles = stylex.create({
   orchestratorProfileSpan: {
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
@@ -81,17 +78,14 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  orchestratorProfileSpanVariant: {
+  orchestratorProfileSpanTone: {
     backgroundColor: "var(--color-hat)",
     color: "var(--color-bark-900)",
   },
-  orchestratorProfileSpanVariant2: {
+  orchestratorProfileSpanAlt: {
     backgroundColor: "var(--color-hover)",
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   orchestratorProfileDiv: {
     height: "100%",
     overflowY: "auto",
@@ -115,12 +109,12 @@ const viewStyles = stylex.create({
     borderColor: "var(--color-line)",
     paddingBlock: "calc(var(--spacing) * 3)",
   },
-  orchestratorProfileSpan: {
+  orchestratorProfileSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: "var(--color-faint)",
   },
-  orchestratorProfileSpan2: {
+  orchestratorProfileSpan22: {
     display: "flex",
     minWidth: "0",
     flex: "1",
@@ -235,26 +229,26 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   };
 
   return (
-    <div {...stylex.attrs(viewStyles.orchestratorProfileDiv)}>
-      <div {...stylex.attrs(viewStyles.orchestratorProfileDiv2)}>
-        <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(viewStyles.profileBar)}>
-          <A href="/agents" data-testid="back" {...stylex.attrs(variantStyles2.orchestratorProfileA)}>
+    <div {...stylex.attrs(styles.orchestratorProfileDiv)}>
+      <div {...stylex.attrs(styles.orchestratorProfileDiv2)}>
+        <div data-testid="profile-bar" data-state={isNew ? "new" : dirty() ? "dirty" : "saved"} {...stylex.attrs(styles.profileBar)}>
+          <A href="/agents" data-testid="back" {...stylex.attrs(styles.orchestratorProfileA)}>
             {t("web.agent.all")}
           </A>
-          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan)}>/</span>
-          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan2)}>
-            <span {...stylex.attrs(viewStyles.orchestratorProfileSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
-            <span {...stylex.attrs(viewStyles.orchestratorProfileSpan4)}>{t("web.agent.role.orchestrator")}</span>
+          <span {...stylex.attrs(styles.orchestratorProfileSpan2)}>/</span>
+          <span {...stylex.attrs(styles.orchestratorProfileSpan22)}>
+            <span {...stylex.attrs(styles.orchestratorProfileSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
+            <span {...stylex.attrs(styles.orchestratorProfileSpan4)}>{t("web.agent.role.orchestrator")}</span>
             <span
               {...stylex.attrs(
-                variantStyles.orchestratorProfileSpan,
-                dirty() ? variantStyles.orchestratorProfileSpanVariant : variantStyles.orchestratorProfileSpanVariant2,
+                styles.orchestratorProfileSpan,
+                dirty() ? styles.orchestratorProfileSpanTone : styles.orchestratorProfileSpanAlt,
               )}
             >
               {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
             </span>
           </span>
-          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan5)}>
+          <span {...stylex.attrs(styles.orchestratorProfileSpan5)}>
             <Show when={props.saved}>
               {(saved) => (
                 <>
@@ -283,17 +277,17 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
           </span>
         </div>
         <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
-        <p {...stylex.attrs(viewStyles.orchestratorProfileP)}>
+        <p {...stylex.attrs(styles.orchestratorProfileP)}>
           {t("web.agent.orchestrator.intro")}{" "}
           <Show when={props.saved}>
             {(saved) => (
-              <A href={orchestratorHref(saved().id)} {...stylex.attrs(variantStyles2.orchestratorProfileA2)}>
+              <A href={orchestratorHref(saved().id)} {...stylex.attrs(styles.orchestratorProfileA2)}>
                 {t("web.agent.orchestrator.page")}
               </A>
             )}
           </Show>
         </p>
-        <div {...stylex.attrs(viewStyles.orchestratorProfileDiv3)}>
+        <div {...stylex.attrs(styles.orchestratorProfileDiv3)}>
           <Field label={t("web.agent.name")} hint={nameTaken() ? t("web.agent.nameTaken") : t("web.agent.orchestrator.nameTip")}>
             <TextInput data-testid="agent-name" aria-label={t("web.agent.name")} value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
           </Field>
@@ -318,8 +312,8 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
             onInput={(e) => patch({ persona: e.currentTarget.value })}
           />
         </Field>
-        <div {...stylex.attrs(viewStyles.orchestratorProfileDiv4)}>
-          <span {...stylex.attrs(viewStyles.orchestratorProfileSpan6)}>{t("web.agent.orchestrator.look")}</span>
+        <div {...stylex.attrs(styles.orchestratorProfileDiv4)}>
+          <span {...stylex.attrs(styles.orchestratorProfileSpan6)}>{t("web.agent.orchestrator.look")}</span>
           <RadioGroup
             aria-label={t("web.agent.orchestrator.look")}
             value={draft().look.orchestrator ?? "farmer"}
@@ -331,7 +325,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
           >
             <For each={orchestratorLooks}>
               {(look) => (
-                <Radio.Root value={look.id} data-key={look.id} title={look.blurb} {...stylex.attrs(variantStyles2.orchestratorProfileRadioRoot)}>
+                <Radio.Root value={look.id} data-key={look.id} title={look.blurb} {...stylex.attrs(styles.orchestratorProfileRadioRoot)}>
                   <OrchestratorFace size={48} look={look.id} />
                   {look.name}
                 </Radio.Root>

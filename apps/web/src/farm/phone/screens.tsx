@@ -20,8 +20,15 @@ import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { lcd, phoneCells } from "./lcd";
 
-const variantStyles = stylex.create({
-  bigFace: { display: "grid", width: "72px", height: "72px", placeItems: "center" },
+const styles = stylex.create({
+  bigFace: {
+    display: "grid",
+    width: "72px",
+    height: "72px",
+    placeItems: "center",
+    backgroundColor: "var(--color-lcd-pale)",
+    boxShadow: "inset 0 0 0 2px var(--color-lcd-dark)",
+  },
   callRow: {
     display: "flex",
     width: "100%",
@@ -30,6 +37,11 @@ const variantStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
     textAlign: "left",
+  },
+  callRule: {
+    borderBottomStyle: "solid",
+    borderBottomWidth: "1px",
+    borderColor: "var(--color-lcd-rule)",
   },
   missedCall: { cursor: "pointer", backgroundColor: { default: null, "@media (hover:hover)": { default: null, ":hover": "var(--color-lcd-light)" } } },
   app: { display: "flex", cursor: "pointer", flexDirection: "column", alignItems: "center", gap: "var(--spacing)" },
@@ -43,9 +55,10 @@ const variantStyles = stylex.create({
       default: "var(--color-lcd-pale)",
       "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-lcd-pale-hover)" },
     },
+    boxShadow: "inset 0 0 0 2px var(--color-lcd-dark)",
     translate: { default: null, [stylex.when.ancestor(":active", farmGroup)]: "0 1px" },
   },
-  ringingScreenDiv: {
+  screenBody: {
     display: "flex",
     minHeight: "0",
     flex: "1",
@@ -55,7 +68,7 @@ const variantStyles = stylex.create({
     paddingTop: "calc(var(--spacing) * 5)",
     textAlign: "center",
   },
-  ringingScreenP: {
+  ringingText: {
     marginTop: "calc(var(--spacing) * 2)",
     WebkitLineClamp: "3",
     WebkitBoxOrient: "vertical",
@@ -63,12 +76,22 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     lineHeight: "1.625",
   },
-  listScreenButton: {
+  tabBar: {
+    display: "flex",
+    borderBottomStyle: "solid",
+    borderBottomWidth: "2px",
+    borderColor: "var(--color-lcd-dark)",
+  },
+  tabButton: {
     flex: "1",
     cursor: "pointer",
     paddingBlock: "var(--spacing)",
   },
-  listScreenButtonVariant: {
+  tabActive: {
+    backgroundColor: "var(--color-lcd-dark)",
+    color: "var(--color-lcd-pale)",
+  },
+  tabIdle: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -77,8 +100,7 @@ const variantStyles = stylex.create({
       },
     },
   },
-  listScreenButtonVariant2: {},
-  orchestratorLineP: {
+  lineStatus: {
     marginTop: "calc(var(--spacing) * 3)",
     WebkitLineClamp: "4",
     WebkitBoxOrient: "vertical",
@@ -86,53 +108,66 @@ const variantStyles = stylex.create({
     overflow: "hidden",
     lineHeight: "1.625",
   },
-});
-
-const viewStyles = stylex.create({
+  lineFailed: {
+    color: "var(--color-phone-failed)",
+  },
   cellsSvg: {
     flexShrink: "0",
   },
-  smallFaceSpan: {
+  smallFace: {
     display: "grid",
     width: "calc(var(--spacing) * 8)",
     height: "calc(var(--spacing) * 8)",
     flexShrink: "0",
     placeItems: "center",
     overflow: "hidden",
+    backgroundColor: "var(--color-lcd-pale)",
   },
-  ringingScreenSpan: {
+  ringingFaceWrap: {
     marginTop: "calc(var(--spacing) * 3)",
   },
-  ringingScreenP: {
+  callerName: {
     marginTop: "calc(var(--spacing) * 3)",
     fontSize: "24px",
     lineHeight: "1",
   },
-  ringingScreenP2: {
+  callerLabel: {
     marginTop: "calc(var(--spacing) * 2)",
+    backgroundColor: "var(--color-lcd-dark)",
     paddingInline: "calc(var(--spacing) * 2)",
+    color: "var(--color-lcd-pale)",
   },
-  ringingScreenDiv: {
+  ringingActions: {
     marginTop: "auto",
     marginBottom: "calc(var(--spacing) * 5)",
     display: "flex",
     gap: "calc(var(--spacing) * 8)",
   },
-  roundKeyButton: {
+  roundKey: {
     display: "flex",
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
     gap: "var(--spacing)",
   },
-  roundKeySpan: {
+  roundKeyCircle: {
     display: "grid",
     width: "calc(var(--spacing) * 11)",
     height: "calc(var(--spacing) * 11)",
     placeItems: "center",
+    boxShadow: "inset 0 0 0 2px var(--color-bark-900), inset -3px -3px 0 0 var(--color-px-key-dent)",
   },
-  roundKeySpan2: {
+  roundKeyAnswer: {
+    backgroundColor: "var(--color-leaf-600)",
+  },
+  roundKeyDecline: {
+    backgroundColor: "var(--color-berry-500)",
+  },
+  flexRow: {
     display: "flex",
+  },
+  declineGlyph: {
+    transform: "rotate(135deg)",
   },
   callOrchestrator: {
     margin: "calc(var(--spacing) * 2)",
@@ -141,7 +176,10 @@ const viewStyles = stylex.create({
     alignItems: "center",
     justifyContent: "center",
     gap: "calc(var(--spacing) * 2)",
+    backgroundColor: "var(--color-leaf-600)",
     paddingBlock: "calc(var(--spacing) * 1.5)",
+    color: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-bark-900)",
     filter: {
       default: null,
       "@media (hover:hover)": {
@@ -154,55 +192,65 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 6)",
     textAlign: "center",
+    color: "var(--color-lcd-dark)",
   },
-  listScreenUl: {
+  callList: {
     minHeight: "0",
     flex: "1",
     overflowY: "auto",
   },
-  listScreenSpan: {
+  callSummary: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  listScreenSpan2: {
+  inkLcdDark: {
+    color: "var(--color-lcd-dark)",
+  },
+  inkDecline: {
+    color: "var(--color-berry-500)",
+  },
+  missedBody: {
     minWidth: "0",
     flex: "1",
   },
-  listScreenSpan3: {
+  missedKind: {
     marginLeft: "auto",
+    color: "var(--color-berry-500)",
   },
-  listScreenSpan4: {
+  missedText: {
     display: "block",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
+    color: "var(--color-lcd-dark)",
   },
-  orchestratorLineP: {
+  orchestratorName: {
     marginTop: "calc(var(--spacing) * 2)",
     fontSize: "24px",
     lineHeight: "1",
   },
-  orchestratorLineDiv: {
+  orchestratorActions: {
     marginTop: "auto",
     marginBottom: "calc(var(--spacing) * 5)",
   },
-  sokobanIconSpan: {
+  sokobanIcon: {
     display: "grid",
     width: "calc(var(--spacing) * 7)",
     height: "calc(var(--spacing) * 7)",
     placeItems: "center",
     fontSize: "18px",
     lineHeight: "1",
+    boxShadow: "inset 0 0 0 2px var(--color-lcd-ink)",
   },
-  gamesIconSpan: {
+  gamesIcon: {
     display: "grid",
     gridTemplateColumns: "repeat(2,minmax(0,1fr))",
     gap: "1px",
   },
-  appGridDiv: {
+  appGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3,minmax(0,1fr))",
     alignContent: "flex-start",
@@ -210,23 +258,20 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 2)",
     paddingTop: "calc(var(--spacing) * 4)",
   },
-  appGridSpan: {
+  appBadge: {
     position: "absolute",
     top: "calc(var(--spacing) * -1.5)",
     right: "calc(var(--spacing) * -1.5)",
+    backgroundColor: "var(--color-berry-500)",
     paddingInline: "var(--spacing)",
     lineHeight: "14px",
+    color: "var(--color-cream-50)",
   },
 });
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
-const cream = "#f7e8c4";
-const bark = "#2f1f13";
-const answerGreen = "#5a8234";
-const declineRed = "#c84a3a";
-// Words in red on the screen: the decline key's red is too light to read on its green.
-const failedInk = "#8f2a1e";
+const creamFill = "var(--color-cream-50)";
 
 /** Cells on a grid, scaled whole into `size` and centred. */
 function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; size: [number, number]; origin?: [number, number] }) {
@@ -238,7 +283,7 @@ function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; siz
       viewBox={`${origin()[0]} ${origin()[1]} ${props.grid[0]} ${props.grid[1]}`}
       shape-rendering="crispEdges"
       aria-hidden="true"
-      {...stylex.attrs(viewStyles.cellsSvg)}
+      {...stylex.attrs(styles.cellsSvg)}
     >
       <For each={props.cells}>{([x, y, w, h, fill]) => <rect x={x} y={y} width={w} height={h} fill={fill} />}</For>
     </svg>
@@ -264,37 +309,24 @@ function CallerFace(props: { call: InboxItem; size: number }) {
 }
 
 const BigFace = (props: { children: JSX.Element; shake?: boolean }) => (
-  <span
-    {...styleProps([variantStyles.bigFace, !(props.shake !== true) && phoneAnimations.shake], {
-      background: lcd.pale,
-      "box-shadow": `inset 0 0 0 2px ${lcd.dark}`,
-    })}
-  >
-    {props.children}
-  </span>
+  <span {...styleProps([styles.bigFace, !(props.shake !== true) && phoneAnimations.shake])}>{props.children}</span>
 );
 
-const SmallFace = (props: { children: JSX.Element }) => (
-  <span {...stylex.attrs(viewStyles.smallFaceSpan)} style={{ background: lcd.pale }}>
-    {props.children}
-  </span>
-);
+const SmallFace = (props: { children: JSX.Element }) => <span {...stylex.attrs(styles.smallFace)}>{props.children}</span>;
 
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
-    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} {...stylex.attrs(variantStyles.ringingScreenDiv)}>
+    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} {...stylex.attrs(styles.screenBody)}>
       <span {...styleProps(phoneAnimations.blink)}>{t("web.farm.phone.ringing")}</span>
-      <span {...stylex.attrs(viewStyles.ringingScreenSpan)}>
+      <span {...stylex.attrs(styles.ringingFaceWrap)}>
         <BigFace shake>
           <CallerFace call={props.call} size={60} />
         </BigFace>
       </span>
-      <p {...stylex.attrs(viewStyles.ringingScreenP)}>{props.call.who}</p>
-      <p {...stylex.attrs(viewStyles.ringingScreenP2)} style={{ background: lcd.dark, color: lcd.pale }}>
-        {props.call.words.label}
-      </p>
-      <p {...stylex.attrs(variantStyles.ringingScreenP)}>{props.call.text}</p>
-      <div {...stylex.attrs(viewStyles.ringingScreenDiv)}>
+      <p {...stylex.attrs(styles.callerName)}>{props.call.who}</p>
+      <p {...stylex.attrs(styles.callerLabel)}>{props.call.words.label}</p>
+      <p {...stylex.attrs(styles.ringingText)}>{props.call.text}</p>
+      <div {...stylex.attrs(styles.ringingActions)}>
         <RoundKey answer={false} testid="decline" label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
         <RoundKey answer testid="answer" label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
       </div>
@@ -304,17 +336,14 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
 
 function RoundKey(props: { answer: boolean; testid: string; label: string; onClick: () => void }) {
   return (
-    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} {...stylex.attrs(viewStyles.roundKeyButton)}>
-      <span
-        {...stylex.attrs(viewStyles.roundKeySpan)}
-        style={{ background: props.answer ? answerGreen : declineRed, "box-shadow": `inset 0 0 0 2px ${bark}, inset -3px -3px 0 0 #00000040` }}
-      >
-        <span style={props.answer ? undefined : { transform: "rotate(135deg)" }} {...stylex.attrs(viewStyles.roundKeySpan2)}>
+    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} {...stylex.attrs(styles.roundKey)}>
+      <span {...stylex.attrs(styles.roundKeyCircle, props.answer ? styles.roundKeyAnswer : styles.roundKeyDecline)}>
+        <span {...stylex.attrs(styles.flexRow, !props.answer && styles.declineGlyph)}>
           <Cells
             cells={[
-              [0, 2, 3, 4, cream],
-              [8, 2, 3, 4, cream],
-              [1, 0, 9, 2, cream],
+              [0, 2, 3, 4, creamFill],
+              [8, 2, 3, 4, creamFill],
+              [1, 0, 9, 2, creamFill],
             ]}
             grid={[11, 6]}
             size={[22, 12]}
@@ -328,13 +357,7 @@ function RoundKey(props: { answer: boolean; testid: string; label: string; onCli
 
 function CallOrchestrator(props: { onCall: () => void }) {
   return (
-    <button
-      type="button"
-      data-testid="call-orchestrator"
-      onClick={() => props.onCall()}
-      {...stylex.attrs(viewStyles.callOrchestrator)}
-      style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
-    >
+    <button type="button" data-testid="call-orchestrator" onClick={() => props.onCall()} {...stylex.attrs(styles.callOrchestrator)}>
       <PhoneGlyph size={14} lit />
       {t("web.farm.phone.callOrchestrator")}
     </button>
@@ -345,14 +368,13 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
   const phone = phoneState();
   const missed = () => missedOf(phone());
   const empty = (text: string) => (
-    <li data-testid="calls-empty" {...stylex.attrs(viewStyles.callsEmpty)} style={{ color: lcd.dark }}>
+    <li data-testid="calls-empty" {...stylex.attrs(styles.callsEmpty)}>
       {text}
     </li>
   );
-  const rule = { "border-bottom": `1px solid ${lcd.rule}` };
   return (
     <>
-      <div {...stylex.attrs(viewStyles.roundKeySpan2)} style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
+      <div {...stylex.attrs(styles.tabBar)}>
         <For each={["missed", "log"] as const}>
           {(s) => (
             <button
@@ -360,32 +382,33 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
               data-key={s}
               onClick={() => props.onScreen(s)}
               aria-pressed={aria(props.screen === s)}
-              {...stylex.attrs(
-                variantStyles.listScreenButton,
-                props.screen !== s ? variantStyles.listScreenButtonVariant : variantStyles.listScreenButtonVariant2,
-              )}
-              style={props.screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
+              {...stylex.attrs(styles.tabButton, props.screen === s ? styles.tabActive : styles.tabIdle)}
             >
               {s === "missed" ? t("web.farm.phone.missed", { n: missed().length }) : t("web.farm.phone.log")}
             </button>
           )}
         </For>
       </div>
-      <ul {...stylex.attrs(viewStyles.listScreenUl)}>
+      <ul {...stylex.attrs(styles.callList)}>
         <Show
           when={props.screen === "missed"}
           fallback={
             <Show when={phone().log.length > 0} fallback={empty(t("web.farm.phone.noCalls"))}>
               <For each={phone().log} keyed={(e) => `${e.call.id}-${e.at}`}>
                 {(e) => (
-                  <li data-testid="call-log" data-key={e().call.id} data-answered={e().answered ? "" : undefined} {...styleProps(variantStyles.callRow, rule)}>
+                  <li
+                    data-testid="call-log"
+                    data-key={e().call.id}
+                    data-answered={e().answered ? "" : undefined}
+                    {...stylex.attrs(styles.callRow, styles.callRule)}
+                  >
                     <SmallFace>
                       <CallerFace call={e().call} size={28} />
                     </SmallFace>
-                    <span {...stylex.attrs(viewStyles.listScreenSpan)}>
+                    <span {...stylex.attrs(styles.callSummary)}>
                       {e().call.who} · {e().call.words.label}
                     </span>
-                    <span style={{ color: e().answered ? lcd.dark : declineRed }}>
+                    <span {...stylex.attrs(e().answered ? styles.inkLcdDark : styles.inkDecline)}>
                       {e().answered ? t("web.farm.phone.answered") : t("web.farm.phone.declined")}
                     </span>
                   </li>
@@ -397,28 +420,24 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           <Show when={missed().length > 0} fallback={empty(t("web.farm.phone.noMissed"))}>
             <For each={missed()} keyed={(c) => c.id}>
               {(c) => (
-                <li style={rule}>
+                <li {...stylex.attrs(styles.callRule)}>
                   <button
                     type="button"
                     data-testid="missed-call"
                     data-key={c().id}
                     onClick={() => props.onAnswer(c())}
                     aria-label={t("shared.join.labeled", { label: c().who, text: c().words.label })}
-                    {...styleProps([variantStyles.callRow, variantStyles.missedCall])}
+                    {...stylex.attrs(styles.callRow, styles.missedCall)}
                   >
                     <SmallFace>
                       <CallerFace call={c()} size={28} />
                     </SmallFace>
-                    <span {...stylex.attrs(viewStyles.listScreenSpan2)}>
-                      <span {...stylex.attrs(viewStyles.roundKeySpan2)}>
+                    <span {...stylex.attrs(styles.missedBody)}>
+                      <span {...stylex.attrs(styles.flexRow)}>
                         {c().who}
-                        <span {...stylex.attrs(viewStyles.listScreenSpan3)} style={{ color: declineRed }}>
-                          {c().words.label}
-                        </span>
+                        <span {...stylex.attrs(styles.missedKind)}>{c().words.label}</span>
                       </span>
-                      <span {...stylex.attrs(viewStyles.listScreenSpan4)} style={{ color: lcd.dark }}>
-                        {c().text}
-                      </span>
+                      <span {...stylex.attrs(styles.missedText)}>{c().text}</span>
                     </span>
                   </button>
                 </li>
@@ -465,16 +484,14 @@ export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; 
       data-testid="orchestrator-line"
       data-state={props.phase}
       data-problem={props.problem ? "" : undefined}
-      {...stylex.attrs(variantStyles.ringingScreenDiv)}
+      {...stylex.attrs(styles.screenBody)}
     >
       <BigFace shake={props.phase === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
-      <p {...stylex.attrs(viewStyles.orchestratorLineP)}>{t("web.farm.phone.manager")}</p>
-      <p {...stylex.attrs(variantStyles.orchestratorLineP)} style={{ color: props.phase === "idle" && props.problem ? failedInk : undefined }}>
-        {line()}
-      </p>
-      <div {...stylex.attrs(viewStyles.orchestratorLineDiv)}>
+      <p {...stylex.attrs(styles.orchestratorName)}>{t("web.farm.phone.manager")}</p>
+      <p {...stylex.attrs(styles.lineStatus, props.phase === "idle" && props.problem !== undefined && props.problem !== "" && styles.lineFailed)}>{line()}</p>
+      <div {...stylex.attrs(styles.orchestratorActions)}>
         <RoundKey
           answer={!on()}
           testid="line-key"
@@ -494,11 +511,7 @@ interface App {
   readonly go: () => void;
 }
 
-const SokobanIcon = () => (
-  <span {...stylex.attrs(viewStyles.sokobanIconSpan)} style={{ "box-shadow": `inset 0 0 0 2px ${lcd.ink}` }}>
-    ×
-  </span>
-);
+const SokobanIcon = () => <span {...stylex.attrs(styles.sokobanIcon)}>×</span>;
 
 /** The games, in one folder on the home screen. */
 const games = (open: (app: PhoneApp) => void): App[] => [
@@ -511,7 +524,7 @@ const games = (open: (app: PhoneApp) => void): App[] => [
 
 /** The games folder's icon: four of them small, as a folder shows what is in it. */
 const GamesIcon = () => (
-  <span {...stylex.attrs(viewStyles.gamesIconSpan)} aria-hidden="true">
+  <span {...stylex.attrs(styles.gamesIcon)} aria-hidden="true">
     <BlocksIcon size={12} />
     <DinoIcon size={12} />
     <BugSnakeIcon size={12} />
@@ -550,16 +563,14 @@ export function GamesScreen(props: { onOpen: (app: PhoneApp) => void }) {
 
 function AppGrid(props: { apps: readonly App[] }) {
   return (
-    <div {...stylex.attrs(viewStyles.appGridDiv)}>
+    <div {...stylex.attrs(styles.appGrid)}>
       <For each={props.apps}>
         {(a) => (
-          <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} {...styleProps([farmGroup, variantStyles.app])}>
-            <span {...styleProps(variantStyles.appIcon, { "box-shadow": `inset 0 0 0 2px ${lcd.dark}` })}>
+          <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} {...styleProps([farmGroup, styles.app])}>
+            <span {...styleProps(styles.appIcon)}>
               {a.icon()}
               <Show when={a.badge?.()}>
-                <span {...stylex.attrs(viewStyles.appGridSpan)} style={{ background: declineRed, color: cream }}>
-                  {a.badge?.()}
-                </span>
+                <span {...stylex.attrs(styles.appBadge)}>{a.badge?.()}</span>
               </Show>
             </span>
             {a.label}

@@ -15,7 +15,7 @@ import type { IconName } from "./icons";
 import { styleProps } from "./positioner";
 import { Hint } from "./Tip";
 
-const viewStyles = stylex.create({
+const styles = stylex.create({
   toggleLabel: {
     display: "flex",
     alignItems: "flex-start",
@@ -62,7 +62,7 @@ const viewStyles = stylex.create({
   },
   quietLink: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
   dangerLink: { color: { default: "var(--color-berry)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
-  windowStrip: { pointerEvents: "none", position: "fixed", insetInline: 0, top: 0 },
+  windowStrip: (height: number) => ({ pointerEvents: "none", position: "fixed", insetInline: 0, top: 0, height }),
   secretInput: { paddingRight: "calc(var(--spacing) * 9)", fontFamily: "var(--font-mono)" },
   split: {
     display: "flex",
@@ -136,7 +136,7 @@ const viewStyles = stylex.create({
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
   },
-  listRowSpan: {
+  rowTitle: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -144,7 +144,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
   },
-  listRowSpan2: {
+  rowLine: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -163,7 +163,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-  cardH2: {
+  cardTitle: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -173,18 +173,18 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-base--line-height)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  cardDiv: {
+  cardBody: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 4)",
     padding: "calc(var(--spacing) * 4)",
   },
-  quietP: {
+  quiet: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: "var(--color-muted)",
   },
-  emptyDiv: {
+  empty: {
     display: "flex",
     height: "100%",
     minHeight: "calc(var(--spacing) * 48)",
@@ -192,7 +192,7 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     padding: "calc(var(--spacing) * 6)",
   },
-  emptyDiv2: {
+  emptyBody: {
     display: "flex",
     maxWidth: "calc(var(--spacing) * 96)",
     flexDirection: "column",
@@ -206,23 +206,23 @@ const viewStyles = stylex.create({
   emptyIcon: {
     color: "var(--color-faint)",
   },
-  toggleSpan: {
+  toggleBody: {
     display: "flex",
     flexDirection: "column",
   },
-  toggleSpan2: {
+  toggleTitle: {
     display: "flex",
     alignItems: "center",
     gap: "var(--spacing)",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  toggleSpan3: {
+  toggleHint: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  secretInputSpan: {
+  secretBox: {
     position: "relative",
     display: "flex",
   },
@@ -258,9 +258,9 @@ const viewStyles = stylex.create({
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
 export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
   return (
-    <div {...stylex.attrs(viewStyles.split, props.edge !== true && viewStyles.splitGap)}>
-      <div {...stylex.attrs(viewStyles.splitList, props.edge === true && viewStyles.splitEdge)}>{props.list}</div>
-      <div {...stylex.attrs(viewStyles.splitBody, props.edge === true && viewStyles.splitBodyEdge)}>{props.children}</div>
+    <div {...stylex.attrs(styles.split, props.edge !== true && styles.splitGap)}>
+      <div {...stylex.attrs(styles.splitList, props.edge === true && styles.splitEdge)}>{props.list}</div>
+      <div {...stylex.attrs(styles.splitBody, props.edge === true && styles.splitBodyEdge)}>{props.children}</div>
     </div>
   );
 }
@@ -269,12 +269,12 @@ export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: 
 export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string; bare?: boolean }) {
   const bare = () => props.bare === true;
   return (
-    <section aria-label={props.label ?? props.title} data-testid={props.testid} {...stylex.attrs(bare() ? viewStyles.column : viewStyles.card)}>
-      <header {...stylex.attrs(viewStyles.listHeader, bare() ? viewStyles.listHeaderBare : viewStyles.listHeaderBox)}>
-        <h2 {...stylex.attrs(viewStyles.listTitle, bare() ? viewStyles.listTitleBare : viewStyles.listTitleBox)}>{props.title}</h2>
+    <section aria-label={props.label ?? props.title} data-testid={props.testid} {...stylex.attrs(bare() ? styles.column : styles.card)}>
+      <header {...stylex.attrs(styles.listHeader, bare() ? styles.listHeaderBare : styles.listHeaderBox)}>
+        <h2 {...stylex.attrs(styles.listTitle, bare() ? styles.listTitleBare : styles.listTitleBox)}>{props.title}</h2>
         {props.action}
       </header>
-      <ul {...stylex.attrs(viewStyles.column, bare() ? viewStyles.listBare : viewStyles.listBox)}>{props.children}</ul>
+      <ul {...stylex.attrs(styles.column, bare() ? styles.listBare : styles.listBox)}>{props.children}</ul>
     </section>
   );
 }
@@ -283,18 +283,12 @@ export function ListCard(props: { title: string; label?: string; action?: JSX.El
 export function ListRow(props: { to: string; item?: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
   return (
     <li>
-      <A
-        href={props.to}
-        data-testid="list-row"
-        data-key={props.item}
-        aria-current={props.active === true ? "page" : undefined}
-        {...stylex.attrs(viewStyles.listRow)}
-      >
+      <A href={props.to} data-testid="list-row" data-key={props.item} aria-current={props.active === true ? "page" : undefined} {...stylex.attrs(styles.listRow)}>
         {props.leading}
-        <span {...stylex.attrs(viewStyles.rowText)}>
-          <span {...stylex.attrs(viewStyles.listRowSpan)}>{props.title}</span>
+        <span {...stylex.attrs(styles.rowText)}>
+          <span {...stylex.attrs(styles.rowTitle)}>{props.title}</span>
           <Show when={props.line}>
-            <span {...stylex.attrs(viewStyles.listRowSpan2)}>{props.line}</span>
+            <span {...stylex.attrs(styles.rowLine)}>{props.line}</span>
           </Show>
         </span>
         {props.trailing}
@@ -313,29 +307,29 @@ export function Card(props: {
   item?: string;
 }) {
   return (
-    <section data-testid={props.testid} data-key={props.item} {...styleProps([viewStyles.card, props.styles])}>
+    <section data-testid={props.testid} data-key={props.item} {...styleProps([styles.card, props.styles])}>
       <Show when={props.title !== undefined}>
-        <header {...stylex.attrs(viewStyles.cardHeader)}>
-          <h2 {...stylex.attrs(viewStyles.cardH2)}>{props.title}</h2>
+        <header {...stylex.attrs(styles.cardHeader)}>
+          <h2 {...stylex.attrs(styles.cardTitle)}>{props.title}</h2>
           {props.action}
         </header>
       </Show>
-      <div {...stylex.attrs(viewStyles.cardDiv)}>{props.children}</div>
+      <div {...stylex.attrs(styles.cardBody)}>{props.children}</div>
     </section>
   );
 }
 
 /** Nothing to show yet, in words. */
 export function Quiet(props: { children: JSX.Element }) {
-  return <p {...stylex.attrs(viewStyles.quietP)}>{props.children}</p>;
+  return <p {...stylex.attrs(styles.quiet)}>{props.children}</p>;
 }
 
 /** A place with nothing in it yet (docs/style/design.md): its icon, why it is empty, and the next step if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
   return (
-    <div data-testid={props.testid ?? "empty"} {...stylex.attrs(viewStyles.emptyDiv)}>
-      <div {...stylex.attrs(viewStyles.emptyDiv2)}>
-        <Icon name={props.icon} size={48} styles={viewStyles.emptyIcon} />
+    <div data-testid={props.testid ?? "empty"} {...stylex.attrs(styles.empty)}>
+      <div {...stylex.attrs(styles.emptyBody)}>
+        <Icon name={props.icon} size={48} styles={styles.emptyIcon} />
         <p>{props.children}</p>
         {props.action}
       </div>
@@ -356,24 +350,24 @@ export function Toggle(props: {
   testid?: string;
 }) {
   return (
-    <label {...stylex.attrs(viewStyles.toggleLabel, props.disabled === true ? viewStyles.toggleDisabled : viewStyles.toggleEnabled)}>
+    <label {...stylex.attrs(styles.toggleLabel, props.disabled === true ? styles.toggleDisabled : styles.toggleEnabled)}>
       <Switch.Root
         data-testid={props.testid}
         checked={props.checked}
         onCheckedChange={props.onChange}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
-        {...stylex.attrs(viewStyles.switchRoot)}
+        {...stylex.attrs(styles.switchRoot)}
       >
-        <Switch.Thumb {...stylex.attrs(viewStyles.switchThumb)} />
+        <Switch.Thumb {...stylex.attrs(styles.switchThumb)} />
       </Switch.Root>
-      <span {...stylex.attrs(viewStyles.toggleSpan)}>
-        <span {...stylex.attrs(viewStyles.toggleSpan2)}>
+      <span {...stylex.attrs(styles.toggleBody)}>
+        <span {...stylex.attrs(styles.toggleTitle)}>
           {props.label}
           <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         </span>
         <Show when={props.hint}>
-          <span {...stylex.attrs(viewStyles.toggleSpan3)}>{props.hint}</span>
+          <span {...stylex.attrs(styles.toggleHint)}>{props.hint}</span>
         </Show>
       </span>
     </label>
@@ -385,13 +379,13 @@ export function SecretInput(props: TextInputProps) {
   const [shown, setShown] = createSignal(false);
   const rest = omit(props, "styles");
   return (
-    <span {...stylex.attrs(viewStyles.secretInputSpan)}>
-      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" styles={[viewStyles.secretInput, props.styles]} />
+    <span {...stylex.attrs(styles.secretBox)}>
+      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" styles={[styles.secretInput, props.styles]} />
       <button
         type="button"
         data-testid="reveal"
         aria-pressed={aria(shown())}
-        {...stylex.attrs(viewStyles.reveal)}
+        {...stylex.attrs(styles.reveal)}
         aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         onClick={() => setShown(!shown())}
@@ -404,7 +398,7 @@ export function SecretInput(props: TextInputProps) {
 
 /** A quiet underlined word: a page to open in the browser, or onClick. */
 export function TextLink(props: { children: JSX.Element; href?: string; onClick?: () => void; danger?: boolean }) {
-  const look = () => stylex.attrs(viewStyles.textLink, props.danger === true ? viewStyles.dangerLink : viewStyles.quietLink);
+  const look = () => stylex.attrs(styles.textLink, props.danger === true ? styles.dangerLink : styles.quietLink);
   return (
     <Show
       when={props.href}
@@ -437,7 +431,7 @@ export const titleBar = {
 export function WindowStrip() {
   return (
     <Show when={titleBar.top > 0}>
-      <div aria-hidden="true" class={["window-drag", stylex.attrs(viewStyles.windowStrip).class]} style={{ height: `${titleBar.top}px` }} />
+      <div aria-hidden="true" data-window-drag="" {...styleProps(styles.windowStrip(titleBar.top))} />
     </Show>
   );
 }

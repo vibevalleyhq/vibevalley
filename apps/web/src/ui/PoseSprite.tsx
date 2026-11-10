@@ -33,6 +33,7 @@ const worry = stylex.keyframes({
   "75%": { transform: "rotate(3deg)" },
 });
 const styles = stylex.create({
+  placeholder: (height: number) => ({ height }),
   sprite: {
     display: "block",
     imageRendering: "pixelated",
@@ -72,7 +73,7 @@ export function PoseSprite(props: { cast: Cast; pose: Pose; height: number }) {
     },
   );
   return (
-    <Show when={ready(sprites, undefined)} fallback={<span style={{ height: `${props.height}px` }} />}>
+    <Show when={ready(sprites, undefined)} fallback={<span {...styleProps(styles.placeholder(props.height))} />}>
       {(sprites) => {
         const has = (n: string) => n in sprites();
         const name = () => {

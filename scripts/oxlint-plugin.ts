@@ -306,6 +306,43 @@ function stylexValues(context: Context, inspect: (value: StyleValue) => void) {
   };
 }
 
+function jsxStyleValues(
+  node: ESTree.Node,
+  property: string | undefined,
+  inspect: (item: { node: ESTree.Node; property: string | undefined; value: string }) => void,
+) {
+  switch (node.type) {
+    case "ObjectExpression":
+      for (const entry of node.properties) {
+        if (entry.type === "Property") jsxStyleValues(entry.value, styleKey(entry.key) ?? property, inspect);
+      }
+      break;
+    case "ConditionalExpression":
+      jsxStyleValues(node.consequent, property, inspect);
+      jsxStyleValues(node.alternate, property, inspect);
+      break;
+    case "LogicalExpression":
+      jsxStyleValues(node.left, property, inspect);
+      jsxStyleValues(node.right, property, inspect);
+      break;
+    case "TSAsExpression":
+    case "TSSatisfiesExpression":
+    case "TSNonNullExpression":
+    case "ParenthesizedExpression":
+      jsxStyleValues(node.expression, property, inspect);
+      break;
+    case "Literal":
+      if (typeof node.value === "string") inspect({ node, property, value: node.value });
+      break;
+    case "TemplateLiteral":
+      inspect({ node, property, value: node.quasis.map((q) => q.value.cooked ?? q.value.raw).join("${}") });
+      for (const expression of node.expressions) jsxStyleValues(expression, property, inspect);
+      break;
+    default:
+      break;
+  }
+}
+
 const noHexColor = defineRule({
   meta: {
     messages: {
@@ -317,9 +354,38 @@ const noHexColor = defineRule({
     },
   },
   create(context) {
-    return stylexValues(context, ({ node, property, value }) => {
+    const check = ({ node, property, value }: { node: ESTree.Node; property: string | undefined; value: string | number }) => {
       if (typeof value === "string" && hexColor(property, value)) context.report({ node, messageId: "hex" });
-    });
+    };
+    return {
+      ...stylexValues(context, check),
+      JSXAttribute(node) {
+        if (node.name.type !== "JSXIdentifier" || node.name.name !== "style" || node.value?.type !== "JSXExpressionContainer") return;
+        jsxStyleValues(node.value.expression, undefined, check);
+      },
+    };
+  },
+});
+
+const rawClassAttrs = new Set(["class", "className", "classList"]);
+
+const stylexOnly = defineRule({
+  meta: {
+    messages: {
+      classAttr: says(
+        "a raw JSX `{{attr}}` bypasses StyleX composition and can drop atomic rules or CSS variables",
+        "declare styles in `stylex.create(...)` and spread `{...stylex.attrs(...)}` or `{...styleProps(...)}` on the element",
+        "apps/web/src/ui/positioner.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      JSXAttribute(node) {
+        if (node.name.type !== "JSXIdentifier" || !rawClassAttrs.has(node.name.name)) return;
+        context.report({ node, messageId: "classAttr", data: { attr: node.name.name } });
+      },
+    };
   },
 });
 
@@ -1520,6 +1586,7 @@ export default definePlugin({
     "no-comment-divider": noCommentDivider,
     "no-cjk-literal": noCjkLiteral,
     "no-hex-color": noHexColor,
+    "stylex-only": stylexOnly,
     "no-copy-selector": noCopySelector,
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,

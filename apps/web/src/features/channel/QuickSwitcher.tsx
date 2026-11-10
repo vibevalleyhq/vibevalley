@@ -19,7 +19,7 @@ import { Dialog } from "#/ui/Dialog.tsx";
 import { chatPath, type SwitchTarget, switchTargets } from "./places";
 import { Count } from "./presence";
 
-const variantStyles2 = stylex.create({
+const styles = stylex.create({
   switcherBodyComboboxInput: {
     height: "calc(var(--spacing) * 10)",
     borderRadius: "var(--radius-md)",
@@ -60,9 +60,6 @@ const variantStyles2 = stylex.create({
       ":is([data-highlighted])": "var(--color-selected)",
     },
   },
-});
-
-const variantStyles = stylex.create({
   switcherBodySpan: {
     minWidth: "0",
     flex: "1",
@@ -72,19 +69,16 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  switcherBodySpanVariant: {
+  switcherBodySpanTone: {
     fontWeight: "var(--font-weight-semibold)",
   },
-  switcherBodySpanVariant2: {},
-});
-
-const viewStyles = stylex.create({
+  switcherBodySpanAlt: {},
   switcherBodyDiv: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
   },
-  switcherBodySpan: {
+  switcherBodySpan2: {
     flexShrink: "0",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -144,16 +138,16 @@ function SwitcherBody(props: { onClose: () => void }) {
   };
   return (
     <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>
-      <div {...stylex.attrs(viewStyles.switcherBodyDiv)}>
+      <div {...stylex.attrs(styles.switcherBodyDiv)}>
         <Combobox.Input
           ref={autofocus()}
           data-testid="switcher-input"
           aria-label={t("web.channel.switcher.title")}
           placeholder={t("web.channel.switcher.hint")}
-          {...stylex.attrs(variantStyles2.switcherBodyComboboxInput)}
+          {...stylex.attrs(styles.switcherBodyComboboxInput)}
         />
-        <Combobox.Popup aria-label={t("web.channel.switcher.title")} {...stylex.attrs(variantStyles2.switcherBodyComboboxPopup)}>
-          <Combobox.Empty {...stylex.attrs(variantStyles2.switcherBodyComboboxEmpty)}>{t("web.channel.switcher.none")}</Combobox.Empty>
+        <Combobox.Popup aria-label={t("web.channel.switcher.title")} {...stylex.attrs(styles.switcherBodyComboboxPopup)}>
+          <Combobox.Empty {...stylex.attrs(styles.switcherBodyComboboxEmpty)}>{t("web.channel.switcher.none")}</Combobox.Empty>
           <For each={targets()} keyed={(t) => `${t.kind}:${t.id}`}>
             {(t) => (
               <Combobox.Item
@@ -165,17 +159,17 @@ function SwitcherBody(props: { onClose: () => void }) {
                   e.preventDefault();
                   go(t());
                 }}
-                {...stylex.attrs(variantStyles2.switcherBodyComboboxItem)}
+                {...stylex.attrs(styles.switcherBodyComboboxItem)}
               >
                 <span
                   {...stylex.attrs(
-                    variantStyles.switcherBodySpan,
-                    t().unread > 0 ? variantStyles.switcherBodySpanVariant : variantStyles.switcherBodySpanVariant2,
+                    styles.switcherBodySpan,
+                    t().unread > 0 ? styles.switcherBodySpanTone : styles.switcherBodySpanAlt,
                   )}
                 >
                   {t().label}
                 </span>
-                <span {...stylex.attrs(viewStyles.switcherBodySpan)}>{t().hint}</span>
+                <span {...stylex.attrs(styles.switcherBodySpan2)}>{t().hint}</span>
                 <Show when={t().unread > 0}>
                   <Count n={t().unread} />
                 </Show>

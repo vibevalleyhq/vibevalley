@@ -12,7 +12,7 @@ import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";
 import { Hint } from "./Tip";
 
-const viewStyles = stylex.create({
+const styles = stylex.create({
   rows: {
     display: "flex",
     flexDirection: "column",
@@ -25,103 +25,112 @@ const viewStyles = stylex.create({
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-side) 60%, transparent)",
     },
   },
-  settingsPageDiv: {
+  page: {
     display: "flex",
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 5)",
     paddingBottom: "calc(var(--spacing) * 6)",
   },
-  settingsPageDiv2: {
+  header: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
     paddingTop: "var(--spacing)",
   },
-  settingsPageH2: {
+  title: {
     fontSize: "var(--text-xl)",
     lineHeight: "var(--text-xl--line-height)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  settingsPageSpan: {
+  spacer: {
     flex: "1",
   },
-  settingsGroupSection: {
+  group: {
     display: "flex",
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
   },
-  settingsGroupDiv: {
+  groupHeader: {
     display: "flex",
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 2)",
     paddingInline: "var(--spacing)",
   },
-  settingsGroupH3: {
+  groupTitle: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  settingsGroupSpan: {
+  note: {
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  settingRow: {
+  row: {
     display: "flex",
     columnGap: "calc(var(--spacing) * 6)",
     rowGap: "calc(var(--spacing) * 2)",
+    borderBottomStyle: {
+      default: "solid",
+      ":last-child": "none",
+    },
+    borderBottomWidth: {
+      default: 1,
+      ":last-child": 0,
+    },
+    borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 3)",
   },
-  settingRowInline: {
+  rowInline: {
     flexWrap: "wrap",
     alignItems: "center",
   },
-  settingRowWide: {
+  rowWide: {
     flexDirection: "column",
   },
-  settingRowFound: {
+  rowFound: {
     backgroundColor: {
       default: "var(--color-wheat)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 15%, transparent)",
     },
   },
-  settingRowText: {
+  rowBody: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
     gap: "calc(var(--spacing) * .5)",
   },
-  settingRowDiv: {
+  rowLabelLine: {
     display: "flex",
     alignItems: "center",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  settingRowSpan: {
+  rowLabel: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     fontWeight: "var(--font-weight-medium)",
   },
-  settingRowControls: {
+  controls: {
     display: "flex",
     maxWidth: "100%",
     flexWrap: "wrap",
     alignItems: "center",
     gap: "calc(var(--spacing) * 2)",
   },
-  settingRowControlsWide: {
+  controlsWide: {
     width: "100%",
   },
-  settingRowControlsInline: {
+  controlsInline: {
     flexShrink: "0",
   },
-  keyRowDiv: {
+  keyBox: {
     width: "calc(var(--spacing) * 64)",
     maxWidth: "100%",
   },
-  keyRowRemoving: {
+  removing: {
     pointerEvents: "none",
     opacity: ".4",
   },
@@ -133,11 +142,11 @@ export const SettingsSearch = createContext<Accessor<string>>(() => "");
 /** A section's page: its name, what it is about on hover, and what goes beside the name (a link, where it is stored). */
 export function SettingsPage(props: { title: string; hint?: string; action?: JSX.Element; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.settingsPageDiv)}>
-      <div {...stylex.attrs(viewStyles.settingsPageDiv2)}>
-        <h2 {...stylex.attrs(viewStyles.settingsPageH2)}>{props.title}</h2>
+    <div {...stylex.attrs(styles.page)}>
+      <div {...stylex.attrs(styles.header)}>
+        <h2 {...stylex.attrs(styles.title)}>{props.title}</h2>
         <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
-        <span {...stylex.attrs(viewStyles.settingsPageSpan)} />
+        <span {...stylex.attrs(styles.spacer)} />
         {props.action}
       </div>
       {props.children}
@@ -148,17 +157,15 @@ export function SettingsPage(props: { title: string; hint?: string; action?: JSX
 /** Rows that belong together, in one card; title is a small heading over it, note what applies to all of them. */
 export function SettingsGroup(props: { title?: string; note?: JSX.Element; children: JSX.Element }) {
   return (
-    <section {...stylex.attrs(viewStyles.settingsGroupSection)}>
+    <section {...stylex.attrs(styles.group)}>
       <Show when={props.title !== undefined || props.note !== undefined}>
-        <div {...stylex.attrs(viewStyles.settingsGroupDiv)}>
-          <Show when={props.title}>{(title) => <h3 {...stylex.attrs(viewStyles.settingsGroupH3)}>{title()}</h3>}</Show>
-          <span {...stylex.attrs(viewStyles.settingsPageSpan)} />
-          <span {...stylex.attrs(viewStyles.settingsGroupSpan)}>{props.note}</span>
+        <div {...stylex.attrs(styles.groupHeader)}>
+          <Show when={props.title}>{(title) => <h3 {...stylex.attrs(styles.groupTitle)}>{title()}</h3>}</Show>
+          <span {...stylex.attrs(styles.spacer)} />
+          <span {...stylex.attrs(styles.note)}>{props.note}</span>
         </div>
       </Show>
-      <div data-settings-rows {...stylex.attrs(viewStyles.rows)}>
-        {props.children}
-      </div>
+      <div {...stylex.attrs(styles.rows)}>{props.children}</div>
     </section>
   );
 }
@@ -176,25 +183,19 @@ export function SettingRow(props: {
   const found = () => query() !== "" && matches(query(), [props.label, props.hint, props.tip]);
   return (
     <div
-      {...stylex.attrs(
-        viewStyles.settingRow,
-        props.wide === true ? viewStyles.settingRowWide : viewStyles.settingRowInline,
-        found() && viewStyles.settingRowFound,
-      )}
+      {...stylex.attrs(styles.row, props.wide === true ? styles.rowWide : styles.rowInline, found() && styles.rowFound)}
       data-found={found() ? "" : undefined}
       data-testid={props.testid}
     >
-      <div {...stylex.attrs(viewStyles.settingRowText)}>
-        <div {...stylex.attrs(viewStyles.settingRowDiv)}>
-          <span {...stylex.attrs(viewStyles.settingRowSpan)}>{props.label}</span>
+      <div {...stylex.attrs(styles.rowBody)}>
+        <div {...stylex.attrs(styles.rowLabelLine)}>
+          <span {...stylex.attrs(styles.rowLabel)}>{props.label}</span>
           <Show when={props.tip}>{(tip) => <Hint text={tip()} />}</Show>
         </div>
-        <Show when={props.hint}>{(hint) => <span {...stylex.attrs(viewStyles.settingsGroupSpan)}>{hint()}</span>}</Show>
+        <Show when={props.hint}>{(hint) => <span {...stylex.attrs(styles.note)}>{hint()}</span>}</Show>
       </div>
       <Show when={props.children}>
-        <div {...stylex.attrs(viewStyles.settingRowControls, props.wide === true ? viewStyles.settingRowControlsWide : viewStyles.settingRowControlsInline)}>
-          {props.children}
-        </div>
+        <div {...stylex.attrs(styles.controls, props.wide === true ? styles.controlsWide : styles.controlsInline)}>{props.children}</div>
       </Show>
     </div>
   );
@@ -219,7 +220,7 @@ export function KeyRow(props: {
   return (
     <SettingRow label={props.label} hint={props.hint} tip={props.tip} testid={props.testid}>
       <KeyMark status={props.status} removing={props.removing} />
-      <div {...stylex.attrs(viewStyles.keyRowDiv, props.removing && viewStyles.keyRowRemoving)}>
+      <div {...stylex.attrs(styles.keyBox, props.removing && styles.removing)}>
         <SecretInput
           {...props.control}
           data-testid="secret"

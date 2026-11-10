@@ -2,12 +2,6 @@
   "name": "vibevalley",
   "private": true,
   "type": "module",
-  "imports": {
-    "#migration-inputs": "./scripts/style-migration-inputs.ts"
-  },
-  "exports": {
-    "./style-migration": "./scripts/style-migration-graph.ts"
-  },
   "scripts": {
     "prepare": "vp config --hooks --no-agent && vp run packages:build",
     "desktop:dev": "vp run --filter @vibevalley/desktop dev",

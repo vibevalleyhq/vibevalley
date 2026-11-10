@@ -89,20 +89,17 @@ const messageStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
-  messageBodyDivVariant1Case1: {
+const styles = stylex.create({
+  messageBodyDivPrimary: {
     overflow: null,
     WebkitMaskImage: null,
     maskImage: null,
   },
-  messageBodyDivVariant1Case2: {
+  messageBodyDivSecondary: {
     overflow: "hidden",
     WebkitMaskImage: "linear-gradient(black 70%,transparent)",
     maskImage: "linear-gradient(black 70%,transparent)",
   },
-});
-
-const recipeStyles = stylex.create({
   messageToolsToolbarButton: {
     display: "inline-flex",
     width: "calc(var(--spacing) * 7)",
@@ -128,7 +125,7 @@ const recipeStyles = stylex.create({
     justifyContent: "center",
     borderRadius: "var(--radius-sm)",
   },
-  messageToolsToolbarButtonVariant1Case1: {
+  messageToolsToolbarButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -137,7 +134,7 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  messageToolsToolbarButtonVariant1Case2: {
+  messageToolsToolbarButtonSecondary: {
     backgroundColor: {
       default: "var(--color-berry)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
@@ -147,16 +144,10 @@ const recipeStyles = stylex.create({
       },
     },
   },
-});
-
-const variantStyles2 = stylex.create({
   replyQuoteIcon: {
     opacity: ".6",
   },
   messageToolsIcon: {},
-});
-
-const variantStyles = stylex.create({
   embedsSpan: {
     display: "flex",
     minWidth: "0",
@@ -195,11 +186,11 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  reactionsButtonVariant: {
+  reactionsButtonTone: {
     borderColor: "var(--color-accent)",
     backgroundColor: "var(--color-selected)",
   },
-  reactionsButtonVariant2: {
+  reactionsButtonAlt: {
     borderColor: "var(--color-line)",
     backgroundColor: {
       default: "var(--color-page)",
@@ -222,11 +213,11 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  editBoxButtonVariant: {
+  editBoxButtonTone: {
     borderStyle: "solid",
     backgroundColor: "var(--color-page)",
   },
-  editBoxButtonVariant2: {
+  editBoxButtonAlt: {
     borderStyle: "dashed",
     color: "var(--color-faint)",
     textDecorationLine: "line-through",
@@ -239,9 +230,6 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-});
-
-const viewStyles = stylex.create({
   quote: {
     marginBottom: "calc(var(--spacing) * .5)",
     display: "flex",
@@ -411,7 +399,7 @@ const viewStyles = stylex.create({
     paddingInline: "calc(var(--spacing) * 3)",
     paddingBlock: "calc(var(--spacing) * 2)",
   },
-  embedsSpan: {
+  embedsSpan4: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -499,7 +487,7 @@ const viewStyles = stylex.create({
     paddingBlock: "calc(var(--spacing) * 2)",
     textAlign: "left",
   },
-  linkedCardSpan: {
+  linkedCardSpan2: {
     display: "flex",
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 2)",
@@ -507,7 +495,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  linkedCardSpan2: {
+  linkedCardSpan22: {
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-ink)",
   },
@@ -533,14 +521,14 @@ export function ReplyQuote(props: { channel: string; number: number }) {
       data-testid="quote"
       data-key={props.number}
       onClick={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
-      {...stylex.attrs(viewStyles.quote)}
+      {...stylex.attrs(styles.quote)}
     >
-      <Icon name="reply" size={10} styles={[variantStyles2.replyQuoteIcon]} />
+      <Icon name="reply" size={10} styles={[styles.replyQuoteIcon]} />
       <Show when={answered()} fallback={<span>#{props.number}</span>}>
         {(m) => (
-          <Show when={m().deleted === undefined} fallback={<span {...stylex.attrs(viewStyles.replyQuoteSpan)}>{t("web.channel.messages.replyGone")}</span>}>
-            <span {...stylex.attrs(viewStyles.replyQuoteSpan2)}>{nameOf(m())}</span>
-            <span {...stylex.attrs(viewStyles.replyQuoteSpan3)}>{m().text || list(m().attachments.map((a) => a.name))}</span>
+          <Show when={m().deleted === undefined} fallback={<span {...stylex.attrs(styles.replyQuoteSpan)}>{t("web.channel.messages.replyGone")}</span>}>
+            <span {...stylex.attrs(styles.replyQuoteSpan2)}>{nameOf(m())}</span>
+            <span {...stylex.attrs(styles.replyQuoteSpan3)}>{m().text || list(m().attachments.map((a) => a.name))}</span>
           </Show>
         )}
       </Show>
@@ -567,13 +555,13 @@ export function MessageBody(props: { m: ChatMessage }) {
   const isFolded = () => fold() === "folded";
   const isExpanded = () => fold() === "expanded";
   return (
-    <Show when={props.m.deleted === undefined} fallback={<p {...stylex.attrs(viewStyles.messageBodyP)}>{t("web.channel.messages.deleted")}</p>}>
+    <Show when={props.m.deleted === undefined} fallback={<p {...stylex.attrs(styles.messageBodyP)}>{t("web.channel.messages.deleted")}</p>}>
       <Show when={props.m.text}>
         <div
           ref={(el) => (box = el)}
           data-testid="message-body"
           data-folded={isFolded() ? "" : undefined}
-          {...stylex.attrs(isFolded() ? recipeStyles2.messageBodyDivVariant1Case2 : recipeStyles2.messageBodyDivVariant1Case1)}
+          {...stylex.attrs(isFolded() ? styles.messageBodyDivSecondary : styles.messageBodyDivPrimary)}
           style={isFolded() ? { "max-height": `${foldPx}px` } : undefined}
         >
           <Markdown text={props.m.text} mentions />
@@ -584,14 +572,14 @@ export function MessageBody(props: { m: ChatMessage }) {
             data-testid="message-more"
             aria-expanded={isExpanded() ? "true" : "false"}
             onClick={() => setFold(isExpanded() ? "folded" : "expanded")}
-            {...stylex.attrs(viewStyles.messageMore)}
+            {...stylex.attrs(styles.messageMore)}
           >
             {isExpanded() ? t("web.base.rich.longLess") : t("web.base.rich.longMore")}
           </button>
         </Show>
       </Show>
       <Show when={props.m.edited !== undefined}>
-        <span {...stylex.attrs(viewStyles.messageBodySpan)}>{t("web.channel.messages.edited")}</span>
+        <span {...stylex.attrs(styles.messageBodySpan)}>{t("web.channel.messages.edited")}</span>
       </Show>
     </Show>
   );
@@ -604,7 +592,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
   const pictures = () => props.files.filter((f) => shownAs(f.type) === "image").map((f) => ({ id: f.id, src: attachmentPath(f.id), name: f.name }));
   const [open, setOpen] = createSignal<number>();
   return (
-    <div {...stylex.attrs(viewStyles.attachmentsDiv)}>
+    <div {...stylex.attrs(styles.attachmentsDiv)}>
       <Lightbox pictures={pictures()} at={open()} onAt={setOpen} />
       <For each={props.files} keyed={(f) => f.id}>
         {(f) => {
@@ -620,10 +608,10 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   data-key={file.id}
                   data-kind="image"
                   aria-label={file.name}
-                  {...stylex.attrs(viewStyles.attachment)}
+                  {...stylex.attrs(styles.attachment)}
                   onClick={() => setOpen(pictures().findIndex((p) => p.id === file.id))}
                 >
-                  <img src={at()} alt={file.name} {...stylex.attrs(viewStyles.attachmentsImg)} loading="lazy" />
+                  <img src={at()} alt={file.name} {...stylex.attrs(styles.attachmentsImg)} loading="lazy" />
                 </button>
               );
             case "video":
@@ -636,7 +624,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   controls
                   preload="metadata"
                   aria-label={file.name}
-                  {...stylex.attrs(viewStyles.attachment2)}
+                  {...stylex.attrs(styles.attachment2)}
                 />
               );
             case "audio":
@@ -649,7 +637,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   controls
                   preload="metadata"
                   aria-label={file.name}
-                  {...stylex.attrs(viewStyles.attachment3)}
+                  {...stylex.attrs(styles.attachment3)}
                 />
               );
             case "pdf":
@@ -662,12 +650,12 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   data-kind={shownAs(file.type)}
                   target="_blank"
                   rel="noreferrer"
-                  {...stylex.attrs(viewStyles.attachment4)}
+                  {...stylex.attrs(styles.attachment4)}
                 >
                   <Icon name={shownAs(file.type) === "pdf" ? "file" : "attach"} size={16} />
-                  <span {...stylex.attrs(viewStyles.attachmentsSpan)}>
-                    <span {...stylex.attrs(viewStyles.attachmentsSpan2)}>{file.name}</span>
-                    <span {...stylex.attrs(viewStyles.attachmentsSpan3)}>
+                  <span {...stylex.attrs(styles.attachmentsSpan)}>
+                    <span {...stylex.attrs(styles.attachmentsSpan2)}>{file.name}</span>
+                    <span {...stylex.attrs(styles.attachmentsSpan3)}>
                       {shownAs(file.type) === "pdf" ? t("web.channel.media.pdf") : t("web.channel.messages.file", { size: sizeText(file.size) })}
                     </span>
                   </span>
@@ -683,23 +671,23 @@ export function Attachments(props: { files: readonly Attachment[] }) {
 /** The links' previews the server read: what the page says of itself, and its picture from its own site. */
 export function Embeds(props: { embeds: readonly Embed[] }) {
   return (
-    <div {...stylex.attrs(viewStyles.embedsDiv)} aria-label={t("web.channel.media.preview")}>
+    <div {...stylex.attrs(styles.embedsDiv)} aria-label={t("web.channel.media.preview")}>
       <For each={props.embeds} keyed={(e) => e.url}>
         {(e) => (
-          <a href={e().url} target="_blank" rel="noreferrer noopener" {...stylex.attrs(viewStyles.embedsA)}>
-            <span {...stylex.attrs(variantStyles.embedsSpan)}>
+          <a href={e().url} target="_blank" rel="noreferrer noopener" {...stylex.attrs(styles.embedsA)}>
+            <span {...stylex.attrs(styles.embedsSpan)}>
               <Show when={e().site}>
-                <span {...stylex.attrs(viewStyles.embedsSpan)}>{e().site}</span>
+                <span {...stylex.attrs(styles.embedsSpan4)}>{e().site}</span>
               </Show>
               <Show when={e().title}>
-                <span {...stylex.attrs(variantStyles.embedsSpan2)}>{e().title}</span>
+                <span {...stylex.attrs(styles.embedsSpan2)}>{e().title}</span>
               </Show>
               <Show when={e().description}>
-                <span {...stylex.attrs(variantStyles.embedsSpan3)}>{e().description}</span>
+                <span {...stylex.attrs(styles.embedsSpan3)}>{e().description}</span>
               </Show>
             </span>
             <Show when={e().image}>
-              {(src) => <img src={src()} alt="" referrerpolicy="no-referrer" loading="lazy" {...stylex.attrs(viewStyles.embedsImg)} />}
+              {(src) => <img src={src()} alt="" referrerpolicy="no-referrer" loading="lazy" {...stylex.attrs(styles.embedsImg)} />}
             </Show>
           </a>
         )}
@@ -711,7 +699,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
 export function Reactions(props: { m: ChatMessage; names: (id: string) => string }) {
   const react = useReact();
   return (
-    <div {...stylex.attrs(viewStyles.reactionsDiv)}>
+    <div {...stylex.attrs(styles.reactionsDiv)}>
       <For each={props.m.reactions} keyed={(r) => r.emoji}>
         {(r) => {
           const mine = () => r().by.includes(userId);
@@ -724,7 +712,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
               aria-pressed={aria(mine())}
               title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: list(r().by.map(props.names)) })}
               onClick={() => react(props.m, r().emoji, !mine())}
-              {...stylex.attrs(variantStyles.reactionsButton, mine() ? variantStyles.reactionsButtonVariant : variantStyles.reactionsButtonVariant2)}
+              {...stylex.attrs(styles.reactionsButton, mine() ? styles.reactionsButtonTone : styles.reactionsButtonAlt)}
             >
               <span>{r().emoji}</span>
               <span>{r().by.length}</span>
@@ -807,11 +795,11 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       {...styleProps([messageStyles.toolbar, everyEmoji() || more() ? messageStyles.openToolbar : messageStyles.revealToolbar])}
     >
       <Show when={picking()}>
-        <div role="group" aria-label={t("web.channel.tools.pick")} {...stylex.attrs(viewStyles.messageToolsDiv)}>
+        <div role="group" aria-label={t("web.channel.tools.pick")} {...stylex.attrs(styles.messageToolsDiv)}>
           <For each={quickReactions}>
             {(emoji) => (
               <Toolbar.Button
-                {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+                {...stylex.attrs(styles.messageToolsToolbarButton)}
                 data-testid="quick-reaction"
                 data-key={emoji}
                 aria-label={emoji}
@@ -827,7 +815,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           </For>
           <Toolbar.Button
             ref={(el) => (moreEmoji = el)}
-            {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+            {...stylex.attrs(styles.messageToolsToolbarButton)}
             data-testid="more-emoji"
             aria-label={t("web.channel.emoji.more")}
             title={t("web.channel.emoji.more")}
@@ -850,7 +838,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         />
       </Show>
       <Toolbar.Button
-        {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+        {...stylex.attrs(styles.messageToolsToolbarButton)}
         data-testid="message-tool"
         data-key="react"
         aria-label={t("web.channel.tools.react")}
@@ -860,7 +848,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <Icon name="react" size={16} />
       </Toolbar.Button>
       <Toolbar.Button
-        {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+        {...stylex.attrs(styles.messageToolsToolbarButton)}
         data-testid="message-tool"
         data-key="reply"
         aria-label={t("web.channel.tools.reply")}
@@ -871,7 +859,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       </Toolbar.Button>
       <Show when={props.inChannel}>
         <Toolbar.Button
-          {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+          {...stylex.attrs(styles.messageToolsToolbarButton)}
           data-testid="message-tool"
           data-key="thread"
           aria-label={t("web.channel.tools.thread")}
@@ -888,7 +876,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         </Toolbar.Button>
       </Show>
       <Toolbar.Button
-        {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+        {...stylex.attrs(styles.messageToolsToolbarButton)}
         data-testid="message-tool"
         data-key="pin"
         aria-label={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
@@ -902,12 +890,12 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <Icon
           name="pin"
           size={16}
-          styles={[variantStyles2.messageToolsIcon, props.m.pinned !== undefined ? variantStyles2.messageToolsIcon : variantStyles2.replyQuoteIcon]}
+          styles={[styles.messageToolsIcon, props.m.pinned !== undefined ? styles.messageToolsIcon : styles.replyQuoteIcon]}
         />
       </Toolbar.Button>
       <Show when={editable()}>
         <Toolbar.Button
-          {...stylex.attrs(recipeStyles.messageToolsToolbarButton)}
+          {...stylex.attrs(styles.messageToolsToolbarButton)}
           data-testid="message-tool"
           data-key="edit"
           aria-label={t("web.channel.tools.edit")}
@@ -932,8 +920,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       />
       <Toolbar.Button
         {...stylex.attrs(
-          recipeStyles.messageToolsToolbarButton2,
-          sure() ? recipeStyles.messageToolsToolbarButtonVariant1Case2 : recipeStyles.messageToolsToolbarButtonVariant1Case1,
+          styles.messageToolsToolbarButton2,
+          sure() ? styles.messageToolsToolbarButtonSecondary : styles.messageToolsToolbarButtonPrimary,
         )}
         data-testid="message-tool"
         data-key="delete"
@@ -972,7 +960,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
     });
   };
   return (
-    <div {...stylex.attrs(viewStyles.editBoxDiv)}>
+    <div {...stylex.attrs(styles.editBoxDiv)}>
       <textarea
         ref={autofocus()}
         data-testid="message-edit"
@@ -990,10 +978,10 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
             done();
           }
         }}
-        {...stylex.attrs(viewStyles.messageEdit)}
+        {...stylex.attrs(styles.messageEdit)}
       />
       <Show when={files.length > 0}>
-        <div {...stylex.attrs(viewStyles.editBoxDiv2)}>
+        <div {...stylex.attrs(styles.editBoxDiv2)}>
           <For each={files}>
             {(f) => {
               const keeps = () => kept().includes(f.id);
@@ -1005,10 +993,10 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
                   aria-pressed={aria(keeps())}
                   aria-label={keeps() ? t("web.channel.media.takeOff", { name: f.name }) : t("web.channel.media.keep", { name: f.name })}
                   onClick={() => setKept((k) => (keeps() ? k.filter((x) => x !== f.id) : [...k, f.id]))}
-                  {...stylex.attrs(variantStyles.editBoxButton, keeps() ? variantStyles.editBoxButtonVariant : variantStyles.editBoxButtonVariant2)}
+                  {...stylex.attrs(styles.editBoxButton, keeps() ? styles.editBoxButtonTone : styles.editBoxButtonAlt)}
                 >
                   <Icon name="attach" size={12} />
-                  <span {...stylex.attrs(viewStyles.editBoxSpan)}>{f.name}</span>
+                  <span {...stylex.attrs(styles.editBoxSpan)}>{f.name}</span>
                   <Icon name={keeps() ? "close" : "add"} size={10} />
                 </button>
               );
@@ -1016,7 +1004,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
           </For>
         </div>
       </Show>
-      <p {...stylex.attrs(viewStyles.editBoxP)}>{t("web.channel.tools.editHint")}</p>
+      <p {...stylex.attrs(styles.editBoxP)}>{t("web.channel.tools.editHint")}</p>
     </div>
   );
 }
@@ -1027,7 +1015,7 @@ export function LinkedMessages(props: { text: string }) {
   const links = () => linkedMessages(props.text, core()?.chat, location.host);
   return (
     <Show when={links().length > 0}>
-      <div {...stylex.attrs(viewStyles.embedsDiv)}>
+      <div {...stylex.attrs(styles.embedsDiv)}>
         <For each={links()} keyed={(l) => `${l.channel}:${l.number}`}>
           {(l) => <LinkedCard at={l()} />}
         </For>
@@ -1048,10 +1036,10 @@ function LinkedCard(props: { at: LinkedMessage }) {
       data-key={`${props.at.channel}:${props.at.number}`}
       aria-label={t("web.channel.messages.linked", { where: channelLabel(where()), number: props.at.number })}
       onClick={() => router.navigate(messagePath(where(), props.at.number))}
-      {...stylex.attrs(viewStyles.linkedMessage)}
+      {...stylex.attrs(styles.linkedMessage)}
     >
-      <span {...stylex.attrs(viewStyles.linkedCardSpan)}>
-        <span {...stylex.attrs(viewStyles.linkedCardSpan2)}>
+      <span {...stylex.attrs(styles.linkedCardSpan2)}>
+        <span {...stylex.attrs(styles.linkedCardSpan22)}>
           <Show when={m()} fallback={`#${props.at.number}`}>
             {(said) => nameOf(said())}
           </Show>
@@ -1061,8 +1049,8 @@ function LinkedCard(props: { at: LinkedMessage }) {
       </span>
       <Show when={m()}>
         {(said) => (
-          <Show when={said().deleted === undefined} fallback={<span {...stylex.attrs(viewStyles.messageBodyP)}>{t("web.channel.messages.replyGone")}</span>}>
-            <span {...stylex.attrs(variantStyles.linkedCardSpan)}>{said().text || list(said().attachments.map((a) => a.name))}</span>
+          <Show when={said().deleted === undefined} fallback={<span {...stylex.attrs(styles.messageBodyP)}>{t("web.channel.messages.replyGone")}</span>}>
+            <span {...stylex.attrs(styles.linkedCardSpan)}>{said().text || list(said().attachments.map((a) => a.name))}</span>
           </Show>
         )}
       </Show>

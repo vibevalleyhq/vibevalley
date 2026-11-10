@@ -21,7 +21,7 @@ import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 
-const recipeStyles3 = stylex.create({
+const styles = stylex.create({
   sidebarDiv: {
     flex: "1",
     WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
@@ -67,9 +67,6 @@ const recipeStyles3 = stylex.create({
     padding: "var(--spacing)",
     boxShadow: "var(--shadow-float)",
   },
-});
-
-const recipeStyles2 = stylex.create({
   sessionRowButton: {
     display: "flex",
     alignItems: "center",
@@ -85,7 +82,7 @@ const recipeStyles2 = stylex.create({
       ":enabled": "pointer",
     },
   },
-  sessionRowButtonVariant1Case1: {
+  sessionRowButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -94,13 +91,10 @@ const recipeStyles2 = stylex.create({
       },
     },
   },
-  sessionRowButtonVariant1Case2: {
+  sessionRowButtonSecondary: {
     backgroundColor: "var(--wb-selected)",
   },
-});
-
-const recipeStyles = stylex.create({
-  sidebarDiv: {
+  sidebarDiv2: {
     display: "flex",
     height: "66px",
     flexShrink: "0",
@@ -147,7 +141,7 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  channelRowButtonVariant1Case1: {
+  channelRowButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -156,13 +150,13 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  channelRowButtonVariant1Case2: {
+  channelRowButtonSecondary: {
     backgroundColor: "var(--color-selected)",
   },
-  channelRowButtonVariant2Case1: {
+  channelRowButtonStateA: {
     boxShadow: null,
   },
-  channelRowButtonVariant2Case2: {
+  channelRowButtonStateB: {
     boxShadow: "inset 0 2px 0 var(--color-accent)",
   },
   channelRowSpan: {
@@ -172,45 +166,36 @@ const recipeStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  channelRowSpanVariant1Case1: {
+  channelRowSpanPrimary: {
     fontWeight: null,
   },
-  channelRowSpanVariant1Case2: {
+  channelRowSpanSecondary: {
     fontWeight: "var(--font-weight-semibold)",
   },
-  channelRowSpanVariant2Case1: {
+  channelRowSpanStateA: {
     color: null,
   },
-  channelRowSpanVariant2Case2: {
+  channelRowSpanStateB: {
     color: "var(--color-muted)",
   },
-});
-
-const variantStyles2 = stylex.create({
   sectionIcon: {
     opacity: ".6",
     transitionProperty: "transform,translate,scale,rotate",
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: ".12s",
   },
-  sectionIconVariant: {
+  sectionIconTone: {
     rotate: "90deg",
   },
-  sectionIconVariant2: {},
-});
-
-const variantStyles = stylex.create({
+  sectionIconAlt: {},
   sectionSection: {},
-  sectionSectionVariant: {
+  sectionSectionTone: {
     marginTop: "var(--spacing)",
     marginBottom: "var(--spacing)",
   },
-  sectionSectionVariant2: {
+  sectionSectionAlt: {
     marginBottom: "calc(var(--spacing) * 4)",
   },
-});
-
-const viewStyles = stylex.create({
   helperDot: { position: "absolute", right: "calc(var(--spacing) * -0.5)", bottom: "calc(var(--spacing) * -0.5)" },
   typingDot: { marginLeft: "var(--spacing)" },
   channelsSide: {
@@ -261,7 +246,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-faint)",
   },
-  sidebarDiv: {
+  sidebarDiv3: {
     position: "relative",
   },
   sidebarP: {
@@ -336,7 +321,7 @@ const viewStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * .5)",
   },
-  channelRowSpan: {
+  channelRowSpan2: {
     color: "var(--color-faint)",
   },
   sessionRowSpan: {
@@ -447,12 +432,12 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
     />
   );
   return (
-    <aside aria-label={t("web.channel.side")} data-testid="channels-side" {...stylex.attrs(viewStyles.channelsSide)}>
-      <div {...stylex.attrs(recipeStyles.sidebarDiv)}>
-        <span {...stylex.attrs(viewStyles.sidebarSpan)}>{t("web.channel.tab.chat")}</span>
+    <aside aria-label={t("web.channel.side")} data-testid="channels-side" {...stylex.attrs(styles.channelsSide)}>
+      <div {...stylex.attrs(styles.sidebarDiv2)}>
+        <span {...stylex.attrs(styles.sidebarSpan)}>{t("web.channel.tab.chat")}</span>
         <button
           type="button"
-          {...stylex.attrs(recipeStyles.sidebarButton)}
+          {...stylex.attrs(styles.sidebarButton)}
           data-testid="farm-search-open"
           aria-label={t("web.channel.farmSearch.open")}
           title={t("web.channel.farmSearch.open")}
@@ -461,10 +446,10 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           <Icon name="search" size={16} />
         </button>
       </div>
-      <div {...stylex.attrs(recipeStyles3.sidebarDiv)}>
-        <button type="button" data-testid="switcher-open" onClick={() => switcher.show()} {...stylex.attrs(viewStyles.switcherOpen)}>
-          <span {...stylex.attrs(viewStyles.sidebarSpan2)}>{t("web.channel.switcher.open")}</span>
-          <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/u.test(navigator.userAgent) })}</span>
+      <div {...stylex.attrs(styles.sidebarDiv)}>
+        <button type="button" data-testid="switcher-open" onClick={() => switcher.show()} {...stylex.attrs(styles.switcherOpen)}>
+          <span {...stylex.attrs(styles.sidebarSpan2)}>{t("web.channel.switcher.open")}</span>
+          <span {...stylex.attrs(styles.sidebarSpan3)}>{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/u.test(navigator.userAgent) })}</span>
         </button>
         <Section
           item="channels"
@@ -473,7 +458,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           action={
             <button
               type="button"
-              {...stylex.attrs(recipeStyles.sidebarButton)}
+              {...stylex.attrs(styles.sidebarButton)}
               data-testid="new-channel"
               aria-label={t("web.channel.newChannel")}
               title={t("web.channel.newChannel")}
@@ -500,10 +485,10 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           title={t("web.channel.directsTitle")}
           count={directsOf(chat()).length}
           action={
-            <div {...stylex.attrs(viewStyles.sidebarDiv)}>
+            <div {...stylex.attrs(styles.sidebarDiv3)}>
               <button
                 type="button"
-                {...stylex.attrs(recipeStyles.sidebarButton)}
+                {...stylex.attrs(styles.sidebarButton)}
                 data-testid="new-direct"
                 aria-label={t("web.channel.direct.add")}
                 title={t("web.channel.direct.add")}
@@ -528,7 +513,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
         </Section>
         <Section title={t("web.channel.helpers")} item="helpers" count={sessions().length}>
           <Show when={sessions().length === 0}>
-            <p {...stylex.attrs(viewStyles.sidebarP)}>{t("web.channel.noHelpers")}</p>
+            <p {...stylex.attrs(styles.sidebarP)}>{t("web.channel.noHelpers")}</p>
           </Show>
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && sessionThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
@@ -554,18 +539,18 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
     if (id !== undefined) props.onPicked(id);
   };
   return (
-    <div role="menu" data-testid="direct-picker" aria-label={t("web.channel.direct.pick")} {...stylex.attrs(recipeStyles3.directPickerDiv)}>
-      <p {...stylex.attrs(viewStyles.directPickerP)}>{t("web.channel.direct.pick")}</p>
+    <div role="menu" data-testid="direct-picker" aria-label={t("web.channel.direct.pick")} {...stylex.attrs(styles.directPickerDiv)}>
+      <p {...stylex.attrs(styles.directPickerP)}>{t("web.channel.direct.pick")}</p>
       <Show when={all.status() === "success" && agents().length === 0}>
-        <p {...stylex.attrs(viewStyles.directPickerP2)}>{t("web.channel.direct.none")}</p>
+        <p {...stylex.attrs(styles.directPickerP2)}>{t("web.channel.direct.none")}</p>
       </Show>
       <For each={agents()} keyed={(a) => a.id}>
         {(a) => (
-          <button type="button" role="menuitem" data-key={a().id} {...stylex.attrs(viewStyles.directPickerButton)} onClick={() => void open(a().id)}>
+          <button type="button" role="menuitem" data-key={a().id} {...stylex.attrs(styles.directPickerButton)} onClick={() => void open(a().id)}>
             <Show when={a().role === "orchestrator"} fallback={<HelperFace agent={a().id} runtime={a().runtime} size={20} />}>
               <OrchestratorFace size={20} agent={a().id} />
             </Show>
-            <span {...stylex.attrs(viewStyles.directPickerSpan)}>{a().name}</span>
+            <span {...stylex.attrs(styles.directPickerSpan)}>{a().name}</span>
           </button>
         )}
       </For>
@@ -577,31 +562,31 @@ function Section(props: { title: string; item: string; count: number; action?: J
   const [open, setOpen] = createSignal(untrack(() => props.closed !== true));
   return (
     <section
-      {...stylex.attrs(variantStyles.sectionSection, props.nested === true ? variantStyles.sectionSectionVariant : variantStyles.sectionSectionVariant2)}
+      {...stylex.attrs(styles.sectionSection, props.nested === true ? styles.sectionSectionTone : styles.sectionSectionAlt)}
       aria-label={props.title}
       data-testid="side-section"
       data-key={props.item}
     >
-      <div {...stylex.attrs(viewStyles.sectionDiv)}>
+      <div {...stylex.attrs(styles.sectionDiv)}>
         <button
           type="button"
           data-testid="side-section-toggle"
           aria-expanded={aria(open())}
           onClick={() => setOpen(!open())}
-          {...stylex.attrs(viewStyles.sideSectionToggle)}
+          {...stylex.attrs(styles.sideSectionToggle)}
         >
           <Icon
             name="expand"
             size={10}
-            styles={[variantStyles2.sectionIcon, open() ? variantStyles2.sectionIconVariant : variantStyles2.sectionIconVariant2]}
+            styles={[styles.sectionIcon, open() ? styles.sectionIconTone : styles.sectionIconAlt]}
           />
-          <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.title}</span>
-          <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{props.count}</span>
+          <span {...stylex.attrs(styles.sectionSpan)}>{props.title}</span>
+          <span {...stylex.attrs(styles.sidebarSpan3)}>{props.count}</span>
         </button>
         {props.action}
       </div>
       <Show when={open()}>
-        <div {...stylex.attrs(viewStyles.sectionDiv2)}>{props.children}</div>
+        <div {...stylex.attrs(styles.sectionDiv2)}>{props.children}</div>
       </Show>
     </section>
   );
@@ -647,25 +632,25 @@ function ChannelRow(props: {
         untrack(() => props.onDrop)?.();
       }}
       {...stylex.attrs(
-        recipeStyles.channelRowButton,
-        props.here ? recipeStyles.channelRowButtonVariant1Case2 : recipeStyles.channelRowButtonVariant1Case1,
-        over() ? recipeStyles.channelRowButtonVariant2Case2 : recipeStyles.channelRowButtonVariant2Case1,
+        styles.channelRowButton,
+        props.here ? styles.channelRowButtonSecondary : styles.channelRowButtonPrimary,
+        over() ? styles.channelRowButtonStateB : styles.channelRowButtonStateA,
       )}
     >
-      <span {...stylex.attrs(viewStyles.channelRowSpan)} aria-hidden="true">
+      <span {...stylex.attrs(styles.channelRowSpan2)} aria-hidden="true">
         {markOf(props.channel)}
       </span>
       <span
         {...stylex.attrs(
-          recipeStyles.channelRowSpan,
-          props.here || props.unread > 0 ? recipeStyles.channelRowSpanVariant1Case2 : recipeStyles.channelRowSpanVariant1Case1,
-          quiet() && !props.here ? recipeStyles.channelRowSpanVariant2Case2 : recipeStyles.channelRowSpanVariant2Case1,
+          styles.channelRowSpan,
+          props.here || props.unread > 0 ? styles.channelRowSpanSecondary : styles.channelRowSpanPrimary,
+          quiet() && !props.here ? styles.channelRowSpanStateB : styles.channelRowSpanStateA,
         )}
       >
         {channelName(props.channel)}
       </span>
       <Show when={props.channel.notify && props.channel.notify !== "all"}>
-        <span {...stylex.attrs(viewStyles.sidebarSpan3)}>
+        <span {...stylex.attrs(styles.sidebarSpan3)}>
           {props.channel.notify === "none" ? t("web.channel.manage.muted") : t("web.channel.manage.mentionsOnly")}
         </span>
       </Show>
@@ -695,17 +680,17 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
       }}
       title={phase()}
       {...stylex.attrs(
-        recipeStyles2.sessionRowButton,
-        props.active ? recipeStyles2.sessionRowButtonVariant1Case2 : recipeStyles2.sessionRowButtonVariant1Case1,
+        styles.sessionRowButton,
+        props.active ? styles.sessionRowButtonSecondary : styles.sessionRowButtonPrimary,
       )}
     >
-      <span {...stylex.attrs(viewStyles.sessionRowSpan)}>
+      <span {...stylex.attrs(styles.sessionRowSpan)}>
         <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={24} />
-        <Dot tone={phaseDot(props.h.phase)} styles={viewStyles.helperDot} />
+        <Dot tone={phaseDot(props.h.phase)} styles={styles.helperDot} />
       </span>
-      <span {...stylex.attrs(viewStyles.sessionRowSpan2)}>{props.h.name}</span>
+      <span {...stylex.attrs(styles.sessionRowSpan2)}>{props.h.name}</span>
       <PhaseGlyph phase={props.h.phase} />
-      <span {...stylex.attrs(viewStyles.sessionRowSpan3)}>{phase()}</span>
+      <span {...stylex.attrs(styles.sessionRowSpan3)}>{phase()}</span>
       <Show when={unread() > 0}>
         <Count n={unread()} />
       </Show>
@@ -728,14 +713,14 @@ function OrchestratorLine(props: { agent: string }) {
       data-testid="channel-orchestrator-line"
       data-key={props.agent}
       data-state={now()}
-      {...stylex.attrs(viewStyles.channelOrchestratorLine)}
+      {...stylex.attrs(styles.channelOrchestratorLine)}
       aria-label={t("web.channel.orchestrator")}
     >
       <OrchestratorFace size={32} agent={props.agent} />
       {profile()?.name || t("web.channel.orchestrator")}
-      <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} styles={viewStyles.typingDot} />
-      <span {...stylex.attrs(viewStyles.orchestratorLineSpan)}>{orchestratorMoodLabels[now()]}</span>
-      <Show when={since()}>{(at) => <span {...stylex.attrs(viewStyles.sidebarSpan3)}>{tookText(Math.max(0, clock() - at()))}</span>}</Show>
+      <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} styles={styles.typingDot} />
+      <span {...stylex.attrs(styles.orchestratorLineSpan)}>{orchestratorMoodLabels[now()]}</span>
+      <Show when={since()}>{(at) => <span {...stylex.attrs(styles.sidebarSpan3)}>{tookText(Math.max(0, clock() - at()))}</span>}</Show>
       <Show when={now() === "thinking"}>
         <ThinkingDots />
       </Show>

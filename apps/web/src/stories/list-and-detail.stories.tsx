@@ -9,7 +9,7 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { Card, Empty, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
 import { Dot, type DotTone } from "#/ui/Tag.tsx";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   listAndDetailStoriesP: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
@@ -45,7 +45,7 @@ export default stories({
               {(p) => (
                 <Card title={p().id} action={<Button>打开目录</Button>}>
                   <Show when={p().about} fallback={<Quiet>还没有说明。</Quiet>}>
-                    <p {...stylex.attrs(variantStyles.listAndDetailStoriesP)}>{p().about}</p>
+                    <p {...stylex.attrs(styles.listAndDetailStoriesP)}>{p().about}</p>
                   </Show>
                 </Card>
               )}

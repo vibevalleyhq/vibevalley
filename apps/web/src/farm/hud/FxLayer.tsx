@@ -11,7 +11,7 @@ import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastT
 
 import { clearingLevels } from "./readout";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   fxLayerDiv: {
     display: "flex",
     flexDirection: "column",
@@ -54,9 +54,6 @@ const recipeStyles = stylex.create({
       "@media (prefers-reduced-motion:no-preference)": "running",
     },
   },
-});
-
-const viewStyles = stylex.create({
   levelUp: {
     pointerEvents: "none",
     position: "absolute",
@@ -154,22 +151,22 @@ export function FxLayer() {
       <Show when={banner()} keyed>
         {(b) => (
           <div
-            {...stylex.attrs(viewStyles.levelUp)}
+            {...stylex.attrs(styles.levelUp)}
             role="status"
             data-testid="level-up"
             data-level={b.level}
             aria-label={t("web.farm.fx.levelUp", { level: b.level })}
           >
-            <div {...stylex.attrs(recipeStyles.fxLayerDiv)}>
-              <span {...stylex.attrs(viewStyles.fxLayerSpan)}>
+            <div {...stylex.attrs(styles.fxLayerDiv)}>
+              <span {...stylex.attrs(styles.fxLayerSpan)}>
                 <Show when={loaded().village?.atlas.has("icon-star")}>
-                  <img src="/pixel/icon-star.png" alt="" {...stylex.attrs(viewStyles.fxLayerImg)} />
+                  <img src="/pixel/icon-star.png" alt="" {...stylex.attrs(styles.fxLayerImg)} />
                 </Show>
               </span>
-              <span {...stylex.attrs(viewStyles.fxLayerSpan2)}>LEVEL UP</span>
-              <span {...stylex.attrs(viewStyles.fxLayerSpan3)}>{t("web.farm.fx.level", { level: b.level })}</span>
+              <span {...stylex.attrs(styles.fxLayerSpan2)}>LEVEL UP</span>
+              <span {...stylex.attrs(styles.fxLayerSpan3)}>{t("web.farm.fx.level", { level: b.level })}</span>
               <Show when={clearingLevels.has(b.level)}>
-                <span {...stylex.attrs(viewStyles.fxLayerSpan4)}>{t("web.farm.fx.cleared")}</span>
+                <span {...stylex.attrs(styles.fxLayerSpan4)}>{t("web.farm.fx.cleared")}</span>
               </Show>
             </div>
           </div>

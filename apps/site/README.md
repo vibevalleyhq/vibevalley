@@ -1,6 +1,6 @@
 # site
 
-官网 vibevalley.dev：中文在 `/`，英文在 `/en/`，未找到的页面用 `/404.html`。Vite 与 Solid 2 在构建时生成完整 HTML；每个文档只有一个接管根，语言链接加载另一个文档。组件样式使用 StyleX，重置、令牌和接管前的规则由 `src/styles/global.css` 提供；动画使用 Motion DOM API。架构约定见[官网](docs/subsystems/site.md)，样式替换按[迁移验收](.agents/skills/vv-stylex/references/migration.md#运行最终验收)执行。
+官网 vibevalley.dev：中文在 `/`，英文在 `/en/`，未找到的页面用 `/404.html`。Vite 与 Solid 2 在构建时生成完整 HTML；每个文档只有一个接管根，语言链接加载另一个文档。组件样式使用 StyleX（[vv-stylex](.agents/skills/vv-stylex/SKILL.md)），重置、令牌和接管前的规则由 `src/styles/global.css` 提供；动画使用 Motion DOM API。架构约定见[官网](docs/subsystems/site.md)。
 
 `apps/site` 属于根 workspace，共用根 catalog、锁文件和检查。在根目录 `vp install`，再运行：
 

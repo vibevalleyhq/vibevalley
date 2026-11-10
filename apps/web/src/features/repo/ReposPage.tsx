@@ -20,7 +20,7 @@ import { dateText, type Recency, recencyOf, recencyText, since } from "./calenda
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   reposPageDiv: {
     display: "flex",
     height: "100%",
@@ -38,9 +38,6 @@ const recipeStyles2 = stylex.create({
       "@media (width>=48rem)": "hidden",
     },
   },
-});
-
-const recipeStyles = stylex.create({
   overviewSpan: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: {
@@ -51,10 +48,7 @@ const recipeStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-});
-
-const variantStyles = stylex.create({
-  reposPageDiv: {
+  reposPageDiv2: {
     display: "flex",
     minHeight: {
       default: "480px",
@@ -72,10 +66,7 @@ const variantStyles = stylex.create({
     flexDirection: "column",
     gap: "calc(var(--spacing) * 3)",
   },
-});
-
-const viewStyles = stylex.create({
-  reposPageDiv: {
+  reposPageDiv3: {
     maxHeight: {
       default: "calc(var(--spacing) * 60)",
       "@media (width>=48rem)": "none",
@@ -144,7 +135,7 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-page)",
     padding: "calc(var(--spacing) * 4)",
   },
-  overviewSpan: {
+  overviewSpan2: {
     display: "flex",
     width: "calc(var(--spacing) * 24)",
     height: "calc(var(--spacing) * 24)",
@@ -154,7 +145,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-hover)",
   },
-  overviewDiv: {
+  overviewDiv2: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
@@ -168,7 +159,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-xl--line-height)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  overviewDiv2: {
+  overviewDiv22: {
     display: "flex",
     flexWrap: "wrap",
     columnGap: "calc(var(--spacing) * 6)",
@@ -179,7 +170,7 @@ const viewStyles = stylex.create({
     alignItems: "center",
     gap: "calc(var(--spacing) * 1.5)",
   },
-  overviewSpan2: {
+  overviewSpan22: {
     minWidth: "0",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -278,8 +269,8 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
   const [creating, setCreating] = createSignal(false);
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
-    <div {...stylex.attrs(recipeStyles2.reposPageDiv)}>
-      <div {...stylex.attrs(viewStyles.reposPageDiv)}>
+    <div {...stylex.attrs(styles.reposPageDiv)}>
+      <div {...stylex.attrs(styles.reposPageDiv3)}>
         <ListCard
           bare
           title={t("web.repo.title")}
@@ -291,7 +282,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
             </Button>
           }
         >
-          <li {...stylex.attrs(viewStyles.reposPageLi)}>{t("web.repo.repos")}</li>
+          <li {...stylex.attrs(styles.reposPageLi)}>{t("web.repo.repos")}</li>
           <Switch
             fallback={
               <>
@@ -316,15 +307,15 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
             }
           >
             <Match when={!ready(list, undefined)}>
-              <li {...stylex.attrs(viewStyles.reposPageLi2)}>{t("web.repo.finding")}</li>
+              <li {...stylex.attrs(styles.reposPageLi2)}>{t("web.repo.finding")}</li>
             </Match>
             <Match when={sorted().length === 0}>
-              <li {...stylex.attrs(viewStyles.reposPageLi2)}>{t("web.repo.none")}</li>
+              <li {...stylex.attrs(styles.reposPageLi2)}>{t("web.repo.none")}</li>
             </Match>
           </Switch>
         </ListCard>
       </div>
-      <div {...stylex.attrs(variantStyles.reposPageDiv)}>
+      <div {...stylex.attrs(styles.reposPageDiv2)}>
         {/* Keyed by the name, a plain value: the panel's queries are still settling when the page moves back to the map, and a read through a narrowed accessor then would halt the page. */}
         <Show when={selected()?.name} keyed fallback={<props.skin.Map />}>
           {(name) => <RepoPanel name={name} repos={sorted} now={now()} Head={props.skin.Head} />}
@@ -345,7 +336,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
 function RepoPanel(props: { name: string; repos: () => RepoSummary[]; now: number; Head: ReposSkin["Head"] }) {
   const repo = createMemo<RepoSummary | undefined>((last) => props.repos().find((p) => p.name === props.name) ?? last);
   return (
-    <div data-testid="repo" data-key={props.name} {...stylex.attrs(viewStyles.repo)}>
+    <div data-testid="repo" data-key={props.name} {...stylex.attrs(styles.repo)}>
       <props.Head name={props.name} />
       <Show when={repo()}>{(p) => <Details repo={p()} now={props.now} />}</Show>
     </div>
@@ -403,38 +394,38 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
   const busy = () => props.languages.fetching() || props.activity.fetching();
   const notCounted = () => !!props.languages.error();
   return (
-    <section {...stylex.attrs(viewStyles.overviewSection)}>
-      <span {...stylex.attrs(viewStyles.overviewSpan)}>
+    <section {...stylex.attrs(styles.overviewSection)}>
+      <span {...stylex.attrs(styles.overviewSpan2)}>
         <SpriteIcon name={recencyPicture[recency()]} size={80} label={t("web.repo.recency.label", { label: recencyText(recency()) })} />
       </span>
-      <div {...stylex.attrs(variantStyles.overviewDiv)}>
-        <div {...stylex.attrs(viewStyles.overviewDiv)}>
-          <h2 {...stylex.attrs(viewStyles.overviewH2)}>{props.repo.name}</h2>
-          <span {...stylex.attrs(recipeStyles.overviewSpan)}>{recencyText(recency())}</span>
+      <div {...stylex.attrs(styles.overviewDiv)}>
+        <div {...stylex.attrs(styles.overviewDiv2)}>
+          <h2 {...stylex.attrs(styles.overviewH2)}>{props.repo.name}</h2>
+          <span {...stylex.attrs(styles.overviewSpan)}>{recencyText(recency())}</span>
         </div>
-        <div {...stylex.attrs(viewStyles.overviewDiv2)}>
+        <div {...stylex.attrs(styles.overviewDiv22)}>
           <Stat label={t("web.repo.firstCommit")} value={firstCommit()} />
           <Stat label={t("web.repo.commitCount")} value={commitTotal()} />
           <Stat label={t("web.repo.code")} value={codeLines()} />
           <Stat label={t("web.repo.languages")} value={languageTotal()} />
         </div>
-        <div {...stylex.attrs(viewStyles.overviewDiv3)}>
+        <div {...stylex.attrs(styles.overviewDiv3)}>
           <Icon name="folder" size={14} />
-          <span {...stylex.attrs(viewStyles.overviewSpan2)} title={props.repo.path}>
+          <span {...stylex.attrs(styles.overviewSpan22)} title={props.repo.path}>
             {props.repo.path}
           </span>
           <button
             type="button"
             title={t("web.repo.copyPath")}
             aria-label={t("web.repo.copyPath")}
-            {...stylex.attrs(viewStyles.overviewButton)}
+            {...stylex.attrs(styles.overviewButton)}
             onClick={() => void copyPath(props.repo.path)}
           >
             <Icon name="copy" size={14} />
           </button>
         </div>
       </div>
-      <div {...stylex.attrs(viewStyles.overviewDiv4)}>
+      <div {...stylex.attrs(styles.overviewDiv4)}>
         <button
           type="button"
           title={busy() ? t("web.repo.counting") : t("web.repo.recount")}
@@ -443,12 +434,12 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           onClick={() => {
             void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
           }}
-          {...stylex.attrs(viewStyles.overviewButton2)}
+          {...stylex.attrs(styles.overviewButton2)}
         >
           <Icon name="refresh" size={16} />
         </button>
         <Show when={counted()}>
-          {(c) => <span {...stylex.attrs(viewStyles.overviewSpan3)}>{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</span>}
+          {(c) => <span {...stylex.attrs(styles.overviewSpan3)}>{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</span>}
         </Show>
       </div>
     </section>

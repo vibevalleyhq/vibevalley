@@ -1,8 +1,7 @@
-@layer theme, base, components, stylex, utilities;
+@layer theme, base, components, stylex;
 @import "./reset.css";
 @import "./ui/Markdown.css";
 @import "./ui/pixel/PxMarkdown.css";
-@import "./ui/settings.css";
 
 /* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets
    <html data-theme>). Paper and ink are near neutral, so that colour is left for what means something: green to go,
@@ -251,8 +250,10 @@
   --color-cream-hover: #f1dcab;
   --color-cream-input: #fff4d8;
   --color-bark-400: #9b7550;
+  --color-bark-450: #a5743f;
   --color-bark-500: #7f5b3b;
   --color-bark-600: #67482d;
+  --color-bark-700: #5a3d26;
   --color-bark-800: #46301d;
   --color-bark-900: #2f1f13;
   --color-leaf-300: #b4cb7c;
@@ -298,6 +299,28 @@
   --color-bark-850: #3a2a18;
   --color-peach: #f3b07a;
   --color-px-toast-warn: #f3b07a4d;
+  --color-px-quota-low: #b8862a;
+  --color-px-gold-frame: #e5a93cb3;
+  --color-px-key-dent: #00000040;
+  --color-medal-bronze: #c07a43;
+  --color-medal-silver: #a9b4bf;
+  --color-outcome-ok-fill: #e5a93c66;
+  --color-outcome-fail-fill: #c84a3a26;
+  --color-log-ok-fill: #efcf92;
+  --color-log-fail-fill: #f0cda6;
+  --color-diff-add-fill: #d0dca9;
+  --color-diff-mod-fill: #f0dba9;
+  --color-diff-del-fill: #edcba9;
+  --color-patch-add-bg: #b4cb7c59;
+  --color-patch-del-bg: #c84a3a1a;
+  --color-card-muted: #776046;
+  --color-card-good: #3f6b2a;
+  --color-card-light-ink: #fff3dc;
+  --color-card-wood: #b07a45;
+  --color-card-ripe: #e8b84a;
+  --color-card-bug: #b44b36;
+  --color-card-stuck: #4a728c;
+  --color-card-rest: #cdbb92;
   --color-px-map-paper: #ebd9ae;
   --color-px-map-grid: #c8a46e73;
   --color-agent-stage-center: #c7dd9a;
@@ -310,8 +333,17 @@
   /* The phone's screen, an old handheld's green LCD: the same greens farm/phone/lcd.ts draws the canvas with. */
   --color-lcd-paper: #c9dc9a;
   --color-lcd-light: #b9cf8c;
+  --color-lcd-mid: #6f8f45;
+  --color-lcd-dark: #3d5a2a;
+  --color-lcd-ink: #22341a;
   --color-lcd-pale: #e8f0c8;
   --color-lcd-pale-hover: #f2f7dc;
+  --color-lcd-rule: #9fb07a;
+  --color-lcd-bevel: #a8bd78;
+  --color-phone-shade: #4a321e;
+  --color-phone-lit: #8a6440;
+  --color-phone-key-shade: #9c3a2d;
+  --color-phone-failed: #8f2a1e;
   /* The title screen's evening: the sky's dusk and the warm light of a window. */
   --color-dusk-800: #2a1d2e;
   --color-dusk-900: #1e1424;
@@ -472,8 +504,8 @@ body {
   }
 }
 
-/* The desktop window's drag strip (app/TitleBar.tsx); what is clickable in it stays clickable. */
-.window-drag {
+/* The desktop window's drag strip (ui/layout.tsx, WindowStrip); what is clickable in it stays clickable. */
+[data-window-drag] {
   -webkit-app-region: drag;
   app-region: drag;
 }

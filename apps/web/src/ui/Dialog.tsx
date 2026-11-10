@@ -4,8 +4,8 @@ import { createEffect } from "solid-js";
 
 import { Dialog as Base } from "@vibevalley/base-ui";
 
-const recipeStyles = stylex.create({
-  dialogBasePopup: {
+const styles = stylex.create({
+  popup: {
     margin: "auto",
     animationName: {
       default: "pop-in",
@@ -52,21 +52,18 @@ const recipeStyles = stylex.create({
     color: "var(--wb-ink)",
     boxShadow: "var(--shadow-float)",
   },
-  dialogBasePopupVariant1Case1: {
+  popupNarrow: {
     width: "min(480px,92vw)",
   },
-  dialogBasePopupVariant1Case2: {
+  popupWide: {
     width: "min(1080px,94vw)",
   },
-});
-
-const viewStyles = stylex.create({
-  dialogDiv: {
+  frame: {
     display: "flex",
     maxHeight: "86vh",
     flexDirection: "column",
   },
-  dialogBaseTitle: {
+  title: {
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
@@ -76,7 +73,7 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-base--line-height)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  dialogDiv2: {
+  body: {
     overflowY: "auto",
     paddingInline: "calc(var(--spacing) * 5)",
     paddingBlock: "calc(var(--spacing) * 4)",
@@ -106,16 +103,10 @@ export function createModal(open: () => boolean, onClose: () => void) {
 export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {
   return (
     <Base.Root open={props.open} onOpenChange={(open) => !open && props.onClose()}>
-      <Base.Popup
-        data-testid={props.testid}
-        {...stylex.attrs(
-          recipeStyles.dialogBasePopup,
-          props.wide === true ? recipeStyles.dialogBasePopupVariant1Case2 : recipeStyles.dialogBasePopupVariant1Case1,
-        )}
-      >
-        <div {...stylex.attrs(viewStyles.dialogDiv)}>
-          <Base.Title {...stylex.attrs(viewStyles.dialogBaseTitle)}>{props.title}</Base.Title>
-          <div {...stylex.attrs(viewStyles.dialogDiv2)}>{props.children}</div>
+      <Base.Popup data-testid={props.testid} {...stylex.attrs(styles.popup, props.wide === true ? styles.popupWide : styles.popupNarrow)}>
+        <div {...stylex.attrs(styles.frame)}>
+          <Base.Title {...stylex.attrs(styles.title)}>{props.title}</Base.Title>
+          <div {...stylex.attrs(styles.body)}>{props.children}</div>
         </div>
       </Base.Popup>
     </Base.Root>

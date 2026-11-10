@@ -43,7 +43,7 @@ const buttonStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   panelAside: {
     position: "absolute",
     top: "calc(var(--spacing) * 2)",
@@ -65,9 +65,6 @@ const recipeStyles = stylex.create({
     color: "var(--color-paper)",
     boxShadow: "var(--shadow-px)",
   },
-});
-
-const variantStyles = stylex.create({
   panelDiv: {
     display: "flex",
     minHeight: "0",
@@ -76,9 +73,6 @@ const variantStyles = stylex.create({
     gap: "calc(var(--spacing) * 2)",
     overflowY: "auto",
   },
-});
-
-const viewStyles = stylex.create({
   sectionSection: {
     display: "flex",
     flexDirection: "column",
@@ -109,14 +103,14 @@ const viewStyles = stylex.create({
     fontSize: "13px",
     color: "var(--color-hat)",
   },
-  panelDiv: {
+  panelDiv2: {
     display: "flex",
     gap: "calc(var(--spacing) * 1.5)",
   },
   panelInput: {
     accentColor: "var(--color-hat)",
   },
-  panelDiv2: {
+  panelDiv22: {
     display: "flex",
     gap: "var(--spacing)",
   },
@@ -235,9 +229,9 @@ const btn = (tone: "plain" | "hat" | "bad" = "plain") => styleProps([buttonStyle
 
 function Section(props: { title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} {...stylex.attrs(viewStyles.sectionSection)}>
-      <header {...stylex.attrs(viewStyles.sectionHeader)}>
-        <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.title}</span>
+    <section aria-label={props.title} {...stylex.attrs(styles.sectionSection)}>
+      <header {...stylex.attrs(styles.sectionHeader)}>
+        <span {...stylex.attrs(styles.sectionSpan)}>{props.title}</span>
         {props.aside}
       </header>
       {props.children}
@@ -263,14 +257,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
-    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(recipeStyles.panelAside)}>
-      <header {...stylex.attrs(viewStyles.panelHeader)}>
-        <span {...stylex.attrs(viewStyles.panelSpan)}>{t("web.farm.debug.title")}</span>
+    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(styles.panelAside)}>
+      <header {...stylex.attrs(styles.panelHeader)}>
+        <span {...stylex.attrs(styles.panelSpan)}>{t("web.farm.debug.title")}</span>
         <button type="button" data-testid="debug-close" {...btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
-      <div {...stylex.attrs(variantStyles.panelDiv)}>
+      <div {...stylex.attrs(styles.panelDiv)}>
         <Section
           title={t("web.farm.debug.call")}
           aside={
@@ -279,7 +273,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <div {...stylex.attrs(viewStyles.panelDiv)}>
+          <div {...stylex.attrs(styles.panelDiv2)}>
             <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
               {t("web.farm.debug.open")}
             </button>
@@ -297,9 +291,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             step={0.005}
             value={day().tod}
             onInput={(e) => clock.setTimeOfDay(Number(e.currentTarget.value))}
-            {...stylex.attrs(viewStyles.panelInput)}
+            {...stylex.attrs(styles.panelInput)}
           />
-          <div {...stylex.attrs(viewStyles.panelDiv2)}>
+          <div {...stylex.attrs(styles.panelDiv22)}>
             <For
               each={
                 [
@@ -325,7 +319,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </div>
         </Section>
         <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
-          <div {...stylex.attrs(viewStyles.panelDiv)}>
+          <div {...stylex.attrs(styles.panelDiv2)}>
             <button type="button" data-testid="debug-level-up" {...btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
               {t("web.farm.debug.levelUp")}
             </button>
@@ -356,12 +350,12 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.helpers", { n: sessions().length })}>
           <Show when={sessions().length === 0}>
-            <span {...stylex.attrs(viewStyles.panelSpan2)}>{t("web.farm.debug.nobody")}</span>
+            <span {...stylex.attrs(styles.panelSpan2)}>{t("web.farm.debug.nobody")}</span>
           </Show>
           <For each={sessions()}>
             {(h) => (
-              <div {...stylex.attrs(viewStyles.panelDiv3)}>
-                <button type="button" {...stylex.attrs(viewStyles.panelButton)} onClick={() => farm.select(h.id)}>
+              <div {...stylex.attrs(styles.panelDiv3)}>
+                <button type="button" {...stylex.attrs(styles.panelButton)} onClick={() => farm.select(h.id)}>
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
@@ -380,7 +374,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </For>
         </Section>
         <Section title={t("web.farm.debug.all")}>
-          <div {...stylex.attrs(viewStyles.panelDiv)}>
+          <div {...stylex.attrs(styles.panelDiv2)}>
             <button type="button" {...btn()} onClick={() => void everyone("stop")}>
               {t("web.farm.debug.haltAll")}
             </button>
@@ -392,7 +386,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <For each={SOUND_GROUPS}>
           {(g) => (
             <Section title={g.title}>
-              <div {...stylex.attrs(viewStyles.panelDiv4)}>
+              <div {...stylex.attrs(styles.panelDiv4)}>
                 <For each={g.names}>
                   {(n) => (
                     <button type="button" title={n} {...btn()} onClick={() => playSound(n)}>
@@ -407,7 +401,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <Section
           title={t("web.farm.debug.frames", { n: props.log.entries().length })}
           aside={
-            <span {...stylex.attrs(viewStyles.panelDiv2)}>
+            <span {...stylex.attrs(styles.panelDiv22)}>
               <button type="button" {...btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
                 {props.log.paused() ? t("web.farm.debug.resume") : t("web.farm.debug.pause")}
               </button>
@@ -433,13 +427,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <ol {...stylex.attrs(viewStyles.panelOl)}>
+          <ol {...stylex.attrs(styles.panelOl)}>
             <For each={props.log.entries().slice(-200).toReversed()} keyed={(e) => e.seq}>
               {(e) => (
-                <li data-testid="debug-frame" data-type={e().type} {...stylex.attrs(viewStyles.debugFrame)}>
-                  <span {...stylex.attrs(viewStyles.panelSpan3)}>{e().seq}</span>
-                  <span {...stylex.attrs(viewStyles.panelSpan4)}>{e().type}</span>
-                  <span {...stylex.attrs(viewStyles.panelSpan5)}>{e().summary}</span>
+                <li data-testid="debug-frame" data-type={e().type} {...stylex.attrs(styles.debugFrame)}>
+                  <span {...stylex.attrs(styles.panelSpan3)}>{e().seq}</span>
+                  <span {...stylex.attrs(styles.panelSpan4)}>{e().type}</span>
+                  <span {...stylex.attrs(styles.panelSpan5)}>{e().summary}</span>
                 </li>
               )}
             </For>

@@ -37,7 +37,7 @@ const connectorStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   connectorCardSpan: {
     display: "inline-block",
     borderRadius: "var(--radius-lg)",
@@ -52,15 +52,9 @@ const recipeStyles = stylex.create({
     WebkitUserSelect: "all",
     userSelect: "all",
   },
-});
-
-const variantStyles = stylex.create({
   qqLoginTextInput: {
     fontFamily: "var(--font-mono)",
   },
-});
-
-const viewStyles = stylex.create({
   connectorsPageLi: {
     paddingInline: "calc(var(--spacing) * 2.5)",
     paddingTop: "var(--spacing)",
@@ -111,7 +105,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-  connectorCardSpan: {
+  connectorCardSpan2: {
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: "var(--color-muted)",
@@ -227,7 +221,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
     <Split
       list={
         <ListCard title={t("web.connector.connectors.section.label")} label={t("web.connector.connectors.list")} testid="connectors">
-          <li {...stylex.attrs(viewStyles.connectorsPageLi)}>{t("web.connector.connectors.intro")}</li>
+          <li {...stylex.attrs(styles.connectorsPageLi)}>{t("web.connector.connectors.intro")}</li>
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
@@ -244,7 +238,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
         </ListCard>
       }
     >
-      <div {...stylex.attrs(viewStyles.connectorsPageDiv)}>
+      <div {...stylex.attrs(styles.connectorsPageDiv)}>
         <Show
           when={list()}
           fallback={
@@ -258,11 +252,11 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
           </Keyed>
         </Show>
         <Card title={t("web.connector.connectors.know")}>
-          <ul {...stylex.attrs(viewStyles.connectorsPageUl)}>
+          <ul {...stylex.attrs(styles.connectorsPageUl)}>
             <For each={[...connectorNotes[selected()], connectorsAlways]}>
               {(n) => (
-                <li {...stylex.attrs(viewStyles.connectorsPageLi2)}>
-                  <span {...stylex.attrs(viewStyles.connectorsPageSpan)} aria-hidden="true" />
+                <li {...stylex.attrs(styles.connectorsPageLi2)}>
+                  <span {...stylex.attrs(styles.connectorsPageSpan)} aria-hidden="true" />
                   {n}
                 </li>
               )}
@@ -276,9 +270,9 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.rowDiv)}>
-      <span {...stylex.attrs(viewStyles.rowSpan)}>{props.label}</span>
-      <div {...stylex.attrs(viewStyles.rowDiv2)}>{props.children}</div>
+    <div {...stylex.attrs(styles.rowDiv)}>
+      <span {...stylex.attrs(styles.rowSpan)}>{props.label}</span>
+      <div {...stylex.attrs(styles.rowDiv2)}>{props.children}</div>
     </div>
   );
 }
@@ -310,11 +304,11 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
   );
   const state = () => props.status.state;
   return (
-    <Card title={label()} action={<span {...stylex.attrs(viewStyles.connectorCardSpan)}>{stateLabel[state()]}</span>}>
+    <Card title={label()} action={<span {...stylex.attrs(styles.connectorCardSpan2)}>{stateLabel[state()]}</span>}>
       <Switch>
         <Match when={state() === "off"}>
           <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => void login({ appId, secret })} />}>
-            <p {...stylex.attrs(viewStyles.connectorCardP)}>
+            <p {...stylex.attrs(styles.connectorCardP)}>
               {props.id === "weixin" ? t("web.connector.connectors.weixinIntro") : t("web.connector.connectors.feishuIntro")}
             </p>
             <div>
@@ -328,11 +322,11 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
           <LoginCode status={props.status} busy={busy()} app={label()} onRefresh={() => void login({ force: true })} onVerify={(code) => void verify(code)} />
         </Match>
         <Match when={state() === "pairing"}>
-          <p {...stylex.attrs(viewStyles.connectorCardP)}>{t("web.connector.connectors.pairing", { app: label() })}</p>
+          <p {...stylex.attrs(styles.connectorCardP)}>{t("web.connector.connectors.pairing", { app: label() })}</p>
           <div>
-            <span {...stylex.attrs(recipeStyles.connectorCardSpan)}>{props.status.pairCode}</span>
+            <span {...stylex.attrs(styles.connectorCardSpan)}>{props.status.pairCode}</span>
           </div>
-          <p {...stylex.attrs(viewStyles.connectorCardP2)}>{t("web.connector.connectors.pairingNote")}</p>
+          <p {...stylex.attrs(styles.connectorCardP2)}>{t("web.connector.connectors.pairingNote")}</p>
           {disconnect()}
         </Match>
         <Match when={state() === "connected" || state() === "paused"}>
@@ -350,13 +344,13 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
               : t("web.connector.connectors.noPending")}
           </Row>
           <Show when={state() === "paused" ? props.status.pausedUntil : undefined}>
-            {(until) => <p {...stylex.attrs(viewStyles.connectorCardP3)}>{t("web.connector.connectors.paused", { clock: wallClockText(until()) })}</p>}
+            {(until) => <p {...stylex.attrs(styles.connectorCardP3)}>{t("web.connector.connectors.paused", { clock: wallClockText(until()) })}</p>}
           </Show>
           {disconnect()}
         </Match>
       </Switch>
       <Show when={props.status.error}>
-        <p {...stylex.attrs(viewStyles.connectorCardP3)}>{props.status.error}</p>
+        <p {...stylex.attrs(styles.connectorCardP3)}>{props.status.error}</p>
       </Show>
     </Card>
   );
@@ -382,7 +376,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
     await act.run(() => api.connector.channel.set({ id, channel }));
   };
   return (
-    <span {...stylex.attrs(viewStyles.channelPickSpan)}>
+    <span {...stylex.attrs(styles.channelPickSpan)}>
       <Select
         styles={selectStyles.channel}
         label={t("web.connector.connectors.whichChannel")}
@@ -392,7 +386,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
         onChange={(v) => void move(v)}
       />
       <Show when={error()}>
-        <span {...stylex.attrs(viewStyles.channelPickSpan2)}>{error()}</span>
+        <span {...stylex.attrs(styles.channelPickSpan2)}>{error()}</span>
       </Show>
     </span>
   );
@@ -404,15 +398,15 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
   const canLogin = () => !props.busy && appId().trim() !== "" && secret().trim() !== "";
   return (
     <form
-      {...stylex.attrs(viewStyles.qqLoginForm)}
+      {...stylex.attrs(styles.qqLoginForm)}
       onSubmit={(e) => {
         e.preventDefault();
         if (canLogin()) props.onLogin(appId().trim(), secret().trim());
       }}
     >
-      <p {...stylex.attrs(viewStyles.connectorCardP)}>
+      <p {...stylex.attrs(styles.connectorCardP)}>
         {t("web.connector.connectors.qqBefore")}{" "}
-        <a {...stylex.attrs(viewStyles.qqLoginA)} href="https://q.qq.com/" target="_blank" rel="noreferrer">
+        <a {...stylex.attrs(styles.qqLoginA)} href="https://q.qq.com/" target="_blank" rel="noreferrer">
           {t("web.connector.connectors.qqPlatform")}
         </a>{" "}
         {t("web.connector.connectors.qqAfter")}
@@ -421,7 +415,7 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
         <TextInput
           data-testid="qq-app-id"
           aria-label="AppID"
-          styles={variantStyles.qqLoginTextInput}
+          styles={styles.qqLoginTextInput}
           placeholder="102xxxxxx"
           value={appId()}
           onInput={(e) => setAppId(e.currentTarget.value)}
@@ -456,17 +450,17 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
           ? t("web.connector.connectors.digits")
           : "";
   return (
-    <div {...stylex.attrs(viewStyles.loginCodeDiv)}>
-      <div {...stylex.attrs(viewStyles.loginCodeDiv2)}>
-        <Show when={props.status.qr} fallback={<span {...stylex.attrs(viewStyles.connectorCardP2)}>{t("web.connector.connectors.gettingQr")}</span>}>
+    <div {...stylex.attrs(styles.loginCodeDiv)}>
+      <div {...stylex.attrs(styles.loginCodeDiv2)}>
+        <Show when={props.status.qr} fallback={<span {...stylex.attrs(styles.connectorCardP2)}>{t("web.connector.connectors.gettingQr")}</span>}>
           {(qr) => <Qr text={qr()} label={t("web.connector.connectors.qr", { app: props.app })} />}
         </Show>
       </div>
-      <div {...stylex.attrs(viewStyles.loginCodeDiv3)}>
-        <p {...stylex.attrs(viewStyles.connectorCardP)}>{say()}</p>
+      <div {...stylex.attrs(styles.loginCodeDiv3)}>
+        <p {...stylex.attrs(styles.connectorCardP)}>{say()}</p>
         <Show when={props.status.state === "verify"}>
           <form
-            {...stylex.attrs(viewStyles.loginCodeForm)}
+            {...stylex.attrs(styles.loginCodeForm)}
             onSubmit={(e) => {
               e.preventDefault();
               if (!props.busy && code().trim()) props.onVerify(code().trim());
@@ -485,7 +479,7 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
         </Show>
         <Show when={props.status.qr}>
           {(qr) => (
-            <p {...stylex.attrs(viewStyles.connectorCardP2)}>
+            <p {...stylex.attrs(styles.connectorCardP2)}>
               {t("web.connector.connectors.cannotScan")}
               <TextLink href={qr()}>{qr()}</TextLink>
             </p>

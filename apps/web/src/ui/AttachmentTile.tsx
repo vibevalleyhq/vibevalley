@@ -7,8 +7,8 @@ import { type Attachment, attachmentPath } from "@vibevalley/protocol";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
-const recipeStyles = stylex.create({
-  attachmentTileButton: {
+const styles = stylex.create({
+  remove: {
     marginLeft: "auto",
     flexShrink: "0",
     cursor: "pointer",
@@ -32,10 +32,7 @@ const recipeStyles = stylex.create({
       },
     },
   },
-});
-
-const viewStyles = stylex.create({
-  attachmentTileSpan: {
+  tile: {
     display: "flex",
     maxWidth: "calc(var(--spacing) * 64)",
     alignItems: "center",
@@ -51,7 +48,7 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  attachmentTileSpan2: {
+  preview: {
     display: "flex",
     width: "calc(var(--spacing) * 8)",
     height: "calc(var(--spacing) * 8)",
@@ -63,23 +60,23 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-hover)",
     color: "var(--color-muted)",
   },
-  attachmentTileImg: {
+  thumbnail: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
   },
-  attachmentTileSpan3: {
+  meta: {
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
   },
-  attachmentTileSpan4: {
+  name: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     color: "var(--color-ink)",
   },
-  attachmentTileSpan5: {
+  size: {
     fontSize: "var(--text-2xs)",
     lineHeight: "var(--text-2xs--line-height)",
     color: "var(--color-muted)",
@@ -101,21 +98,21 @@ export const sizeText = (bytes: number) =>
 export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void) | undefined; testid?: string }) {
   const kind = () => fileKind(props.file.type);
   return (
-    <span data-testid={props.testid} data-key={props.file.name} {...stylex.attrs(viewStyles.attachmentTileSpan)}>
-      <span {...stylex.attrs(viewStyles.attachmentTileSpan2)}>
+    <span data-testid={props.testid} data-key={props.file.name} {...stylex.attrs(styles.tile)}>
+      <span {...stylex.attrs(styles.preview)}>
         <Show when={kind() === "image"} fallback={<Icon name={kindIcon[kind()]} size={16} />}>
-          <img src={attachmentPath(props.file.id)} alt="" {...stylex.attrs(viewStyles.attachmentTileImg)} loading="lazy" />
+          <img src={attachmentPath(props.file.id)} alt="" {...stylex.attrs(styles.thumbnail)} loading="lazy" />
         </Show>
       </span>
-      <span {...stylex.attrs(viewStyles.attachmentTileSpan3)}>
-        <span {...stylex.attrs(viewStyles.attachmentTileSpan4)}>{props.file.name}</span>
-        <span {...stylex.attrs(viewStyles.attachmentTileSpan5)}>{kind() === "pdf" ? t("web.base.file.pdf") : sizeText(props.file.size)}</span>
+      <span {...stylex.attrs(styles.meta)}>
+        <span {...stylex.attrs(styles.name)}>{props.file.name}</span>
+        <span {...stylex.attrs(styles.size)}>{kind() === "pdf" ? t("web.base.file.pdf") : sizeText(props.file.size)}</span>
       </span>
       <Show when={props.onRemove}>
         {(remove) => (
           <button
             type="button"
-            {...stylex.attrs(recipeStyles.attachmentTileButton)}
+            {...stylex.attrs(styles.remove)}
             aria-label={t("web.base.file.remove", { name: props.file.name })}
             onClick={() => remove()()}
           >

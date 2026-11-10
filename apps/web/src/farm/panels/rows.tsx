@@ -10,7 +10,7 @@ import { changeKind, patchLines, patchMarkOf } from "#/features/issue/index.ts";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   fileRowButton: {
     display: "flex",
     width: "100%",
@@ -31,10 +31,7 @@ const recipeStyles = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
-  fileRowSpan: {
+  filePath: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -43,26 +40,33 @@ const variantStyles = stylex.create({
     fontFamily: "var(--font-mono)",
     fontSize: "12.5px",
   },
-  fileRowSpanVariant: {
+  filePathConflict: {
     color: "var(--color-berry)",
   },
-  fileRowSpanVariant2: {
+  filePathNormal: {
     color: "var(--color-bark-800)",
   },
-});
-
-const viewStyles = stylex.create({
-  tinted: { paddingInline: "calc(var(--spacing) * 3)", paddingBlock: "calc(var(--spacing) * 2)" },
-  farmTagSpan: {
+  tinted: {
+    backgroundColor: "var(--color-cream-100)",
+    paddingInline: "calc(var(--spacing) * 3)",
+    paddingBlock: "calc(var(--spacing) * 2)",
+  },
+  farmTag: {
     display: "inline-flex",
     alignItems: "center",
     gap: "var(--spacing)",
+    backgroundColor: "var(--color-cream-200)",
     paddingInline: "calc(var(--spacing) * 2)",
     paddingBlock: "calc(var(--spacing) * .5)",
     fontSize: "12px",
     whiteSpace: "nowrap",
+    color: "var(--color-bark-800)",
   },
-  farmEmptyDiv: {
+  conflictTag: {
+    backgroundColor: "color-mix(in srgb, var(--color-berry-500) 15%, var(--color-cream-50))",
+    color: "var(--color-berry-500)",
+  },
+  farmEmpty: {
     backgroundColor: "var(--color-cream-100)",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 8)",
@@ -70,18 +74,18 @@ const viewStyles = stylex.create({
     fontSize: "13px",
     color: "var(--color-bark-600)",
   },
-  plusMinusSpan: {
+  plusMinus: {
     fontFamily: "var(--font-mono)",
     fontSize: "12.5px",
     whiteSpace: "nowrap",
   },
-  plusMinusSpan2: {
+  addedCount: {
     color: "var(--color-leaf-700)",
   },
-  plusMinusSpan3: {
+  removedCount: {
     color: "var(--color-berry)",
   },
-  patchDiv: {
+  patchBox: {
     marginInline: "calc(var(--spacing) * 2)",
     marginBottom: "calc(var(--spacing) * 2)",
     maxHeight: "calc(var(--spacing) * 80)",
@@ -89,17 +93,31 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-cream-50)",
     paddingBlock: "var(--spacing)",
   },
-  patchDiv2: {
+  patchLine: {
     paddingInline: "calc(var(--spacing) * 2)",
     fontFamily: "var(--font-mono)",
     fontSize: "12.5px",
     lineHeight: "1.4",
     whiteSpace: "pre",
   },
-  fileRowDiv: {
+  patchAdded: {
+    backgroundColor: "var(--color-patch-add-bg)",
+    color: "var(--color-leaf-700)",
+  },
+  patchRemoved: {
+    backgroundColor: "var(--color-patch-del-bg)",
+    color: "var(--color-berry-500)",
+  },
+  patchHunk: {
+    color: "var(--color-water-500)",
+  },
+  patchPlain: {
+    color: "var(--color-bark-800)",
+  },
+  fileRow: {
     backgroundColor: "var(--color-cream-100)",
   },
-  fileRowSpan: {
+  fileBadge: {
     display: "flex",
     height: "calc(var(--spacing) * 5)",
     width: "calc(var(--spacing) * 5)",
@@ -108,19 +126,32 @@ const viewStyles = stylex.create({
     justifyContent: "center",
     fontSize: "12px",
   },
-  fileRowSpan2: {
+  fileBadgeAdded: {
+    backgroundColor: "var(--color-diff-add-fill)",
+    color: "var(--color-leaf-700)",
+  },
+  fileBadgeModified: {
+    backgroundColor: "var(--color-diff-mod-fill)",
+    color: "var(--color-bark-800)",
+  },
+  fileBadgeDeleted: {
+    backgroundColor: "var(--color-diff-del-fill)",
+    color: "var(--color-berry-500)",
+  },
+  fileBadgeOther: {
+    backgroundColor: "var(--color-cream-200)",
+    color: "var(--color-bark-800)",
+  },
+  binaryLabel: {
     fontFamily: "var(--font-mono)",
     fontSize: "12.5px",
     color: "var(--color-bark-500)",
   },
 });
 
-/** A colour at `alpha` of its strength over cream. */
-export const tint = (hex: string, alpha: number) => `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, #f7e8c4)`;
-
-export function FarmTag(props: { text: string; fill?: string; ink?: string; icon?: string; goes?: boolean }) {
+export function FarmTag(props: { text: string; styles?: stylex.StyleXStyles; icon?: string; goes?: boolean }) {
   return (
-    <span {...stylex.attrs(viewStyles.farmTagSpan)} style={{ background: props.fill ?? "#e2c995", color: props.ink ?? "#46301d" }}>
+    <span {...styleProps([styles.farmTag, props.styles])}>
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={12} />}</Show>
       {props.text}
       <Show when={props.goes}>
@@ -130,46 +161,44 @@ export function FarmTag(props: { text: string; fill?: string; ink?: string; icon
   );
 }
 
-export function Tinted(props: { children: JSX.Element; color?: string; styles?: stylex.StyleXStyles; style?: JSX.CSSProperties }) {
-  return <div {...styleProps([viewStyles.tinted, props.styles], { background: props.color ?? "#eedcb2", ...props.style })}>{props.children}</div>;
+export function Tinted(props: { children: JSX.Element; styles?: stylex.StyleXStyles; style?: JSX.CSSProperties }) {
+  return <div {...styleProps([styles.tinted, props.styles], props.style)}>{props.children}</div>;
 }
 
 export function FarmEmpty(props: { text: string }) {
-  return <div {...stylex.attrs(viewStyles.farmEmptyDiv)}>{props.text}</div>;
+  return <div {...stylex.attrs(styles.farmEmpty)}>{props.text}</div>;
 }
-
-/** What the server answered, under the button that asked. */
 
 /** Hours and minutes of a time. */
 export { farmClock as clockOf } from "#/farm/store.ts";
 
 export function PlusMinus(props: { added: number; removed: number }) {
   return (
-    <span {...stylex.attrs(viewStyles.plusMinusSpan)}>
-      <span {...stylex.attrs(viewStyles.plusMinusSpan2)}>+{props.added}</span>
-      <span {...stylex.attrs(viewStyles.plusMinusSpan3)}> −{props.removed}</span>
+    <span {...stylex.attrs(styles.plusMinus)}>
+      <span {...stylex.attrs(styles.addedCount)}>+{props.added}</span>
+      <span {...stylex.attrs(styles.removedCount)}> −{props.removed}</span>
     </span>
   );
 }
 
-const fileLook: Record<string, { fill: string; ink: string }> = {
-  A: { fill: "#d0dca9", ink: "#3f6427" },
-  M: { fill: "#f0dba9", ink: "#46301d" },
-  D: { fill: "#edcba9", ink: "#c84a3a" },
+const fileLook: Record<string, stylex.StyleXStyles> = {
+  A: styles.fileBadgeAdded,
+  M: styles.fileBadgeModified,
+  D: styles.fileBadgeDeleted,
 };
 
-const patchInk = { added: "#3f6427", removed: "#c84a3a", hunk: "#4f8fbd", plain: "#46301d" } as const;
-const patchFill = { added: "#b4cb7c59", removed: "#c84a3a1a", hunk: undefined, plain: undefined } as const;
+const patchLook = {
+  added: styles.patchAdded,
+  removed: styles.patchRemoved,
+  hunk: styles.patchHunk,
+  plain: styles.patchPlain,
+} as const;
 
 function Patch(props: { text: string }) {
   return (
-    <div {...stylex.attrs(viewStyles.patchDiv)}>
+    <div {...stylex.attrs(styles.patchBox)}>
       <For each={patchLines(props.text)} keyed={false}>
-        {(line) => (
-          <div {...stylex.attrs(viewStyles.patchDiv2)} style={{ background: patchFill[patchMarkOf(line())], color: patchInk[patchMarkOf(line())] }}>
-            {line() || " "}
-          </div>
-        )}
+        {(line) => <div {...stylex.attrs(styles.patchLine, patchLook[patchMarkOf(line())])}>{line() || " "}</div>}
       </For>
     </div>
   );
@@ -178,30 +207,26 @@ function Patch(props: { text: string }) {
 export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
   const [open, setOpen] = createSignal(false);
   const kind = () => changeKind(props.file.status);
-  const look = () => fileLook[props.file.status] ?? { fill: "#e2c995", ink: "#46301d" };
   return (
-    <div {...stylex.attrs(viewStyles.fileRowDiv)}>
+    <div {...stylex.attrs(styles.fileRow)}>
       <button
         type="button"
         aria-label={props.file.path}
         aria-expanded={props.file.patch ? aria(open()) : undefined}
         disabled={!props.file.patch}
         onClick={() => setOpen(!open())}
-        {...stylex.attrs(recipeStyles.fileRowButton)}
+        {...stylex.attrs(styles.fileRowButton)}
       >
-        <span title={kind().label} {...stylex.attrs(viewStyles.fileRowSpan)} style={{ background: look().fill, color: look().ink }}>
+        <span title={kind().label} {...styleProps([styles.fileBadge, fileLook[props.file.status] ?? styles.fileBadgeOther])}>
           {kind().mark}
         </span>
-        <span
-          title={props.file.path}
-          {...stylex.attrs(variantStyles.fileRowSpan, props.conflict ? variantStyles.fileRowSpanVariant : variantStyles.fileRowSpanVariant2)}
-        >
+        <span title={props.file.path} {...stylex.attrs(styles.filePath, props.conflict ? styles.filePathConflict : styles.filePathNormal)}>
           {props.file.path}
         </span>
         <Show when={props.conflict}>
-          <FarmTag text={t("web.farm.conflictTag")} fill={tint("#c84a3a", 0.15)} ink="#c84a3a" />
+          <FarmTag text={t("web.farm.conflictTag")} styles={styles.conflictTag} />
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span {...stylex.attrs(viewStyles.fileRowSpan2)}>{t("web.farm.binary")}</span>}>
+        <Show when={props.file.added >= 0} fallback={<span {...stylex.attrs(styles.binaryLabel)}>{t("web.farm.binary")}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>

@@ -61,7 +61,7 @@ const sceneStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   featuresSpan: {
     marginTop: "calc(var(--spacing) * 1.5)",
     fontSize: "13px",
@@ -69,9 +69,6 @@ const recipeStyles = stylex.create({
     textWrap: "balance",
     color: "var(--color-bark-800)",
   },
-});
-
-const viewStyles = stylex.create({
   runtimesHeading: { marginTop: "72px" },
   featuresUl: {
     marginBottom: "calc(var(--spacing) * 12)",
@@ -105,7 +102,7 @@ const viewStyles = stylex.create({
     objectFit: "contain",
     imageRendering: "pixelated",
   },
-  featuresSpan: {
+  featuresSpan2: {
     fontFamily: "var(--font-pixel)",
     fontSize: "var(--text-4xl)",
     lineHeight: "1",
@@ -139,6 +136,7 @@ const viewStyles = stylex.create({
     gap: "18px",
   },
 });
+
 interface Props {
   copy: Pick<Copy, "features" | "runtimes">;
   icons: string[];
@@ -154,31 +152,31 @@ export default function Features(props: Props) {
   const root = createReveal<HTMLElement>();
   return (
     <Section ref={root.set} id="features" alt title={props.copy.features.title}>
-      <ul role="list" {...stylex.attrs(viewStyles.featuresUl)}>
+      <ul role="list" {...stylex.attrs(styles.featuresUl)}>
         {FACTS.map((f, i) => (
-          <li data-reveal={(i % 6) * 60} {...stylex.attrs(viewStyles.featuresLi)}>
-            <img loading="lazy" src={props.tallies[i]} alt="" {...stylex.attrs(viewStyles.featuresImg)} />
-            <span {...stylex.attrs(viewStyles.featuresSpan)}>
+          <li data-reveal={(i % 6) * 60} {...stylex.attrs(styles.featuresLi)}>
+            <img loading="lazy" src={props.tallies[i]} alt="" {...stylex.attrs(styles.featuresImg)} />
+            <span {...stylex.attrs(styles.featuresSpan2)}>
               <CountUp to={f.n} />
             </span>
-            <span {...stylex.attrs(recipeStyles.featuresSpan)}>{props.copy.features.tally[f.key]}</span>
+            <span {...stylex.attrs(styles.featuresSpan)}>{props.copy.features.tally[f.key]}</span>
           </li>
         ))}
       </ul>
-      <div {...stylex.attrs(viewStyles.featuresDiv)}>
+      <div {...stylex.attrs(styles.featuresDiv)}>
         {props.copy.features.items.map((f, i) => (
           <article data-reveal={(i % 4) * 70} {...stylex.attrs(featureCard, sceneStyles.card)}>
             <img loading="lazy" src={props.icons[i]} alt="" {...stylex.attrs(sceneStyles.cardIcon, sceneStyles.hoverIcon)} />
-            <h3 {...stylex.attrs(viewStyles.featuresH3)}>{f.title}</h3>
-            <p {...stylex.attrs(viewStyles.featuresP)}>{f.text}</p>
+            <h3 {...stylex.attrs(styles.featuresH3)}>{f.title}</h3>
+            <p {...stylex.attrs(styles.featuresP)}>{f.text}</p>
           </article>
         ))}
       </div>
-      <Heading styles={viewStyles.runtimesHeading}>{props.copy.runtimes.title}</Heading>
-      <p data-reveal {...stylex.attrs(viewStyles.featuresP2)}>
+      <Heading styles={styles.runtimesHeading}>{props.copy.runtimes.title}</Heading>
+      <p data-reveal {...stylex.attrs(styles.featuresP2)}>
         {props.copy.runtimes.text}
       </p>
-      <div {...stylex.attrs(viewStyles.featuresDiv2)}>
+      <div {...stylex.attrs(styles.featuresDiv2)}>
         {props.runtimes.map((r, i) => (
           <span data-reveal={i * 90} {...stylex.attrs(featureCard, sceneStyles.runtime)}>
             <img loading="lazy" src={r.logo} alt="" {...stylex.attrs(sceneStyles.runtimeIcon, sceneStyles.hoverIcon)} />

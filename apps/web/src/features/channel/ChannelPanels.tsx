@@ -59,7 +59,7 @@ const threadStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   pinsDiv: {
     position: "absolute",
     top: "100%",
@@ -118,9 +118,6 @@ const recipeStyles2 = stylex.create({
     padding: "calc(var(--spacing) * 2)",
     boxShadow: "var(--shadow-float)",
   },
-});
-
-const recipeStyles = stylex.create({
   membersButton: {
     display: "inline-flex",
     width: "calc(var(--spacing) * 8)",
@@ -156,22 +153,16 @@ const recipeStyles = stylex.create({
     borderColor: "var(--color-line)",
     paddingInline: "calc(var(--spacing) * 4)",
   },
-});
-
-const variantStyles2 = stylex.create({
   threadListIcon: {
     opacity: ".6",
     transitionProperty: "transform,translate,scale,rotate",
     transitionTimingFunction: "var(--default-transition-timing-function)",
     transitionDuration: "var(--default-transition-duration)",
   },
-  threadListIconVariant: {
+  threadListIconTone: {
     rotate: "90deg",
   },
-  threadListIconVariant2: {},
-});
-
-const variantStyles = stylex.create({
+  threadListIconAlt: {},
   pinsSpan: {
     WebkitLineClamp: "3",
     WebkitBoxOrient: "vertical",
@@ -188,9 +179,6 @@ const variantStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
   },
-});
-
-const viewStyles = stylex.create({
   pinsP: {
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-xs)",
@@ -226,14 +214,14 @@ const viewStyles = stylex.create({
       },
     },
   },
-  pinsSpan: {
+  pinsSpan2: {
     display: "flex",
     alignItems: "baseline",
     gap: "calc(var(--spacing) * 2)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
   },
-  pinsSpan2: {
+  pinsSpan22: {
     fontWeight: "var(--font-weight-semibold)",
   },
   pinsSpan3: {
@@ -472,7 +460,7 @@ const viewStyles = stylex.create({
       },
     },
   },
-  farmSearchBodySpan: {
+  farmSearchBodySpan2: {
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-accent)",
   },
@@ -497,14 +485,14 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <div role="dialog" data-testid="pins" aria-label={t("web.channel.pins.title")} {...stylex.attrs(recipeStyles2.pinsDiv)}>
-      <p {...stylex.attrs(viewStyles.pinsP)}>{t("web.channel.pins.title")}</p>
+    <div role="dialog" data-testid="pins" aria-label={t("web.channel.pins.title")} {...stylex.attrs(styles.pinsDiv)}>
+      <p {...stylex.attrs(styles.pinsP)}>{t("web.channel.pins.title")}</p>
       <Show when={pinned()?.length === 0}>
-        <p {...stylex.attrs(viewStyles.pinsP2)}>{t("web.channel.pins.none")}</p>
+        <p {...stylex.attrs(styles.pinsP2)}>{t("web.channel.pins.none")}</p>
       </Show>
       <Show when={failed()}>
         {(why) => (
-          <p data-testid="pins-failed" {...stylex.attrs(viewStyles.pinsFailed)}>
+          <p data-testid="pins-failed" {...stylex.attrs(styles.pinsFailed)}>
             {t("web.channel.pins.failed", { why: why() })}
           </p>
         )}
@@ -515,17 +503,17 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
             type="button"
             data-testid="pin"
             data-key={m().id}
-            {...stylex.attrs(viewStyles.pin)}
+            {...stylex.attrs(styles.pin)}
             onClick={() => {
               router.navigate(messagePath(channelOf(core()?.chat, m().channel), m().number));
               untrack(() => props.onPick)();
             }}
           >
-            <span {...stylex.attrs(viewStyles.pinsSpan)}>
-              <span {...stylex.attrs(viewStyles.pinsSpan2)}>{m().from === userId ? t("web.channel.messages.user") : m().name}</span>
-              <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(m().at)}</span>
+            <span {...stylex.attrs(styles.pinsSpan2)}>
+              <span {...stylex.attrs(styles.pinsSpan22)}>{m().from === userId ? t("web.channel.messages.user") : m().name}</span>
+              <span {...stylex.attrs(styles.pinsSpan3)}>{workbenchClock(m().at)}</span>
             </span>
-            <span {...stylex.attrs(variantStyles.pinsSpan)}>{m().text}</span>
+            <span {...stylex.attrs(styles.pinsSpan)}>{m().text}</span>
           </button>
         )}
       </For>
@@ -554,36 +542,36 @@ export function Members(props: { channel: Channel }) {
     return (core()?.sessions ?? []).filter((h) => h.role === "worker" && (h.channel ?? fallback) === props.channel.id);
   };
   return (
-    <aside aria-label={t("web.channel.members.title")} data-testid="members" {...stylex.attrs(viewStyles.members)}>
-      <p {...stylex.attrs(viewStyles.membersP)}>{t("web.channel.members.title")}</p>
-      <div {...stylex.attrs(viewStyles.membersDiv)}>
-        <span {...stylex.attrs(viewStyles.membersSpan)}>{t("web.channel.members.user").slice(0, 1)}</span>
+    <aside aria-label={t("web.channel.members.title")} data-testid="members" {...stylex.attrs(styles.members)}>
+      <p {...stylex.attrs(styles.membersP)}>{t("web.channel.members.title")}</p>
+      <div {...stylex.attrs(styles.membersDiv)}>
+        <span {...stylex.attrs(styles.membersSpan)}>{t("web.channel.members.user").slice(0, 1)}</span>
         {t("web.channel.members.user")}
       </div>
       <For each={inside()} keyed={(id) => id}>
         {(id) => (
-          <div data-testid="member-orchestrator" data-key={id()} {...stylex.attrs(viewStyles.membersDiv)}>
+          <div data-testid="member-orchestrator" data-key={id()} {...stylex.attrs(styles.membersDiv)}>
             <OrchestratorFace size={28} agent={id()} />
-            <span {...stylex.attrs(viewStyles.membersSpan2)}>
-              <span {...stylex.attrs(viewStyles.membersSpan3)}>{nameOf(id())}</span>
-              <span {...stylex.attrs(viewStyles.membersSpan4)}>{t("web.channel.members.inChannel")}</span>
+            <span {...stylex.attrs(styles.membersSpan2)}>
+              <span {...stylex.attrs(styles.membersSpan3)}>{nameOf(id())}</span>
+              <span {...stylex.attrs(styles.membersSpan4)}>{t("web.channel.members.inChannel")}</span>
             </span>
-            <span {...stylex.attrs(viewStyles.membersSpan5)}>{orchestratorMoodLabels[orchestratorMood(core(), id())]}</span>
+            <span {...stylex.attrs(styles.membersSpan5)}>{orchestratorMoodLabels[orchestratorMood(core(), id())]}</span>
           </div>
         )}
       </For>
       <For each={helpers()} keyed={(h) => h.id}>
         {(h) => (
-          <div {...stylex.attrs(viewStyles.membersDiv)}>
+          <div {...stylex.attrs(styles.membersDiv)}>
             <HelperFace agent={h().agent} runtime={h().runtime} size={28} />
-            <span {...stylex.attrs(viewStyles.membersSpan2)}>
-              <span {...stylex.attrs(viewStyles.membersSpan3)}>{h().name}</span>
-              <span {...stylex.attrs(viewStyles.membersSpan4)}>{phaseText(h(), now())}</span>
+            <span {...stylex.attrs(styles.membersSpan2)}>
+              <span {...stylex.attrs(styles.membersSpan3)}>{h().name}</span>
+              <span {...stylex.attrs(styles.membersSpan4)}>{phaseText(h(), now())}</span>
             </span>
             <PhaseGlyph phase={h().phase} />
             <button
               type="button"
-              {...stylex.attrs(recipeStyles.membersButton)}
+              {...stylex.attrs(styles.membersButton)}
               aria-label={t("web.channel.direct.open", { name: h().name })}
               title={t("web.channel.direct.open", { name: h().name })}
               onClick={() => {
@@ -597,7 +585,7 @@ export function Members(props: { channel: Channel }) {
         )}
       </For>
       <Show when={props.channel.type !== "direct" && helpers().length === 0}>
-        <p {...stylex.attrs(viewStyles.membersP2)}>{t("web.channel.members.none")}</p>
+        <p {...stylex.attrs(styles.membersP2)}>{t("web.channel.members.none")}</p>
       </Show>
     </aside>
   );
@@ -622,18 +610,18 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         : t("web.channel.replies", { n: props.thread.replies });
   };
   return (
-    <section aria-label={t("web.channel.thread")} {...stylex.attrs(viewStyles.membersSpan2)}>
-      <header {...stylex.attrs(recipeStyles.threadPaneHeader)}>
-        <span {...stylex.attrs(viewStyles.threadPaneSpan)}>
+    <section aria-label={t("web.channel.thread")} {...stylex.attrs(styles.membersSpan2)}>
+      <header {...stylex.attrs(styles.threadPaneHeader)}>
+        <span {...stylex.attrs(styles.threadPaneSpan)}>
           <Show when={session()} fallback={<Icon name="thread" size={16} />}>
             {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
           </Show>
         </span>
-        <div {...stylex.attrs(viewStyles.membersSpan2)}>
-          <span {...stylex.attrs(viewStyles.threadPaneSpan2)}>{threadTitle(props.thread, core()?.issues, sessions())}</span>
-          <span {...stylex.attrs(viewStyles.threadPaneSpan3)}>
+        <div {...stylex.attrs(styles.membersSpan2)}>
+          <span {...stylex.attrs(styles.threadPaneSpan2)}>{threadTitle(props.thread, core()?.issues, sessions())}</span>
+          <span {...stylex.attrs(styles.threadPaneSpan3)}>
             <Show when={session()}>{(s) => <PhaseGlyph phase={s().phase} />}</Show>
-            <span {...stylex.attrs(viewStyles.membersSpan3)}>{status()}</span>
+            <span {...stylex.attrs(styles.membersSpan3)}>{status()}</span>
           </span>
         </div>
         <Select
@@ -649,7 +637,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         />
         <button
           type="button"
-          {...stylex.attrs(recipeStyles.membersButton)}
+          {...stylex.attrs(styles.membersButton)}
           aria-label={t("web.channel.closeThread")}
           title={t("web.channel.closeThread")}
           onClick={() => props.onClose()}
@@ -678,10 +666,10 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
     <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
   );
   return (
-    <div role="dialog" data-testid="thread-list" aria-label={t("web.channel.threadList.title")} {...stylex.attrs(recipeStyles2.threadListDiv)}>
-      <p {...stylex.attrs(viewStyles.membersP)}>{t("web.channel.threadList.title")}</p>
+    <div role="dialog" data-testid="thread-list" aria-label={t("web.channel.threadList.title")} {...stylex.attrs(styles.threadListDiv)}>
+      <p {...stylex.attrs(styles.membersP)}>{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
-        <p data-testid="threads-empty" {...stylex.attrs(viewStyles.pinsP2)}>
+        <p data-testid="threads-empty" {...stylex.attrs(styles.pinsP2)}>
           {t("web.channel.threadList.none")}
         </p>
       </Show>
@@ -691,13 +679,13 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
           type="button"
           data-testid="threads-archived"
           aria-expanded={aria(showArchived())}
-          {...stylex.attrs(viewStyles.threadsArchived)}
+          {...stylex.attrs(styles.threadsArchived)}
           onClick={() => setShowArchived(!showArchived())}
         >
           <Icon
             name="expand"
             size={10}
-            styles={[variantStyles2.threadListIcon, showArchived() ? variantStyles2.threadListIconVariant : variantStyles2.threadListIconVariant2]}
+            styles={[styles.threadListIcon, showArchived() ? styles.threadListIconTone : styles.threadListIconAlt]}
           />
           {t("web.channel.threadList.archived", { n: archived().length })}
         </button>
@@ -730,15 +718,15 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <Show
         when={renaming()}
         fallback={
-          <button type="button" {...stylex.attrs(viewStyles.threadItemButton)} onClick={() => props.onOpen()}>
-            <span {...stylex.attrs(viewStyles.threadItemSpan)}>
+          <button type="button" {...stylex.attrs(styles.threadItemButton)} onClick={() => props.onOpen()}>
+            <span {...stylex.attrs(styles.threadItemSpan)}>
               <Icon name="thread" size={14} />
-              <span {...stylex.attrs(viewStyles.threadItemSpan2)}>{props.title}</span>
-              <span {...stylex.attrs(viewStyles.threadItemSpan3)}>{t("web.channel.replies", { n: props.thread.replies })}</span>
+              <span {...stylex.attrs(styles.threadItemSpan2)}>{props.title}</span>
+              <span {...stylex.attrs(styles.threadItemSpan3)}>{t("web.channel.replies", { n: props.thread.replies })}</span>
             </span>
             <Show when={props.thread.last}>
               {(m) => (
-                <span {...stylex.attrs(viewStyles.membersSpan4)}>
+                <span {...stylex.attrs(styles.membersSpan4)}>
                   {t("shared.join.labeled", { label: m().from === userId ? t("web.channel.messages.user") : m().name, text: m().text })}
                 </span>
               )}
@@ -761,7 +749,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             }
           }}
           onBlur={save}
-          {...stylex.attrs(viewStyles.threadName)}
+          {...stylex.attrs(styles.threadName)}
         />
       </Show>
       <button
@@ -826,8 +814,8 @@ function FarmSearchBody(props: { onClose: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <div {...stylex.attrs(viewStyles.farmSearchBodyDiv)}>
-      <label {...stylex.attrs(viewStyles.farmSearchBodyLabel)}>
+    <div {...stylex.attrs(styles.farmSearchBodyDiv)}>
+      <label {...stylex.attrs(styles.farmSearchBodyLabel)}>
         <Icon name="search" size={16} />
         <input
           ref={autofocus()}
@@ -836,24 +824,24 @@ function FarmSearchBody(props: { onClose: () => void }) {
           onInput={(e) => setText(e.currentTarget.value)}
           placeholder={t("web.channel.farmSearch.hint")}
           aria-label={t("web.channel.farmSearch.title")}
-          {...stylex.attrs(viewStyles.farmSearchInput)}
+          {...stylex.attrs(styles.farmSearchInput)}
         />
       </label>
-      <p {...stylex.attrs(viewStyles.farmSearchBodyP)}>{t("web.channel.farmSearch.filters")}</p>
+      <p {...stylex.attrs(styles.farmSearchBodyP)}>{t("web.channel.farmSearch.filters")}</p>
       <Show when={search()?.state === "waiting"}>
-        <p {...stylex.attrs(viewStyles.farmSearchBodyP2)}>{t("web.channel.farmSearch.searching")}</p>
+        <p {...stylex.attrs(styles.farmSearchBodyP2)}>{t("web.channel.farmSearch.searching")}</p>
       </Show>
       <Show when={failed()}>
         {(why) => (
-          <p data-testid="search-failed" {...stylex.attrs(viewStyles.searchFailed)}>
+          <p data-testid="search-failed" {...stylex.attrs(styles.searchFailed)}>
             {t("web.channel.farmSearch.failed", { why: why() })}
           </p>
         )}
       </Show>
       <Show when={hits()?.length === 0 && text().trim() !== ""}>
-        <p {...stylex.attrs(viewStyles.farmSearchBodyP2)}>{t("web.channel.farmSearch.none")}</p>
+        <p {...stylex.attrs(styles.farmSearchBodyP2)}>{t("web.channel.farmSearch.none")}</p>
       </Show>
-      <div role="list" aria-label={t("web.channel.messages.label")} {...stylex.attrs(viewStyles.farmSearchBodyDiv2)}>
+      <div role="list" aria-label={t("web.channel.messages.label")} {...stylex.attrs(styles.farmSearchBodyDiv2)}>
         <For each={hits() ?? []} keyed={(h) => h.message.id}>
           {(h) => (
             <button
@@ -861,18 +849,18 @@ function FarmSearchBody(props: { onClose: () => void }) {
               role="listitem"
               data-testid="search-hit"
               data-key={h().message.id}
-              {...stylex.attrs(viewStyles.searchHit)}
+              {...stylex.attrs(styles.searchHit)}
               onClick={() => {
                 router.navigate(messagePath(channelOf(core()?.chat, h().message.channel), h().message.number));
                 untrack(() => props.onClose)();
               }}
             >
-              <span {...stylex.attrs(viewStyles.pinsSpan)}>
-                <span {...stylex.attrs(viewStyles.farmSearchBodySpan)}>{h().address}</span>
-                <span {...stylex.attrs(viewStyles.pinsSpan2)}>{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</span>
-                <span {...stylex.attrs(viewStyles.pinsSpan3)}>{workbenchClock(h().message.at)}</span>
+              <span {...stylex.attrs(styles.pinsSpan2)}>
+                <span {...stylex.attrs(styles.farmSearchBodySpan2)}>{h().address}</span>
+                <span {...stylex.attrs(styles.pinsSpan22)}>{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</span>
+                <span {...stylex.attrs(styles.pinsSpan3)}>{workbenchClock(h().message.at)}</span>
               </span>
-              <span {...stylex.attrs(variantStyles.farmSearchBodySpan)}>{h().message.text}</span>
+              <span {...stylex.attrs(styles.farmSearchBodySpan)}>{h().message.text}</span>
             </button>
           )}
         </For>

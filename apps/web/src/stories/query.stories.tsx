@@ -7,7 +7,7 @@ import { stories, story } from "@vibevalley/stories";
 import { createQueryClient, defineQuery, QueryProvider, useQuery, type QueryDescriptor } from "#/infra/query.ts";
 import { Button } from "#/ui/Button.tsx";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   queriesDiv: {
     display: "flex",
     flexDirection: "column",
@@ -55,7 +55,7 @@ function Queries() {
   });
   return (
     <QueryProvider client={createQueryClient()}>
-      <div {...stylex.attrs(variantStyles.queriesDiv)}>
+      <div {...stylex.attrs(styles.queriesDiv)}>
         <Observer name="one" id={id} query={query} enabled={enabled} />
         <Show when={second()}>
           <Observer name="two" id={id} query={query} enabled={enabled} />

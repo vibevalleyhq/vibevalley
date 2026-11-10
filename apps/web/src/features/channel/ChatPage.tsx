@@ -23,7 +23,7 @@ import { MessageList } from "./MessageList";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "./places";
 import { Crons, Sessions } from "./Tabs";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   chatDiv: {
     position: "absolute",
     insetBlock: "0",
@@ -70,9 +70,6 @@ const recipeStyles2 = stylex.create({
       "@starting-style": "100% 0",
     },
   },
-});
-
-const recipeStyles = stylex.create({
   channelMainHeader: {
     display: "flex",
     height: "66px",
@@ -128,7 +125,7 @@ const recipeStyles = stylex.create({
       ":disabled": ".5",
     },
   },
-  channelMainButtonVariant1Case1: {
+  channelMainButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -137,7 +134,7 @@ const recipeStyles = stylex.create({
       },
     },
   },
-  channelMainButtonVariant1Case2: {
+  channelMainButtonSecondary: {
     backgroundColor: {
       default: "var(--color-selected)",
       "@media (hover:hover)": {
@@ -193,16 +190,13 @@ const recipeStyles = stylex.create({
       ":disabled": ".5",
     },
   },
-});
-
-const viewStyles = stylex.create({
-  chatDiv: {
+  chatDiv3: {
     position: "relative",
     display: "flex",
     height: "100%",
     overflow: "hidden",
   },
-  chatDiv2: {
+  chatDiv22: {
     display: {
       default: "none",
       "@media (width>=48rem)": "flex",
@@ -210,7 +204,7 @@ const viewStyles = stylex.create({
     width: "calc(var(--spacing) * 72)",
     flexShrink: "0",
   },
-  chatDiv3: {
+  chatDiv32: {
     position: "absolute",
     inset: "0",
     zIndex: "30",
@@ -325,9 +319,6 @@ const viewStyles = stylex.create({
     minHeight: "0",
     flex: "1",
   },
-});
-
-const styles = stylex.create({
   tabs: { flexShrink: 0, borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "calc(var(--spacing) * 3)" },
 });
 
@@ -376,12 +367,12 @@ function Chat() {
     <Sidebar channel={channel()} thread={thread()} onNew={() => setDialog("new")} onSearch={() => setDialog("search")} onPick={() => setDrawer(false)} />
   );
   return (
-    <div {...stylex.attrs(viewStyles.chatDiv)}>
-      <div {...stylex.attrs(viewStyles.chatDiv2)}>{sidebar()}</div>
+    <div {...stylex.attrs(styles.chatDiv3)}>
+      <div {...stylex.attrs(styles.chatDiv22)}>{sidebar()}</div>
       <Show when={drawer()}>
-        <div {...stylex.attrs(viewStyles.chatDiv3)}>
-          <div {...stylex.attrs(viewStyles.chatDiv4)} onClick={() => setDrawer(false)} />
-          <div {...stylex.attrs(recipeStyles2.chatDiv)}>{sidebar()}</div>
+        <div {...stylex.attrs(styles.chatDiv32)}>
+          <div {...stylex.attrs(styles.chatDiv4)} onClick={() => setDrawer(false)} />
+          <div {...stylex.attrs(styles.chatDiv)}>{sidebar()}</div>
         </div>
       </Show>
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
@@ -401,8 +392,8 @@ function Chat() {
       </Show>
       <Show when={thread()}>
         {(shown) => (
-          <div {...stylex.attrs(recipeStyles2.chatDiv2)} style={{ "--pane-w": `${threadWidth()}px` }}>
-            <div {...stylex.attrs(viewStyles.chatDiv5)}>
+          <div {...stylex.attrs(styles.chatDiv2)} style={{ "--pane-w": `${threadWidth()}px` }}>
+            <div {...stylex.attrs(styles.chatDiv5)}>
               <Splitter pane="thread" side="left" width={threadWidth()} min={320} max={720} label={t("web.channel.threadWidth")} />
             </div>
             <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
@@ -411,7 +402,7 @@ function Chat() {
       </Show>
       <Show when={artifact()}>
         {(id) => (
-          <div {...stylex.attrs(viewStyles.chatDiv6)}>
+          <div {...stylex.attrs(styles.chatDiv6)}>
             <ArtifactCanvas id={id()} onClose={closeArtifact} onQuote={(block) => quote(id(), block)} />
           </div>
         )}
@@ -457,22 +448,22 @@ function ChannelMain(props: {
   const about = () =>
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
-    <section {...stylex.attrs(viewStyles.channelMainSection)} aria-label={channelLabel(props.channel)}>
-      <header data-testid="channel-head" data-key={props.channel?.id} {...stylex.attrs(recipeStyles.channelMainHeader)}>
-        <button type="button" {...stylex.attrs(recipeStyles.channelMainButton)} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
+    <section {...stylex.attrs(styles.channelMainSection)} aria-label={channelLabel(props.channel)}>
+      <header data-testid="channel-head" data-key={props.channel?.id} {...stylex.attrs(styles.channelMainHeader)}>
+        <button type="button" {...stylex.attrs(styles.channelMainButton)} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={20} />
         </button>
-        <span {...stylex.attrs(viewStyles.channelMainSpan)}>{markOf(props.channel)}</span>
-        <div {...stylex.attrs(viewStyles.channelMainSection)}>
-          <h1 {...stylex.attrs(viewStyles.channelMainH1)} title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
+        <span {...stylex.attrs(styles.channelMainSpan)}>{markOf(props.channel)}</span>
+        <div {...stylex.attrs(styles.channelMainSection)}>
+          <h1 {...stylex.attrs(styles.channelMainH1)} title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
-            <p {...stylex.attrs(viewStyles.channelMainP)}>{about()}</p>
+            <p {...stylex.attrs(styles.channelMainP)}>{about()}</p>
           </Show>
         </div>
         <Show when={search() !== undefined}>
-          <label {...stylex.attrs(viewStyles.channelMainLabel)}>
+          <label {...stylex.attrs(styles.channelMainLabel)}>
             <Icon name="search" size={14} />
             <input
               ref={autofocus()}
@@ -482,15 +473,15 @@ function ChannelMain(props: {
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
               placeholder={t("web.channel.findHint")}
               aria-label={t("web.channel.find")}
-              {...stylex.attrs(viewStyles.messageSearch)}
+              {...stylex.attrs(styles.messageSearch)}
             />
           </label>
         </Show>
         <button
           type="button"
           {...stylex.attrs(
-            recipeStyles.channelMainButton2,
-            search() !== undefined ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+            styles.channelMainButton2,
+            search() !== undefined ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary,
           )}
           data-testid="message-search-toggle"
           aria-label={t("web.channel.findMessages")}
@@ -505,12 +496,12 @@ function ChannelMain(props: {
         </button>
         <Show when={props.channel?.type === "channel" ? props.channel : undefined}>
           {(c) => (
-            <div {...stylex.attrs(viewStyles.channelMainDiv)}>
+            <div {...stylex.attrs(styles.channelMainDiv)}>
               <button
                 type="button"
                 {...stylex.attrs(
-                  recipeStyles.channelMainButton2,
-                  threadsOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+                  styles.channelMainButton2,
+                  threadsOpen() ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary,
                 )}
                 data-testid="threads-toggle"
                 aria-label={t("web.channel.threadList.title")}
@@ -526,12 +517,12 @@ function ChannelMain(props: {
             </div>
           )}
         </Show>
-        <div {...stylex.attrs(viewStyles.channelMainDiv)}>
+        <div {...stylex.attrs(styles.channelMainDiv)}>
           <button
             type="button"
             {...stylex.attrs(
-              recipeStyles.channelMainButton2,
-              pinsOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+              styles.channelMainButton2,
+              pinsOpen() ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary,
             )}
             data-testid="pins-toggle"
             aria-label={t("web.channel.pins.open")}
@@ -548,8 +539,8 @@ function ChannelMain(props: {
           type="button"
           // The members panel is beside the list, which a phone has no room for.
           {...stylex.attrs(
-            recipeStyles.channelMainButton3,
-            membersOpen() ? recipeStyles.channelMainButtonVariant1Case2 : recipeStyles.channelMainButtonVariant1Case1,
+            styles.channelMainButton3,
+            membersOpen() ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary,
           )}
           data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
@@ -564,7 +555,7 @@ function ChannelMain(props: {
         </button>
         <button
           type="button"
-          {...stylex.attrs(recipeStyles.channelMainButton4)}
+          {...stylex.attrs(styles.channelMainButton4)}
           data-testid="channel-settings-open"
           aria-label={t("web.channel.settings")}
           title={t("web.channel.settings")}
@@ -587,7 +578,7 @@ function ChannelMain(props: {
         styles={styles.tabs}
       />
       <Show when={tab() === "chat"}>
-        <div {...stylex.attrs(viewStyles.channelMainDiv2)}>
+        <div {...stylex.attrs(styles.channelMainDiv2)}>
           <FileDrop channel={props.channel}>
             <MessageList
               channel={props.channel}

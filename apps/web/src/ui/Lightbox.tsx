@@ -7,8 +7,8 @@ import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 
-const recipeStyles3 = stylex.create({
-  lightboxDialog: {
+const styles = stylex.create({
+  dialog: {
     margin: "auto",
     width: "100%",
     height: "100%",
@@ -61,10 +61,7 @@ const recipeStyles3 = stylex.create({
       "::backdrop": "blur(var(--blur-sm))",
     },
   },
-});
-
-const recipeStyles2 = stylex.create({
-  lightboxImg: {
+  picture: {
     pointerEvents: "auto",
     maxHeight: "calc(100% - 4rem)",
     maxWidth: "100%",
@@ -80,10 +77,7 @@ const recipeStyles2 = stylex.create({
     objectFit: "contain",
     boxShadow: "var(--shadow-float)",
   },
-});
-
-const recipeStyles = stylex.create({
-  lightboxA: {
+  openOriginal: {
     display: "inline-flex",
     width: "calc(var(--spacing) * 7)",
     height: "calc(var(--spacing) * 7)",
@@ -108,10 +102,7 @@ const recipeStyles = stylex.create({
       },
     },
   },
-});
-
-const viewStyles = stylex.create({
-  lightboxDiv: {
+  stage: {
     pointerEvents: "none",
     display: "flex",
     width: "100%",
@@ -122,7 +113,7 @@ const viewStyles = stylex.create({
     gap: "calc(var(--spacing) * 3)",
     padding: "calc(var(--spacing) * 6)",
   },
-  lightboxDiv2: {
+  toolbar: {
     pointerEvents: "auto",
     display: "flex",
     alignItems: "center",
@@ -136,13 +127,13 @@ const viewStyles = stylex.create({
     color: "var(--color-ink)",
     boxShadow: "var(--shadow-float)",
   },
-  lightboxSpan: {
+  counter: {
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
     color: "var(--color-muted)",
   },
-  lightboxSpan2: {
+  caption: {
     maxWidth: "calc(var(--spacing) * 72)",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -181,21 +172,21 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
         if (e.key === "ArrowLeft") go(-1);
         if (e.key === "ArrowRight") go(1);
       }}
-      {...stylex.attrs(recipeStyles3.lightboxDialog)}
+      {...stylex.attrs(styles.dialog)}
     >
       <Show when={shown()}>
         {(p) => (
-          <div {...stylex.attrs(viewStyles.lightboxDiv)} onClick={() => props.onAt(undefined)}>
-            <img src={p().src} alt={p().name} {...stylex.attrs(recipeStyles2.lightboxImg)} onClick={(e) => e.stopPropagation()} />
-            <div {...stylex.attrs(viewStyles.lightboxDiv2)} onClick={(e) => e.stopPropagation()}>
+          <div {...stylex.attrs(styles.stage)} onClick={() => props.onAt(undefined)}>
+            <img src={p().src} alt={p().name} {...stylex.attrs(styles.picture)} onClick={(e) => e.stopPropagation()} />
+            <div {...stylex.attrs(styles.toolbar)} onClick={(e) => e.stopPropagation()}>
               <Show when={count() > 1}>
                 <IconButton icon="previous" label={t("web.base.lightbox.prev")} onClick={() => go(-1)} />
-                <span {...stylex.attrs(viewStyles.lightboxSpan)}>
+                <span {...stylex.attrs(styles.counter)}>
                   {(props.at ?? 0) + 1} / {count()}
                 </span>
                 <IconButton icon="next" label={t("web.base.lightbox.next")} onClick={() => go(1)} />
               </Show>
-              <span {...stylex.attrs(viewStyles.lightboxSpan2)}>{p().name}</span>
+              <span {...stylex.attrs(styles.caption)}>{p().name}</span>
               {/* The file itself, not a page of the workbench: a plain link to a new tab. */}
               <a
                 href={p().src}
@@ -204,7 +195,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
                 data-testid="lightbox-original"
                 aria-label={t("web.base.lightbox.original")}
                 title={t("web.base.lightbox.original")}
-                {...stylex.attrs(recipeStyles.lightboxA)}
+                {...stylex.attrs(styles.openOriginal)}
               >
                 <Icon name="open" size={16} />
               </a>
