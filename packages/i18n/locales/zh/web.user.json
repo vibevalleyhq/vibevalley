@@ -40,5 +40,15 @@
     "android": "安卓手机",
     "windows": "Windows 电脑",
     "device": "一台设备"
+  },
+  "approvals": {
+    "page": "让一台设备登录",
+    "hint": "在那台设备的终端里运行了 vibevalley auth login：对一下码，一样就同意。",
+    "title": "等你同意的登录",
+    "none": "现在没有设备在等。在那台设备上运行 vibevalley auth login，这里会出现它的码。",
+    "wants": "{name} 想登录",
+    "left": "还有 {m} 分钟过期",
+    "allow": "同意",
+    "refuse": "拒绝"
   }
 }

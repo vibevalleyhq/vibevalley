@@ -22,7 +22,7 @@ import { PkmPage } from "#/features/pkm/index.ts";
 import { ReposPage, sortRepos } from "#/features/repo/index.ts";
 import { RuntimesPage } from "#/features/runtime/index.ts";
 import { SettingsPage } from "#/features/setting/index.ts";
-import { LoginPage } from "#/features/user/index.ts";
+import { ApprovePage, LoginPage } from "#/features/user/index.ts";
 import { ready, useRepos } from "#/infra/query.ts";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "#/infra/router.ts";
 import { prefsNow } from "#/state/prefs.ts";
@@ -126,6 +126,7 @@ const routes: readonly RouteDefinition[] = [
         </div>
       )),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
+      page("/approve", "settings", () => <ApprovePage />),
       page("/orchestrator", "agents", (rest) => <OrchestratorPage rest={rest()} />),
       page("/agents", "agents", (rest) => <AgentsRoute rest={rest()} />),
       page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),

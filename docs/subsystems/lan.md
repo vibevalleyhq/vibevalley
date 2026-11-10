@@ -26,7 +26,7 @@
 - **双监听隔离，按钥匙的来路放行**：
   - 主监听永远只绑 `127.0.0.1`；局域网监听开启时绑 `0.0.0.0:<lan.port>`。
   - 非 `/api/v1/` 下的静态页面 `GET`/`HEAD` 直接转发；`/mcp` 与 `/v1/chat/completions` 一律返回 `404`。
-  - 不带钥匙只放 `lan.pair`、`user.login`、`user.get`；`user.get` 对没钥匙的只说有没有密码，不说名字。
+  - 不带钥匙只放 `lan.pair`、`user.login`、`user.get`、`user.approval.create`、`user.approval.collect`；`user.get` 对没钥匙的只说有没有密码，不说名字。
   - 配对来的设备在 `/api/v1/` 下仅放行 `can` 含 `remote` 的接口、三条 SSE 流、附件与网页稿子 `GET` 以及 `/api/v1/rpc` WebSocket；管理「连接到本机」自身及修改本机设置、档案、技能、农机、连接器的接口均不含 `remote`，远端调用返回 `403`。
   - 登录来的设备放行 `/api/v1/` 下的一切，只有 `user.password.set` 返回 `403`：密码只在本机设。
   - 门给转发的每个请求加 `x-vibevalley-outside`，主监听凭它知道请求不是本机发的。
@@ -47,6 +47,8 @@
 3. 用户在本机点击批准，远端收到钥匙写入 Cookie 并跳转 `/` 使用农场。
 
 凭密码登录：在本机设过密码（`user.password.set`）后，远端调 `POST /api/v1/user/login`（密码和这台设备叫什么），门写下 Cookie，之后的请求带着它。
+
+凭确认码登录（命令行的 `vibevalley auth login`，照 `gh auth login`）：远端调 `user.approval.create` 拿到 `XXXX-XXXX` 的确认码和只有它知道的取件凭证（`claim`）；用户在任何已有钥匙的页面（`/approve?code=…`，或设置的「设备」页）对上码点同意（`user.approval.answer`）；远端凭取件凭证轮询 `user.approval.collect`，同意后拿到一把 `login` 来路的钥匙。请求只在内存里，10 分钟过期，同时至多 5 个；设备在取钥匙时才建，同意了没人取的不留下设备。
 
 ## 和谁打交道
 

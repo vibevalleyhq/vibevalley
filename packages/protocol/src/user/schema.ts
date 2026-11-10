@@ -37,3 +37,36 @@ export const UserLogin: Codec<T.UserLogin> = Schema.Struct({
 });
 
 export const UserDevices = Schema.mutable(Schema.Array(UserDevice));
+
+export const Approval: Codec<T.Approval> = Schema.Struct({
+  id: Schema.String,
+  code: Schema.String,
+  name: Schema.String,
+  expiresAt: Schema.Finite,
+});
+
+export const Approvals = Schema.mutable(Schema.Array(Approval));
+
+export const ApprovalCreateRequest: Codec<T.ApprovalCreateRequest> = Schema.Struct({
+  name: Schema.String,
+});
+
+export const ApprovalCreated: Codec<T.ApprovalCreated> = Schema.Struct({
+  code: Schema.String,
+  claim: Schema.String,
+  expiresAt: Schema.Finite,
+  every: Schema.Finite,
+});
+
+export const ApprovalCollectRequest: Codec<T.ApprovalCollectRequest> = Schema.Struct({
+  claim: Schema.String,
+});
+
+export const ApprovalCollected: Codec<T.ApprovalCollected> = Schema.Struct({
+  login: Schema.optionalKey(UserLogin),
+});
+
+export const ApprovalAnswerRequest: Codec<T.ApprovalAnswerRequest> = Schema.Struct({
+  id: Schema.String,
+  allow: Schema.Boolean,
+});

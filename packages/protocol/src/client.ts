@@ -67,10 +67,13 @@ export class VibeValleyApi {
   /** The server's address; empty is the page's own origin, which serves it. */
   readonly base: string;
   private readonly fetcher: (url: string, init: RequestInit) => Promise<Response>;
+  /** A device key to send as a Bearer token: the command line's, signed in to a server through its gate. */
+  private readonly key: string | undefined;
 
-  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)) {
+  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init), key?: string) {
     this.base = base;
     this.fetcher = fetcher;
+    this.key = key;
   }
 
   readonly server = {
@@ -641,12 +644,26 @@ export class VibeValleyApi {
       previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
         this.call<T.Preview>("/api/v1/user/device/previewDelete", a, options),
     },
+    approval: {
+      /** A device asks to be signed in (the command line's auth login); no key needed. */
+      create: (a: T.ApprovalCreateRequest, options?: { signal?: AbortSignal }): Promise<T.ApprovalCreated> =>
+        this.call<T.ApprovalCreated>("/api/v1/user/approval/create", a, options),
+      /** The asking device collects its key once approved; no key needed, the claim is its proof. */
+      collect: (a: T.ApprovalCollectRequest, options?: { signal?: AbortSignal }): Promise<T.ApprovalCollected> =>
+        this.call<T.ApprovalCollected>("/api/v1/user/approval/collect", a, options),
+      list: (options?: { signal?: AbortSignal }): Promise<T.Approval[]> => this.call<T.Approval[]>("/api/v1/user/approval/list", undefined, options),
+      answer: (a: T.ApprovalAnswerRequest, options?: { signal?: AbortSignal }): Promise<T.Approval[]> =>
+        this.call<T.Approval[]>("/api/v1/user/approval/answer", a, options),
+    },
   };
 
   /** R is the answer api.ts gives the path; each method above names it. */
   private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
+    const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };
     const res = await this.fetcher(this.base + path, {
-      ...(input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+      ...(input === undefined
+        ? { method: "POST", headers }
+        : { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input) }),
       ...options,
     });
     const text = await res.text();

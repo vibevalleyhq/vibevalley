@@ -4,7 +4,8 @@ import { Command } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, optionalText, show, words } from "#/farm.ts";
+import { ask, change, given, nameArg, optionalText, words } from "#/farm.ts";
+import { show } from "#/format.ts";
 
 const agentArg = nameArg("agent", "cli.arg.agent");
 

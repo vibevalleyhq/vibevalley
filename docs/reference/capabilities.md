@@ -359,3 +359,7 @@ GitHub 的检测：gh 装没装、登没登录
 | `user.device.list` | 列出用户的设备：配对来的和登录来的 | `/api/v1/user/device/list` | ✓ |   |   |   |
 | `user.device.delete` | 收回一台设备的钥匙 | `/api/v1/user/device/delete` | ✓ |   |   |   |
 | `user.device.previewDelete` | 试收回一台设备：说会怎样，不真收回 | `/api/v1/user/device/previewDelete` | ✓ |   |   |   |
+| `user.approval.create` | 请求登录这台设备：拿到确认码，等你在页面上同意 | `/api/v1/user/approval/create` | ✓ | ✓ |   |   |
+| `user.approval.collect` | 取回同意后的钥匙；还在等时什么都不给 | `/api/v1/user/approval/collect` | ✓ | ✓ |   |   |
+| `user.approval.list` | 列出等着你同意的登录请求 | `/api/v1/user/approval/list` | ✓ |   |   |   |
+| `user.approval.answer` | 同意或拒绝一个登录请求 | `/api/v1/user/approval/answer` | ✓ |   |   |   |

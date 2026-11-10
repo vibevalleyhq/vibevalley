@@ -4,7 +4,7 @@ import type { Socket } from "node:net";
 import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Formatter, Layer, Schema } from "effect";
+import { Array as Arr, Context, Effect, Formatter, Layer, Schema, String as Str } from "effect";
 
 import { attachmentPath, deviceKeyCookie } from "@vibevalley/protocol";
 import { pathOf } from "@vibevalley/protocol/api";
@@ -33,6 +33,8 @@ const farmAndUser = (lanPort = 0) =>
 const farm = (lanPort = 0) => Effect.map(farmAndUser(lanPort), (f) => f.lan);
 
 const decodeStatus = Schema.decodeEffect(Schema.fromJsonString(S.UserStatus));
+const decodeCreated = Schema.decodeEffect(Schema.fromJsonString(S.ApprovalCreated));
+const decodeCollected = Schema.decodeEffect(Schema.fromJsonString(S.ApprovalCollected));
 
 const signIn = (addr: string, password: string, headers: Record<string, string> = {}) =>
   request("POST", addr + pathOf("user.login"), "", { password, device: "公司的笔记本" }, headers);
@@ -235,6 +237,45 @@ describe("lan access", () => {
       expect(user.status({ here: true })).toEqual({ name: "小明", password: true, here: true });
       const here = yield* Effect.flip(user.logout({ here: true }));
       expect(here).toMatchObject({ _tag: "LanRefused" });
+    }).pipe(Effect.scoped),
+  );
+
+  it.live("signs a device in once the user approves the code it shows, and gives its key only once", () =>
+    Effect.gen(function* () {
+      const { lan, user } = yield* farmAndUser();
+      const addr = yield* open(lan);
+      const ask = (name: string) =>
+        Effect.flatMap(
+          Effect.promise(() => request("POST", addr + pathOf("user.approval.create"), "", { name })),
+          (r) => decodeCreated(r.body),
+        );
+      const collect = (claim: string) => Effect.promise(() => request("POST", addr + pathOf("user.approval.collect"), "", { claim }));
+      const asked = yield* ask("  build\nbox ");
+      expect(asked.code).toMatch(/^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/u);
+      const waiting = yield* collect(asked.claim);
+      expect([waiting.status, waiting.body]).toEqual([200, "{}"]);
+      // Only someone holding a key sees or answers what waits.
+      for (const op of ["user.approval.list", "user.approval.answer"] as const)
+        expect([op, (yield* Effect.promise(() => request("POST", addr + pathOf(op), "", { id: "x", allow: true }))).status]).toEqual([op, 401]);
+      const pending = user.requests();
+      expect(pending).toMatchObject([{ code: asked.code, name: "build box" }]);
+      // Approved, yet no device until its key is collected.
+      yield* user.answerRequest(pending[0]?.id ?? "", true);
+      expect(user.devices()).toEqual([]);
+      const got = yield* Effect.flatMap(collect(asked.claim), (r) => decodeCollected(r.body));
+      const key = got.login?.key ?? "";
+      expect(Arr.map(user.devices(), (d) => [d.name, d.came])).toEqual([["build box", "login"]]);
+      expect((yield* Effect.promise(() => request("POST", addr + pathOf("setting.get"), key))).status).toBe(200);
+      const again = yield* collect(asked.claim);
+      expect([again.status, Str.includes("登录请求没了")(again.body)]).toEqual([403, true]);
+      // Refused, the asking device is told so.
+      const refused = yield* ask("陌生人");
+      yield* user.answerRequest(user.requests()[0]?.id ?? "", false);
+      expect((yield* collect(refused.claim)).status).toBe(403);
+      // A keyless door is held to a few at once.
+      for (let i = 0; i < 5; i++) yield* ask("刷屏 " + i);
+      const sixth = yield* Effect.promise(() => request("POST", addr + pathOf("user.approval.create"), "", { name: "第六个" }));
+      expect([sixth.status, Str.includes("好几台设备")(sixth.body)]).toEqual([403, true]);
     }).pipe(Effect.scoped),
   );
 

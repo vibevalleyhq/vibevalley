@@ -98,6 +98,12 @@ export const catalogs = {
         runtime: { list: "列出农机：装没装、版本", refresh: "重新探测一台农机：装了新的或升了版本以后" },
         session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", stop: "停下帮工这一轮" },
         chat: "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
+        auth: {
+          about: "登录到别处的服务端，像 gh auth login：在页面上点同意，这台电脑就拿到自己的钥匙",
+          login: "登录到一个服务端：显示确认码，等你在已登录的页面上同意，钥匙存在家目录的 auth.json",
+          status: "现在连哪个服务端、用的是哪台设备的钥匙",
+          logout: "退出：服务端收回这台电脑的钥匙，本机忘掉它",
+        },
       },
       next: {
         help: "看这条命令怎么写",
@@ -117,6 +123,12 @@ export const catalogs = {
       },
       op: {
         user: {
+          approval: {
+            create: "请求登录这台设备：拿到确认码，等你在页面上同意",
+            collect: "取回同意后的钥匙；还在等时什么都不给",
+            list: "列出等着你同意的登录请求",
+            answer: "同意或拒绝一个登录请求",
+          },
           get: "看用户叫什么、设没设密码、这个请求是从哪台设备来的",
           update: "改用户的名字",
           password: { set: "设密码（只能在跑着 VibeValley 的那台电脑上）" },
@@ -403,6 +415,7 @@ export const catalogs = {
         updateStep: "check 去查有没有新版本，install 装上并重启；不填只说现在的样子",
         pageTitle: "页的标题",
         agentName: "档案的名字",
+        authServer: "服务端的地址（https://farm.example.com）；不给就用 --server",
       },
       channel: { sent: "发到了 {channel}" },
       cron: { when: "什么时候跑：--every、--daily、--cron、--at 正好给一个", deleted: "删掉了定时任务 {cron}", edited: "改好了定时任务 {cron}" },
@@ -465,6 +478,9 @@ export const catalogs = {
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
         agentDelete: { about: "先试删，看会删掉什么" },
         issueObserve: { about: "以 JSONL 跟随工单执行" },
+        authLogin: { about: "登录到那个服务端，之后的命令都连它" },
+        authStatus: { about: "看登录到了哪里" },
+        authLogout: { about: "退出，回到这台电脑上的服务端" },
       },
       issue: {
         can: "能做：",
@@ -501,6 +517,17 @@ export const catalogs = {
         read: "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
         doctor: "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
         json: "工具输入的 JSON 对象；参数格式见本命令说明。",
+      },
+      auth: {
+        here: "{server} 是这台电脑上的服务端：命令行直接就能用，不用登录",
+        approve: "在浏览器里打开 {link}\n确认码 {code}：页面上的码一样就点同意。等你同意……",
+        noBrowser: "没能打开浏览器：自己打开上面的链接",
+        signedIn: "已登录 {server}，这台电脑在设备列表里叫「{device}」",
+        notSignedIn: "没有登录：命令连的是 {server}",
+        revoked: "{server} 收回了这台电脑的钥匙：重新运行 vibevalley auth login",
+        status: "已登录 {server}，以「{device}」的身份；你叫「{name}」",
+        signedOut: "已退出 {server}",
+        logoutUnsaid: "没能让服务端收回钥匙（{why}）：本机已经忘掉它，到设备页上收回它",
       },
     },
     desktop: {
@@ -1576,6 +1603,8 @@ export const catalogs = {
       wrongPassword: "密码不对",
       notADevice: "这里就是跑着 VibeValley 的本机，没有要退出的设备",
       revoke: "收回设备「{name}」的钥匙：它要再连得重新配对或登录",
+      requestsBusy: "已经有好几台设备在等你同意了：过几分钟再试",
+      requestGone: "这个登录请求没了：过期了、被拒了，或者已经用过了；重新运行 vibevalley auth login",
     },
     "server.voice": {
       misheard: "嗯？我没听清，你再说一遍？",
@@ -4285,6 +4314,16 @@ export const catalogs = {
         removeWhich: "收回 {name} 的钥匙",
       },
       guess: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
+      approvals: {
+        page: "让一台设备登录",
+        hint: "在那台设备的终端里运行了 vibevalley auth login：对一下码，一样就同意。",
+        title: "等你同意的登录",
+        none: "现在没有设备在等。在那台设备上运行 vibevalley auth login，这里会出现它的码。",
+        wants: "{name} 想登录",
+        left: "还有 {m} 分钟过期",
+        allow: "同意",
+        refuse: "拒绝",
+      },
     },
     "web.voice": {
       voice: {
@@ -4602,6 +4641,12 @@ export const catalogs = {
         runtime: { list: "List the runtimes: installed or not, their versions", refresh: "Look for a runtime again, after installing or upgrading it" },
         session: { list: "List helpers: id, name, profile, what it is doing", show: "Show a helper", stop: "Stop a helper's round" },
         chat: "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
+        auth: {
+          about: "Sign in to a server elsewhere, like gh auth login: approve on a page, and this computer gets a key of its own",
+          login: "Sign in to a server: show a code, wait for approval on a signed-in page, keep the key in the home's auth.json",
+          status: "Which server commands reach, and which device's key they carry",
+          logout: "Sign out: the server takes this computer's key back, and this computer forgets it",
+        },
       },
       next: {
         help: "See how this command is written",
@@ -4622,6 +4667,12 @@ export const catalogs = {
       },
       op: {
         user: {
+          approval: {
+            create: "Ask to sign this device in: get a code and wait for approval on a page",
+            collect: "Collect the key once approved; nothing while it waits",
+            list: "List the sign-in requests waiting for approval",
+            answer: "Approve or refuse a sign-in request",
+          },
           get: "The user's name, whether a password is set, and which device this request comes from",
           update: "Change the user's name",
           password: { set: "Set the password (only on the computer running VibeValley)" },
@@ -4948,6 +4999,7 @@ export const catalogs = {
         updateStep: "check looks for a new version, install installs it and restarts; none says how it stands",
         pageTitle: "The page's title",
         agentName: "The profile's name",
+        authServer: "The server's address (https://farm.example.com); --server when not given",
       },
       channel: { sent: "Sent to {channel}" },
       cron: {
@@ -5026,6 +5078,9 @@ export const catalogs = {
         agentCreate: { about: "Create a profile on Claude Code" },
         agentDelete: { about: "Try it first: what it would delete" },
         issueObserve: { about: "Follow execution as JSONL" },
+        authLogin: { about: "Sign in to that server; every command after reaches it" },
+        authStatus: { about: "See where you are signed in" },
+        authLogout: { about: "Sign out and go back to the server on this computer" },
       },
       issue: {
         can: "What can be done:",
@@ -5063,6 +5118,17 @@ export const catalogs = {
         doctor:
           "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
         json: "Tool input as a JSON object; see the command description for fields.",
+      },
+      auth: {
+        here: "{server} is the server on this computer: the command line uses it as is, no sign-in needed",
+        approve: "Open {link} in a browser\nCode {code}: approve if the page shows the same code. Waiting for approval…",
+        noBrowser: "Could not open a browser: open the link above yourself",
+        signedIn: "Signed in to {server}; this computer is “{device}” in the device list",
+        notSignedIn: "Not signed in: commands reach {server}",
+        revoked: "{server} took this computer's key back: run vibevalley auth login again",
+        status: "Signed in to {server} as “{device}”; you are “{name}”",
+        signedOut: "Signed out of {server}",
+        logoutUnsaid: "Could not have the server take the key back ({why}): this computer forgot it; take it back on the devices page",
       },
     },
     desktop: {
@@ -6180,6 +6246,8 @@ export const catalogs = {
       wrongPassword: "Wrong password",
       notADevice: "This is the computer running VibeValley itself: there is no device to sign out",
       revoke: "Take back the key of “{name}”: it has to pair or sign in again to connect",
+      requestsBusy: "Several devices are already waiting for approval: try again in a few minutes",
+      requestGone: "This sign-in request is gone: it expired, was refused or was already used; run vibevalley auth login again",
     },
     "server.voice": {
       misheard: "Hm? I didn't catch that. Could you say it again?",
@@ -9067,6 +9135,16 @@ export const catalogs = {
         removeWhich: "Take back the key of {name}",
       },
       guess: { android: "Android phone", windows: "Windows PC", device: "A device" },
+      approvals: {
+        page: "Let a device sign in",
+        hint: "Ran vibevalley auth login in that device's terminal? Check the code; approve if it matches.",
+        title: "Sign-ins waiting for you",
+        none: "No device is waiting. Run vibevalley auth login on that device and its code shows up here.",
+        wants: "{name} wants to sign in",
+        left: "Expires in {m} min",
+        allow: "Approve",
+        refuse: "Refuse",
+      },
     },
     "web.voice": {
       voice: {
@@ -9298,6 +9376,7 @@ export interface Messages {
   "cli.arg.agentName": undefined;
   "cli.arg.appPath": undefined;
   "cli.arg.artifact": undefined;
+  "cli.arg.authServer": undefined;
   "cli.arg.capture": undefined;
   "cli.arg.channel": undefined;
   "cli.arg.chatRuntime": undefined;
@@ -9318,6 +9397,15 @@ export interface Messages {
   "cli.arg.status": undefined;
   "cli.arg.title": undefined;
   "cli.arg.updateStep": undefined;
+  "cli.auth.approve": { readonly code: string | number; readonly link: string | number };
+  "cli.auth.here": { readonly server: string | number };
+  "cli.auth.logoutUnsaid": { readonly why: string | number };
+  "cli.auth.noBrowser": undefined;
+  "cli.auth.notSignedIn": { readonly server: string | number };
+  "cli.auth.revoked": { readonly server: string | number };
+  "cli.auth.signedIn": { readonly device: string | number; readonly server: string | number };
+  "cli.auth.signedOut": { readonly server: string | number };
+  "cli.auth.status": { readonly device: string | number; readonly name: string | number; readonly server: string | number };
   "cli.channel.sent": { readonly channel: string | number };
   "cli.command.agent.create": undefined;
   "cli.command.agent.delete": undefined;
@@ -9331,6 +9419,10 @@ export interface Messages {
   "cli.command.artifact.list": undefined;
   "cli.command.artifact.read": undefined;
   "cli.command.artifact.show": undefined;
+  "cli.command.auth.about": undefined;
+  "cli.command.auth.login": undefined;
+  "cli.command.auth.logout": undefined;
+  "cli.command.auth.status": undefined;
   "cli.command.channel.list": undefined;
   "cli.command.channel.messageList": undefined;
   "cli.command.channel.messageSearch": undefined;
@@ -9394,6 +9486,9 @@ export interface Messages {
   "cli.example.artifactList.about": undefined;
   "cli.example.artifactRead.about": undefined;
   "cli.example.artifactShow.about": undefined;
+  "cli.example.authLogin.about": undefined;
+  "cli.example.authLogout.about": undefined;
+  "cli.example.authStatus.about": undefined;
   "cli.example.channelList.about": undefined;
   "cli.example.channelMessageList.about": undefined;
   "cli.example.channelMessageSearch.about": undefined;
@@ -9733,6 +9828,10 @@ export interface Messages {
   "cli.op.skill.list": undefined;
   "cli.op.skill.previewDelete": undefined;
   "cli.op.skill.update": undefined;
+  "cli.op.user.approval.answer": undefined;
+  "cli.op.user.approval.collect": undefined;
+  "cli.op.user.approval.create": undefined;
+  "cli.op.user.approval.list": undefined;
   "cli.op.user.device.delete": undefined;
   "cli.op.user.device.list": undefined;
   "cli.op.user.device.previewDelete": undefined;
@@ -10785,6 +10884,8 @@ export interface Messages {
   "server.user.notADevice": undefined;
   "server.user.passwordHere": undefined;
   "server.user.passwordShort": { readonly n: string | number };
+  "server.user.requestGone": undefined;
+  "server.user.requestsBusy": undefined;
   "server.user.revoke": { readonly name: string | number };
   "server.user.wrongPassword": undefined;
   "server.voice.connecting": undefined;
@@ -13579,6 +13680,14 @@ export interface Messages {
   "web.user.account.signOut": undefined;
   "web.user.account.thisDevice": { readonly name: string | number };
   "web.user.account.title": undefined;
+  "web.user.approvals.allow": undefined;
+  "web.user.approvals.hint": undefined;
+  "web.user.approvals.left": { readonly m: string | number };
+  "web.user.approvals.none": undefined;
+  "web.user.approvals.page": undefined;
+  "web.user.approvals.refuse": undefined;
+  "web.user.approvals.title": undefined;
+  "web.user.approvals.wants": { readonly name: string | number };
   "web.user.devices.count": { readonly n: string | number };
   "web.user.devices.login": { readonly at: string | number; readonly seen: string | number };
   "web.user.devices.loginNever": { readonly at: string | number };

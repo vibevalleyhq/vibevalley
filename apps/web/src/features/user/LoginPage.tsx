@@ -9,6 +9,7 @@ import { Button } from "#/ui/Button.tsx";
 import { Field, TextInput } from "#/ui/Field.tsx";
 
 import { deviceGuess } from "./device";
+import { afterSignIn } from "./entry";
 import { signIn as signInWith } from "./login";
 import { userQuery } from "./queries";
 
@@ -77,7 +78,7 @@ export function LoginPage() {
     setSigning(true);
     setProblem("");
     signInWith({ password: password(), device: name().trim() }).then(
-      () => location.replace("/"),
+      () => location.replace(afterSignIn(location.search)),
       (e: unknown) => {
         setProblem(reasonOf(e));
         setSigning(false);

@@ -6,7 +6,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { PkmMarkerValues, PkmTierValues } from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, optionalText, optionalWords, show } from "#/farm.ts";
+import { ask, change, given, nameArg, optionalText, optionalWords } from "#/farm.ts";
+import { show } from "#/format.ts";
 import { exit, Failure, out, stdinText } from "#/output.ts";
 
 const pageArgument = nameArg("page", "cli.arg.page");

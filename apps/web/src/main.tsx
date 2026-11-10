@@ -13,7 +13,10 @@ import { followAppearance } from "./state/prefs";
 const entry = (): Promise<string> =>
   !isRemote(location.hostname) || location.pathname === "/pair" || location.pathname === "/login"
     ? Promise.resolve("")
-    : api.user.get().then(entryFor, () => entryFor(undefined));
+    : api.user.get().then(
+        (status) => entryFor({ status, at: location.pathname + location.search }),
+        () => entryFor({ status: undefined }),
+      );
 
 void entry().then((to) => {
   if (to !== "") return location.replace(to);

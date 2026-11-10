@@ -8,8 +8,8 @@ import { actCommand } from "@vibevalley/protocol/api";
 import { latestSessionIdOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
-import { FormatFlag } from "#/format.ts";
+import { ask, change, frames, given, nameArg, optionalText, ServerFlag, words } from "#/farm.ts";
+import { show, FormatFlag } from "#/format.ts";
 import { observeIssue } from "#/issue-watch.ts";
 import { err, exit, Failure, jsonText, stdinText } from "#/output.ts";
 

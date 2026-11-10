@@ -7,5 +7,7 @@
   "locked": "密码错了太多次：{s} 秒后再试",
   "wrongPassword": "密码不对",
   "notADevice": "这里就是跑着 VibeValley 的本机，没有要退出的设备",
-  "revoke": "收回设备「{name}」的钥匙：它要再连得重新配对或登录"
+  "revoke": "收回设备「{name}」的钥匙：它要再连得重新配对或登录",
+  "requestsBusy": "已经有好几台设备在等你同意了：过几分钟再试",
+  "requestGone": "这个登录请求没了：过期了、被拒了，或者已经用过了；重新运行 vibevalley auth login"
 }

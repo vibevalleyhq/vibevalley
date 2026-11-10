@@ -62,7 +62,7 @@ vp install                                                      # 根目录：�
 vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和全部包的类型；--fix 改格式
 vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
-vp run --filter @vibevalley/cli start issue list                 # 命令行：照领域模型一条命令一个操作（issue status、channel message send…；guide 是用法，api list|call 够得着每个接口），doctor 看农场好不好，pkm 记、搜、看、改笔记，app 管桌面版，chat [农机] 在终端里对话；装了桌面版的在「关于」里装 vibevalley 命令
+vp run --filter @vibevalley/cli start issue list                 # 命令行：照领域模型一条命令一个操作（issue status、channel message send…；guide 是用法，api list|call 够得着每个接口），auth login 像 gh 那样登录到别处的服务端，doctor 看农场好不好，pkm 记、搜、看、改笔记，app 管桌面版，chat [农机] 在终端里对话；装了桌面版的在「关于」里装 vibevalley 命令
 vp run server:check                                             # 改完服务端、packages/protocol、ai、agent、testkit：类型（vp check）、规则的测试、查询是否最新、vitest
 vp run packages:build                                           # 改了 packages/ 的导出或类型、单跑 vp check 以前：打出各库给别人的声明（dist/，带缓存；各项检查、提交前的钩子、vp install 都先跑它）
 vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：重写 db/generated（推不出的类型写 ::int 这类，生成器会说）

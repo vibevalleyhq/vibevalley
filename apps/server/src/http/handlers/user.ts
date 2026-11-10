@@ -24,6 +24,10 @@ export const userHandlers = Effect.gen(function* () {
     "user.device.list": () => Effect.sync(user.devices),
     "user.device.delete": ({ id }) => user.revoke(id),
     "user.device.previewDelete": ({ id }) => user.previewRevoke(id),
+    "user.approval.create": (body) => user.request(body.name),
+    "user.approval.collect": (body) => user.collect(body.claim),
+    "user.approval.list": () => Effect.sync(user.requests),
+    "user.approval.answer": (body) => user.answerRequest(body.id, body.allow),
   };
   return done;
 });

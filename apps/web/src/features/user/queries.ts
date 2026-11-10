@@ -11,3 +11,10 @@ export const devicesQuery = defineQuery({
   fetch: (_: void, context) => api.user.device.list(context),
   ...retryRead,
 });
+
+export const approvalsQuery = defineQuery({
+  schema: S.Approvals,
+  key: () => ["user", "approvals"],
+  fetch: (_: void, context) => api.user.approval.list(context),
+  ...retryRead,
+});

@@ -125,7 +125,13 @@
       "show": "Show a helper",
       "stop": "Stop a helper's round"
     },
-    "chat": "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)"
+    "chat": "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
+    "auth": {
+      "about": "Sign in to a server elsewhere, like gh auth login: approve on a page, and this computer gets a key of its own",
+      "login": "Sign in to a server: show a code, wait for approval on a signed-in page, keep the key in the home's auth.json",
+      "status": "Which server commands reach, and which device's key they carry",
+      "logout": "Sign out: the server takes this computer's key back, and this computer forgets it"
+    }
   },
   "next": {
     "help": "See how this command is written",
@@ -145,6 +151,12 @@
   },
   "op": {
     "user": {
+      "approval": {
+        "create": "Ask to sign this device in: get a code and wait for approval on a page",
+        "collect": "Collect the key once approved; nothing while it waits",
+        "list": "List the sign-in requests waiting for approval",
+        "answer": "Approve or refuse a sign-in request"
+      },
       "get": "The user's name, whether a password is set, and which device this request comes from",
       "update": "Change the user's name",
       "password": {
@@ -608,7 +620,8 @@
     "title": "The issue's title",
     "updateStep": "check looks for a new version, install installs it and restarts; none says how it stands",
     "pageTitle": "The page's title",
-    "agentName": "The profile's name"
+    "agentName": "The profile's name",
+    "authServer": "The server's address (https://farm.example.com); --server when not given"
   },
   "channel": {
     "sent": "Sent to {channel}"
@@ -809,6 +822,15 @@
     },
     "issueObserve": {
       "about": "Follow execution as JSONL"
+    },
+    "authLogin": {
+      "about": "Sign in to that server; every command after reaches it"
+    },
+    "authStatus": {
+      "about": "See where you are signed in"
+    },
+    "authLogout": {
+      "about": "Sign out and go back to the server on this computer"
     }
   },
   "issue": {
@@ -851,5 +873,16 @@
     "read": "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
     "doctor": "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
     "json": "Tool input as a JSON object; see the command description for fields."
+  },
+  "auth": {
+    "here": "{server} is the server on this computer: the command line uses it as is, no sign-in needed",
+    "approve": "Open {link} in a browser\nCode {code}: approve if the page shows the same code. Waiting for approval…",
+    "noBrowser": "Could not open a browser: open the link above yourself",
+    "signedIn": "Signed in to {server}; this computer is “{device}” in the device list",
+    "notSignedIn": "Not signed in: commands reach {server}",
+    "revoked": "{server} took this computer's key back: run vibevalley auth login again",
+    "status": "Signed in to {server} as “{device}”; you are “{name}”",
+    "signedOut": "Signed out of {server}",
+    "logoutUnsaid": "Could not have the server take the key back ({why}): this computer forgot it; take it back on the devices page"
   }
 }

@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 import { agentCommand } from "./commands/agent.ts";
 import { appCommand } from "./commands/app.ts";
 import { artifactCommand } from "./commands/artifact.ts";
+import { authCommand } from "./commands/auth.ts";
 import { channelCommand } from "./commands/channel.ts";
 import { chatCommand } from "./commands/chat.ts";
 import { cronCommand } from "./commands/cron.ts";
@@ -19,7 +20,8 @@ import { repoCommand } from "./commands/repo.ts";
 import { runtimeCommand } from "./commands/runtime.ts";
 import { sessionCommand } from "./commands/session.ts";
 import { WorkerAccessFlag, workerCommand } from "./commands/worker.ts";
-import { DryRunFlag, FormatFlag, ServerFlag } from "./farm.ts";
+import { ServerFlag } from "./farm.ts";
+import { DryRunFlag, FormatFlag } from "./format.ts";
 import { Ended, err, exit, Failure, out, printFailure } from "./output.ts";
 
 const version = "0.1.0";
@@ -41,6 +43,7 @@ const root = Command.make("vibevalley").pipe(
     chatCommand,
     doctorCommand,
     appCommand,
+    authCommand,
   ]),
   Command.withGlobalFlags([ServerFlag, DryRunFlag, FormatFlag, WorkerAccessFlag]),
 );

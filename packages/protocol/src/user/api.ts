@@ -18,6 +18,12 @@ export interface UserHandlers<R = never> {
   readonly "user.device.delete": (a: { readonly id: string }) => Effect.Effect<T.UserDevice[], ApiError, R>;
   /** What deleting the device would do, refused as it would be; nothing changes. */
   readonly "user.device.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  /** A device asks to be signed in (the command line's auth login); no key needed. */
+  readonly "user.approval.create": (a: T.ApprovalCreateRequest) => Effect.Effect<T.ApprovalCreated, ApiError, R>;
+  /** The asking device collects its key once approved; no key needed, the claim is its proof. */
+  readonly "user.approval.collect": (a: T.ApprovalCollectRequest) => Effect.Effect<T.ApprovalCollected, ApiError, R>;
+  readonly "user.approval.list": () => Effect.Effect<T.Approval[], ApiError, R>;
+  readonly "user.approval.answer": (a: T.ApprovalAnswerRequest) => Effect.Effect<T.Approval[], ApiError, R>;
 }
 
 export const userEndpoints: readonly Endpoint[] = [
@@ -36,4 +42,8 @@ export const userEndpoints: readonly Endpoint[] = [
     dryRun: "user.device.previewDelete",
   },
   { op: "user.device.previewDelete", about: ["id"], input: userDeviceDeleteInput, result: S.Preview, can: ["user"] },
+  { op: "user.approval.create", about: [], input: S.ApprovalCreateRequest, result: S.ApprovalCreated, can: ["user", "remote"] },
+  { op: "user.approval.collect", about: [], input: S.ApprovalCollectRequest, result: S.ApprovalCollected, can: ["user", "remote"] },
+  { op: "user.approval.list", about: [], input: undefined, result: S.Approvals, can: ["user"] },
+  { op: "user.approval.answer", about: ["id"], input: S.ApprovalAnswerRequest, result: S.Approvals, can: ["user"] },
 ];

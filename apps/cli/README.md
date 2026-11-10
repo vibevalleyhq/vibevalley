@@ -36,6 +36,16 @@ src/testdata/      the golden answers: help, typical mistakes, refusals and dry 
 - Run it from the repository with `vp run --filter @vibevalley/cli start <command…>`; the desktop app bundles it
   (`vp pack`, dist/) and installs it as `vibevalley` (`-beta`, `-alpha`).
 
+## Sign in to a server elsewhere
+
+`vibevalley auth login <server>` works like `gh auth login`: it asks the server's gate for a sign-in
+(`user.approval.create`), prints a code and `<server>/approve?code=…` (opened in a browser when at a terminal), and
+collects its key once the user approves it on any page that already holds a key. The server, the key and the device are
+kept in the home's `auth.json` (`0600`); every command after defaults to that server and sends the key as a Bearer token
+(`askAt`, `frames` in farm.ts), and to no other server. `auth status` says where it is signed in and whether the key still
+works; `auth logout` has the server take the key back and forgets it. The server on this computer answers without a
+key: `auth login` to it says so and keeps nothing.
+
 ## Publish an existing branch
 
 The local owner calls `repo pr submit --cwd /absolute/checkout --branch feat/topic --sha <full-sha> --base main --title <title> --body <body>`.

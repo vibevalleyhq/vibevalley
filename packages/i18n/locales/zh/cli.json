@@ -125,7 +125,13 @@
       "show": "看一个帮工",
       "stop": "停下帮工这一轮"
     },
-    "chat": "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）"
+    "chat": "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
+    "auth": {
+      "about": "登录到别处的服务端，像 gh auth login：在页面上点同意，这台电脑就拿到自己的钥匙",
+      "login": "登录到一个服务端：显示确认码，等你在已登录的页面上同意，钥匙存在家目录的 auth.json",
+      "status": "现在连哪个服务端、用的是哪台设备的钥匙",
+      "logout": "退出：服务端收回这台电脑的钥匙，本机忘掉它"
+    }
   },
   "next": {
     "help": "看这条命令怎么写",
@@ -145,6 +151,12 @@
   },
   "op": {
     "user": {
+      "approval": {
+        "create": "请求登录这台设备：拿到确认码，等你在页面上同意",
+        "collect": "取回同意后的钥匙；还在等时什么都不给",
+        "list": "列出等着你同意的登录请求",
+        "answer": "同意或拒绝一个登录请求"
+      },
       "get": "看用户叫什么、设没设密码、这个请求是从哪台设备来的",
       "update": "改用户的名字",
       "password": {
@@ -608,7 +620,8 @@
     "title": "工单的标题",
     "updateStep": "check 去查有没有新版本，install 装上并重启；不填只说现在的样子",
     "pageTitle": "页的标题",
-    "agentName": "档案的名字"
+    "agentName": "档案的名字",
+    "authServer": "服务端的地址（https://farm.example.com）；不给就用 --server"
   },
   "channel": {
     "sent": "发到了 {channel}"
@@ -809,6 +822,15 @@
     },
     "issueObserve": {
       "about": "以 JSONL 跟随工单执行"
+    },
+    "authLogin": {
+      "about": "登录到那个服务端，之后的命令都连它"
+    },
+    "authStatus": {
+      "about": "看登录到了哪里"
+    },
+    "authLogout": {
+      "about": "退出，回到这台电脑上的服务端"
     }
   },
   "issue": {
@@ -851,5 +873,16 @@
     "read": "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
     "doctor": "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
     "json": "工具输入的 JSON 对象；参数格式见本命令说明。"
+  },
+  "auth": {
+    "here": "{server} 是这台电脑上的服务端：命令行直接就能用，不用登录",
+    "approve": "在浏览器里打开 {link}\n确认码 {code}：页面上的码一样就点同意。等你同意……",
+    "noBrowser": "没能打开浏览器：自己打开上面的链接",
+    "signedIn": "已登录 {server}，这台电脑在设备列表里叫「{device}」",
+    "notSignedIn": "没有登录：命令连的是 {server}",
+    "revoked": "{server} 收回了这台电脑的钥匙：重新运行 vibevalley auth login",
+    "status": "已登录 {server}，以「{device}」的身份；你叫「{name}」",
+    "signedOut": "已退出 {server}",
+    "logoutUnsaid": "没能让服务端收回钥匙（{why}）：本机已经忘掉它，到设备页上收回它"
   }
 }

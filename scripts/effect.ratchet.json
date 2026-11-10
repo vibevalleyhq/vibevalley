@@ -1,7 +1,7 @@
 {
   "apiStabilityLeak": {
     "apps/server": 119,
-    "apps/cli": 37,
+    "apps/cli": 35,
     "packages/ai": 3,
     "packages/provider": 21,
     "packages/protocol": 1,

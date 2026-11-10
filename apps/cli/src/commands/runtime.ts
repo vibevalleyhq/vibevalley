@@ -4,7 +4,8 @@ import { Command } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, nameArg, show } from "#/farm.ts";
+import { ask, change, nameArg } from "#/farm.ts";
+import { show } from "#/format.ts";
 
 const runtimeLine = (r: T.RuntimeInfo) =>
   [r.id, r.installation.status === "available" ? `${r.installation.version ?? ""} ${r.installation.command}`.trim() : r.installation.status].join("  ");

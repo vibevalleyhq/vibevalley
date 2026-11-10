@@ -40,5 +40,15 @@
     "android": "Android phone",
     "windows": "Windows PC",
     "device": "A device"
+  },
+  "approvals": {
+    "page": "Let a device sign in",
+    "hint": "Ran vibevalley auth login in that device's terminal? Check the code; approve if it matches.",
+    "title": "Sign-ins waiting for you",
+    "none": "No device is waiting. Run vibevalley auth login on that device and its code shows up here.",
+    "wants": "{name} wants to sign in",
+    "left": "Expires in {m} min",
+    "allow": "Approve",
+    "refuse": "Refuse"
   }
 }

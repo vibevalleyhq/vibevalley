@@ -133,8 +133,15 @@ const loginPath = pathOf("user.login");
 const logoutPath = pathOf("user.logout");
 const passwordPath = pathOf("user.password.set");
 
-/** Let through with no key: pairing, signing in, and whether there is anything to sign in to. */
-const keyless = new Set(["POST " + pathOf("lan.pair"), "POST " + loginPath, "POST " + pathOf("user.get")]);
+/** Let through with no key: pairing, signing in (with the password, or by asking to be approved), and whether there is
+ * anything to sign in to. */
+const keyless = new Set([
+  "POST " + pathOf("lan.pair"),
+  "POST " + loginPath,
+  "POST " + pathOf("user.get"),
+  "POST " + pathOf("user.approval.create"),
+  "POST " + pathOf("user.approval.collect"),
+]);
 
 /** A signed-in device is the user everywhere but the password, which is set only at the machine. */
 const loginMay = (method: string, path: string) => !(method === "POST" && path === passwordPath);

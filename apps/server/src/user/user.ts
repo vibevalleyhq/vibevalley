@@ -18,6 +18,11 @@ const wrongTries = 5;
 const lockedForMs = 60_000;
 const seenEveryMs = 60_000;
 const passwordMin = 8;
+const requestForMs = 10 * 60_000;
+const requestsAtOnce = 5;
+const collectEverySeconds = 2;
+// No vowels and no look-alikes (0/O, 1/I): a code read off a terminal is typed or matched without slips or words.
+const codeLetters = "BCDFGHJKLMNPQRSTVWXZ";
 
 // OWASP's floor for scrypt; a sign-in waits for it, which is what makes guessing slow.
 const cost = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
@@ -29,6 +34,17 @@ interface Device extends T.UserDevice {
   readonly keyHash: string;
   written: number;
 }
+
+interface Request extends T.Approval {
+  readonly claimHash: string;
+  approved: boolean;
+}
+
+/** XXXX-XXXX from codeLetters; randomBytes' bias over 20 letters is far too small to matter for a ten-minute code. */
+const requestCode = () => {
+  const letters = Array.from(randomBytes(8), (b) => codeLetters[b % codeLetters.length] ?? "B");
+  return Arr.join(Arr.take(letters, 4), "") + "-" + Arr.join(Arr.drop(letters, 4), "");
+};
 
 /** The person a request is for: on this machine, or through the gate as one of their devices. */
 export interface Caller {
@@ -53,6 +69,12 @@ export class User extends Context.Service<
     readonly revoke: (id: string) => Effect.Effect<T.UserDevice[], ApiError>;
     /** What revoke would do, refused as it would be; nothing changes. */
     readonly previewRevoke: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    /** A device asking to be signed in; refused while too many already wait. */
+    readonly request: (name: string) => Effect.Effect<T.ApprovalCreated, ApiError>;
+    /** The asking device's key once approved, given once; nothing while it waits. */
+    readonly collect: (claim: string) => Effect.Effect<T.ApprovalCollected, ApiError>;
+    readonly requests: () => T.Approval[];
+    readonly answerRequest: (id: string, allow: boolean) => Effect.Effect<T.Approval[], ApiError>;
     /** Each revoked device's id: what holds its connections cuts them. */
     readonly revoked: Stream.Stream<string>;
   }
@@ -128,6 +150,13 @@ const make = Effect.gen(function* () {
       ...(row.last_seen !== null ? { lastSeen: row.last_seen } : {}),
     });
   }
+
+  // Kept in memory only: a restart drops every waiting request, and the asking device asks again.
+  const waiting = new Map<string, Request>();
+  const live = () => {
+    for (const [id, r] of waiting) if (r.expiresAt <= now()) waiting.delete(id);
+    return Arr.map(Array.from(waiting.values()), ({ claimHash: _, approved: __, ...r }): T.Approval => r);
+  };
 
   const shown = ({ keyHash: _, written: __, ...d }: Device): T.UserDevice => d;
   const listed = () => Arr.sort(Arr.map(Array.from(devices.values()), shown), byAdded);
@@ -220,6 +249,42 @@ const make = Effect.gen(function* () {
       return shown(found);
     },
     revoke,
+    request: Effect.fn("User.request")(function* (given) {
+      if (live().length >= requestsAtOnce) return yield* Effect.fail(refuse(t("server.user.requestsBusy")));
+      const tidy = tidyName(given);
+      const claim = randomBytes(32).toString("base64url");
+      const r: Request = {
+        id: newId(),
+        code: requestCode(),
+        name: Str.isEmpty(tidy) ? t("server.user.aDevice") : tidy,
+        expiresAt: now() + requestForMs,
+        claimHash: keyHash(claim),
+        approved: false,
+      };
+      waiting.set(r.id, r);
+      logs.info(`vibevalley: user: "${r.name}" asks to sign in (${r.code})`);
+      return { code: r.code, claim, expiresAt: r.expiresAt, every: collectEverySeconds };
+    }),
+    collect: Effect.fn("User.collect")(function* (claim) {
+      live();
+      const matches = sameSecret(keyHash(claim));
+      const hit = Arr.findFirst(Array.from(waiting.values()), (r) => matches(r.claimHash));
+      if (Option.isNone(hit)) return yield* Effect.fail(refuse(t("server.user.requestGone")));
+      if (!hit.value.approved) return {};
+      // The device is made when its key is collected: an approval nobody collects leaves no device behind.
+      waiting.delete(hit.value.id);
+      return { login: yield* addDevice(hit.value.name, "login") };
+    }),
+    requests: live,
+    answerRequest: Effect.fn("User.answerRequest")(function* (id, allow) {
+      live();
+      const r = waiting.get(id);
+      if (r === undefined) return yield* Effect.fail(refuse(t("server.user.requestGone")));
+      if (allow) r.approved = true;
+      else waiting.delete(id);
+      logs.info(`vibevalley: user: "${r.name}" (${r.code}) ${allow ? "approved" : "refused"}`);
+      return live();
+    }),
     previewRevoke: Effect.fn("User.previewRevoke")(function* (id) {
       const d = yield* known(id);
       return { does: [t("server.user.revoke", { name: d.name })] };

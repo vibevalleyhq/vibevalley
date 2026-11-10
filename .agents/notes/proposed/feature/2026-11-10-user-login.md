@@ -32,7 +32,7 @@ Status: proposed
 1. **改名。** 代码里的 owner 改叫 user：`ownerId` 改 `userId`（LSP 重命名），`ActorKind`、频道参与者、记忆的作者等取值里的 `owner` 改 `user`（ast-grep 限定文件，库里的取值和黄金数据跟着改），`stale-names` 拦着旧名字。行为不变。
 2. **账号与钥匙（服务端）。** `user_account`、`user_device`（由 `lan_device` 改名）、scrypt；接口 `user.get`、`user.update`、`user.password.set`（本机才能调）、`user.login`、`user.logout`、`user.device.list`、`user.device.delete`；门口按钥匙的来路放行（配对的只放 `remote`，登录的放全部给用户的），登录时写 Cookie；`user.update` 改名字。
 3. **页面。** 登录页、设备页合并、设密码。
-4. **命令行。** `vibevalley user password`；`vibevalley login <服务端地址>` 存下钥匙，之后的命令带着它（第 4 步机器加入时也要用）。
+4. **命令行。** `vibevalley auth login <服务端地址>`，照 `gh auth login`（用户定，2026-11-10）：命令行拿到确认码，用户在已登录的页面上同意，命令行取回钥匙存进家目录，之后的命令带着它。机器加入（服务端管多台机器的第 4 步）用同一套「出码、页面同意、发钥匙」。密码只在本机页面上设，命令行不另设。
 5. **文档与规矩。** AGENTS.md、`lan.md`、`setting.md`、`architecture.md`。
 
 ## 进度
@@ -42,6 +42,7 @@ Status: proposed
 | 1 改名 | 完成 | 代码、表、取值、词典的键、黄金数据里指这个人的 owner 都改叫 user；界面上的「主人」「Owner」不动。别的东西的 owner 照旧：线程归哪个帮工（`threadOwnerOf`）、触发器归哪张工单（`Mailbox.ownerOf`）、块归哪篇稿子、Solid 的响应式 owner、oar 的会话键；EverOS 的 `sender_id` 仍是 `owner`，外面已存的记忆按它归档。`stale-names` 加了一条拦这个人的旧名字（改名前的代码在它查的目录里命中 882 处） |
 | 2 账号与钥匙 | 完成 | 新模块 `user`（Platform 组，服务 `User`）：`user_account` 一行存名字和 scrypt 的密码哈希（`scrypt:N:r:p:盐:哈希`，读的时候按它记下的参数算），`lan_device` 改名 `user_device` 加 `came`、`paired_at` 改 `added_at`。接口 `user.get`、`user.update`、`user.password.set`（从门进来一律拒绝，至少 8 个字）、`user.login`（输错 5 次锁 60 秒）、`user.logout`、`user.device.list`、`user.device.delete`。门（`lan.ts`）的钥匙改由 `User.byKey` 认，配对的钥匙由 `User.pair` 签；不带钥匙放 `lan.pair`、`user.login`、`user.get`；登录来的设备放全部，除了设密码；每个转发的请求带 `x-vibevalley-outside`；登录和退出的答复由门整个读完，写或清 HttpOnly 的 Cookie。收回设备走 `User.revoked` 流，门照旧切断它的连接；退出的请求不登记在设备的连接里，否则会把自己切断。Cookie 改名 `vibevalley_device_key`，已配对的手机要重新配对。页面暂时照旧，第 3 步换掉 |
 | 3 页面 | 完成 | 门外打开的页面先问 `user.get`（HttpOnly 的 Cookie 页面读不到），没钥匙的设过密码去 `/login`、没设去 `/pair`（`features/user/entry.ts`）。新 feature `user`：登录页、设置「设备」页里的「名字和密码」卡片（本机才有密码框；从设备上来的能退出）和「你的设备」列表（标着配对或登录、这台，能收回，收回这台就回登录或配对页）。没另开设置页：导航的图标一个意思一个，钥匙已给了「账号与钥匙」。去掉被取代的 `lan.device.delete`、`lan.device.previewDelete`、`lan.me.get`、`LanStatus.devices`，手机壳的 e2e 改用 `user.device.*`。`login.spec.ts` 在自己的服务端上走一遍（设了密码，别的文件没配对的设备就会去登录页） |
+| 4 命令行 | 完成 | `user.approval.*`：`create`、`collect` 不要钥匙（门放行），`list`、`answer` 要用户的钥匙；请求在 `User` 的内存里，确认码是 `XXXX-XXXX`（没有元音和易混的字母），10 分钟过期、同时至多 5 个，取件凭证只存哈希，设备在取钥匙时才建。页面：`/approve?code=…` 和「设备」页里「等你同意的登录」；门外没钥匙的先去 `/login?next=…`，登录完回原处（`afterSignIn` 只认本站的路径）。命令行：`auth login [服务端]`（先问 `user.get` 的 `here`，本机的不用登录）、`auth status`、`auth logout`；`auth.json`（`0600`）由 `@vibevalley/home` 读写；生成的 `VibeValleyApi` 多了可选的 `key`，`askAt` 和事件流只把钥匙发给登录过的那个服务端。真机上走过：门外 `auth login`、本机同意、带钥匙跑 `issue list`、`auth logout` 后旧钥匙 401 |
 
 ## Alternatives considered
 

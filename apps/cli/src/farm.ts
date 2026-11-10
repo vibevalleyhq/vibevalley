@@ -7,22 +7,35 @@ import { HttpClient, HttpClientRequest } from "effect/http";
 
 import { connect } from "@vibevalley/bridge";
 import { socketLink } from "@vibevalley/bridge/socket";
-import { announced, controlSocketOf, homeOf } from "@vibevalley/home";
+import { announced, controlSocketOf, homeOf, signedIn } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 import { type Preview, VibeValleyApi, type VibeValleyApiError } from "@vibevalley/protocol";
 import { ApiError } from "@vibevalley/protocol/api";
 import { desktopControl } from "@vibevalley/protocol/host";
 
 import { DryRunFlag, show } from "./format.ts";
-export { DryRunFlag, FormatFlag, show } from "./format.ts";
-
 import { exit, Failure, type Next } from "./output.ts";
 
 const fallbackServer = "http://127.0.0.1:8787";
-/** The server using this machine's home (its server.json), else the configured default port. */
-const defaultServer = announced(homeOf()) ?? fallbackServer;
+/** The server signed in to (auth login), else the one using this machine's home (its server.json), else the default port. */
+const defaultServer = signedIn(homeOf())?.server ?? announced(homeOf()) ?? fallbackServer;
 
-/** --server, else VIBEVALLEY_SERVER, else the one on this machine. */
+/** The server a URL is on, as a sign-in is kept: its origin, whatever path or trailing slash it was given with. */
+export const serverOf = (url: string) => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+};
+
+/** The key to send to base: the home's sign-in's, when base is the server signed in to; none for any other. */
+const keyIn = (home: string, base: string): string | undefined => {
+  const saved = signedIn(home);
+  return saved !== undefined && serverOf(saved.server) === serverOf(base) ? saved.key : undefined;
+};
+
+/** --server, else VIBEVALLEY_SERVER, else the one signed in to, else the one on this machine. */
 export const ServerFlag = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(
     Flag.withFallbackConfig(Config.String("VIBEVALLEY_SERVER")),
@@ -86,7 +99,12 @@ const failureOf = (status: number, text: string): Failure =>
 export const frames = (base: string, path: string) =>
   Stream.unwrap(
     Effect.gen(function* () {
-      const request = HttpClientRequest.get(base + path).pipe(HttpClientRequest.accept("text/event-stream"));
+      const home = yield* keyHome;
+      const key = keyIn(home, base);
+      const request = HttpClientRequest.get(base + path).pipe(
+        HttpClientRequest.accept("text/event-stream"),
+        key === undefined ? (r) => r : HttpClientRequest.bearerToken(key),
+      );
       const res = yield* Effect.flatMap(HttpClient.HttpClient, (client) => client.execute(request)).pipe(Effect.mapError((e) => unreachable(base, e)));
       if (res.status !== 200) {
         const body = yield* res.text.pipe(Effect.mapError((e) => unreachable(base, e)));
@@ -119,9 +137,16 @@ function failureFrom(base: string, e: unknown): Failure {
   return Failure.make({ code, tag: tag ?? "Server", text: e.reason, status: e.status, next: nextOf(e.error) });
 }
 
-/** One question to the farm at --server, typed by the endpoint it calls. */
-export const ask = <A>(use: (api: VibeValleyApi) => Promise<A>) =>
-  Effect.flatMap(ServerFlag, (base) => Effect.tryPromise({ try: () => use(new VibeValleyApi(base)), catch: (e) => failureFrom(base, e) }));
+/** One question to the farm at base, typed by the endpoint it calls; with the key when base is the server signed in to. */
+export const askAt =
+  (base: string) =>
+  <A>(use: (api: VibeValleyApi) => Promise<A>) =>
+    Effect.flatMap(keyHome, (home) =>
+      Effect.tryPromise({ try: () => use(new VibeValleyApi(base, undefined, keyIn(home, base))), catch: (e) => failureFrom(base, e) }),
+    );
+
+/** One question to the farm at --server. */
+export const ask = <A>(use: (api: VibeValleyApi) => Promise<A>) => Effect.flatMap(ServerFlag, (base) => askAt(base)(use));
 
 /** A change, or with --dry-run what it would do: by the endpoint's own dry run where it has one; a change with none is
  * refused rather than made. */
@@ -150,6 +175,9 @@ export const farmHome = Config.String("VIBEVALLEY_HOME").pipe(
   Config.withDefault(""),
   Config.map((home) => home || homeOf({})),
 );
+
+/** The home a request's key is read from; an environment that cannot say it is a mistake to report, not a home to guess. */
+const keyHome = Effect.mapError(farmHome, (e) => Failure.make({ code: exit.usage, tag: "Config", text: e.message }));
 
 /** The app the launcher was started from, to open when it is not running; none from the repository. */
 export const launchedFrom = Config.String("VIBEVALLEY_APP").pipe(Config.withDefault(""));
