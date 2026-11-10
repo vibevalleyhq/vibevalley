@@ -26,7 +26,7 @@ export interface Execution {
   readonly failure?: string;
 }
 
-interface StartExecution {
+export interface StartExecution {
   readonly agent: T.Agent;
   readonly owner: ExecutionOwner;
   readonly cwd: string;
@@ -35,7 +35,7 @@ interface StartExecution {
   readonly options: Partial<SessionOptions>;
 }
 
-interface ExecutionObserver {
+export interface ExecutionObserver {
   readonly connection: (connection: T.ToolConnection) => void;
   readonly event: (event: Event) => void;
   readonly input: (input: ExecutionInput) => void;
@@ -46,7 +46,7 @@ interface ExecutionObserver {
 }
 
 export type ExecutionInput = { readonly kind: "consumed" | "returned"; readonly inputId: string };
-type DeliveredInput =
+export type DeliveredInput =
   | { readonly kind: "accepted"; readonly landed: "prompted" | "steered" | "queued"; readonly inputId?: string }
   | { readonly kind: "rejected"; readonly code: string; readonly reason: string };
 

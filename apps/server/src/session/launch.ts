@@ -11,7 +11,8 @@ import { Agent } from "#/agent/agent.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { Executor, type Started } from "#/executor/executor.ts";
+import { type Started } from "#/executor/executor.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Repo } from "#/repo/repo.ts";
 import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/repo/workplace.ts";
@@ -47,7 +48,8 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     const store = yield* Agent;
     const memories = yield* Memory;
     const repos = yield* Repo;
-    const executor = yield* Executor;
+    const machines = yield* Machine;
+    const executor = machines.executions(machines.here());
     const cli = yield* (yield* WorkerAccess).pipe(Effect.orElseSucceed(() => undefined));
     const clock = yield* Clock.Clock;
     const {

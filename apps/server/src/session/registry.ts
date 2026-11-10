@@ -13,10 +13,11 @@ import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core, type FactIn } from "#/core/core.ts";
-import { Executor, type ExecutionInput } from "#/executor/executor.ts";
+import { type ExecutionInput } from "#/executor/executor.ts";
 import { serverAddress, ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { Machine } from "#/machine/machine.ts";
 import { type Workplace } from "#/repo/workplace.ts";
 import * as qs from "#db/session.sql.ts";
 
@@ -74,7 +75,8 @@ export const sessionRegistry = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const core = yield* Core;
   const store = yield* Agent;
-  const executor = yield* Executor;
+  const machines = yield* Machine;
+  const executor = machines.executions(machines.here());
   const db = yield* Db;
   const clock = yield* Clock.Clock;
   const context2 = yield* Effect.context();

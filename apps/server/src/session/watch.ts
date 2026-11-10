@@ -7,9 +7,10 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { worker as sessionActor } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
-import { Executor, type Execution, type StartFailure } from "#/executor/executor.ts";
+import { type Execution, type StartFailure } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 
@@ -25,7 +26,8 @@ export const sessionWatch = (r: SessionRegistry) =>
     const core = yield* Core;
     const memories = yield* Memory;
     const runtimes = yield* Runtime;
-    const executor = yield* Executor;
+    const machines = yield* Machine;
+    const executor = machines.executions(machines.here());
     const clock = yield* Clock.Clock;
     const { fire, apply, notice, signal, launchOf, save, startRun, inputChanged, endRun } = r;
     const stallMs = config.session.stallSeconds * 1000;

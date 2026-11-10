@@ -77,7 +77,7 @@ export const sourceControl =
     below.pipe(on(Repo.layer(o.repo)));
 
 /** Agent Sessions: an agent at work on an issue in a workplace. */
-export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Machine.layer), on(Executor.layer), on(Session.layer));
+export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Machine.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents, the owner's notes; the sessions register as its helpers. */
 export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Media.layer), on(Artifact.layer), on(Pkm.layer));

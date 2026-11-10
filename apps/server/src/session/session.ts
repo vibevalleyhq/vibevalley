@@ -10,7 +10,6 @@ import { worker as sessionActor } from "#/base/actor.ts";
 import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
-import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -199,8 +198,8 @@ const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const memories = yield* Memory;
   const repos = yield* Repo;
-  const executor = yield* Executor;
   const machines = yield* Machine;
+  const executor = machines.executions(machines.here());
   const db = yield* Db;
   yield* Effect.forkScoped(
     Stream.runForEach(moves, ({ fact, after }) => {
