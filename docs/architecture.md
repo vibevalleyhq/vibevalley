@@ -124,7 +124,6 @@ Host：
 | `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
 | `agent/<档案 id>/` | 助手对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
 | `logs/` | 帮工原始运行日志与桌面端服务端日志 |
-| `artifacts/<sha256>` | 网页 Artifact 内容文件（按内容哈希去重，[Artifact](docs/subsystems/artifact.md)） |
 
 Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
 - `repos/`：仓库的 git 仓库。

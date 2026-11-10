@@ -4,9 +4,9 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { fileBlob } from "#/infra/files.ts";
 import * as q from "#db/media_input.sql.ts";
@@ -25,10 +25,11 @@ export const makeInputs = Effect.gen(function* () {
   const path = yield* Path.Path;
   const { join } = path;
   const db = yield* Db;
-  const config = yield* ServerConfig;
-  const directory = join(config.home, "media-inputs");
-  const staging = join(directory, "staging");
-  const content = join(directory, "content");
+  const kept = yield* Attachment;
+  // An input's bytes are an attachment (its hash is the attachment's id); media keeps only its own staging under the
+  // attachments' one, so a staged file is renamed into place.
+  const staging = join(kept.staging, "media");
+  const contentOf = (hash: string) => kept.pathOf(hash);
   const lock = yield* Semaphore.make(1);
   const uploading = new Set<string>();
   const resultReservations = new Map<string, number>();
@@ -71,8 +72,7 @@ export const makeInputs = Effect.gen(function* () {
     if (!canDelete(row)) return yield* Effect.fail(refused(t("server.media.inputBusy")));
     yield* change(row, "deleting");
     yield* fs.remove(join(staging, row.id), { recursive: true, force: true }).pipe(Effect.mapError(storageError));
-    if (row.hash && (yield* db.run(q.otherInputHash({ id: row.id, hash: row.hash }))).count === 0)
-      yield* fs.remove(join(content, row.hash), { force: true }).pipe(Effect.mapError(storageError));
+    // Its bytes stay: an attachment may be a message's file or a library item too.
     // The tombstone survives failed unlink or commit, so cleanup can be resumed without reviving the input.
     yield* persist(q.deleteInput({ id: row.id }));
   });
@@ -160,13 +160,8 @@ export const makeInputs = Effect.gen(function* () {
         );
         const row = yield* found(id);
         yield* Effect.gen(function* () {
-          yield* fs.makeDirectory(content, { recursive: true, mode: 0o700 });
           yield* change(row, "uploading", staged.hash);
-          const target = join(content, staged.hash);
-          const exists = yield* fs.exists(target);
-          if (exists) yield* verifyMediaInput(target, staged.size, staged.hash).pipe(Effect.provideService(FileSystem.FileSystem, fs));
-          else if (retainSource) yield* fs.link(staged.path, target);
-          else yield* fs.rename(staged.path, target);
+          yield* kept.keepStaged({ path: staged.path, hash: staged.hash, size: staged.size, name: staged.name, type: staged.mime }, retainSource);
           yield* db.inTx(
             Effect.gen(function* () {
               yield* change(row, "ready", staged.hash);
@@ -175,10 +170,6 @@ export const makeInputs = Effect.gen(function* () {
           );
           resultReservations.delete(staged.path);
         }).pipe(
-          Effect.catchTags({
-            PlatformError: () => Effect.fail(storageError()),
-            MediaInputRejected: () => Effect.fail(refused(t("server.media.inputChanged"))),
-          }),
           Effect.onError(() =>
             Effect.gen(function* () {
               const latest = yield* found(id);
@@ -235,29 +226,10 @@ export const makeInputs = Effect.gen(function* () {
               return yield* lock.withPermits(1)(
                 Effect.gen(function* () {
                   if (row.hash !== null && staged.hash !== row.hash) return yield* Effect.fail(refused(t("server.media.inputChanged")));
-                  yield* fs.makeDirectory(content, { recursive: true, mode: 0o700 });
-                  const target = join(content, staged.hash);
-                  // Record the intended hash before publishing, so failed rollback still has a user and consumes quota.
+                  // Record the intended hash before publishing, so a failed commit still has a user and consumes quota.
                   yield* change(row, "uploading", staged.hash);
-                  const linked = yield* fs.link(staged.path, target).pipe(
-                    Effect.as(true),
-                    Effect.catchIf(
-                      (error) => error.reason._tag === "AlreadyExists",
-                      () => Effect.succeed(false),
-                    ),
-                  );
-                  if (!linked)
-                    yield* verifyMediaInput(target, staged.size, staged.hash).pipe(
-                      Effect.provideService(FileSystem.FileSystem, fs),
-                      Effect.catch(() => fs.rename(staged.path, target)),
-                    );
-                  yield* change(row, "ready", staged.hash, (yield* Clock.currentTimeMillis) + lifetime).pipe(
-                    Effect.onError(() =>
-                      linked
-                        ? fs.remove(target, { force: true }).pipe(Effect.catch(() => Effect.logError("Media input rollback could not remove its file")))
-                        : Effect.void,
-                    ),
-                  );
+                  yield* kept.keepStaged({ path: staged.path, hash: staged.hash, size: staged.size, name: declared.name, type: declared.mime });
+                  yield* change(row, "ready", staged.hash, (yield* Clock.currentTimeMillis) + lifetime);
                 }).pipe(Effect.uninterruptible),
               );
             }),
@@ -296,9 +268,7 @@ export const makeInputs = Effect.gen(function* () {
       const row = yield* db.one(q.input({ id }));
       if (!row) return { does: [] };
       if (!canDelete(row)) return yield* Effect.fail(refused(t("server.media.inputBusy")));
-      const does = [t("server.media.inputDeletePreview", { name: (yield* metadata(row)).name })];
-      if (row.hash && (yield* db.run(q.otherInputHash({ id, hash: row.hash }))).count === 0) does.push(t("server.media.inputDeleteBytes"));
-      return { does };
+      return { does: [t("server.media.inputDeletePreview", { name: (yield* metadata(row)).name })] };
     }, lock.withPermits(1)),
     delete: Effect.fn("Media.inputDelete")(
       function* (id: string) {
@@ -320,7 +290,7 @@ export const makeInputs = Effect.gen(function* () {
                 row.phase !== "ready" ||
                 (row.pinned === 0 && row.expires_at <= (yield* Clock.currentTimeMillis)) ||
                 !row.hash ||
-                !(yield* fs.exists(join(content, row.hash)).pipe(Effect.mapError(storageError)))
+                !(yield* fs.exists(contentOf(row.hash)).pipe(Effect.mapError(storageError)))
               )
                 return yield* Effect.fail(refused(t("server.media.inputMissing")));
               yield* persist(pins.pinInput({ id, holder }));
@@ -340,7 +310,7 @@ export const makeInputs = Effect.gen(function* () {
       if (row.phase !== "ready" || !row.hash || (yield* db.run(pins.inputPinnedBy({ id, holder }))).pinned === 0)
         return yield* Effect.fail(refused(t("server.media.inputMissing")));
       const savedHash = row.hash;
-      const path = join(content, savedHash);
+      const path = contentOf(savedHash);
       return yield* Effect.gen(function* () {
         const input = yield* metadata(row);
         yield* verifyMediaInput(path, input.size, savedHash).pipe(
@@ -371,7 +341,7 @@ export const makeInputs = Effect.gen(function* () {
       if (row.phase !== "ready" || !row.hash || (row.pinned === 0 && row.expires_at <= (yield* Clock.currentTimeMillis)))
         return yield* Effect.fail(refused(t("server.media.inputMissing")));
       const input = yield* metadata(row);
-      const path = join(content, row.hash);
+      const path = contentOf(row.hash);
       yield* verifyMediaInput(path, input.size, row.hash).pipe(
         Effect.provideService(FileSystem.FileSystem, fs),
         Effect.mapError(() => refused(t("server.media.inputChanged"))),
@@ -411,23 +381,12 @@ export const makeInputs = Effect.gen(function* () {
         if (uploading.size > 0 || resultReservations.size > 0) return yield* Effect.fail(refused(t("server.media.inputBusy")));
         yield* fs.remove(staging, { recursive: true, force: true }).pipe(Effect.mapError(storageError));
         yield* persist(q.interruptInputs());
-        yield* fs.makeDirectory(content, { recursive: true, mode: 0o700 }).pipe(Effect.mapError(storageError));
         const rows = yield* db.run(q.inputs());
-        const hashes = new Set(rows.flatMap((row) => (row.hash ? [row.hash] : [])));
-        const directory2 = yield* fs.readDirectory(content).pipe(Effect.mapError(storageError));
-        yield* Effect.forEach(
-          directory2,
-          (name) =>
-            /^[0-9a-f]{64}$/u.test(name) && !hashes.has(name)
-              ? fs.remove(join(content, name), { force: true }).pipe(Effect.mapError(storageError))
-              : Effect.void,
-          { discard: true },
-        );
         yield* Effect.forEach(
           rows,
           (row) =>
             Effect.gen(function* () {
-              if (row.phase === "ready" && row.hash && !(yield* fs.exists(join(content, row.hash)).pipe(Effect.mapError(storageError))))
+              if (row.phase === "ready" && row.hash && !(yield* fs.exists(contentOf(row.hash)).pipe(Effect.mapError(storageError))))
                 yield* change(row, "failed");
             }),
           { discard: true },

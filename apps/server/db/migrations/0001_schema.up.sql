@@ -90,6 +90,7 @@ CREATE TABLE media_input (
   metadata TEXT NOT NULL,
   size INTEGER NOT NULL CHECK (size BETWEEN 1 AND 512000000),
   phase TEXT NOT NULL CHECK (phase IN ('reserved','uploading','ready','failed','deleting')),
+  -- The sha256 of its bytes, which is its attachment's id (attachment/): set before the bytes are kept, so no reference.
   hash TEXT CHECK (hash IS NULL OR hash ~ '^[0-9a-f]{64}$'),
   created_at double precision NOT NULL,
   expires_at double precision NOT NULL,
@@ -600,8 +601,8 @@ CREATE INDEX artifact_by_issue on artifact (issue, updated_at);
 CREATE TABLE artifact_version (
   artifact_id text not null references artifact (id) on delete cascade,
   version     integer not null,
-  -- The sha256 of its bytes, kept under the home directory's artifacts/: the same content is kept once.
-  sha         text not null,
+  -- Its bytes, an attachment (attachment/): the same content is kept once, whoever keeps it.
+  attachment_id text not null references attachment (id),
   size        integer not null,
   note        text,
   by_id       text not null,
@@ -611,7 +612,7 @@ CREATE TABLE artifact_version (
   created_at  double precision not null,
   primary key (artifact_id, version)
 );
-CREATE INDEX artifact_version_by_sha on artifact_version (sha);
+CREATE INDEX artifact_version_attachment on artifact_version (attachment_id);
 CREATE TABLE artifact_block (
   id          text primary key,
   artifact_id text not null references artifact (id) on delete cascade,

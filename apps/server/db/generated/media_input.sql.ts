@@ -175,30 +175,6 @@ export const deleteInput = Effect.fn("DeleteInput")(function* (params: DeleteInp
   })(params)
 })
 
-export const OtherInputHashParams = Schema.Struct({
-  ["hash"]: Schema.String,
-  ["id"]: Schema.String,
-})
-export type OtherInputHashParams = typeof OtherInputHashParams.Type
-
-
-export const OtherInputHashResult = Schema.Struct({
-  ["count"]: Schema.Int,
-})
-export type OtherInputHashResult = typeof OtherInputHashResult.Type
-
-
-export const OtherInputHashSql = "-- name: OtherInputHash :one\nselect count(*)::int as count from media_input where hash = $1 and id != $2;"
-
-export const otherInputHash = Effect.fn("OtherInputHash")(function* (params: OtherInputHashParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: OtherInputHashParams,
-    Result: OtherInputHashResult,
-    execute: (p) => sql.unsafe(OtherInputHashSql, [p["hash"], p["id"]]),
-  })(params)
-})
-
 export const InterruptInputsParams = Schema.Struct({
 
 })

@@ -1,8 +1,8 @@
-import { existsSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Array as Arr, Effect } from "effect";
 import { TestClock } from "effect/testing";
 
 import { userId } from "@vibevalley/protocol";
@@ -132,24 +132,26 @@ describe("an artifact", () => {
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
-  it.effect("goes with its versions, and its content files go once no other artifact keeps them", () =>
+  it.effect("goes with its versions, and its pages stay as attachments, each kept once", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;
-      const dir = join((yield* ServerConfig).home, "artifacts");
+      const dir = join((yield* ServerConfig).home, "attachments");
+      const pages = () => Arr.filter(readdirSync(dir), (name) => /^[0-9a-f]{64}$/u.test(name));
       const same = page("同一页");
       const one = yield* artifacts.create(user, { title: "一", kind: "html", content: same });
       yield* artifacts.version(user, { id: one.id, content: page("一的第二版") });
       const two = yield* artifacts.create(user, { title: "二", kind: "html", content: same });
-      expect(readdirSync(dir).length).toBe(2);
+      // The same page is one file, whichever artifact keeps it.
+      expect(pages().length).toBe(2);
       expect((yield* artifacts.previewRemove(one.id)).does.length).toBeGreaterThan(0);
       yield* artifacts.remove(one.id);
       const artifactFailure = yield* Effect.flip(artifacts.get(one.id));
       expect(artifactFailure).toMatchObject({ _tag: "Missing" });
-      // the same page is still two's.
-      expect(readdirSync(dir).length).toBe(1);
+      expect((yield* artifacts.content(two.id)).content).toBe(same);
       yield* artifacts.remove(two.id);
-      expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
+      // Attachments are not deleted with what used them (docs/subsystems/attachment.md).
+      expect(pages().length).toBe(2);
       // Its cards stay in the conversation.
       expect((yield* chat.history(chat.defaultChannel())).filter((m) => m.artifact).length).toBe(3);
     }).pipe(Effect.scoped, Effect.provide(world())),

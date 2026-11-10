@@ -5,7 +5,6 @@
   "speechUnknown": "No complete speech result was received. The provider may still be processing or charging. Speech was not submitted again.",
   "speechRejected": "MOSS rejected the speech request. Check account access and input before creating a new task.",
   "inputDeletePreview": "Delete the local input reservation for {name} and any unfinished upload.",
-  "inputDeleteBytes": "Delete the local file if no other input retains it.",
   "remoteAccountChanged": "This remote file belongs to a different connection or credential. No request was sent with a replacement account.",
   "remoteUploadUnknown": "The remote upload outcome is unresolved, or this upload has already ended. It will not be submitted again; a remote file may still exist.",
   "remoteUploadRejected": "MOSS rejected this file upload. It was not retried.",

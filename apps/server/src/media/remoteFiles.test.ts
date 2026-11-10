@@ -4,6 +4,7 @@ import { Clock, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Provider } from "#/provider/provider.ts";
@@ -24,7 +25,7 @@ const notIn = (value: unknown, secret: string) =>
 /** The library, and a Provider whose accounts' calls go to the given vendor. */
 const layer = (http: HttpClient.HttpClient) =>
   Layer.mergeAll(
-    Db.layer.pipe(Layer.provideMerge(Database)),
+    Attachment.layer.pipe(Layer.provideMerge(Db.layer), Layer.provideMerge(Database)),
     Provider.layer.pipe(Layer.provide(Setting.layer), Layer.provide(Layer.succeed(HttpClient.HttpClient, http))),
   ).pipe(Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())));
 const key = "isolated-test-key";

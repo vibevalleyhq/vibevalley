@@ -23,8 +23,5 @@ update media_input set phase = sqlc.arg(phase), hash = sqlc.narg(hash), expires_
 -- name: DeleteInput :exec
 delete from media_input where id = sqlc.arg(id);
 
--- name: OtherInputHash :one
-select count(*)::int as count from media_input where hash = sqlc.arg(hash) and id != sqlc.arg(id);
-
 -- name: InterruptInputs :exec
 update media_input set phase = 'failed' where phase = 'uploading';

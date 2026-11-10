@@ -7,7 +7,7 @@ import { SqlClient, SqlSchema } from "effect/sql"
 export const AddArtifactVersionParams = Schema.Struct({
   ["artifact_id"]: Schema.String,
   ["version"]: Schema.Int,
-  ["sha"]: Schema.String,
+  ["attachment_id"]: Schema.String,
   ["size"]: Schema.Int,
   ["note"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
@@ -17,13 +17,13 @@ export const AddArtifactVersionParams = Schema.Struct({
 export type AddArtifactVersionParams = typeof AddArtifactVersionParams.Type
 
 
-export const AddArtifactVersionSql = "-- name: AddArtifactVersion :exec\ninsert into artifact_version (artifact_id, version, sha, size, note, by_id, by_name, created_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8);"
+export const AddArtifactVersionSql = "-- name: AddArtifactVersion :exec\ninsert into artifact_version (artifact_id, version, attachment_id, size, note, by_id, by_name, created_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8);"
 
 export const addArtifactVersion = Effect.fn("AddArtifactVersion")(function* (params: AddArtifactVersionParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddArtifactVersionParams,
-    execute: (p) => sql.unsafe(AddArtifactVersionSql, [p["artifact_id"], p["version"], p["sha"], p["size"], p["note"], p["by_id"], p["by_name"], p["created_at"]]),
+    execute: (p) => sql.unsafe(AddArtifactVersionSql, [p["artifact_id"], p["version"], p["attachment_id"], p["size"], p["note"], p["by_id"], p["by_name"], p["created_at"]]),
   })(params)
 })
 
@@ -54,7 +54,7 @@ export type ArtifactVersionsParams = typeof ArtifactVersionsParams.Type
 export const ArtifactVersionsResult = Schema.Struct({
   ["artifact_id"]: Schema.String,
   ["version"]: Schema.Int,
-  ["sha"]: Schema.String,
+  ["attachment_id"]: Schema.String,
   ["size"]: Schema.Int,
   ["note"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
@@ -88,7 +88,7 @@ export type ArtifactVersionParams = typeof ArtifactVersionParams.Type
 export const ArtifactVersionResult = Schema.Struct({
   ["artifact_id"]: Schema.String,
   ["version"]: Schema.Int,
-  ["sha"]: Schema.String,
+  ["attachment_id"]: Schema.String,
   ["size"]: Schema.Int,
   ["note"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
@@ -107,28 +107,5 @@ export const artifactVersion = Effect.fn("ArtifactVersion")(function* (params: A
     Request: ArtifactVersionParams,
     Result: ArtifactVersionResult,
     execute: (p) => sql.unsafe(ArtifactVersionSql, [p["artifact_id"], p["version"]]),
-  })(params)
-})
-
-export const ArtifactShaUsersParams = Schema.Struct({
-  ["sha"]: Schema.String,
-})
-export type ArtifactShaUsersParams = typeof ArtifactShaUsersParams.Type
-
-
-export const ArtifactShaUsersResult = Schema.Struct({
-  ["n"]: Schema.Int,
-})
-export type ArtifactShaUsersResult = typeof ArtifactShaUsersResult.Type
-
-
-export const ArtifactShaUsersSql = "-- name: ArtifactShaUsers :one\n-- How many versions keep this content: its file goes only when none does.\nselect count(*)::integer as n from artifact_version where sha = $1;"
-
-export const artifactShaUsers = Effect.fn("ArtifactShaUsers")(function* (params: ArtifactShaUsersParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: ArtifactShaUsersParams,
-    Result: ArtifactShaUsersResult,
-    execute: (p) => sql.unsafe(ArtifactShaUsersSql, [p["sha"]]),
   })(params)
 })

@@ -1,21 +1,18 @@
-import { createHash } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 
-import { Clock, Context, Effect, FileSystem, Layer, Semaphore, type Stream } from "effect";
+import { Clock, Context, Effect, Layer, Semaphore, type Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, lookIn, missing, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
-import { writeOnce } from "#/infra/files.ts";
 import * as qa from "#db/artifact.sql.ts";
 import * as qv from "#db/artifact_version.sql.ts";
 
@@ -47,7 +44,7 @@ export class Artifact extends Context.Service<
     readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError>;
     readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
     readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
-    /** It and its versions or blocks go. a content file goes when no other version keeps it. */
+    /** It and its versions or blocks go; the versions' attachments stay. */
     readonly remove: (id: T.ArtifactId) => Effect.Effect<void, ApiError>;
     readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.BlockSnapshot, ApiError>;
     readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
@@ -81,23 +78,13 @@ const missingArtifact = (id: T.ArtifactId) => missing(t("server.artifact.missing
 
 const make = () =>
   Effect.gen(function* () {
-    const config = yield* ServerConfig;
     const chat = yield* Channel;
     const db = yield* Db;
-    const fs = yield* FileSystem.FileSystem;
+    const kept = yield* Attachment;
     // One change of an artifact's row at a time: a version's number is the latest's plus one.
     const lock = yield* Semaphore.make(1);
-    const dir = join(config.home, "artifacts");
-    const fileOf = (sha: string) => join(dir, sha);
-
-    const keep = (bytes: Buffer) => {
-      const sha = createHash("sha256").update(bytes).digest("hex");
-      return writeOnce(fileOf(sha), bytes).pipe(
-        Effect.provideService(FileSystem.FileSystem, fs),
-        Effect.as(sha),
-        Effect.mapError((e) => refused(t("server.artifact.notKept", { why: String(e.cause) }))),
-      );
-    };
+    // A version's bytes are an attachment: kept once, whoever else keeps the same page.
+    const keep = (bytes: Buffer, title: string) => Effect.map(kept.keep(bytes, `${title}.html`, "text/html"), (a) => a.id);
 
     const assemble = Effect.fnUntraced(function* (row: qa.ArtifactsResult) {
       const versions = row.body === "html" ? yield* db.run(qv.artifactVersions({ artifact_id: row.id })) : [];
@@ -166,7 +153,7 @@ const make = () =>
       if (problem) return yield* Effect.fail(refused(problem));
       const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
       const channel = yield* chat.placeOf(maker.from, req.channel ?? "");
-      const sha = body === "html" ? yield* keep(bytes) : "";
+      const file = body === "html" ? yield* keep(bytes, title) : "";
       const id = S.artifactId(newId());
       const note = req.note?.trim() || undefined;
       const version = body === "html" ? 1 : 0;
@@ -189,7 +176,7 @@ const make = () =>
           qv.addArtifactVersion({
             artifact_id: id,
             version: 1,
-            sha,
+            attachment_id: file,
             size: bytes.length,
             note: note ?? null,
             by_id: maker.by,
@@ -209,7 +196,7 @@ const make = () =>
       const bytes = Buffer.from(req.content, "utf8");
       const problem = artifactProblem({ size: bytes.length }) || htmlProblem(htmlCheck(req.content));
       if (problem) return yield* Effect.fail(refused(problem));
-      const sha = yield* keep(bytes);
+      const file = yield* keep(bytes, row.title);
       const next = row.version + 1;
       const note = req.note?.trim() || undefined;
       const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "" };
@@ -228,7 +215,7 @@ const make = () =>
         qv.addArtifactVersion({
           artifact_id: row.id,
           version: next,
-          sha,
+          attachment_id: file,
           size: bytes.length,
           note: note ?? null,
           by_id: maker.by,
@@ -281,7 +268,7 @@ const make = () =>
         if (row.body === "blocks") return { version: row.seq, content: yield* blocks.markdown(id), body: "blocks" as const };
         const { v } = yield* versionOf(id, version);
         const content = yield* Effect.tryPromise({
-          try: () => readFile(fileOf(v.sha), "utf8"),
+          try: () => readFile(kept.pathOf(v.attachment_id), "utf8"),
           catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
         });
         return { version: v.version, content, body: "html" as const };
@@ -289,7 +276,7 @@ const make = () =>
       file: Effect.fn("Artifact.file")(function* (id, version) {
         const row = yield* db.one(qa.artifact({ id }));
         const v = row?.body === "html" ? yield* db.one(qv.artifactVersion({ artifact_id: id, version })) : undefined;
-        return v ? fileOf(v.sha) : undefined;
+        return v ? kept.pathOf(v.attachment_id) : undefined;
       }),
       create: Effect.fn("Artifact.create")(function* (maker, req) {
         return yield* create(maker, req);
@@ -303,7 +290,7 @@ const make = () =>
         // Over the latest only: a later version's changes would be lost under an edit of an older one.
         if (v.version !== row.version) return yield* Effect.fail(refused(t("server.artifact.edit.stale", { version: v.version, latest: row.version })));
         const source = yield* Effect.tryPromise({
-          try: () => readFile(fileOf(v.sha), "utf8"),
+          try: () => readFile(kept.pathOf(v.attachment_id), "utf8"),
           catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
         });
         const edited = htmlEdit(source, req.anchor, req.text);
@@ -329,17 +316,8 @@ const make = () =>
       }),
       remove: Effect.fn("Artifact.remove")(function* (id) {
         yield* found(id);
-        const versions = yield* db.run(qv.artifactVersions({ artifact_id: id }));
+        // Its versions' attachments stay: the same bytes may be a message's file or a library item.
         yield* db.run(qa.deleteArtifact({ id }));
-        yield* Effect.forEach(
-          new Set(versions.map((v) => v.sha)),
-          (sha) =>
-            Effect.gen(function* () {
-              const users = yield* db.one(qv.artifactShaUsers({ sha }));
-              if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
-            }),
-          { discard: true },
-        );
       }, lock.withPermits(1)),
       blocks: Effect.fn("Artifact.blocks")(function* (id) {
         const list = yield* blocks.blocks(id);

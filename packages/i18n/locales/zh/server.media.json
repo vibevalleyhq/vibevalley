@@ -5,7 +5,6 @@
   "speechUnknown": "没有收到完整的语音合成结果，供应商可能仍在处理或计费，没有重复提交。",
   "speechRejected": "MOSS 拒绝了语音合成请求，请检查账号权限与输入后再创建新任务。",
   "inputDeletePreview": "删除「{name}」的本机输入预留及未完成的上传。",
-  "inputDeleteBytes": "没有其他输入保留这份本机文件时，删除文件。",
   "remoteAccountChanged": "这份远端文件属于另一条连接或凭据，没有用替换后的账号发送请求。",
   "remoteUploadUnknown": "远端上传结果尚未确认，或这次上传已结束，不会再次提交；供应商处可能仍有文件。",
   "remoteUploadRejected": "MOSS 拒绝了这次文件上传，没有自动重试。",

@@ -4,7 +4,6 @@
   "badKind": "认不得 {kind} 这种 Artifact，只认 {kinds}",
   "empty": "Artifact 是空的",
   "tooBig": "一稿最多 {mb} MB",
-  "notKept": "Artifact 没存下来：{why}",
   "missing": "没有 {id} 这份 Artifact",
   "noVersion": "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
   "noFile": "「{title}」第 {version} 稿的内容不见了",

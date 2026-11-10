@@ -669,7 +669,6 @@ export const catalogs = {
       badKind: "认不得 {kind} 这种 Artifact，只认 {kinds}",
       empty: "Artifact 是空的",
       tooBig: "一稿最多 {mb} MB",
-      notKept: "Artifact 没存下来：{why}",
       missing: "没有 {id} 这份 Artifact",
       noVersion: "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
       noFile: "「{title}」第 {version} 稿的内容不见了",
@@ -1171,7 +1170,6 @@ export const catalogs = {
       speechUnknown: "没有收到完整的语音合成结果，供应商可能仍在处理或计费，没有重复提交。",
       speechRejected: "MOSS 拒绝了语音合成请求，请检查账号权限与输入后再创建新任务。",
       inputDeletePreview: "删除「{name}」的本机输入预留及未完成的上传。",
-      inputDeleteBytes: "没有其他输入保留这份本机文件时，删除文件。",
       remoteAccountChanged: "这份远端文件属于另一条连接或凭据，没有用替换后的账号发送请求。",
       remoteUploadUnknown: "远端上传结果尚未确认，或这次上传已结束，不会再次提交；供应商处可能仍有文件。",
       remoteUploadRejected: "MOSS 拒绝了这次文件上传，没有自动重试。",
@@ -5311,7 +5309,6 @@ export const catalogs = {
       badKind: "No artifact of kind {kind}: only {kinds}",
       empty: "The artifact is empty",
       tooBig: "A version is at most {mb} MB",
-      notKept: "The artifact was not kept: {why}",
       missing: "There is no artifact {id}",
       noVersion: '"{title}" has no version {version}; the latest is {latest}',
       noFile: 'The content of "{title}" version {version} is gone',
@@ -5827,7 +5824,6 @@ export const catalogs = {
       speechUnknown: "No complete speech result was received. The provider may still be processing or charging. Speech was not submitted again.",
       speechRejected: "MOSS rejected the speech request. Check account access and input before creating a new task.",
       inputDeletePreview: "Delete the local input reservation for {name} and any unfinished upload.",
-      inputDeleteBytes: "Delete the local file if no other input retains it.",
       remoteAccountChanged: "This remote file belongs to a different connection or credential. No request was sent with a replacement account.",
       remoteUploadUnknown:
         "The remote upload outcome is unresolved, or this upload has already ended. It will not be submitted again; a remote file may still exist.",
@@ -10084,7 +10080,6 @@ export interface Messages {
   "server.artifact.notApplied": undefined;
   "server.artifact.notBlocks": { readonly title: string | number };
   "server.artifact.notHtml": { readonly title: string | number };
-  "server.artifact.notKept": { readonly why: string | number };
   "server.artifact.nothingToChange": undefined;
   "server.artifact.op.badKey": { readonly key: string | number };
   "server.artifact.op.changed": undefined;
@@ -10562,7 +10557,6 @@ export interface Messages {
   "server.media.imageMade": { readonly prompt: string | number };
   "server.media.inputBusy": undefined;
   "server.media.inputChanged": undefined;
-  "server.media.inputDeleteBytes": undefined;
   "server.media.inputDeletePreview": { readonly name: string | number };
   "server.media.inputDisconnected": undefined;
   "server.media.inputInvalid": undefined;

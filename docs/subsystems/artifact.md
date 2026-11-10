@@ -17,7 +17,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 | 位置 | 职责 |
 |---|---|
 | [`packages/artifact/`](packages/artifact/README.md) | 独立 Artifact 纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML CSP 响应头与 `parse5` 白名单检查及划词改字（`html.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
-| `apps/server/src/artifact/artifact.ts`、`blocks.ts` | Artifact 增删改查、块与建议的持久化、HTML 版本文件读写（`$VIBEVALLEY_HOME/artifacts/<sha256>`）与频道卡片发送 |
+| `apps/server/src/artifact/artifact.ts`、`blocks.ts` | Artifact 增删改查、块与建议的持久化、HTML 每一稿存成附件（[附件](docs/subsystems/attachment.md)）与频道卡片发送 |
 | `apps/server/src/artifact/ops.ts`、`markdown.ts`、`policy.ts`、`check.ts`、`edit.ts`、`shell.ts` | 服务端薄消费出口（转发 `@vibevalley/artifact`） |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | Artifact、HTML 版本、块、块修订、操作批次与改写建议表 |
@@ -29,7 +29,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 ### 网页 Artifact（`html`）
 
-- **内容寻址与版本不可变**：单版上限 5MB，按 SHA-256 存入 `$VIBEVALLEY_HOME/artifacts/<sha256>`；提交新版追加 `artifact_version` 记录，不覆盖旧版。
+- **每一稿是一个附件，版本不可变**：单版上限 5MB，字节经 `Attachment.keep` 存一次，`artifact_version.attachment_id` 指向它；提交新版追加 `artifact_version` 记录，不覆盖旧版；删掉 Artifact 不删附件。
 - **双层沙箱隔离**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`。
 - **提交前静态白名单检查（`check.ts`）**：仅放行 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`，且媒体必须内联為 `data:` 或 `blob:`；含表外外链、表单提交或嵌套页面的直接拒绝并报错行号。
 - **划词源码替换（`artifact.html.edit`）**：预览挂载 `?shell=1` 外壳，划词生成选中文本及前后各 32 字的 `HtmlAnchor`；服务端在最新版源码中唯一匹配并替换该处转义字节存为新版，跨标签或有歧义则拒绝。

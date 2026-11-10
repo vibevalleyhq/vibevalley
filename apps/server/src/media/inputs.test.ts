@@ -1,9 +1,10 @@
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Exit, Fiber, FileSystem, Layer, Option, Path, PlatformError, Schema, Stream } from "effect";
+import { Array as Arr, Context, Deferred, Effect, Exit, Fiber, FileSystem, Layer, Option, Path, PlatformError, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
@@ -22,7 +23,18 @@ const notIn = (value: unknown, secret: string) =>
   });
 
 const layer = () =>
-  Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())));
+  Attachment.layer.pipe(
+    Layer.provideMerge(Db.layer),
+    Layer.provideMerge(Database),
+    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
+  );
+/** Inputs and the Attachment they keep bytes through, both on the given file system. */
+const inputsOn = Effect.fnUntraced(function* (fs: FileSystem.FileSystem) {
+  const built = yield* Layer.build(Layer.fresh(Attachment.layer)).pipe(Effect.provideService(FileSystem.FileSystem, fs));
+  return yield* makeInputs.pipe(Effect.provideService(Attachment, Context.get(built, Attachment)), Effect.provideService(FileSystem.FileSystem, fs));
+});
+const keptAt = (home: string, ...parts: string[]) => [home, "attachments", ...parts].join("/");
 const bytes = png();
 const metadata = { kind: "image", name: "input.png", mime: "image/png", size: bytes.length } as const;
 const saved = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInputs>) {
@@ -30,9 +42,8 @@ const saved = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInp
   return yield* inputs.upload(input.id, Stream.make(bytes));
 });
 
-it.effect("input reservations are immutable, deduplicated on disk, and never return private paths", () =>
+it.effect("input reservations are immutable, kept as one attachment, and never return private paths", () =>
   Effect.gen(function* () {
-    const { join } = yield* Path.Path;
     const inputs = yield* makeInputs;
     const fs = yield* FileSystem.FileSystem;
     const config = yield* ServerConfig;
@@ -43,21 +54,20 @@ it.effect("input reservations are immutable, deduplicated on disk, and never ret
     expect((yield* inputs.get(first.id)).phase).toBe("ready");
     expect(first).toMatchObject({ phase: "ready", canDelete: true, hash: second.hash });
     yield* notIn(first, config.home);
-    const directory = yield* fs.readDirectory(join(config.home, "media-inputs/content"));
-    expect(directory).toEqual([first.hash]);
+    const exists = yield* fs.exists(keptAt(config.home, first.hash ?? ""));
+    expect(exists).toBe(true);
     const uploaded = yield* inputs.upload(first.id, Stream.fromEffect(Effect.die("do not read a repeated upload")));
     expect(uploaded).toEqual(first);
     yield* inputs.delete(first.id);
     expect((yield* inputs.get(second.id)).phase).toBe("ready");
-    const directory2 = yield* fs.readDirectory(join(config.home, "media-inputs/content"));
-    expect(directory2).toEqual([second.hash]);
-    expect((yield* inputs.previewDelete(second.id)).does).toHaveLength(2);
+    expect((yield* inputs.previewDelete(second.id)).does).toHaveLength(1);
     yield* inputs.delete(second.id);
     const previewDelete2 = yield* inputs.previewDelete(second.id);
     expect(previewDelete2).toEqual({ does: [] });
     yield* inputs.delete(second.id);
-    const directory3 = yield* fs.readDirectory(join(config.home, "media-inputs/content"));
-    expect(directory3).toEqual([]);
+    // Media stops holding it; the attachment stays for whatever else keeps it.
+    const stays = yield* fs.exists(keptAt(config.home, second.hash ?? ""));
+    expect(stays).toBe(true);
   }).pipe(Effect.provide(layer())),
 );
 
@@ -154,7 +164,7 @@ it.effect("regression: failed partial-file cleanup retains its reservation and c
   Effect.gen(function* () {
     const { join } = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
-    const root = join((yield* ServerConfig).home, "media-inputs/staging");
+    const root = keptAt((yield* ServerConfig).home, "staging", "media");
     let blocked = false;
     const remove: typeof fs.remove = (path, options) =>
       blocked && path.startsWith(root + "/")
@@ -218,7 +228,7 @@ it.effect("at most eight streams are accepted concurrently and timeout releases 
   }).pipe(Effect.provide(layer())),
 );
 
-it.effect("startup removes partial and orphan files without repeating any upload", () =>
+it.effect("startup removes partial files without repeating any upload", () =>
   Effect.gen(function* () {
     const { join } = yield* Path.Path;
     const inputs = yield* makeInputs;
@@ -226,30 +236,25 @@ it.effect("startup removes partial and orphan files without repeating any upload
     const db = yield* Db;
     const fs = yield* FileSystem.FileSystem;
     const config = yield* ServerConfig;
-    const root = join(config.home, "media-inputs");
-    yield* fs.makeDirectory(join(root, "staging/.input-interrupted"), { recursive: true });
-    yield* fs.writeFileString(join(root, "staging/.input-interrupted/content"), "partial");
-    yield* fs.makeDirectory(join(root, "content"), { recursive: true });
-    yield* fs.writeFileString(join(root, "content", "0".repeat(64)), "orphan");
+    const staging = keptAt(config.home, "staging", "media");
+    yield* fs.makeDirectory(join(staging, ".input-interrupted"), { recursive: true });
+    yield* fs.writeFileString(join(staging, ".input-interrupted/content"), "partial");
     yield* db.run(q.changeInput({ id: input.id, phase: "uploading", hash: null, expires: input.expiresAt }));
     const restarted = yield* makeInputs;
     yield* restarted.restore();
     expect((yield* restarted.get(input.id)).phase).toBe("failed");
-    const exists2 = yield* fs.exists(join(root, "staging"));
+    const exists2 = yield* fs.exists(staging);
     expect(exists2).toBe(false);
-    const directory = yield* fs.readDirectory(join(root, "content"));
-    expect(directory).toEqual([]);
   }).pipe(Effect.provide(layer())),
 );
 
 it.effect("regression: repairing a missing saved input cannot replace its original content", () =>
   Effect.gen(function* () {
-    const { join } = yield* Path.Path;
     const inputs = yield* makeInputs;
     const fs = yield* FileSystem.FileSystem;
     const config = yield* ServerConfig;
     const input = yield* saved(inputs);
-    yield* fs.remove(join(config.home, "media-inputs/content", input.hash ?? ""));
+    yield* fs.remove(keptAt(config.home, input.hash ?? ""));
     const restarted = yield* makeInputs;
     yield* restarted.restore();
     expect((yield* restarted.get(input.id)).phase).toBe("failed");
@@ -263,32 +268,38 @@ it.effect("regression: repairing a missing saved input cannot replace its origin
 
 it.effect.each([false, true])("regression: a rejected database commit remains accounted and retryable when rollback is blocked: %s", (blockRollback) =>
   Effect.gen(function* () {
-    const { join } = yield* Path.Path;
     const sql = yield* SqlClient.SqlClient;
     const fs = yield* FileSystem.FileSystem;
-    const root = join((yield* ServerConfig).home, "media-inputs");
-    const content = join(root, "content");
-    let blocked = blockRollback;
+    const home = (yield* ServerConfig).home;
+    const staging = keptAt(home, "staging", "media");
+    // Blocked once bytes flow: the cleanup after the failed commit, not the one before the upload starts.
+    let blocked = false;
     const failing = FileSystem.FileSystem.of({
       ...fs,
       remove: (path, options) =>
-        blocked && path.startsWith(content + "/")
+        blocked && path.startsWith(staging + "/")
           ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
           : fs.remove(path, options),
     });
-    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
+    const inputs = yield* inputsOn(failing);
     const input = yield* inputs.create(metadata);
     yield* refuse(sql, "media_input_test_fail", "BEFORE UPDATE OF phase ON media_input", "NEW.phase = 'ready'", "injected database failure");
-    const error = yield* Effect.flip(inputs.upload(input.id, Stream.make(bytes)));
+    const flowing = Stream.make(bytes).pipe(
+      Stream.tap(() =>
+        Effect.sync(() => {
+          blocked = blockRollback;
+        }),
+      ),
+    );
+    const error = yield* Effect.flip(inputs.upload(input.id, flowing));
     expect(error).toMatchObject({ _tag: "Refused" });
     yield* notIn(error, "injected database failure");
     const failed = yield* inputs.get(input.id);
     expect(failed).toMatchObject({ phase: "failed" });
     expect(failed.hash).not.toBeNull();
-    const directory = yield* fs.readDirectory(join(root, "content"));
-    expect(directory).toEqual(blockRollback ? [failed.hash] : []);
-    const directory2 = yield* fs.readDirectory(join(root, "staging"));
-    expect(directory2).toEqual([]);
+    // The bytes were kept as an attachment before the commit failed; the reservation stays accounted either way.
+    const exists = yield* fs.exists(keptAt(home, failed.hash ?? ""));
+    expect(exists).toBe(true);
     blocked = false;
     yield* allow(sql, "media_input_test_fail");
     expect((yield* inputs.upload(input.id, Stream.make(bytes))).phase).toBe("ready");
@@ -307,9 +318,9 @@ it.effect("failed deletion remains a tombstone and is resumed after restart", ()
           ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
           : fs.remove(path, options),
     });
-    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
+    const inputs = yield* inputsOn(failing);
     const input = yield* saved(inputs);
-    blocked = join((yield* ServerConfig).home, "media-inputs/content", input.hash ?? "");
+    blocked = join(keptAt((yield* ServerConfig).home, "staging", "media"), input.id);
     const deletedFailure = yield* Effect.flip(inputs.delete(input.id));
     expect(deletedFailure).toMatchObject({ _tag: "Refused" });
     expect((yield* inputs.get(input.id)).phase).toBe("deleting");
@@ -350,11 +361,10 @@ it.effect("only the retaining task can obtain a checked disk-backed Blob", () =>
 
 it.effect.each(["changed", "truncated", "grown", "missing"])("regression: %s input bytes cannot be sent to a provider", (failure) =>
   Effect.gen(function* () {
-    const { join } = yield* Path.Path;
     const inputs = yield* makeInputs;
     const input = yield* saved(inputs);
     const fs = yield* FileSystem.FileSystem;
-    const path = join((yield* ServerConfig).home, "media-inputs/content", input.hash ?? "");
+    const path = keptAt((yield* ServerConfig).home, input.hash ?? "");
     yield* inputs.pin([input.id], "task-a", Effect.void);
     const changed = Buffer.from(bytes);
     changed[20] = 23;
@@ -416,11 +426,10 @@ it.effect("regression: generated raw PCM uses the hash store without inventing m
     );
     expect(first.hash).toBe(second.hash);
     const fs = yield* FileSystem.FileSystem;
-    const { join } = yield* Path.Path;
-    const root = join((yield* ServerConfig).home, "media-inputs");
-    const directory = yield* fs.readDirectory(join(root, "content"));
-    expect(directory).toEqual([first.hash]);
-    const directory2 = yield* fs.readDirectory(join(root, "staging"));
+    const home = (yield* ServerConfig).home;
+    const exists = yield* fs.exists(keptAt(home, first.hash));
+    expect(exists).toBe(true);
+    const directory2 = yield* fs.readDirectory(keptAt(home, "staging", "media"));
     expect(directory2).toEqual([]);
     expect((yield* inputs.content(first.id)).mime).toBe("audio/pcm");
     yield* inputs.release("unrelated");
@@ -434,7 +443,6 @@ it.effect("regression: generated raw PCM uses the hash store without inventing m
 
 it.effect("regression: generated staging observes reserved quota and releases failed temporary bytes", () =>
   Effect.gen(function* () {
-    const { join } = yield* Path.Path;
     const inputs = yield* makeInputs;
     for (let index = 0; index < 4; index++) yield* inputs.create({ kind: "audio", name: `reserved-${index}.wav`, mime: "audio/wav", size: 512_000_000 });
     yield* inputs.create({ kind: "audio", name: "remainder.wav", mime: "audio/wav", size: 2 * 1024 * 1024 * 1024 - 4 * 512_000_000 - 4 });
@@ -443,7 +451,7 @@ it.effect("regression: generated staging observes reserved quota and releases fa
       _tag: "Refused",
     });
     const fs = yield* FileSystem.FileSystem;
-    const directory = yield* fs.readDirectory(join((yield* ServerConfig).home, "media-inputs/staging"));
+    const directory = yield* fs.readDirectory(keptAt((yield* ServerConfig).home, "staging", "media"));
     expect(directory).toEqual([]);
     const result = yield* Effect.scoped(
       Effect.gen(function* () {
@@ -463,7 +471,7 @@ it.effect("regression: failed generated-result promotion rolls back rows, pins, 
       ...fs,
       rename: () => Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "rename" })),
     });
-    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
+    const inputs = yield* inputsOn(failing);
     yield* Effect.scoped(
       Effect.gen(function* () {
         const staged = yield* inputs.stageResult("sample.wav", "wav", Stream.make(wav()));
@@ -473,12 +481,11 @@ it.effect("regression: failed generated-result promotion rolls back rows, pins, 
     );
     const inputs2 = yield* inputs.list();
     expect(inputs2).toEqual([]);
-    const { join } = yield* Path.Path;
-    const root = join((yield* ServerConfig).home, "media-inputs");
-    const directory = yield* fs.readDirectory(join(root, "staging"));
+    const home = (yield* ServerConfig).home;
+    const directory = yield* fs.readDirectory(keptAt(home, "staging", "media"));
     expect(directory).toEqual([]);
-    const directory2 = yield* fs.readDirectory(join(root, "content"));
-    expect(directory2).toEqual([]);
+    const kept = yield* fs.readDirectory(keptAt(home));
+    expect(Arr.filter(kept, (name) => /^[0-9a-f]{64}$/u.test(name))).toEqual([]);
   }).pipe(Effect.provide(layer())),
 );
 
@@ -524,6 +531,7 @@ it.effect("regression: failed reference clearing rolls back asset pins and leave
 
 it.effect("regression: failed explicit unlink keeps a quota-accounted tombstone for restart cleanup", () =>
   Effect.gen(function* () {
+    const { join } = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
     let blocked = "";
     const failing = FileSystem.FileSystem.of({
@@ -533,10 +541,10 @@ it.effect("regression: failed explicit unlink keeps a quota-accounted tombstone 
           ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
           : fs.remove(path, options),
     });
-    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
+    const inputs = yield* inputsOn(failing);
     const input = yield* saved(inputs);
     yield* inputs.pin([input.id], "job", Effect.void);
-    blocked = (yield* inputs.content(input.id)).path;
+    blocked = join(keptAt((yield* ServerConfig).home, "staging", "media"), input.id);
     const assetsReleasedFailure = yield* inputs.releaseAssets([input.id], ["job"], Effect.void).pipe(Effect.flip);
     expect(assetsReleasedFailure).toMatchObject({ _tag: "Refused" });
     const input2 = yield* inputs.get(input.id);

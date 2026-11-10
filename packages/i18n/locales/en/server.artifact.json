@@ -4,7 +4,6 @@
   "badKind": "No artifact of kind {kind}: only {kinds}",
   "empty": "The artifact is empty",
   "tooBig": "A version is at most {mb} MB",
-  "notKept": "The artifact was not kept: {why}",
   "missing": "There is no artifact {id}",
   "noVersion": "\"{title}\" has no version {version}; the latest is {latest}",
   "noFile": "The content of \"{title}\" version {version} is gone",

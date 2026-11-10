@@ -1,6 +1,6 @@
 {
   "apiStabilityLeak": {
-    "apps/server": 118,
+    "apps/server": 117,
     "apps/cli": 35,
     "packages/ai": 3,
     "packages/provider": 21,
@@ -101,7 +101,7 @@
     "apps/desktop": 11
   },
   "nodeBuiltinImport": {
-    "apps/server": 158,
+    "apps/server": 156,
     "packages/agent": 23,
     "packages/pkm": 1,
     "packages/protocol": 3,
@@ -113,7 +113,7 @@
     "apps/desktop": 48
   },
   "preferEffectArray": {
-    "apps/server": 1843,
+    "apps/server": 1842,
     "apps/cli": 119,
     "packages/agent": 181,
     "packages/ai": 90,
@@ -142,7 +142,7 @@
     "apps/desktop": 4
   },
   "preferEffectString": {
-    "apps/server": 1098,
+    "apps/server": 1097,
     "apps/cli": 48,
     "packages/agent": 112,
     "packages/ai": 27,
@@ -173,7 +173,7 @@
     "apps/desktop": 3
   },
   "strictBooleanExpressions": {
-    "apps/server": 1666,
+    "apps/server": 1663,
     "apps/cli": 47,
     "packages/agent": 90,
     "packages/ai": 63,
