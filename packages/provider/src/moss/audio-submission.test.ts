@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Formatter } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -20,7 +20,7 @@ it.effect.each(endpoints)("%s never retries ambiguous billable submissions or ex
   return Effect.gen(function* () {
     const error = yield* submitMossAudioTask("test-key", endpoint, {}).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "HttpStatus", status: 503, outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/secret-account|private-key|signed-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/secret-account|private-key|signed-url/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -33,13 +33,15 @@ it.effect.each([
   { task_id: "task", retry_after: "5" },
 ])("invalid submission receipt %# remains unknown, not rejected", (body) =>
   Effect.gen(function* () {
-    expect(yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossAudioTaskSubmittedFailure = yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip);
+    expect(mossAudioTaskSubmittedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer(body))),
 );
 
 it.effect.each(["", " ", "private\nheader"])("invalid credentials %# do not submit", (key) =>
   Effect.gen(function* () {
-    expect(yield* submitMossAudioTask(key, "voice/generations", {}).pipe(Effect.flip)).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const mossAudioTaskSubmittedFailure = yield* submitMossAudioTask(key, "voice/generations", {}).pipe(Effect.flip);
+    expect(mossAudioTaskSubmittedFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -50,7 +52,8 @@ it.effect.each(["", " ", "private\nheader"])("invalid credentials %# do not subm
 
 it.effect("oversized submission receipts are bounded independently of task metadata", () =>
   Effect.gen(function* () {
-    expect(yield* submitMossAudioTask("test-key", "speech/speakers", {}).pipe(Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const mossAudioTaskSubmittedFailure = yield* submitMossAudioTask("test-key", "speech/speakers", {}).pipe(Effect.flip);
+    expect(mossAudioTaskSubmittedFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ task_id: "task", padding: "x".repeat(1 << 20) }))),
 );
 
@@ -59,21 +62,23 @@ it.effect.each([301, 302, 303, 307, 308])("regression: bodyless HTTP %i stays un
   const http = HttpClient.make((request) =>
     Effect.gen(function* () {
       calls++;
-      expect(yield* Effect.serviceOption(FetchHttpClient.RequestInit)).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
+      const serviceOption2 = yield* Effect.serviceOption(FetchHttpClient.RequestInit);
+      expect(serviceOption2).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
       return HttpClientResponse.fromWeb(request, new Response(null, { status, headers: { location: "https://private.example.com/signed-url" } }));
     }),
   );
   return Effect.gen(function* () {
     const error = yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "HttpStatus", status, outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/private|signed-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/private|signed-url/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect.each([400, 401, 403, 413, 422, 429, 503])("regression: bodyless HTTP %i preserves submission status", (status) =>
   Effect.gen(function* () {
-    expect(yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip)).toMatchObject({
+    const mossAudioTaskSubmittedFailure = yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip);
+    expect(mossAudioTaskSubmittedFailure).toMatchObject({
       reason: "HttpStatus",
       status,
       outcome: status === 503 ? "Unknown" : "Rejected",
@@ -88,7 +93,8 @@ it.effect.each([400, 401, 403, 413, 422, 429, 503])("regression: bodyless HTTP %
 
 it.effect.each([200, 204])("regression: empty HTTP %i is not a valid submission receipt", (status) =>
   Effect.gen(function* () {
-    expect(yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip)).toMatchObject({
+    const mossAudioTaskSubmittedFailure = yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip);
+    expect(mossAudioTaskSubmittedFailure).toMatchObject({
       reason: "InvalidResponse",
       outcome: "Unknown",
     });
@@ -113,7 +119,7 @@ it.effect("regression: transport errors are not mistaken for empty receipts", ()
   return Effect.gen(function* () {
     const error = yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "Network", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/private-key|signed-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/private-key|signed-url/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -136,7 +142,7 @@ it.effect("regression: interrupted receipt bodies stay network failures with unk
   return Effect.gen(function* () {
     const error = yield* submitMossAudioTask("test-key", "transcriptions", {}).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "Network", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toContain("private-body-error");
+    expect(Formatter.formatJson(error)).not.toContain("private-body-error");
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
@@ -161,9 +167,11 @@ it.effect.each(["timeout", "cancel"])("%s interrupts an outstanding submission w
     if (action === "cancel") yield* Fiber.interrupt(fiber);
     else {
       yield* TestClock.adjust("300 seconds");
-      expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     }
-    expect(yield* Deferred.isDone(stopped)).toBe(true);
+    const isDone2 = yield* Deferred.isDone(stopped);
+    expect(isDone2).toBe(true);
     expect(calls).toBe(1);
   }),
 );
@@ -194,6 +202,7 @@ it.effect("submission deadline includes a response body that never completes", (
     );
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
   }),
 );

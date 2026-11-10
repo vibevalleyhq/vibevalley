@@ -1,6 +1,3 @@
-import { readFile, realpath, stat } from "node:fs/promises";
-import { resolve, sep } from "node:path";
-
 import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
@@ -9,7 +6,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { Artifact } from "#/artifact/artifact.ts";
 import { htmlCheck } from "#/artifact/check.ts";
 import { artifactMax } from "#/artifact/policy.ts";
-import { messageOf, type ApiError, reasonOf, refused } from "#/base/errors.ts";
+import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Session } from "#/session/session.ts";
 
@@ -39,17 +36,27 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
         if (content !== undefined && file !== undefined) return yield* Effect.fail(refused(answers.artifact.both));
         if (content !== undefined) return content;
         if (file === undefined || file.trim() === "") return yield* Effect.fail(refused(answers.artifact.noContent));
-        const cwd = c.session ? run.cwdOf(c.session) : undefined;
-        if (!cwd) return yield* Effect.fail(refused(answers.artifact.noPlace));
-        const unread = (e: unknown) => refused(messageOf(e));
-        const root = yield* Effect.tryPromise({ try: () => realpath(cwd), catch: unread });
-        const full = yield* Effect.tryPromise({ try: () => realpath(resolve(root, file)), catch: () => refused(answers.artifact.notFile(file)) });
-        if (full !== root && !full.startsWith(root + sep)) return yield* Effect.fail(refused(answers.artifact.outside(file)));
-        const info = yield* Effect.tryPromise({ try: () => stat(full), catch: unread });
-        if (!info.isFile()) return yield* Effect.fail(refused(answers.artifact.notFile(file)));
-        // Read whole only when it may be kept; a bigger one is refused by its size as artifact.create would.
-        if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
-        return yield* Effect.tryPromise({ try: () => readFile(full, "utf8"), catch: unread });
+        if (!c.session) return yield* Effect.fail(refused(answers.artifact.noPlace));
+        const read = yield* run.workFile(c.session, file, artifactMax).pipe(
+          Effect.map((f) => new TextDecoder().decode(f.bytes)),
+          // A bigger one is refused by its size as artifact.create would.
+          Effect.catchIf(
+            (e) => e.reason === "tooBig",
+            () => Effect.succeed("x".repeat(artifactMax + 1)),
+          ),
+          Effect.mapError((e) =>
+            refused(
+              e.reason === "noPlace"
+                ? answers.artifact.noPlace
+                : e.reason === "outside"
+                  ? answers.artifact.outside(file)
+                  : e.reason === "notFile"
+                    ? answers.artifact.notFile(file)
+                    : e.message,
+            ),
+          ),
+        );
+        return read;
       });
 
     const artifactList = (who: Who) =>
@@ -121,6 +128,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
                 {
                   title: p.title,
                   kind: p.kind,
+                  ...(p.display !== undefined ? { display: p.display } : {}),
                   content,
                   ...(p.note ? { note: p.note } : {}),
                   channel: p.channel ?? c.here,
@@ -143,7 +151,14 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
               const content = yield* artifactWords(c, p.content, p.file);
               const made = yield* artifacts.create(
                 { from: c.session, by: c.agent },
-                { title: p.title, kind: p.kind, content, ...(p.note ? { note: p.note } : {}), ...sessionArtifactScope(c.session) },
+                {
+                  title: p.title,
+                  kind: p.kind,
+                  ...(p.display !== undefined ? { display: p.display } : {}),
+                  content,
+                  ...(p.note ? { note: p.note } : {}),
+                  ...sessionArtifactScope(c.session),
+                },
               );
               return answers.artifact.made(made) + warnings(made, content);
             }),
@@ -171,7 +186,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
         }),
       );
 
-    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op pipeline the owner's editor uses, written as the agent's profile.
+    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op pipeline the user's editor uses, written as the agent's profile.
     const writer = (c: Caller) => c.agent || c.session;
 
     interface BlockCreateInput {
@@ -243,7 +258,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       sessionSchemaTool(
         "artifact.block.create",
         Effect.fn("Tool.blockCreate")(function* (p: SessionInput<"artifact.block.create">) {
-          return yield* insert(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* insert(callerOf2, p);
         }),
       );
 
@@ -251,7 +267,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       tool(
         "artifact.block.create",
         Effect.fn("Tool.blockCreate")(function* (p: Orchestrator<"artifact.block.create">) {
-          return yield* insert(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* insert(callerOf2, p);
         }),
       );
 
@@ -259,7 +276,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       sessionSchemaTool(
         "artifact.block.update",
         Effect.fn("Tool.blockUpdate")(function* (p: SessionInput<"artifact.block.update">) {
-          return yield* update(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* update(callerOf2, p);
         }),
       );
 
@@ -267,7 +285,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       tool(
         "artifact.block.update",
         Effect.fn("Tool.blockUpdate")(function* (p: Orchestrator<"artifact.block.update">) {
-          return yield* update(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* update(callerOf2, p);
         }),
       );
 
@@ -275,7 +294,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       sessionSchemaTool(
         "artifact.block.delete",
         Effect.fn("Tool.blockDelete")(function* (p: SessionInput<"artifact.block.delete">) {
-          return yield* remove(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* remove(callerOf2, p);
         }),
       );
 
@@ -283,7 +303,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
       tool(
         "artifact.block.delete",
         Effect.fn("Tool.blockDelete")(function* (p: Orchestrator<"artifact.block.delete">) {
-          return yield* remove(yield* callerOf(who), p);
+          const callerOf2 = yield* callerOf(who);
+          return yield* remove(callerOf2, p);
         }),
       );
 

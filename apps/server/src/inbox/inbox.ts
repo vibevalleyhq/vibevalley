@@ -13,9 +13,9 @@ import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
-import { messageByID, notificationReceipt, ownerReadReports } from "#db/channel_message.sql.ts";
+import { messageByID, notificationReceipt, userReadReports } from "#db/channel_message.sql.ts";
 
-import { forOwner, inbox, inboxEntries } from "./items.ts";
+import { forUser, inbox, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 import { patrolText } from "./prompts.ts";
 
@@ -24,8 +24,8 @@ export class Inbox extends Context.Service<
   {
     /** What came into the inbox, each item once; what stood when the farm came up is known, not news. */
     readonly news: Effect.Effect<Stream.Stream<readonly InboxItem[]>, never, Scope.Scope>;
-    /** The farm's talk the owner hears off the farm, as it is said (forOwner); the chat apps carry it. */
-    readonly toOwner: Effect.Effect<Stream.Stream<ChatMessage>, never, Scope.Scope>;
+    /** The farm's talk the user hears off the farm, as it is said (forUser); the chat apps carry it. */
+    readonly toUser: Effect.Effect<Stream.Stream<ChatMessage>, never, Scope.Scope>;
     /** One round of the patrol, now. */
     readonly patrol: Effect.Effect<void>;
     readonly handoffState: (message: string) => Effect.Effect<"unseen" | "seen" | undefined>;
@@ -33,7 +33,7 @@ export class Inbox extends Context.Service<
     /** Pending external deliveries changed: a later connector rereads them. */
     readonly externalChanges: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>;
   }
->()("vibevalley/Inbox") {
+>()("@vibevalley/server/inbox/inbox") {
   static readonly layer = Layer.effect(
     Inbox,
     Effect.suspend(() => make),
@@ -54,7 +54,7 @@ const make = Effect.gen(function* () {
     const row = yield* db.one(messageByID({ id }));
     if (!row || row.deleted_at !== null) return undefined;
     const message = toMessage(row);
-    if (!forOwner(message, chat.notifyOf(message.channel))) return undefined;
+    if (!forUser(message, chat.notifyOf(message.channel))) return undefined;
     const receipt = yield* db.one(notificationReceipt({ id }));
     if (!receipt || receipt.superseded) return undefined;
     if (message.kind === "report") {
@@ -69,31 +69,32 @@ const make = Effect.gen(function* () {
   let known: Set<string> | undefined;
   let primed = false;
   const newsHub = yield* scopedPubSub<readonly InboxItem[]>();
-  const toOwnerHub = yield* scopedPubSub<ChatMessage>();
+  const toUserHub = yield* scopedPubSub<ChatMessage>();
   const facts = yield* core.subscribe;
   yield* Effect.forkScoped(
     Stream.runForEach(facts, (event) =>
       turn.withPermits(1)(
         Effect.gen(function* () {
-          if (event.type === "messageChanged" && (yield* handoffState(event.message.id)) === "unseen") yield* PubSub.publish(toOwnerHub, event.message);
+          if (event.type === "messageChanged" && (yield* handoffState(event.message.id)) === "unseen") yield* PubSub.publish(toUserHub, event.message);
           if (event.type === "messageChanged" || event.type === "sessionReported" || event.type === "issueChanged")
             yield* PubSub.publish(externalHub, undefined);
           if (!primed) return;
           const news = freshOf(known, inbox(core.state()));
           known = news.known;
           if (news.fresh.length > 0) yield* PubSub.publish(newsHub, news.fresh);
-        }).pipe(bestEffort("vibevalley: owner notifications failed")),
+        }).pipe(bestEffort("vibevalley: user notifications failed")),
       ),
     ),
   );
-  yield* Effect.forkScoped(Stream.runForEach(yield* chat.ownerReads, () => PubSub.publish(externalHub, undefined)));
+  const userReads2 = yield* chat.userReads;
+  yield* Effect.forkScoped(Stream.runForEach(userReads2, () => PubSub.publish(externalHub, undefined)));
 
   let memory: PatrolMemory = emptyPatrol();
   const patrol = Effect.gen(function* () {
     const state = core.state();
     const now = yield* Clock.currentTimeMillis;
-    const read = yield* db.run(ownerReadReports());
-    const ownerSeen = Object.fromEntries(
+    const read = yield* db.run(userReadReports());
+    const userSeen = Object.fromEntries(
       inboxEntries(state).flatMap((entry) => {
         const target = entry.item.target;
         if (target.kind !== "session") return [];
@@ -101,7 +102,7 @@ const make = Effect.gen(function* () {
         return receipt ? [[entry.item.id, receipt.updated_at]] : [];
       }),
     );
-    const [report, next] = patrolStep(state, now, memory, ownerSeen);
+    const [report, next] = patrolStep(state, now, memory, userSeen);
     memory = next;
     const byChannel = new Map<string, PatrolNote[]>();
     for (const f of report) {
@@ -123,7 +124,7 @@ const make = Effect.gen(function* () {
               at: now,
               text: patrolText(top.name, notes),
             })
-            .pipe(Effect.flatMap(mailbox.receive)),
+            .pipe(Effect.flatMap((trigger) => mailbox.receive({ _tag: "Trigger", trigger }))),
         ),
       { discard: true },
     ).pipe(bestEffort("vibevalley: patrol inputs were not kept"));
@@ -139,7 +140,7 @@ const make = Effect.gen(function* () {
 
   return Inbox.of({
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    toOwner: Effect.map(PubSub.subscribe(toOwnerHub), Stream.fromSubscription),
+    toUser: Effect.map(PubSub.subscribe(toUserHub), Stream.fromSubscription),
     patrol,
     handoffState,
     prime,

@@ -21,16 +21,18 @@ import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
 
 import { type Adapter, type AppFailed, failedWith, Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
-import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
+import { digestOver, flushText, isPairing, maxChars, userLine, shortId, splitText } from "./digest.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
 
 const SecretsSchema = Schema.Record(Schema.String, Schema.String);
+const encodeSecrets = Schema.encodeEffect(Schema.fromJsonString(SecretsSchema));
+const encodeInbound = Schema.encodeEffect(Schema.fromJsonString(Inbound));
 
 interface Account {
   secrets: Record<string, string>;
-  owner: string;
+  user: string;
   pairCode: string;
   cursor: string;
   replyContext: string;
@@ -50,7 +52,7 @@ export class BridgeError extends Schema.TaggedError<BridgeError, { readonly bran
 
 /** A bridge's step that the database or the farm failed, in the words its status says. */
 export const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError | ApiError) =>
-  new BridgeError({ message: causeMessage(e), cause: e });
+  BridgeError.make({ message: causeMessage(e), cause: e });
 
 export type SqlFailure = SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError;
 
@@ -77,11 +79,11 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     Schedule.modifyDelay(({ duration }) => Effect.succeed(Duration.min(duration, Duration.millis(retryMost)))),
   );
   const say = (text: string, channel: string | undefined, sendKey: string) =>
-    ingress.owner({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
+    ingress.user({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
 
   let account: Account | undefined;
-  let progress: Progress | undefined;
-  let verifyCode = "";
+  /** A login going on: how far it is, and the code the user typed for it. None when no login is. */
+  let signingIn: { readonly progress: Progress; readonly code: string } | undefined;
   // A login stopped by a newer one leaves the newer one's progress alone.
   let loginTry = 0;
   let err = "";
@@ -120,7 +122,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     }
     account = {
       secrets: Option.getOrElse(secrets, () => ({})),
-      owner: r.owner_id ?? "",
+      user: r.user_id ?? "",
       pairCode: r.pair_code ?? "",
       cursor: r.cursor,
       replyContext: r.reply_context ?? "",
@@ -165,9 +167,9 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       const where = a.channel ? channelOf(state, a.channel) : defaultOf(state);
       if (where?.name) s.channel = where.name;
     }
-    if (progress) return { ...s, state: progress.state, qr: progress.qr };
+    if (signingIn !== undefined) return { ...s, state: signingIn.progress.state, qr: signingIn.progress.qr };
     if (!a) return s;
-    if (!a.owner)
+    if (!a.user)
       return {
         ...s,
         state: "pairing",
@@ -179,7 +181,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       ...s,
       state: stopped ? "paused" : "connected",
       ...(stopped ? { pausedUntil: a.pausedUntil } : {}),
-      owner: shortId(a.owner),
+      user: shortId(a.user),
       since: a.connectedAt,
       ...(a.lastInbound !== 0 ? { lastInbound: a.lastInbound } : {}),
     };
@@ -214,7 +216,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     draining.withPermits(1)(
       Effect.gen(function* () {
         const a = snapshot();
-        if (!a || !a.owner) return true;
+        if (!a || !a.user) return true;
         const listed = yield* tried(outboxQ.pendingOutbox({ connector: id })).pipe(
           Effect.catch((e) =>
             Effect.as(Effect.logError("vibevalley: the outbox could not be read", e.message).pipe(Effect.annotateLogs({ connector: id })), undefined),
@@ -240,7 +242,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
             ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0] ?? "" }]
             : pending.map((r) => ({ ids: [r.id], text: r.body }));
         for (const out of batches) {
-          const sent = yield* adapter.send(a.secrets, a.owner, out.text, a.replyContext).pipe(
+          const sent = yield* adapter.send(a.secrets, a.user, out.text, a.replyContext).pipe(
             Effect.flatMap((extId) =>
               inTx(
                 Effect.forEach(out.ids, (oid) => outboxQ.outboxSent({ sent_at: now(), ext_id: extId || null, id: oid }), {
@@ -267,7 +269,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
               Effect.gen(function* () {
                 yield* Effect.forEach(out.ids, (oid) => kept(tried(outboxQ.outboxFailed({ error: refused.message || null, id: oid }))), { discard: true });
                 if (refused.kind === "stale") yield* pause;
-                // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
+                // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the user's next message.
                 else if (refused.kind === "restricted") setErr("");
                 else setErr(refused.message);
                 return false;
@@ -283,12 +285,12 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
 
   const offer = Effect.fnUntraced(function* (m: ChatMessage) {
     const a = snapshot();
-    if (!a || !a.owner) return;
+    if (!a || !a.user) return;
     if ((yield* inbox.handoffState(m.id)) !== "unseen") return;
     yield* Effect.gen(function* () {
       const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
       if (!place || place.top !== (a.channel ?? chat.defaultChannel())) return 0;
-      const pieces = splitText(ownerLine(m, place.channel), maxChars[id]);
+      const pieces = splitText(userLine(m, place.channel), maxChars[id]);
       const at = now();
       yield* inTx(
         Effect.forEach(pieces, (piece) => outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: at }), {
@@ -328,17 +330,17 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const got = Effect.fnUntraced(function* (m: Inbound) {
     const a = snapshot();
     if (!a) return;
-    if (!a.owner) {
+    if (!a.user) {
       if (!a.pairCode || !isPairing(m.text, a.pairCode)) return;
       const at = now();
       yield* inTx(
         Effect.gen(function* () {
-          yield* accountQ.accountOwner({ owner_id: m.from || null, connector: id });
+          yield* accountQ.accountUser({ user_id: m.from || null, connector: id });
           yield* accountQ.accountReply({ reply_context: m.reply || null, at, connector: id });
           if (m.id) yield* inboundQ.deliverInbound({ connector: id, ext_id: m.id });
         }),
       );
-      // Told once the owner has the word: the status is not paired before the app's confirmation went out.
+      // Told once the user has the word: the status is not paired before the app's confirmation went out.
       yield* reloadAccount;
       yield* Effect.ignore(adapter.send(a.secrets, m.from, t("server.connector.paired"), m.reply), {
         log: "Warn",
@@ -347,16 +349,16 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       told();
       return;
     }
-    if (m.from !== a.owner) return;
+    if (m.from !== a.user) return;
     yield* tried(accountQ.accountReply({ reply_context: m.reply || null, at: now(), connector: id }));
     yield* reload;
     const channel = (yield* quotedChannel(m.quoted)) ?? snapshot()?.channel;
     if (m.text) {
       // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
       const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
-      yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e), cause: e }));
+      yield* Effect.mapError(say(m.text, channel, sendKey), (e) => BridgeError.make({ message: reasonOf(e), cause: e }));
     }
-    // The owner's action withdraws stale handoffs before its fresh reply opens the platform's delivery window.
+    // The user's action withdraws stale handoffs before its fresh reply opens the platform's delivery window.
     yield* drain(true);
   });
 
@@ -373,7 +375,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
               yield* inboundQ.acceptInbound({
                 connector: id,
                 ext_id: withId.id,
-                payload: JSON.stringify(withId),
+                payload: yield* encodeInbound(withId),
                 created_at: yield* Clock.currentTimeMillis,
               });
             }),
@@ -471,8 +473,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const connected = () =>
     account && !isClosing() ? generation(Effect.all([receiving, inboxRun, outboxRun], { concurrency: "unbounded", discard: true })) : undefined;
   const resetProgress = () => {
-    progress = undefined;
-    verifyCode = "";
+    signingIn = undefined;
     changed();
   };
   const loginResult = (g: Fiber.Fiber<unknown, unknown>, result: Linked | AppFailed) =>
@@ -483,24 +484,26 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
         let failure = Predicate.isTagged(result, "AppFailed") ? result.message : undefined;
         if (!Predicate.isTagged(result, "AppFailed") && !isClosing()) {
           const linked = result;
-          const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
+          const pair = linked.user ? null : String(100_000 + randomInt(900_000));
           const at = yield* Clock.currentTimeMillis;
-          const failedConnect = yield* inTx(
-            Effect.gen(function* () {
-              yield* accountQ.connectAccount({
-                connector: id,
-                secrets: JSON.stringify(linked.secrets),
-                owner_id: linked.owner || null,
-                pair_code: pair,
-                connected_at: at,
-              });
-              yield* inboundQ.clearInbound({ connector: id });
-              yield* retire(t("server.connector.switched"));
-            }),
-          ).pipe(
-            Effect.andThen(Effect.sync(() => outboxChanged(() => 0))),
-            Effect.andThen(reload),
-            Effect.as(undefined),
+          const failedConnect = yield* Effect.gen(function* () {
+            yield* inTx(
+              Effect.gen(function* () {
+                yield* accountQ.connectAccount({
+                  connector: id,
+                  secrets: yield* encodeSecrets(linked.secrets),
+                  user_id: linked.user || null,
+                  pair_code: pair,
+                  connected_at: at,
+                });
+                yield* inboundQ.clearInbound({ connector: id });
+                yield* retire(t("server.connector.switched"));
+              }),
+            );
+            outboxChanged(() => 0);
+            yield* reload;
+            return undefined;
+          }).pipe(
             Effect.catch((e) =>
               Effect.sync(() => {
                 outboxChanged();
@@ -521,10 +524,10 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       input,
       (p) =>
         Effect.sync(() => {
-          progress = p;
+          signingIn = { progress: p, code: signingIn?.code ?? "" };
           changed();
         }),
-      Effect.sync(() => verifyCode),
+      Effect.sync(() => signingIn?.code ?? ""),
     );
     // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
     return generation(
@@ -554,12 +557,11 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     login: Effect.fnUntraced(function* (input: ConnectorLogin) {
       const started = yield* commands.withPermits(1)(
         Effect.gen(function* () {
-          if (progress && input.force !== true) return loginTry;
+          if (signingIn !== undefined && input.force !== true) return loginTry;
           yield* stopGeneration;
           loginTry++;
           setErr("");
-          verifyCode = "";
-          progress = { state: "waiting", qr: "" };
+          signingIn = { progress: { state: "waiting", qr: "" }, code: "" };
           current = loggingIn(input);
           told();
           return loginTry;
@@ -568,7 +570,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       // The answer carries the code when it shows within a moment.
       const shown = Deferred.makeUnsafe<void>();
       const done = () => {
-        if (loginTry !== started || !progress || progress.qr) Deferred.doneUnsafe(shown, Effect.void);
+        if (loginTry !== started || signingIn === undefined || signingIn.progress.qr) Deferred.doneUnsafe(shown, Effect.void);
       };
       progressed.add(done);
       done();
@@ -577,8 +579,12 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     }),
     verify: (code: string) =>
       Effect.suspend(() => {
-        verifyCode = code.trim();
-        if (progress?.state === "verify") progress = { state: "scanned", qr: progress.qr };
+        // A code with no login going on is for none: the next login starts with none.
+        if (signingIn !== undefined)
+          signingIn = {
+            progress: signingIn.progress.state === "verify" ? { state: "scanned", qr: signingIn.progress.qr } : signingIn.progress,
+            code: code.trim(),
+          };
         told();
         return status;
       }),

@@ -10,7 +10,7 @@ import seedsZh from "./seeds.json";
 import catalogEn from "./template_catalog.en.json";
 import catalogZh from "./template_catalog.json";
 
-/** An achievement as seeds.json defines it; the game says it in the owner's words (game/view.ts). */
+/** An achievement as seeds.json defines it; the game says it in the user's words (game/view.ts). */
 const AchievementDef = Schema.Struct({
   id: Schema.String,
   category: S.AchievementCategory,

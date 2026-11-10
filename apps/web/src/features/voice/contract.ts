@@ -2,7 +2,7 @@ import type { VoiceTurn as TranscriptTurn } from "@vibevalley/ai/realtime/turns"
 
 export type VoicePhase = "idle" | "connecting" | "live" | "ending";
 
-export type VoiceSpeaker = "owner" | "moss" | "orchestrator";
+export type VoiceSpeaker = "user" | "moss" | "orchestrator";
 
 export type VoiceTurn<Who extends string = VoiceSpeaker> = TranscriptTurn<Who>;
 

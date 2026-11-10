@@ -3,8 +3,7 @@ import { Schema } from "effect";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactVersion, artifactPath, ownerId, type SayRequest } from "@vibevalley/protocol";
-import { htmlSandbox } from "@vibevalley/protocol/rules";
+import { type Artifact, type ArtifactVersion, artifactPath, userId, type SayRequest } from "@vibevalley/protocol";
 
 import { Keyed, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
@@ -28,8 +27,8 @@ import { toast } from "#/ui/toasts.ts";
 import { artifactHref, bodyIcon, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
+import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
-import { shellPath } from "./shell";
 
 const recipeStyles3 = stylex.create({
   artifactsPageA: {
@@ -255,7 +254,11 @@ const variantStyles = stylex.create({
       "@media (width>=80rem)": "0",
     },
     minWidth: "0",
-    flex: "1",
+    // Narrow, the view scrolls: the section is as tall as what it holds (a deck's controls too), not squeezed under the rail.
+    flex: {
+      default: "0 0 auto",
+      "@media (width>=80rem)": "1",
+    },
     flexDirection: "column",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
@@ -442,6 +445,17 @@ const viewStyles = stylex.create({
     lineHeight: "var(--text-sm--line-height)",
     color: "var(--color-berry)",
   },
+  // Narrow, the page scrolls: the frame keeps its own height and the deck's controls stay under it.
+  artifactFramed: {
+    minHeight: {
+      default: "auto",
+      "@media (width>=80rem)": "0",
+    },
+    flexShrink: {
+      default: "0",
+      "@media (width>=80rem)": "1",
+    },
+  },
   artifactFrame: {
     minHeight: {
       default: "60vh",
@@ -547,7 +561,7 @@ const rail = defineStored("artifact.rail", Schema.Boolean, true);
 const justMade = defineAtom<string | undefined>(undefined);
 
 /** `rest` is the path after /artifacts/. */
-/** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
+/** The user's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
  * one does not import it back. */
 type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
 
@@ -575,8 +589,8 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const groups = () => {
     const list = shown();
     return [
-      { key: "delivered", rows: list.filter((a) => a.by !== ownerId) },
-      { key: "mine", rows: list.filter((a) => a.by === ownerId) },
+      { key: "delivered", rows: list.filter((a) => a.by !== userId) },
+      { key: "mine", rows: list.filter((a) => a.by === userId) },
     ] as const;
   };
   const [shut, setShut] = createSignal<ReadonlySet<string>>(new Set());
@@ -732,11 +746,12 @@ function Title(props: { artifact: Artifact }) {
       setText(props.artifact.title);
       return;
     }
-    const done = await act.run(async () => {
-      await api.artifact.update({ id, title });
-      void queries.invalidate({ prefix: ["artifacts"] });
-      return true;
-    });
+    const done = await act.run(() =>
+      api.artifact.update({ id, title }).then(() => {
+        void queries.invalidate({ prefix: ["artifacts"] });
+        return true;
+      }),
+    );
     if (done !== true) setText(props.artifact.title);
   };
   return (
@@ -897,14 +912,14 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
           >
             {(v) => (
               <>
-                <iframe
-                  ref={setFrame}
-                  data-testid="artifact-frame"
+                <HtmlFrame
+                  artifact={props.artifact}
+                  version={v().version}
                   title={t("web.artifact.page.frame", { title: props.artifact.title, version: v().version })}
-                  src={shellPath(props.artifact.id, v().version)}
-                  sandbox={htmlSandbox}
-                  referrerpolicy="no-referrer"
-                  {...stylex.attrs(viewStyles.artifactFrame)}
+                  testId="artifact-frame"
+                  frameStyle={viewStyles.artifactFrame}
+                  rootStyle={viewStyles.artifactFramed}
+                  onFrame={setFrame}
                 />
                 {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}
                 <Show when={rail.get() && v().version === props.artifact.version}>
@@ -992,7 +1007,7 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
     setBusy(true);
     const end = await sendOnce(says, { id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
     setBusy(false);
-    if (end?.status === "failed") return toast(end.reason ?? "", "bad");
+    if (end?.phase === "failed") return toast(end.fault.reason, "bad");
     setText("");
     toast(props.version ? t("web.artifact.talk.sentVersion", { version: props.version.version }) : t("web.artifact.talk.sent"));
   };

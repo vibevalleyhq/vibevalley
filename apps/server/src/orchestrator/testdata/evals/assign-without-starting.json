@@ -2,7 +2,7 @@
   "id": "assign-without-starting",
   "createdAt": 1792270980000,
   "model": "deepseek-flash",
-  "want": "主人说这张让 Codex 做、先别开始，管家却开工了。应该记下并写上 agent，不开工。",
+  "want": "用户说这张让 Codex 做、先别开始，助手却开工了。应该记下并写上 agent，不开工。",
   "memory": "",
   "tools": [
     "channel_create",
@@ -34,7 +34,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：给 demo 记一张：README 补上安装步骤，让 codex 做，先别开始",
+    "content": "[来源：用户]\n用户说：给 demo 记一张：README 补上安装步骤，让 codex 做，先别开始",
     "display": true,
     "details": {
       "channel": "general"

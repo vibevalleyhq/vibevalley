@@ -7,11 +7,11 @@ import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf 
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "#/artifact/artifact.ts";
-import { artifactHeaders } from "#/artifact/policy.ts";
-import { withShell } from "#/artifact/shell.ts";
+import { artifactHeaders, artifactPrintHeaders } from "#/artifact/policy.ts";
+import { shellThemeOf, withShell } from "#/artifact/shell.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { wireOf } from "#/base/json.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Voice } from "#/voice/voice.ts";
 
 import { fromTheFarm } from "./rpc.ts";
@@ -25,7 +25,7 @@ const notFound = () => HttpServerResponse.text("404 page not found\n", { status:
 /** The most a body may be, read before it is decoded: an attachment comes as base64 in JSON, everything else is small. */
 const bodyMax = 2 * 1024 * 1024;
 const attachmentBodyMax = Math.ceil(attachmentMax / 3) * 4 + 64 * 1024;
-const bodyMaxOf = (endpoint: Endpoint) => (endpoint.op === "channel.attachment.create" ? attachmentBodyMax : bodyMax);
+const bodyMaxOf = (endpoint: Endpoint) => (endpoint.op === "attachment.create" ? attachmentBodyMax : bodyMax);
 
 /** Each call of an endpoint, by its op and the status it answered. */
 const requests = Metric.counter("vibevalley.http.requests", { description: "Calls of an endpoint, by op and status", incremental: true });
@@ -90,11 +90,11 @@ export const attachments = HttpRouter.add(
   "GET",
   "/api/v1/attachment/:id",
   Effect.gen(function* () {
-    const chat = yield* Channel;
+    const files = yield* Attachment;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const id = new URL(request.url, "http://farm").pathname.slice(attachmentPrefix.length);
     if (!/^[0-9a-f]{64}$/u.test(id)) return notFound();
-    const found = yield* chat.attachment(id);
+    const found = yield* files.get(id);
     if (!found) return notFound();
     const pdf = found.type === "application/pdf";
     return yield* HttpServerResponse.file(found.path, {
@@ -122,15 +122,21 @@ export const artifactContent = HttpRouter.add(
     const path = yield* artifacts.file(artifactId(id), Number(version));
     if (!path) return notFound();
     const contentType = artifactHeaders["content-type"] ?? "text/html; charset=utf-8";
-    if (new URL(request.url, "http://farm").searchParams.get("shell") !== "1")
-      return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
-    // The workbench's view: the page with the shell after it (artifact/shell.ts).
+    const asked = new URL(request.url, "http://farm").searchParams;
+    if (asked.get("shell") !== "1") return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
+    // The workbench's view: the page with the runtime after it, for how it is shown and in the workbench's theme (artifact/shell.ts).
     const page = yield* artifacts.content(artifactId(id), Number(version));
-    return HttpServerResponse.text(withShell(page.content), { contentType, headers: artifactHeaders });
+    const shown = yield* artifacts.get(artifactId(id));
+    // ?print=1 is that page opened on its own to be printed: only it may open the print dialog.
+    const headers = asked.get("print") === "1" ? artifactPrintHeaders : artifactHeaders;
+    return HttpServerResponse.text(withShell({ page: page.content, display: shown.display ?? "page", theme: shellThemeOf(asked.get("theme")) }), {
+      contentType,
+      headers,
+    });
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 
-// Both protocols freeze their own provider binding before upgrading the owner's page.
+// Both protocols freeze their own provider binding before upgrading the user's page.
 export const mossLine = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const voice = yield* Voice;

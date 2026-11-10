@@ -60,7 +60,7 @@ export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Ser
           Effect.gen(function* () {
             const response = open(true);
             yield* ingress
-              .owner({
+              .user({
                 source: "voice",
                 text,
                 envelope: newId(),

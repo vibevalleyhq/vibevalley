@@ -13,7 +13,7 @@ export class ToolFailed extends Schema.TaggedError<ToolFailed, { readonly brand:
 }) {}
 
 /** What a tool's body threw or rejected with, or the agent it started failed with, as the failed result. */
-export const toolFailed = (e: unknown): ToolFailed => new ToolFailed({ message: messageOf(e), cause: e });
+export const toolFailed = (e: unknown): ToolFailed => ToolFailed.make({ message: messageOf(e), cause: e });
 
 /** A run asked of an agent that is already running one. */
 export class AgentBusy extends Schema.TaggedError<AgentBusy, { readonly brand: unique symbol }>()("AgentBusy", { message: Schema.String }) {}
@@ -30,4 +30,4 @@ export class AgentFailed extends Schema.TaggedError<AgentFailed, { readonly bran
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-export const agentFailed = (cause: unknown): AgentFailed => new AgentFailed({ message: messageOf(cause), cause });
+export const agentFailed = (cause: unknown): AgentFailed => AgentFailed.make({ message: messageOf(cause), cause });

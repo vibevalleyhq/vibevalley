@@ -5,7 +5,7 @@ import { farmOf, needOf, omitUndefined, plotKeyOf } from "@vibevalley/protocol/r
 
 import { type AchievementDef, achievements } from "#/agent/seed.ts";
 import { openFindings } from "#/issue/status.ts";
-import { sessionOf } from "#/session/roster.ts";
+import { isHired, isOnDuty, sessionOf } from "#/session/roster.ts";
 
 const historyLimit = 30;
 
@@ -140,7 +140,7 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.Session
       return { crop: "dry", badge: badgeQuestions() };
     case "reviewing":
       if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe() };
-      // One its parent issue acts on asks nothing of the owner here.
+      // One its parent issue acts on asks nothing of the user here.
       return a.acts.length > 0 ? { crop: "flowering", badge: badgeReview() } : { crop: "flowering" };
     case "stuck":
       switch (a.stuck) {
@@ -206,8 +206,10 @@ export function effectsOf(before: T.SpaceState, fact: T.Fact): T.GameEffect[] {
       }
       return out;
     }
-    case "sessionReported":
-      return fact.outcome === "failed" && sessionOf(before, fact.id)?.role === "worker" ? [{ kind: "penalty", sessionId: fact.id }] : [];
+    case "sessionReported": {
+      const reporter = sessionOf(before, fact.id);
+      return fact.outcome === "failed" && reporter !== undefined && isHired(reporter) ? [{ kind: "penalty", sessionId: fact.id }] : [];
+    }
     default:
       break;
   }
@@ -218,7 +220,7 @@ export function effectsOf(before: T.SpaceState, fact: T.Fact): T.GameEffect[] {
 export function viewOf(state: T.SpaceState): T.FarmView {
   const latest = new Map<string, T.Session>();
   for (const h of state.sessions) {
-    if (h.role === "orchestrator") continue;
+    if (isOnDuty(h)) continue;
     const key = plotKeyOf(h);
     const was = latest.get(key);
     if (!was || h.hiredAt >= was.hiredAt) latest.set(key, h);

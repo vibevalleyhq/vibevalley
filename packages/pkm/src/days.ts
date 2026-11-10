@@ -21,7 +21,7 @@ export function dayTitle(day: string, today: string, locale: Locale = currentLoc
   return new Intl.DateTimeFormat(locale, { ...(otherYear ? { year: "numeric" } : {}), month: "long", day: "numeric", weekday: "short" }).format(at);
 }
 
-/** A page's title as the owner reads it: a journal by its day (Nov 3 Tue), any other page by its title. */
+/** A page's title as the user reads it: a journal by its day (Nov 3 Tue), any other page by its title. */
 export const titleFor = (title: string, day: string | undefined) => (day ? dayTitle(day, dayKey(Date.now())) : undefined) ?? title;
 
 /** Days from today to day: 0 today, negative once it is past; undefined for a value that is not a day. */

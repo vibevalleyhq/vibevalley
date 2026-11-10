@@ -69,16 +69,16 @@ export const AudioResult = Schema.Struct({
 
 export const audioRequest = Effect.fnUntraced(
   function* (key: string, request: HttpClientRequest.HttpClientRequest) {
-    if (!key.trim() || /\s/u.test(key)) return yield* new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+    if (!key.trim() || /\s/u.test(key)) return yield* MossAudioError.make({ reason: "Credentials", outcome: "NotSubmitted" });
     const http = yield* HttpClient.HttpClient;
     const response = yield* http.execute(request.pipe(HttpClientRequest.setHeaders({ authorization: `Bearer ${key}`, accept: "application/json" })));
     const raw = yield* readMossResponse(response).pipe(
-      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(new MossAudioError({ reason: "TooLarge", outcome: "Unknown" }))),
+      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" }))),
     );
     if (response.status < 200 || response.status >= 300) {
       const parsed = Schema.decodeOption(ErrorBody)(raw);
       const code = parsed._tag === "Some" ? parsed.value.error.code : undefined;
-      return yield* new MossAudioError({
+      return yield* MossAudioError.make({
         reason: "HttpStatus",
         status: response.status,
         outcome:
@@ -91,5 +91,5 @@ export const audioRequest = Effect.fnUntraced(
     return raw;
   },
   Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-  Effect.catchTag("HttpClientError", () => Effect.fail(new MossAudioError({ reason: "Network", outcome: "Unknown" }))),
+  Effect.catchTag("HttpClientError", () => Effect.fail(MossAudioError.make({ reason: "Network", outcome: "Unknown" }))),
 );

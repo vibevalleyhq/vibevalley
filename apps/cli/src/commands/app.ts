@@ -5,9 +5,9 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { t } from "@vibevalley/i18n";
 
 import { appStatus, askApp, farmHome, launchedFrom, notOpen } from "#/farm.ts";
-import { printBody } from "#/output.ts";
+import { jsonText, printBody } from "#/output.ts";
 
-const printed = (value: unknown) => printBody(JSON.stringify(value ?? { ok: true }));
+const printed = (value: unknown) => Effect.flatMap(jsonText(value ?? { ok: true }), printBody);
 
 const statusCommand = Command.make("status", {}, () => Effect.flatMap(appStatus, printed)).pipe(
   Command.withDescription(t("cli.command.app.status")),

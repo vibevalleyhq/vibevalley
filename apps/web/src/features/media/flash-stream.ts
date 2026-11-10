@@ -14,11 +14,12 @@ export async function* flashEvents(body: ReadableStream<Uint8Array>, signal: Abo
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let pending = "";
   let eof = false;
-  let formatted = false;
-  let done = false;
-  let sequence = 0;
+  /** The format comes first, then audio numbered from 0, then done; nothing after done. */
+  const read: { stage: { readonly _tag: "format" } | { readonly _tag: "audio"; readonly next: number } | { readonly _tag: "done" } } = {
+    stage: { _tag: "format" },
+  };
   const parse = (line: string) => {
-    if (line.length > maximumLine || done) throw new Error(t("web.audio.flashInvalid"));
+    if (line.length > maximumLine || read.stage._tag === "done") throw new Error(t("web.audio.flashInvalid"));
     let event: MediaSpeechEvent;
     try {
       event = decodeEvent(line);
@@ -27,15 +28,16 @@ export async function* flashEvents(body: ReadableStream<Uint8Array>, signal: Abo
     }
     switch (event.type) {
       case "format":
-        if (formatted) throw new Error(t("web.audio.flashInvalid"));
-        formatted = true;
+        if (read.stage._tag !== "format") throw new Error(t("web.audio.flashInvalid"));
+        read.stage = { _tag: "audio", next: 0 };
         break;
       case "audio":
-        if (!formatted || event.sequence !== sequence++) throw new Error(t("web.audio.flashInvalid"));
+        if (read.stage._tag !== "audio" || event.sequence !== read.stage.next) throw new Error(t("web.audio.flashInvalid"));
+        read.stage = { _tag: "audio", next: read.stage.next + 1 };
         break;
       case "done":
-        if (!formatted || sequence === 0) throw new Error(t("web.audio.flashIncomplete"));
-        done = true;
+        if (read.stage._tag !== "audio" || read.stage.next === 0) throw new Error(t("web.audio.flashIncomplete"));
+        read.stage = { _tag: "done" };
         break;
       case "failed":
         throw new Error(t("web.audio.flashIncomplete"));
@@ -59,7 +61,7 @@ export async function* flashEvents(body: ReadableStream<Uint8Array>, signal: Abo
       if (pending.length > maximumLine) throw new Error(t("web.audio.flashInvalid"));
     }
     if (pending.trim()) yield parse(pending.trim());
-    if (!done) throw new Error(t("web.audio.flashIncomplete"));
+    if (read.stage._tag !== "done") throw new Error(t("web.audio.flashIncomplete"));
   } finally {
     try {
       if (!eof && !signal.aborted) await reader.cancel();

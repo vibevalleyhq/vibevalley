@@ -15,7 +15,7 @@
     },
     "agents": {
       "label": "档案",
-      "hint": "档案：管家和帮工"
+      "hint": "档案：助手和帮工"
     },
     "runtimes": {
       "label": "农机",
@@ -57,8 +57,8 @@
   },
   "toasts": "提示",
   "runtime": "运行工具：{name}",
-  "owner": "主",
-  "orchestrator": "管家",
+  "user": "你",
+  "orchestrator": "助手",
   "unreachable": "暂时连不上服务端，请等它恢复后重试。",
   "query": { "invalidResponse": "返回的数据格式不符，已有的有效结果已保留。" },
   "table": {
@@ -188,6 +188,7 @@
       "lists": "菜单和名单",
       "issues": "工单",
       "pictures": "看图",
+      "library": "素材库",
       "farm": "农场",
       "desktop": "桌面版（系统全局）"
     },
@@ -207,9 +208,12 @@
       "names": "按住写出院子里每样东西的名字",
       "farmMenu": "放下农具，或打开菜单",
       "debug": "调试台",
-      "voice": "跟管家说话（在设置里能换）",
-      "command": "命令：记工单、让管家记住、叫停、私聊",
-      "newIssue": "新工单"
+      "voice": "跟助手说话（在设置里能换）",
+      "command": "命令：记工单、让助手记住、叫停、私聊",
+      "newIssue": "新工单",
+      "libraryMove": "在素材之间挪",
+      "libraryLook": "全屏看选中的图",
+      "libraryRemove": "从库里拿掉选中的"
     }
   },
   "rich": {

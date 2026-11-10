@@ -13,7 +13,7 @@ import { canCapture, localRelayHost, VisualCapture, type VisualSource } from "./
 let captureUrl: string | undefined;
 let playbackUrl: string | undefined;
 
-export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
+export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
   private static active: MossLine | undefined;
   phase: MossPhase = "idle";
   problem: string | undefined;
@@ -108,7 +108,10 @@ export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
     this.engine.begin(setup);
     document.addEventListener("visibilitychange", this.background);
     window.addEventListener("pagehide", this.leave);
-    this.tick = window.setInterval(() => this.engine.measure(), 1000);
+    this.tick = window.setInterval(() => {
+      this.bridge?.measure();
+      this.engine.measure();
+    }, 1000);
     const url = new URL(mossLinePath, location.href);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     try {

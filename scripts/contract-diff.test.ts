@@ -8,7 +8,6 @@ describe("the contract diff", () => {
       [
         "10\t2\tpackages/protocol/src/shapes.ts",
         "3\t0\tapps/server/db/migrations/0001_schema.up.sql",
-        "-\t-\tapps/server/src/core/testdata/cases.jsonl.gz",
         "40\t20\tapps/server/src/issue/issue.ts",
         "5\t5\tapps/web/src/features/issue/Board.tsx",
       ].join("\n"),
@@ -18,10 +17,9 @@ describe("the contract diff", () => {
     expect(s.contract.map((c) => [c.kind, c.lines])).toEqual([
       ["protocol", 12],
       ["schema", 3],
-      ["golden data", 0],
       ["service interfaces", 4],
     ]);
-    expect(s.areas).toEqual(["apps/server", "packages/protocol", "server/core", "server/issue", "web/issue"]);
+    expect(s.areas).toEqual(["apps/server", "packages/protocol", "server/issue", "web/issue"]);
     expect(markdownOf(s)).toContain("85 lines changed; 19 of them in the contract (4.5 lines for each contract line).");
   });
 

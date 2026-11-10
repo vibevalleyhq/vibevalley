@@ -143,7 +143,7 @@ export default stories({
     }),
     "Empty with a next step": story({
       fill: true,
-      args: { words: "还没有工单。写一句要做的事，管家会帮你拆开。" },
+      args: { words: "还没有工单。写一句要做的事，助手会帮你拆开。" },
       controls: { words: { kind: "text", long: true } },
       render: (a) => (
         <Empty

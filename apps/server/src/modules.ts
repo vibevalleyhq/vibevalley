@@ -5,12 +5,12 @@ export interface Module {
 }
 
 export const modules: readonly Module[] = [
-  { name: "Platform", parts: ["base", "infra", "core", "setting", "provider"] },
+  { name: "Platform", parts: ["base", "infra", "core", "setting", "user", "storage", "attachment", "provider"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["repo"] },
-  { name: "Agent Sessions", parts: ["executor", "session"] },
+  { name: "Agent Sessions", parts: ["executor", "machine", "session"] },
   { name: "Mailbox", parts: ["mailbox"] },
-  { name: "Collaboration", parts: ["channel", "media", "artifact", "pkm"] },
+  { name: "Collaboration", parts: ["channel", "media", "library", "artifact", "pkm"] },
   { name: "Issues", parts: ["issue", "cron"] },
   { name: "Ingress", parts: ["ingress"] },
   { name: "Resource", parts: ["resource"] },

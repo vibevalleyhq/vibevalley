@@ -1,6 +1,4 @@
-import { join } from "node:path";
-
-import { Clock, Config, Effect, FileSystem } from "effect";
+import { Config, DateTime, Effect, FileSystem, Path } from "effect";
 import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
@@ -8,14 +6,15 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { PkmMarkerValues, PkmTierValues } from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, optionalText, optionalWords, show } from "#/farm.ts";
+import { ask, change, given, nameArg, optionalText, optionalWords } from "#/farm.ts";
+import { show } from "#/format.ts";
 import { exit, Failure, out, stdinText } from "#/output.ts";
 
 const pageArgument = nameArg("page", "cli.arg.page");
 const tierFlag = Flag.Literals("tier", PkmTierValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.tier")));
 
-/** Today on this machine, YYYY-MM-DD (sv-SE writes dates so). */
-const today = Effect.map(Clock.currentTimeMillis, (ms) => new Date(ms).toLocaleDateString("sv-SE"));
+/** Today on this machine, YYYY-MM-DD. */
+const today = Effect.map(DateTime.now, (now) => DateTime.formatIsoDate(DateTime.setZone(now, DateTime.zoneMakeLocal())));
 
 /** A page as its outline: the title, then each block at its depth, its marker and priority first. */
 const outline = (p: T.PkmPage) =>
@@ -97,7 +96,8 @@ const radarCommand = Command.make("radar", {}, () =>
 const journalShow = Command.make("show", { day: optionalText("day", "cli.flag.day") }, (o) =>
   Effect.gen(function* () {
     const day = given(o.day) ?? (yield* today);
-    yield* show(yield* ask((api) => api.pkm.journal.open({ day })), outline);
+    const answer = yield* ask((api) => api.pkm.journal.open({ day }));
+    yield* show(answer, outline);
   }),
 ).pipe(
   Command.withDescription(t("cli.command.pkm.journalShow")),
@@ -177,21 +177,23 @@ const pageEdit = Command.make("edit", { page: pageArgument }, (o) =>
   Effect.gen(function* () {
     const source = yield* ask((api) => api.pkm.source.get({ page: o.page }));
     const fs = yield* FileSystem.FileSystem;
-    const kept = (e: { readonly message: string }) => new Failure({ code: exit.other, tag: "File", text: e.message });
+    const kept = (e: { readonly message: string }) => Failure.make({ code: exit.other, tag: "File", text: e.message });
+    const tempDirectory = yield* fs.makeTempDirectory({ prefix: "vibevalley-" }).pipe(Effect.mapError(kept));
     // Not removed afterwards: an edit that could not be written stays there, and the system clears its temporary folder.
-    const file = join(yield* fs.makeTempDirectory({ prefix: "vibevalley-" }).pipe(Effect.mapError(kept)), `${source.page}.md`);
+    const path = yield* Path.Path;
+    const file = path.join(tempDirectory, `${source.page}.md`);
     yield* fs.writeFileString(file, source.markdown).pipe(Effect.mapError(kept));
     const editor = yield* editorCommand;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     // Through the shell, as $EDITOR is a command line ("code --wait"); the file is its last word, quoted.
     const code = yield* spawner
       .exitCode(ChildProcess.make(`${editor} '${file.replaceAll("'", "'\\''")}'`, { shell: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" }))
-      .pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Editor", text: t("cli.pkm.editorFailed", { editor, why: e.message }) })));
-    if (code !== 0) return yield* new Failure({ code: exit.other, tag: "Editor", text: t("cli.pkm.editorExited", { editor, code, file }) });
+      .pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "Editor", text: t("cli.pkm.editorFailed", { editor, why: e.message }) })));
+    if (code !== 0) return yield* Failure.make({ code: exit.other, tag: "Editor", text: t("cli.pkm.editorExited", { editor, code, file }) });
     const edited = yield* fs.readFileString(file).pipe(Effect.mapError(kept));
     if (edited === source.markdown) return yield* out(t("cli.pkm.unchanged", { page: source.title }));
     yield* ask((api) => api.pkm.source.update({ page: source.page, markdown: edited, updated: source.updated })).pipe(
-      Effect.mapError((f) => (f.tag === "Refused" ? new Failure({ ...f, text: t("cli.pkm.keptAt", { why: f.text, file }) }) : f)),
+      Effect.mapError((f) => (f.tag === "Refused" ? Failure.make({ ...f, text: t("cli.pkm.keptAt", { why: f.text, file }) }) : f)),
     );
     yield* out(t("cli.pkm.saved", { page: source.title }));
   }),

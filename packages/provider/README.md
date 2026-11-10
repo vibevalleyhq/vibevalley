@@ -36,7 +36,7 @@ DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具
 
 媒体理解协议只向固定的 `/v1/responses` 提交一次；最多五图或一个视频，支持 file ID 或 HTTPS URL，不支持内联 Base64、流式或异步提交。模型输出 `incomplete` 时仍保留正文，并明确其状态。180 秒覆盖请求与响应体，响应最多 1 MiB；本地指令上限 64000 个 Unicode 码点，规范化 URL 上限 8192 字符，不把这些保护上限称为厂商限制。文件协议 `moss/files.ts` 接受不超过 512 MB 的非空 Blob（可由文件支持，不转成 ArrayBuffer 或 Base64），由 HTTP 客户端生成 multipart boundary；300 秒覆盖请求和响应体，响应最多 1 MiB。文件查询与删除核对回执 ID，上传核对字节数和用途；未知状态原样保留，不推断就绪。路径参数不能跳出文件端点。删除是显式操作，超时与取消可能已留下远端文件，不能假装已经清理。
 
-服务端的用途绑定、输入存储、任务和主人／管家授权由 [Media](docs/subsystems/media.md) 管理，本包不承接上传许可或文件寿命。
+服务端的用途绑定、输入存储、任务和用户／助手授权由 [Media](docs/subsystems/media.md) 管理，本包不承接上传许可或文件寿命。
 
 单人 TTS 只向固定 `/v1/audio/speech` 提交一次，显式传 Key、模型、文字、voice ID 和格式。Flash／Pro 稳定 ID 与官方快照共用目录；Pro 不接受 language 或 pause 标签，Flash 的 language 使用完整英文名称。文本本地上限 10000 个 Unicode 码点，期望时长本地保护上限 3600 秒，不把这些上限称为官方能力保证。同步强制 `delivery_method=url`、`stream=false`，返回经校验的格式、MIME、HTTPS URL 与厂商用量；异步仅返回 task ID。300 秒覆盖提交和响应体，JSON 最多 1 MiB，不重试、不跟随重定向。缺失的采样率、用量和时长不猜；PCM 流式由独立的 `speech-stream` 请求 SSE，产品的落盘、播放与恢复见 [Media](docs/subsystems/media.md)。
 
@@ -44,4 +44,4 @@ DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具
 
 浏览器只导入纯协议子路径，不导入服务端工厂。`ask_orchestrator`、页面中继、设置到厂商配置的组装及 RTC 设备由应用负责。实时内核的保留边界见 [语音](docs/subsystems/voice.md#为什么这样)。
 
-检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build`、`server:check` 和 `effect:check`。AI 的黄金数据继续检查完整请求与响应；服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。
+检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build`、`server:check` 和 `effect:check`。服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。

@@ -45,7 +45,7 @@
    vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android
    ```
 
-   脚本把应用重新装一遍（不留上次的农场），农场打开「连接到本机」、出一个码，用 `vibevalley://pair` 链接打开应用；应用请主人放行，脚本替主人点头，再看农场收到这台手机带钥匙的请求（页面经「连接到本机」加载了）；截图；经 WebView 的 DevTools 让页面往桥上发一条通知，看安卓真的弹出来；最后杀掉应用重开，看它不再要配对就回到农场。
+   脚本把应用重新装一遍（不留上次的农场），农场打开「连接到本机」、出一个码，用 `vibevalley://pair` 链接打开应用；应用请用户放行，脚本替用户点头，再看农场收到这台手机带钥匙的请求（页面经「连接到本机」加载了）；截图；经 WebView 的 DevTools 让页面往桥上发一条通知，看安卓真的弹出来；最后杀掉应用重开，看它不再要配对就回到农场。
 
 3. `command.stdout.log` 应有：`paired and seen 安卓手机`、`bridge: the page's notice shown by the phone`、`back after a restart`。打开 `apps/mobile/.screens/android-farm.png` 看页面画出来了（新农场是首页）。
 

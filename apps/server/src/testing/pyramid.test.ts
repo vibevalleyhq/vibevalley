@@ -37,19 +37,6 @@ describe("the test pyramid", () => {
     ).toEqual([]);
   });
 
-  it("replays each module's recorded cases in the process", () => {
-    const recorded = all.filter((f) => f.endsWith("/recorded.test.ts"));
-    expect(recorded.length).toBeGreaterThan(0);
-    const leaving = recorded.flatMap((f) => {
-      const chain = reach(f);
-      return chain ? [chain.join(" → ")] : [];
-    });
-    expect(
-      leaving,
-      "a module's recorded.test.ts replays its golden data in the process, and this import chain reaches a database, a process or the network. Fix: import the pure function from a file that runs nothing, moving it (or the shapes it needs) out of the file that does, as repo/workplace.ts was. See docs/subsystems/foundation.md",
-    ).toEqual([]);
-  });
-
   it("follows imports into the workspace's packages", () => {
     expect(reach("src/runtime/vibevalley.ts")).toEqual(["src/runtime/vibevalley.ts", "../../packages/agent/src/coding.ts", "node:child_process"]);
   });

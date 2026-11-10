@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 
 import { setLocale } from "@vibevalley/i18n";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
@@ -42,7 +42,7 @@ describe("the built-in templates", () => {
         builtInTemplates,
         Effect.sync(() => setLocale("zh")),
       );
-      for (const t of english) expect(JSON.stringify([t.name, t.duty, t.tags, t.persona])).not.toMatch(han);
+      for (const t of english) expect(Formatter.formatJson([t.name, t.duty, t.tags, t.persona])).not.toMatch(han);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 });

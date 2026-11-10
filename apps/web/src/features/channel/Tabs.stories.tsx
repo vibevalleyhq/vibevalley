@@ -23,7 +23,7 @@ const cron = (more: Partial<CronView>): CronView => ({
   enabled: true,
   created: now - 7 * 86_400_000,
   lastRun: now - 86_400_000,
-  by: "owner",
+  by: "user",
   pending: false,
   whenText: "每天 09:30",
   nextText: "明天 09:30",
@@ -36,14 +36,12 @@ export default stories({
   title: "组件/频道/定时任务",
   stories: {
     States: story({
-      note: "开着、关着、管家提的等你批准。",
+      note: "开着、关着、助手提的等你批准。",
       args: { state: "enabled" },
       grid: { rows: ["state", ["enabled", "disabled", "pending"]] },
       render: (a) => (
         <div {...stylex.attrs(viewStyles.tabsStoriesDiv)}>
-          <CronCard
-            s={a.state === "disabled" ? cron({ enabled: false }) : a.state === "pending" ? neverRun(cron({ pending: true, by: "orchestrator" })) : cron({})}
-          />
+          <CronCard s={a.state === "disabled" ? cron({ enabled: false }) : a.state === "pending" ? neverRun(cron({ pending: true, by: "agent" })) : cron({})} />
         </div>
       ),
     }),

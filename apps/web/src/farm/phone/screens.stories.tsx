@@ -48,7 +48,7 @@ export default stories({
   frame: storyFrame.pixel,
   stories: {
     "Call the orchestrator": story({
-      note: "打给管家的每一步：没打、在接、接通了管家还没来、在说、在挂，和没打通（原因写在屏上）。",
+      note: "打给助手的每一步：没打、在接、接通了助手还没来、在说、在挂，和没打通（原因写在屏上）。",
       args: { phase: "idle", agentHere: false, problem: "" },
       grid: { cols: ["phase", ["idle", "connecting", "live", "ending"]], rows: ["agentHere", [false, true]] },
       render: (a) => (

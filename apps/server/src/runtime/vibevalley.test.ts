@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Event, Session } from "@botiverse/oar";
-import { Effect, Exit, Scope, Stream } from "effect";
+import { NodeServices } from "@effect/platform-node";
+import { Effect, Exit, FileSystem, Scope, Stream } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
@@ -14,6 +14,8 @@ import { nextTurn, whenTrue } from "@vibevalley/testkit/until";
 import { wallTime } from "#/infra/time.ts";
 
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
+
+const fs = Effect.runSync(Effect.service(FileSystem.FileSystem).pipe(Effect.provide(NodeServices.layer)));
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -145,7 +147,7 @@ describe("VibeValley's runtime", () => {
     });
     expect((await r.session.prompt("写个 hello.txt")).kind).toBe("accepted");
     await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
-    expect(readFileSync(join(r.cwd, "hello.txt"), "utf8")).toBe("hi");
+    expect(await Effect.runPromise(fs.readFileString(join(r.cwd, "hello.txt")))).toBe("hi");
     const kinds = new Set(r.events.map((e) => e.kind));
     for (const k of ["model", "text_delta", "tool_call_started", "tool_call_ended", "turn_ended", "usage"]) expect(kinds).toContain(k);
     const started = r.events.find((e) => e.kind === "tool_call_started");
@@ -209,9 +211,10 @@ describe("VibeValley's runtime", () => {
 
   it("gives the model the tools of the session's MCP servers", async () => {
     const dir = home();
-    writeFileSync(
-      join(dir, "farm.cjs"),
-      `const rl = require('node:readline').createInterface({ input: process.stdin })
+    await Effect.runPromise(
+      fs.writeFileString(
+        join(dir, "farm.cjs"),
+        `const rl = require('node:readline').createInterface({ input: process.stdin })
 const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
 rl.on('line', (line) => {
   const m = JSON.parse(line)
@@ -219,6 +222,7 @@ rl.on('line', (line) => {
   else if (m.method === 'tools/list') send({ id: m.id, result: { tools: [{ name: 'say', description: '在田头说话', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] } })
   else if (m.method === 'tools/call') send({ id: m.id, result: { content: [{ type: 'text', text: '说了：' + m.params.arguments.text }] } })
 })`,
+      ),
     );
     const r = await open([answer([toolCall("farm__say", { text: "做完了" })]), (c) => answer(c.messages.at(-1)?.role === "toolResult" ? "好" : "没调到")], {
       mcp: join(dir, "farm.cjs"),

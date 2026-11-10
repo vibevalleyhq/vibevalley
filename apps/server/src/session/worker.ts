@@ -1,8 +1,10 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Context, Effect, FileSystem } from "effect";
+import { Context, Effect, FileSystem, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+
+const encodeAccess = Schema.encodeEffect(Schema.fromJsonString(Schema.Struct({ endpoint: Schema.String, token: Schema.String })));
 
 export const workerAccess = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -41,7 +43,8 @@ export const workerAccess = Effect.gen(function* () {
     yield* revoke(id);
     const file = join(directory, id + "-" + ++generation + ".json");
     files.set(id, file);
-    yield* fs.writeFileString(file, JSON.stringify({ endpoint, token }), { mode: 0o600 });
+    const access = yield* encodeAccess({ endpoint, token });
+    yield* fs.writeFileString(file, access, { mode: 0o600 });
     const authenticated = yield* probe(["--worker-access-file", file, "doctor"]);
     return { authenticated, command: command + " --worker-access-file " + quote(file) };
   });

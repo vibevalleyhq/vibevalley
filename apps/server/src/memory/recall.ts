@@ -31,7 +31,7 @@ const recallMatchWeight = 0.3;
 const recallSharedWeight = 0.5;
 
 /** Another repo's note only when it plainly shares the turn's words; another repo's issue never. */
-export function relevance(m: T.Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
+function relevance(m: T.Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
   if (cue.skip?.has(m.id) === true || (m.session !== undefined && m.session === cue.session)) return undefined;
   const shared = termsInCommon(termsOf(m.text), terms);
   const here = m.repo !== undefined && m.repo === cue.repo;

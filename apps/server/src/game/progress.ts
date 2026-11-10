@@ -1,10 +1,11 @@
 import { dagLayers } from "@vibevalley/agent/dag";
-import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { everyone, defaultOrchestrator, userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { type AchievementDef, achievements } from "#/agent/seed.ts";
-import { sessionOf, sessionOnIssue } from "#/session/roster.ts";
+import { localParts } from "#/infra/time.ts";
+import { isHired, isOnDuty, sessionOf, sessionOnIssue } from "#/session/roster.ts";
 
 import { achievementInWords, levelForCommits } from "./view.ts";
 
@@ -44,7 +45,7 @@ export interface Folded {
 
 export const emptyProgress = (): T.Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1, agents: {} });
 
-export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
+const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 
 const added = (list: readonly string[], item: string): readonly string[] => (list.includes(item) ? list : [...list, item]);
 const bump = (counts: Record<string, number>, id: string, by: number) => ({ ...counts, [id]: (counts[id] ?? 0) + by });
@@ -82,9 +83,9 @@ export function progressStep(folded: Folded, entry: T.LedgerEntry): [Folded, T.P
       if (seen.reviewed.includes(entry.session)) counts = atLeast(counts, "s_review", 1);
       seen = { ...seen, runtimes: added(seen.runtimes, entry.runtime) };
       counts = { ...counts, every_machine: seen.runtimes.length };
-      const when = new Date(entry.at);
-      if (when.getHours() < 5) counts = atLeast(counts, "night_owl", 1);
-      if (when.getDay() === 0 || when.getDay() === 6) counts = atLeast(counts, "weekend", 1);
+      const when = localParts(entry.at);
+      if (when.hour < 5) counts = atLeast(counts, "night_owl", 1);
+      if (when.weekDay === 0 || when.weekDay === 6) counts = atLeast(counts, "weekend", 1);
       break;
     }
     case "failed":
@@ -165,7 +166,7 @@ export const progressFold = (entries: readonly T.LedgerEntry[], from: Folded = e
 
 const fullHouse = 6;
 
-const working = (state: T.SpaceState) => state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
+const working = (state: T.SpaceState) => state.sessions.filter((h) => isHired(h) && h.phase._tag === "working").length;
 
 function familyEntry(id: T.IssueId, children: readonly T.Issue[]): Entry {
   const merged = new Set<string>(children.filter((issue) => issue.delivered === "merged_into_parent").map((issue) => issue.id));
@@ -182,7 +183,7 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
   switch (fact.type) {
     case "sessionReported": {
       const h = sessionOf(after, fact.id) ?? sessionOf(before, fact.id);
-      if (h?.role === "orchestrator") break;
+      if (h !== undefined && isOnDuty(h)) break;
       if (fact.outcome === "failed") out.push({ kind: "failed", session: fact.id, ...(h?.agent ? { agent: h.agent } : {}) });
       break;
     }
@@ -190,7 +191,7 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
       if (fact.state === "live") out.push({ kind: "opened" });
       break;
     case "sessionChanged":
-      if (fact.session.role === "worker") out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
+      if (isHired(fact.session)) out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
       break;
     case "issueChanged": {
       const issue = fact.issue;
@@ -221,16 +222,16 @@ export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceSta
       break;
     }
     case "messageChanged": {
-      if (fact.message.fromKind === "owner") {
+      if (fact.message.fromKind === "user") {
         if (fact.thread) {
           const h = sessionOnIssue(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions) {
-          const h = named !== defaultOrchestrator && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
+          const h = named !== defaultOrchestrator && named !== userId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }
-      } else if (fact.message.fromKind === "session" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
+      } else if (fact.message.fromRole === "worker" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
     case "progressChanged": {

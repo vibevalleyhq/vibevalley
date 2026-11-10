@@ -1,5 +1,6 @@
 import { type DeepSeekContent, type DeepSeekInput, type DeepSeekMessage, encodeDeepSeekRequest } from "@vibevalley/provider/deepseek/request";
 
+import { jsonText } from "./json.ts";
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { clampThinkingLevel, type Model, type ThinkingLevel } from "./models.ts";
 
@@ -104,7 +105,7 @@ function assistantMessage(m: AssistantMessage): DeepSeekMessage | undefined {
     role: "assistant",
     content: text || null,
     ...(signature ? { reasoning: { signature, text: thinking.map((c) => c.thinking).join("\n") } } : {}),
-    calls: calls.map((c) => ({ id: c.id, name: c.name, arguments: JSON.stringify(c.arguments) })),
+    calls: calls.map((c) => ({ id: c.id, name: c.name, arguments: jsonText(c.arguments) })),
   };
 }
 
@@ -199,7 +200,7 @@ function messageTokens(m: Message): number {
   if (m.role !== "assistant") return contentTokens(m.content);
   let chars = 0;
   for (const c of m.content)
-    chars += c.type === "text" ? c.text.length : c.type === "thinking" ? c.thinking.length : c.name.length + JSON.stringify(c.arguments).length;
+    chars += c.type === "text" ? c.text.length : c.type === "thinking" ? c.thinking.length : c.name.length + jsonText(c.arguments).length;
   return Math.ceil(chars / charsPerToken);
 }
 
@@ -207,7 +208,7 @@ const usageTokens = (u: Usage) => (u.totalTokens > 0 ? u.totalTokens : u.input +
 
 function estimateTokens(context: Context): number {
   // The system prompt leads at timestamp 0, as pi-ai's leading system message does.
-  const head = textTokens(context.system) + (context.tools.length > 0 ? textTokens(JSON.stringify(context.tools)) : 0);
+  const head = textTokens(context.system) + (context.tools.length > 0 ? textTokens(jsonText(context.tools)) : 0);
   let latest = 0;
   let last: { readonly at: number; readonly usage: Usage } | undefined;
   context.messages.forEach((m, i) => {

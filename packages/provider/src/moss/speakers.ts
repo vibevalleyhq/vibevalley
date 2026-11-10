@@ -30,7 +30,7 @@ const Input = Schema.Struct({
 
 export const prepareMossSpeakers = Effect.fn("Provider.prepareMossSpeakers")(function* (input: unknown) {
   const request = yield* Schema.decodeUnknownEffect(Input)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   return {
     model: request.model,

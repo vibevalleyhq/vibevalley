@@ -12,6 +12,7 @@ export const emptySpaceState = (): T.SpaceState => ({
   crons: [],
   issues: [],
   connectors: [],
+  machines: [],
 });
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
@@ -25,7 +26,7 @@ export class Projection extends Context.Service<
     /** seq: the core's count of folds the state includes (StateFrame.seq). */
     readonly frame: (state: T.SpaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
   }
->()("vibevalley/Projection") {}
+>()("@vibevalley/server/core/core/Projection") {}
 
 /** The most changes one frame gathers: past it, the frame goes at once. */
 const burstMost = 1_000;
@@ -41,8 +42,8 @@ interface Transition {
   readonly after: T.SpaceState;
 }
 
-/** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
-type OwnerDid = { readonly kind: "reviewed"; readonly session: T.SessionId } | { readonly kind: "talked" };
+/** What the user did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
+type UserDid = { readonly kind: "reviewed"; readonly session: T.SessionId } | { readonly kind: "talked" };
 
 export class Core extends Context.Service<
   Core,
@@ -54,12 +55,12 @@ export class Core extends Context.Service<
     /** How many commits apply has folded: one more with each that changed the state. */
     readonly seq: () => number;
     readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
-    /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
+    /** The farm opens when the user starts it or says something: the call goes live unless it is already. */
     readonly open: () => Effect.Effect<void>;
     readonly sessionEvent: (id: string, activity: T.SessionEvent) => Effect.Effect<void>;
     readonly notice: (level: T.NoticeLevel, text: string) => Effect.Effect<void>;
     readonly runtime: (info: T.RuntimeInfo) => Effect.Effect<void>;
-    readonly did: (d: OwnerDid) => Effect.Effect<void>;
+    readonly did: (d: UserDid) => Effect.Effect<void>;
     /** The state now, then the transitions from here on. */
     readonly transitions: Effect.Effect<readonly [T.SpaceState, Stream.Stream<Transition>], never, Scope.Scope>;
     /** A snapshot of the state, then every side event. */
@@ -68,12 +69,12 @@ export class Core extends Context.Service<
     readonly subscribe: Effect.Effect<Stream.Stream<T.ServerEvent>, never, Scope.Scope>;
     readonly facts: Stream.Stream<T.Fact>;
     readonly live: Stream.Stream<T.LiveEvent>;
-    /** What the owner did from now on, subscribed before this returns: none said after it is missed. */
-    readonly owner: Effect.Effect<Stream.Stream<OwnerDid>, never, Scope.Scope>;
+    /** What the user did from now on, subscribed before this returns: none said after it is missed. */
+    readonly user: Effect.Effect<Stream.Stream<UserDid>, never, Scope.Scope>;
     /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
     readonly states: Stream.Stream<T.StateFrame>;
   }
->()("vibevalley/Core") {
+>()("@vibevalley/server/core/core") {
   static readonly layer = Layer.effect(
     Core,
     Effect.suspend(() => make),
@@ -112,7 +113,7 @@ const make = Effect.gen(function* () {
 
   const events = yield* scopedPubSub<T.ServerEvent>();
   const transitions = yield* scopedPubSub<Transition>();
-  const owner = yield* scopedPubSub<OwnerDid>();
+  const user = yield* scopedPubSub<UserDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
   const changes = yield* scopedPubSub<T.GameEffect | undefined>();
 
@@ -196,7 +197,7 @@ const make = Effect.gen(function* () {
       return yield* side({ type: "runtime", at: yield* Clock.currentTimeMillis, info });
     }),
     did: Effect.fn("Core.did")(function* (d) {
-      yield* PubSub.publish(owner, d);
+      yield* PubSub.publish(user, d);
     }),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);
@@ -217,7 +218,7 @@ const make = Effect.gen(function* () {
       Stream.map(liveOf),
       Stream.filter((e): e is T.LiveEvent => e !== undefined),
     ),
-    owner: Effect.map(PubSub.subscribe(owner), Stream.fromSubscription),
+    user: Effect.map(PubSub.subscribe(user), Stream.fromSubscription),
     states,
   });
   return shape;

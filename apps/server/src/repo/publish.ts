@@ -1,6 +1,4 @@
-import { basename, dirname, isAbsolute } from "node:path";
-
-import { Effect, type FileSystem } from "effect";
+import { Effect, type FileSystem, type Path } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -29,10 +27,11 @@ const network: PublishNetwork = {
   push: (cwd, url, branch, sha) => repository(cwd).push(url, branch, sha),
 };
 
-const refused = (detail: string) => new RepoError({ message: t("server.repo.publish.refused", { detail }) });
+const refused = (detail: string) => RepoError.make({ message: t("server.repo.publish.refused", { detail }) });
 
 export const publisher = (env: {
   readonly fs: FileSystem.FileSystem;
+  readonly path: Path.Path;
   readonly gh: GitHubRun;
   readonly glab: GitHubRun;
   readonly timeoutMs: number;
@@ -41,6 +40,7 @@ export const publisher = (env: {
   readonly serially: <A, E, R>(key: string, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
 }) => {
   const transport = env.network ?? network;
+  const { basename, dirname, isAbsolute } = env.path;
   const submit = Effect.fn("Repo.submitBranch")(
     function* (req: T.SubmitBranch): Effect.fn.Return<T.BranchPublication, RepoError | MergeFailure | GitError> {
       if (!isAbsolute(req.cwd) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(req.sha) || !req.title.trim()) return yield* refused("cwd / sha / title");
@@ -90,7 +90,7 @@ export const publisher = (env: {
           yield* transport.fetch(cwd, remote.read, req.base);
           const conflicts = yield* repo.conflicts(baseSha, req.sha);
           if (conflicts.length > 0) return yield* MergeFailure.conflict(req.base, conflicts);
-          const check = yield* checkRepository(cwd, env.timeoutMs, env.command);
+          const check = yield* checkRepository(env.fs, cwd, env.timeoutMs, env.command);
           const after = yield* destination();
           if (
             after.name !== remote.name ||
@@ -102,12 +102,12 @@ export const publisher = (env: {
           yield* unchanged();
           yield* transport
             .push(cwd, remote.write, req.branch, req.sha)
-            .pipe(Effect.mapError((cause) => new RepoError({ message: t("server.repo.publish.pushUnconfirmed", { sha: req.sha }), cause })));
+            .pipe(Effect.mapError((cause) => RepoError.make({ message: t("server.repo.publish.pushUnconfirmed", { sha: req.sha }), cause })));
           const published = yield* Effect.gen(function* () {
             const existing = yield* host.find(req.branch, req.base);
             const receipt = existing ?? (yield* host.create(req));
             return { ...receipt, reused: existing !== undefined };
-          }).pipe(Effect.mapError((e) => new RepoError({ message: t("server.repo.publish.pushedWithoutLink", { sha: req.sha, why: e.message }), cause: e })));
+          }).pipe(Effect.mapError((e) => RepoError.make({ message: t("server.repo.publish.pushedWithoutLink", { sha: req.sha, why: e.message }), cause: e })));
           return { ...result, check, pushed: true, ...published };
         }),
       );

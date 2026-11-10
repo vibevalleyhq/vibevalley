@@ -45,12 +45,13 @@ it.live("regression: cancelling a close caller leaves disposal owned by the exec
     const sessions = yield* Session;
     const agent = { ...starter("lab"), effort: "" };
     yield* (yield* Agent).save(agent);
-    const hired = yield* sessions.send(agent, "work", "demo", {
+    const hired = yield* sessions.hire(agent, "work", "demo", {
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
       hiring: (session) =>
         Effect.gen(function* () {
           expect(executor.find(session.id)?.attached).toBe(false);
-          expect(yield* sessions.stop(session.id)).toBe(false);
+          const stopped2 = yield* sessions.stop(session.id);
+          expect(stopped2).toBe(false);
           expect(interrupted).toBe(0);
         }),
     });
@@ -67,7 +68,8 @@ it.live("regression: cancelling a close caller leaves disposal owned by the exec
     expect(executor.find(id)?.closing).toBe(true);
     expect(acquired.closing).toBe(false);
     expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
-    expect(yield* sessions.stop(id)).toBe(false);
+    const stopped = yield* sessions.stop(id);
+    expect(stopped).toBe(false);
     expect(interrupted).toBe(0);
     expect(disposed).toBe(1);
     release();

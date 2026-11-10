@@ -9,7 +9,7 @@ import { inbox } from "./items.ts";
 
 const assignments = [{ id: "a1", issue: "t1", agent: "lab", assignedAt: 0, executions: [{ kind: "worker", session: "w1", startedAt: 0 }] }];
 
-test("a helper handed back with questions asks the owner to answer, not to complete it", () => {
+test("a helper handed back with questions asks the user to answer, not to complete it", () => {
   const session = {
     id: "w1",
     name: "阿狐",
@@ -34,7 +34,7 @@ test("a helper handed back with questions asks the owner to answer, not to compl
   expect(inbox(state([])).map((i) => i.kind)).toEqual(["review"]);
 });
 
-test("the inbox says what the issue's stage says: a round stopped halfway wants the owner too", () => {
+test("the inbox says what the issue's stage says: a round stopped halfway wants the user too", () => {
   const session = {
     id: "w1",
     name: "阿狐",
@@ -57,7 +57,7 @@ test("the inbox says what the issue's stage says: a round stopped halfway wants 
     stage: { state: "stuck", stuck: "interrupted", since: 2, acts: [] },
   } as unknown as Issue;
   expect(inbox({ ...emptySpaceState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
-  // Closed by the owner, the helper still on the farm asks nothing.
+  // Closed by the user, the helper still on the farm asks nothing.
   expect(inbox({ ...emptySpaceState(), sessions: [session], issues: [{ ...issue, stage: { state: "canceled", acts: [] } }] })).toEqual([]);
 });
 
@@ -80,8 +80,8 @@ test("each item is worded for every route: the phone, the system notice, the tra
   const [handedBack, asked] = [...inbox({ ...emptySpaceState(), sessions: [session], issues: [issue], crons: [cron] })].toSorted((a, b) => a.at - b.at);
   expect([handedBack!.who, handedBack!.words]).toEqual(["小吴", { label: "等你看", title: "小吴 做完了", body: "打卡 写好了", tray: "小吴 做完了，等你看" }]);
   expect([asked!.who, asked!.words]).toEqual([
-    "管家",
-    { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「每天看测试」：同意了才开始", tray: "定时任务「每天看测试」等你同意" },
+    "助手",
+    { label: "定时任务等你同意", title: "助手想定一个定时任务", body: "「每天看测试」：同意了才开始", tray: "定时任务「每天看测试」等你同意" },
   ]);
 });
 

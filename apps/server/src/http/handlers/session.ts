@@ -10,7 +10,7 @@ export const sessionHandlers = Effect.gen(function* () {
   const sessions = yield* Session;
   const done: SessionHandlers = {
     "session.stop": ({ id }) =>
-      sessions.present(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session])),
+      sessions.isReachable(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session])),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) => sessions.get(id).pipe(orMissing(t("server.helperRef", { id }), [lookIn.session])),
     "session.event.list": ({ id, run }) => Effect.map(sessions.events(id, run ?? ""), (events) => events ?? []),

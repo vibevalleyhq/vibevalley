@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Formatter } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -21,7 +21,7 @@ it.effect.each(mossUnderstandingModels)("%s submits exactly once with explicit c
   const sent: { url: string; init: RequestInit | undefined }[] = [];
   const fetcher: typeof fetch = (url, init) => {
     sent.push({ url: url instanceof Request ? url.url : String(url), init });
-    return Promise.resolve(new Response(JSON.stringify(result)));
+    return Promise.resolve(new Response(Formatter.formatJson(result)));
   };
   return Effect.gen(function* () {
     const understood = yield* understandMossMedia("test-key", { ...input, model, maxOutputTokens: 8192 });
@@ -39,7 +39,8 @@ it.effect.each(mossUnderstandingModels)("%s submits exactly once with explicit c
     expect(init?.redirect).toBe("manual");
     expect(init?.method).toBe("POST");
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-key");
-    expect(yield* Effect.promise(() => new Response(init?.body).json())).toEqual({
+    const json2 = yield* Effect.promise(() => new Response(init?.body).json());
+    expect(json2).toEqual({
       model,
       input: [
         {
@@ -112,14 +113,16 @@ it.effect.each([
     return Effect.never;
   });
   return Effect.gen(function* () {
-    expect(yield* Effect.flip(understandMossMedia("test-key", { ...input, ...invalid }))).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+    const understandMossMediaFailure = yield* Effect.flip(understandMossMedia("test-key", { ...input, ...invalid }));
+    expect(understandMossMediaFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
     expect(calls).toBe(0);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect.each(["", " ", "key\nheader", "key with spaces"])("invalid credentials never submit %#", (key) =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(understandMossMedia(key, input))).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const understandMossMediaFailure = yield* Effect.flip(understandMossMedia(key, input));
+    expect(understandMossMediaFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -137,12 +140,12 @@ it.effect.each(["max_output_tokens", "private-upstream-details", null])(
       expect(understood.text).toBe("A farm.\nA partial sentence");
       expect(understood.incompleteReason).toBe(reason === "max_output_tokens" ? reason : null);
       expect(understood.usage.totalTokens).toBe(124);
-      expect(JSON.stringify(understood)).not.toContain("private-upstream-details");
+      expect(Formatter.formatJson(understood)).not.toContain("private-upstream-details");
     }).pipe(
       Effect.provideService(
         HttpClient.HttpClient,
         answer(
-          JSON.stringify({
+          Formatter.formatJson({
             ...result,
             status: "incomplete",
             incomplete_details: { reason },
@@ -162,25 +165,27 @@ it.effect.each([400, 401, 403, 413, 422, 429, 302, 404, 408, 500, 503])("HTTP %s
   return Effect.gen(function* () {
     const error = yield* Effect.flip(understandMossMedia("test-key", input));
     expect(error).toMatchObject({ reason: "HttpStatus", status, outcome: [400, 401, 403, 413, 422, 429].includes(status) ? "Rejected" : "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/test-key|private-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/test-key|private-url/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect.each([
   "not JSON",
-  JSON.stringify({ ...result, status: "queued" }),
-  JSON.stringify({ ...result, output: [] }),
-  JSON.stringify({ ...result, usage: { input_tokens: -1, output_tokens: 1, total_tokens: 0 } }),
+  Formatter.formatJson({ ...result, status: "queued" }),
+  Formatter.formatJson({ ...result, output: [] }),
+  Formatter.formatJson({ ...result, usage: { input_tokens: -1, output_tokens: 1, total_tokens: 0 } }),
 ])("invalid responses remain unknown %#", (body) =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(understandMossMedia("test-key", input))).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const understandMossMediaFailure = yield* Effect.flip(understandMossMedia("test-key", input));
+    expect(understandMossMediaFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer(body))),
 );
 
 it.effect("understanding bounds response bytes", () =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(understandMossMedia("test-key", input))).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const understandMossMediaFailure = yield* Effect.flip(understandMossMedia("test-key", input));
+    expect(understandMossMediaFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer("x".repeat((1 << 20) + 1)))),
 );
 
@@ -209,7 +214,8 @@ it.effect("understanding's deadline includes body reading and aborts without res
     const fiber = yield* understandMossMedia("test-key", input).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     yield* TestClock.adjust("180 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(canceled).toBe(true);
     expect(calls).toBe(1);
   }),

@@ -258,7 +258,7 @@ const repoTemplatesQuery = defineQuery({
   ...retryRead,
 });
 
-/** Who picks the helper when the owner does not. */
+/** Who picks the helper when the user does not. */
 const byOrchestrator = "auto";
 
 /** The bag's seeds: the recent words, and each kind that has templates, with them. */

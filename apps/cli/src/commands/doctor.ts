@@ -5,7 +5,7 @@ import { announced } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
 import { appStatus, ask, farmHome, ServerFlag } from "#/farm.ts";
-import { exit, Failure, type Next, printBody } from "#/output.ts";
+import { exit, Failure, jsonText, type Next, printBody } from "#/output.ts";
 
 interface Check {
   readonly check: string;
@@ -31,19 +31,19 @@ export const doctorCommand = Command.make("doctor", {}, () =>
     );
     checks.push(health);
     if ("why" in health) {
-      yield* printBody(JSON.stringify(checks));
-      return yield* new Failure({ code: exit.unreachable, tag: "Doctor", text: t("cli.doctor.unreachable", { base }) });
+      const text = yield* jsonText(checks);
+      yield* printBody(text);
+      return yield* Failure.make({ code: exit.unreachable, tag: "Doctor", text: t("cli.doctor.unreachable", { base }) });
     }
 
-    // The desktop app not being open is fine: a farm runs without it too (vp run start).
-    checks.push(
-      yield* appStatus.pipe(
-        Effect.match({
-          onSuccess: (s): Check => ({ check: "app", ok: true, open: true, ...s }),
-          onFailure: (): Check => ({ check: "app", ok: true, open: false }),
-        }),
-      ),
+    const appStatus2 = yield* appStatus.pipe(
+      Effect.match({
+        onSuccess: (s): Check => ({ check: "app", ok: true, open: true, ...s }),
+        onFailure: (): Check => ({ check: "app", ok: true, open: false }),
+      }),
     );
+    // The desktop app not being open is fine: a farm runs without it too (vp run start).
+    checks.push(appStatus2);
 
     const runtimes = yield* ask((api) => api.runtime.list());
     const installed = runtimes.flatMap((r) => (r.installation.status === "available" ? [r.id] : []));
@@ -67,8 +67,9 @@ export const doctorCommand = Command.make("doctor", {}, () =>
         : failed("lan", lan.problem, [{ say: t("cli.doctor.lanSettings"), run: ["app", "open", "/settings/devices"] }]),
     );
 
-    yield* printBody(JSON.stringify(checks));
+    const text = yield* jsonText(checks);
+    yield* printBody(text);
     const wrong = checks.filter((c) => !c.ok).map((c) => c.check);
-    if (wrong.length > 0) return yield* new Failure({ code: exit.other, tag: "Doctor", text: t("cli.doctor.wrong", { checks: wrong.join(", ") }) });
+    if (wrong.length > 0) return yield* Failure.make({ code: exit.other, tag: "Doctor", text: t("cli.doctor.wrong", { checks: wrong.join(", ") }) });
   }),
 ).pipe(Command.withDescription(t("cli.command.doctor")), Command.withExamples([{ command: "vibevalley doctor", description: t("cli.example.doctor.about") }]));

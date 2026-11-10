@@ -8,7 +8,7 @@ import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
@@ -41,7 +41,8 @@ describe("a refined issue", () => {
   it.live("regression: repository-free drafts preserve discussion without dispatching work", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const chat = yield* Channel;
       const sessions = yield* Session;
       yield* (yield* Agent).save({ ...lab(), workdir: "" });
@@ -65,7 +66,7 @@ describe("a refined issue", () => {
       expect(existsSync(join(f.config.workRoot, "repos", "board"))).toBe(false);
       const thread = yield* chat.issueThread(issue.id, issue.title);
       const messages = yield* chat.history(thread);
-      expect(messages.filter((m) => m.fromKind === "owner").map((m) => m.text)).toEqual(["只讨论桌面端，不做移动端", "看板拖卡", "用 8797"]);
+      expect(messages.filter((m) => m.fromKind === "user").map((m) => m.text)).toEqual(["只讨论桌面端，不做移动端", "看板拖卡", "用 8797"]);
       expect(messages.some((m) => m.text.includes("看板拖卡改用 8797"))).toBe(true);
       const runs = yield* sessions.issueRuns(issue.id);
       expect(runs).toHaveLength(2);
@@ -80,11 +81,13 @@ describe("a refined issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      const before = mustHire(yield* issues.hire(lab(), "看看仓库", "board"));
+      const hired = yield* issues.hire(lab(), "看看仓库", "board");
+      const before = mustHire(hired);
       yield* w.nextReport;
       yield* sessions.dismiss(before.id);
       let issue = yield* issues.add({ title: "新工单", repo: "board" });
@@ -92,7 +95,7 @@ describe("a refined issue", () => {
       expect([got.status, got.title, assignedAgentOf(got), sessionIdsOf(got).length]).toEqual(["backlog", "慢慢看：看板拖卡还在调旧接口", "lab", 0]);
       expect(got.refining?.name).toBe(lab().name);
       expect(got.moves).toEqual(["canceled"]);
-      expect((yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", owner)))._tag).toBe("Refused");
+      expect((yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", user)))._tag).toBe("Refused");
       expect((yield* Effect.flip(issues.refine(issue.id, "再来", "")))._tag).toBe("Refused");
       yield* releaseHeld();
 
@@ -124,11 +127,11 @@ describe("a refined issue", () => {
       expect([issue.criteria, issue.questions.length]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
       yield* until(() => !drafting(core), "the second refiner left");
 
-      issue = yield* issues.setStatus(issue.id, "todo", "", "", owner);
+      issue = yield* issues.setStatus(issue.id, "todo", "", "", user);
       expect(sessionIdsOf(issue)).toHaveLength(1);
       const session = sessionIdsOf(issue)[0];
       if (session === undefined) throw new Error("the issue has no execution session");
-      expect((yield* Effect.flip(issues.edit(issue.id, { description: "replace the confirmed goal" }, owner)))._tag).toBe("Refused");
+      expect((yield* Effect.flip(issues.edit(issue.id, { description: "replace the confirmed goal" }, user)))._tag).toBe("Refused");
       const brief = sessions.sessionOf(session)!.brief;
       for (const want of ["看板拖卡改用 8797 端口", "验收标准", "1. 拖到待办就开工\n2. 端口是 8797"]) expect(brief).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -138,7 +141,8 @@ describe("a refined issue", () => {
   it.live("leaves nothing behind", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
       let issue = yield* issues.add({ title: "新工单", repo: "board", agent: "lab" });
@@ -157,7 +161,7 @@ describe("a refined issue", () => {
       yield* issues.refine(canceled.id, "慢慢看：取消它", "");
       const tree = join(f.config.workRoot, "worktrees", `board.${canceled.number}`);
       expect(existsSync(tree)).toBe(true);
-      const got = yield* issues.setStatus(canceled.id, "canceled", "", "", owner);
+      const got = yield* issues.setStatus(canceled.id, "canceled", "", "", user);
       expect(got.status).toBe("canceled");
       yield* until(() => !drafting(core), "the refiner went home");
       yield* until(() => !existsSync(tree), "its worktree is gone");
@@ -169,7 +173,8 @@ describe("a refined issue", () => {
   it.live("that cannot be read changes nothing", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
       yield* (yield* Agent).save(lab());

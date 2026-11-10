@@ -14,7 +14,7 @@ describe("what an artifact may be", () => {
     expect(artifactProblem({ title: "a", kind: "pdf", size: 10 })).not.toBe("");
     expect(artifactProblem({ size: 0 })).not.toBe("");
     expect(artifactProblem({ size: artifactMax + 1 })).not.toBe("");
-    // The owner's new one: a title and nothing in it yet.
+    // The user's new one: a title and nothing in it yet.
     expect(artifactProblem({ title: "周报" })).toBe("");
   });
 

@@ -11,7 +11,7 @@ import type { Act } from "#/ui/act.ts";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { issueSay, pendingWords } from "./write";
 
-// The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
+// The user's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
 
 /** An action sent once, without an overlay (the farm's bed tools, which play their effect after it). */
 export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""): Promise<unknown> {
@@ -61,7 +61,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   /** True once the server took it; a failed move shows on the page with why. */
   const moveTo = async (a: IssueAct, status: IssueStatus, words: string) => {
     const done = await sendMove(moves, omitUndefined({ id: issue().id, status, text: words || undefined })).done;
-    const ok = done !== undefined && done.status !== "failed";
+    const ok = done !== undefined && done.phase !== "failed";
     if (ok) ways.done?.(a);
     return ok;
   };

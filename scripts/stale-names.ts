@@ -18,9 +18,40 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
-    name: "产出 for an artifact",
-    pattern: /产出/u,
-    says: "the owner and the prompts call an artifact 稿子, and its versions 第 N 稿 (docs/README.md 用语); 产出 named nothing a person would say",
+    name: "the farm's person under the owner name",
+    pattern:
+      /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
+    says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
+    // oar's acquired-session key, and the EverOS sender id that memories already stored outside are filed under.
+    except: /^apps\/server\/src\/(executor\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
+  },
+  {
+    name: "a delivery name the one-door plan retired",
+    pattern:
+      /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange|recordChannelTrigger|forOrchestrator|OrchestratorNews|ChannelMail|ChannelRouteInput|InboxMessage|asInbox|inboxLines|orchestratorInboxLines|inboxMore|InputConsumed|InputReturned|startedIssues|finishedRuns|inputsConsumed|inputsReturned|launchesHub)\b|\bsessions\.(register|launches|present|presentSessions|workers)\b|\b(presentSessions|registerOrchestrator|orchestratorOfRow|orchestratorForChannel|OrchestratorForChannel|setOrchestrator|SetOrchestrator|channel_follow|Follows|isForOrchestrator|beginOrchestrator|recordOrchestratorStart|recordWorkerStart|publishOrchestrator|orchestratorSays|tellSession|runSays)\b/u,
+    says: "Mailbox's door: recordTrigger, receive (a Trigger with ChannelHearers or a session, or a Hire), withdraw, news (Consumed, Braked, Handed), triggersOf, queuedTriggers, deliveriesOf, handBack, decline; an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md); its own steps inside apps/server/src/mailbox are its business",
+    except: /apps\/server\/src\/mailbox\//u,
+  },
+  {
+    name: "send for hiring a helper",
+    pattern: /\b(sessions?\.send\(|Session\.send\b|Session\["Service"\]\["send"\])/u,
+    says: "a helper is hired: Session.hire (send is for a message; docs/style/naming.md)",
+  },
+  {
+    name: "主人 for the user",
+    pattern: /主人/u,
+    says: "the person is 你 when spoken to, 用户 when spoken about (to a model, in docs), and called by the name they set; docs/README.md 用语",
+  },
+  {
+    name: "管家 for the assistant",
+    // 管家 is the built-in assistant's default name (templates/orchestrator/agent.json) and a look's (机器人管家), not the role.
+    pattern: /(?<!机器人)管家/u,
+    says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); 管家 is only the default assistant's name, which the user can change; the code name stays orchestrator (docs/README.md 用语)",
+  },
+  {
+    name: "产出 or 稿子 for an artifact",
+    pattern: /产出|稿子/u,
+    says: "the page and the prompts call an artifact Artifact, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
   },
   {
     name: "a fact split from sessionPhase or gameProgress",
@@ -41,7 +72,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a toggle, now an explicit set",
     pattern: /\b(reaction|pin|archive)\.toggle\b|\bReactionToggle\b|\/(reaction|pin|archive)\/toggle\b/u,
-    says: "a retried toggle undoes itself; send the value the owner asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",
+    says: "a retried toggle undoes itself; send the value the user asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",
   },
   {
     name: "a document, now an artifact",
@@ -103,7 +134,7 @@ const RULES: readonly Rule[] = [
     name: "an agent tool under its name before it was its endpoint's",
     pattern:
       /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_crons|cancel_cron|issue_status|graph_action|task_action|task_edit|task_add|task_update|task_graph|memory_add|doc_read|doc_append|doc_update|wants_owner|all_repos|base_rev)\b/u,
-    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsOwner, repo, baseRev)",
+    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsUser, repo, baseRev)",
     // Nowledge Mem's own tools, which the memory source calls.
     except: /^apps\/server\/src\/memory\/(nowledge|outside)(\.test)?\.ts$/u,
   },
@@ -189,7 +220,7 @@ const RULES: readonly Rule[] = [
   {
     name: "an issue's stage under the attention type name",
     pattern: /\b(Attention|AttentionValues|IssueAttention|attentionOf|attentionIn|attentionWantsOwner|attentionTone)\b|\.attention\b|shared\.attention/u,
-    says: "Issue.stage, IssueStage, IssueStageKind, issueStageOf, issueStageIn, stageWantsOwner, stageTone and shared.stage",
+    says: "Issue.stage, IssueStage, IssueStageKind, issueStageOf, issueStageIn, stageWantsUser, stageTone and shared.stage",
   },
   {
     name: "issue responsibility and executions under flattened fields",
@@ -261,7 +292,7 @@ const RULES: readonly Rule[] = [
       "apps/web/src/base",
       "apps/web/src/ui",
     ],
-    // What the owner types in a test is the owner's words; the pixel pieces are the skins' own.
+    // What the user types in a test is the user's words; the pixel pieces are the skins' own.
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//u,
   },
   {
@@ -276,11 +307,11 @@ const RULES: readonly Rule[] = [
     says: "a profile's role (isOrchestrator, role: \"orchestrator\"); defaultOrchestrator only for what names none; agentHome; the profile's look.manager; SpaceState.orchestrators[id].channel",
   },
   {
-    name: "a profile called a helper's where the owner reads it",
+    name: "a profile called a helper's where the user reads it",
     pattern: /帮工档案/u,
-    says: "档案 (a profile): its role is 管家 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
+    says: "档案 (a profile): its role is 助手 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
     dirs: ["apps/web/src", "apps/server/src"],
-    // On the server only the word tables are the owner's; prompts.ts is a model's.
+    // On the server only the word tables are the user's; prompts.ts is a model's.
     except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
   },
   {
@@ -330,13 +361,13 @@ const RULES: readonly Rule[] = [
   {
     name: "the inbox module under the notice name",
     pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\.|features\/notice\b|web\.notice\./u,
-    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the owner",
+    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the user",
   },
   {
     name: "the page's log split into rounds or turns of its own",
     pattern:
       /\b(Round|RoundView|roundsOf|roundLabel|roundMs|liveRound|failedRound|finishedRound|TurnSteps|turnLabel)\b|features\/session\/rounds\b|web\.session\.rounds\.|web\.session\.trajectory\.rounds?\b|web\.issue\.card\.turns?\b/u,
-    says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the owner's word for a Run",
+    says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the user's word for a Run",
     dirs: ["apps/web/src", "apps/web/test"],
   },
   {
@@ -359,12 +390,12 @@ const RULES: readonly Rule[] = [
     name: "the orchestrator in a local called manager",
     // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face").
     pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
-    says: "orchestrator (or the profile's id): manager is only the English page's word for 管家",
+    says: "orchestrator (or the profile's id): manager is only the English page's word for 助手",
   },
   {
     name: "a service not in Effect's default class form",
     pattern: /= Context\.Service<|\b[A-Z][A-Za-z]*Shape\b|^export const layer\b/mu,
-    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issue["Service"]',
+    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("@vibevalley/server/issue/issue") { static readonly layer = … }; its type is Issue["Service"]',
     // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
     // cannot sit on the class.
     except: /^apps\/server\/src\/projection\/frame\.ts$/u,
@@ -386,8 +417,8 @@ const RULES: readonly Rule[] = [
   },
 ];
 
-// A catalog (and the test that reads the English page) says what the owner reads, in the glossary's English column (docs/README.md glossary.
-const ownerWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
+// A catalog (and the test that reads the English page) says what the user reads, in the glossary's English column (docs/README.md glossary.
+const userWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
 /** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/ setting's, shared both sides'. */
@@ -408,7 +439,7 @@ export function staleNamesIn(source: string, text: string): string[] {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
       if (rule.except?.test(file) === true) continue;
-      if (ownerWords(source) && !han.test(rule.pattern.source)) continue;
+      if (userWords(source) && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }

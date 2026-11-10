@@ -18,7 +18,7 @@ export default stories({
               <SettingRow label="开机时启动" hint="登录后自己起来">
                 <Toggle label="开机时启动" ariaLabel="开机时启动" checked onChange={() => undefined} />
               </SettingRow>
-              <SettingRow label="语言" hint="界面和管家说话用的">
+              <SettingRow label="语言" hint="界面和助手说话用的">
                 <Select
                   label="语言"
                   value="zh"
@@ -33,7 +33,7 @@ export default stories({
             <SettingsGroup title="模型" note="存在本机的 vibevalley.yaml">
               <KeyRow
                 label="DeepSeek"
-                hint="管家和记性用它"
+                hint="助手和记性用它"
                 status={{ source: "settings", hint: "a1b2" }}
                 value={a.key}
                 onInput={(key) => set({ key })}

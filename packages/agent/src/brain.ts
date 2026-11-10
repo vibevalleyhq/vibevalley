@@ -182,9 +182,7 @@ export interface Brain {
 /** Connects to its MCP servers first: one that cannot be reached is left out (mcpStatus). */
 export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFailed, Scope.Scope> =>
   Effect.gen(function* () {
-    const mcp = yield* Effect.acquireRelease(Effect.tryPromise({ try: (signal) => connectAll(options.mcpServers ?? [], signal), catch: agentFailed }), (m) =>
-      Effect.promise(() => m.close()),
-    );
+    const mcp = yield* Effect.acquireRelease(connectAll(options.mcpServers ?? []), (m) => Effect.promise(() => m.close()));
     const clock = yield* Clock.Clock;
     /** The Clock of the scope it was made in. */
     const now = () => clock.currentTimeMillisUnsafe();
@@ -391,7 +389,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       yield* refreshPrefix;
     });
 
-    // Folding when the run ends would give the owner a lossy summary a minute later.
+    // Folding when the run ends would give the user a lossy summary a minute later.
     const idleLater = Effect.suspend(() => {
       const after = idleAfter();
       if (after < 0 || estimateTokens(history()) <= idleAt()) return Effect.void;
@@ -402,9 +400,10 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     const continueRun: Effect.Effect<void> = Effect.suspend(() => {
       steps = 0;
       // Stop can clear the queue after its check: then no run starts, and no end event will follow.
-      return Effect.catchTag(loop().continue, "CannotContinue", () => ended).pipe(
-        Effect.catchTag("AgentBusy", (err) => Effect.logWarning(`agent ${options.name}: cannot continue run:`, err)),
-      );
+      return Effect.catchTags(loop().continue, {
+        CannotContinue: () => ended,
+        AgentBusy: (err) => Effect.logWarning(`agent ${options.name}: cannot continue run:`, err),
+      });
     });
 
     const ended: Effect.Effect<void> = Effect.gen(function* () {
@@ -469,7 +468,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     yield* refreshPrefix;
     let tools = allowed([...hostTools, ...own], options.disallowedTools);
     if (options.reminders ?? sessionFile !== undefined) {
-      const reminders = yield* makeReminders(options.home, now, (due) =>
+      const reminders = yield* makeReminders(options.home, (due) =>
         Effect.forEach(due, (text) => later(customMessage("reminder", text, now())), { discard: true }),
       );
       tools = allowed([...tools, ...reminders.tools], options.disallowedTools);
@@ -517,7 +516,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       later,
       ask: (message) =>
         Effect.gen(function* () {
-          if (closed) return yield* new AgentClosed({ message: "the agent is closed" });
+          if (closed) return yield* AgentClosed.make({ message: "the agent is closed" });
           const answer = yield* Deferred.make<RunResult>();
           yield* Ref.update(waiters, (all) => [...all, answer]);
           yield* deliver(message, true);

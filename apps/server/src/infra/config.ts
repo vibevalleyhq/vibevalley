@@ -1,7 +1,7 @@
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 
-import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Schema } from "effect";
+import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Redacted, Schema } from "effect";
 import { parse } from "yaml";
 
 import { defaultHome } from "@vibevalley/home";
@@ -17,8 +17,10 @@ export class ServerConfig extends Context.Service<
     readonly version: string;
     /** The space's own folder: repos/<name> are its repositories, worktrees/ the issues' worktrees, pkm/ the notes. */
     readonly workRoot: string;
-    /** Empty: home/db. "memory" keeps it in memory. */
+    /** PGlite's folder when database.url is empty. Empty: home/db. "memory" keeps it in memory. */
     readonly db: string;
+    /** A Postgres to keep the farm in (postgres://…); empty: PGlite in db. It may hold a password, so it is a secret. */
+    readonly database: { readonly url: Redacted.Redacted };
     readonly port: number;
     /** The built page (apps/web/dist), served at / beside the API. Empty: no page. */
     readonly web: string;
@@ -26,8 +28,8 @@ export class ServerConfig extends Context.Service<
      * environment, comma-separated. */
     readonly agent: { readonly model: string; readonly starters: readonly string[] };
     /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
-    readonly deepseek: { readonly apiKey: string };
-    readonly agora: { readonly appId: string; readonly appCertificate: string };
+    readonly deepseek: { readonly apiKey: Redacted.Redacted };
+    readonly agora: { readonly appId: string; readonly appCertificate: Redacted.Redacted };
     readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
     readonly lan: { readonly port: number };
     /** Commits by these emails count as yours too; in the environment, comma-separated. */
@@ -49,7 +51,7 @@ export class ServerConfig extends Context.Service<
     /** The notes' vault (pkm/): its PARA folders and journals. Empty: <workRoot>/pkm. */
     readonly pkm: { readonly root: string };
   }
->()("vibevalley/ServerConfig") {}
+>()("@vibevalley/server/infra/config/ServerConfig") {}
 
 const noticeBatchMs = 3_000;
 
@@ -59,11 +61,12 @@ export function defaults(home = homedir()): ServerConfig["Service"] {
     version: "0.1.0",
     workRoot: join(home, "vibevalley-dev"),
     db: "",
+    database: { url: Redacted.make("") },
     port: 8787,
     web: "",
     agent: { model: "", starters: [] },
-    deepseek: { apiKey: "" },
-    agora: { appId: "", appCertificate: "" },
+    deepseek: { apiKey: Redacted.make("") },
+    agora: { appId: "", appCertificate: Redacted.make("") },
     voice: { id: "", line: { port: 8788, url: "" } },
     lan: { port: 8790 },
     gitEmails: [],
@@ -88,6 +91,8 @@ export class ConfigError extends Schema.TaggedError<ConfigError, { readonly bran
 
 const port = (name: string, value: number) => Keys.Int(name).pipe(Keys.withDefault(value));
 const text = (name: string, value: string) => Keys.String(name).pipe(Keys.withDefault(value));
+/** A key: redacted from the moment it is read; empty when not given. */
+const secret = (name: string, value: Redacted.Redacted) => Keys.Redacted(name).pipe(Keys.withDefault(value));
 const number = (name: string, value: number) => Keys.Finite(name).pipe(Keys.withDefault(value));
 /** A list: comma-separated in the environment, a list in the file. */
 const list = (name: string) =>
@@ -101,11 +106,12 @@ const keys = (d: ServerConfig["Service"]) =>
   Keys.all({
     workRoot: text("work_root", d.workRoot),
     db: text("db", d.db),
+    database: Keys.nested(Keys.all({ url: secret("url", d.database.url) }), "database"),
     port: port("port", d.port),
     web: text("web", d.web),
     agent: Keys.nested(Keys.all({ model: text("model", d.agent.model), starters: list("starters") }), "agent"),
-    deepseek: Keys.nested(Keys.all({ apiKey: text("api_key", d.deepseek.apiKey) }), "deepseek"),
-    agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: text("app_certificate", d.agora.appCertificate) }), "agora"),
+    deepseek: Keys.nested(Keys.all({ apiKey: secret("api_key", d.deepseek.apiKey) }), "deepseek"),
+    agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: secret("app_certificate", d.agora.appCertificate) }), "agora"),
     voice: Keys.nested(
       Keys.all({
         id: text("id", d.voice.id),
@@ -146,12 +152,12 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
   const fs = yield* FileSystem.FileSystem;
   if (!(yield* Effect.orElseSucceed(fs.exists(path), () => false))) {
     if (optional) return undefined;
-    return yield* new ConfigError({ message: t("server.base.noFile", { path }) });
+    return yield* ConfigError.make({ message: t("server.base.noFile", { path }) });
   }
-  const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}`, cause: e }));
+  const body = yield* Effect.mapError(fs.readFileString(path), (e) => ConfigError.make({ message: `${path}: ${e.message}`, cause: e }));
   return yield* Effect.try({
     try: (): unknown => parse(body),
-    catch: (e) => new ConfigError({ message: `${path}: ${messageOf(e)}`, cause: e }),
+    catch: (e) => ConfigError.make({ message: `${path}: ${messageOf(e)}`, cause: e }),
   });
 });
 
@@ -173,15 +179,15 @@ export const loadConfig = Effect.fnUntraced(function* (
     agora: { app_id: env.AGORA_APP_ID, app_certificate: env.AGORA_APP_CERTIFICATE },
   });
   const provider = ConfigProvider.orElse(fromEnv, ConfigProvider.orElse(ownNames, ConfigProvider.fromUnknown(given ?? {})));
-  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => new ConfigError({ message: `${path}: ${e.message}`, cause: e }));
+  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => ConfigError.make({ message: `${path}: ${e.message}`, cause: e }));
   for (const [name, n] of [
     ["port", read.port],
     ["voice.line.port", read.voice.line.port],
     ["lan.port", read.lan.port],
   ] as const) {
-    if (n < 0 || n > 65535) return yield* new ConfigError({ message: t("server.base.notPort", { path, name, port: n }) });
+    if (n < 0 || n > 65535) return yield* ConfigError.make({ message: t("server.base.notPort", { path, name, port: n }) });
   }
-  if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: t("server.base.prPoll") });
+  if (read.github.prPollSeconds <= 0) return yield* ConfigError.make({ message: t("server.base.prPoll") });
   const c: ServerConfig["Service"] = { ...base, ...read, home };
   return {
     ...c,
@@ -194,6 +200,9 @@ export const loadConfig = Effect.fnUntraced(function* (
 });
 
 export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.workRoot, "pkm");
+
+/** This computer's name as people say it: its host name without .local. */
+export const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** The database's folder, or "memory". */
 export function dbDir(c: ServerConfig["Service"]): string {

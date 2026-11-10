@@ -2,7 +2,7 @@
   "id": "answer-from-state",
   "createdAt": 1792271220000,
   "model": "deepseek-flash",
-  "want": "主人问哪些在等他，管家派了个帮工去查。农场自己的数据就能答：用 issue_list（wantsOwner）列出来，不建工单。",
+  "want": "用户问哪些在等他，助手派了个帮工去查。农场自己的数据就能答：用 issue_list（wantsUser）列出来，不建工单。",
   "memory": "",
   "tools": [
     "channel_create",
@@ -34,7 +34,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：哪些在等我？",
+    "content": "[来源：用户]\n用户说：哪些在等我？",
     "display": true,
     "details": {
       "channel": "general"
@@ -50,7 +50,7 @@
           "id": "call_1",
           "name": "issue_create",
           "arguments": {
-            "title": "看看哪些工单在等主人",
+            "title": "看看哪些工单在等用户",
             "repo": "demo",
             "start": true
           }
@@ -84,7 +84,7 @@
       "content": [
         {
           "type": "text",
-          "text": "记下了：#8「看看哪些工单在等主人」，已在 #田头 派 测试小吴（w5）去 demo"
+          "text": "记下了：#8「看看哪些工单在等用户」，已在 #田头 派 测试小吴（w5）去 demo"
         }
       ],
       "isError": false,
@@ -129,7 +129,7 @@
     {
       "kind": "called",
       "tool": "issue_list",
-      "argContains": "wantsOwner"
+      "argContains": "wantsUser"
     }
   ]
 }

@@ -8,6 +8,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { Agent } from "#/agent/agent.ts";
 import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
+import { jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -26,7 +27,7 @@ import { kept, openQuestions } from "./refinement.ts";
 import { issueRows, jsonOrNull, nullText } from "./rows.ts";
 import { isClosed, issueOrder, keepClosedIssues } from "./status.ts";
 
-/** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
+/** Only while the issue is still open: a completion the user chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
 const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Delivery } | { canceled: T.IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
@@ -82,7 +83,8 @@ export const issueLifecycle = Effect.gen(function* () {
   const ofCron = Effect.fn("Issue.ofCron")(function* (id: string) {
     const row = yield* db.one(q.latestOfCron({ cron: id }));
     if (!row) return undefined;
-    return Option.getOrUndefined(yield* Effect.option(get(row.id)));
+    const found = yield* Effect.option(get(row.id));
+    return Option.getOrUndefined(found);
   });
 
   const lastAssigneeIn = (repo: string) => Effect.map(db.one(qs.lastAssigneeIn({ repo })), (row) => row?.agent);
@@ -110,7 +112,7 @@ export const issueLifecycle = Effect.gen(function* () {
   const liveSession = (id: string) =>
     Effect.filterOrFail(
       latest(id),
-      (session) => sessions.present(session),
+      (session) => sessions.isReachable(session),
       (session) => missing(t("server.issue.helperRef", { id: session }), [lookIn.session]),
     );
 
@@ -122,7 +124,7 @@ export const issueLifecycle = Effect.gen(function* () {
     return Effect.succeed([title, description] as const);
   };
 
-  /** add, with the database refusing the row kept as a failure: hire tells it to the owner. */
+  /** add, with the database refusing the row kept as a failure: hire tells it to the user. */
   const attemptAdd = Effect.fn("Issue.attemptAdd")(function* (req: T.IssueRequest, mandate: T.IssueMandate, cron?: string) {
     const [title, description] = yield* issueWords(req);
     if (req.constraints?.acceptance === true && !req.constraints.check?.trim())
@@ -252,7 +254,7 @@ export const issueLifecycle = Effect.gen(function* () {
     const row = yield* db.one(q.getIssue({ id: issue }));
     if (!row) return;
     const runs = worked.sessionIds(issue);
-    // Closed already (completed by the owner before its session went home): the verdict stands.
+    // Closed already (completed by the user before its session went home): the verdict stands.
     if (runs.at(-1) !== sessionId || row.closed_at !== null) return;
     const closing = closingOf(closed);
     yield* db.run(
@@ -271,7 +273,7 @@ export const issueLifecycle = Effect.gen(function* () {
 
   const changesOf = Effect.fn("Issue.changesOf")(function* (item: T.Issue) {
     const session = latestSessionIdOf(item);
-    if (session && sessions.present(session))
+    if (session && sessions.isReachable(session))
       return yield* sessions.withWorkplace(session, (place) => repos.changes(place).pipe(Effect.mapError((error) => refused(error.message))));
     return item.repo ? yield* repos.branchChanges(item.repo, issueBranch(item.number)).pipe(Effect.mapError((error) => refused(error.message))) : undefined;
   });
@@ -279,7 +281,7 @@ export const issueLifecycle = Effect.gen(function* () {
   const setConflict = Effect.fn("Issue.setConflict")(function* (id: string, conflict: T.Conflict | undefined) {
     const row = yield* db.one(q.getIssue({ id }));
     if (!row) return;
-    const stored = conflict ? JSON.stringify(conflict) : null;
+    const stored = conflict ? jsonOrNull(conflict, true) : null;
     if (row.conflict === stored) return;
     yield* db.run(q.setIssueConflict({ id, conflict: stored }));
     yield* publish(id);
@@ -289,7 +291,7 @@ export const issueLifecycle = Effect.gen(function* () {
 
   const unqueue = (id: string) => Effect.andThen(db.run(q.unqueueIssue({ id })), publish(id));
 
-  /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
+  /** What the session waits on the user for, from its report; a report with none, or a comment, clears them. */
   const asked = (id: string, questions: readonly T.Question[] | undefined) =>
     Effect.andThen(db.run(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
@@ -328,8 +330,8 @@ export const issueLifecycle = Effect.gen(function* () {
   const judged = (id: string, at: number, findings: readonly T.Finding[]) =>
     Effect.andThen(db.run(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
-  /** A new owner reply invalidates the previous acceptance. */
-  const ownerSaid = Effect.fn("Issue.ownerSaid")(function* (id: string) {
+  /** A new user reply invalidates the previous acceptance. */
+  const userSaid = Effect.fn("Issue.userSaid")(function* (id: string) {
     const item = yield* get(id);
     yield* db.inTx(
       Effect.gen(function* () {
@@ -342,32 +344,32 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* publish(id);
   });
 
-  const retireDispatches = (id: string, at: number) => mailbox.retireDispatches(id, at);
+  const withdrawDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
 
   /** The issue already owns its number and workplace before its session starts. */
-  const recordWorkerStart = Effect.fn("Issue.recordWorkerStart")(function* (id: string, session: T.Session) {
+  const recordHiredStart = Effect.fn("Issue.recordHiredStart")(function* (id: string, session: T.Session) {
     const linked = yield* db
       .attemptTx(
         Effect.gen(function* () {
           yield* q.reopenIssue({ id });
           const assignment = yield* assignTo(id, session.agent, session.hiredAt);
-          if (!assignment.assigned) return yield* Effect.die(new Inconsistent({ message: "a session's profile must own its assignment" }));
+          if (!assignment.assigned) return yield* Effect.die(Inconsistent.make({ message: "a session's profile must own its assignment" }));
           const execution = yield* qe.addExecution({
             assignment: assignment.assigned.id,
             executor: session.id,
             started_at: session.hiredAt,
           });
-          yield* retireDispatches(id, session.hiredAt);
+          yield* withdrawDispatches(id, session.hiredAt);
           return { assignment, execution };
         }),
       )
-      .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+      .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
     worked.changed(linked.assignment.changed);
     worked.executed(id, linked.execution);
     yield* publish(id);
   });
 
-  const recordOrchestratorStart = Effect.fn("Issue.recordOrchestratorStart")(function* (
+  const recordOnDutyStart = Effect.fn("Issue.recordOnDutyStart")(function* (
     issue: T.Issue,
     agent: string,
     channel: string,
@@ -381,7 +383,7 @@ export const issueLifecycle = Effect.gen(function* () {
           if (isClosed(issue.status)) yield* q.reopenIssue({ id: issue.id });
           yield* q.queueIssue({ id: issue.id, at: assignedAt });
           const assignment = yield* assignTo(issue.id, agent, assignedAt);
-          if (!assignment.assigned) return yield* Effect.die(new Inconsistent({ message: "an orchestrator's profile must own its assignment" }));
+          if (!assignment.assigned) return yield* Effect.die(Inconsistent.make({ message: "an orchestrator's profile must own its assignment" }));
           const execution = yield* qe.addExecution({
             assignment: assignment.assigned.id,
             executor: agent,
@@ -403,7 +405,7 @@ export const issueLifecycle = Effect.gen(function* () {
         }),
       ),
     );
-    if (dispatch) yield* mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`));
+    if (dispatch) yield* mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`));
     worked.changed(linked.assignment.changed);
     worked.executed(issue.id, linked.execution);
     yield* publish(issue.id);
@@ -416,7 +418,7 @@ export const issueLifecycle = Effect.gen(function* () {
     yield* db.inTx(
       Effect.gen(function* () {
         if (!queued) {
-          yield* retireDispatches(id, at);
+          yield* withdrawDispatches(id, at);
           yield* db.run(q.unqueueIssue({ id }));
           return;
         }
@@ -435,17 +437,18 @@ export const issueLifecycle = Effect.gen(function* () {
           });
       }),
     );
-    if (dispatch) yield* mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`));
+    if (dispatch) yield* mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`));
     yield* publish(id);
     return yield* get(id);
   });
 
   const drop = Effect.fn("Issue.drop")(function* (id: string) {
     yield* unsent(id);
+    const now = yield* Clock.currentTimeMillis;
     yield* db.inTx(
       Effect.all(
         [
-          retireDispatches(id, yield* Clock.currentTimeMillis),
+          withdrawDispatches(id, now),
           db.run(q.unqueueIssue({ id })),
           db.run(q.cancelIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: "dismissed", id })),
         ],
@@ -458,7 +461,7 @@ export const issueLifecycle = Effect.gen(function* () {
   });
 
   const savePullRequest = Effect.fn("Issue.savePullRequest")(function* (id: string, pr: T.PullRequest) {
-    yield* db.run(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) }));
+    yield* db.run(Effect.flatMap(jsonText(pr), (text) => q.setIssuePullRequest({ id, pull_request: text })));
     yield* publish(id);
   });
 
@@ -470,7 +473,7 @@ export const issueLifecycle = Effect.gen(function* () {
             ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: yield* Clock.currentTimeMillis })
             : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: yield* Clock.currentTimeMillis }),
         ),
-        db.run(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
+        db.run(Effect.flatMap(jsonText({ ...issue.pullRequest, state }), (text) => q.setIssuePullRequest({ id: issue.id, pull_request: text }))),
       ),
     );
     yield* publish(issue.id);
@@ -504,19 +507,18 @@ export const issueLifecycle = Effect.gen(function* () {
           return yield* Effect.forEach(rows, (row) =>
             Effect.gen(function* () {
               yield* q.addIssue(issueRow(row.id, row.req, parentMandate, at));
-              dispatches.push(
-                yield* mailbox.recordTrigger({
-                  source: "workbench",
-                  key: newId(),
-                  actor: { kind: "system", id: "system" },
-                  text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
-                  threads: [`issue:${row.id}`],
-                  addressed: "thread_owner",
-                  replyChannel: channel,
-                  meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
-                  at,
-                }),
-              );
+              const triggerRecorded = yield* mailbox.recordTrigger({
+                source: "workbench",
+                key: newId(),
+                actor: { kind: "system", id: "system" },
+                text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
+                threads: [`issue:${row.id}`],
+                addressed: "thread_owner",
+                replyChannel: channel,
+                meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
+                at,
+              });
+              dispatches.push(triggerRecorded);
               yield* q.queueIssue({ id: row.id, at });
               return yield* assignTo(row.id, row.req.agent, at);
             }),
@@ -525,13 +527,15 @@ export const issueLifecycle = Effect.gen(function* () {
       )
       .pipe(
         Effect.catchTags({
-          SqlError: (error) => Effect.fail(refused(causeMessage(error))),
+          SqlError: (error) => Effect.fail(error.pipe(causeMessage, refused)),
           SchemaError: Effect.die,
           NoSuchElementError: () => Effect.fail(missing(t("server.issue.issueRef", { ref: id }), [lookIn.issue])),
         }),
       );
     for (const assignment of assignments) worked.changed(assignment.changed);
-    yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`)), { discard: true });
+    yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive({ _tag: "Trigger", trigger: dispatch }).pipe(bestEffort(`issue: route ${dispatch.id}`)), {
+      discard: true,
+    });
     yield* Effect.forEach(rows, (row) => publish(row.id), { discard: true });
     yield* publish(id);
   });
@@ -539,7 +543,7 @@ export const issueLifecycle = Effect.gen(function* () {
   const completeChild = Effect.fn("Issue.completeChild")(function* (childId: string, constraints: T.IssueConstraints | undefined) {
     yield* db.inTx(
       Effect.gen(function* () {
-        if (constraints) yield* db.run(q.setIssueConstraints({ id: childId, constraints: JSON.stringify(constraints) }));
+        if (constraints) yield* db.run(Effect.flatMap(jsonText(constraints), (text) => q.setIssueConstraints({ id: childId, constraints: text })));
         yield* db.run(q.completeIssue({ closed_at: yield* Clock.currentTimeMillis, delivered: "merged_into_parent", id: childId }));
       }),
     );
@@ -577,9 +581,9 @@ export const issueLifecycle = Effect.gen(function* () {
     asked,
     recordReport,
     judged,
-    ownerSaid,
-    recordWorkerStart,
-    recordOrchestratorStart,
+    userSaid,
+    recordHiredStart,
+    recordOnDutyStart,
     setQueued,
     drop,
     place,

@@ -79,7 +79,7 @@ const viewStyles = stylex.create({
   },
 });
 
-/** What the owner did here that the frame does not show yet. */
+/** What the user did here that the frame does not show yet. */
 export function ActLines(props: {
   issue: string;
   words?: readonly PendingWords[] | undefined;

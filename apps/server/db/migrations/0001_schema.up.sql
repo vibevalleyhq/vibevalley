@@ -1,17 +1,27 @@
--- The database (SQLite, node:sqlite in this process): one baseline, edited in place. Times are Unix milliseconds as
--- real (exact to 2^53, and numbers to the code, as the shapes have them); a closed set of words is text with a check
--- (col in (…)), which the generated code reads as its literals; a boolean is stored as 0 or 1; JSON is kept as text and
--- read with @vibevalley/protocol/schema; a memory's terms are searched by an FTS5 table (memory_term).
+-- The database (Postgres: a database.url, or PGlite in the home): one baseline, edited in place. Times are Unix
+-- milliseconds as double precision (exact to 2^53, and numbers to the code, as the shapes have them); no column is
+-- bigint, which a Postgres driver hands back as a string. A closed set of words is text with a check (col in (…)), which
+-- the generated code reads as its literals; JSON is kept as text and read with @vibevalley/protocol/schema (a query casts
+-- it to jsonb to look inside); a memory's and a note block's terms are searched through term_vector and term_query.
+
+-- Terms are cut before they are kept (memory/gse.ts): only a space parts two words, so db/migrations or v1.2.3 is one
+-- word, and the words are kept as they are (no stemming, no stop words).
+CREATE FUNCTION term_vector(terms text) RETURNS tsvector LANGUAGE sql IMMUTABLE PARALLEL SAFE
+  RETURN array_to_tsvector(array_remove(string_to_array(terms, ' '), ''));
+-- Any of words, each quoted so none reads as an operator; prefix: a word matches the words it begins.
+CREATE FUNCTION term_query(words text[], prefix boolean) RETURNS tsquery LANGUAGE sql IMMUTABLE PARALLEL SAFE
+  RETURN (SELECT string_agg('''' || replace(replace(w, '\', '\\'), '''', '''''') || '''' || CASE WHEN prefix THEN ':*' ELSE '' END, ' | ')
+          FROM unnest(words) AS w WHERE w <> '')::tsquery;
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  -- A profile is a helper profile the owner talks with alone (its id is profile:<agent>), not one of its sessions.
-  kind       text not null check (kind in ('owner', 'orchestrator', 'session', 'profile', 'system')),
+  -- A profile is a helper profile the user talks with alone (its id is profile:<agent>), not one of its sessions.
+  kind       text not null check (kind in ('user', 'orchestrator', 'session', 'profile', 'system')),
   name       text not null,
   agent_id   text,
   runtime    text,
-  joined_at  real not null,
-  left_at    real,
+  joined_at  double precision not null,
+  left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond (numbered by channel_participant_seq).
   seq        integer not null default 0,
   check ((kind in ('session', 'profile')) = (agent_id is not null))
@@ -20,19 +30,19 @@ CREATE TABLE channel (
   id            text primary key,
   type          text not null check (type in ('channel', 'direct', 'thread')),
   is_default    boolean not null default false,
-  -- A thread hangs under a message, which is made after its channel.
-  root_id       text unique references channel_message (id),
+  -- A thread hangs under a message, which is made after its channel (its key is added once channel_message is there).
+  root_id       text unique,
   root_number   integer,
   subject_kind  text check (subject_kind in ('issue', 'talk')),
   subject_id    text,
   last_number   integer,
   reply_count   integer not null default 0,
-  created_at    real not null,
+  created_at    double precision not null,
   name          text,
   description   text,
   repo       text,
   parent_id     text references channel (id),
-  -- A direct channel is the owner's and one other participant's: the peer.
+  -- A direct channel is the user's and one other participant's: the peer.
   peer_id       text unique references channel_participant (id),
   -- Moves on with every message written or changed here: what a follower catches up from (channel_message.revision).
   revision      integer not null default 0,
@@ -40,19 +50,16 @@ CREATE TABLE channel (
   category      text,
   -- Its place in the sidebar, lowest first; none comes after the placed, oldest first.
   position      integer,
-  archived_at   real,
-  -- What of it counts for the owner: everything, only what @s the owner, or nothing.
+  archived_at   double precision,
+  -- What of it counts for the user: everything, only what @s the user, or nothing.
   notify        text not null default 'all' check (notify in ('all', 'mentions', 'none')),
-  -- The orchestrator's profile id that looks after a channel: the owner's words there go to it; none is the default one.
-  orchestrator  text,
   check ((type = 'thread') = (root_id is not null)),
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
   check ((subject_kind is null) or type = 'thread'),
   check (not is_default or type = 'channel'),
-  check (not is_default or archived_at is null),
-  check (orchestrator is null or type = 'channel')
+  check (not is_default or archived_at is null)
 );
 CREATE TABLE channel_message (
   id              text primary key,
@@ -63,28 +70,30 @@ CREATE TABLE channel_message (
   body            text not null,
   meta            text,
   send_key        text,
-  created_at      real not null,
+  created_at      double precision not null,
   -- The channel's revision when it was last written or changed.
   revision        integer not null,
   -- The number of the message in the same channel it answers.
   reply_number    integer,
-  edited_at       real,
+  edited_at       double precision,
   -- Deleted: its words gone, its number kept.
-  deleted_at      real,
-  pinned_at       real,
+  deleted_at      double precision,
+  pinned_at       double precision,
   -- {"emoji": ["participant", …]}, in the order they came.
   reactions       text,
   unique (channel_id, number),
   unique (channel_id, revision)
 );
+ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);
 CREATE TABLE media_input (
   id TEXT PRIMARY KEY NOT NULL,
   metadata TEXT NOT NULL,
   size INTEGER NOT NULL CHECK (size BETWEEN 1 AND 512000000),
   phase TEXT NOT NULL CHECK (phase IN ('reserved','uploading','ready','failed','deleting')),
-  hash TEXT CHECK (hash IS NULL OR (length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*')),
-  created_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL,
+  -- The sha256 of its bytes, which is its attachment's id (attachment/): set before the bytes are kept, so no reference.
+  hash TEXT CHECK (hash IS NULL OR hash ~ '^[0-9a-f]{64}$'),
+  created_at double precision NOT NULL,
+  expires_at double precision NOT NULL,
   CHECK (phase != 'ready' OR hash IS NOT NULL)
 );
 CREATE INDEX media_input_hash ON media_input(hash);
@@ -110,131 +119,89 @@ CREATE TABLE media_remote_file (
   content_hash TEXT NOT NULL,
   phase TEXT NOT NULL CHECK (phase IN ('uploading','ready','rejected','unknown','deleting','deleted')),
   remote_id TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at double precision NOT NULL,
+  updated_at double precision NOT NULL,
   UNIQUE (holder, input_id),
   CHECK (phase NOT IN ('ready','deleting') OR remote_id IS NOT NULL)
 );
 CREATE INDEX media_remote_file_phase ON media_remote_file(phase);
 
-CREATE TABLE media_understanding (
+CREATE TABLE media_job (
+  -- The caller's id, one job whatever its kind: the same id again is that job, or refused when it differs.
   id TEXT PRIMARY KEY NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('image','understanding','speech','speakers','voiceDesign','clone','transcription')),
+  -- The request as the caller gave it (JSON, by kind): what makes the same id the same job.
   request TEXT NOT NULL,
-  inputs TEXT NOT NULL,
   source TEXT NOT NULL,
-  authorization TEXT,
   connection TEXT NOT NULL,
   revision INTEGER NOT NULL,
   model TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('authorized','queued','uploading','generating','ready','incomplete','failed','unknown','canceled')),
-  result TEXT,
-  cleanup TEXT NOT NULL CHECK (cleanup IN ('pending','running','done','blocked','unknown')),
+  phase TEXT NOT NULL CHECK (phase IN ('authorized','queued','uploading','generating','downloading','ready','incomplete','failed','unknown','canceled','download_failed')),
   problem TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-CREATE INDEX media_understanding_recent ON media_understanding(created_at DESC, id);
-CREATE INDEX media_understanding_phase ON media_understanding(phase, cleanup);
-
-CREATE TABLE media_generation (
-  id TEXT PRIMARY KEY NOT NULL,
-  request TEXT NOT NULL,
-  source TEXT NOT NULL,
   usage TEXT,
-  connection TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
+  -- What the vendor made: its signed address, the kept attachment, and (understanding, audio) its answer as JSON.
   result_url TEXT,
   attachment TEXT,
-  problem TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-CREATE INDEX media_generation_recent ON media_generation(created_at DESC, id);
-CREATE INDEX media_generation_phase ON media_generation(phase);
-
-CREATE TABLE media_speech (
-  id TEXT PRIMARY KEY NOT NULL,
-  request TEXT NOT NULL,
-  source TEXT NOT NULL,
-  connection TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  credential_hash TEXT NOT NULL,
+  result TEXT,
+  -- The vendor's task while it runs elsewhere (speech, audio).
   remote_task TEXT,
   result_format TEXT CHECK (result_format IN ('mp3','wav','pcm','flac','aac','opus')),
   content_type TEXT,
   metadata TEXT,
-  usage TEXT,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
-  result_url TEXT,
-  attachment TEXT,
-  result_input TEXT,
-  assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
-  problem TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-CREATE INDEX media_speech_recent ON media_speech(created_at DESC, id);
-CREATE INDEX media_speech_phase ON media_speech(phase);
-
-CREATE TABLE media_audio (
-  id TEXT PRIMARY KEY NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('speakers','voiceDesign','clone','transcription')),
-  request TEXT NOT NULL,
-  source TEXT NOT NULL,
+  -- Media inputs it holds: the one it reads (audio), the ones it reads (understanding, JSON), and what it made as inputs.
   input TEXT,
-  connection TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  fingerprint TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
-  remote_task_id TEXT,
-  result_url TEXT,
-  result_format TEXT CHECK (result_format IN ('mp3','wav','pcm','flac','aac','opus')),
-  content_type TEXT,
-  metadata TEXT,
-  usage TEXT,
-  result TEXT,
-  attachment TEXT,
+  inputs TEXT NOT NULL DEFAULT '[]',
   result_input TEXT,
   preview_input TEXT,
   assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
-  problem TEXT NOT NULL DEFAULT '',
-  created_at REAL NOT NULL,
-  updated_at REAL NOT NULL
+  -- The vendor account it was asked with: polling, resuming and cleanup refuse another key. Who allowed it (understanding).
+  fingerprint TEXT NOT NULL DEFAULT '',
+  "authorization" TEXT,
+  -- The vendor-side cleanup of what it uploaded (understanding); done for every other kind.
+  cleanup TEXT NOT NULL DEFAULT 'done' CHECK (cleanup IN ('pending','running','done','blocked','unknown')),
+  created_at double precision NOT NULL,
+  updated_at double precision NOT NULL
 );
-CREATE INDEX media_audio_phase ON media_audio(phase);
-CREATE INDEX media_audio_created ON media_audio(created_at DESC, id);
+CREATE INDEX media_job_recent ON media_job(created_at DESC, id);
+CREATE INDEX media_job_phase ON media_job(phase, cleanup);
 
-CREATE TABLE channel_attachment (
+CREATE TABLE attachment (
   -- The sha256 of its bytes, kept under the home directory's attachments/: the same file is kept once.
   id          text primary key,
   name        text not null,
   type        text not null,
   size        integer not null,
-  created_at  real not null
+  created_at  double precision not null
 );
+CREATE TABLE library_item (
+  -- A file in the library is a kept attachment: one item per file, however often it comes back.
+  attachment_id text primary key references attachment (id),
+  kind          text not null check (kind in ('generated', 'uploaded', 'fetched')),
+  -- Where it first came from (LibraryOrigin as JSON); a later arrival only moves last_at.
+  origin        text not null,
+  added_at      double precision not null,
+  last_at       double precision not null
+);
+CREATE INDEX library_item_recent on library_item (last_at desc, attachment_id);
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
   target_id   text not null,
   resolved    text not null check (resolved in ('delivered', 'absent', 'unknown')),
   primary key (message_id, target_id)
 );
-CREATE TABLE channel_follow (
+CREATE TABLE channel_member (
   channel_id  text not null references channel (id),
   participant_id   text not null references channel_participant (id),
-  reason           text not null check (reason in ('owner', 'replied', 'mentioned', 'manual')),
+  reason           text not null check (reason in ('user', 'replied', 'mentioned', 'manual')),
   from_number      integer not null,
-  unfollowed_at    real,
+  left_at    double precision,
   primary key (channel_id, participant_id)
 );
 CREATE TABLE channel_read_cursor (
   participant_id   text not null references channel_participant (id),
   channel_id  text not null references channel (id),
   read_number      integer not null,
-  updated_at       real not null,
+  updated_at       double precision not null,
   primary key (participant_id, channel_id)
 );
 CREATE TABLE mailbox_trigger (
@@ -244,8 +211,8 @@ CREATE TABLE mailbox_trigger (
   source_key text not null,
   trigger_json text not null,
   payload_json text not null,
-  occurred_at real not null,
-  routed_at real,
+  occurred_at double precision not null,
+  routed_at double precision,
   routing_scope text,
   routing_position integer,
   check ((routed_at is null and routing_scope is null and routing_position is null) or
@@ -276,15 +243,15 @@ CREATE TABLE issue (
   blocked_by  text,
   constraints text,
   cron    text,
-  created_at  real not null,
-  queued_at   real,
-  closed_at   real,
+  created_at  double precision not null,
+  queued_at   double precision,
+  closed_at   double precision,
   -- Closed, an issue is done with what it delivered, or canceled with why; never both.
   delivered   text check (delivered in ('merged', 'merged_into_parent', 'pull_request', 'submitted', 'kept', 'none')),
   canceled    text check (canceled in ('dismissed', 'lost')),
   pull_request text,
   deliver text not null default 'change' check (deliver in ('change', 'branch', 'answer', 'pull_request')),
-  reviewed_at real,
+  reviewed_at double precision,
   findings    text,
   questions        text,
   criteria    text,
@@ -299,9 +266,17 @@ CREATE TABLE issue_assignment (
   id              text primary key,
   issue           text not null references issue (id) on delete cascade,
   agent           text not null,
-  assigned_at     real not null,
-  ended_at        real
+  assigned_at     double precision not null,
+  ended_at        double precision
 );
+-- The computers helpers work on (machine/machine.ts): the server's own, and in time those let in from the command line.
+CREATE TABLE machine (
+  id         text primary key,
+  name       text not null,
+  here       boolean not null default false,
+  joined_at  double precision not null
+);
+CREATE UNIQUE INDEX machine_one_here ON machine (here) WHERE here;
 CREATE TABLE session (
   id          text primary key,
   role        text not null check (role in ('orchestrator', 'worker')),
@@ -312,8 +287,8 @@ CREATE TABLE session (
   repo     text,
   issue       text,
   channel     text,
-  hired_at    real not null,
-  ended_at    real,
+  hired_at    double precision not null,
+  ended_at    double precision,
   closed      text check (closed in ('merged', 'completed', 'dismissed', 'lost')),
   place       text,
   oar_session text,
@@ -324,18 +299,21 @@ CREATE TABLE session (
   refining boolean not null default false,
   runs integer not null default 0,
   last_run text,
-  spent text
+  spent text,
+  -- The machine it works on; none for an agent hosted in the server's process.
+  machine text references machine (id)
 );
+CREATE INDEX session_by_machine on session (machine) where machine is not null;
 CREATE TABLE issue_assignment_execution (
   assignment text not null references issue_assignment(id) on delete cascade,
   executor text not null references session(id),
-  started_at real not null,
+  started_at double precision not null,
   primary key (assignment, executor)
 );
 CREATE INDEX session_by_agent on session (agent, hired_at);
--- One order across the deliveries and the routed triggers (mailbox_owner_route reads both): each takes the next id here.
+-- One order across the deliveries and the routed triggers (mailbox_user_route reads both): each takes the next id here.
 CREATE TABLE mailbox_order (
-  id integer primary key autoincrement
+  id integer primary key
 );
 CREATE TABLE mailbox_delivery (
   position integer not null default 0, -- the next of mailbox_order
@@ -352,10 +330,10 @@ CREATE TABLE mailbox_delivery (
   state          text not null default 'pending' check (state in ('pending', 'handed', 'consumed', 'dropped')),
   payload_json   text not null,
   launch         text,
-  handed_at      real,
-  consumed_at        real,
+  handed_at      double precision,
+  consumed_at        double precision,
   dropped_why    text,
-  created_at     real not null,
+  created_at     double precision not null,
   primary key (session_id, envelope_id),
   check ((held_by is null) or wakes),
   check ((state = 'handed') = (launch is not null) or state in ('consumed', 'dropped'))
@@ -371,20 +349,20 @@ CREATE TABLE mailbox_issue (
   state text not null default 'held' check (state in ('held', 'forwarded', 'returned')),
   session_id text references session(id) on delete set null,
   reason text,
-  created_at real not null
+  created_at double precision not null
 );
 CREATE INDEX mailbox_issue_by_issue on mailbox_issue(issue_id, state, created_at);
 -- At most one held input per issue: a newer hold replaces the older one.
+CREATE FUNCTION mailbox_issue_one_held() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM mailbox_issue WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
+    AND EXISTS (SELECT 1 FROM mailbox_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
+  RETURN NEW;
+END $$;
 CREATE TRIGGER mailbox_issue_one_held BEFORE INSERT ON mailbox_issue
-  FOR EACH ROW WHEN NEW.state = 'held' AND NEW.reason = 'human' BEGIN
-  DELETE FROM mailbox_issue WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
-    AND EXISTS (SELECT 1 FROM mailbox_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
-END;
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION mailbox_issue_one_held();
 CREATE TRIGGER mailbox_issue_one_held_again BEFORE UPDATE OF state ON mailbox_issue
-  FOR EACH ROW WHEN NEW.state = 'held' AND NEW.reason = 'human' BEGIN
-  DELETE FROM mailbox_issue WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
-    AND EXISTS (SELECT 1 FROM mailbox_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
-END;
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION mailbox_issue_one_held();
 
 CREATE INDEX mailbox_trigger_route_order on mailbox_trigger (routing_scope, routing_position) where routed_at is not null;
 CREATE INDEX mailbox_delivery_scope_position on mailbox_delivery (scope, position);
@@ -394,8 +372,8 @@ CREATE TABLE session_run (
   issue        text,
   triggered_by text not null,
   heard        text,
-  started_at   real not null,
-  ended_at     real,
+  started_at   double precision not null,
+  ended_at     double precision,
   outcome      text check (outcome in ('completed', 'failed', 'interrupted')),
   summary      text,
   spent        text
@@ -410,23 +388,23 @@ CREATE TABLE cron (
   spec        text not null,
   tz          text not null,
   enabled     boolean not null default true,
-  created_at  real not null,
-  last_run    real,
-  -- Who set it, and whether it waits for the owner to say yes (cron/rules.go's needsOK): a waiting one stays off
-  -- until the owner turns it on, which clears pending.
-  set_by      text not null default 'owner' check (set_by in ('owner', 'orchestrator', 'session', 'system')),
+  created_at  double precision not null,
+  last_run    double precision,
+  -- Who set it, and whether it waits for the user to say yes (cron/rules.go's needsOK): a waiting one stays off
+  -- until the user turns it on, which clears pending.
+  set_by      text not null default 'user' check (set_by in ('user', 'agent', 'system')),
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
   id      text primary key,
   kind    text not null,
-  at      real not null,
+  at      double precision not null,
   payload text not null default '{}'
 );
 CREATE TABLE memory (
   id           text primary key,
-  scope        text not null check (scope in ('owner', 'agent')),
-  agent        text,                -- the profile id; null for scope owner
+  scope        text not null check (scope in ('user', 'agent')),
+  agent        text,                -- the profile id; null for scope user
   kind         text not null check (kind in ('note', 'issue')),
   title        text,
   body         text not null,
@@ -436,49 +414,37 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   repo      text,                -- null: every repo
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'orchestrator', 'session', 'system')),
+  author       text not null check (author in ('user', 'agent', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again
-  created_at   real not null,
-  updated_at   real not null,
+  created_at   double precision not null,
+  updated_at   double precision not null,
   recalled     integer not null default 0,
-  recalled_at  real,
-  check ((scope = 'owner') = (agent is null))
+  recalled_at  double precision,
+  check ((scope = 'user') = (agent is null))
 );
 CREATE INDEX memory_by_agent ON memory (agent, created_at desc);
 CREATE INDEX memory_by_scope ON memory (scope, kind) WHERE replaced_by IS NULL;
 CREATE UNIQUE INDEX memory_one_issue ON memory (agent, session) WHERE kind = 'issue';
--- The terms as FTS5 searches them: only a space parts two words (every ASCII mark is a word's own character), so
--- db/migrations or v1.2.3 is one word, as memory/recall.ts cut it. Kept by the triggers below, from memory's rowid.
-CREATE VIRTUAL TABLE memory_term USING fts5(terms, content = 'memory', content_rowid = 'rowid',
-  tokenize = "unicode61 remove_diacritics 0 tokenchars '!""#$%&''()*+,-./:;<=>?@[\]^_`{|}~'");
-CREATE TRIGGER memory_term_insert AFTER INSERT ON memory BEGIN
-  INSERT INTO memory_term (rowid, terms) VALUES (NEW.rowid, NEW.terms);
-END;
-CREATE TRIGGER memory_term_delete AFTER DELETE ON memory BEGIN
-  INSERT INTO memory_term (memory_term, rowid, terms) VALUES ('delete', OLD.rowid, OLD.terms);
-END;
-CREATE TRIGGER memory_term_update AFTER UPDATE OF terms ON memory BEGIN
-  INSERT INTO memory_term (memory_term, rowid, terms) VALUES ('delete', OLD.rowid, OLD.terms);
-  INSERT INTO memory_term (rowid, terms) VALUES (NEW.rowid, NEW.terms);
-END;
+-- The terms as a search reads them (memory.sql MatchMemories).
+CREATE INDEX memory_terms ON memory USING gin (term_vector(terms));
 CREATE TABLE connector_account (
   connector      text primary key check (connector in ('weixin', 'feishu', 'qq')),
   secrets        text not null,
-  owner_id       text,
+  user_id       text,
   pair_code      text,
   cursor         text not null default '',
   reply_context  text,
-  reply_at       real,
-  last_inbound   real,
-  paused_until   real,
-  connected_at   real not null,
+  reply_at       double precision,
+  last_inbound   double precision,
+  paused_until   double precision,
+  connected_at   double precision not null,
   channel_id     text references channel (id)
 );
 CREATE TABLE connector_inbound (
   connector   text not null,
   ext_id      text not null,
   message_id  text references channel_message (id) on delete set null,
-  created_at  real not null,
+  created_at  double precision not null,
   payload     text not null default '',
   delivered   boolean not null default true,
   -- The order they were accepted in (connector_inbound_seq).
@@ -495,8 +461,8 @@ CREATE TABLE connector_outbox (
   ext_id      text,
   tries       integer not null default 0,
   error       text,
-  created_at  real not null,
-  sent_at     real
+  created_at  double precision not null,
+  sent_at     double precision
 );
 CREATE INDEX connector_outbox_pending on connector_outbox (connector, id) where state = 'pending';
 CREATE INDEX connector_outbox_by_ext on connector_outbox (connector, ext_id) where ext_id is not null;
@@ -504,12 +470,21 @@ CREATE TABLE lan (
   id    integer primary key check (id = 1),
   open  boolean not null
 );
-CREATE TABLE lan_device (
+CREATE TABLE user_account (
+  id              integer primary key check (id = 1),
+  name            text not null,
+  -- scrypt:<N>:<r>:<p>:<salt>:<hash>, base64url; null until a password is set.
+  password_hash   text,
+  password_set_at double precision
+);
+CREATE TABLE user_device (
   id         text primary key,
   name       text not null,
+  -- paired: let in at the gate by the user's nod; login: signed in with the password.
+  came       text not null check (came in ('paired', 'login')),
   key_hash   text not null unique,
-  paired_at  real not null,
-  last_seen  real
+  added_at   double precision not null,
+  last_seen  double precision
 );
 CREATE INDEX issue_assignment_by_issue on issue_assignment (issue, assigned_at, id);
 CREATE UNIQUE INDEX issue_assignment_current on issue_assignment (issue) where ended_at is null;
@@ -542,8 +517,8 @@ CREATE TABLE runtime_todo (
   state text not null check (state in ('waiting', 'working', 'done', 'failed', 'skipped')),
   result text not null,
   tries integer not null,
-  updated_at real not null,
-  finished_at real,
+  updated_at double precision not null,
+  finished_at double precision,
   primary key (graph, id)
 );
 CREATE INDEX runtime_todo_by_keeper on runtime_todo (keeper, finished_at);
@@ -554,38 +529,40 @@ CREATE TABLE artifact (
   title       text not null,
   -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version).
   body        text not null check (body in ('blocks', 'html')),
-  -- The channel or thread it was announced in, none for one the owner started on the page; the issue it was made for, if any.
+  -- html: how the workbench shows it (page, slides, motion); blocks: none.
+  display     text check ((body = 'html') = (display is not null) and (display is null or display in ('page', 'slides', 'motion'))),
+  -- The channel or thread it was announced in, none for one the user started on the page; the issue it was made for, if any.
   channel_id  text references channel (id),
   -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).
   message_id  text references channel_message (id) on delete set null,
   issue       text,
-  -- Its maker, a profile's id or the owner's, and the name it went by then.
+  -- Its maker, a profile's id or the user's, and the name it went by then.
   by_id       text not null,
   by_name     text not null,
   -- html: the latest version; blocks: 0.
   version     integer not null,
   -- blocks: the batches taken (artifact_change); html: 0.
   seq         integer not null default 0,
-  created_at  real not null,
-  updated_at  real not null
+  created_at  double precision not null,
+  updated_at  double precision not null
 );
 CREATE INDEX artifact_by_channel on artifact (channel_id, updated_at);
 CREATE INDEX artifact_by_issue on artifact (issue, updated_at);
 CREATE TABLE artifact_version (
   artifact_id text not null references artifact (id) on delete cascade,
   version     integer not null,
-  -- The sha256 of its bytes, kept under the home directory's artifacts/: the same content is kept once.
-  sha         text not null,
+  -- Its bytes, an attachment (attachment/): the same content is kept once, whoever keeps it.
+  attachment_id text not null references attachment (id),
   size        integer not null,
   note        text,
   by_id       text not null,
   by_name     text not null,
   -- The message that announced it: its comments are the replies to it.
   message_id  text references channel_message (id) on delete set null,
-  created_at  real not null,
+  created_at  double precision not null,
   primary key (artifact_id, version)
 );
-CREATE INDEX artifact_version_by_sha on artifact_version (sha);
+CREATE INDEX artifact_version_attachment on artifact_version (attachment_id);
 CREATE TABLE artifact_block (
   id          text primary key,
   artifact_id text not null references artifact (id) on delete cascade,
@@ -597,7 +574,7 @@ CREATE TABLE artifact_block (
   rev         integer not null,
   deleted     boolean not null default false,
   updated_by  text not null,
-  updated_at  real not null
+  updated_at  double precision not null
 );
 CREATE INDEX artifact_block_by_artifact on artifact_block (artifact_id, order_key, id);
 -- A block's text at each rev (kind normal), and a submitted text that was not taken (kind conflict, at the rev it lost to).
@@ -608,7 +585,7 @@ CREATE TABLE artifact_block_revision (
   spans      text not null,
   actor      text not null,
   kind       text not null check (kind in ('normal', 'conflict')),
-  created_at real not null
+  created_at double precision not null
 );
 CREATE INDEX artifact_block_revision_by_block on artifact_block_revision (block_id, rev);
 CREATE TABLE artifact_change (
@@ -618,13 +595,13 @@ CREATE TABLE artifact_change (
   actor       text not null,
   block_ids   text not null, -- JSON: the blocks the batch changed
   results     text not null, -- JSON: []protocol.BlockOpResult, answered again when the batch comes again
-  created_at  real not null,
+  created_at  double precision not null,
   primary key (artifact_id, seq)
 );
 
--- SQLite does not index a foreign key; a delete that cascades and a lookup by it scan without one.
--- A change an agent proposed to a block the owner wrote (artifact/blocks.ts): once open, then accepted or rejected by the
--- owner. A block that moved on since base_rev comes back stale instead of being changed.
+-- Postgres does not index a foreign key; a delete that cascades and a lookup by it scan without one.
+-- A change an agent proposed to a block the user wrote (artifact/blocks.ts): once open, then accepted or rejected by the
+-- user. A block that moved on since base_rev comes back stale instead of being changed.
 CREATE TABLE artifact_suggestion (
   id          text primary key,
   artifact_id text not null references artifact (id) on delete cascade,
@@ -633,8 +610,8 @@ CREATE TABLE artifact_suggestion (
   at_rev      integer not null,
   change      text not null, -- JSON: protocol.SuggestionChange
   status      text not null default 'open' check (status in ('open', 'accepted', 'rejected')),
-  created_at  real not null,
-  resolved_at real,
+  created_at  double precision not null,
+  resolved_at double precision,
   resolved_by text
 );
 CREATE INDEX artifact_suggestion_by_artifact on artifact_suggestion (artifact_id, created_at);
@@ -642,7 +619,7 @@ CREATE INDEX artifact_suggestion_open on artifact_suggestion (artifact_id, statu
 CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
 
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
-CREATE INDEX channel_follow_by_participant on channel_follow (participant_id);
+CREATE INDEX channel_member_by_participant on channel_member (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
 CREATE INDEX mailbox_delivery_by_message on mailbox_delivery (message_id);
 CREATE INDEX mailbox_issue_by_session on mailbox_issue (session_id) where session_id is not null;
@@ -654,48 +631,53 @@ CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);
 CREATE INDEX artifact_by_message on artifact (message_id) where message_id is not null;
 CREATE INDEX artifact_version_by_message on artifact_version (message_id) where message_id is not null;
 
-CREATE VIEW mailbox_owner_route AS
+CREATE VIEW mailbox_user_route AS
 select routing_scope as scope, routing_position as position from mailbox_trigger
-where routed_at is not null and trigger_json ->> '$.actor.kind' = 'owner'
+where routed_at is not null and trigger_json::jsonb -> 'actor' ->> 'kind' = 'user'
 union all
 select scope, position from mailbox_delivery
-where payload_json ->> '$.trigger.actor.kind' = 'owner'
-  and envelope_id <> payload_json ->> '$.trigger.id';
+where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'user'
+  and envelope_id <> payload_json::jsonb -> 'trigger' ->> 'id';
 
 CREATE TABLE runtime_spend (
   day text NOT NULL,
   runtime text NOT NULL,
-  cny real NOT NULL CHECK (cny >= 0 AND cny < 9e999),
+  cny double precision NOT NULL CHECK (cny >= 0 AND cny < 'Infinity'::double precision),
   PRIMARY KEY (day, runtime)
 );
 
--- PKM (pkm/pkm.ts): the pages are files in the vault; these hold what the files do not. A remark the owner wrote in a file
+-- PKM (pkm/pkm.ts): the pages are files in the vault; these hold what the files do not. A remark the user wrote in a file
 -- is kept here by an id made from its block, so its status outlives a reading of the file.
 CREATE TABLE pkm_comment (
   id          text primary key,
   page        text not null,      -- the page's slug
   block       text not null,
   span        text,               -- the words an inline remark is on
-  author      text not null,      -- the owner's id, or the agent's that proposed the rewrite
+  author      text not null,      -- the user's id, or the agent's that proposed the rewrite
   body        text not null,
   status      text not null default 'open' check (status in ('open', 'suggested', 'accepted', 'rejected')),
   suggested   text,               -- the block's text as proposed
   rationale   text,
-  created_at  real not null,
-  resolved_at real
+  created_at  double precision not null,
+  resolved_at double precision
 );
 CREATE INDEX pkm_comment_by_block ON pkm_comment (block, created_at);
 CREATE INDEX pkm_comment_by_page ON pkm_comment (page, created_at);
 
--- The notes' blocks as FTS5 searches them (pkm.search): each block's words, cut as memory cuts them (memory/recall.ts),
+-- The notes' blocks as a search reads them (pkm.search): each block's words, cut as memory cuts them (memory/recall.ts),
 -- from its page's title, the path above it and its text. Kept whole by pkm/pkm.ts each time it reads or writes a page.
-CREATE VIRTUAL TABLE pkm_term USING fts5(block UNINDEXED, page UNINDEXED, terms,
-  tokenize = "unicode61 remove_diacritics 0 tokenchars '!""#$%&''()*+,-./:;<=>?@[\]^_`{|}~'");
+CREATE TABLE pkm_term (
+  block  text not null,
+  page   text not null,
+  terms  text not null
+);
+CREATE INDEX pkm_term_terms ON pkm_term USING gin (term_vector(terms));
+CREATE INDEX pkm_term_by_page ON pkm_term (page);
 
 -- Each file a change wrote, as it was before (none: the change made it) and after: pkm.undo puts back the newest.
 CREATE TABLE pkm_change (
-  seq          integer primary key autoincrement,
-  at           real not null,
+  seq          integer generated by default as identity primary key,
+  at           double precision not null,
   what         text not null,
   page         text not null,
   before_file  text,
@@ -704,28 +686,38 @@ CREATE TABLE pkm_change (
   after_text   text not null
 );
 
--- The orders Postgres numbered by identity: each new row takes one more than the most there was.
-CREATE TRIGGER channel_participant_seq AFTER INSERT ON channel_participant BEGIN
-  UPDATE channel_participant SET seq = (SELECT coalesce(max(seq), 0) + 1 FROM channel_participant) WHERE rowid = NEW.rowid;
-END;
-CREATE TRIGGER mailbox_trigger_seq AFTER INSERT ON mailbox_trigger BEGIN
-  UPDATE mailbox_trigger SET seq = (SELECT coalesce(max(seq), 0) + 1 FROM mailbox_trigger) WHERE rowid = NEW.rowid;
-END;
-CREATE TRIGGER connector_inbound_seq AFTER INSERT ON connector_inbound BEGIN
-  UPDATE connector_inbound SET seq = (SELECT coalesce(max(seq), 0) + 1 FROM connector_inbound) WHERE rowid = NEW.rowid;
-END;
+-- The orders they came in: each new row takes one more than the most there was.
+CREATE FUNCTION next_seq() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  EXECUTE format('SELECT coalesce(max(seq), 0) + 1 FROM %I', TG_TABLE_NAME) INTO NEW.seq;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER channel_participant_seq BEFORE INSERT ON channel_participant FOR EACH ROW EXECUTE FUNCTION next_seq();
+CREATE TRIGGER mailbox_trigger_seq BEFORE INSERT ON mailbox_trigger FOR EACH ROW EXECUTE FUNCTION next_seq();
+CREATE TRIGGER connector_inbound_seq BEFORE INSERT ON connector_inbound FOR EACH ROW EXECUTE FUNCTION next_seq();
 -- A delivery's and a routed trigger's position is the next of mailbox_order, taken by their queries
 -- (mailbox_delivery.sql, mailbox_trigger.sql); the order is moved past it here so nothing takes it again. A delivery
 -- written without one (position 0) is given the next here.
-CREATE TRIGGER mailbox_delivery_position AFTER INSERT ON mailbox_delivery WHEN NEW.position = 0 BEGIN
-  INSERT INTO mailbox_order (id) VALUES (NULL);
-  UPDATE mailbox_delivery SET position = last_insert_rowid() WHERE rowid = NEW.rowid;
-END;
-CREATE TRIGGER mailbox_delivery_placed AFTER INSERT ON mailbox_delivery
-  WHEN NEW.position > (SELECT coalesce(max(id), 0) FROM mailbox_order) BEGIN
-  INSERT INTO mailbox_order (id) VALUES (NEW.position);
-END;
+CREATE FUNCTION mailbox_order_past(at integer) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  IF at > (SELECT coalesce(max(id), 0) FROM mailbox_order) THEN
+    INSERT INTO mailbox_order (id) VALUES (at);
+  END IF;
+END $$;
+CREATE FUNCTION mailbox_delivery_position() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.position = 0 THEN
+    INSERT INTO mailbox_order (id) SELECT coalesce(max(id), 0) + 1 FROM mailbox_order RETURNING id INTO NEW.position;
+  ELSE
+    PERFORM mailbox_order_past(NEW.position);
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER mailbox_delivery_position BEFORE INSERT ON mailbox_delivery FOR EACH ROW EXECUTE FUNCTION mailbox_delivery_position();
+CREATE FUNCTION mailbox_trigger_routed() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM mailbox_order_past(NEW.routing_position);
+  RETURN NEW;
+END $$;
 CREATE TRIGGER mailbox_trigger_routed AFTER UPDATE OF routing_position ON mailbox_trigger
-  WHEN NEW.routing_position > (SELECT coalesce(max(id), 0) FROM mailbox_order) BEGIN
-  INSERT INTO mailbox_order (id) VALUES (NEW.routing_position);
-END;
+  FOR EACH ROW WHEN (NEW.routing_position IS NOT NULL) EXECUTE FUNCTION mailbox_trigger_routed();

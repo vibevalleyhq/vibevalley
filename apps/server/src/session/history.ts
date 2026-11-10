@@ -1,13 +1,15 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOf, jsonOrNone } from "#/base/json.ts";
+import { jsonOf, jsonOrNone, jsonText } from "#/base/json.ts";
 import { type Workplace } from "#/repo/workplace.ts";
 import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
+
+import { isOnDuty } from "./roster.ts";
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
@@ -52,6 +54,7 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
     phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
     refining: false,
     ...(r.repo !== null ? { repo: r.repo } : {}),
+    ...(r.machine !== null ? { machine: r.machine } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
     ...(r.channel !== null ? { channel: r.channel } : {}),
   };
@@ -73,17 +76,23 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
   return s;
 }
 
-export function sessionState(s: T.Session): qs.KeepSessionStateParams {
-  return {
-    id: s.id,
-    phase: JSON.stringify(s.phase),
-    refining: s.refining,
-    runs: s.runs,
-    last_run: s.lastRun ? JSON.stringify(s.lastRun) : null,
-    spent: s.spent ? JSON.stringify(s.spent) : null,
-    channel: s.channel ?? null,
-  };
-}
+export const sessionState = (s: T.Session) =>
+  Effect.map(
+    Effect.all({
+      phase: jsonText(s.phase),
+      lastRun: s.lastRun ? jsonText(s.lastRun) : Effect.succeed(null),
+      spent: s.spent ? jsonText(s.spent) : Effect.succeed(null),
+    }),
+    ({ phase, lastRun, spent }): qs.KeepSessionStateParams => ({
+      id: s.id,
+      phase,
+      refining: s.refining,
+      runs: s.runs,
+      last_run: lastRun,
+      spent,
+      channel: s.channel ?? null,
+    }),
+  );
 
 export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
   const phase = phaseOf(row.phase);
@@ -100,8 +109,9 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
     hiredAt: row.hired_at,
     refining: row.refining,
     runs: row.runs,
-    phase: row.role === "orchestrator" ? { _tag: "resting" } : phase,
+    phase: isOnDuty(row) ? { _tag: "resting" } : phase,
     ...(row.repo === null ? {} : { repo: row.repo }),
+    ...(row.machine === null ? {} : { machine: row.machine }),
     ...(row.issue === null ? {} : { issue: issueId(row.issue) }),
     ...(row.channel === null ? {} : { channel: row.channel }),
     ...(place?.branch ? { branch: place.branch, worktree: place.cwd } : {}),

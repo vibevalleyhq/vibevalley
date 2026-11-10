@@ -1,19 +1,23 @@
 import { randomBytes } from "node:crypto";
 
 import { type SubagentReport } from "@botiverse/oar/agents";
-import { Clock, Deferred, Effect, FiberMap, FiberSet, Queue, PubSub, Semaphore, Stream } from "effect";
+import { Clock, Deferred, Effect, FiberMap, FiberSet, Queue, PubSub, Semaphore, Stream, String as Str } from "effect";
 
+import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
+import { jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core, type FactIn } from "#/core/core.ts";
-import { Executor, type ExecutionInput } from "#/executor/executor.ts";
+import { type ExecutionInput } from "#/executor/executor.ts";
 import { serverAddress, ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { Machine } from "#/machine/machine.ts";
 import { type Workplace } from "#/repo/workplace.ts";
 import * as qs from "#db/session.sql.ts";
 
@@ -21,16 +25,11 @@ import { restoredSession, sessionState } from "./history.ts";
 import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
 import { type Tracking } from "./reaction.ts";
-import type { DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./signals.ts";
+import { isOnDuty } from "./roster.ts";
+import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
-
-export interface RunFinished {
-  readonly id: string;
-  readonly issues: T.IssueId[];
-  readonly outcome: T.Outcome;
-}
 
 export interface Hand {
   readonly id: T.SessionId;
@@ -68,7 +67,7 @@ export interface RunStore {
   readonly issues: (run: string) => Effect.Effect<T.IssueId[], NotRecorded>;
   readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Effect.Effect<void, NotRecorded>;
   readonly finished: (r: RunFinished) => void;
-  readonly consumed: (c: InputConsumed) => void;
+  readonly consumed: (c: Consumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
 }
 
@@ -76,10 +75,12 @@ export const sessionRegistry = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const core = yield* Core;
   const store = yield* Agent;
-  const executor = yield* Executor;
+  const machines = yield* Machine;
+  const executor = machines.executions(machines.here());
   const db = yield* Db;
   const clock = yield* Clock.Clock;
-  const runSync = Effect.runSyncWith(yield* Effect.context());
+  const context2 = yield* Effect.context();
+  const runSync = Effect.runSyncWith(context2);
   // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
   const forkHere = yield* FiberSet.makeRuntime();
   const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
@@ -104,15 +105,10 @@ export const sessionRegistry = Effect.gen(function* () {
   // A hand is acquired before admission; no path holding admission waits for a hand.
   const admission = yield* Semaphore.make(1);
 
-  const launchesHub = yield* scopedPubSub<LaunchActivity>();
-  // The sessions' own facts, told as news in the order they were applied.
   const newsHub = yield* scopedPubSub<SessionNews>();
   const [, moves] = yield* core.transitions;
-  const startedIssuesHub = yield* scopedPubSub<string>();
-  const finishedHub = yield* scopedPubSub<RunFinished>();
-  const consumedHub = yield* scopedPubSub<InputConsumed>();
-  const returnedHub = yield* scopedPubSub<InputReturned>();
-  const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
+  const tell = (news: SessionNews) => void PubSub.publishUnsafe(newsHub, news);
+  const signal = (a: LaunchActivity) => tell(a);
 
   const hands = new Map<string, Hand>();
   const executions = new Map<string, () => string>();
@@ -136,21 +132,16 @@ export const sessionRegistry = Effect.gen(function* () {
   const who = (token: string) => tokens.get(token) ?? "";
 
   // A session's own row keeps what taking it up again needs, so it goes with the database.
-  const handRow = (h: Hand) => {
-    const oar = h.oarSessionId;
-    return {
-      id: h.id,
-      place: JSON.stringify(h.place),
-      oar_session: oar || null,
-      last_text: h.lastText || null,
-      recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].toSorted()) : null,
-    };
-  };
+  const handRow = (h: Hand) =>
+    Effect.map(
+      Effect.all({ place: jsonText(h.place), recalled: h.recalled.size > 0 ? jsonText([...h.recalled].toSorted()) : Effect.succeed(null) }),
+      ({ place, recalled }) => ({ id: h.id, place, oar_session: h.oarSessionId || null, last_text: h.lastText || null, recalled }),
+    );
   const keepHands = Effect.suspend(() =>
     db.inTx(
       Effect.gen(function* () {
-        yield* Effect.forEach(core.state().sessions, (session) => db.run(qs.keepSessionState(sessionState(session))), { discard: true });
-        yield* Effect.forEach([...hands.values()], (h) => db.run(qs.keepHand(handRow(h))), { discard: true });
+        yield* Effect.forEach(core.state().sessions, (session) => db.run(Effect.flatMap(sessionState(session), qs.keepSessionState)), { discard: true });
+        yield* Effect.forEach([...hands.values()], (h) => db.run(Effect.flatMap(handRow(h), qs.keepHand)), { discard: true });
       }),
     ),
   ).pipe(bestEffort("session: recovery state was not saved"));
@@ -168,8 +159,9 @@ export const sessionRegistry = Effect.gen(function* () {
       }),
     ),
   );
+  const activeSessions2 = yield* db.run(qs.activeSessions());
   yield* Effect.forEach(
-    yield* db.run(qs.activeSessions()),
+    activeSessions2,
     (row) =>
       Effect.gen(function* () {
         const session = restoredSession(row);
@@ -179,7 +171,7 @@ export const sessionRegistry = Effect.gen(function* () {
   );
 
   const keepRow = (row: qs.KeepSessionParams) =>
-    db.attempt(qs.keepSession(row)).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+    db.attempt(qs.keepSession(row)).pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
 
   const register = Effect.fn("Session.register")(function* (session: SessionIdentity) {
     const hiredAt = yield* Clock.currentTimeMillis;
@@ -189,26 +181,31 @@ export const sessionRegistry = Effect.gen(function* () {
       issue: null,
       channel: null,
       hired_at: hiredAt,
+      machine: null,
     });
-    if (!core.session(session.id))
+    const kept = core.session(session.id);
+    // An orchestrator renamed is the same session under its new name.
+    if (kept === undefined || kept.name !== session.name)
       yield* core.apply({
         type: "sessionChanged",
-        session: {
-          ...session,
-          id: sessionId(session.id),
-          hiredAt,
-          runs: 0,
-          refining: false,
-          phase: { _tag: "resting" },
-        },
+        session:
+          kept === undefined
+            ? { ...session, id: sessionId(session.id), hiredAt, runs: 0, refining: false, phase: { _tag: "resting" } }
+            : { ...kept, name: session.name },
       });
   });
 
-  yield* Effect.forEach(
-    store.orchestrators(),
-    (agent) => register({ id: agent.id, role: "orchestrator", agent: agent.id, name: agent.name, runtime: agent.runtime, brief: agent.duty }),
-    { discard: true },
-  );
+  /** An on-duty agent's session, kept before anything can record a Run or address its mailbox: written when there is
+   * none or its name changed, at startup and whenever a profile is kept. A profile hired per piece of work is left
+   * alone. */
+  const keepOnDuty = Effect.fn("Session.keepOnDuty")(function* (profile: T.Agent) {
+    if (!isOnDuty(profile)) return;
+    const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
+    if (core.session(profile.id)?.name === name) return;
+    yield* register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
+  });
+  yield* Effect.forEach(store.all(), keepOnDuty, { discard: true });
+  store.whenKept((profile) => keepOnDuty(profile).pipe(Effect.mapError((error) => refused(error.message))));
 
   const keep = (s: T.Session) =>
     keepRow({
@@ -222,6 +219,7 @@ export const sessionRegistry = Effect.gen(function* () {
       issue: s.issue ?? null,
       channel: s.channel ?? null,
       hired_at: s.hiredAt,
+      machine: s.machine ?? null,
     });
 
   const ended = (id: string, closed: T.SessionClose) =>
@@ -230,7 +228,7 @@ export const sessionRegistry = Effect.gen(function* () {
   const forget = (id: string) => db.attempt(qs.forgetSession({ id })).pipe(bestEffort(`vibevalley: unstarted session ${id} not forgotten`));
 
   /** The session kept, with its log. */
-  const logOf = (s: T.Session, journal: Journal) => Effect.as(Effect.andThen(keep(s), db.run(qs.keepSessionState(sessionState(s)))), journal);
+  const logOf = (s: T.Session, journal: Journal) => Effect.as(Effect.andThen(keep(s), db.run(Effect.flatMap(sessionState(s), qs.keepSessionState))), journal);
 
   const runs = yield* recording;
 
@@ -260,7 +258,7 @@ export const sessionRegistry = Effect.gen(function* () {
     if (fresh.length === 0) return;
     h.heard.push(...fresh);
     if (h.run) recordRun(runs.heard(h.run, h.heard).pipe(bestEffort(`vibevalley: run ${h.run}`)));
-    PubSub.publishUnsafe(consumedHub, { session: h.id, envelopeIds: fresh });
+    tell({ _tag: "Consumed", session: h.id, envelopeIds: fresh });
   };
 
   const inputChanged = (h: Hand, input: ExecutionInput) => {
@@ -268,7 +266,7 @@ export const sessionRegistry = Effect.gen(function* () {
     if (envelopeIds === undefined) return;
     h.inputs.delete(input.inputId);
     if (input.kind === "consumed") consume(h, envelopeIds);
-    else PubSub.publishUnsafe(returnedHub, { session: h.id, envelopeIds });
+    else tell({ _tag: "Returned", session: h.id, envelopeIds });
   };
 
   const endRun = (h: Hand, outcome: T.Outcome, summary: string, spent?: T.Spent) => {
@@ -284,14 +282,14 @@ export const sessionRegistry = Effect.gen(function* () {
           Effect.gen(function* () {
             yield* runs.finish(id, outcome, summary, spent);
             const session = core.session(h.id);
-            if (session) yield* db.run(qs.keepSessionState(sessionState(session)));
+            if (session) yield* db.run(Effect.flatMap(sessionState(session), qs.keepSessionState));
             yield* db.run(qs.clearPendingReport({ id: h.id }));
           }),
         )
         .pipe(
           Effect.tap(() =>
             Effect.sync(() => {
-              if (issue) PubSub.publishUnsafe(finishedHub, { id, issues: [issue], outcome });
+              if (issue) tell({ _tag: "RunFinished", id, issues: [issue], outcome });
             }),
           ),
           bestEffort(`vibevalley: run ${id}`),
@@ -323,14 +321,14 @@ export const sessionRegistry = Effect.gen(function* () {
     ...runs,
     start: Effect.fn("Session.startHostedRun")(function* (id, session, issue, trigger) {
       yield* runs.start(id, session, issue, trigger);
-      if (issue) PubSub.publishUnsafe(startedIssuesHub, issue);
+      if (issue) tell({ _tag: "IssueStarted", issue });
     }),
     link: Effect.fn("Session.linkHostedIssue")(function* (run, issue) {
       yield* runs.link(run, issue);
-      PubSub.publishUnsafe(startedIssuesHub, issue);
+      tell({ _tag: "IssueStarted", issue });
     }),
-    finished: (r) => PubSub.publishUnsafe(finishedHub, r),
-    consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
+    finished: (r) => tell({ _tag: "RunFinished", ...r }),
+    consumed: (c) => tell({ _tag: "Consumed", ...c }),
     register: (session, current) => void executions.set(session, current),
   };
   return {
@@ -343,13 +341,9 @@ export const sessionRegistry = Effect.gen(function* () {
     mcpEndpoint,
     trajectories,
     admission,
-    launchesHub,
     newsHub,
+    tell,
     moves,
-    startedIssuesHub,
-    finishedHub,
-    consumedHub,
-    returnedHub,
     signal,
     hands,
     executions,

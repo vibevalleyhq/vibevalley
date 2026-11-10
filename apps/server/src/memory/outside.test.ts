@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Fiber, Layer } from "effect";
+import { Effect, Fiber, Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 
@@ -15,7 +15,7 @@ import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner, session } from "#/base/actor.ts";
+import { user, worker } from "#/base/actor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -36,18 +36,21 @@ afterEach(() => {
   }
 });
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 const bodyOf = (req: IncomingMessage) =>
-  new Promise<unknown>((resolve) => {
+  Effect.callback<unknown, Schema.SchemaError>((resume) => {
     let text = "";
     req.on("data", (c: Buffer) => (text += c.toString("utf8")));
-    req.on("end", () => resolve(text ? JSON.parse(text) : undefined));
+    req.on("end", () => resume(text ? decodeJson(text) : Effect.undefined));
   });
 
-const listen = async (server: Server) => {
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-};
+const listen = (server: Server) =>
+  Effect.callback<string>((resume) => {
+    servers.push(server);
+    server.listen(0, "127.0.0.1", () => resume(Effect.succeed(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)));
+  });
 
 interface NowledgeMemory {
   id: string;
@@ -77,7 +80,7 @@ class FakeNowledge {
     }));
     server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const a = req.params.arguments ?? {};
-      const text = (v: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(v) }] });
+      const text = async (v: unknown) => ({ content: [{ type: "text" as const, text: await Effect.runPromise(encodeJson(v)) }] });
       switch (req.params.name) {
         case "get_memory_by_id": {
           const id = String(a.memory_id);
@@ -113,18 +116,17 @@ class FakeNowledge {
     return server;
   }
 
-  async serve() {
-    const url = await listen(
+  serve() {
+    return listen(
       createServer(
         (req, res) =>
           void (async () => {
             const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
             await this.server().connect(asTransport(transport));
-            await transport.handleRequest(req, res, req.method === "POST" ? await bodyOf(req) : undefined);
+            await transport.handleRequest(req, res, req.method === "POST" ? await Effect.runPromise(bodyOf(req)) : undefined);
           })(),
       ),
-    );
-    return url + "/mcp/";
+    ).pipe(Effect.map((url) => url + "/mcp/"));
   }
 }
 
@@ -143,7 +145,7 @@ class FakeEveros {
       createServer(
         (req, res) =>
           void (async () => {
-            const body = ((await bodyOf(req)) ?? {}) as Record<string, unknown>;
+            const body = ((await Effect.runPromise(bodyOf(req))) ?? {}) as Record<string, unknown>;
             this.requests.push({ path: req.url ?? "", auth: req.headers.authorization ?? "", body });
             res.setHeader("Content-Type", "application/json");
             if (req.url === "/api/v2/memory/search") {
@@ -154,7 +156,7 @@ class FakeEveros {
                         {
                           id: "ep-1",
                           subject: "登录页",
-                          summary: "主人让修登录页，改完了",
+                          summary: "用户让修登录页，改完了",
                           score: 0.7,
                           app_id: body.app_id ?? "default",
                           repo_id: body.repo_id ?? "default",
@@ -174,8 +176,8 @@ class FakeEveros {
                         },
                       ],
                     };
-              res.end(JSON.stringify(this.searchData === undefined ? { request_id: "r1", data } : this.searchData));
-            } else if (req.url === "/api/v2/memory/add" || req.url === "/api/v2/memory/flush") res.end(JSON.stringify({ request_id: "r2", data: {} }));
+              res.end(await Effect.runPromise(encodeJson(this.searchData === undefined ? { request_id: "r1", data } : this.searchData)));
+            } else if (req.url === "/api/v2/memory/add" || req.url === "/api/v2/memory/flush") res.end(`{"request_id":"r2","data":{}}`);
             else res.writeHead(404).end();
           })(),
       ),
@@ -210,10 +212,11 @@ describe("Nowledge Mem", () => {
         { id: "g", title: "", content: "测试 global", labels: nowledgeLabels("lab", "").split(",") },
         { id: "u", title: "", content: "测试 unknown", labels: [] },
       ];
-      yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false, everything: true });
+      yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: false, everything: true });
       const m = yield* Memory;
       const q = { agent: "lab", repo: "demo", text: "测试", kind: "" as const, limit: 10 };
-      const text = foundText(yield* m.search(q), q);
+      const ms = yield* m.search(q);
+      const text = foundText(ms, q);
       expect(text).toContain("测试 repo-a");
       expect(text).toContain("测试 global");
       expect(text).not.toContain("测试 repo-b");
@@ -221,17 +224,18 @@ describe("Nowledge Mem", () => {
       expect(text).toContain("范围");
       expect(fake.details.toSorted()).toEqual(["a", "b", "g", "u"]);
       const all = { ...q, repo: "" };
-      expect(foundText(yield* m.search(all), all)).toContain("测试 unknown");
+      const ms2 = yield* m.search(all);
+      expect(foundText(ms2, all)).toContain("测试 unknown");
     }).pipe(Effect.provide(world())),
   );
 
   it.effect("a run's notes reach Nowledge and come back", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
+      yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: true });
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234", repo: "demo", by: session("w1") });
-      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234", repo: "demo", by: worker("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: worker("w1") });
       yield* until(() => fake.adds.length === 2);
       expect([fake.adds[0]!.content, fake.adds[0]!.labels, fake.adds[0]!.source_app]).toEqual([
         "测试前要 export DEEPSEEK_API_KEY=[redacted]",
@@ -266,15 +270,15 @@ describe("Nowledge Mem", () => {
   it.effect("Nowledge reads everything only when told, and writes only when told", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      fake.memories = [{ id: "own-1", title: "主人的偏好", content: "测试要写成可观察的结果", labels: [] }];
-      const url = yield* Effect.promise(() => fake.serve());
+      fake.memories = [{ id: "own-1", title: "用户的偏好", content: "测试要写成可观察的结果", labels: [] }];
+      const url = yield* fake.serve();
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memory;
       const q = { agent: "lab", repo: "", text: "测试", kind: "" as const, limit: 0 };
       expect((yield* m.search(q)).found).toEqual([]);
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
-      expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
-      yield* m.write({ agent: "lab", text: "不写进去", repo: "", by: owner });
+      expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["用户的偏好：测试要写成可观察的结果"]);
+      yield* m.write({ agent: "lab", text: "不写进去", repo: "", by: user });
       // A write would go out in the background; nothing to wait on shows that none does.
       yield* TestClock.adjust(50);
       expect(fake.adds).toEqual([]);
@@ -283,10 +287,10 @@ describe("Nowledge Mem", () => {
 
   it.effect("a Nowledge that does not answer is skipped", () =>
     Effect.gen(function* () {
-      const url = yield* Effect.promise(() => listen(createServer(() => {})));
+      const url = yield* listen(createServer(() => {}));
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", repo: "demo", by: owner });
+      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", repo: "demo", by: user });
       const recall = yield* Effect.forkChild(m.recall({ agent: "lab", repo: "demo", text: "迁移" }));
       yield* TestClock.adjust(100);
       expect((yield* Fiber.join(recall)).lines).toHaveLength(1);
@@ -296,7 +300,7 @@ describe("Nowledge Mem", () => {
   it.effect("malformed Nowledge responses degrade to no outside memories and can recover", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
+      yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: false });
       const m = yield* Memory;
       const q = { agent: "lab", repo: "", text: "有效", kind: "" as const, limit: 10 };
       fake.searchResult = { results: {} };
@@ -314,8 +318,8 @@ describe("EverOS", () => {
   it.effect("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true });
-      const note = { agent: "lab", text: "记住：苹果", repo: "", by: session("w1") };
+      const source = nowledge({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: false, write: true });
+      const note = { agent: "lab", text: "记住：苹果", repo: "", by: worker("w1") };
       fake.addResult = { title: "已经有了" };
       expect((yield* source.add(note))?.id).toBe("");
       fake.addResult = { id: 42 };
@@ -328,10 +332,11 @@ describe("EverOS", () => {
   it.effect("a repo query asks the farm's repo and global scopes and does not claim cross-repo coverage", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
-      yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
+      yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: false });
       const m = yield* Memory;
       const q = { agent: "lab", repo: "demo", text: "分页", kind: "" as const, limit: 10 };
-      expect(foundText(yield* m.search(q), q)).toContain("给打卡接口加分页");
+      const ms = yield* m.search(q);
+      expect(foundText(ms, q)).toContain("给打卡接口加分页");
       expect(
         fake
           .seen("search")
@@ -342,7 +347,8 @@ describe("EverOS", () => {
         ["vibevalley", everosRepo("demo")],
       ]);
       const all = { ...q, repo: "" };
-      const text = foundText(yield* m.search(all), all);
+      const ms2 = yield* m.search(all);
+      const text = foundText(ms2, all);
       expect(text).toContain("EverOS");
       expect(text).toContain("不支持跨仓库");
       expect(fake.seen("search")).toHaveLength(2);
@@ -352,7 +358,7 @@ describe("EverOS", () => {
   it.effect("malformed EverOS responses degrade to no outside memories and can recover", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
-      yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
+      yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: false });
       const m = yield* Memory;
       const q = { agent: "lab", repo: "demo", text: "分页", kind: "" as const, limit: 10 };
       fake.searchData = { data: { agent_cases: {} } };
@@ -369,7 +375,7 @@ describe("EverOS", () => {
       const fake = new FakeEveros();
       yield* save({
         kind: "everos",
-        url: (yield* Effect.promise(() => fake.serve())) + "/",
+        url: (yield* fake.serve()) + "/",
         enabled: true,
         read: true,
         write: true,
@@ -398,7 +404,7 @@ describe("EverOS", () => {
       expect(adds[0]!.auth).toBe("Bearer ev-key-1234");
       const second = adds[1]!.body.messages as { role: string; content: string }[];
       expect(second.map((x) => x.role)).not.toContain("user");
-      expect(JSON.stringify(second)).toContain("（这一轮没做成）测试没过");
+      expect(second.map((x) => x.content).join("\n")).toContain("（这一轮没做成）测试没过");
       expect(fake.seen("flush")).toEqual([]);
 
       yield* m.endSession({ agent: "lab", session: "w1", repo: "demo" });
@@ -416,7 +422,7 @@ describe("EverOS", () => {
       const asked = fake.seen("search")[0]!.body;
       expect([asked.agent_id, asked.query, asked.user_id]).toEqual(["vibevalley-lab", "分页", undefined]);
       const found = (yield* m.search({ agent: "lab", repo: "demo", text: "登录", kind: "issue", limit: 0 })).found;
-      expect(found.some((f) => f.id === `everos:${everosRepo("demo")}:ep-1` && f.text === "登录页：主人让修登录页，改完了")).toBe(true);
+      expect(found.some((f) => f.id === `everos:${everosRepo("demo")}:ep-1` && f.text === "登录页：用户让修登录页，改完了")).toBe(true);
       expect((yield* m.search({ agent: "", repo: "", text: "登录", kind: "", limit: 0 })).found.some((f) => f.source === "everos")).toBe(false);
       const sources = yield* m.sources;
       expect([sources.length, sources[1]!.label, sources[1]!.canList, sources[1]!.canForget, sources[1]!.transcripts]).toEqual([
@@ -432,9 +438,9 @@ describe("EverOS", () => {
   it.effect("a note outside a run is extracted at once", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
-      yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
+      yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: true });
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: owner });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: user });
       yield* until(() => fake.seen("flush").length === 1);
       const add = fake.seen("add")[0]!;
       expect(add.body.session_id).toBe(fake.seen("flush")[0]!.body.session_id);
@@ -445,7 +451,7 @@ describe("EverOS", () => {
   it.effect("EverOS is told what is left when the farm stops", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
-      const url = yield* Effect.promise(() => fake.serve());
+      const url = yield* fake.serve();
       yield* Effect.gen(function* () {
         yield* save({ kind: "everos", url, enabled: true, read: false, write: true });
         const m = yield* Memory;

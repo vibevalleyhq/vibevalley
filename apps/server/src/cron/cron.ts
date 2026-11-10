@@ -1,15 +1,15 @@
-import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Config, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import type { Actor } from "#/base/actor.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { jsonOrNone } from "#/base/json.ts";
+import { jsonOrNone, jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
@@ -34,7 +34,7 @@ export class Cron extends Context.Service<
     readonly list: () => T.Cron[];
     /** by is who asks, and on whose word (needsOK). */
     readonly add: (req: T.CronRequest, by: Actor) => Effect.Effect<T.Cron, ApiError>;
-    /** Turned on is the owner's yes. */
+    /** Turned on is the user's yes. */
     readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<T.Cron, ApiError>;
     readonly remove: (id: string) => Effect.Effect<T.Cron, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
@@ -43,7 +43,7 @@ export class Cron extends Context.Service<
     /** What comes due from now on, subscribed before it returns. */
     readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
   }
->()("vibevalley/Cron") {
+>()("@vibevalley/server/cron/cron") {
   static readonly layer = Layer.effect(
     Cron,
     Effect.suspend(() => make),
@@ -51,10 +51,11 @@ export class Cron extends Context.Service<
 }
 
 /** $TZ when it names a zone, else the system's. */
-function localZone(): string {
-  const tz = process.env.TZ;
-  return tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
+const localZone = Config.String("TZ").pipe(
+  Config.withDefault(""),
+  Effect.orElseSucceed(() => ""),
+  Effect.map((tz) => (tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone)),
+);
 
 const whenOf = jsonOrNone(S.CronWhen);
 
@@ -74,7 +75,7 @@ const make = Effect.gen(function* () {
 
   for (const row of yield* db.run(q.crons())) {
     const when = whenOf(row.spec);
-    // A cron whose time or owner this code cannot read any more is left out.
+    // A cron whose time or setter this code cannot read any more is left out.
     if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
     const s: T.Cron = {
       id: row.id,
@@ -123,10 +124,10 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      if (!(yield* mailbox.registered(trigger.id))) {
+      if (!(yield* mailbox.isRouted(trigger.id))) {
         const issue = yield* issues.scheduled(due, trigger);
         yield* mailbox.subscribe(issue.id, [thread]);
-        yield* mailbox.receive(trigger);
+        yield* mailbox.receive({ _tag: "Trigger", trigger });
       } else {
         const issue = yield* mailbox.ownerOf(trigger.id);
         if (issue) yield* mailbox.subscribe(issue, [thread]);
@@ -181,8 +182,8 @@ const make = Effect.gen(function* () {
       const at = now();
       const problem = cronProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
-      // A channel as the owner names it (general, #general) as well as by id.
-      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(ownerId, req.channel);
+      // A channel as the user names it (general, #general) as well as by id.
+      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(userId, req.channel);
       const channel = (yield* chat.channels()).find((c) => c.id === want);
       if (!channel) return yield* Effect.fail(refused(t("server.cron.noChannel", { name: want }), [lookIn.channel]));
       const named = (req.agent ?? "").trim();
@@ -191,7 +192,7 @@ const make = Effect.gen(function* () {
       if (named && !agent) return yield* Effect.fail(refused(t("server.cron.noProfile", { name: req.agent ?? "" }), [lookIn.agent]));
       const repo = (req.repo ?? "").trim();
       if (agent && !repo && !channel.repo) return yield* Effect.fail(refused(t("server.cron.noRepo", { channel: channel.name })));
-      const tz = req.tz ?? localZone();
+      const tz = req.tz ?? (yield* localZone);
       const pending = needsOK(req, by);
       const s: T.Cron = {
         id: newId(),
@@ -209,26 +210,28 @@ const make = Effect.gen(function* () {
         pending,
       };
       yield* db.run(
-        q.addCron({
-          id: s.id,
-          name: s.name,
-          body: s.text,
-          channel_id: s.channel,
-          agent: s.agent ?? null,
-          repo: s.repo ?? null,
-          spec: JSON.stringify(s.when),
-          tz,
-          set_by: by.kind,
-          pending,
-          created_at: at,
-        }),
+        Effect.flatMap(jsonText(s.when), (spec) =>
+          q.addCron({
+            id: s.id,
+            name: s.name,
+            body: s.text,
+            channel_id: s.channel,
+            agent: s.agent ?? null,
+            repo: s.repo ?? null,
+            spec,
+            tz,
+            set_by: by.kind,
+            pending,
+            created_at: at,
+          }),
+        ),
       );
       yield* core.apply({ type: "cronChanged", cron: s });
       return s;
     }, lock.withPermits(1)),
     setEnabled: Effect.fn("Cron.setEnabled")(function* (id, enabled) {
       const was = yield* find(id);
-      // Turned on is the owner's yes (only the owner may: cron.update); the queries clear pending the same way.
+      // Turned on is the user's yes (only the user may: cron.update); the queries clear pending the same way.
       let s: T.Cron = { ...was, enabled, pending: was.pending && !enabled };
       // Switched back on: it counts from now, not from runs it skipped while off.
       if (enabled && !was.enabled && was.when.kind !== "once") {

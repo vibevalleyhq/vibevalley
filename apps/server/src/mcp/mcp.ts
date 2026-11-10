@@ -6,7 +6,7 @@ import { Context, Effect, FiberSet, Layer } from "effect";
 import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { coerceArguments } from "@vibevalley/ai/tools";
 
-import { session } from "#/base/actor.ts";
+import { worker } from "#/base/actor.ts";
 import { messageOf } from "#/base/errors.ts";
 import { redact, redactedHead } from "#/base/redact.ts";
 import { ServerConfig } from "#/infra/config.ts";
@@ -21,7 +21,7 @@ export class Mcp extends Context.Service<
   {
     readonly handle: (request: Request) => Effect.Effect<Response>;
   }
->()("vibevalley/Mcp") {
+>()("@vibevalley/server/mcp/mcp") {
   static readonly layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));
 }
 
@@ -43,7 +43,7 @@ const make = (options: McpOptions = {}) =>
 
     const callerOf = (id: string): Caller => {
       const h = sessions.sessionOf(id);
-      return { agent: h?.agent ?? "", session: id, repo: h?.repo ?? "", here: "", picked: "", envelope: "", actor: session(id) };
+      return { agent: h?.agent ?? "", session: id, repo: h?.repo ?? "", here: "", picked: "", envelope: "", actor: worker(id) };
     };
 
     const call = async (tool: LoopTool, args: unknown, token: string): Promise<ReturnType<typeof text> & { isError?: boolean }> => {

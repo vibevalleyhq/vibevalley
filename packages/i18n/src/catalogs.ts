@@ -44,7 +44,7 @@ export const catalogs = {
         reviewComment: "验收的话",
         statusComment: "一起说的话：再来一轮时说要改什么",
         title: "新的标题",
-        wantsOwner: "只看在等主人的，等得最久的在前",
+        wantsUser: "只看在等你的，等得最久的在前",
         issueWatch: "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr",
         tier: "PARA 分层",
         marker: "待办标记",
@@ -77,7 +77,7 @@ export const catalogs = {
           pageSave: "新建一页笔记，或更新同名页的分层与大纲",
         },
         agent: { list: "列出档案：id、名字、角色、农机", create: "新建一份档案", delete: "删掉一份档案" },
-        artifact: { list: "列出稿子（--issue 只看一张工单的）", show: "看一篇稿子：标题、版本、归属", read: "读一篇稿子的正文" },
+        artifact: { list: "列出 Artifact（--issue 只看一张工单的）", show: "看一篇 Artifact：标题、版本、归属", read: "读一篇 Artifact 的正文" },
         channel: { list: "列出频道和私聊", messageList: "列出一个频道最近的消息", messageSearch: "在全部频道里搜消息", messageSend: "在频道里发一条消息" },
         cron: { list: "列出定时任务", create: "新建定时任务：--every、--daily、--cron、--at 给一个", delete: "删掉一个定时任务", edit: "开或关一个定时任务" },
         issue: {
@@ -98,6 +98,12 @@ export const catalogs = {
         runtime: { list: "列出农机：装没装、版本", refresh: "重新探测一台农机：装了新的或升了版本以后" },
         session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", stop: "停下帮工这一轮" },
         chat: "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
+        auth: {
+          about: "登录到别处的服务端，像 gh auth login：在页面上点同意，这台电脑就拿到自己的钥匙",
+          login: "登录到一个服务端：显示确认码，等你在已登录的页面上同意，钥匙存在家目录的 auth.json",
+          status: "现在连哪个服务端、用的是哪台设备的钥匙",
+          logout: "退出：服务端收回这台电脑的钥匙，本机忘掉它",
+        },
       },
       next: {
         help: "看这条命令怎么写",
@@ -116,6 +122,29 @@ export const catalogs = {
         chatFlag: "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的",
       },
       op: {
+        user: {
+          approval: {
+            create: "请求登录这台设备：拿到确认码，等你在页面上同意",
+            collect: "取回同意后的钥匙；还在等时什么都不给",
+            list: "列出等着你同意的登录请求",
+            answer: "同意或拒绝一个登录请求",
+          },
+          get: "看用户叫什么、设没设密码、这个请求是从哪台设备来的",
+          update: "改用户的名字",
+          password: { set: "设密码（只能在跑着 VibeValley 的那台电脑上）" },
+          login: "用密码登录，给这台设备一把钥匙",
+          logout: "退出：收回这台设备的钥匙",
+          device: { list: "列出用户的设备：配对来的和登录来的", delete: "收回一台设备的钥匙", previewDelete: "试收回一台设备：说会怎样，不真收回" },
+        },
+        attachment: { create: "上传一个文件，给消息带上或放进素材库" },
+        library: {
+          item: {
+            list: "列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛",
+            add: "把文件放进素材库：你上传好的附件，或助手、帮工给的网址或工作目录里的文件",
+            delete: "从素材库拿掉一个文件（发过它的消息仍能打开）",
+            previewDelete: "试拿掉：说会怎样，不真拿掉",
+          },
+        },
         agent: {
           create: "新建一份档案",
           delete: "删掉一份档案",
@@ -134,34 +163,33 @@ export const catalogs = {
         },
         artifact: {
           block: {
-            create: "在稿子里插一块",
-            delete: "删掉稿子里的一块和它的子块",
-            list: "按顺序列出稿子现有的每一块",
+            create: "在 Artifact 里插一块",
+            delete: "删掉 Artifact 里的一块和它的子块",
+            list: "按顺序列出 Artifact 现有的每一块",
             previewDelete: "试删一块：说会删掉什么，不真删",
             update: "改一块的字、类型或属性",
           },
-          content: { get: "读稿子的正文：网页的一版，或块写成的 Markdown" },
-          create: "新建稿子：空的一篇来一起写，或交上来一稿",
-          delete: "删掉一篇稿子",
-          demo: "开演示：几个帮工一起写一篇稿子，不花模型的钱",
-          get: "看一篇稿子",
-          html: { edit: "在网页稿子里换掉一段字，成为新的一版" },
-          list: "列出某个频道或工单的稿子，不指定就是全部",
-          markdown: { get: "把一起写的稿子读成 Markdown" },
-          previewDelete: "试删一篇稿子：说会删掉什么，不真删",
-          submit: "以主人的身份交一批块的操作，按顺序一次做完",
+          content: { get: "读 Artifact 的正文：网页的一版，或块写成的 Markdown" },
+          create: "新建 Artifact：空的一篇来一起写，或交上来一稿",
+          delete: "删掉一篇 Artifact",
+          demo: "开演示：几个帮工一起写一篇 Artifact，不花模型的钱",
+          get: "看一篇 Artifact",
+          html: { edit: "在网页 Artifact 里换掉一段字，成为新的一版" },
+          list: "列出某个频道或工单的 Artifact，不指定就是全部",
+          markdown: { get: "把一起写的 Artifact 读成 Markdown" },
+          previewDelete: "试删一篇 Artifact：说会删掉什么，不真删",
+          submit: "以你的身份交一批块的操作，按顺序一次做完",
           suggestion: {
             accept: "接受一条改写建议",
-            create: "对主人写的一块提改写建议",
-            list: "列出稿子上的改写建议，没答的和答过的",
+            create: "对你写的一块提改写建议",
+            list: "列出 Artifact 上的改写建议，没答的和答过的",
             reject: "拒绝一条改写建议",
           },
-          update: "给稿子改标题",
-          version: { create: "给网页稿子交新的一版，旧的留着" },
+          update: "给 Artifact 改标题",
+          version: { create: "给网页 Artifact 交新的一版，旧的留着" },
         },
         channel: {
           archive: { set: "归档一个频道或取回来，消息留着" },
-          attachment: { create: "上传一个附件，给消息带上" },
           create: "新建一个频道",
           default: { set: "设成默认频道：没指名的话都到这里" },
           delete: "删掉一个频道，连同它的串和消息",
@@ -175,9 +203,9 @@ export const catalogs = {
             previewDelete: "试删一条消息：说会删掉什么，不真删",
             search: "搜消息",
             send: "在频道或串里发一条消息",
-            update: "改主人自己发的一条消息，不再通知谁",
+            update: "改你自己发的一条消息，不再通知谁",
           },
-          notify: { set: "设一个频道的提醒：全部、只在 @主人 时、不提醒" },
+          notify: { set: "设一个频道的提醒：全部、只在有人 @你 时、不提醒" },
           pin: { list: "列出频道里钉住的消息，新钉的在前", set: "钉住一条消息，或取消钉住" },
           previewDelete: "试删一个频道：说会删掉什么，不真删",
           reaction: { set: "给一条消息加上表情，或撤回" },
@@ -220,9 +248,7 @@ export const catalogs = {
           conversation: { get: "工单讨论串的位置" },
         },
         lan: {
-          device: { delete: "移除一台配对过的设备", previewDelete: "试移除一台设备：说会怎样，不真移除" },
-          get: "看「连接到本机」开没开、有哪些设备",
-          me: { get: "发这个请求的设备是哪台" },
+          get: "看「连接到本机」开没开、地址和配对码",
           pair: "用配对码把这台设备配上",
           pairing: { answer: "放行或拒绝来配对的设备", previewStop: "试停配对：说会怎样，不真停", start: "开始配对，给出配对码", stop: "停止配对" },
           update: "打开或关上「连接到本机」",
@@ -236,10 +262,10 @@ export const catalogs = {
           search: "按字搜记性，不指定档案就搜全部",
         },
         orchestrator: {
-          archive: { get: "读管家压掉的一份对话原文", list: "列出或搜管家压掉的对话原文" },
-          eval: { create: "把管家做错的一轮存成评测样例，写上该怎么做" },
-          open: "让管家上线，可以说话了",
-          stop: "停下管家这一轮，派出去的帮工接着干",
+          archive: { get: "读助手压掉的一份对话原文", list: "列出或搜助手压掉的对话原文" },
+          eval: { create: "把助手做错的一轮存成评测样例，写上该怎么做" },
+          open: "让助手上线，可以说话了",
+          stop: "停下助手这一轮，派出去的帮工接着干",
         },
         pkm: {
           block: { apply: "对一页按顺序施加块的操作，一次写回" },
@@ -276,14 +302,15 @@ export const catalogs = {
         session: { event: { list: "读一个帮工的轨迹，从早到晚" }, get: "看一个帮工", list: "列出帮工，可以只看一份档案的", stop: "停下帮工这一轮，帮工还在" },
         media: {
           understanding: {
-            authorize: "登记不可变理解请求，只授权指定频道的管家执行一次",
-            start: "管家按已授权任务编号执行理解，不接受新的输入或授权声明",
+            authorize: "登记不可变理解请求，只授权指定频道的助手执行一次",
+            start: "助手按已授权任务编号执行理解，不接受新的输入或授权声明",
             create: "确认账号和上传许可后理解选中的本机输入",
             cleanup: "清理已知远端文件，不重复理解请求",
             previewCleanup: "预览远端清理和本机保留释放，不改变任何文件",
           },
           input: {
             create: "为媒体输入预留有限的本机空间，不上传给供应商",
+            adopt: "把素材库里的一个文件拿来当媒体输入，照上传一样检查",
             get: "查看本机的媒体输入",
             list: "列出本机的媒体输入",
             delete: "删除没有被任务保留的本机媒体输入",
@@ -324,7 +351,7 @@ export const catalogs = {
           update: "改一个技能",
         },
         voice: {
-          call: { hear: "交上通话里主人说的一句", say: "交上通话里管家说出的话", start: "开始和管家通话", stop: "挂断通话" },
+          call: { hear: "交上通话里你说的一句", say: "交上通话里助手说出的话", start: "开始和助手通话", stop: "挂断通话" },
           dictate: "听写：把一段录音转成字",
           grant: { create: "拿通话用的声网令牌", renew: "给通话换新的声网令牌" },
           hear: "交上正在通的那通电话里听到的一句",
@@ -333,7 +360,7 @@ export const catalogs = {
       },
       group: {
         agent: { about: "档案：派活时指给谁" },
-        artifact: { about: "稿子：一起写的，和交上来的网页" },
+        artifact: { about: "Artifact：一起写的，和交上来的网页" },
         channel: { about: "频道和私聊，和里面的消息", message: { about: "频道里的消息：读、发、搜" } },
         connector: { about: "连接器：把微信、飞书、QQ 接到频道" },
         cron: { about: "定时任务" },
@@ -342,7 +369,7 @@ export const catalogs = {
         issue: { about: "工单：写、改、挪状态、评论、验收" },
         lan: { about: "连接到本机：开关、配对、设备" },
         memory: { about: "档案的记性" },
-        orchestrator: { about: "管家：上线、停下、旧账、评测" },
+        orchestrator: { about: "助手：上线、停下、旧账、评测" },
         pkm: { about: "笔记：记一句、搜、雷达、日记和页", page: { about: "笔记的页：列出、看大纲、导出、改原文" }, journal: { about: "日记：一天一页" } },
         repo: { about: "仓库：工作目录下的 git 仓库" },
         runtime: { about: "农机：机器上的编码 agent" },
@@ -356,7 +383,7 @@ export const catalogs = {
         unreachable: "农场 {base} 连不上，后面几项没查",
         noRuntime: "一个农机也没装：帮工没有能干活的",
         installRuntime: "装一个编码 agent（Claude Code、Codex……），装好以后让农场再找一遍",
-        noModelKey: "没有 DeepSeek 的 key：管家和自己的 agent 起不来",
+        noModelKey: "没有 DeepSeek 的 key：助手和自己的 agent 起不来",
         setModelKey: "在「设置 › 模型」里填 DeepSeek 的 key",
         lanSettings: "看「设置 › 设备」",
         wrong: "这几项不对：{checks}",
@@ -374,7 +401,7 @@ export const catalogs = {
       },
       arg: {
         agent: "档案：id 或名字",
-        artifact: "稿子的 id",
+        artifact: "Artifact 的 id",
         channel: "频道：名字（general 或 #general）或 id",
         cron: "定时任务的 id",
         cronName: "定时任务的名字",
@@ -386,7 +413,7 @@ export const catalogs = {
         appPath: "桌面版里的一页，比如 /issues/12；不填是首页",
         capture: "要记的话；不给就读标准输入",
         comment: "评论的话",
-        cronText: "到点时说的话：交给管家或档案去做的事",
+        cronText: "到点时说的话：交给助手或档案去做的事",
         memory: "要记的一条",
         memoryId: "记性的 id，memory list 列出",
         message: "消息的话",
@@ -397,12 +424,13 @@ export const catalogs = {
         updateStep: "check 去查有没有新版本，install 装上并重启；不填只说现在的样子",
         pageTitle: "页的标题",
         agentName: "档案的名字",
+        authServer: "服务端的地址（https://farm.example.com）；不给就用 --server",
       },
       channel: { sent: "发到了 {channel}" },
       cron: { when: "什么时候跑：--every、--daily、--cron、--at 正好给一个", deleted: "删掉了定时任务 {cron}", edited: "改好了定时任务 {cron}" },
       example: {
         agentList: { about: "看有哪些档案能派活" },
-        artifactList: { about: "一张工单的稿子" },
+        artifactList: { about: "一张工单的 Artifact" },
         artifactShow: { about: "看 a1 是哪篇、第几版" },
         channelList: { about: "看有哪些频道" },
         cronList: { about: "看有哪些定时任务" },
@@ -431,7 +459,7 @@ export const catalogs = {
         channelMessageList: { about: "读 #general 最近十条" },
         channelMessageSearch: { run: "vibevalley channel message search 端口", about: "Find “端口” in every channel" },
         channelMessageSend: { run: "vibevalley channel message send general '@w3 先看看登录页'", about: "在 #general 里叫 w3 先看看登录页" },
-        cronCreate: { run: "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00", about: "每天早上九点让管家看看昨天的改动" },
+        cronCreate: { run: "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00", about: "每天早上九点让助手看看昨天的改动" },
         cronDelete: { about: "先试删，看会删掉什么" },
         cronEdit: { about: "先关掉 c1" },
         issueCreate: { run: "vibevalley issue create 修登录页 --repo web --agent docs --criterion '过期后回到登录页'", about: "写一张工单，交给 docs" },
@@ -441,7 +469,7 @@ export const catalogs = {
         issueReviewPass: { about: "12 号验收通过" },
         issueStatus: { about: "派 12 号出去（或再来一轮）" },
         issueTimeline: { about: "12 号的时间线和花费" },
-        issueWantsOwner: { about: "在等主人的工单，等得最久的在前" },
+        issueWantsUser: { about: "在等你的工单，等得最久的在前" },
         issueWatch: { about: "跟着 12 号，等它交回来或完了再看，最多等十分钟" },
         memoryCreate: { run: "vibevalley memory create docs 端口用 8797", about: "让 docs 记住端口用 8797" },
         memoryDelete: { about: "先试删 docs 的 m1" },
@@ -459,6 +487,9 @@ export const catalogs = {
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
         agentDelete: { about: "先试删，看会删掉什么" },
         issueObserve: { about: "以 JSONL 跟随工单执行" },
+        authLogin: { about: "登录到那个服务端，之后的命令都连它" },
+        authStatus: { about: "看登录到了哪里" },
+        authLogout: { about: "退出，回到这台电脑上的服务端" },
       },
       issue: {
         can: "能做：",
@@ -489,12 +520,23 @@ export const catalogs = {
         about: "以当前帮工会话交活、提交 PR 或读取上下文",
         failed: "帮工接入失败：检查会话凭证、服务连接和操作授权",
         report:
-          "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需主人明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
-        pr: "提交当前会话的 PR，须获主人明确授权。JSON 可选 summary 字符串。",
+          "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需用户明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
+        pr: "提交当前会话的 PR，须获用户明确授权。JSON 可选 summary 字符串。",
         context: "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
         read: "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
         doctor: "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
         json: "工具输入的 JSON 对象；参数格式见本命令说明。",
+      },
+      auth: {
+        here: "{server} 是这台电脑上的服务端：命令行直接就能用，不用登录",
+        approve: "在浏览器里打开 {link}\n确认码 {code}：页面上的码一样就点同意。等你同意……",
+        noBrowser: "没能打开浏览器：自己打开上面的链接",
+        signedIn: "已登录 {server}，这台电脑在设备列表里叫「{device}」",
+        notSignedIn: "没有登录：命令连的是 {server}",
+        revoked: "{server} 收回了这台电脑的钥匙：重新运行 vibevalley auth login",
+        status: "已登录 {server}，以「{device}」的身份；你叫「{name}」",
+        signedOut: "已退出 {server}",
+        logoutUnsaid: "没能让服务端收回钥匙（{why}）：本机已经忘掉它，到设备页上收回它",
       },
     },
     desktop: {
@@ -552,12 +594,12 @@ export const catalogs = {
       noCamera: "没有相机的权限：到系统设置里打开，或者粘贴链接",
       stopScan: "不扫了",
       title: "连进 VibeValley",
-      intro: "在跑 VibeValley 的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。",
+      intro: "在跑 VibeValley 的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要有人在那台电脑上点头。",
       scan: "扫二维码",
       paste: "或者粘贴配对链接",
       name: "这台手机叫",
-      waiting: "等那台电脑上的主人点头……",
-      ask: "请主人放行",
+      waiting: "等那台电脑上点头……",
+      ask: "请求放行",
       cancel: "取消配对",
       agora: "声网：{what}失败（{code}）",
       agoraLost: "声网：连接失败（{reason}）",
@@ -577,11 +619,12 @@ export const catalogs = {
         template: "列出模板，找它的 id",
         cron: "列出定时任务，找它的 id",
         device: "看连着的设备，找它的 id",
-        archive: "列出管家的旧账",
+        archive: "列出助手的旧账",
         channel: "列出频道，找它的 id",
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
-        artifact: "列出稿子，找它的 id",
+        artifact: "列出 Artifact，找它的 id",
+        library: "列出素材库，找它的 id",
         pkm: "列出笔记页，找它的名字",
       },
       repoRef: "仓库 {id}",
@@ -604,11 +647,12 @@ export const catalogs = {
         deleteKept: "删掉模板「{name}」：从它装的 {installed} 份档案留着",
       },
       notSaved: "没存下来：{file} 写不进去（{why}）",
-      orchestratorStays: "默认管家删不了：至少要有一个管家",
-      defaultStaysOrchestrator: "默认管家只能是管家：至少要有一个管家",
+      builtInSkill: "「{name}」是 VibeValley 自带的技能，跟着 VibeValley 更新，不能在这里改或删；要换一种做法，新建一个你自己的技能",
+      orchestratorStays: "默认助手删不了：至少要有一个助手",
+      defaultStaysOrchestrator: "默认助手只能是助手：至少要有一个助手",
       noAgent: "没有 {id} 这个档案",
       noSkill: "没有 {id} 这个技能",
-      orchestratorRuntime: "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
+      orchestratorRuntime: "助手只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
       newAgentId: "新档案的 id 要留空；指定 id 请用保存",
       newSkillId: "新技能的 id 要留空；指定 id 请用保存",
       removeAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
@@ -622,13 +666,13 @@ export const catalogs = {
       effortsAnd: "、",
     },
     "server.artifact": {
-      noTitle: "稿子要有个标题",
+      noTitle: "Artifact 要有个标题",
       longTitle: "标题太长了，最多 {max} 个字",
-      badKind: "认不得 {kind} 这种稿子，只认 {kinds}",
-      empty: "稿子是空的",
+      badKind: "认不得 {kind} 这种 Artifact，只认 {kinds}",
+      displayHtmlOnly: "只有网页 Artifact 能选怎么看（page、slides、motion）；一起写的没有这一项",
+      empty: "Artifact 是空的",
       tooBig: "一稿最多 {mb} MB",
-      notKept: "稿子没存下来：{why}",
-      missing: "没有 {id} 这份稿子",
+      missing: "没有 {id} 这份 Artifact",
       noVersion: "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
       noFile: "「{title}」第 {version} 稿的内容不见了",
       made: "做了「{title}」",
@@ -641,7 +685,7 @@ export const catalogs = {
         removeChildren: "连同 {n} 个子块",
         removeBlocks: "删掉「{title}」和它的 {n} 块",
       },
-      untitled: "没起名的稿子",
+      untitled: "没起名的 Artifact",
       noBatch: "这批改动没有 batchId",
       demoNotInserted: "演示的块没插进去：{status}",
       noWriter: "没有能写的帮工：先在档案里打开一个",
@@ -658,7 +702,7 @@ export const catalogs = {
         beyond: "建议对着第 {rev} 版，可这一块现在才第 {now} 版",
         missing: "没有建议 {id}",
         stale: "这一块从第 {rev} 版起改过了，现在是第 {now} 版；建议作废，让它重看再提",
-        suggested: "主人写过的块不直接改，已经提了建议〔{id}〕，等主人接受",
+        suggested: "用户写过的块不直接改，已经提了建议〔{id}〕，等用户接受",
       },
       op: {
         deleted: "这一块已经删掉了",
@@ -682,29 +726,29 @@ export const catalogs = {
           heading: "背景 · 演示",
           paragraphs: {
             "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
-            "1": "现在稿子按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
-            "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
+            "1": "现在 Artifact 按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
+            "2": "这篇演示就是想让你亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
           },
         },
         "1": {
           heading: "做法 · 演示",
           paragraphs: {
             "0": "（演示）每个帮工先在自己那一节的末尾插一个空段落，然后每隔一秒左右把这一段整段换新，看起来就是一段话在慢慢长长。",
-            "1": "所有改动都走和主人一样的 op 管线：插入是 insert_block，长字是 update_text，带着上一版的版本号，服务端按顺序一批一批收下。",
-            "2": "如果主人在帮工正写着的那一段里改了字，帮工那一下就会冲突、写不进去；它不抢这一段，接着去写下一段。",
+            "1": "所有改动都走和你一样的 op 管线：插入是 insert_block，长字是 update_text，带着上一版的版本号，服务端按顺序一批一批收下。",
+            "2": "如果你在帮工正写着的那一段里改了字，帮工那一下就会冲突、写不进去；它不抢这一段，接着去写下一段。",
           },
         },
         "2": {
           heading: "下一步 · 演示",
           paragraphs: {
-            "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
-            "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
-            "2": "演示到这里就结束了。这篇稿子留着也行，删掉也行，它不会影响任何工单和记性。",
+            "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，你这边马上就能看到。",
+            "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等你点头；写完的一节在大纲里标成写完待看。",
+            "2": "演示到这里就结束了。这篇 Artifact 留着也行，删掉也行，它不会影响任何工单和记性。",
           },
         },
       },
       badBlockType: "块的类型只能是 {types}",
-      otherArtifact: "这批改动（{batch}）是另一份稿子的",
+      otherArtifact: "这批改动（{batch}）是另一份 Artifact 的",
       notBlocks: "「{title}」是一整页网页，不按块改：交新的一稿",
       notHtml: "「{title}」是一起写的，不交新的一稿：一块一块改（artifact_block_create、artifact_block_update）",
       check: {
@@ -727,9 +771,10 @@ export const catalogs = {
         many: "「{words}」在页面里有 {n} 处，分不清是哪一处：多选几个字再改，或者交给帮工改",
         crosses: "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
         stale: "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
-        note: "主人在页面上改了：「{old}」→「{new}」",
+        note: "用户在页面上改了：「{old}」→「{new}」",
       },
     },
+    "server.attachment": { noAttachment: "没有 {id} 这个附件：先上传，再带着它说话", emptyFile: "这个文件是空的", fileTooBig: "文件太大了：至多 {mb} MB" },
     "server.base": {
       noFile: "{path}: 没有这个文件",
       notPort: "{path}: {name} 不是端口：{port}",
@@ -739,11 +784,11 @@ export const catalogs = {
       requestKeyLong: "requestKey 太长（最多 {max} 个字符）",
     },
     "server.channel": {
-      name: { owner: "主人", orchestrator: "管家" },
-      mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
+      name: { user: "用户", orchestrator: "助手" },
+      mention: { orchestrator: "@助手", user: "@用户", everyone: "@所有人" },
       channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
       channelTaken: "已经有叫 {name} 的频道了",
-      hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
+      hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等用户说一句再接着叫人。",
       breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
       dispatch: {
         draft: "看代码，起草这张工单",
@@ -759,7 +804,7 @@ export const catalogs = {
       channelGone: "找不到这个频道",
       noHelper: "没有 {id} 这个帮工",
       noChannel: "没有 {id} 这个频道",
-      notOrchestrator: "{id} 不是管家的档案：频道只能交给管家照看",
+      notOrchestrator: "{id} 不是助手的档案：频道只能交给助手照看",
       noMessageId: "没有 {id} 这条消息",
       threadOnlyTitle: "串只能改标题",
       defaultStays: "默认频道不能归档、不能删：先把别的频道设成默认",
@@ -770,19 +815,16 @@ export const catalogs = {
       connectorsThere: "接着连接器",
       queuedThere: "还有 {n} 张工单排着队要在这里开工",
       issuesThere: "这里派过 {n} 张工单的活",
-      noAttachment: "没有 {id} 这个附件：先上传，再带着它说话",
       messageGone: "这条消息已经删了",
       notYours: "只能改你自己说的话",
       badEmoji: "回应是一个表情或一个短词，不带空格",
       threadOnlyInChannel: "串只开在频道里的消息下面",
-      emptyFile: "这个文件是空的",
       deletes: "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
       deletesDeliveries: "还没交出去的 {n} 份不再送",
       defaultIsChannel: "默认频道只能是一个频道，不能是私聊或串",
       noDirect: "{target}：你和对方之间没有私聊",
       noChannelNamed: "没有叫 #{name} 的频道。有：{tags}",
       absent: "{who} 不在场，没送到",
-      fileTooBig: "文件太大了：至多 {mb} MB",
       noProfileNamed: "没有叫 {key} 的档案",
       talkFailed: "没有接上这个会话：{why}",
       profileDisabled: "{name}已停用",
@@ -814,7 +856,7 @@ export const catalogs = {
       disconnected: "断开了",
       noConnector: "没有 {id} 这个连接",
       noChannel: "没有叫 {name} 的频道",
-      line: { orchestrator: "管家", dispatch: "派活", thread: "在工单串里", head: "【{who}】", headWhat: "【{who} · {what}】" },
+      line: { orchestrator: "助手", dispatch: "派活", thread: "在工单串里", head: "【{who}】", headWhat: "【{who} · {what}】" },
       feishu: {
         register: "飞书注册：{why}",
         registerTimeout: "飞书注册：超时了",
@@ -866,7 +908,7 @@ export const catalogs = {
         cron: "cron {expr}",
         weekly: "每周{days} {time}",
       },
-      next: { never: "不会再到点", pending: "等主人同意", done: "做过了", off: "关着" },
+      next: { never: "不会再到点", pending: "等你同意", done: "做过了", off: "关着" },
       expr: {
         fields: { "0": "分钟", "1": "小时", "2": "日", "3": "月", "4": "周几" },
         badField: "cron 的{name}写错了：{field}",
@@ -895,7 +937,7 @@ export const catalogs = {
       reached: { starter: "新手任务做完了", secret: "发现一个彩蛋", gold: "升到金牌", silver: "升到银牌", unlocked: "解锁成就" },
     },
     "server.inbox": {
-      orchestrator: "管家",
+      orchestrator: "助手",
       conflictFiles: "{files} 个文件和主分支冲突",
       item: {
         review: { label: "等你看", title: "{who} 做完了", tray: "{who} 做完了，等你看" },
@@ -905,7 +947,7 @@ export const catalogs = {
         conflict: { label: "合不进去", title: "{who} 的活合进主分支会冲突", tray: "{who} 的活会冲突" },
         quiet: { label: "好久没动静", title: "{who} 好一阵没动静了", body: "可能在跑很久的命令，也可能卡住了：看看它的轨迹。", tray: "{who} 好一阵没动静" },
         mention: { label: "找你", title: "{who} 叫你" },
-        "cron-ask": { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「{text}」：同意了才开始", tray: "定时任务「{text}」等你同意" },
+        "cron-ask": { label: "定时任务等你同意", title: "助手想定一个定时任务", body: "「{text}」：同意了才开始", tray: "定时任务「{text}」等你同意" },
       },
     },
     "server.issue": {
@@ -939,7 +981,7 @@ export const catalogs = {
       notStarted: "这张工单还没开工",
       started: "这张工单已经开工了",
       noTitle: "工单没有标题",
-      orchestratorNotHelper: "管家不当帮工：派给一个帮工",
+      orchestratorNotHelper: "助手不当帮工：派给一个帮工",
       disabled: "{name} 被停用了",
       cannotSend: "{name} 派不出去：{why}",
       noRepo: "没说在哪个仓库里做：仓库是工作目录下的一个文件夹",
@@ -968,11 +1010,11 @@ export const catalogs = {
       cannotMoveRepo: "工单 #{n} 还不能换仓库：{why}",
       cannotDelete: "工单 #{n} 还不能删：{why}",
       noConflict: "{name} 和主分支没有冲突",
-      orchestratorAnswers: "这是派给管家的工单：管家答完就关",
+      orchestratorAnswers: "这是派给助手的工单：助手答完就关",
       nothingToAccept: "还没交回来，没有东西可验收",
       failNeedsFindings: "没过验收要说哪里不行：至少写一条意见",
       does: {
-        toOrchestrator: "{n} 交给管家答",
+        toOrchestrator: "{n} 交给助手答",
         sendTo: "{n} 派给 {agent}",
         noRoom: "现在没空位（{full}）：排进待办，有空位就自动开工",
         startIn: "{n} 派 {agent} 去 {repo} 开工",
@@ -980,7 +1022,7 @@ export const catalogs = {
         unqueue: "{n} 不排了，挪回备选",
         leaves: "{helper} 收工，分支留着",
         takesOver: "{taker} 接手，在同一条分支上接着做",
-        orchestratorRound: "{n} 再交给管家答一轮：{said}",
+        orchestratorRound: "{n} 再交给助手答一轮：{said}",
         round: "把这句话带给 {helper}，再干一轮：{said}",
         thisTime: "这一次要做的：{said}",
         revive: "{n} 挪回备选",
@@ -1059,7 +1101,7 @@ export const catalogs = {
       merge: { tellFailed: "\n给帮工带话失败：{why}", merged: "{name} 的活合进去了：{text}" },
       refinement: {
         noDrafter: "没有能派的帮工来起草",
-        orchestrator: "这是派给管家的工单：管家自己会看",
+        orchestrator: "这是派给助手的工单：助手自己会看",
         onlyBacklog: "只有备选里的工单能起草：先挪回备选",
         drafting: "{name} 正在起草：等它交回来",
         unread: "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
@@ -1077,7 +1119,7 @@ export const catalogs = {
         files: "可能涉及：",
       },
       noProfileNamed: "没有叫 {key} 的档案",
-      prSubmitNotAllowed: "这张工单没有主人明确授予的自行提交 PR 权限",
+      prSubmitNotAllowed: "这张工单没有用户明确授予的自行提交 PR 权限",
       prSubmitNotCurrent: "只有当前处理这张工单的帮工能提交 PR",
       prSubmitUnavailable: "这张工单的仓库没有启用 PR 交付",
       deliveryNeedsPr: "请先交付一个有效的 PR/MR，再验收完成",
@@ -1086,10 +1128,8 @@ export const catalogs = {
       confirmedRequirements: "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}",
     },
     "server.lan": {
-      aDevice: "一台设备",
-      noDevice: "没有 {id} 这台设备",
       notUp: "VibeValley 还没起来",
-      unpaired: "这台设备没配对，或者已经被主人移除了：回那台电脑上扫码配对",
+      unpaired: "这台设备没配对，或者它的钥匙已经被收回了：回那台电脑上扫码配对",
       notRemote: "连进来的设备不能做这个：只能在跑着 VibeValley 的那台电脑上做",
       badGateway: "转不过去",
       cannotOpen: "连接开不起来：{why}",
@@ -1099,15 +1139,27 @@ export const catalogs = {
       closedThere: "那台电脑没允许连接：回那台电脑的「连接到本机」打开它",
       codeExpired: "配对码过期了：回那台电脑上换一个码",
       wrongCode: "配对码不对",
-      anotherAsking: "另一台设备正在等主人点头：等一会儿再试",
-      ownerLate: "主人没来得及点头，配对码过期了：回那台电脑上换一个码",
-      denied: "主人没让这台设备进来",
+      anotherAsking: "另一台设备正在等点头：等一会儿再试",
+      userLate: "那台电脑上没来得及点头，配对码过期了：回那台电脑上换一个码",
+      denied: "那台电脑上没让这台设备进来",
       noCode: "没有在配对的码：什么都不会动",
       dropCode: "收起配对码 {code}",
       dropAsking: "正在等你点头的「{name}」连不进来",
-      forget: "忘掉设备「{name}」：它的钥匙作废，要再连得重新配对",
-      cut: "断开它连着的 {n} 条连接",
-      local: "这里就是跑着 VibeValley 的本机，不是连进来的设备",
+    },
+    "server.library": {
+      noItem: "素材库里没有 {id}",
+      oneSource: "给且只给一样：附件（attachment）、网址（url）或工作目录里的文件（path）",
+      agentAttachment: "附件是用户上传的；帮工和助手放东西进素材库，给网址（url）或工作目录里的文件（path）",
+      userFetch: "你放进素材库的是上传好的附件（attachment）；从网址或文件拿东西进来，交给助手或帮工",
+      badUrl: "{url} 不是一个公网的 https 地址：素材库只从公网的 https 地址下载",
+      notFetched: "没能从 {url} 下载：{why}",
+      slow: "下载超过 60 秒还没完，放弃了",
+      tooBig: "文件超过 {mb} MB，素材库放不下",
+      noPlace: "你没有工作目录：给一个网址（url）",
+      outside: "{path} 不在你的工作目录里：只能放工作目录里的文件",
+      notFile: "{path} 不是工作目录里的一个文件",
+      unreadable: "读不了 {path}：{why}",
+      preview: { remove: "从素材库拿掉「{name}」；发过它的消息仍能打开它" },
     },
     "server.mailbox": {
       notOwned: "这条输入不归当前会话处理，不能退回",
@@ -1121,7 +1173,6 @@ export const catalogs = {
       speechUnknown: "没有收到完整的语音合成结果，供应商可能仍在处理或计费，没有重复提交。",
       speechRejected: "MOSS 拒绝了语音合成请求，请检查账号权限与输入后再创建新任务。",
       inputDeletePreview: "删除「{name}」的本机输入预留及未完成的上传。",
-      inputDeleteBytes: "没有其他输入保留这份本机文件时，删除文件。",
       remoteAccountChanged: "这份远端文件属于另一条连接或凭据，没有用替换后的账号发送请求。",
       remoteUploadUnknown: "远端上传结果尚未确认，或这次上传已结束，不会再次提交；供应商处可能仍有文件。",
       remoteUploadRejected: "MOSS 拒绝了这次文件上传，没有自动重试。",
@@ -1135,7 +1186,7 @@ export const catalogs = {
       understandingRejected: "MOSS 拒绝了理解请求，没有重复提交。",
       remoteUnresolved: "部分上传没有取得文件 ID。已知文件已清理，请在供应商后台核对这些文件名：{files}",
       understandingPhase: {
-        authorized: "等待管家执行",
+        authorized: "等待助手执行",
         queued: "排队中",
         uploading: "上传到 MOSS",
         generating: "理解中",
@@ -1160,7 +1211,7 @@ export const catalogs = {
       inputChanged: "已保存的输入不能换成另一份内容，请创建新的输入。",
       inputTimeout: "上传到本机已超时，不完整的文件已删除，没有向供应商发起请求。",
       inputDisconnected: "上传到本机已中断，不完整的文件已删除，没有向供应商发起请求。",
-      ownerRequired: "需要主人的委托才能提交生成，管家不会在自主巡查中发起可能计费的请求。",
+      userRequired: "需要用户的委托才能提交生成，助手不会在自主巡查中发起可能计费的请求。",
       invalid: "生图参数无效，请检查提示词、布局、尺寸和高级参数。",
       missing: "找不到这次生成任务。",
       corrupt: "生成任务记录无法读取，请保留本机数据后检查。",
@@ -1196,6 +1247,7 @@ export const catalogs = {
         canceled: "已取消等待",
         download_failed: "下载失败",
       },
+      imageMade: "画好了：{prompt}",
     },
     "server.memory": {
       source: { local: "本地", nowledge: "Nowledge Mem", everos: "EverOS" },
@@ -1220,10 +1272,10 @@ export const catalogs = {
       forget: "从 {agent} 的记性里忘掉：「{text}」",
     },
     "server.orchestrator": {
-      label: "管家",
+      label: "助手",
       noKey: "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。",
       cannotStart: "我这边起不来：{why}",
-      onlyDeepseek: "管家只接 DeepSeek 的模型：管家档案的模型设成 deepseek/<模型> 或直接写模型名，{configured} 用不了",
+      onlyDeepseek: "助手只接 DeepSeek 的模型：助手档案的模型设成 deepseek/<模型> 或直接写模型名，{configured} 用不了",
     },
     "server.pkm": {
       noPage: "没有「{page}」这一页",
@@ -1348,7 +1400,7 @@ export const catalogs = {
       "publish.refused": "分支发布被拒绝：{detail}",
       "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
       "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
-      "publish.ownerOnly": "只有本机主人可以发布已有分支",
+      "publish.userOnly": "只有本机的用户可以发布已有分支",
       "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。",
     },
     "server.runtime": {
@@ -1416,11 +1468,11 @@ export const catalogs = {
         repo: "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件",
       },
       notTaken: {
-        conflictOwner: "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
+        conflictUser: "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
         conflictNotice: "{name} 的分支合进 {base} 会冲突（{files}），先没合。可以让它自己把冲突解决掉",
         conflictShort: "合进 {base} 会冲突：{files}",
         checkFix: "{reason}\n请修好检查，再交回来。",
-        owner: "没合进去：{why}。{name} 还在",
+        user: "没合进去：{why}。{name} 还在",
         notice: "{name} 的活没合进去：{why}",
         checkShort: "仓库检查没通过",
       },
@@ -1429,7 +1481,7 @@ export const catalogs = {
         image: "[图片]",
         exitedNotice: "{name} 的 {why}",
         staleRun: "上一轮停在了半路，太久了，没有接着做",
-        stoppedByOwner: "主人叫停了",
+        stoppedByUser: "你叫停了",
         folded: "整理对话，{usage}",
         clipped: "… 省略 {n} 个字 …",
         quiet: "已经 {span}没动静了{last}。可能在跑很久的命令，也可能卡住了",
@@ -1518,13 +1570,15 @@ export const catalogs = {
         url: "大模型的地址要是 http(s) 开头的完整地址，比如 https://api.openai.com/v1/chat/completions",
         voiceId: "音色不能空着：选一个或填 MiniMax 的音色 id",
         microsoft: "微软合成要填区域和音色名",
-        persona: "管家的人设不能空着",
+        persona: "助手的人设不能空着",
       },
       defaults: { failureMessage: "我这边卡了一下，你再说一遍？" },
       notSaved: "存不进 {file}：{why}",
     },
     "server.tool": {
       labels: {
+        library_item_list: "素材库",
+        library_item_add: "放进素材库",
         media_image_create: "提交生图",
         media_understanding_start: "执行已授权理解",
         media_speech_create: "生成单人语音",
@@ -1558,11 +1612,24 @@ export const catalogs = {
         search_archive: "翻旧账",
         memory_search: "翻记性",
         memory_create: "替帮工记",
-        artifact_block_create: "往稿子里加一块",
-        artifact_block_update: "改稿子的一块",
-        artifact_block_delete: "删稿子的一块",
+        artifact_block_create: "往 Artifact 里加一块",
+        artifact_block_update: "改 Artifact 的一块",
+        artifact_block_delete: "删 Artifact 的一块",
       },
       about: "{label}：{about}",
+    },
+    "server.user": {
+      aDevice: "一台设备",
+      noDevice: "没有 {id} 这台设备",
+      passwordHere: "密码只能在跑着 VibeValley 的那台电脑上设",
+      passwordShort: "密码至少要 {n} 个字",
+      noPassword: "还没设密码：先在跑着 VibeValley 的那台电脑上设一个",
+      locked: "密码错了太多次：{s} 秒后再试",
+      wrongPassword: "密码不对",
+      notADevice: "这里就是跑着 VibeValley 的本机，没有要退出的设备",
+      revoke: "收回设备「{name}」的钥匙：它要再连得重新配对或登录",
+      requestsBusy: "已经有好几台设备在等你同意了：过几分钟再试",
+      requestGone: "这个登录请求没了：过期了、被拒了，或者已经用过了；重新运行 vibevalley auth login",
     },
     "server.voice": {
       misheard: "嗯？我没听清，你再说一遍？",
@@ -1570,7 +1637,7 @@ export const catalogs = {
       unknown: "{what}用的 {vendor} 服务端还不会用",
       part: { asr: "识别", llm: "大模型", tts: "合成" },
       noAsrKey: "微软识别还没有 key：在声音页的「识别」里填",
-      noLine: "管家的语音线路没接通",
+      noLine: "助手的语音线路没接通",
       noDeepseekKey: "用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填",
       noLlmKey: "自己的大模型还没有 key：在声音页的「想」里填",
       noTtsKey: "微软合成还没有 key：在声音页的「说」里填",
@@ -1589,9 +1656,9 @@ export const catalogs = {
       stopped: "语音服务已经停下",
       grantGone: "这通电话的语音凭据已经失效，请重新接通",
       connecting: "这通电话已经在接通",
-      lineFailed: "管家的语音线路接不通：{why}",
-      joinFailed: "请管家进频道失败：{why}",
-      leaveFailed: "请管家离开失败：{why}",
+      lineFailed: "助手的语音线路接不通：{why}",
+      joinFailed: "请助手进频道失败：{why}",
+      leaveFailed: "请助手离开失败：{why}",
       manyCalls: "有几通电话正在接通，请升级客户端后重试",
       noCall: "没有正在接通的电话",
       dictation: {
@@ -1726,18 +1793,18 @@ export const catalogs = {
       tab: { who: "身份", runtime: "能力", persona: "人设", skills: "技能", tools: "工具", env: "环境", memory: "记性" },
       tabs: "档案的",
       name: "名字",
-      nameTip: "管家和字幕里都叫这个名字，说话时也可以直接点名。",
+      nameTip: "助手和字幕里都叫这个名字，说话时也可以直接点名。",
       nameTaken: "已经有同名的 agent 了",
       duty: "职责",
-      dutyTip: "一句话。管家挑人时会读。",
+      dutyTip: "一句话。助手挑人时会读。",
       roleHint: "比如：写接口、改 server、跑 Go 测试",
       tags: "适合的活",
-      tagsTip: "用户的话里出现这些词，管家选「自动」时就优先派它。回车添加。",
+      tagsTip: "用户的话里出现这些词，助手选「自动」时就优先派它。回车添加。",
       tagsHint: "前端、测试、文档…",
       enabled: "启用",
-      enabledHint: "停用后管家不会派它，名字点到也会拒绝。",
+      enabledHint: "停用后助手不会派它，名字点到也会拒绝。",
       workdir: "默认仓库",
-      workdirTip: "工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说仓库时用它；留空时派活必须说在哪个仓库。",
+      workdirTip: "工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
       worktree: "每个帮工一个 git worktree",
       worktreeHint: "每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
@@ -1791,13 +1858,13 @@ export const catalogs = {
       ownMcpTip: "农机自己报告的，和上面加的叠在一起。",
       unreported: "这台农机 不报告这一项。",
       none: "没有。",
-      role: { orchestrator: "管家", worker: "帮工" },
+      role: { orchestrator: "助手", worker: "帮工" },
       templates: {
         title: "模板",
         intro:
           "每个模板是一份 agent 的配方：角色、职责、人设、推荐的农机和长相。装一份就多一份档案，同一个模板能装好几份；装好的随便改，模板出了新版本，档案页会提示更新。",
         open: "从模板装",
-        openLine: "管家和帮工的配方，挑着装",
+        openLine: "助手和帮工的配方，挑着装",
         folder: "模板文件夹",
         folderHint: "本机上一个模板文件夹的路径（里面有 agent.json）",
         add: "加进来",
@@ -1808,6 +1875,8 @@ export const catalogs = {
         noPersona: "没写人设。",
         installed: "装了 {n} 份",
         addedHere: " · 本机加进来的",
+        skills: "带着技能：{skills}",
+        skill: "技能「{name}」：{description}",
         look: "看看",
         fold: "收起",
         removeSure: "真的删掉模板",
@@ -1819,24 +1888,24 @@ export const catalogs = {
         updated: "照模板更新好了",
       },
       orchestrator: {
-        newName: "新的管家",
+        newName: "新的助手",
         intro:
-          "管家常驻、带队、自己不干活：听你说要做什么，派帮工去做，盯着进度，转告结果。它跑在 VibeValley 自己的 agent 上，有自己的私聊、记性和轨迹；把频道交给它照看，在那个频道里说话就是它回答。",
+          "助手常驻、带队、自己不干活：听你说要做什么，派帮工去做，盯着进度，转告结果。它跑在 VibeValley 自己的 agent 上，有自己的私聊、记性和轨迹；把频道交给它照看，在那个频道里说话就是它回答。",
         page: "它的记性和轨迹 →",
         nameTip: "频道里叫这个名字；别人用 @它的档案 id 叫它。",
         model: "模型",
         modelTip: "DeepSeek 的模型，留空用默认的。",
         modelHint: "deepseek-v4-flash",
         dutyTip: "一句话：它专管什么。",
-        personaTip: "它是谁、怎么说话、专管什么，接在管家的提示后面。",
+        personaTip: "它是谁、怎么说话、专管什么，接在助手的提示后面。",
         personaHint: "你专管 clock-in 这个仓库，先看测试再派活……",
         look: "长相",
       },
       list: {
-        orchestrators: "管家",
+        orchestrators: "助手",
         helpers: "帮工",
         make: "捏一个新帮工",
-        makeOrchestrator: "添一个管家",
+        makeOrchestrator: "添一个助手",
         orchestratorLine: "不当帮工：派活、盯进度、转告结果。",
         ledger: "旧账",
         voice: "声音",
@@ -1854,7 +1923,7 @@ export const catalogs = {
       noEffortModel: "{model}没有推理强度可选。",
     },
     "web.artifact": {
-      place: { label: "稿子", hint: "你和帮工、管家留下要看的东西：一起写的稿子、交上来的网页，都在这里" },
+      place: { label: "Artifact", hint: "你和帮工、助手留下要看的东西：一起写的 Artifact、交上来的网页，都在这里" },
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
       page: {
         by: "{name} 做的",
@@ -1864,21 +1933,21 @@ export const catalogs = {
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
-        gone: "这份稿子已经删掉了，或者没有这份稿子。",
+        gone: "这份 Artifact 已经删掉了，或者没有这份 Artifact。",
         frame: "「{title}」第 {version} 稿",
-        list: "全部稿子",
+        list: "全部 Artifact",
         new: "新建",
-        none: "还没有稿子：写个标题新建一篇，或者让帮工交一份上来。",
-        all: "全部稿子",
+        none: "还没有 Artifact：写个标题新建一篇，或者让帮工交一份上来。",
+        all: "全部 Artifact",
         forIssue: "为 #{number} 做的",
-        untitled: "没起名的稿子",
+        untitled: "没起名的 Artifact",
         find: "按标题找",
         nothingFound: "没有标题对得上的",
         title: "标题",
         more: "更多",
         copyLink: "复制链接",
         copied: "链接复制好了",
-        group: { delivered: "帮工和管家交的", mine: "我写的" },
+        group: { delivered: "帮工和助手交的", mine: "我写的" },
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
@@ -1893,7 +1962,7 @@ export const catalogs = {
         sentVersion: "回复了第 {version} 稿",
         none: "还没在对话里说过：自己写的这篇，还没交给谁看。",
       },
-      issue: { title: "稿子" },
+      issue: { title: "Artifact" },
       blocks: {
         memoryItem: "记性",
         saving: "在存……",
@@ -1902,7 +1971,7 @@ export const catalogs = {
         helpersWriting: "帮工在写",
         demo: "演示：几个帮工一起写",
         append: "在末尾写一段",
-        owner: "主人",
+        user: "你",
         done: "做完了",
         notDone: "没做完",
         writing: "{who} 在写",
@@ -1917,7 +1986,7 @@ export const catalogs = {
         image: "图片：{alt} {src}",
         start: "从这里开始写……",
       },
-      canvas: { label: "打开的稿子", close: "关掉", openPage: "在稿子页打开", quote: "带话" },
+      canvas: { label: "打开的 Artifact", close: "关掉", openPage: "在 Artifact 页打开", quote: "带话" },
       suggestions: {
         title: "建议（{n}）",
         by: "{name} 提的",
@@ -1945,7 +2014,7 @@ export const catalogs = {
         attrLanguage: "语言",
         attrs: "改属性：{attrs}",
       },
-      body: { blocks: "一起写的", html: "网页" },
+      body: { blocks: "一起写的", html: "网页", slides: "幻灯片", motion: "动画" },
       edit: {
         title: "改字",
         hint: "选中页面里的字，就能在右边直接改掉它",
@@ -1954,11 +2023,33 @@ export const catalogs = {
         save: "存成新的一稿",
         saved: "存成了第 {version} 稿",
       },
+      slides: {
+        previous: "上一页",
+        next: "下一页",
+        at: "{at} / {pages}",
+        present: "全屏放映",
+        presenter: "演讲者视图",
+        pdf: "存成 PDF",
+        thumbnails: "每一页",
+        slide: "第 {at} 页 {title}",
+      },
+      presenter: {
+        title: "演讲者视图：{title}",
+        missing: "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
+        current: "这一页",
+        next: "下一页",
+        end: "这是最后一页",
+        notes: "备注",
+        noNotes: "这一页没有备注",
+        clock: "讲了多久",
+        restart: "重新计时",
+        aside: "下一页和备注",
+      },
     },
     "web.audio": {
       title: "音频工作台",
       notice:
-        "请求可能产生费用。取消只停止本机等待，不代表厂商停止计费。结果未知时不会自动重新提交。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅主人可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
+        "请求可能产生费用。取消只停止本机等待，不代表厂商停止计费。结果未知时不会自动重新提交。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅你可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
       configure: "请先在 AI 服务中配置这项用途。",
       refresh: "刷新账号与配置",
       account: "音色账号",
@@ -2003,7 +2094,7 @@ export const catalogs = {
       executionStreaming: "流式文字与说话人",
       partialTitle: "部分转写",
       partialTranscript: "部分转写——并非完整结果。",
-      savePartialTranscript: "将部分转写保存为稿子",
+      savePartialTranscript: "将部分转写保存为 Artifact",
       downloadPartialTranscript: "下载部分转写",
       usageAudioSeconds: "输入音频：{value} 秒",
       input: "音频文件",
@@ -2012,8 +2103,8 @@ export const catalogs = {
       timeline: "说话人时间轴",
       seek: "定位到 {time}",
       noTimestamps: "厂商没有返回带时间戳的分段。",
-      saveTranscript: "将转写保存为稿子",
-      openTranscript: "打开已保存的转写稿子",
+      saveTranscript: "将转写保存为 Artifact",
+      openTranscript: "打开已保存的转写 Artifact",
       downloadTranscript: "下载转写",
       downloadAudio: "下载音频",
       history: "音频任务",
@@ -2066,7 +2157,7 @@ export const catalogs = {
       place: {
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
-        agents: { label: "档案", hint: "档案：管家和帮工" },
+        agents: { label: "档案", hint: "档案：助手和帮工" },
         runtimes: { label: "农机", hint: "机器上的编码 agent" },
         repos: { label: "仓库", hint: "每个仓库一座岛" },
         catalog: { label: "图鉴", hint: "素材：农场用的每张图、每个指针、每个声音，和工作台的界面零件" },
@@ -2082,8 +2173,8 @@ export const catalogs = {
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
       toasts: "提示",
       runtime: "运行工具：{name}",
-      owner: "主",
-      orchestrator: "管家",
+      user: "你",
+      orchestrator: "助手",
       unreachable: "暂时连不上服务端，请等它恢复后重试。",
       query: { invalidResponse: "返回的数据格式不符，已有的有效结果已保留。" },
       table: {
@@ -2155,7 +2246,16 @@ export const catalogs = {
       lightbox: { label: "看图", prev: "上一张", next: "下一张", original: "打开原图", close: "关上" },
       shortcuts: {
         title: "快捷键",
-        place: { everywhere: "到处", composer: "输入框", lists: "菜单和名单", issues: "工单", pictures: "看图", farm: "农场", desktop: "桌面版（系统全局）" },
+        place: {
+          everywhere: "到处",
+          composer: "输入框",
+          lists: "菜单和名单",
+          issues: "工单",
+          pictures: "看图",
+          library: "素材库",
+          farm: "农场",
+          desktop: "桌面版（系统全局）",
+        },
         say: {
           switcher: "跳到频道、串、私聊",
           sheet: "打开这张表",
@@ -2172,9 +2272,12 @@ export const catalogs = {
           names: "按住写出院子里每样东西的名字",
           farmMenu: "放下农具，或打开菜单",
           debug: "调试台",
-          voice: "跟管家说话（在设置里能换）",
-          command: "命令：记工单、让管家记住、叫停、私聊",
+          voice: "跟助手说话（在设置里能换）",
+          command: "命令：记工单、让助手记住、叫停、私聊",
           newIssue: "新工单",
+          libraryMove: "在素材之间挪",
+          libraryLook: "全屏看选中的图",
+          libraryRemove: "从库里拿掉选中的",
         },
       },
       rich: {
@@ -2256,13 +2359,13 @@ export const catalogs = {
       tab: { chat: "聊天", issues: "工单", crons: "定时任务" },
       defaultRepo: "默认仓库 {repo}",
       channels: "频道列表",
-      defaultHint: "默认的频道：你、管家和帮工都在这儿",
+      defaultHint: "默认的频道：你、助手和帮工都在这儿",
       findHint: "在这个频道里找…",
       find: "在这个频道里找",
       findMessages: "找消息",
       settings: "频道设置",
       inChannel: "频道里的",
-      empty: "{label} 还没人说话：跟管家说一件要做的事。",
+      empty: "{label} 还没人说话：跟助手说一件要做的事。",
       sendTo: "发送消息至 {label}",
       side: "频道和帮工",
       channelsTitle: "频道",
@@ -2271,7 +2374,7 @@ export const catalogs = {
       helpers: "帮工",
       noHelpers: "没有在场的帮工",
       mood: { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" },
-      orchestrator: "管家",
+      orchestrator: "助手",
       nobodyOnIt: "现在没有帮工在干，串还留着",
       replies: "{n} 条回复",
       thread: "串",
@@ -2289,16 +2392,16 @@ export const catalogs = {
         descriptionHint: "这个频道是做什么的？",
         repo: "默认仓库（可不填）",
         repoHint: "在这个频道里派活、没说仓库时，就在这个仓库里干",
-        repoNone: "空着就没有：派活时管家要问在哪个仓库",
+        repoNone: "空着就没有：派活时助手要问在哪个仓库",
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
-      issues: { empty: "这个频道里还没有工单。在聊天里跟管家说一件要做的事，它会派帮工，工单就列在这里。", thread: "工单串" },
+      issues: { empty: "这个频道里还没有工单。在聊天里跟助手说一件要做的事，它会派帮工，工单就列在这里。", thread: "工单串" },
       crons: {
-        empty: "还没有定时任务：跟管家说「每天九点跑一遍测试」。",
+        empty: "还没有定时任务：跟助手说「每天九点跑一遍测试」。",
         next: "下次 {next}",
         direct: "直接派 {agent}",
-        byOrchestrator: "管家定的",
+        byOrchestrator: "助手定的",
         label: "定时任务「{name}」",
         on: "开着",
         off: "关着",
@@ -2322,7 +2425,7 @@ export const catalogs = {
         typing: "正在输入…",
         foldDispatch: "收起派活",
         unfoldDispatch: "展开派活",
-        owner: "主人",
+        user: "你",
         dispatch: "派活",
         spent: "这一轮花了 {spent}",
         unread: "{n} 条新",
@@ -2361,13 +2464,13 @@ export const catalogs = {
         editHint: "回车存下 · Esc 不改了",
       },
       pins: { open: "置顶的消息", title: "置顶", none: "这里还没有置顶的消息", failed: "置顶没读到：{why}" },
-      members: { open: "成员", title: "成员", owner: "主人", none: "这里还没有帮工", looksAfter: "照看这里的管家" },
+      members: { open: "成员", title: "成员", user: "你", none: "这里还没有帮工", inChannel: "频道里的助手" },
       composer: {
         notSent: "没发出去：{why}",
         who: "叫谁",
-        mention: "@ 叫人",
-        stop: "叫停管家",
-        stopHint: "叫管家停下这一轮，派出去的帮工照常干活",
+        mention: "叫人",
+        stop: "叫停助手",
+        stopHint: "叫助手停下这一轮，派出去的帮工照常干活",
         send: "发送",
         sendHint: "回车发送 · Shift+回车换行",
         replying: "回复 {name}",
@@ -2376,16 +2479,17 @@ export const catalogs = {
         cancelReply: "不回复了",
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
+        command: "命令",
       },
       manage: {
         name: "名称",
         category: "分组（可不填）",
         categoryHint: "侧栏里按分组列频道",
-        orchestrator: "照看的管家",
-        orchestratorHint: "你在这个频道里说话、没 @ 别人时，是它回答",
+        members: "频道里的助手",
+        membersHint: "在频道里的助手能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
         notify: "提醒",
         notifyAll: "全部",
-        notifyMentions: "只在 @主人 时",
+        notifyMentions: "只在有人 @你 时",
         notifyNone: "不提醒",
         notifyHint: "不提醒的不算未读、不进 Inbox、不转到微信",
         archive: "归档",
@@ -2424,7 +2528,7 @@ export const catalogs = {
         open: "全部搜索",
         title: "全部搜索",
         hint: "找消息…",
-        filters: "from:主人  in:#频道  has:file / image / link  before: / after:2026-10-01",
+        filters: "from:用户  in:#频道  has:file / image / link  before: / after:2026-10-01",
         none: "没有找到",
         searching: "在找…",
         failed: "没搜成：{why}",
@@ -2443,18 +2547,26 @@ export const catalogs = {
         issueThread: "工单串",
         talkThread: "{who}的串",
         thread: "串",
-        mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
+        mention: { orchestrator: "@助手", user: "@用户", everyone: "@所有人" },
         orchestratorNote: "派活、拆计划、问进度",
         everyone: "所有人",
         everyoneNote: "叫醒在场的每个帮工",
       },
       threadWidth: "串的宽窄（拖动，双击回默认）",
       commands: {
-        issue: { name: "记一张工单", note: "/issue 标题：记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
-        remember: { name: "让管家记住", note: "/remember 一句话：记进照看这里的管家的记性", needs: "/remember 后面写要它记住的话" },
-        stop: { name: "叫停管家", note: "照看这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
-        dm: { name: "私聊", note: "/dm 名字：打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
-        done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了" },
+        issue: { name: "记一张工单", args: "标题", note: "记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
+        remember: { name: "让助手记住", args: "一句话", note: "记进这里助手的记性", needs: "/remember 后面写要它记住的话" },
+        stop: { name: "叫停助手", args: "", note: "这里的助手停下这一轮，派出去的帮工照常干活", needs: "" },
+        dm: { name: "私聊", args: "名字", note: "打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
+        imagegen: {
+          name: "生图",
+          args: "描述",
+          note: "交给这里的助手用 MOSS 画一张，画好发回这里",
+          needs: "/imagegen 后面写想要的画面",
+          nowhere: "先打开一个频道再生图",
+          notReady: "生图还没设置好：{why}，回车去设置",
+        },
+        done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了", imagegen: "交给助手了，画好会发到这里" },
       },
     },
     "web.connector": {
@@ -2470,16 +2582,16 @@ export const catalogs = {
           },
           feishu: {
             "0": "扫码后，飞书会替你建一个只属于你的机器人应用，不用去开放平台手动配。",
-            "1": "建好后在飞书里找到这个机器人，私聊它发配对码：发了码的人就是主人，只有主人的话进得来。只收私聊，群里的不收。",
+            "1": "建好后在飞书里找到这个机器人，私聊它发配对码：发了码的人就当作是你，只有这个人的话进得来。只收私聊，群里的不收。",
             "2": "飞书的机器人可以随时给你发消息，汇报不用等你先说话。",
           },
           qq: {
             "0": "QQ 没有扫码建机器人：先在 QQ 开放平台（q.qq.com）建一个机器人，打开「单聊」消息，把 AppID 和 AppSecret 填在这里。",
-            "1": "用你自己的 QQ 加这个机器人，私聊它发配对码：发了码的人就是主人。只收私聊。",
+            "1": "用你自己的 QQ 加这个机器人，私聊它发配对码：发了码的人就当作是你。只收私聊。",
             "2": "QQ 只让机器人在你说话后的一小段时间里回复。过了时间的汇报先攒着，隔一会儿再试，你下次说一句就一起发过来。",
           },
         },
-        always: "帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。VibeValley 只往外连，不开端口。",
+        always: "帮工能在这台电脑上跑命令，所以只认你；回复时引用某条汇报，你的话会进那件活的工单串。VibeValley 只往外连，不开端口。",
         state: {
           off: "没连接",
           waiting: "等你扫码",
@@ -2490,15 +2602,15 @@ export const catalogs = {
           paused: "暂停中",
         },
         list: "连接器列表",
-        intro: "在聊天软件里和管家说话：派活、问进度、收汇报。",
+        intro: "在聊天软件里和助手说话：派活、问进度、收汇报。",
         know: "要知道的",
         disconnect: "断开",
-        weixinIntro: "用手机微信扫一个码，就能在微信里和管家说话：派活、问进度，帮工的汇报和提问也会发到微信上。",
-        feishuIntro: "用手机飞书扫一个码，飞书会替你建一个机器人；在飞书里和它说话，就是和管家说话。",
+        weixinIntro: "用手机微信扫一个码，就能在微信里和助手说话：派活、问进度，帮工的汇报和提问也会发到微信上。",
+        feishuIntro: "用手机飞书扫一个码，飞书会替你建一个机器人；在飞书里和它说话，就是和助手说话。",
         scan: "{app}扫码登录",
         pairing: "机器人连上了。最后一步：用你自己的{app}，私聊这个机器人，发：",
-        pairingNote: "发了这个码的人就是主人：以后只有这个人的话进得来。码只能用一次。",
-        owner: "主人",
+        pairingNote: "发了这个码的人就当作是你：以后只有这个人的话进得来。码只能用一次。",
+        user: "你",
         channel: "接在",
         since: "连上的时间",
         lastInbound: "上次收到你的话",
@@ -2528,7 +2640,7 @@ export const catalogs = {
       reading: "在读……",
       unread: "读不到。",
       notNow: "先不收",
-      orchestrator: "管家",
+      orchestrator: "助手",
       plotOf: "{name}的地",
       plot: {
         unread: "这块地的工单还没读到。",
@@ -2637,8 +2749,8 @@ export const catalogs = {
         jobHint: "要做什么，做到什么程度算完",
         job: "工单",
         who: "谁来种",
-        orchestratorPicks: "管家挑",
-        how: "开始：管家把这句话交给帮工，在 {repo} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
+        orchestratorPicks: "助手挑",
+        how: "开始：助手把这句话交给帮工，在 {repo} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
         draft: "草稿",
         start: "开始",
       },
@@ -2673,19 +2785,19 @@ export const catalogs = {
         warehouse: "仓库",
         graphs: "任务与成就",
         log: "农场日志",
-        orchestrator: "管家和宠物",
+        orchestrator: "助手和宠物",
         harvest: "收获{name}的地",
         sow: "播种 · 第 {plot} 块地",
         water: "给{name}浇水",
         menu: "菜单",
-        pickLook: "挑一个你喜欢的管家，农场和对话里马上换上。",
+        pickLook: "挑一个你喜欢的助手，农场和对话里马上换上。",
         drawing: "还在画……",
         pets: "宠物",
         shopItems: {
           scarecrow: { name: "稻草人", note: "吓跑乌鸦，好看" },
           seeds: { name: "新种子包", note: "常用工单模板" },
           bunting: { name: "彩旗", note: "挂在篱笆上" },
-          doghouse: { name: "狗窝", note: "给管家的狗" },
+          doghouse: { name: "狗窝", note: "给助手的狗" },
         },
         shopClosed: "商店还在装修，下一版开张。现在有 {coins} 金币，先攒着。",
       },
@@ -2704,7 +2816,7 @@ export const catalogs = {
         issues: "工单",
         yard: "院子里能点的",
       },
-      log: { empty: "还没有事。开工以后，你和管家说的话、谁做完了什么，都记在这里。", you: "你", said: "说", answered: "答", spent: "这一轮花了 {spent}" },
+      log: { empty: "还没有事。开工以后，你和助手说的话、谁做完了什么，都记在这里。", you: "你", said: "说", answered: "答", spent: "这一轮花了 {spent}" },
       conflictTag: "冲突",
       binary: "二进制",
       chat: {
@@ -2725,13 +2837,13 @@ export const catalogs = {
         deleted: "这条消息已删除",
         suggestions: { "0": "让阿郑做字幕面板", "1": "让小吴跑测试", "2": "进度怎么样？", "3": "大家收工" },
         greeting:
-          "这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
+          "这里是田头，你、助手和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
         phase: {
           off: "打字或者按麦克风，就开工",
-          connecting: "正在接通管家…",
-          listening: "管家在听",
-          thinking: "管家在想…",
-          speaking: "管家在说",
+          connecting: "正在接通助手…",
+          listening: "助手在听",
+          thinking: "助手在想…",
+          speaking: "助手在说",
           error: "没接通，再试一次",
         },
         newIn: "{n} 处有新话",
@@ -2764,7 +2876,7 @@ export const catalogs = {
         pageAndSchedules: "频道页和定时任务",
         settingsLink: "设置",
         back2: "返回",
-        newChannelLine: "一件长期的事、一个仓库，单独一个地方说话、派活。在这里叫管家，活就派在这里。",
+        newChannelLine: "一件长期的事、一个仓库，单独一个地方说话、派活。在这里叫助手，活就派在这里。",
         nameHint: "名字，比如 clock-in",
         name: "频道名",
         descriptionHint: "做什么的（可以不填）",
@@ -2780,11 +2892,11 @@ export const catalogs = {
         anyone: "不指定帮工",
         inThread: "在串里说，{name}会看到…",
         inThreadAnyone: "在串里说…",
-        toOrchestrator: "对管家说，@ 叫帮工…",
-        toOrchestratorAlone: "只对管家说…",
+        toOrchestrator: "对助手说，@ 叫帮工…",
+        toOrchestratorAlone: "只对助手说…",
         who: "叫谁",
-        stop: "叫管家停下",
-        stopHint: "叫管家停下这一轮，派出去的帮工照常干活",
+        stop: "叫助手停下",
+        stopHint: "叫助手停下这一轮，派出去的帮工照常干活",
         send: "发送",
         less: "收起",
         more: "展开阅读",
@@ -2831,7 +2943,7 @@ export const catalogs = {
       page: { lost: "连不上农场，重连中……（server 开着吗？）", waiting: "在等农场……" },
       hud: {
         label: "农场的 HUD",
-        look: "换管家的样子",
+        look: "换助手的样子",
         workbenchHint: "工单、聊天……管活的页面",
         workbench: "工作台",
         treeHint: "记忆树：农场学会了什么",
@@ -2898,7 +3010,7 @@ export const catalogs = {
         log: { hint: "说过的话和收成，按时间倒着排" },
         taskBoard: { hint: "一件长活拆成几步，交给几个帮工" },
         agents: { hint: "每个帮工用哪台农机、带什么人设和技能、长什么样" },
-        manager: { hint: "跟管家说话" },
+        manager: { hint: "跟助手说话" },
         runtimes: { label: "工坊 · 农具", hint: "每台农机是一种 runtime：装没装、用量" },
         skills: { label: "书屋 · 技能书", hint: "帮工能带的技能" },
       },
@@ -2955,7 +3067,7 @@ export const catalogs = {
       homeless: "不在哪个仓库里：",
       sea: "工作目录下还没有仓库，地图上还是一片海。",
       notDrafted: "先没起草：{why}",
-      sowIntro: "种在 {repo}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
+      sowIntro: "种在 {repo}：写一句要做的事，助手派帮工来干；或者先写成待办，看过再开工。",
       job: "要做的事",
       jobExample: "比如：登录页加一个「记住我」",
       todo: "先写成待办",
@@ -2985,7 +3097,7 @@ export const catalogs = {
       ringing: "来电…",
       decline: "挂断",
       answer: "接听",
-      callOrchestrator: "打给管家",
+      callOrchestrator: "打给助手",
       missed: "未接 {n}",
       log: "记录",
       noCalls: "还没有通话。",
@@ -2994,13 +3106,13 @@ export const catalogs = {
       noMissed: "没有未接来电。地里都好好的。",
       phase: {
         connecting: "正在接通……",
-        live: "通话中：说吧，管家在听",
-        coming: "通话中：管家在路上",
+        live: "通话中：说吧，助手在听",
+        coming: "通话中：助手在路上",
         ending: "挂断中……",
         failed: "没接通：{why}",
-        idle: "有事直接说，工单交回来、卡住了，管家也会打过来。",
+        idle: "有事直接说，工单交回来、卡住了，助手也会打过来。",
       },
-      manager: "管家",
+      manager: "助手",
       hangUp: "挂断",
       app: { missed: "未接", channels: "频道", games: "游戏" },
       game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
@@ -3080,7 +3192,7 @@ export const catalogs = {
       reading: "在读……",
       never: "算了",
       later: "先放着",
-      orchestrator: "管家",
+      orchestrator: "助手",
       noHelper: "还没选帮工",
       board: {
         earlier: "更早的 {n} 张",
@@ -3234,10 +3346,10 @@ export const catalogs = {
           "run/error": "出错",
           "run/end": "这一轮结束",
         },
-        orchestratorStuck: "管家这一轮没答成：在频道里看它说了什么",
+        orchestratorStuck: "助手这一轮没答成：在频道里看它说了什么",
         job: "要做的",
         from: "来自",
-        fromCron: "定时任务：每次到点交给管家，答完等你看",
+        fromCron: "定时任务：每次到点交给助手，答完等你看",
         answered: "在它的频道里",
         evidence: "依据",
         unsure: "拿不准的",
@@ -3310,7 +3422,7 @@ export const catalogs = {
       },
       run: { working: "正在干", heard: "中途听到 {n} 句" },
       card: {
-        orchestrator: "管家",
+        orchestrator: "助手",
         refining: "{name}在起草",
         draft: "草稿",
         queued: "排队中",
@@ -3326,7 +3438,7 @@ export const catalogs = {
         used: "用了 {took}",
         run: "第 {n} 轮",
         runs: "{n} 轮",
-        orchestratorWorking: "管家在做",
+        orchestratorWorking: "助手在做",
         missingFlag: "记录缺失",
         missing: "这一轮的记录缺失：{what}",
       },
@@ -3375,10 +3487,6 @@ export const catalogs = {
         address: "地址",
         add: "添加设备",
         close: "关掉连接",
-        devices: "配对过的设备",
-        deviceCount: "{n} 台",
-        removeWhich: "移除 {name}",
-        remove: "移除",
         copied: "复制好了：在另一台电脑的浏览器里打开它。",
         notCopied: "复制不了：选中链接自己复制吧。",
         qr: "配对二维码",
@@ -3390,34 +3498,91 @@ export const catalogs = {
         asking: "「{name}」想连接到这台电脑。让它进来以后，它能和你一样用这台电脑上的 VibeValley。",
         letIn: "让它进来",
         refuse: "不让",
-        paired: "配对于 {at} · 上次来 {seen}",
-        pairedNever: "配对于 {at} · 还没来过",
         notes: {
-          "0": "帮工能在这台电脑上跑命令，所以只让配对过的设备连进来；配对要你在这里点头。",
-          "1": "配对过的设备和你一样用这台电脑上的 VibeValley。开关和设备只能在这台电脑上管。",
+          "0": "帮工能在这台电脑上跑命令，所以只让有钥匙的设备连进来：配对要你在这里点头，登录要你在这里设的密码。",
+          "1": "配对过的设备和你一样看帮工、派活、说话，开关和设置只能在这台电脑上管；登录来的设备就是你，只有密码只能在这台电脑上设。",
           "2": "连接走的是不加密的 HTTP：同一个网络里的人可能看到传的内容。只在信得过的网络里开，比如家里的 Wi-Fi、自己的热点。",
           "3": "电脑换了地址（换了网络）以后，设备连不上了，在这里添加设备再扫一次就好，不用重新点头。",
         },
       },
-      devices: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
       pair: {
         title: "连进那台电脑",
-        intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在频道里说话。配对要那台电脑上的主人点头。",
+        intro: "这台设备连进那台电脑上的 VibeValley，和在那台电脑上一样看帮工、派活、在频道里说话。配对要有人在那台电脑上点头。",
         code: "配对码",
         codeHint: "在那台电脑的「连接到本机」里点「添加设备」",
         name: "这台设备叫",
-        nameHint: "主人在设备列表里看到的名字",
-        ask: "请主人放行",
-        waiting: "等那台电脑上的主人点头……",
+        nameHint: "设备列表里显示的名字",
+        ask: "请求放行",
+        waiting: "等那台电脑上点头……",
       },
     },
+    "web.library": {
+      title: "素材库",
+      hint: "生成的、你上传的、帮工拿回来的文件都在这里。",
+      upload: "上传",
+      uploading: "正在上传…",
+      make: "生成",
+      makeTitle: "生成",
+      empty: "还没有素材",
+      emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在聊天里让帮工把找到的东西放进来。",
+      nothingShown: "没有符合筛选的素材。",
+      drop: "松开，放进素材库",
+      rail: { label: "筛选", where: "来路", kind: "种类", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
+      origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
+      kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
+      search: "搜索名字",
+      sortLabel: "排序",
+      sort: { recent: "最近", name: "名字", size: "大小" },
+      tileSize: "缩略图大小",
+      grid: "素材",
+      job: {
+        image: "生图",
+        speech: "单人语音",
+        speakers: "多人对白",
+        voiceDesign: "音色设计",
+        clone: "音色克隆",
+        transcription: "转写",
+        understanding: "理解",
+      },
+      from: {
+        generated: "生成的 · {job}",
+        uploadedHere: "你在素材库上传的",
+        uploadedIn: "你在 {channel} 发的",
+        fetchedUrl: "{agent} 从 {url} 拿回来的",
+        fetchedPath: "{agent} 从工作目录的 {path} 拿回来的",
+      },
+      inspector: {
+        label: "详情",
+        kind: "种类",
+        pixels: "尺寸",
+        bytes: "大小",
+        length: "时长",
+        from: "来路",
+        added: "加入",
+        openChannel: "去 {channel} 看",
+        selected: "已选 {n} 个",
+        clear: "不选了",
+        more: "更多",
+      },
+      download: "下载",
+      sendTo: "发到频道",
+      sentTo: "发到了 {channel}",
+      remove: "从库里拿掉",
+      removeAsk: "从素材库拿掉「{name}」？聊天里发过的照样能打开。",
+      removeSome: "从素材库拿掉这 {n} 个？聊天里发过的照样能打开。",
+      removeSure: "拿掉",
+      keep: "算了",
+      understand: "理解",
+      understandTitle: "理解「{name}」",
+      understood: "理解的结果",
+      makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
+    },
     "web.media": {
-      title: "媒体",
       image: "生成图片",
       speech: {
         title: "单人语音生成",
         notice:
-          "将文字发送到下方的 MOSS 账号，生成单人语音，可能产生费用。不会自动播放；Flash 流式播放也需手动开始。取消只停止本机等待，不代表供应商停止处理或计费。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅主人可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
+          "将文字发送到下方的 MOSS 账号，生成单人语音，可能产生费用。不会自动播放；Flash 流式播放也需手动开始。取消只停止本机等待，不代表供应商停止处理或计费。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅你可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
         configure: "请先在 AI 服务中选择语音生成连接和 Flash 或 Pro 模型。",
         binding: "{account} · {connection} · {model} · 配置版本 {revision}",
         refresh: "刷新连接配置",
@@ -3448,20 +3613,17 @@ export const catalogs = {
         notice:
           "选 1–5 张图片（每张不超过 30 MB）或一个视频（不超过 200 MB），不要混传。文件先存到这台电脑，经你确认后才发给下方的 MOSS 连接，可能产生费用。停止等待不代表供应商停止处理。",
         configure: "请先在 AI 服务中选择图片与视频理解的连接。",
-        files: "本机图片或视频",
         prompt: "想让模型说明什么？",
         tokens: "最多输出多少 token",
         executor: "执行方式／授权频道",
         direct: "现在由我提交",
-        authorize: "登记管家授权",
-        authorizationNotice: "仅登记这份问题、输入和输出上限，不立即上传到 MOSS。所选频道的管家可在 15 分钟内替你执行一次；取消、过期或服务端重启后失效。",
-        authorization: "已授权频道 {channel}。发送给管家后才开始执行；授权在登记后 15 分钟失效。",
-        delegate: "发送给管家",
-        delegated: "已发送给管家",
+        authorize: "登记助手授权",
+        authorizationNotice: "仅登记这份问题、输入和输出上限，不立即上传到 MOSS。所选频道的助手可在 15 分钟内替你执行一次；取消、过期或服务端重启后失效。",
+        authorization: "已授权频道 {channel}。发送给助手后才开始执行；授权在登记后 15 分钟失效。",
+        delegate: "发送给助手",
+        delegated: "已发送给助手",
         delegation: "请执行我已授权的媒体理解任务 {id}，完成后告诉我结果。",
         consent: "我同意将这些文件和问题发送到上方的 MOSS 连接。",
-        stored: "已存到本机",
-        selected: "已选择，还未上传",
         uploading: "正在将选中的文件保存到本机…",
         stopUpload: "停止本机上传",
         uploadFailed: "本机上传失败，这次提交尚未开始理解；请重试或重新选择文件。",
@@ -3472,17 +3634,15 @@ export const catalogs = {
         history: "最近的理解任务",
         truncated: "结果不完整，已收到的文字保留在下方。要增加输出上限，需要发起新请求，可能再次计费。",
         usage: "供应商回报：输入 {input} token · 输出 {output} token · 总计 {total}",
-        save: "将文字存为稿子",
-        open: "打开保存的稿子",
+        save: "将文字存为 Artifact",
+        open: "打开保存的 Artifact",
         cleanup: "清理远端文件",
         cleanupAsk: "删除已知远端文件并释放本机输入的保留？供应商可能还在处理结果未知的请求。没有确认 ID 的上传可能仍有文件，需要人工核对；这不会重复理解。",
       },
-      sourceOwner: "来源：主人",
-      sourceAgent: "来源：管家 {agent} · 频道 {channel}",
+      sourceUser: "来源：你",
+      sourceAgent: "来源：助手 {agent} · 频道 {channel}",
       usage: "厂商报告：{images} 张 · {width} × {height}",
       usageUnknown: "尚无厂商用量结果；不代表未计费。",
-      hint: "用 AI 服务中绑定的连接生成图片、单人语音或理解选中的图片、视频，结果保存在本机。",
-      configure: "配置 AI 连接",
       prompt: "提示词 / 布局 JSON",
       format: "输入方式",
       text: "文生图",
@@ -3519,7 +3679,7 @@ export const catalogs = {
     "web.memory": {
       memory: {
         yours: "你记的",
-        orchestrators: "管家替它记的",
+        orchestrators: "助手替它记的",
         sessions: "{name} 记的",
         own: "它自己记的",
         intro:
@@ -3553,18 +3713,18 @@ export const catalogs = {
         wordsHint: "这一轮的话（可以不填）",
         blank: "在这个仓库里开工，什么也想不起来。",
         noRepos: "还没有仓库。",
-        orchestratorReading: "在读管家的记性……",
-        orchestratorIntro: "管家开工时和每次压缩后读一遍记性；中间记下、忘掉的，它下一句就知道。",
-        orchestratorNothing: "还没记下什么。跟管家说「记住……」，或者你在上面替它记。",
-        orchestratorOwn: "管家自己记的",
+        orchestratorReading: "在读助手的记性……",
+        orchestratorIntro: "助手开工时和每次压缩后读一遍记性；中间记下、忘掉的，它下一句就知道。",
+        orchestratorNothing: "还没记下什么。跟助手说「记住……」，或者你在上面替它记。",
+        orchestratorOwn: "助手自己记的",
         told: "你交代的",
-        archiveIntro: "对话太长时，管家把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。",
+        archiveIntro: "对话太长时，助手把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。",
         search: "在旧账里搜",
         searchHint: "搜一个词",
         find: "搜",
         found: "搜到的",
         compacted: "压掉的对话",
-        noArchive: "还没有：管家的对话还没长到要压缩。",
+        noArchive: "还没有：助手的对话还没长到要压缩。",
         chars: "{n} 字",
         note: "替它记一条",
         noteRepo: "比如：clock-in 的测试用 pnpm test，别用 npm",
@@ -3591,14 +3751,14 @@ export const catalogs = {
       orchestrator: {
         tab: { memory: "记性", trajectory: "轨迹", archive: "旧账", voice: "声音" },
         all: "← 全部档案",
-        title: "管家",
-        intro: "管家不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。",
+        title: "助手",
+        intro: "助手不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。",
         look: "长相是{name}。",
         profile: "改它的档案",
-        tabs: "管家的",
+        tabs: "助手的",
         heard: "收到",
-        quiet: "管家还没开过口。",
-        trajectory: "管家每一轮的经过",
+        quiet: "助手还没开过口。",
+        trajectory: "助手每一轮的经过",
         about:
           "它收到的话、调的每个工具（点一行看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。哪一轮做错了，在它收到的话上点「这一轮做错了」，写一句应该怎样，存成一条评测。",
       },
@@ -3659,29 +3819,12 @@ export const catalogs = {
       tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.provider": {
-      speakersSettings: "多人语音生成",
-      voiceDesignSettings: "音色设计",
-      transcriptionSettings: "音频转写",
-      visionSettings: "实时视觉",
-      capabilityConnection: "连接",
-      capabilityModel: "模型 / 版本",
-      capabilityNotice: "选择独立的连接和模型。保存设置不会提交请求，也不会访问麦克风、摄像头或文件。",
-      speechSettings: "单人语音生成",
-      speechConnection: "语音生成连接",
-      speechModel: "语音生成模型",
-      speechNotice: "可独立选择 Flash 或 Pro，再到媒体页生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
-      openSpeech: "打开语音生成",
-      title: "AI 服务",
-      intro: "保存 MOSS 连接，再为听写、生图、媒体理解、语音生成、音色设计、转写和实时音视频分别选择模型。",
+      speechNotice:
+        "可独立选择 Flash 或 Pro，再到素材库的「生成」里生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
+      title: "用途",
+      intro: "每个功能用哪个账号和模型。账号和钥匙在「账号与钥匙」里填。",
       words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 理解 语音 音频 AI",
-      understandingSettings: "媒体理解配置",
-      understandingConnection: "媒体理解连接",
-      understandingModel: "理解模型 / 版本",
-      understandingNotice: "配置独立的连接和模型。在媒体页选择文件并明确确认上传；保存配置不会上传文件或发起推理。",
-      imageSettings: "生图配置",
-      imageConnection: "生图连接",
-      imageModel: "生图模型 / 版本",
-      imageModelHint: "稳定名称跟随供应商更新，带日期的快照固定模型版本。账号权限与实际效果仍需真实调用验证。",
+      understandingNotice: "配置独立的连接和模型。在素材库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
       imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
       add: "添加 MOSS 连接",
       reload: "重新加载",
@@ -3696,14 +3839,32 @@ export const catalogs = {
       saveFirst: "先保存修改，再查询账号可用模型。",
       discoveryHint: "只查询目录，不发推理请求；模型可见不代表推理已验证。",
       noModels: "此账号返回的模型目录为空。",
-      bindings: "默认用途",
-      dictation: "听写连接",
-      model: "听写模型",
       modelHint: "这里只列出产品已适配的普通转写模型；账号权限与实际效果仍需真实调用验证。",
       unbound: "不使用",
       liveHint: "MOSS Live 使用独立的连接和模型；更改听写模型不会切换实时协议。",
       bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
       manage: "管理 AI 服务连接",
+      connections: "连接",
+      uses: "用途",
+      usesIntro: "每个用途选一个连接和模型；不选就是不使用。",
+      groupImage: "图像",
+      groupVoice: "语音",
+      groupLive: "实时",
+      use: {
+        dictation: "听写",
+        image: "生图",
+        understanding: "媒体理解",
+        speech: "单人语音",
+        speakers: "多人语音",
+        voiceDesign: "音色设计",
+        transcription: "音频转写",
+        live: "MOSS Live",
+        vision: "实时视觉",
+      },
+      connectionFor: "{use}用的连接",
+      modelFor: "{use}用的模型",
+      openSpeechShort: "去生成",
+      adapted: "能用的模型",
     },
     "web.repo": {
       title: "仓库",
@@ -3872,9 +4033,13 @@ export const catalogs = {
         installed: "这台电脑上装的 · {count}",
         noneReported: "农机还没报告装了哪些技能（或者还在读）。",
         noMatch: "没有对得上的。",
-        own: "VibeValley 自己的 · {count}",
+        own: "你写的 · {count}",
         newSkill: "新技能",
         noSkills: "还没有技能：写一个 VibeValley 自己的，或者在农机上装好再回来看。",
+        builtIn: "VibeValley 自带 · {count}",
+        builtInNote:
+          "VibeValley 自带的技能：跟着 VibeValley 更新，不能在这里改或删。在 agent 的「技能」页签里勾上它，帮工的提示里就带着它；想换一种做法，新建一个你自己的技能。",
+        builtInTag: "自带",
         installedNote: "装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。",
         where: "哪些农机有它",
         inUse: "{n} 个 agent 在用，删掉会从它们身上去掉。",
@@ -3990,7 +4155,7 @@ export const catalogs = {
     "web.setting": {
       language: {
         title: "语言",
-        line: "界面上的字、管家和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
+        line: "界面上的字、助手和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
         zh: "中文",
         en: "English",
         label: "界面语言",
@@ -4008,13 +4173,13 @@ export const catalogs = {
         key: "{label} 的 key",
         keyHint: "key（不用或不改就空着）",
         user: "{label} 的 user_id",
-        userHint: "你在 EverOS 里的 user_id（空着就是 owner）",
+        userHint: "你在 EverOS 里的 user_id（空着用默认的那个）",
         read: "读",
         readHint: "开工想起、帮工翻记性时也问它",
         write: "写",
         writeHint: "记下的也送一份过去",
         everything: "读全部",
-        everythingHint: "不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到",
+        everythingHint: "不只读 VibeValley 替帮工记的，你在里面的记忆每个帮工都读得到",
       },
       github: {
         noGh: "没装 gh",
@@ -4031,7 +4196,6 @@ export const catalogs = {
         search: "搜索设置…",
         general: "通用",
         appearance: "外观",
-        models: "模型",
         about: "关于",
         memory: "记性",
         skills: "技能",
@@ -4040,12 +4204,12 @@ export const catalogs = {
         chat: "聊天软件",
         devices: "设备",
         width: "导航的宽窄（拖动，双击回默认）",
+        accounts: "账号与钥匙",
       },
       groups: { options: "选项", helpers: "帮工", voice: "语音", connect: "连接" },
       words: {
         general: "语言 language 启动 打开 工作台 农场",
         appearance: "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
-        models: "DeepSeek key 钥匙 模型 管家",
         about: "版本 家目录 设置文件 version",
         memory: "Nowledge EverOS 记性 记忆",
         skills: "技能 skill",
@@ -4054,11 +4218,12 @@ export const catalogs = {
         dictation: "听写 转写 语音输入",
         github: "gh PR 登录",
         chat: "微信 飞书 QQ 连接器 配对",
-        devices: "手机 配对 连接到本机 局域网",
+        devices: "手机 配对 连接到本机 局域网 名字 密码 登录 退出",
+        accounts: "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
-        languageHint: "界面、管家和帮工说的话都用它",
+        languageHint: "界面、助手和帮工说的话都用它",
         start: "启动时打开",
         startHint: "打开应用、或者打开首页时先进哪里",
         starts: { workbench: "工作台", farm: "农场" },
@@ -4071,7 +4236,7 @@ export const catalogs = {
         scale: "界面大小",
         scaleHint: "缩放整个工作台；农场按整数倍放大，不跟着变",
       },
-      models: { intro: "管家和 VibeValley 自己的帮工用的模型。", deepseekHint: "管家和 VibeValley 自己的帮工用它" },
+      models: { deepseekHint: "助手和 VibeValley 自己的帮工用它" },
       memory: { intro: "帮工还能去外面的记性里查、往里记。" },
       about: {
         version: "版本",
@@ -4118,6 +4283,30 @@ export const catalogs = {
         cliInstall: "安装",
         cliRemove: "移除",
       },
+      missing: {
+        deepseekKey: "还没填 DeepSeek 的钥匙",
+        mossAccount: "还没有 MOSS 账号",
+        mossKey: "MOSS 账号还没填钥匙",
+        mossOff: "用到的 MOSS 账号停用了",
+        binding: "还没选用哪个账号和模型",
+        agora: "还缺声网的凭据",
+        dictationUrl: "还没填听写的地址",
+      },
+      feature: {
+        orchestrator: "助手",
+        image: "生图",
+        understanding: "媒体理解",
+        speech: "单人语音",
+        speakers: "多人语音",
+        voiceDesign: "音色设计",
+        transcription: "音频转写",
+        dictation: "听写",
+        live: "MOSS Live",
+        vision: "实时视觉",
+        call: "通话",
+      },
+      readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
+      accounts: { intro: "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。" },
     },
     "web.tree": {
       kind: { leaf: "叶", fruit: "果", seed: "种子" },
@@ -4207,6 +4396,60 @@ export const catalogs = {
       drop: "去掉 {chip}",
       noticeTitle: { info: "提示", warn: "没派成", error: "出错了" },
     },
+    "web.user": {
+      login: {
+        title: "登录",
+        intro: "用在跑着 VibeValley 的那台电脑上设的密码登录，这台设备就能看帮工、派活、在频道里说话。",
+        noPassword: "那台电脑上还没设密码：先在那台电脑的「设置 › 设备」里设一个，或者用配对码连进来。",
+        password: "密码",
+        device: "这台设备叫",
+        deviceHint: "在设备列表里看到的名字",
+        submit: "登录",
+        signing: "正在登录……",
+        pairInstead: "用配对码连进来",
+      },
+      account: {
+        title: "名字和密码",
+        name: "名字",
+        nameHint: "VibeValley 称呼你用的名字",
+        save: "保存",
+        nameSaved: "名字存好了",
+        password: "密码",
+        passwordHint: "从别的设备登录时用，至少 8 个字",
+        setPassword: "设密码",
+        changePassword: "改密码",
+        passwordSaved: "密码设好了",
+        passwordHere: "密码只能在跑着 VibeValley 的那台电脑上设。",
+        thisDevice: "这台设备：{name}",
+        signOut: "退出",
+      },
+      devices: {
+        title: "你的设备",
+        count: "{n} 台",
+        paired: "配对于 {at} · 上次来 {seen}",
+        pairedNever: "配对于 {at} · 还没来过",
+        login: "登录于 {at} · 上次来 {seen}",
+        loginNever: "登录于 {at} · 还没来过",
+        thisOne: "{name}（这台）",
+        remove: "收回",
+        removeWhich: "收回 {name} 的钥匙",
+      },
+      guess: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
+      approvals: {
+        page: "让一台设备登录",
+        hint: "在那台设备的终端里运行了 vibevalley auth login：对一下码，一样就同意。",
+        title: "等你同意的登录",
+        none: "现在没有设备在等。在那台设备上运行 vibevalley auth login，这里会出现它的码。",
+        wants: "{name} 想登录",
+        left: "还有 {m} 分钟过期",
+        allow: "同意",
+        refuse: "拒绝",
+        from: "从 {from} 发来，{at}",
+        fromHere: "从这台电脑发来，{at}",
+        onlyYours:
+          "只同意你自己刚在终端里运行 vibevalley auth login 出的码：别人发给你的码、你不认得的地址，都点拒绝——同意了，那台设备就能以你的身份做任何事。",
+      },
+    },
     "web.voice": {
       voice: {
         section: { label: "声音" },
@@ -4215,19 +4458,17 @@ export const catalogs = {
         saved: "存好了，下一通电话就用上。",
         answer: {
           orchestrator:
-            "频道里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
-          moss: "经本机 WebSocket 直连 MOSS Live 实时语音模型接电话，不需要声网凭据或公网隧道；涉及农场工单与派活时自动交给管家。",
+            "频道里那个助手本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
+          moss: "经本机 WebSocket 直连 MOSS Live 实时语音模型接电话，不需要声网凭据或公网隧道；涉及农场工单与派活时自动交给助手。",
           agora: "声网托管的模型，不用别的 key。",
           deepseek: "用设置里的 DeepSeek key（{from}）。",
           noDeepseek: "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
           openai: "任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……",
         },
         intro:
-          "管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。管家的人设、开场白和音色在",
-        orchestratorPage: "管家页",
+          "助手用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。助手的人设、开场白和音色在",
+        orchestratorPage: "助手页",
         period: "。",
-        ready: "能接通",
-        missing: "还缺凭据",
         nextCall: "改了以后，下一通电话生效",
         credentials: "凭据",
         console: "声网控制台",
@@ -4264,13 +4505,13 @@ export const catalogs = {
         dictationModelLabel: "听写的模型",
         dictationKey: "凭据（本机可以空着）",
         persona: {
-          intro: "打电话时管家怎么开口、用什么声音。凭据、怎么听、谁接电话在",
+          intro: "打电话时助手怎么开口、用什么声音。凭据、怎么听、谁接电话在",
           page: "页。",
           open: "开口",
           openParts: "人设 · 开场白",
-          ownCall: "电话由管家自己接：它就是频道里那个管家，用它自己的提示词，不另设人设。",
+          ownCall: "电话由助手自己接：它就是频道里那个助手，用它自己的提示词，不另设人设。",
           persona: "人设",
-          personaHint: "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的管家做；写明别编进度。",
+          personaHint: "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的助手做；写明别编进度。",
           greeting: "开场白",
           greetingHint: "接通时先说的一句。",
           failure: "出错时说",
@@ -4294,6 +4535,7 @@ export const catalogs = {
         dictationVia: "听写走哪",
         dictationOwn: "自己的地址",
         dictationMossIntro: "录音经服务端交给 AI 服务中选定的 MOSS 连接和听写模型。",
+        line: "线路",
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -4370,7 +4612,7 @@ export const catalogs = {
         requestFailed: "MOSS Live 未能完成此请求。请检查通话配置后再试。",
         intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
         persona: "人设（不填用 MOSS 默认的）",
-        personaHint: "比如：你是我的管家，说话简短。",
+        personaHint: "比如：你是我的助手，说话简短。",
         instructions: "规则",
         defaultInstructions: "用简短的中文回答。",
         talk: "开始说话",
@@ -4409,6 +4651,7 @@ export const catalogs = {
         },
         tryIt: "试音",
         notInChat: "说的话不进田头",
+        debug: "调试：线路质量与线路上的消息",
       },
     },
   },
@@ -4454,7 +4697,7 @@ export const catalogs = {
         reviewComment: "Words with the review",
         statusComment: "Words with the move: what to change, when it goes for another round",
         title: "The new title",
-        wantsOwner: "Only those waiting on the owner, the longest waiting first",
+        wantsUser: "Only those waiting on you, the longest waiting first",
         issueWatch: "Follow it until in_review, done or canceled, then show it; each status on stderr",
         tier: "The PARA tier",
         marker: "The task marker",
@@ -4487,7 +4730,11 @@ export const catalogs = {
           pageSave: "Create a page, or set the folder and outline of the one with that title",
         },
         agent: { list: "List profiles: id, name, role, runtime", create: "Create a profile", delete: "Delete a profile" },
-        artifact: { list: "List drafts (--issue: only one issue's)", show: "Show a draft: its title, version and owner", read: "Read a draft's words" },
+        artifact: {
+          list: "List drafts (--issue: only one issue's)",
+          show: "Show a draft: its title, version and where it belongs",
+          read: "Read a draft's words",
+        },
         channel: {
           list: "List channels and direct chats",
           messageList: "List a channel's latest messages",
@@ -4523,6 +4770,12 @@ export const catalogs = {
         runtime: { list: "List the runtimes: installed or not, their versions", refresh: "Look for a runtime again, after installing or upgrading it" },
         session: { list: "List helpers: id, name, profile, what it is doing", show: "Show a helper", stop: "Stop a helper's round" },
         chat: "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
+        auth: {
+          about: "Sign in to a server elsewhere, like gh auth login: approve on a page, and this computer gets a key of its own",
+          login: "Sign in to a server: show a code, wait for approval on a signed-in page, keep the key in the home's auth.json",
+          status: "Which server commands reach, and which device's key they carry",
+          logout: "Sign out: the server takes this computer's key back, and this computer forgets it",
+        },
       },
       next: {
         help: "See how this command is written",
@@ -4542,6 +4795,33 @@ export const catalogs = {
         chatFlag: "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's",
       },
       op: {
+        user: {
+          approval: {
+            create: "Ask to sign this device in: get a code and wait for approval on a page",
+            collect: "Collect the key once approved; nothing while it waits",
+            list: "List the sign-in requests waiting for approval",
+            answer: "Approve or refuse a sign-in request",
+          },
+          get: "The user's name, whether a password is set, and which device this request comes from",
+          update: "Change the user's name",
+          password: { set: "Set the password (only on the computer running VibeValley)" },
+          login: "Sign in with the password and get this device a key",
+          logout: "Sign out: take back this device's key",
+          device: {
+            list: "List the user's devices, paired and signed in",
+            delete: "Take back a device's key",
+            previewDelete: "Preview taking back a device's key: say what would happen, without doing it",
+          },
+        },
+        attachment: { create: "Upload a file, to say with a message or keep in the library" },
+        library: {
+          item: {
+            list: "List the library: generated files, your uploads, and what helpers fetched; filter by origin and type",
+            add: "Put a file in the library: your uploaded attachment, or a url or working-directory file from an assistant or helper",
+            delete: "Take a file out of the library (messages that have it still open it)",
+            previewDelete: "Try taking it out: say what would happen, change nothing",
+          },
+        },
         agent: {
           create: "Create a profile",
           delete: "Delete a profile",
@@ -4575,10 +4855,10 @@ export const catalogs = {
           list: "List the artifacts of a channel or ticket, or every one",
           markdown: { get: "Read a block artifact as Markdown" },
           previewDelete: "Preview deleting an artifact: say what would go, without deleting",
-          submit: "Submit a batch of block operations as the owner, applied in order at once",
+          submit: "Submit a batch of block operations as you, applied in order at once",
           suggestion: {
             accept: "Accept a suggested change",
-            create: "Suggest a change to a block the owner wrote",
+            create: "Suggest a change to a block you wrote",
             list: "List an artifact's suggestions, open and resolved",
             reject: "Reject a suggested change",
           },
@@ -4587,7 +4867,6 @@ export const catalogs = {
         },
         channel: {
           archive: { set: "Archive a channel or bring it back; its messages stay" },
-          attachment: { create: "Upload an attachment for a message" },
           create: "Create a channel",
           default: { set: "Make a channel the default: where anything unaddressed goes" },
           delete: "Delete a channel with its threads and messages",
@@ -4601,7 +4880,7 @@ export const catalogs = {
             previewDelete: "Preview deleting a message: say what would go, without deleting",
             search: "Search messages",
             send: "Send a message to a channel or thread",
-            update: "Edit one of the owner's own messages; nobody is told again",
+            update: "Edit one of your own messages; nobody is told again",
           },
           notify: { set: "Set a channel's notifications: all, mentions or none" },
           pin: { list: "List a channel's pinned messages, newest pinned first", set: "Pin or unpin a message" },
@@ -4649,9 +4928,7 @@ export const catalogs = {
           conversation: { get: "The issue conversation location" },
         },
         lan: {
-          device: { delete: "Remove a paired device", previewDelete: "Preview removing a device: say what would go, without removing it" },
-          get: "Whether connect to this machine is on, and its devices",
-          me: { get: "The device this request comes from" },
+          get: "Whether connect to this machine is on, its address and pairing code",
           pair: "Pair this device with a pairing code",
           pairing: {
             answer: "Allow or refuse the device asking to pair",
@@ -4670,10 +4947,10 @@ export const catalogs = {
           search: "Search memories by words, every profile's if none is named",
         },
         orchestrator: {
-          archive: { get: "Read one of the manager's archived conversations", list: "List or search the manager's archived conversations" },
-          eval: { create: "Save a manager turn that went wrong as an eval case, with what it should have done" },
-          open: "Bring the manager online",
-          stop: "Stop the manager's current round; the helpers it sent keep working",
+          archive: { get: "Read one of the assistant's archived conversations", list: "List or search the assistant's archived conversations" },
+          eval: { create: "Save an assistant turn that went wrong as an eval case, with what it should have done" },
+          open: "Bring the assistant online",
+          stop: "Stop the assistant's current round; the helpers it sent keep working",
         },
         pkm: {
           block: { apply: "Apply block operations to a page in order, written back once" },
@@ -4727,13 +5004,14 @@ export const catalogs = {
         media: {
           input: {
             create: "Reserve bounded local storage for a media input without uploading to a provider",
+            adopt: "Take a library file as a media input, checked as an upload is",
             get: "Read a local media input",
             list: "List local media inputs",
             delete: "Delete a local media input not retained by a task",
             previewDelete: "Preview deleting a local media input without changing it",
           },
           understanding: {
-            authorize: "Freeze an understanding request for one execution by the selected channel's orchestrator",
+            authorize: "Freeze an understanding request for one execution by the selected channel's assistant",
             start: "Execute an authorized understanding task by ID without accepting new input or self-declared consent",
             create: "Understand selected local inputs with explicit account and upload approval",
             cleanup: "Clean known remote files without repeating understanding",
@@ -4778,9 +5056,9 @@ export const catalogs = {
         },
         voice: {
           call: {
-            hear: "Hand in a line the owner said on a call",
-            say: "Hand in what the manager said on a call",
-            start: "Start a call with the manager",
+            hear: "Hand in a line you said on a call",
+            say: "Hand in what the assistant said on a call",
+            start: "Start a call with the assistant",
             stop: "Hang up a call",
           },
           dictate: "Dictate: turn a recording into text",
@@ -4800,7 +5078,7 @@ export const catalogs = {
         issue: { about: "Issues: write, edit, move, comment, review" },
         lan: { about: "Connect to this machine: on or off, pairing, devices" },
         memory: { about: "A profile's memories" },
-        orchestrator: { about: "The manager: online, stop, archive, evals" },
+        orchestrator: { about: "The assistant: online, stop, archive, evals" },
         pkm: {
           about: "Notes: note a line, search, the radar, journals and pages",
           page: { about: "Notes pages: list, outline, export, edit the file" },
@@ -4818,7 +5096,7 @@ export const catalogs = {
         unreachable: "The farm at {base} does not answer; the rest was not checked",
         noRuntime: "No runtime is installed: helpers have nothing to work with",
         installRuntime: "Install a coding agent (Claude Code, Codex…), then have the farm look again",
-        noModelKey: "No DeepSeek key: the orchestrator and your own agent cannot start",
+        noModelKey: "No DeepSeek key: the assistant and your own agent cannot start",
         setModelKey: "Fill in the DeepSeek key under Settings › Models",
         lanSettings: "See Settings › Devices",
         wrong: "These are not right: {checks}",
@@ -4848,7 +5126,7 @@ export const catalogs = {
         appPath: "A page of the desktop app, such as /issues/12; the start page if none",
         capture: "What to note; stdin if none",
         comment: "The comment",
-        cronText: "What is said when it comes due: the work for the orchestrator or a profile",
+        cronText: "What is said when it comes due: the work for the assistant or a profile",
         memory: "The memory to keep",
         memoryId: "The memory's id, as memory list shows it",
         message: "The message",
@@ -4859,6 +5137,7 @@ export const catalogs = {
         updateStep: "check looks for a new version, install installs it and restarts; none says how it stands",
         pageTitle: "The page's title",
         agentName: "The profile's name",
+        authServer: "The server's address (https://farm.example.com); --server when not given",
       },
       channel: { sent: "Sent to {channel}" },
       cron: {
@@ -4902,7 +5181,7 @@ export const catalogs = {
         },
         cronCreate: {
           run: "vibevalley cron create morning 'look at yesterday\\'s changes' --daily 09:00",
-          about: "Have the orchestrator look at yesterday's changes every morning at nine",
+          about: "Have the assistant look at yesterday's changes every morning at nine",
         },
         cronDelete: { about: "Try it first: what it would delete" },
         cronEdit: { about: "Turn c1 off for now" },
@@ -4919,7 +5198,7 @@ export const catalogs = {
         issueReviewPass: { about: "#12 passes review" },
         issueStatus: { about: "Send #12 out (or for another round)" },
         issueTimeline: { about: "#12's timeline and cost" },
-        issueWantsOwner: { about: "The issues waiting on the owner, the longest waiting first" },
+        issueWantsUser: { about: "The issues waiting on you, the longest waiting first" },
         issueWatch: { about: "Follow #12 until it is handed back or over, then show it; ten minutes at most" },
         memoryCreate: { run: "vibevalley memory create docs 'the port is 8797'", about: "Have docs remember the port is 8797" },
         memoryDelete: { about: "Try deleting docs' m1 first" },
@@ -4937,6 +5216,9 @@ export const catalogs = {
         agentCreate: { about: "Create a profile on Claude Code" },
         agentDelete: { about: "Try it first: what it would delete" },
         issueObserve: { about: "Follow execution as JSONL" },
+        authLogin: { about: "Sign in to that server; every command after reaches it" },
+        authStatus: { about: "See where you are signed in" },
+        authLogout: { about: "Sign out and go back to the server on this computer" },
       },
       issue: {
         can: "What can be done:",
@@ -4967,13 +5249,24 @@ export const catalogs = {
         about: "Report, submit a PR or read context as the current helper session",
         failed: "Helper access failed: check session credentials, connectivity and operation authorization",
         report:
-          "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit owner authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
-        pr: "Submit the current session PR with explicit owner authorization. JSON accepts optional summary string.",
+          "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit user authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
+        pr: "Submit the current session PR with explicit user authorization. JSON accepts optional summary string.",
         context: "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
         read: "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
         doctor:
           "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
         json: "Tool input as a JSON object; see the command description for fields.",
+      },
+      auth: {
+        here: "{server} is the server on this computer: the command line uses it as is, no sign-in needed",
+        approve: "Open {link} in a browser\nCode {code}: approve if the page shows the same code. Waiting for approval…",
+        noBrowser: "Could not open a browser: open the link above yourself",
+        signedIn: "Signed in to {server}; this computer is “{device}” in the device list",
+        notSignedIn: "Not signed in: commands reach {server}",
+        revoked: "{server} took this computer's key back: run vibevalley auth login again",
+        status: "Signed in to {server} as “{device}”; you are “{name}”",
+        signedOut: "Signed out of {server}",
+        logoutUnsaid: "Could not have the server take the key back ({why}): this computer forgot it; take it back on the devices page",
       },
     },
     desktop: {
@@ -5032,12 +5325,12 @@ export const catalogs = {
       stopScan: "Stop scanning",
       title: "Connect to VibeValley",
       intro:
-        "On the computer running VibeValley, open Connect to this machine under Settings, press Add a device, and scan its QR code. Pairing needs the owner's approval on that computer.",
+        "On the computer running VibeValley, open Connect to this machine under Settings, press Add a device, and scan its QR code. Pairing needs approval on that computer.",
       scan: "Scan the QR code",
       paste: "Or paste the pairing link",
       name: "This phone is called",
-      waiting: "Waiting for the owner on that computer to approve…",
-      ask: "Ask the owner to let it in",
+      waiting: "Waiting for approval on that computer…",
+      ask: "Ask to be let in",
       cancel: "Cancel pairing",
       agora: "Agora: {what} failed ({code})",
       agoraLost: "Agora: the connection failed ({reason})",
@@ -5065,11 +5358,12 @@ export const catalogs = {
         template: "List the templates and find its id",
         cron: "List the scheduled tasks and find its id",
         device: "See the connected devices and find its id",
-        archive: "List the manager's archive",
+        archive: "List the assistant's archive",
         channel: "List the channels and find its id",
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
         artifact: "List the artifacts to find its id",
+        library: "List the library and find its id",
         pkm: "List the notes’ pages to find its name",
       },
       repoRef: "repo {id}",
@@ -5092,11 +5386,13 @@ export const catalogs = {
         deleteKept: 'Delete the template "{name}": the {installed} profiles installed from it stay',
       },
       notSaved: "Not saved: could not write {file} ({why})",
-      orchestratorStays: "The default manager cannot be deleted: there is always at least one manager",
-      defaultStaysOrchestrator: "The default manager stays a manager: there is always at least one",
+      builtInSkill:
+        '"{name}" ships with VibeValley and is updated with it: it can\'t be changed or deleted here. To work another way, make a skill of your own',
+      orchestratorStays: "The default assistant cannot be deleted: there is always at least one assistant",
+      defaultStaysOrchestrator: "The default assistant stays an assistant: there is always at least one",
       noAgent: "There is no profile {id}",
       noSkill: "There is no skill {id}",
-      orchestratorRuntime: "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
+      orchestratorRuntime: "An assistant runs only on VibeValley's own agent: its machine must be {runtime}",
       newAgentId: "Leave a new profile's id empty; to choose the id, save it instead",
       newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
       removeAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
@@ -5113,9 +5409,9 @@ export const catalogs = {
       noTitle: "An artifact needs a title",
       longTitle: "The title is too long: at most {max} characters",
       badKind: "No artifact of kind {kind}: only {kinds}",
+      displayHtmlOnly: "Only an html artifact is shown as a page, slides or motion; one written together has no display",
       empty: "The artifact is empty",
       tooBig: "A version is at most {mb} MB",
-      notKept: "The artifact was not kept: {why}",
       missing: "There is no artifact {id}",
       noVersion: '"{title}" has no version {version}; the latest is {latest}',
       noFile: 'The content of "{title}" version {version} is gone',
@@ -5146,7 +5442,7 @@ export const catalogs = {
         beyond: "The suggestion is for rev {rev}, but the block is only at rev {now}",
         missing: "There is no suggestion {id}",
         stale: "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
-        suggested: "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner",
+        suggested: "A block the user wrote is not changed directly: a suggestion was made〔{id}〕and waits for the user",
       },
       op: {
         deleted: "This block was deleted",
@@ -5215,8 +5511,13 @@ export const catalogs = {
         many: '"{words}" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper',
         crosses: '"{words}" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper',
         stale: "You are looking at version {version}; the latest is {latest}: change the latest",
-        note: 'The owner changed on the page: "{old}" → "{new}"',
+        note: 'The user changed on the page: "{old}" → "{new}"',
       },
+    },
+    "server.attachment": {
+      noAttachment: "There is no attachment {id}: upload it first, then say it",
+      emptyFile: "The file is empty",
+      fileTooBig: "The file is too big: {mb} MB at most",
     },
     "server.base": {
       noFile: "{path}: no such file",
@@ -5227,8 +5528,8 @@ export const catalogs = {
       requestKeyLong: "requestKey is too long (at most {max} characters)",
     },
     "server.channel": {
-      name: { owner: "You", orchestrator: "Manager" },
-      mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
+      name: { user: "You", orchestrator: "Assistant" },
+      mention: { orchestrator: "@assistant", user: "@user", everyone: "@everyone" },
       channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
       channelTaken: "There is already a channel called {name}",
       hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
@@ -5247,7 +5548,7 @@ export const catalogs = {
       channelGone: "The channel cannot be found",
       noHelper: "There is no helper {id}",
       noChannel: "There is no channel {id}",
-      notOrchestrator: "{id} is not a manager's profile: only a manager can look after a channel",
+      notOrchestrator: "{id} is not an assistant's profile: only an assistant can look after a channel",
       noMessageId: "There is no message {id}",
       threadOnlyTitle: "A thread can only get a title",
       defaultStays: "The default channel cannot be archived or deleted: make another one the default first",
@@ -5258,19 +5559,16 @@ export const catalogs = {
       connectorsThere: "a connector is bound to it",
       queuedThere: "{n} tickets wait in the queue to start here",
       issuesThere: "{n} tickets were worked here",
-      noAttachment: "There is no attachment {id}: upload it first, then say it",
       messageGone: "This message is deleted already",
       notYours: "Only your own words can be changed",
       badEmoji: "A reaction is one emoji or a short word, without spaces",
       threadOnlyInChannel: "A thread opens only under a message in a channel",
-      emptyFile: "The file is empty",
       deletes: "Delete message {number} in {target} ({name}: {text}); its number stays",
       deletesDeliveries: "{n} not yet handed are no longer sent",
       defaultIsChannel: "Only a channel can be the default, not a direct channel or a thread",
       noDirect: "{target}: there is no direct channel between you",
       noChannelNamed: "There is no channel #{name}. There are: {tags}",
       absent: "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
-      fileTooBig: "The file is too big: {mb} MB at most",
       noProfileNamed: "No profile is named {key}",
       talkFailed: "Could not start this conversation: {why}",
       profileDisabled: "{name} is disabled",
@@ -5302,7 +5600,7 @@ export const catalogs = {
       disconnected: "disconnected",
       noConnector: "There is no connection {id}",
       noChannel: "There is no channel called {name}",
-      line: { orchestrator: "Manager", dispatch: "sent", thread: "in a ticket's thread", head: "[{who}]", headWhat: "[{who} · {what}]" },
+      line: { orchestrator: "Assistant", dispatch: "sent", thread: "in a ticket's thread", head: "[{who}]", headWhat: "[{who} · {what}]" },
       feishu: {
         register: "Feishu registration: {why}",
         registerTimeout: "Feishu registration: timed out",
@@ -5383,7 +5681,7 @@ export const catalogs = {
       reached: { starter: "Starter task done", secret: "Found a secret", gold: "Up to gold", silver: "Up to silver", unlocked: "Achievement unlocked" },
     },
     "server.inbox": {
-      orchestrator: "The manager",
+      orchestrator: "The assistant",
       conflictFiles: "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
       item: {
         review: { label: "For you to see", title: "{who} is done", tray: "{who} is done, for you to see" },
@@ -5400,7 +5698,7 @@ export const catalogs = {
         mention: { label: "Calling you", title: "{who} is calling you" },
         "cron-ask": {
           label: "A scheduled task to approve",
-          title: "The manager wants to set a scheduled task",
+          title: "The assistant wants to set a scheduled task",
           body: '"{text}": it starts once you approve',
           tray: 'The scheduled task "{text}" waits for your approval',
         },
@@ -5437,7 +5735,7 @@ export const catalogs = {
       notStarted: "This ticket has not started yet",
       started: "This ticket has already started",
       noTitle: "The ticket has no title",
-      orchestratorNotHelper: "The manager is not a helper: send it to a helper",
+      orchestratorNotHelper: "The assistant is not a helper: send it to a helper",
       disabled: "{name} is disabled",
       cannotSend: "{name} cannot be sent: {why}",
       noRepo: "No repo was named: a repo is a folder in the work folder",
@@ -5466,11 +5764,11 @@ export const catalogs = {
       cannotMoveRepo: "Ticket #{n} cannot change repo yet: {why}",
       cannotDelete: "Ticket #{n} cannot be deleted yet: {why}",
       noConflict: "{name} has no conflict with main",
-      orchestratorAnswers: "This ticket is the manager's: it closes once the manager answers",
+      orchestratorAnswers: "This ticket is the assistant's: it closes once the assistant answers",
       nothingToAccept: "Nothing has been handed back yet, so there is nothing to accept",
       failNeedsFindings: "Failing the acceptance needs what is wrong: write at least one point",
       does: {
-        toOrchestrator: "{n} goes to the manager to answer",
+        toOrchestrator: "{n} goes to the assistant to answer",
         sendTo: "{n} is sent to {agent}",
         noRoom: "No room now ({full}): it is queued in To do and starts as soon as there is room",
         startIn: "{n} sends {agent} to work in {repo}",
@@ -5478,7 +5776,7 @@ export const catalogs = {
         unqueue: "{n} leaves the queue, back to Backlog",
         leaves: "{helper} leaves, the branch is kept",
         takesOver: "{taker} takes over and carries on on the same branch",
-        orchestratorRound: "{n} goes back to the manager for another answer: {said}",
+        orchestratorRound: "{n} goes back to the assistant for another answer: {said}",
         round: "Tell {helper} this, for another round: {said}",
         thisTime: "What to do this time: {said}",
         revive: "{n} goes back to Backlog",
@@ -5557,7 +5855,7 @@ export const catalogs = {
       merge: { tellFailed: "\nCould not tell the helper: {why}", merged: "{name}'s work is merged: {text}" },
       refinement: {
         noDrafter: "No helper can be sent to draft it",
-        orchestrator: "This ticket is the manager's: the manager reads it itself",
+        orchestrator: "This ticket is the assistant's: the assistant reads it itself",
         onlyBacklog: "Only a ticket in Backlog can be drafted: move it back to Backlog first",
         drafting: "{name} is drafting it: wait for it to come back",
         unread: "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
@@ -5575,7 +5873,7 @@ export const catalogs = {
         files: "May touch:",
       },
       noProfileNamed: "No profile is named {key}",
-      prSubmitNotAllowed: "The owner did not explicitly authorize this ticket to submit its own pull request",
+      prSubmitNotAllowed: "The user did not explicitly authorize this ticket to submit its own pull request",
       prSubmitNotCurrent: "Only the helper currently handling this ticket can submit its pull request",
       prSubmitUnavailable: "Pull-request delivery is not enabled for this ticket's repo",
       deliveryNeedsPr: "Deliver a valid PR/MR before accepting this issue",
@@ -5584,10 +5882,8 @@ export const catalogs = {
       confirmedRequirements: "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}",
     },
     "server.lan": {
-      aDevice: "A device",
-      noDevice: "There is no device {id}",
       notUp: "VibeValley is not up yet",
-      unpaired: "This device is not paired, or the owner removed it: pair it again by scanning on that computer",
+      unpaired: "This device is not paired, or its key was taken back: pair it again by scanning on that computer",
       notRemote: "A connected device cannot do this: only the computer running VibeValley can",
       badGateway: "Could not pass it on",
       cannotOpen: "The connection cannot open: {why}",
@@ -5597,20 +5893,32 @@ export const catalogs = {
       closedThere: "That computer does not allow connections: turn on Connect to this machine there",
       codeExpired: "The pairing code expired: get a new one on that computer",
       wrongCode: "Wrong pairing code",
-      anotherAsking: "Another device is waiting for the owner's approval: try again in a moment",
-      ownerLate: "The owner did not approve in time and the pairing code expired: get a new one on that computer",
-      denied: "The owner did not let this device in",
+      anotherAsking: "Another device is waiting for approval: try again in a moment",
+      userLate: "Nobody approved in time on that computer and the pairing code expired: get a new one on that computer",
+      denied: "That computer did not let this device in",
       noCode: "No pairing code is out: nothing changes",
       dropCode: "Withdraw the pairing code {code}",
       dropAsking: '"{name}", waiting for your approval, cannot get in',
-      forget: 'Forget the device "{name}": its key stops working, and it must pair again to connect',
-      cut: "Cut its {n} open connections",
-      local: "This is the machine running VibeValley, not a connected device",
+    },
+    "server.library": {
+      noItem: "The library has no {id}",
+      oneSource: "Give exactly one of: an attachment, a url, or a path to a file in your working directory",
+      agentAttachment: "Attachments are the user's uploads; helpers and assistants put things in the library by url or by a path in their working directory",
+      userFetch: "You put uploaded attachments in the library; to bring something in from an address or a file, ask an assistant or a helper",
+      badUrl: "{url} is not a public https address: the library downloads only from public https addresses",
+      notFetched: "Could not download {url}: {why}",
+      slow: "The download took more than 60 seconds and was given up",
+      tooBig: "The file is larger than {mb} MB, more than the library keeps",
+      noPlace: "You have no working directory: give a url",
+      outside: "{path} is outside your working directory: only files in it can go in",
+      notFile: "{path} is not a file in your working directory",
+      unreadable: "Cannot read {path}: {why}",
+      preview: { remove: 'Take "{name}" out of the library; messages that have it still open it' },
     },
     "server.mailbox": {
       notOwned: "This input does not belong to the current session and cannot be returned",
       subscriptionTaken: "Thread {thread} already belongs to another issue",
-      ambiguous: "This input matches multiple issues and needs an explicit owner",
+      ambiguous: "This input matches multiple issues and needs to be told which one it belongs to",
     },
     "server.media": {
       speechInvalid: "Invalid speech parameters. Check the text, voice and audio format; Pro does not support pause tags.",
@@ -5619,7 +5927,6 @@ export const catalogs = {
       speechUnknown: "No complete speech result was received. The provider may still be processing or charging. Speech was not submitted again.",
       speechRejected: "MOSS rejected the speech request. Check account access and input before creating a new task.",
       inputDeletePreview: "Delete the local input reservation for {name} and any unfinished upload.",
-      inputDeleteBytes: "Delete the local file if no other input retains it.",
       remoteAccountChanged: "This remote file belongs to a different connection or credential. No request was sent with a replacement account.",
       remoteUploadUnknown:
         "The remote upload outcome is unresolved, or this upload has already ended. It will not be submitted again; a remote file may still exist.",
@@ -5634,7 +5941,7 @@ export const catalogs = {
       understandingRejected: "MOSS rejected the understanding request. It was not repeated.",
       remoteUnresolved: "Some uploads have no confirmed file ID. Known files were cleaned, but inspect these names in the provider console: {files}",
       understandingPhase: {
-        authorized: "Awaiting orchestrator",
+        authorized: "Awaiting the assistant",
         queued: "Queued",
         uploading: "Uploading to MOSS",
         generating: "Understanding",
@@ -5659,7 +5966,7 @@ export const catalogs = {
       inputChanged: "A saved input cannot be replaced with different bytes. Create a new input instead.",
       inputTimeout: "The local upload timed out. Its partial file was removed; no provider request was made.",
       inputDisconnected: "The local upload was interrupted. Its partial file was removed; no provider request was made.",
-      ownerRequired: "Generation requires the owner's mandate. Autonomous patrols cannot submit potentially billable requests.",
+      userRequired: "Generation requires the user's mandate. Autonomous patrols cannot submit potentially billable requests.",
       invalid: "Invalid image parameters. Check the prompt, layout, dimensions and advanced options.",
       missing: "This generation task was not found.",
       corrupt: "The generation record cannot be read. Preserve local data before investigating.",
@@ -5698,6 +6005,7 @@ export const catalogs = {
         canceled: "Waiting canceled",
         download_failed: "Download failed",
       },
+      imageMade: "Here it is: {prompt}",
     },
     "server.memory": {
       source: { local: "Local", nowledge: "Nowledge Mem", everos: "EverOS" },
@@ -5722,12 +6030,12 @@ export const catalogs = {
       forget: 'Forget from {agent}\'s memory: "{text}"',
     },
     "server.orchestrator": {
-      label: "The manager",
+      label: "The assistant",
       noKey:
         "I don't have a DeepSeek key yet, so I can't think. Put a DeepSeek API Key in Settings (also at the bottom of the workbench's left bar), then tell me again.",
       cannotStart: "I can't start on my side: {why}",
       onlyDeepseek:
-        "The manager runs only on DeepSeek models: set the manager profile's model to deepseek/<model> or just the model's name; {configured} cannot be used",
+        "The assistant runs only on DeepSeek models: set the assistant profile's model to deepseek/<model> or just the model's name; {configured} cannot be used",
     },
     "server.pkm": {
       noPage: "There is no page “{page}”",
@@ -5864,7 +6172,7 @@ export const catalogs = {
       "publish.refused": "Branch publication refused: {detail}",
       "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
       "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
-      "publish.ownerOnly": "Only the local owner can publish an existing branch",
+      "publish.userOnly": "Only the user on this computer can publish an existing branch",
       "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",
     },
     "server.runtime": {
@@ -5932,12 +6240,12 @@ export const catalogs = {
         repo: "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files",
       },
       notTaken: {
-        conflictOwner:
+        conflictUser:
           "Not merged: merging into {base} would conflict ({files}). {name} is still here, with its branch and worktree. To have it resolve this, tell it: {brief}",
         conflictNotice: "{name}'s branch would conflict with {base} ({files}), so it was not merged. It can resolve the conflict itself",
         conflictShort: "Merging into {base} would conflict: {files}",
         checkFix: "{reason}\nFix the check and hand it back.",
-        owner: "Not merged: {why}. {name} is still here",
+        user: "Not merged: {why}. {name} is still here",
         notice: "{name}'s work was not merged: {why}",
         checkShort: "the repo's check failed",
       },
@@ -5946,7 +6254,7 @@ export const catalogs = {
         image: "[image]",
         exitedNotice: "{name}: {why}",
         staleRun: "The last round stopped halfway too long ago, and was not carried on",
-        stoppedByOwner: "You stopped it",
+        stoppedByUser: "You stopped it",
         folded: "Folded the conversation, {usage}",
         clipped: "… {n} characters left out …",
         quiet: "Quiet for {span}{last}. It may be running a long command, or it may be stuck",
@@ -6039,13 +6347,15 @@ export const catalogs = {
         url: "The model's address is a full address starting with http(s), such as https://api.openai.com/v1/chat/completions",
         voiceId: "The voice cannot be empty: pick one or fill in a MiniMax voice id",
         microsoft: "Microsoft speech needs a region and a voice name",
-        persona: "The manager's persona cannot be empty",
+        persona: "The assistant's persona cannot be empty",
       },
       defaults: { failureMessage: "I got stuck for a moment. Could you say that again?" },
       notSaved: "Could not save {file}: {why}",
     },
     "server.tool": {
       labels: {
+        library_item_list: "Library",
+        library_item_add: "Put in the library",
         media_image_create: "Submit image generation",
         media_understanding_start: "Execute authorized understanding",
         media_speech_create: "Generate single-speaker speech",
@@ -6085,13 +6395,26 @@ export const catalogs = {
       },
       about: "{label}: {about}",
     },
+    "server.user": {
+      aDevice: "A device",
+      noDevice: "No device {id}",
+      passwordHere: "The password can only be set on the computer running VibeValley",
+      passwordShort: "The password needs at least {n} characters",
+      noPassword: "No password yet: set one on the computer running VibeValley first",
+      locked: "Too many wrong passwords: try again in {s} seconds",
+      wrongPassword: "Wrong password",
+      notADevice: "This is the computer running VibeValley itself: there is no device to sign out",
+      revoke: "Take back the key of “{name}”: it has to pair or sign in again to connect",
+      requestsBusy: "Several devices are already waiting for approval: try again in a few minutes",
+      requestGone: "This sign-in request is gone: it expired, was refused or was already used; run vibevalley auth login again",
+    },
     "server.voice": {
       misheard: "Hm? I didn't catch that. Could you say it again?",
       unknownSuffix: "the server cannot use it yet",
       unknown: "{vendor} for {what}: the server cannot use it yet",
       part: { asr: "recognition", llm: "the model", tts: "speech" },
       noAsrKey: "Microsoft recognition has no key yet: fill it in under Recognition on the Voice page",
-      noLine: "The manager's voice line is not connected",
+      noLine: "The assistant's voice line is not connected",
       noDeepseekKey: "DeepSeek needs a DeepSeek key first: fill it in under Settings",
       noLlmKey: "Your own model has no key yet: fill it in under Think on the Voice page",
       noTtsKey: "Microsoft speech has no key yet: fill it in under Speak on the Voice page",
@@ -6110,9 +6433,9 @@ export const catalogs = {
       stopped: "The voice service has stopped",
       grantGone: "This call's voice credentials have expired: connect again",
       connecting: "This call is already connecting",
-      lineFailed: "The manager's voice line cannot connect: {why}",
-      joinFailed: "Could not bring the manager into the channel: {why}",
-      leaveFailed: "Could not have the manager leave: {why}",
+      lineFailed: "The assistant's voice line cannot connect: {why}",
+      joinFailed: "Could not bring the assistant into the channel: {why}",
+      leaveFailed: "Could not have the assistant leave: {why}",
       manyCalls: "Several calls are connecting: update the app and try again",
       noCall: "No call is connecting",
       dictation: {
@@ -6261,19 +6584,19 @@ export const catalogs = {
       tab: { who: "Who", runtime: "Machine", persona: "Persona", skills: "Skills", tools: "Tools", env: "Environment", memory: "Memory" },
       tabs: "Profile",
       name: "Name",
-      nameTip: "The manager and the captions call it this, and you can name it when you speak.",
+      nameTip: "The assistant and the captions call it this, and you can name it when you speak.",
       nameTaken: "An agent of this name already exists",
       duty: "Duty",
-      dutyTip: "A sentence. The manager reads it when picking someone.",
+      dutyTip: "A sentence. The assistant reads it when picking someone.",
       roleHint: "Such as: writes endpoints, changes the server, runs the Go tests",
       tags: "Good for",
-      tagsTip: "When your words have these, the manager on Auto sends it first. Enter adds one.",
+      tagsTip: "When your words have these, the assistant on Auto sends it first. Enter adds one.",
       tagsHint: "frontend, tests, docs…",
       enabled: "Enabled",
-      enabledHint: "Disabled, the manager does not send it, and refuses when it is named.",
+      enabledHint: "Disabled, the assistant does not send it, and refuses when it is named.",
       workdir: "Default repo",
       workdirTip:
-        "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the manager sends work without naming a repo; when empty, the repo must be named.",
+        "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
       workdirHint: "such as clock-in",
       worktree: "A git worktree for each helper",
       worktreeHint:
@@ -6331,13 +6654,13 @@ export const catalogs = {
       ownMcpTip: "Reported by the runtime, together with those added above.",
       unreported: "This runtime does not report this.",
       none: "None.",
-      role: { orchestrator: "Manager", worker: "Helper" },
+      role: { orchestrator: "Assistant", worker: "Helper" },
       templates: {
         title: "Templates",
         intro:
           "Each template is a recipe for an agent: its role, duty, persona, the machine it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
         open: "Install from a template",
-        openLine: "Recipes for managers and helpers, to pick from",
+        openLine: "Recipes for assistants and helpers, to pick from",
         folder: "Template folder",
         folderHint: "The path of a template folder on this machine (with agent.json in it)",
         add: "Add it",
@@ -6348,6 +6671,8 @@ export const catalogs = {
         noPersona: "No persona.",
         installed: "{n} installed",
         addedHere: " · added on this machine",
+        skills: "Comes with skills: {skills}",
+        skill: 'Skill "{name}": {description}',
         look: "Look",
         fold: "Fold",
         removeSure: "Really delete the template",
@@ -6359,24 +6684,24 @@ export const catalogs = {
         updated: "Updated from the template",
       },
       orchestrator: {
-        newName: "New manager",
+        newName: "New assistant",
         intro:
-          "A manager stays, leads and does no work itself: it hears what you want done, sends helpers to do it, watches progress and passes on results. It runs on VibeValley's own agent, with its own direct messages, memory and trajectory; hand it a channel to look after, and what you say there it answers.",
+          "An assistant stays, leads and does no work itself: it hears what you want done, sends helpers to do it, watches progress and passes on results. It runs on VibeValley's own agent, with its own direct messages, memory and trajectory; hand it a channel to look after, and what you say there it answers.",
         page: "Its memory and trajectory →",
         nameTip: "Its name in the chat; others call it with @ and its profile id.",
         model: "Model",
         modelTip: "A DeepSeek model; empty is the default one.",
         modelHint: "deepseek-v4-flash",
         dutyTip: "One sentence: what it looks after.",
-        personaTip: "Who it is, how it talks, what it looks after; it follows the manager's prompt.",
+        personaTip: "Who it is, how it talks, what it looks after; it follows the assistant's prompt.",
         personaHint: "You look after the clock-in repo; read the tests before sending work…",
         look: "Look",
       },
       list: {
-        orchestrators: "Managers",
+        orchestrators: "Assistants",
         helpers: "Helpers",
         make: "Make a new helper",
-        makeOrchestrator: "Add a manager",
+        makeOrchestrator: "Add an assistant",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
         ledger: "Ledger",
         voice: "Voice",
@@ -6394,7 +6719,7 @@ export const catalogs = {
       noEffortModel: "{model} has no effort levels.",
     },
     "web.artifact": {
-      place: { label: "Artifacts", hint: "What you, the helpers and the manager leave to be read: pages written together and web pages handed in" },
+      place: { label: "Artifacts", hint: "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in" },
       card: { version: "Version {version}", open: 'Open "{title}"' },
       page: {
         by: "Made by {name}",
@@ -6442,7 +6767,7 @@ export const catalogs = {
         helpersWriting: "helpers writing",
         demo: "Demo: several helpers writing at once",
         append: "Write a paragraph at the end",
-        owner: "Owner",
+        user: "You",
         done: "Done",
         notDone: "Not done",
         writing: "{who} is writing",
@@ -6485,7 +6810,7 @@ export const catalogs = {
         attrLanguage: "language",
         attrs: "Change attrs: {attrs}",
       },
-      body: { blocks: "Written together", html: "Web page" },
+      body: { blocks: "Written together", html: "Web page", slides: "Slides", motion: "Motion" },
       edit: {
         title: "Change words",
         hint: "Select words in the page to change them on the right",
@@ -6494,11 +6819,33 @@ export const catalogs = {
         save: "Save as a new version",
         saved: "Saved as version {version}",
       },
+      slides: {
+        previous: "Previous slide",
+        next: "Next slide",
+        at: "{at} / {pages}",
+        present: "Present full screen",
+        presenter: "Presenter view",
+        pdf: "Save as PDF",
+        thumbnails: "Slides",
+        slide: "Slide {at} {title}",
+      },
+      presenter: {
+        title: "Presenter view: {title}",
+        missing: "No deck named: open the presenter view from an artifact's controls.",
+        current: "This slide",
+        next: "Next slide",
+        end: "This is the last slide",
+        notes: "Notes",
+        noNotes: "No notes on this slide",
+        clock: "Time so far",
+        restart: "Restart timer",
+        aside: "Next slide and notes",
+      },
     },
     "web.audio": {
       title: "Audio studio",
       notice:
-        "Requests may incur charges. Canceling stops local waiting, not remote billing. Unknown outcomes are never automatically submitted again. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in owner-only Media storage, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
+        "Requests may incur charges. Canceling stops local waiting, not remote billing. Unknown outcomes are never automatically submitted again. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in Media storage only you can reach, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
       configure: "Configure this capability in AI services first.",
       refresh: "Refresh accounts and configuration",
       account: "Voice account",
@@ -6607,7 +6954,7 @@ export const catalogs = {
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
-        agents: { label: "Profiles", hint: "Profiles: managers and helpers" },
+        agents: { label: "Profiles", hint: "Profiles: assistants and helpers" },
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
         repos: { label: "Repos", hint: "An island for each repo" },
         catalog: { label: "Catalog", hint: "Assets: every picture, cursor and sound the farm uses, and the workbench's kit" },
@@ -6632,8 +6979,8 @@ export const catalogs = {
       },
       toasts: "Notices",
       runtime: "Runs on: {name}",
-      owner: "Me",
-      orchestrator: "Manager",
+      user: "Me",
+      orchestrator: "Assistant",
       unreachable: "The server cannot be reached for now: try again when it is back.",
       query: { invalidResponse: "The response does not match the expected data format. The last valid result has been kept." },
       table: {
@@ -6717,6 +7064,7 @@ export const catalogs = {
           lists: "Menus and lists",
           issues: "Issues",
           pictures: "Pictures",
+          library: "Library",
           farm: "Farm",
           desktop: "Desktop app (system-wide)",
         },
@@ -6736,9 +7084,12 @@ export const catalogs = {
           names: "Hold to name everything in the yard",
           farmMenu: "Put the tool down, or open the menu",
           debug: "Debug console",
-          voice: "Talk to the manager (changeable in settings)",
+          voice: "Talk to the assistant (changeable in settings)",
           command: "Commands: a ticket, remember, stop, a direct message",
           newIssue: "New issue",
+          libraryMove: "Move between files",
+          libraryLook: "See the picture full screen",
+          libraryRemove: "Remove the selected from the library",
         },
       },
       rich: {
@@ -6820,13 +7171,13 @@ export const catalogs = {
       tab: { chat: "Chat", issues: "Tickets", crons: "Scheduled tasks" },
       defaultRepo: "default repo {repo}",
       channels: "Channels",
-      defaultHint: "The default channel: you, the manager and the helpers are all here",
+      defaultHint: "The default channel: you, the assistant and the helpers are all here",
       findHint: "Find in this channel…",
       find: "Find in this channel",
       findMessages: "Find messages",
       settings: "Channel settings",
       inChannel: "In the channel",
-      empty: "Nobody has spoken in {label}: tell the manager something to do.",
+      empty: "Nobody has spoken in {label}: tell the assistant something to do.",
       sendTo: "Message {label}",
       side: "Channels and helpers",
       channelsTitle: "Channels",
@@ -6835,7 +7186,7 @@ export const catalogs = {
       helpers: "Helpers",
       noHelpers: "No helpers here",
       mood: { idle: "resting", listening: "listening", thinking: "thinking", speaking: "speaking" },
-      orchestrator: "Manager",
+      orchestrator: "Assistant",
       nobodyOnIt: "No helper is on it now; the thread stays",
       replies: "{n, plural, one {# reply} other {# replies}}",
       thread: "Thread",
@@ -6853,19 +7204,19 @@ export const catalogs = {
         descriptionHint: "What is this channel for?",
         repo: "Default repo (optional)",
         repoHint: "Work sent in this channel without a repo goes to this one",
-        repoNone: "Empty means none: the manager asks which repo when sending work",
+        repoNone: "Empty means none: the assistant asks which repo when sending work",
         settingsOf: "Settings of # {name}",
         save: "Save",
       },
       issues: {
-        empty: "No tickets in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the ticket is listed here.",
+        empty: "No tickets in this channel yet. Tell the assistant something to do in the chat; it sends a helper, and the ticket is listed here.",
         thread: "Ticket thread",
       },
       crons: {
-        empty: 'No scheduled tasks: tell the manager "run the tests every day at nine".',
+        empty: 'No scheduled tasks: tell the assistant "run the tests every day at nine".',
         next: "next {next}",
         direct: "straight to {agent}",
-        byOrchestrator: "set by the manager",
+        byOrchestrator: "set by the assistant",
         label: 'Scheduled task "{name}"',
         on: "On",
         off: "Off",
@@ -6889,7 +7240,7 @@ export const catalogs = {
         typing: "typing…",
         foldDispatch: "Fold the dispatch",
         unfoldDispatch: "Unfold the dispatch",
-        owner: "Owner",
+        user: "You",
         dispatch: "Sent work",
         spent: "This round spent {spent}",
         unread: "{n} new",
@@ -6928,13 +7279,13 @@ export const catalogs = {
         editHint: "Enter saves · Esc cancels",
       },
       pins: { open: "Pinned messages", title: "Pinned", none: "Nothing is pinned here yet", failed: "Could not read the pins: {why}" },
-      members: { open: "Members", title: "Members", owner: "Owner", none: "No helpers here yet", looksAfter: "The manager looking after this" },
+      members: { open: "Members", title: "Members", user: "You", none: "No helpers here yet", inChannel: "An assistant in the channel" },
       composer: {
         notSent: "Not sent: {why}",
         who: "Who",
-        mention: "@ to call someone",
-        stop: "Stop the manager",
-        stopHint: "Stops the manager's round; helpers already sent keep working",
+        mention: "Mention someone",
+        stop: "Stop the assistant",
+        stopHint: "Stops the assistant's round; helpers already sent keep working",
         send: "Send",
         sendHint: "Enter sends · Shift+Enter for a new line",
         replying: "Replying to {name}",
@@ -6943,16 +7294,17 @@ export const catalogs = {
         cancelReply: "Cancel the reply",
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
+        command: "Commands",
       },
       manage: {
         name: "Name",
         category: "Group (optional)",
         categoryHint: "The sidebar lists channels by group",
-        orchestrator: "Looked after by",
-        orchestratorHint: "When you speak here without @ anyone, this manager answers",
+        members: "Assistants in the channel",
+        membersHint: "The assistants in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
         notify: "Notify",
         notifyAll: "All",
-        notifyMentions: "Only @owner",
+        notifyMentions: "Only @user",
         notifyNone: "Nothing",
         notifyHint: "Nothing means no unread count, no Inbox and nothing forwarded to WeChat",
         archive: "Archive",
@@ -6991,7 +7343,7 @@ export const catalogs = {
         open: "Search everything",
         title: "Search everything",
         hint: "Find messages…",
-        filters: "from:owner  in:#channel  has:file / image / link  before: / after:2026-10-01",
+        filters: "from:user  in:#channel  has:file / image / link  before: / after:2026-10-01",
         none: "Nothing found",
         searching: "Searching…",
         failed: "The search failed: {why}",
@@ -7014,22 +7366,31 @@ export const catalogs = {
         issueThread: "Ticket thread",
         talkThread: "{who}'s thread",
         thread: "Thread",
-        mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
+        mention: { orchestrator: "@assistant", user: "@user", everyone: "@everyone" },
         orchestratorNote: "sends work, splits plans, answers how it goes",
         everyone: "Everyone",
         everyoneNote: "wakes every helper here",
       },
       threadWidth: "Thread width (drag; double-click for the default)",
       commands: {
-        issue: { name: "Write a ticket", note: "/issue title: into the backlog, in this channel's repo", needs: "Write the ticket's title after /issue" },
+        issue: { name: "Write a ticket", args: "title", note: "Kept as a draft, in this channel's repository", needs: "Write the ticket's title after /issue" },
         remember: {
-          name: "Have the manager remember",
-          note: "/remember a sentence: into the memory of the manager looking after this",
+          name: "Have the assistant remember",
+          args: "a line",
+          note: "Kept in the memory of the assistant here",
           needs: "Write what it should remember after /remember",
         },
-        stop: { name: "Stop the manager", note: "The manager looking after this stops its round; helpers it sent keep working", needs: "" },
-        dm: { name: "Direct message", note: "/dm name: open the direct channel with that profile", needs: "Write the profile's name or id after /dm" },
-        done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped" },
+        stop: { name: "Stop the assistant", args: "", note: "The assistant here stops this turn; helpers it sent keep working", needs: "" },
+        dm: { name: "Direct message", args: "name", note: "Opens the direct channel with this profile", needs: "Write the profile's name or id after /dm" },
+        imagegen: {
+          name: "Make an image",
+          args: "description",
+          note: "The assistant here draws it with MOSS and posts it here",
+          needs: "Write what to draw after /imagegen",
+          nowhere: "Open a channel first to make an image",
+          notReady: "Images aren't set up: {why}. Press Enter to set it up",
+        },
+        done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped", imagegen: "Handed to the assistant; the image will be posted here" },
       },
     },
     "web.connector": {
@@ -7045,17 +7406,17 @@ export const catalogs = {
           },
           feishu: {
             "0": "After the scan, Feishu makes a bot app that is yours alone; nothing to set up by hand on the open platform.",
-            "1": "Then find the bot in Feishu and send it the pairing code in a direct message: whoever sends the code is the owner, and only the owner's words come in. Direct messages only, not groups.",
+            "1": "Then find the bot in Feishu and send it the pairing code in a direct message: whoever sends the code counts as you, and only their words come in. Direct messages only, not groups.",
             "2": "A Feishu bot can message you any time, so reports do not wait for you to speak first.",
           },
           qq: {
             "0": "QQ cannot make a bot by scanning: make one on the QQ open platform (q.qq.com) first, turn on direct messages, and fill in its AppID and AppSecret here.",
-            "1": "Add the bot with your own QQ and send it the pairing code in a direct message: whoever sends the code is the owner. Direct messages only.",
+            "1": "Add the bot with your own QQ and send it the pairing code in a direct message: whoever sends the code counts as you. Direct messages only.",
             "2": "QQ lets a bot reply only for a short while after you speak. Reports after that wait, are retried later, and come with your next message.",
           },
         },
         always:
-          "Helpers can run commands on this computer, so only the owner counts; reply quoting a report and your words go to that ticket's thread. VibeValley only connects out and opens no port.",
+          "Helpers can run commands on this computer, so only you count; reply quoting a report and your words go to that ticket's thread. VibeValley only connects out and opens no port.",
         state: {
           off: "Not connected",
           waiting: "Waiting for your scan",
@@ -7066,16 +7427,16 @@ export const catalogs = {
           paused: "Paused",
         },
         list: "Connectors",
-        intro: "Talk to the manager in a chat app: send work, ask how it goes, get reports.",
+        intro: "Talk to the assistant in a chat app: send work, ask how it goes, get reports.",
         know: "Good to know",
         disconnect: "Disconnect",
         weixinIntro:
-          "Scan a code with WeChat on your phone and talk to the manager in WeChat: send work, ask how it goes; helpers' reports and questions come to WeChat too.",
-        feishuIntro: "Scan a code with Feishu on your phone and Feishu makes a bot for you; talking to it in Feishu is talking to the manager.",
+          "Scan a code with WeChat on your phone and talk to the assistant in WeChat: send work, ask how it goes; helpers' reports and questions come to WeChat too.",
+        feishuIntro: "Scan a code with Feishu on your phone and Feishu makes a bot for you; talking to it in Feishu is talking to the assistant.",
         scan: "Sign in to {app} by scanning",
         pairing: "The bot is connected. Last step: with your own {app}, message this bot directly and send:",
-        pairingNote: "Whoever sends this code is the owner: from then on only that person's words come in. The code works once.",
-        owner: "Owner",
+        pairingNote: "Whoever sends this code counts as you: from then on only that person's words come in. The code works once.",
+        user: "You",
         channel: "Connected to",
         since: "Connected since",
         lastInbound: "Last heard from you",
@@ -7105,7 +7466,7 @@ export const catalogs = {
       reading: "Reading…",
       unread: "Cannot be read.",
       notNow: "Not yet",
-      orchestrator: "Manager",
+      orchestrator: "Assistant",
       plotOf: "{name}'s plot",
       plot: {
         unread: "This plot's ticket has not been read yet.",
@@ -7215,8 +7576,8 @@ export const catalogs = {
         jobHint: "What to do, and what counts as done",
         job: "Ticket",
         who: "Who plants it",
-        orchestratorPicks: "Manager picks",
-        how: "Start: the manager hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
+        orchestratorPicks: "Assistant picks",
+        how: "Start: the assistant hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
         draft: "Draft",
         start: "Start",
       },
@@ -7251,19 +7612,19 @@ export const catalogs = {
         warehouse: "Warehouse",
         graphs: "Tasks and achievements",
         log: "Farm log",
-        orchestrator: "Manager and pets",
+        orchestrator: "Assistant and pets",
         harvest: "Harvest {name}'s plot",
         sow: "Sow · plot {plot}",
         water: "Water {name}",
         menu: "Menu",
-        pickLook: "Pick a manager you like; the farm and the chat change at once.",
+        pickLook: "Pick an assistant you like; the farm and the chat change at once.",
         drawing: "Still being drawn…",
         pets: "Pets",
         shopItems: {
           scarecrow: { name: "Scarecrow", note: "Scares off crows, looks nice" },
           seeds: { name: "Seed pack", note: "Common ticket templates" },
           bunting: { name: "Bunting", note: "Hangs on the fence" },
-          doghouse: { name: "Doghouse", note: "For the manager's dog" },
+          doghouse: { name: "Doghouse", note: "For the assistant's dog" },
         },
         shopClosed: "The shop is being done up and opens in the next version. You have {coins} coins: save them for now.",
       },
@@ -7283,7 +7644,7 @@ export const catalogs = {
         yard: "What you can click in the yard",
       },
       log: {
-        empty: "Nothing yet. Once you open, what you and the manager say and who finished what are kept here.",
+        empty: "Nothing yet. Once you open, what you and the assistant say and who finished what are kept here.",
         you: "You",
         said: "said",
         answered: "answered",
@@ -7314,13 +7675,13 @@ export const catalogs = {
           "3": "Everyone, call it a day",
         },
         greeting:
-          'This is the farm chat, where you, the manager and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
+          'This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
         phase: {
           off: "Type or press the mic to open",
-          connecting: "Reaching the manager…",
-          listening: "The manager is listening",
-          thinking: "The manager is thinking…",
-          speaking: "The manager is speaking",
+          connecting: "Reaching the assistant…",
+          listening: "The assistant is listening",
+          thinking: "The assistant is thinking…",
+          speaking: "The assistant is speaking",
           error: "Not connected: try again",
         },
         newIn: "new words in {n} places",
@@ -7353,7 +7714,7 @@ export const catalogs = {
         pageAndSchedules: "Channel page and scheduled tasks",
         settingsLink: "Settings",
         back2: "Back",
-        newChannelLine: "A long-running matter or a repo gets a place of its own to talk and send work. Call the manager here and the work is sent here.",
+        newChannelLine: "A long-running matter or a repo gets a place of its own to talk and send work. Call the assistant here and the work is sent here.",
         nameHint: "Name, such as clock-in",
         name: "Channel name",
         descriptionHint: "What it is for (optional)",
@@ -7369,11 +7730,11 @@ export const catalogs = {
         anyone: "Any helper",
         inThread: "Say it in the thread; {name} sees it…",
         inThreadAnyone: "Say it in the thread…",
-        toOrchestrator: "Tell the manager; @ calls a helper…",
-        toOrchestratorAlone: "Just between you and the manager…",
+        toOrchestrator: "Tell the assistant; @ calls a helper…",
+        toOrchestratorAlone: "Just between you and the assistant…",
         who: "Who",
-        stop: "Stop the manager",
-        stopHint: "Stops the manager's round; helpers already sent keep working",
+        stop: "Stop the assistant",
+        stopHint: "Stops the assistant's round; helpers already sent keep working",
         send: "Send",
         less: "Less",
         more: "Read more",
@@ -7425,7 +7786,7 @@ export const catalogs = {
       page: { lost: "Cannot reach the farm, reconnecting… (is the server running?)", waiting: "Waiting for the farm…" },
       hud: {
         label: "The farm's HUD",
-        look: "Change the manager's look",
+        look: "Change the assistant's look",
         workbenchHint: "Tickets, chat… the pages for managing work",
         workbench: "Workbench",
         treeHint: "Memory tree: what the farm has learned",
@@ -7503,7 +7864,7 @@ export const catalogs = {
         log: { hint: "What was said and harvested, newest first" },
         taskBoard: { hint: "A long job split into steps for several helpers" },
         agents: { hint: "Which machine each helper uses, its persona and skills, how it looks" },
-        manager: { hint: "Talk to the manager" },
+        manager: { hint: "Talk to the assistant" },
         runtimes: { label: "Workshop · machines", hint: "Each machine is a runtime: installed or not, usage" },
         skills: { label: "Library · skill book", hint: "Skills helpers can carry" },
       },
@@ -7560,7 +7921,7 @@ export const catalogs = {
       homeless: "Not in any repo: ",
       sea: "No repos in the work folder yet: the map is all sea.",
       notDrafted: "Not drafted: {why}",
-      sowIntro: "Planting in {repo}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
+      sowIntro: "Planting in {repo}: write a line on what to do, and the assistant sends a helper; or write it as a to-do first and start it after a look.",
       job: "What to do",
       jobExample: "Such as: add Remember me to the sign-in page",
       todo: "Write it as a to-do",
@@ -7590,7 +7951,7 @@ export const catalogs = {
       ringing: "Incoming…",
       decline: "Decline",
       answer: "Answer",
-      callOrchestrator: "Call the manager",
+      callOrchestrator: "Call the assistant",
       missed: "Missed {n}",
       log: "Log",
       noCalls: "No calls yet.",
@@ -7599,13 +7960,13 @@ export const catalogs = {
       noMissed: "No missed calls. All is well in the field.",
       phase: {
         connecting: "Connecting…",
-        live: "On the call: go ahead, the manager is listening",
-        coming: "On the call: the manager is on the way",
+        live: "On the call: go ahead, the assistant is listening",
+        coming: "On the call: the assistant is on the way",
         ending: "Hanging up…",
         failed: "Not connected: {why}",
-        idle: "Just say it. When a ticket comes back or gets stuck, the manager calls you too.",
+        idle: "Just say it. When a ticket comes back or gets stuck, the assistant calls you too.",
       },
-      manager: "Manager",
+      manager: "Assistant",
       hangUp: "Hang up",
       app: { missed: "Missed", channels: "Chat", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
@@ -7709,7 +8070,7 @@ export const catalogs = {
       reading: "Reading…",
       never: "Never mind",
       later: "Leave it for now",
-      orchestrator: "Manager",
+      orchestrator: "Assistant",
       noHelper: "No helper yet",
       board: {
         earlier: "{n} earlier",
@@ -7865,10 +8226,10 @@ export const catalogs = {
           "run/error": "Error",
           "run/end": "Round over",
         },
-        orchestratorStuck: "The manager did not finish answering this round: see what it said in its channel",
+        orchestratorStuck: "The assistant did not finish answering this round: see what it said in its channel",
         job: "To do",
         from: "From",
-        fromCron: "A scheduled task: each time it is due it goes to the manager, and its answer waits for you",
+        fromCron: "A scheduled task: each time it is due it goes to the assistant, and its answer waits for you",
         answered: "In its channel",
         evidence: "Evidence",
         unsure: "Not sure about",
@@ -7941,7 +8302,7 @@ export const catalogs = {
       },
       run: { working: "working", heard: "{n, plural, one {heard # word on the way} other {heard # words on the way}}" },
       card: {
-        orchestrator: "Manager",
+        orchestrator: "Assistant",
         refining: "{name} is drafting",
         draft: "Draft",
         queued: "Queued",
@@ -7957,7 +8318,7 @@ export const catalogs = {
         used: "took {took}",
         run: "round {n}",
         runs: "{n, plural, one {# round} other {# rounds}}",
-        orchestratorWorking: "the manager is on it",
+        orchestratorWorking: "the assistant is on it",
         missingFlag: "Record missing",
         missing: "The run's record is missing: {what}",
       },
@@ -8014,10 +8375,6 @@ export const catalogs = {
         address: "Address",
         add: "Add a device",
         close: "Turn off",
-        devices: "Paired devices",
-        deviceCount: "{n}",
-        removeWhich: "Remove {name}",
-        remove: "Remove",
         copied: "Copied: open it in the other computer's browser.",
         notCopied: "Cannot copy: select the link and copy it yourself.",
         qr: "Pairing QR code",
@@ -8029,35 +8386,92 @@ export const catalogs = {
         asking: '"{name}" wants to connect to this computer. Let in, it can use VibeValley on this computer as you do.',
         letIn: "Let it in",
         refuse: "Refuse",
-        paired: "Paired {at} · last seen {seen}",
-        pairedNever: "Paired {at} · never seen",
         notes: {
-          "0": "Helpers can run commands on this computer, so only paired devices may connect; pairing needs your approval here.",
-          "1": "A paired device uses VibeValley on this computer as you do. The switch and the devices are managed only on this computer.",
+          "0": "Helpers can run commands on this computer, so only devices holding a key may connect: pairing needs your approval here, signing in needs the password set here.",
+          "1": "A paired device sees helpers, sends work and talks as you do, but the switch and the settings are managed only on this computer; a signed-in device is you, and only the password is set on this computer alone.",
           "2": "The connection is plain HTTP: people on the same network may see what goes over it. Turn it on only on networks you trust, such as your home Wi-Fi or your own hotspot.",
           "3": "When the computer's address changes (another network), devices cannot connect; add the device here and scan again, without approving again.",
         },
       },
-      devices: { android: "Android phone", windows: "Windows PC", device: "A device" },
       pair: {
         title: "Connect to that computer",
         intro:
-          "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the channels. Pairing needs the owner's approval on that computer.",
+          "This device connects to VibeValley on that computer and, as on that computer, sees helpers, sends work and talks in the channels. Pairing needs approval on that computer.",
         code: "Pairing code",
         codeHint: "On that computer, press Add a device under Connect to this machine",
         name: "This device is called",
-        nameHint: "The name the owner sees in the list of devices",
-        ask: "Ask the owner to let it in",
-        waiting: "Waiting for the owner on that computer to approve…",
+        nameHint: "The name shown in the list of devices",
+        ask: "Ask to be let in",
+        waiting: "Waiting for approval on that computer…",
       },
     },
+    "web.library": {
+      title: "Library",
+      hint: "Files that were generated, that you uploaded, and that helpers brought back.",
+      upload: "Upload",
+      uploading: "Uploading…",
+      make: "Generate",
+      makeTitle: "Generate",
+      empty: "Nothing here yet",
+      emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
+      nothingShown: "Nothing matches these filters.",
+      drop: "Let go to put it in the library",
+      rail: { label: "Filters", where: "From", kind: "Kind", channels: "From channels", agents: "From helpers", anyWhere: "Any origin", anyKind: "Any kind" },
+      origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
+      kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
+      search: "Search names",
+      sortLabel: "Sort",
+      sort: { recent: "Recent", name: "Name", size: "Size" },
+      tileSize: "Thumbnail size",
+      grid: "Files",
+      job: {
+        image: "image",
+        speech: "speech",
+        speakers: "dialogue",
+        voiceDesign: "voice design",
+        clone: "voice clone",
+        transcription: "transcription",
+        understanding: "understanding",
+      },
+      from: {
+        generated: "Generated · {job}",
+        uploadedHere: "You uploaded it here",
+        uploadedIn: "You sent it in {channel}",
+        fetchedUrl: "{agent} brought it back from {url}",
+        fetchedPath: "{agent} brought it back from {path} in its working directory",
+      },
+      inspector: {
+        label: "Details",
+        kind: "Kind",
+        pixels: "Size",
+        bytes: "File size",
+        length: "Length",
+        from: "From",
+        added: "Added",
+        openChannel: "See it in {channel}",
+        selected: "{n} selected",
+        clear: "Clear selection",
+        more: "More",
+      },
+      download: "Download",
+      sendTo: "Send to a channel",
+      sentTo: "Sent to {channel}",
+      remove: "Remove from library",
+      removeAsk: "Remove “{name}” from the library? Messages that have it still open it.",
+      removeSome: "Remove these {n} from the library? Messages that have them still open them.",
+      removeSure: "Remove",
+      keep: "Keep",
+      understand: "Understand",
+      understandTitle: "Understand “{name}”",
+      understood: "What it shows",
+      makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
+    },
     "web.media": {
-      title: "Media",
       image: "Image generation",
       speech: {
         title: "Single-speaker speech",
         notice:
-          "Send text to the displayed MOSS account to generate one speaker. Charges may apply. Playback never starts automatically; Flash streaming plays only when requested. Canceling stops local waiting, not necessarily provider work or charges. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in owner-only Media storage, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
+          "Send text to the displayed MOSS account to generate one speaker. Charges may apply. Playback never starts automatically; Flash streaming plays only when requested. Canceling stops local waiting, not necessarily provider work or charges. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in Media storage only you can reach, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
         configure: "Select a speech connection and Flash or Pro model in AI services first.",
         binding: "{account} · {connection} · {model} · configuration revision {revision}",
         refresh: "Refresh connection settings",
@@ -8088,21 +8502,18 @@ export const catalogs = {
         notice:
           "Select 1–5 images (up to 30 MB each), or one video (up to 200 MB); do not mix them. Files are first stored on this computer, then sent to the displayed MOSS connection after your approval. Charges may apply. Canceling does not guarantee that the provider stopped.",
         configure: "Select an understanding connection in AI services first.",
-        files: "Local images or video",
         prompt: "What should the model explain?",
         tokens: "Maximum output tokens",
         executor: "Execution / authorized channel",
         direct: "Submit now myself",
-        authorize: "Authorize the orchestrator",
+        authorize: "Authorize the assistant",
         authorizationNotice:
-          "Freeze this prompt, input and output limit without uploading to MOSS yet. An orchestrator acting for you in the selected channel may execute it once within 15 minutes. Cancellation, expiry or a server restart invalidates approval.",
-        authorization: "Authorized channel: {channel}. Send to the orchestrator to begin. Approval expires 15 minutes after registration.",
-        delegate: "Send to orchestrator",
-        delegated: "Sent to orchestrator",
+          "Freeze this prompt, input and output limit without uploading to MOSS yet. An assistant acting for you in the selected channel may execute it once within 15 minutes. Cancellation, expiry or a server restart invalidates approval.",
+        authorization: "Authorized channel: {channel}. Send to the assistant to begin. Approval expires 15 minutes after registration.",
+        delegate: "Send to the assistant",
+        delegated: "Sent to the assistant",
         delegation: "Execute my authorized media understanding task {id}, then report the result.",
         consent: "I approve sending these files and this prompt to the displayed MOSS connection.",
-        stored: "Stored locally",
-        selected: "Selected; not uploaded yet",
         uploading: "Storing selected files on this computer…",
         stopUpload: "Stop local upload",
         uploadFailed: "Local upload failed. This submission has not started understanding; retry or select the files again.",
@@ -8121,12 +8532,10 @@ export const catalogs = {
         cleanupAsk:
           "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding.",
       },
-      sourceOwner: "Source: owner",
-      sourceAgent: "Source: orchestrator {agent} · channel {channel}",
+      sourceUser: "Source: you",
+      sourceAgent: "Source: assistant {agent} · channel {channel}",
       usage: "Provider reported: {images} image(s) · {width} × {height}",
       usageUnknown: "No provider usage result yet. This does not mean there was no charge.",
-      hint: "Generate images or single-speaker speech, or understand selected images and video with the connections bound in AI services. Keep results locally.",
-      configure: "Configure AI connections",
       prompt: "Prompt / layout JSON",
       format: "Input format",
       text: "Text to image",
@@ -8166,7 +8575,7 @@ export const catalogs = {
     "web.memory": {
       memory: {
         yours: "you remembered",
-        orchestrators: "the manager remembered for it",
+        orchestrators: "the assistant remembered for it",
         sessions: "{name} remembered",
         own: "it remembered",
         intro:
@@ -8200,20 +8609,20 @@ export const catalogs = {
         wordsHint: "This round's words (optional)",
         blank: "Starting in this repo, nothing comes to mind.",
         noRepos: "No repos yet.",
-        orchestratorReading: "Reading the manager's memory…",
+        orchestratorReading: "Reading the assistant's memory…",
         orchestratorIntro:
-          "The manager reads its memory when it starts and after each compaction; what is remembered or forgotten in between, it knows by its next line.",
-        orchestratorNothing: 'Nothing remembered yet. Tell the manager "Remember…", or write one for it above.',
-        orchestratorOwn: "the manager remembered",
+          "The assistant reads its memory when it starts and after each compaction; what is remembered or forgotten in between, it knows by its next line.",
+        orchestratorNothing: 'Nothing remembered yet. Tell the assistant "Remember…", or write one for it above.',
+        orchestratorOwn: "the assistant remembered",
         told: "you told it",
         archiveIntro:
-          "When the conversation grows too long, the manager compacts the earlier part into a summary and keeps the original here word for word. When the summary misses a detail, it looks it up with search_archive; you can look here too.",
+          "When the conversation grows too long, the assistant compacts the earlier part into a summary and keeps the original here word for word. When the summary misses a detail, it looks it up with search_archive; you can look here too.",
         search: "Search the archive",
         searchHint: "A word",
         find: "Search",
         found: "Found",
         compacted: "Compacted conversations",
-        noArchive: "None yet: the manager's conversation has not grown long enough to compact.",
+        noArchive: "None yet: the assistant's conversation has not grown long enough to compact.",
         chars: "{n} characters",
         note: "Write one for it",
         noteRepo: "Such as: clock-in's tests run with pnpm test, not npm",
@@ -8234,20 +8643,20 @@ export const catalogs = {
         auntie: { name: "Farm auntie", blurb: "Headscarf and apron, every plot's work in her notebook." },
         grandpa: { name: "Old hand", blurb: "White beard, a lifetime of farming, never in a hurry." },
         gardener: { name: "Gardener", blurb: "A flower in a wide straw hat, shears in the apron pocket." },
-        robot: { name: "Robot manager", blurb: "A round farm robot whose face screen smiles." },
+        robot: { name: "Robot butler", blurb: "A round farm robot whose face screen smiles." },
       },
       pet: { dog: "Puppy", ragdoll: "Colorpoint ragdoll", bluecat: "Blue cat" },
       orchestrator: {
         tab: { memory: "Memory", trajectory: "Trajectory", archive: "Archive", voice: "Voice" },
         all: "← All profiles",
-        title: "Manager",
-        intro: "The manager is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
+        title: "Assistant",
+        intro: "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
         look: "It looks like {name}.",
         profile: "Edit its profile",
-        tabs: "The manager's",
+        tabs: "The assistant's",
         heard: "Heard",
-        quiet: "The manager has not spoken yet.",
-        trajectory: "Each of the manager's rounds",
+        quiet: "The assistant has not spoken yet.",
+        trajectory: "Each of the assistant's rounds",
         about:
           'What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click "This round went wrong" on what it heard, write what it should have done, and it is kept as an eval.',
       },
@@ -8339,34 +8748,13 @@ export const catalogs = {
       tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
     "web.provider": {
-      speakersSettings: "Multi-speaker speech",
-      voiceDesignSettings: "Voice design",
-      transcriptionSettings: "Audio transcription",
-      visionSettings: "Realtime vision",
-      capabilityConnection: "Connection",
-      capabilityModel: "Model / version",
-      capabilityNotice:
-        "Choose an independent connection and model. Saving these settings does not submit a request or access your microphone, camera or files.",
-      speechSettings: "Single-speaker speech",
-      speechConnection: "Speech connection",
-      speechModel: "Speech model",
       speechNotice:
-        "Choose a separate Flash or Pro binding, then generate one speaker on the Media page. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
-      openSpeech: "Open speech generation",
-      title: "AI services",
-      intro:
-        "Save MOSS connections, then choose independent models for dictation, images, media understanding, speech, voice design, transcription and realtime audio or vision.",
+        "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
+      title: "Uses",
+      intro: "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
       words: "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
-      understandingSettings: "Media understanding settings",
-      understandingConnection: "Media understanding connection",
-      understandingModel: "Understanding model / version",
       understandingNotice:
-        "Configure the independent connection and model. Select files and explicitly approve uploads on the Media page. Saving this configuration does not upload or run inference.",
-      imageSettings: "Image generation settings",
-      imageConnection: "Image generation connection",
-      imageModel: "Image model / version",
-      imageModelHint:
-        "Stable names follow provider updates; dated snapshots pin the model version. Account access and quality still require a real request to verify.",
+        "Configure the independent connection and model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
       imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
       add: "Add MOSS connection",
       reload: "Reload",
@@ -8381,15 +8769,33 @@ export const catalogs = {
       saveFirst: "Save changes before querying the account's available models.",
       discoveryHint: "Catalog only, no inference. A listed model has not been verified by inference.",
       noModels: "This account returned an empty model catalog.",
-      bindings: "Default uses",
-      dictation: "Dictation connection",
-      model: "Dictation model",
       modelHint: "Only integrated transcription models are offered. Account permission and quality still require a real request to verify.",
       unbound: "Not in use",
       liveHint: "MOSS Live uses its own connection and model. Changing the dictation model does not change the realtime protocol.",
       bindingHint:
         "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
       manage: "Manage AI service connections",
+      connections: "Connections",
+      uses: "Uses",
+      usesIntro: "Pick a connection and model for each use; none leaves it unused.",
+      groupImage: "Images",
+      groupVoice: "Voice",
+      groupLive: "Live",
+      use: {
+        dictation: "Dictation",
+        image: "Image generation",
+        understanding: "Media understanding",
+        speech: "Speech",
+        speakers: "Dialogue",
+        voiceDesign: "Voice design",
+        transcription: "Transcription",
+        live: "MOSS Live",
+        vision: "Live vision",
+      },
+      connectionFor: "Connection for {use}",
+      modelFor: "Model for {use}",
+      openSpeechShort: "Open",
+      adapted: "Models it can use",
     },
     "web.repo": {
       title: "Repos",
@@ -8560,9 +8966,13 @@ export const catalogs = {
         installed: "Installed on this computer · {count}",
         noneReported: "The machines have not reported their skills yet (or are still being read).",
         noMatch: "Nothing matches.",
-        own: "VibeValley's own · {count}",
+        own: "Written by you · {count}",
         newSkill: "New skill",
         noSkills: "No skills yet: write one of VibeValley's own, or install some on a runtime and come back.",
+        builtIn: "Ships with VibeValley · {count}",
+        builtInNote:
+          "A skill that ships with VibeValley: it is updated with VibeValley and can't be changed or deleted here. Tick it on a profile's Skills tab and the helper's prompt carries it; to work another way, make a skill of your own.",
+        builtInTag: "Built in",
         installedNote:
           "A skill installed on the machines: helpers using these machines load it when needed, no need to tick it in a profile. To change it, edit its file.",
         where: "Machines that have it",
@@ -8689,7 +9099,7 @@ export const catalogs = {
     "web.setting": {
       language: {
         title: "Language",
-        line: "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
+        line: "The page's words, what the assistant and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
         zh: "中文",
         en: "English",
         label: "Page language",
@@ -8707,7 +9117,7 @@ export const catalogs = {
         key: "{label}'s key",
         keyHint: "key (leave empty if none or to keep)",
         user: "{label}'s user_id",
-        userHint: "Your user_id in EverOS (empty means owner)",
+        userHint: "Your user_id in EverOS (empty uses the default one)",
         read: "Read",
         readHint: "Also asked when recalling at the start and when a helper looks things up",
         write: "Write",
@@ -8730,7 +9140,6 @@ export const catalogs = {
         search: "Search settings…",
         general: "General",
         appearance: "Appearance",
-        models: "Models",
         about: "About",
         memory: "Memory",
         skills: "Skills",
@@ -8739,12 +9148,12 @@ export const catalogs = {
         chat: "Chat apps",
         devices: "Devices",
         width: "Navigation width (drag; double-click for the default)",
+        accounts: "Accounts and keys",
       },
       groups: { options: "Options", helpers: "Helpers", voice: "Voice", connect: "Connections" },
       words: {
         general: "language start open workbench farm",
         appearance: "theme dark light size zoom scale font",
-        models: "DeepSeek key model manager",
         about: "version home folder settings file",
         memory: "Nowledge EverOS memory recall",
         skills: "skill library",
@@ -8753,11 +9162,12 @@ export const catalogs = {
         dictation: "dictation transcription voice input",
         github: "gh PR login",
         chat: "WeChat Feishu Lark QQ connectors pairing",
-        devices: "phone pairing connect to this machine LAN",
+        devices: "phone pairing connect to this machine LAN name password sign in sign out",
+        accounts: "keys accounts DeepSeek MOSS Agora API key models",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
-        languageHint: "The page, the manager and the helpers all speak it",
+        languageHint: "The page, the assistant and the helpers all speak it",
         start: "Open on start",
         startHint: "Where the app, or the home page, opens",
         starts: { workbench: "Workbench", farm: "Farm" },
@@ -8770,7 +9180,7 @@ export const catalogs = {
         scale: "Interface size",
         scaleHint: "Scales the whole workbench; the farm keeps its whole-number scaling",
       },
-      models: { intro: "The models the manager and VibeValley's own helpers use.", deepseekHint: "The manager and VibeValley's own helpers use it" },
+      models: { deepseekHint: "The assistant and VibeValley's own helpers use it" },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
         version: "Version",
@@ -8816,6 +9226,32 @@ export const catalogs = {
         cliTaken: "{link} is another program's file and was not replaced: move it away, then install",
         cliInstall: "Install",
         cliRemove: "Remove",
+      },
+      missing: {
+        deepseekKey: "No DeepSeek key yet",
+        mossAccount: "No MOSS account yet",
+        mossKey: "The MOSS account has no key yet",
+        mossOff: "The MOSS account it uses is turned off",
+        binding: "No account and model chosen for it yet",
+        agora: "Agora's credentials are missing",
+        dictationUrl: "No dictation address yet",
+      },
+      feature: {
+        orchestrator: "The assistant",
+        image: "Image generation",
+        understanding: "Media understanding",
+        speech: "Speech",
+        speakers: "Dialogue",
+        voiceDesign: "Voice design",
+        transcription: "Transcription",
+        dictation: "Dictation",
+        live: "MOSS Live",
+        vision: "Live vision",
+        call: "Calls",
+      },
+      readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
+      accounts: {
+        intro: "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses.",
       },
     },
     "web.tree": {
@@ -8906,6 +9342,60 @@ export const catalogs = {
       drop: "Remove {chip}",
       noticeTitle: { info: "Notice", warn: "Not sent", error: "Something went wrong" },
     },
+    "web.user": {
+      login: {
+        title: "Sign in",
+        intro: "Sign in with the password set on the computer running VibeValley, and this device sees helpers, sends work and talks in the channels.",
+        noPassword: "No password is set on that computer yet: set one there under Settings › Devices, or connect with a pairing code.",
+        password: "Password",
+        device: "This device is called",
+        deviceHint: "The name shown in the list of devices",
+        submit: "Sign in",
+        signing: "Signing in…",
+        pairInstead: "Connect with a pairing code",
+      },
+      account: {
+        title: "Name and password",
+        name: "Name",
+        nameHint: "What VibeValley calls you",
+        save: "Save",
+        nameSaved: "Name saved",
+        password: "Password",
+        passwordHint: "For signing in from other devices; at least 8 characters",
+        setPassword: "Set password",
+        changePassword: "Change password",
+        passwordSaved: "Password set",
+        passwordHere: "The password can only be set on the computer running VibeValley.",
+        thisDevice: "This device: {name}",
+        signOut: "Sign out",
+      },
+      devices: {
+        title: "Your devices",
+        count: "{n}",
+        paired: "Paired {at} · last seen {seen}",
+        pairedNever: "Paired {at} · never seen",
+        login: "Signed in {at} · last seen {seen}",
+        loginNever: "Signed in {at} · never seen",
+        thisOne: "{name} (this one)",
+        remove: "Take back",
+        removeWhich: "Take back the key of {name}",
+      },
+      guess: { android: "Android phone", windows: "Windows PC", device: "A device" },
+      approvals: {
+        page: "Let a device sign in",
+        hint: "Ran vibevalley auth login in that device's terminal? Check the code; approve if it matches.",
+        title: "Sign-ins waiting for you",
+        none: "No device is waiting. Run vibevalley auth login on that device and its code shows up here.",
+        wants: "{name} wants to sign in",
+        left: "Expires in {m} min",
+        allow: "Approve",
+        refuse: "Refuse",
+        from: "Asked from {from}, {at}",
+        fromHere: "Asked from this computer, {at}",
+        onlyYours:
+          "Approve only a code you just got from vibevalley auth login in your own terminal: refuse a code someone sent you or an address you do not know; once approved, that device can do anything as you.",
+      },
+    },
     "web.voice": {
       voice: {
         section: { label: "Voice" },
@@ -8914,19 +9404,17 @@ export const catalogs = {
         saved: "Saved: the next call uses it.",
         answer: {
           orchestrator:
-            "The channel's manager itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
-          moss: "MOSS Live takes the call directly over a local WebSocket with your MOSS key — no Agora credentials or tunnel needed — and hands farm work to the manager.",
+            "The channel's assistant itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
+          moss: "MOSS Live takes the call directly over a local WebSocket with your MOSS key — no Agora credentials or tunnel needed — and hands farm work to the assistant.",
           agora: "A model hosted by Agora, no other key needed.",
           deepseek: "Uses the DeepSeek key in the settings ({from}).",
           noDeepseek: "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",
           openai: "Any OpenAI-compatible endpoint: Qwen, Kimi, your own deployment…",
         },
         intro:
-          "The manager hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The manager's persona, greeting and voice are on the",
-        orchestratorPage: "manager page",
+          "The assistant hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The assistant's persona, greeting and voice are on the",
+        orchestratorPage: "assistant page",
         period: ".",
-        ready: "Can connect",
-        missing: "Credentials missing",
         nextCall: "Changes take effect on the next call",
         credentials: "Credentials",
         console: "Agora console",
@@ -8963,14 +9451,14 @@ export const catalogs = {
         dictationModelLabel: "Dictation model",
         dictationKey: "Credentials (may be empty locally)",
         persona: {
-          intro: "How the manager opens a call and what voice it uses. The credentials, how it listens and who answers are on the",
+          intro: "How the assistant opens a call and what voice it uses. The credentials, how it listens and who answers are on the",
           page: "page.",
           open: "Opening",
           openParts: "Persona · greeting",
-          ownCall: "The manager takes the call itself: it is the channel's manager, with its own prompt and no separate persona.",
+          ownCall: "The assistant takes the call itself: it is the channel's assistant, with its own prompt and no separate persona.",
           persona: "Persona",
           personaHint:
-            "Who the model that answers first on the call is, and how it speaks. It cannot see how things are; the manager on this computer sends work. Tell it not to make up progress.",
+            "Who the model that answers first on the call is, and how it speaks. It cannot see how things are; the assistant on this computer sends work. Tell it not to make up progress.",
           greeting: "Greeting",
           greetingHint: "The first thing said when the call connects.",
           failure: "On a failure, say",
@@ -8994,6 +9482,7 @@ export const catalogs = {
         dictationVia: "Dictation goes to",
         dictationOwn: "Your own address",
         dictationMossIntro: "The server transcribes recordings using the MOSS connection and dictation model selected in AI services.",
+        line: "Line",
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -9123,6 +9612,7 @@ export const catalogs = {
         },
         tryIt: "Try it",
         notInChat: "Nothing goes to the chat",
+        debug: "Debugging: line quality and messages on the line",
       },
     },
   },
@@ -9136,6 +9626,7 @@ export interface Messages {
   "cli.arg.agentName": undefined;
   "cli.arg.appPath": undefined;
   "cli.arg.artifact": undefined;
+  "cli.arg.authServer": undefined;
   "cli.arg.capture": undefined;
   "cli.arg.channel": undefined;
   "cli.arg.chatRuntime": undefined;
@@ -9156,6 +9647,15 @@ export interface Messages {
   "cli.arg.status": undefined;
   "cli.arg.title": undefined;
   "cli.arg.updateStep": undefined;
+  "cli.auth.approve": { readonly code: string | number; readonly link: string | number };
+  "cli.auth.here": { readonly server: string | number };
+  "cli.auth.logoutUnsaid": { readonly why: string | number };
+  "cli.auth.noBrowser": undefined;
+  "cli.auth.notSignedIn": { readonly server: string | number };
+  "cli.auth.revoked": { readonly server: string | number };
+  "cli.auth.signedIn": { readonly device: string | number; readonly server: string | number };
+  "cli.auth.signedOut": { readonly server: string | number };
+  "cli.auth.status": { readonly device: string | number; readonly name: string | number; readonly server: string | number };
   "cli.channel.sent": { readonly channel: string | number };
   "cli.command.agent.create": undefined;
   "cli.command.agent.delete": undefined;
@@ -9169,6 +9669,10 @@ export interface Messages {
   "cli.command.artifact.list": undefined;
   "cli.command.artifact.read": undefined;
   "cli.command.artifact.show": undefined;
+  "cli.command.auth.about": undefined;
+  "cli.command.auth.login": undefined;
+  "cli.command.auth.logout": undefined;
+  "cli.command.auth.status": undefined;
   "cli.command.channel.list": undefined;
   "cli.command.channel.messageList": undefined;
   "cli.command.channel.messageSearch": undefined;
@@ -9232,6 +9736,9 @@ export interface Messages {
   "cli.example.artifactList.about": undefined;
   "cli.example.artifactRead.about": undefined;
   "cli.example.artifactShow.about": undefined;
+  "cli.example.authLogin.about": undefined;
+  "cli.example.authLogout.about": undefined;
+  "cli.example.authStatus.about": undefined;
   "cli.example.channelList.about": undefined;
   "cli.example.channelMessageList.about": undefined;
   "cli.example.channelMessageSearch.about": undefined;
@@ -9261,7 +9768,7 @@ export interface Messages {
   "cli.example.issueShow.about": undefined;
   "cli.example.issueStatus.about": undefined;
   "cli.example.issueTimeline.about": undefined;
-  "cli.example.issueWantsOwner.about": undefined;
+  "cli.example.issueWantsUser.about": undefined;
   "cli.example.issueWatch.about": undefined;
   "cli.example.memoryCreate.about": undefined;
   "cli.example.memoryCreate.run": undefined;
@@ -9349,7 +9856,7 @@ export interface Messages {
   "cli.flag.tier": undefined;
   "cli.flag.timeout": undefined;
   "cli.flag.title": undefined;
-  "cli.flag.wantsOwner": undefined;
+  "cli.flag.wantsUser": undefined;
   "cli.group.agent.about": undefined;
   "cli.group.artifact.about": undefined;
   "cli.group.channel.about": undefined;
@@ -9426,8 +9933,8 @@ export interface Messages {
   "cli.op.artifact.suggestion.reject": undefined;
   "cli.op.artifact.update": undefined;
   "cli.op.artifact.version.create": undefined;
+  "cli.op.attachment.create": undefined;
   "cli.op.channel.archive.set": undefined;
-  "cli.op.channel.attachment.create": undefined;
   "cli.op.channel.create": undefined;
   "cli.op.channel.default.set": undefined;
   "cli.op.channel.delete": undefined;
@@ -9480,22 +9987,24 @@ export interface Messages {
   "cli.op.issue.status.update": undefined;
   "cli.op.issue.timeline.get": undefined;
   "cli.op.issue.update": undefined;
-  "cli.op.lan.device.delete": undefined;
-  "cli.op.lan.device.previewDelete": undefined;
   "cli.op.lan.get": undefined;
-  "cli.op.lan.me.get": undefined;
   "cli.op.lan.pair": undefined;
   "cli.op.lan.pairing.answer": undefined;
   "cli.op.lan.pairing.previewStop": undefined;
   "cli.op.lan.pairing.start": undefined;
   "cli.op.lan.pairing.stop": undefined;
   "cli.op.lan.update": undefined;
+  "cli.op.library.item.add": undefined;
+  "cli.op.library.item.delete": undefined;
+  "cli.op.library.item.list": undefined;
+  "cli.op.library.item.previewDelete": undefined;
   "cli.op.media.audio.cleanup": undefined;
   "cli.op.media.audio.previewCleanup": undefined;
   "cli.op.media.audio.resume": undefined;
   "cli.op.media.clone.create": undefined;
   "cli.op.media.dialogue.create": undefined;
   "cli.op.media.image.create": undefined;
+  "cli.op.media.input.adopt": undefined;
   "cli.op.media.input.create": undefined;
   "cli.op.media.input.delete": undefined;
   "cli.op.media.input.get": undefined;
@@ -9574,6 +10083,18 @@ export interface Messages {
   "cli.op.skill.list": undefined;
   "cli.op.skill.previewDelete": undefined;
   "cli.op.skill.update": undefined;
+  "cli.op.user.approval.answer": undefined;
+  "cli.op.user.approval.collect": undefined;
+  "cli.op.user.approval.create": undefined;
+  "cli.op.user.approval.list": undefined;
+  "cli.op.user.device.delete": undefined;
+  "cli.op.user.device.list": undefined;
+  "cli.op.user.device.previewDelete": undefined;
+  "cli.op.user.get": undefined;
+  "cli.op.user.login": undefined;
+  "cli.op.user.logout": undefined;
+  "cli.op.user.password.set": undefined;
+  "cli.op.user.update": undefined;
   "cli.op.voice.call.hear": undefined;
   "cli.op.voice.call.say": undefined;
   "cli.op.voice.call.start": undefined;
@@ -9671,6 +10192,7 @@ export interface Messages {
   "mobile.title": undefined;
   "mobile.unreachable": undefined;
   "mobile.waiting": undefined;
+  "server.agent.builtInSkill": { readonly name: string | number };
   "server.agent.defaultStaysOrchestrator": undefined;
   "server.agent.efforts": { readonly asked: string | number; readonly efforts: string | number; readonly runtime: string | number };
   "server.agent.effortsAnd": undefined;
@@ -9731,6 +10253,7 @@ export interface Messages {
   "server.artifact.demo.2.paragraphs.2": undefined;
   "server.artifact.demoNotInserted": { readonly status: string | number };
   "server.artifact.demoRunning": undefined;
+  "server.artifact.displayHtmlOnly": undefined;
   "server.artifact.edit.crosses": { readonly words: string | number };
   "server.artifact.edit.empty": undefined;
   "server.artifact.edit.many": { readonly n: string | number; readonly words: string | number };
@@ -9750,7 +10273,6 @@ export interface Messages {
   "server.artifact.notApplied": undefined;
   "server.artifact.notBlocks": { readonly title: string | number };
   "server.artifact.notHtml": { readonly title: string | number };
-  "server.artifact.notKept": { readonly why: string | number };
   "server.artifact.nothingToChange": undefined;
   "server.artifact.op.badKey": { readonly key: string | number };
   "server.artifact.op.changed": undefined;
@@ -9785,6 +10307,9 @@ export interface Messages {
   "server.artifact.untitled": undefined;
   "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
   "server.artifact.withNote": { readonly note: string | number; readonly said: string | number };
+  "server.attachment.emptyFile": undefined;
+  "server.attachment.fileTooBig": { readonly mb: string | number };
+  "server.attachment.noAttachment": { readonly id: string | number };
   "server.base.homeTaken": { readonly home: string | number };
   "server.base.homeUnlocked": { readonly home: string | number };
   "server.base.noFile": { readonly path: string | number };
@@ -9821,19 +10346,16 @@ export interface Messages {
     readonly what: string | number;
   };
   "server.channel.empty": undefined;
-  "server.channel.emptyFile": undefined;
-  "server.channel.fileTooBig": { readonly mb: string | number };
   "server.channel.helpersThere": undefined;
   "server.channel.hopLimit": { readonly limit: string | number };
   "server.channel.inUse": { readonly why: string | number };
   "server.channel.issuesThere": { readonly n: string | number };
   "server.channel.mention.everyone": undefined;
   "server.channel.mention.orchestrator": undefined;
-  "server.channel.mention.owner": undefined;
+  "server.channel.mention.user": undefined;
   "server.channel.messageGone": undefined;
   "server.channel.name.orchestrator": undefined;
-  "server.channel.name.owner": undefined;
-  "server.channel.noAttachment": { readonly id: string | number };
+  "server.channel.name.user": undefined;
   "server.channel.noChannel": { readonly id: string | number };
   "server.channel.noChannelNamed": { readonly name: string | number; readonly tags: string | number };
   "server.channel.noDirect": { readonly target: string | number };
@@ -10156,28 +10678,36 @@ export interface Messages {
   "server.issue.verification.frozen": { readonly files: string | number };
   "server.issue.waitingDispatch": undefined;
   "server.issue.workKept": { readonly n: string | number; readonly refused: string | number };
-  "server.lan.aDevice": undefined;
   "server.lan.anotherAsking": undefined;
   "server.lan.badGateway": undefined;
   "server.lan.cannotOpen": { readonly why: string | number };
   "server.lan.closedThere": undefined;
   "server.lan.codeExpired": undefined;
-  "server.lan.cut": { readonly n: string | number };
   "server.lan.denied": undefined;
   "server.lan.dropAsking": { readonly name: string | number };
   "server.lan.dropCode": { readonly code: string | number };
-  "server.lan.forget": { readonly name: string | number };
-  "server.lan.local": undefined;
   "server.lan.noAddress": undefined;
   "server.lan.noCode": undefined;
-  "server.lan.noDevice": { readonly id: string | number };
   "server.lan.noneAsking": undefined;
   "server.lan.notOpen": undefined;
   "server.lan.notRemote": undefined;
   "server.lan.notUp": undefined;
-  "server.lan.ownerLate": undefined;
   "server.lan.unpaired": undefined;
+  "server.lan.userLate": undefined;
   "server.lan.wrongCode": undefined;
+  "server.library.agentAttachment": undefined;
+  "server.library.badUrl": { readonly url: string | number };
+  "server.library.noItem": { readonly id: string | number };
+  "server.library.noPlace": undefined;
+  "server.library.notFetched": { readonly url: string | number; readonly why: string | number };
+  "server.library.notFile": { readonly path: string | number };
+  "server.library.oneSource": undefined;
+  "server.library.outside": { readonly path: string | number };
+  "server.library.preview.remove": { readonly name: string | number };
+  "server.library.slow": undefined;
+  "server.library.tooBig": { readonly mb: string | number };
+  "server.library.unreadable": { readonly path: string | number; readonly why: string | number };
+  "server.library.userFetch": undefined;
   "server.lookIn.agent": undefined;
   "server.lookIn.archive": undefined;
   "server.lookIn.artifact": undefined;
@@ -10186,6 +10716,7 @@ export interface Messages {
   "server.lookIn.device": undefined;
   "server.lookIn.graph": undefined;
   "server.lookIn.issue": undefined;
+  "server.lookIn.library": undefined;
   "server.lookIn.memories": undefined;
   "server.lookIn.pkm": undefined;
   "server.lookIn.repo": undefined;
@@ -10216,9 +10747,9 @@ export interface Messages {
   "server.media.consentChanged": undefined;
   "server.media.corrupt": undefined;
   "server.media.downloadFailed": undefined;
+  "server.media.imageMade": { readonly prompt: string | number };
   "server.media.inputBusy": undefined;
   "server.media.inputChanged": undefined;
-  "server.media.inputDeleteBytes": undefined;
   "server.media.inputDeletePreview": { readonly name: string | number };
   "server.media.inputDisconnected": undefined;
   "server.media.inputInvalid": undefined;
@@ -10229,7 +10760,6 @@ export interface Messages {
   "server.media.invalid": undefined;
   "server.media.missing": undefined;
   "server.media.noDownload": undefined;
-  "server.media.ownerRequired": undefined;
   "server.media.phase.canceled": undefined;
   "server.media.phase.download_failed": undefined;
   "server.media.phase.downloading": undefined;
@@ -10271,6 +10801,7 @@ export interface Messages {
   "server.media.understandingRejected": undefined;
   "server.media.understandingUnknown": undefined;
   "server.media.unknown": undefined;
+  "server.media.userRequired": undefined;
   "server.memory.coverage.everosAcross": undefined;
   "server.memory.coverage.everosAgent": undefined;
   "server.memory.coverage.failed": undefined;
@@ -10407,11 +10938,11 @@ export interface Messages {
   "server.repo.outside": undefined;
   "server.repo.parentBranchChanged": undefined;
   "server.repo.parentHasChanges": undefined;
-  "server.repo.publish.ownerOnly": undefined;
   "server.repo.publish.platformFailed": { readonly stage: string | number };
   "server.repo.publish.pushUnconfirmed": { readonly sha: string | number };
   "server.repo.publish.pushedWithoutLink": { readonly sha: string | number; readonly why: string | number };
   "server.repo.publish.refused": { readonly detail: string | number };
+  "server.repo.publish.userOnly": undefined;
   "server.repo.tokeiFailed": { readonly why: string | number };
   "server.repo.tokeiUnread": undefined;
   "server.repoRef": { readonly id: string | number };
@@ -10525,22 +11056,22 @@ export interface Messages {
   "server.session.log.retryWhy": { readonly reason: string | number };
   "server.session.log.staleRun": undefined;
   "server.session.log.stopped": undefined;
-  "server.session.log.stoppedByOwner": undefined;
+  "server.session.log.stoppedByUser": undefined;
   "server.session.noRoom.farm": { readonly max: string | number };
   "server.session.noRoom.repo": { readonly max: string | number; readonly on: string | number; readonly repo: string | number };
   "server.session.noRoom.runtime": { readonly max: string | number; readonly on: string | number; readonly runtime: string | number };
   "server.session.notTaken.checkFix": { readonly reason: string | number };
   "server.session.notTaken.checkShort": undefined;
   "server.session.notTaken.conflictNotice": { readonly base: string | number; readonly files: string | number; readonly name: string | number };
-  "server.session.notTaken.conflictOwner": {
+  "server.session.notTaken.conflictShort": { readonly base: string | number; readonly files: string | number };
+  "server.session.notTaken.conflictUser": {
     readonly base: string | number;
     readonly brief: string | number;
     readonly files: string | number;
     readonly name: string | number;
   };
-  "server.session.notTaken.conflictShort": { readonly base: string | number; readonly files: string | number };
   "server.session.notTaken.notice": { readonly name: string | number; readonly why: string | number };
-  "server.session.notTaken.owner": { readonly name: string | number; readonly why: string | number };
+  "server.session.notTaken.user": { readonly name: string | number; readonly why: string | number };
   "server.session.unfinished": undefined;
   "server.session.usage.cached": {
     readonly missed: string | number;
@@ -10600,6 +11131,8 @@ export interface Messages {
   "server.tool.labels.issue_split": undefined;
   "server.tool.labels.issue_status_update": undefined;
   "server.tool.labels.issue_update": undefined;
+  "server.tool.labels.library_item_add": undefined;
+  "server.tool.labels.library_item_list": undefined;
   "server.tool.labels.media_image_create": undefined;
   "server.tool.labels.media_job_cancel": undefined;
   "server.tool.labels.media_job_download": undefined;
@@ -10615,6 +11148,17 @@ export interface Messages {
   "server.tool.labels.search_archive": undefined;
   "server.tool.labels.session_list": undefined;
   "server.tool.labels.session_stop": undefined;
+  "server.user.aDevice": undefined;
+  "server.user.locked": { readonly s: string | number };
+  "server.user.noDevice": { readonly id: string | number };
+  "server.user.noPassword": undefined;
+  "server.user.notADevice": undefined;
+  "server.user.passwordHere": undefined;
+  "server.user.passwordShort": { readonly n: string | number };
+  "server.user.requestGone": undefined;
+  "server.user.requestsBusy": undefined;
+  "server.user.revoke": { readonly name: string | number };
+  "server.user.wrongPassword": undefined;
   "server.voice.connecting": undefined;
   "server.voice.dictation.cut": { readonly why: string | number };
   "server.voice.dictation.empty": undefined;
@@ -10884,6 +11428,8 @@ export interface Messages {
   "web.agent.templates.openLine": undefined;
   "web.agent.templates.removeSure": undefined;
   "web.agent.templates.runsOn": { readonly runtime: string | number };
+  "web.agent.templates.skill": { readonly description: string | number; readonly name: string | number };
+  "web.agent.templates.skills": { readonly skills: string | number };
   "web.agent.templates.title": undefined;
   "web.agent.templates.update": { readonly version: string | number };
   "web.agent.templates.updateHint": undefined;
@@ -10914,15 +11460,17 @@ export interface Messages {
   "web.artifact.blocks.memoryItem": undefined;
   "web.artifact.blocks.notDone": undefined;
   "web.artifact.blocks.notSaved": { readonly why: string | number };
-  "web.artifact.blocks.owner": undefined;
   "web.artifact.blocks.saved": undefined;
   "web.artifact.blocks.saving": undefined;
   "web.artifact.blocks.start": undefined;
   "web.artifact.blocks.unknown": { readonly type: string | number };
+  "web.artifact.blocks.user": undefined;
   "web.artifact.blocks.writing": { readonly who: string | number };
   "web.artifact.blocks.wrote": { readonly who: string | number };
   "web.artifact.body.blocks": undefined;
   "web.artifact.body.html": undefined;
+  "web.artifact.body.motion": undefined;
+  "web.artifact.body.slides": undefined;
   "web.artifact.canvas.close": undefined;
   "web.artifact.canvas.label": undefined;
   "web.artifact.canvas.openPage": undefined;
@@ -10964,6 +11512,24 @@ export interface Messages {
   "web.artifact.page.versions": undefined;
   "web.artifact.place.hint": undefined;
   "web.artifact.place.label": undefined;
+  "web.artifact.presenter.aside": undefined;
+  "web.artifact.presenter.clock": undefined;
+  "web.artifact.presenter.current": undefined;
+  "web.artifact.presenter.end": undefined;
+  "web.artifact.presenter.missing": undefined;
+  "web.artifact.presenter.next": undefined;
+  "web.artifact.presenter.noNotes": undefined;
+  "web.artifact.presenter.notes": undefined;
+  "web.artifact.presenter.restart": undefined;
+  "web.artifact.presenter.title": { readonly title: string | number };
+  "web.artifact.slides.at": { readonly at: string | number; readonly pages: string | number };
+  "web.artifact.slides.next": undefined;
+  "web.artifact.slides.pdf": undefined;
+  "web.artifact.slides.present": undefined;
+  "web.artifact.slides.presenter": undefined;
+  "web.artifact.slides.previous": undefined;
+  "web.artifact.slides.slide": { readonly at: string | number; readonly title: string | number };
+  "web.artifact.slides.thumbnails": undefined;
   "web.artifact.suggestions.accept": undefined;
   "web.artifact.suggestions.attrChecked": undefined;
   "web.artifact.suggestions.attrLanguage": undefined;
@@ -11161,7 +11727,6 @@ export interface Messages {
   "web.base.money.underCent": undefined;
   "web.base.off": undefined;
   "web.base.orchestrator": undefined;
-  "web.base.owner": undefined;
   "web.base.place.agents.hint": undefined;
   "web.base.place.agents.label": undefined;
   "web.base.place.catalog.hint": undefined;
@@ -11201,6 +11766,7 @@ export interface Messages {
   "web.base.shortcuts.place.everywhere": undefined;
   "web.base.shortcuts.place.farm": undefined;
   "web.base.shortcuts.place.issues": undefined;
+  "web.base.shortcuts.place.library": undefined;
   "web.base.shortcuts.place.lists": undefined;
   "web.base.shortcuts.place.pictures": undefined;
   "web.base.shortcuts.say.close": undefined;
@@ -11210,6 +11776,9 @@ export interface Messages {
   "web.base.shortcuts.say.editLast": undefined;
   "web.base.shortcuts.say.farmMenu": undefined;
   "web.base.shortcuts.say.flip": undefined;
+  "web.base.shortcuts.say.libraryLook": undefined;
+  "web.base.shortcuts.say.libraryMove": undefined;
+  "web.base.shortcuts.say.libraryRemove": undefined;
   "web.base.shortcuts.say.mention": undefined;
   "web.base.shortcuts.say.move": undefined;
   "web.base.shortcuts.say.names": undefined;
@@ -11263,6 +11832,7 @@ export interface Messages {
   "web.base.unreachable": undefined;
   "web.base.update": undefined;
   "web.base.updateReady": { readonly next: string | number };
+  "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
   "web.catalog.all": undefined;
@@ -11338,24 +11908,36 @@ export interface Messages {
   "web.channel.channels": undefined;
   "web.channel.channelsTitle": undefined;
   "web.channel.closeThread": undefined;
+  "web.channel.commands.dm.args": undefined;
   "web.channel.commands.dm.name": undefined;
   "web.channel.commands.dm.needs": undefined;
   "web.channel.commands.dm.note": undefined;
+  "web.channel.commands.done.imagegen": undefined;
   "web.channel.commands.done.issue": { readonly n: string | number };
   "web.channel.commands.done.remember": undefined;
   "web.channel.commands.done.stop": undefined;
+  "web.channel.commands.imagegen.args": undefined;
+  "web.channel.commands.imagegen.name": undefined;
+  "web.channel.commands.imagegen.needs": undefined;
+  "web.channel.commands.imagegen.notReady": { readonly why: string | number };
+  "web.channel.commands.imagegen.note": undefined;
+  "web.channel.commands.imagegen.nowhere": undefined;
+  "web.channel.commands.issue.args": undefined;
   "web.channel.commands.issue.name": undefined;
   "web.channel.commands.issue.needs": undefined;
   "web.channel.commands.issue.note": undefined;
+  "web.channel.commands.remember.args": undefined;
   "web.channel.commands.remember.name": undefined;
   "web.channel.commands.remember.needs": undefined;
   "web.channel.commands.remember.note": undefined;
+  "web.channel.commands.stop.args": undefined;
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelQuote": undefined;
   "web.channel.composer.cancelReply": undefined;
+  "web.channel.composer.command": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
   "web.channel.composer.quotedBlock": { readonly text: string | number };
@@ -11428,6 +12010,8 @@ export interface Messages {
   "web.channel.manage.category": undefined;
   "web.channel.manage.categoryHint": undefined;
   "web.channel.manage.drag": undefined;
+  "web.channel.manage.members": undefined;
+  "web.channel.manage.membersHint": undefined;
   "web.channel.manage.mentionsOnly": undefined;
   "web.channel.manage.muted": undefined;
   "web.channel.manage.name": undefined;
@@ -11436,8 +12020,6 @@ export interface Messages {
   "web.channel.manage.notifyHint": undefined;
   "web.channel.manage.notifyMentions": undefined;
   "web.channel.manage.notifyNone": undefined;
-  "web.channel.manage.orchestrator": undefined;
-  "web.channel.manage.orchestratorHint": undefined;
   "web.channel.manage.remove": undefined;
   "web.channel.manage.removeSure": undefined;
   "web.channel.manage.removeWill": undefined;
@@ -11448,11 +12030,11 @@ export interface Messages {
   "web.channel.media.preview": undefined;
   "web.channel.media.takeOff": { readonly name: string | number };
   "web.channel.media.uploadingFile": { readonly name: string | number; readonly percent: string | number };
-  "web.channel.members.looksAfter": undefined;
+  "web.channel.members.inChannel": undefined;
   "web.channel.members.none": undefined;
   "web.channel.members.open": undefined;
-  "web.channel.members.owner": undefined;
   "web.channel.members.title": undefined;
+  "web.channel.members.user": undefined;
   "web.channel.messages.containing": { readonly text: string | number };
   "web.channel.messages.deleted": undefined;
   "web.channel.messages.dispatch": undefined;
@@ -11468,7 +12050,6 @@ export interface Messages {
   "web.channel.messages.notFound": undefined;
   "web.channel.messages.notSent": undefined;
   "web.channel.messages.older": undefined;
-  "web.channel.messages.owner": undefined;
   "web.channel.messages.pinned": undefined;
   "web.channel.messages.quotedBlock": { readonly text: string | number; readonly title: string | number };
   "web.channel.messages.quotedGone": undefined;
@@ -11488,6 +12069,7 @@ export interface Messages {
   "web.channel.messages.typing": undefined;
   "web.channel.messages.unfoldDispatch": undefined;
   "web.channel.messages.unread": { readonly n: string | number };
+  "web.channel.messages.user": undefined;
   "web.channel.mood.idle": undefined;
   "web.channel.mood.listening": undefined;
   "web.channel.mood.speaking": undefined;
@@ -11502,7 +12084,7 @@ export interface Messages {
   "web.channel.names.issueThread": undefined;
   "web.channel.names.mention.everyone": undefined;
   "web.channel.names.mention.orchestrator": undefined;
-  "web.channel.names.mention.owner": undefined;
+  "web.channel.names.mention.user": undefined;
   "web.channel.names.orchestratorNote": undefined;
   "web.channel.names.talkThread": { readonly who: string | number };
   "web.channel.names.thread": undefined;
@@ -11582,7 +12164,6 @@ export interface Messages {
   "web.connector.connectors.notes.weixin.1": undefined;
   "web.connector.connectors.notes.weixin.2": undefined;
   "web.connector.connectors.ok": undefined;
-  "web.connector.connectors.owner": undefined;
   "web.connector.connectors.pairing": { readonly app: string | number };
   "web.connector.connectors.pairingNote": undefined;
   "web.connector.connectors.paused": { readonly clock: string | number };
@@ -11607,6 +12188,7 @@ export interface Messages {
   "web.connector.connectors.state.scanned": undefined;
   "web.connector.connectors.state.verify": undefined;
   "web.connector.connectors.state.waiting": undefined;
+  "web.connector.connectors.user": undefined;
   "web.connector.connectors.weixinIntro": undefined;
   "web.connector.connectors.whichChannel": undefined;
   "web.farm.achievements.category.craft": undefined;
@@ -12488,9 +13070,6 @@ export interface Messages {
   "web.issue.trigger.missed": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
-  "web.lan.devices.android": undefined;
-  "web.lan.devices.device": undefined;
-  "web.lan.devices.windows": undefined;
   "web.lan.lan.add": undefined;
   "web.lan.lan.address": undefined;
   "web.lan.lan.allow": undefined;
@@ -12499,8 +13078,6 @@ export interface Messages {
   "web.lan.lan.closed": undefined;
   "web.lan.lan.copied": undefined;
   "web.lan.lan.copy": undefined;
-  "web.lan.lan.deviceCount": { readonly n: string | number };
-  "web.lan.lan.devices": undefined;
   "web.lan.lan.intro": undefined;
   "web.lan.lan.left": { readonly s: string | number };
   "web.lan.lan.letIn": undefined;
@@ -12511,12 +13088,8 @@ export interface Messages {
   "web.lan.lan.notes.2": undefined;
   "web.lan.lan.notes.3": undefined;
   "web.lan.lan.open": undefined;
-  "web.lan.lan.paired": { readonly at: string | number; readonly seen: string | number };
-  "web.lan.lan.pairedNever": { readonly at: string | number };
   "web.lan.lan.qr": undefined;
   "web.lan.lan.refuse": undefined;
-  "web.lan.lan.remove": undefined;
-  "web.lan.lan.removeWhich": { readonly name: string | number };
   "web.lan.lan.scan": undefined;
   "web.lan.lan.section.label": undefined;
   "web.lan.lan.stop": undefined;
@@ -12528,19 +13101,87 @@ export interface Messages {
   "web.lan.pair.nameHint": undefined;
   "web.lan.pair.title": undefined;
   "web.lan.pair.waiting": undefined;
+  "web.library.download": undefined;
+  "web.library.drop": undefined;
+  "web.library.empty": undefined;
+  "web.library.emptyHow": undefined;
+  "web.library.from.fetchedPath": { readonly agent: string | number; readonly path: string | number };
+  "web.library.from.fetchedUrl": { readonly agent: string | number; readonly url: string | number };
+  "web.library.from.generated": { readonly job: string | number };
+  "web.library.from.uploadedHere": undefined;
+  "web.library.from.uploadedIn": { readonly channel: string | number };
+  "web.library.grid": undefined;
+  "web.library.hint": undefined;
+  "web.library.inspector.added": undefined;
+  "web.library.inspector.bytes": undefined;
+  "web.library.inspector.clear": undefined;
+  "web.library.inspector.from": undefined;
+  "web.library.inspector.kind": undefined;
+  "web.library.inspector.label": undefined;
+  "web.library.inspector.length": undefined;
+  "web.library.inspector.more": undefined;
+  "web.library.inspector.openChannel": { readonly channel: string | number };
+  "web.library.inspector.pixels": undefined;
+  "web.library.inspector.selected": { readonly n: string | number };
+  "web.library.job.clone": undefined;
+  "web.library.job.image": undefined;
+  "web.library.job.speakers": undefined;
+  "web.library.job.speech": undefined;
+  "web.library.job.transcription": undefined;
+  "web.library.job.understanding": undefined;
+  "web.library.job.voiceDesign": undefined;
+  "web.library.keep": undefined;
+  "web.library.kind.all": undefined;
+  "web.library.kind.audio": undefined;
+  "web.library.kind.image": undefined;
+  "web.library.kind.other": undefined;
+  "web.library.kind.video": undefined;
+  "web.library.make": undefined;
+  "web.library.makeTabs.audio": undefined;
+  "web.library.makeTabs.image": undefined;
+  "web.library.makeTabs.speech": undefined;
+  "web.library.makeTitle": undefined;
+  "web.library.nothingShown": undefined;
+  "web.library.origin.all": undefined;
+  "web.library.origin.fetched": undefined;
+  "web.library.origin.generated": undefined;
+  "web.library.origin.uploaded": undefined;
+  "web.library.rail.agents": undefined;
+  "web.library.rail.anyKind": undefined;
+  "web.library.rail.anyWhere": undefined;
+  "web.library.rail.channels": undefined;
+  "web.library.rail.kind": undefined;
+  "web.library.rail.label": undefined;
+  "web.library.rail.where": undefined;
+  "web.library.remove": undefined;
+  "web.library.removeAsk": { readonly name: string | number };
+  "web.library.removeSome": { readonly n: string | number };
+  "web.library.removeSure": undefined;
+  "web.library.search": undefined;
+  "web.library.sendTo": undefined;
+  "web.library.sentTo": { readonly channel: string | number };
+  "web.library.sort.name": undefined;
+  "web.library.sort.recent": undefined;
+  "web.library.sort.size": undefined;
+  "web.library.sortLabel": undefined;
+  "web.library.tileSize": undefined;
+  "web.library.title": undefined;
+  "web.library.understand": undefined;
+  "web.library.understandTitle": { readonly name: string | number };
+  "web.library.understood": undefined;
+  "web.library.upload": undefined;
+  "web.library.uploading": undefined;
   "web.media.advanced": undefined;
   "web.media.cancel": undefined;
   "web.media.cancelAsk": undefined;
   "web.media.channel": undefined;
   "web.media.chooseChannel": undefined;
-  "web.media.configure": undefined;
   "web.media.empty": undefined;
   "web.media.enhance": undefined;
   "web.media.format": undefined;
   "web.media.generate": undefined;
   "web.media.guidance": undefined;
   "web.media.height": undefined;
-  "web.media.hint": undefined;
   "web.media.history": undefined;
   "web.media.image": undefined;
   "web.media.layout": undefined;
@@ -12560,7 +13201,7 @@ export interface Messages {
   "web.media.save": undefined;
   "web.media.seed": undefined;
   "web.media.sourceAgent": { readonly agent: string | number; readonly channel: string | number };
-  "web.media.sourceOwner": undefined;
+  "web.media.sourceUser": undefined;
   "web.media.speech.asynchronous": undefined;
   "web.media.speech.binding": {
     readonly account: string | number;
@@ -12593,7 +13234,6 @@ export interface Messages {
   "web.media.speech.voiceHint": undefined;
   "web.media.steps": undefined;
   "web.media.text": undefined;
-  "web.media.title": undefined;
   "web.media.understanding.authorization": { readonly channel: string | number };
   "web.media.understanding.authorizationNotice": undefined;
   "web.media.understanding.authorize": undefined;
@@ -12606,7 +13246,6 @@ export interface Messages {
   "web.media.understanding.delegation": { readonly id: string | number };
   "web.media.understanding.direct": undefined;
   "web.media.understanding.executor": undefined;
-  "web.media.understanding.files": undefined;
   "web.media.understanding.history": undefined;
   "web.media.understanding.new": undefined;
   "web.media.understanding.newAsk": undefined;
@@ -12615,9 +13254,7 @@ export interface Messages {
   "web.media.understanding.pending": undefined;
   "web.media.understanding.prompt": undefined;
   "web.media.understanding.save": undefined;
-  "web.media.understanding.selected": undefined;
   "web.media.understanding.stopUpload": undefined;
-  "web.media.understanding.stored": undefined;
   "web.media.understanding.submit": undefined;
   "web.media.understanding.title": undefined;
   "web.media.understanding.tokens": undefined;
@@ -12824,50 +13461,48 @@ export interface Messages {
   "web.pkm.toolbar.outdent": undefined;
   "web.pkm.toolbar.todo": undefined;
   "web.pkm.toolbar.up": undefined;
+  "web.provider.adapted": undefined;
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
-  "web.provider.bindings": undefined;
-  "web.provider.capabilityConnection": undefined;
-  "web.provider.capabilityModel": undefined;
-  "web.provider.capabilityNotice": undefined;
+  "web.provider.connectionFor": { readonly use: string | number };
+  "web.provider.connections": undefined;
   "web.provider.console": undefined;
-  "web.provider.dictation": undefined;
   "web.provider.discover": undefined;
   "web.provider.discoveryHint": undefined;
   "web.provider.empty": undefined;
   "web.provider.enabled": undefined;
-  "web.provider.imageConnection": undefined;
-  "web.provider.imageModel": undefined;
-  "web.provider.imageModelHint": undefined;
+  "web.provider.groupImage": undefined;
+  "web.provider.groupLive": undefined;
+  "web.provider.groupVoice": undefined;
   "web.provider.imageNotice": undefined;
-  "web.provider.imageSettings": undefined;
   "web.provider.intro": undefined;
   "web.provider.liveHint": undefined;
   "web.provider.manage": undefined;
-  "web.provider.model": undefined;
+  "web.provider.modelFor": { readonly use: string | number };
   "web.provider.modelHint": undefined;
   "web.provider.name": undefined;
   "web.provider.noModels": undefined;
-  "web.provider.openSpeech": undefined;
+  "web.provider.openSpeechShort": undefined;
   "web.provider.reload": undefined;
   "web.provider.reloadAsk": undefined;
   "web.provider.remove": undefined;
   "web.provider.removeAsk": undefined;
   "web.provider.saveFirst": undefined;
-  "web.provider.speakersSettings": undefined;
-  "web.provider.speechConnection": undefined;
-  "web.provider.speechModel": undefined;
   "web.provider.speechNotice": undefined;
-  "web.provider.speechSettings": undefined;
   "web.provider.title": undefined;
-  "web.provider.transcriptionSettings": undefined;
   "web.provider.unbound": undefined;
-  "web.provider.understandingConnection": undefined;
-  "web.provider.understandingModel": undefined;
   "web.provider.understandingNotice": undefined;
-  "web.provider.understandingSettings": undefined;
-  "web.provider.visionSettings": undefined;
-  "web.provider.voiceDesignSettings": undefined;
+  "web.provider.use.dictation": undefined;
+  "web.provider.use.image": undefined;
+  "web.provider.use.live": undefined;
+  "web.provider.use.speakers": undefined;
+  "web.provider.use.speech": undefined;
+  "web.provider.use.transcription": undefined;
+  "web.provider.use.understanding": undefined;
+  "web.provider.use.vision": undefined;
+  "web.provider.use.voiceDesign": undefined;
+  "web.provider.uses": undefined;
+  "web.provider.usesIntro": undefined;
   "web.provider.words": undefined;
   "web.repo.add": undefined;
   "web.repo.all": undefined;
@@ -12995,6 +13630,9 @@ export interface Messages {
   "web.runtime.library.bodyExample": undefined;
   "web.runtime.library.bodyHint": undefined;
   "web.runtime.library.book": undefined;
+  "web.runtime.library.builtIn": { readonly count: string | number };
+  "web.runtime.library.builtInNote": undefined;
+  "web.runtime.library.builtInTag": undefined;
   "web.runtime.library.description": undefined;
   "web.runtime.library.descriptionHint": undefined;
   "web.runtime.library.inUse": { readonly n: string | number };
@@ -13199,6 +13837,7 @@ export interface Messages {
   "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
+  "web.setting.accounts.intro": undefined;
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
@@ -13207,6 +13846,17 @@ export interface Messages {
   "web.setting.appearance.themes.dark": undefined;
   "web.setting.appearance.themes.light": undefined;
   "web.setting.appearance.themes.system": undefined;
+  "web.setting.feature.call": undefined;
+  "web.setting.feature.dictation": undefined;
+  "web.setting.feature.image": undefined;
+  "web.setting.feature.live": undefined;
+  "web.setting.feature.orchestrator": undefined;
+  "web.setting.feature.speakers": undefined;
+  "web.setting.feature.speech": undefined;
+  "web.setting.feature.transcription": undefined;
+  "web.setting.feature.understanding": undefined;
+  "web.setting.feature.vision": undefined;
+  "web.setting.feature.voiceDesign": undefined;
   "web.setting.general.languageHint": undefined;
   "web.setting.general.start": undefined;
   "web.setting.general.startHint": undefined;
@@ -13232,9 +13882,16 @@ export interface Messages {
   "web.setting.language.title": undefined;
   "web.setting.language.zh": undefined;
   "web.setting.memory.intro": undefined;
+  "web.setting.missing.agora": undefined;
+  "web.setting.missing.binding": undefined;
+  "web.setting.missing.deepseekKey": undefined;
+  "web.setting.missing.dictationUrl": undefined;
+  "web.setting.missing.mossAccount": undefined;
+  "web.setting.missing.mossKey": undefined;
+  "web.setting.missing.mossOff": undefined;
   "web.setting.models.deepseekHint": undefined;
-  "web.setting.models.intro": undefined;
   "web.setting.nav.about": undefined;
+  "web.setting.nav.accounts": undefined;
   "web.setting.nav.appearance": undefined;
   "web.setting.nav.call": undefined;
   "web.setting.nav.chat": undefined;
@@ -13243,10 +13900,12 @@ export interface Messages {
   "web.setting.nav.general": undefined;
   "web.setting.nav.label": undefined;
   "web.setting.nav.memory": undefined;
-  "web.setting.nav.models": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
   "web.setting.nav.width": undefined;
+  "web.setting.readiness.fix": undefined;
+  "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
+  "web.setting.readiness.ready": { readonly feature: string | number };
   "web.setting.scope.device": undefined;
   "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };
@@ -13268,6 +13927,7 @@ export interface Messages {
   "web.setting.source.write": undefined;
   "web.setting.source.writeHint": undefined;
   "web.setting.words.about": undefined;
+  "web.setting.words.accounts": undefined;
   "web.setting.words.appearance": undefined;
   "web.setting.words.call": undefined;
   "web.setting.words.chat": undefined;
@@ -13276,7 +13936,6 @@ export interface Messages {
   "web.setting.words.general": undefined;
   "web.setting.words.github": undefined;
   "web.setting.words.memory": undefined;
-  "web.setting.words.models": undefined;
   "web.setting.words.moss": undefined;
   "web.setting.words.skills": undefined;
   "web.tree.aboutToFall": undefined;
@@ -13372,6 +14031,51 @@ export interface Messages {
   "web.ui.pixel.sound.label.weed": undefined;
   "web.ui.pixel.sound.label.woof": undefined;
   "web.ui.pixel.sound.label.yip": undefined;
+  "web.user.account.changePassword": undefined;
+  "web.user.account.name": undefined;
+  "web.user.account.nameHint": undefined;
+  "web.user.account.nameSaved": undefined;
+  "web.user.account.password": undefined;
+  "web.user.account.passwordHere": undefined;
+  "web.user.account.passwordHint": undefined;
+  "web.user.account.passwordSaved": undefined;
+  "web.user.account.save": undefined;
+  "web.user.account.setPassword": undefined;
+  "web.user.account.signOut": undefined;
+  "web.user.account.thisDevice": { readonly name: string | number };
+  "web.user.account.title": undefined;
+  "web.user.approvals.allow": undefined;
+  "web.user.approvals.from": { readonly at: string | number; readonly from: string | number };
+  "web.user.approvals.fromHere": { readonly at: string | number };
+  "web.user.approvals.hint": undefined;
+  "web.user.approvals.left": { readonly m: string | number };
+  "web.user.approvals.none": undefined;
+  "web.user.approvals.onlyYours": undefined;
+  "web.user.approvals.page": undefined;
+  "web.user.approvals.refuse": undefined;
+  "web.user.approvals.title": undefined;
+  "web.user.approvals.wants": { readonly name: string | number };
+  "web.user.devices.count": { readonly n: string | number };
+  "web.user.devices.login": { readonly at: string | number; readonly seen: string | number };
+  "web.user.devices.loginNever": { readonly at: string | number };
+  "web.user.devices.paired": { readonly at: string | number; readonly seen: string | number };
+  "web.user.devices.pairedNever": { readonly at: string | number };
+  "web.user.devices.remove": undefined;
+  "web.user.devices.removeWhich": { readonly name: string | number };
+  "web.user.devices.thisOne": { readonly name: string | number };
+  "web.user.devices.title": undefined;
+  "web.user.guess.android": undefined;
+  "web.user.guess.device": undefined;
+  "web.user.guess.windows": undefined;
+  "web.user.login.device": undefined;
+  "web.user.login.deviceHint": undefined;
+  "web.user.login.intro": undefined;
+  "web.user.login.noPassword": undefined;
+  "web.user.login.pairInstead": undefined;
+  "web.user.login.password": undefined;
+  "web.user.login.signing": undefined;
+  "web.user.login.submit": undefined;
+  "web.user.login.title": undefined;
   "web.voice.call.agora": { readonly code: string | number; readonly msg: string | number };
   "web.voice.call.cannotHear": { readonly why: string | number };
   "web.voice.call.noMic": undefined;
@@ -13425,6 +14129,7 @@ export interface Messages {
   "web.voice.moss.busy": undefined;
   "web.voice.moss.closed": undefined;
   "web.voice.moss.connecting": undefined;
+  "web.voice.moss.debug": undefined;
   "web.voice.moss.defaultInstructions": undefined;
   "web.voice.moss.down": undefined;
   "web.voice.moss.events": undefined;
@@ -13521,6 +14226,7 @@ export interface Messages {
   "web.voice.voice.intro": undefined;
   "web.voice.voice.language": undefined;
   "web.voice.voice.languageHint": undefined;
+  "web.voice.voice.line": undefined;
   "web.voice.voice.listen": undefined;
   "web.voice.voice.listenParts": undefined;
   "web.voice.voice.llmAddress": undefined;
@@ -13529,7 +14235,6 @@ export interface Messages {
   "web.voice.voice.llmModel": undefined;
   "web.voice.voice.microsoft": undefined;
   "web.voice.voice.microsoftKey": undefined;
-  "web.voice.voice.missing": undefined;
   "web.voice.voice.model": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.ok": undefined;
@@ -13564,7 +14269,6 @@ export interface Messages {
   "web.voice.voice.persona.voice": undefined;
   "web.voice.voice.persona.voiceId": undefined;
   "web.voice.voice.range": { readonly fallback: string | number; readonly max: string | number; readonly min: string | number };
-  "web.voice.voice.ready": undefined;
   "web.voice.voice.saved": undefined;
   "web.voice.voice.section.label": undefined;
   "web.voice.voice.speechServer": undefined;

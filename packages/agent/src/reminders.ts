@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Cron, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
+import { Clock, Cron, DateTime, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
 
 import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
@@ -72,8 +73,10 @@ interface Reminders {
 }
 
 /** The reminders in home: read once, then held. a fiber of the scope sleeps until the next is due and hands what came due to wake. */
-export const makeReminders = (home: string, now: () => number, wake: (due: string[]) => Effect.Effect<void>): Effect.Effect<Reminders, never, Scope.Scope> =>
+export const makeReminders = (home: string, wake: (due: string[]) => Effect.Effect<void>): Effect.Effect<Reminders, never, Scope.Scope> =>
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
+    const now = () => clock.currentTimeMillisUnsafe();
     const file = join(home, "reminders.json");
     const read = yield* Effect.promise(() =>
       readFile(file, "utf8").then(
@@ -117,12 +120,18 @@ export const makeReminders = (home: string, now: () => number, wake: (due: strin
         .reduce<number | undefined>((soonest, d) => (d && (soonest === undefined || d.getTime() < soonest) ? d.getTime() : soonest), undefined);
       if (next === undefined) return void start(Effect.void);
       start(
-        Effect.sleep(Math.max(0, next - now())).pipe(
-          Effect.andThen(Effect.suspend(() => claimDue(new Date(now())))),
-          Effect.flatMap(wake),
-          Effect.andThen(Effect.sync(arm)),
+        Effect.gen(function* () {
+          yield* Effect.sleep(Math.max(0, next - now()));
+          const due = yield* claimDue(DateTime.toDateUtc(DateTime.makeUnsafe(now())));
+          yield* wake(due);
+          arm();
+        }).pipe(
           Effect.catch((e) =>
-            Effect.logError("agent: cannot claim due reminders:", e).pipe(Effect.andThen(Effect.sleep(retryClaimMs)), Effect.andThen(Effect.sync(arm))),
+            Effect.gen(function* () {
+              yield* Effect.logError("agent: cannot claim due reminders:", e);
+              yield* Effect.sleep(retryClaimMs);
+              arm();
+            }),
           ),
         ),
       );
@@ -151,9 +160,9 @@ export const makeReminders = (home: string, now: () => number, wake: (due: strin
           const parsed = parseCron(p.cron);
           if (Result.isFailure(parsed)) throw new Error(parsed.failure);
         }
-        const made = new Date(now());
+        const made = DateTime.toDateUtc(DateTime.makeUnsafe(now()));
         const reminder: Reminder = {
-          id: "reminder-" + made.getTime().toString(36),
+          id: "reminder-" + randomUUID(),
           name: p.name,
           message: p.message,
           ...(p.cron != null ? { cron: p.cron } : {}),

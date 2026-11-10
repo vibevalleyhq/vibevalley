@@ -2,15 +2,14 @@ import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { artifactPath } from "@vibevalley/protocol";
-import { htmlSandbox } from "@vibevalley/protocol/rules";
 
 import { reasonOf } from "#/infra/api.ts";
 import { ready } from "#/infra/query.ts";
 import { Icon } from "#/ui/Icon.tsx";
 
-import { bodyIcon, bodyLabel, useArtifact } from "./ArtifactCard";
+import { bodyIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
+import { HtmlFrame } from "./HtmlFrame";
 
 const variantStyles = stylex.create({
   artifactCanvasSection: {
@@ -163,7 +162,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
               <span {...stylex.attrs(variantStyles.artifactCanvasSpan)}>
                 <span {...stylex.attrs(viewStyles.artifactCanvasSpan2)}>{a().title}</span>
                 <span {...stylex.attrs(viewStyles.artifactCanvasSpan3)}>
-                  {bodyLabel[a().body]}
+                  {kindLabel(a())}
                   <Show when={a().body === "html"}> · {t("web.artifact.card.version", { version: props.version ?? a().version })}</Show>
                 </span>
               </span>
@@ -194,11 +193,12 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
           <Show
             when={a().body === "blocks"}
             fallback={
-              <iframe
+              <HtmlFrame
+                artifact={a()}
+                version={props.version ?? a().version}
                 title={t("web.artifact.page.frame", { title: a().title, version: props.version ?? a().version })}
-                src={artifactPath(a().id, props.version ?? a().version)}
-                sandbox={htmlSandbox}
-                {...stylex.attrs(viewStyles.artifactCanvasIframe)}
+                testId="artifact-canvas-frame"
+                frameStyle={viewStyles.artifactCanvasIframe}
               />
             }
           >

@@ -10,7 +10,7 @@ export interface PageServer {
 export interface WriterHooks {
   readonly changed: (blocks: PkmBlock[]) => void;
   readonly answered: (page: PkmPage) => void;
-  /** The server refused a batch, in the owner's words; the blocks went back to `server`. */
+  /** The server refused a batch, in the user's words; the blocks went back to `server`. */
   readonly refused: (why: string) => void;
 }
 

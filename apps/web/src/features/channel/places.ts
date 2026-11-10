@@ -117,7 +117,7 @@ export function threadOwnerOf<S extends Session>(thread: Channel, sessions: read
       return findLast(sessions, (h) => h.issue === thread.subjectId);
     case "talk":
       return sessions.find((h) => h.id === thread.subjectId);
-    // Only issues and talks have an owner.
+    // Only issues and talks have a user.
     default:
       return undefined;
   }

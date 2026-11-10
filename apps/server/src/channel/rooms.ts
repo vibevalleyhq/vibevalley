@@ -7,30 +7,36 @@ type ParticipantRow = qp.ParticipantsResult;
 
 const subjectKey = (kind: string, id: string) => kind + ":" + id;
 
-/** Who follows each thread, told each follow as the chat writes it and reloaded with the model. */
-export class Follows {
-  private follows = new Map<string, Set<string>>();
+/** Who follows each thread and who is in each channel, told each change as the chat writes it and reloaded with the model. */
+export class Members {
+  private members = new Map<string, Set<string>>();
 
   load(follows: readonly { channel_id: string; participant_id: string }[]) {
-    this.follows.clear();
-    for (const f of follows) this.followed(f.channel_id, f.participant_id);
+    this.members.clear();
+    for (const f of follows) this.memberAdded(f.channel_id, f.participant_id);
   }
 
   /** Follow: following again is following. */
-  followed(channel: string, participant: string) {
-    const held = this.follows.get(channel);
+  memberAdded(channel: string, participant: string) {
+    const held = this.members.get(channel);
     if (held) held.add(participant);
-    else this.follows.set(channel, new Set([participant]));
+    else this.members.set(channel, new Set([participant]));
+  }
+
+  /** One taken out of a place. */
+  memberRemoved(channel: string, participant: string) {
+    const held = this.members.get(channel);
+    if (held?.delete(participant) === true && held.size === 0) this.members.delete(channel);
   }
 
   /** A Session that left follows nothing. */
   left(participant: string) {
-    for (const [channel, held] of this.follows) if (held.delete(participant) && held.size === 0) this.follows.delete(channel);
+    for (const [channel, held] of this.members) if (held.delete(participant) && held.size === 0) this.members.delete(channel);
   }
 
   /** By id. */
-  followers(channel: string): string[] {
-    return [...(this.follows.get(channel) ?? [])].toSorted();
+  membersOf(channel: string): string[] {
+    return [...(this.members.get(channel) ?? [])].toSorted();
   }
 }
 
@@ -39,26 +45,26 @@ export class ChatModel {
   private threadByRoot = new Map<string, string>();
   private threadBySubject = new Map<string, string>();
   private people = new Map<string, ParticipantRow>();
-  private ownerRead = new Map<string, number>();
-  private follows = new Follows();
+  private userRead = new Map<string, number>();
+  private members = new Members();
   readonly lastRead = new Map<string, string>();
   private publishedLast = new Map<string, number>();
 
   load(
     channels: readonly ChannelRow[],
     participants: readonly ParticipantRow[],
-    ownerRead: readonly { channel_id: string; read_number: number }[],
+    userRead: readonly { channel_id: string; read_number: number }[],
     follows?: readonly { channel_id: string; participant_id: string }[],
   ) {
     this.byId.clear();
     this.threadByRoot.clear();
     this.threadBySubject.clear();
     this.people.clear();
-    this.ownerRead.clear();
+    this.userRead.clear();
     for (const c of channels) this.created(c);
     for (const p of participants) this.people.set(p.id, { ...p });
-    for (const r of ownerRead) this.ownerRead.set(r.channel_id, r.read_number);
-    if (follows) this.follows.load(follows);
+    for (const r of userRead) this.userRead.set(r.channel_id, r.read_number);
+    if (follows) this.members.load(follows);
   }
 
   channel(id: string): ChannelRow | undefined {
@@ -126,7 +132,7 @@ export class ChatModel {
   }
 
   /** RenameChannel, SetCategory, PlaceChannel, SetArchived, SetNotify. */
-  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify" | "orchestrator">>) {
+  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify">>) {
     const c = this.byId.get(id);
     if (c) this.byId.set(id, { ...c, ...change });
   }
@@ -136,7 +142,7 @@ export class ChatModel {
     for (const c of [...this.byId.values()])
       if (c.id === id || c.parent_id === id) {
         this.byId.delete(c.id);
-        this.ownerRead.delete(c.id);
+        this.userRead.delete(c.id);
         this.publishedLast.delete(c.id);
         if (c.root_id !== null) this.threadByRoot.delete(c.root_id);
         if (c.subject_kind !== null && c.subject_id !== null && this.threadBySubject.get(subjectKey(c.subject_kind, c.subject_id)) === c.id)
@@ -144,9 +150,9 @@ export class ChatModel {
       }
   }
 
-  /** MarkUnread for the owner: it moves back too. */
-  ownerReadBack(channel: string, number: number) {
-    this.ownerRead.set(channel, number);
+  /** MarkUnread for the user: it moves back too. */
+  userReadBack(channel: string, number: number) {
+    this.userRead.set(channel, number);
   }
 
   /** ClearDefault, MakeDefault. */
@@ -184,20 +190,24 @@ export class ChatModel {
 
   /** ParticipantLeft: their participant state, follows and read place go with them. */
   left(id: string, at: number) {
-    this.follows.left(id);
+    this.members.left(id);
     this.lastRead.delete(id);
     const p = this.people.get(id);
     if (p && p.left_at === null) this.people.set(id, { ...p, left_at: at });
   }
 
   /** Follow: following again is following. */
-  followed(channel: string, participant: string) {
-    this.follows.followed(channel, participant);
+  memberAdded(channel: string, participant: string) {
+    this.members.memberAdded(channel, participant);
   }
 
-  /** Who follows a thread, by id. */
-  followers(channel: string): string[] {
-    return this.follows.followers(channel);
+  memberRemoved(channel: string, participant: string) {
+    this.members.memberRemoved(channel, participant);
+  }
+
+  /** Who follows a thread or is in a channel, by id. */
+  membersOf(channel: string): string[] {
+    return this.members.membersOf(channel);
   }
 
   /** The newest number the chat published for a channel. */
@@ -210,13 +220,13 @@ export class ChatModel {
     this.publishedLast.set(channel, Math.max(this.publishedLast.get(channel) ?? 0, number));
   }
 
-  /** ReadCursor for the owner. */
-  ownerReadIn(channel: string): number | undefined {
-    return this.ownerRead.get(channel);
+  /** ReadCursor for the user. */
+  userReadIn(channel: string): number | undefined {
+    return this.userRead.get(channel);
   }
 
-  /** SetReadCursor for the owner: it only moves on. */
-  ownerReadTo(channel: string, number: number) {
-    this.ownerRead.set(channel, Math.max(this.ownerRead.get(channel) ?? number, number));
+  /** SetReadCursor for the user: it only moves on. */
+  userReadTo(channel: string, number: number) {
+    this.userRead.set(channel, Math.max(this.userRead.get(channel) ?? number, number));
   }
 }

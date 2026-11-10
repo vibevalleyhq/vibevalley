@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { Formatter } from "effect";
+
 import type { ToolDeclaration } from "@vibevalley/ai/messages";
 
 export interface PromptPart {
@@ -17,7 +19,7 @@ const prefixParts = ["instructions", "env", "skills", "memory", "tools"] as cons
 export function prefixHashes(parts: readonly PromptPart[], tools: readonly ToolDeclaration[]): Record<string, string> {
   const hashes: Record<string, string> = {};
   for (const p of parts) hashes[p.name] = digest(p.text);
-  hashes.tools = digest(tools.map((t) => t.name + "\0" + t.description + "\0" + JSON.stringify(t.parameters) + "\0").join(""));
+  hashes.tools = digest(tools.map((t) => t.name + "\0" + t.description + "\0" + Formatter.formatJson(t.parameters) + "\0").join(""));
   return hashes;
 }
 

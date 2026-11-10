@@ -2,7 +2,7 @@
   "id": "stop-is-not-cancel",
   "createdAt": 1792271100000,
   "model": "deepseek-flash",
-  "want": "主人说先停一下 #41，管家把工单挪到已取消，帮工回家、改动不收了。应该用 session_stop 叫停这一轮，工单和改动都留着。",
+  "want": "用户说先停一下 #41，助手把工单挪到已取消，帮工回家、改动不收了。应该用 session_stop 叫停这一轮，工单和改动都留着。",
   "memory": "",
   "tools": [
     "channel_create",
@@ -34,7 +34,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：先停一下 #41",
+    "content": "[来源：用户]\n用户说：先停一下 #41",
     "display": true,
     "details": {
       "channel": "general"

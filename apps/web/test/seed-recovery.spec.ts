@@ -24,7 +24,7 @@ test("one lost seed request retries through the query observer and loads the rea
   expect(attempts).toBe(2);
 });
 
-test("the seed bag can retry after the server is reachable again without losing the owner's draft", async ({ page, api }) => {
+test("the seed bag can retry after the server is reachable again without losing the user's draft", async ({ page, api }) => {
   const repo = await api.repo.create({ name: "seed-recover" });
   let unavailable = true;
   let attempts = 0;
@@ -36,7 +36,7 @@ test("the seed bag can retry after the server is reachable again without losing 
   const problem = bag.getByRole("alert");
   await expect(problem).toBeVisible();
   expect(attempts).toBe(2);
-  // The browser's own words for a refused connection are not the owner's.
+  // The browser's own words for a refused connection are not the user's.
   await expect(problem).not.toContainText("Failed to fetch");
   const box = bag.getByRole("textbox");
   await box.fill(draft);

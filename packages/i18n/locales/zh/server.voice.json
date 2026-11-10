@@ -8,7 +8,7 @@
     "tts": "合成"
   },
   "noAsrKey": "微软识别还没有 key：在声音页的「识别」里填",
-  "noLine": "管家的语音线路没接通",
+  "noLine": "助手的语音线路没接通",
   "noDeepseekKey": "用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填",
   "noLlmKey": "自己的大模型还没有 key：在声音页的「想」里填",
   "noTtsKey": "微软合成还没有 key：在声音页的「说」里填",
@@ -27,9 +27,9 @@
   "stopped": "语音服务已经停下",
   "grantGone": "这通电话的语音凭据已经失效，请重新接通",
   "connecting": "这通电话已经在接通",
-  "lineFailed": "管家的语音线路接不通：{why}",
-  "joinFailed": "请管家进频道失败：{why}",
-  "leaveFailed": "请管家离开失败：{why}",
+  "lineFailed": "助手的语音线路接不通：{why}",
+  "joinFailed": "请助手进频道失败：{why}",
+  "leaveFailed": "请助手离开失败：{why}",
   "manyCalls": "有几通电话正在接通，请升级客户端后重试",
   "noCall": "没有正在接通的电话",
   "dictation": {

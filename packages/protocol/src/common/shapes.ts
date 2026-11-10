@@ -18,8 +18,8 @@ export const defaultOrchestrator = "orchestrator";
 /** The runtime of VibeValley's own agent: the only one an orchestrator runs on. */
 export const orchestratorRuntime = "vibevalley";
 
-/** The owner's participant id: who the owner mention is. */
-export const ownerId = "owner";
+/** The user's participant id: who the user mention is. */
+export const userId = "user";
 
 /** Who the everyone mention is. */
 export const everyone = "everyone";
@@ -36,8 +36,8 @@ export interface Validation {
   problem: string;
 }
 
-/** Who did a thing, as it is kept: the owner, the orchestrator, a session (a helper at work), or the farm itself; also who said a message. */
-export const ActorKindValues = ["owner", "orchestrator", "session", "system"] as const;
+/** Who did a thing, as it is kept: the user, an agent (whatever its role), or the farm itself; also who said a message. */
+export const ActorKindValues = ["user", "agent", "system"] as const;
 export type ActorKind = (typeof ActorKindValues)[number];
 
 export const OutcomeValues = ["completed", "failed", "interrupted"] as const;

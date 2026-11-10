@@ -18,24 +18,24 @@ export type Inbound = typeof Inbound.Type;
 
 const AppFailedKindValues = ["restricted", "stale", "failed"] as const;
 
-/** Why an app did not do what it was asked. The message is what the owner sees. */
+/** Why an app did not do what it was asked. The message is what the user sees. */
 export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: unique symbol }>()("AppFailed", {
   kind: Schema.Literals(AppFailedKindValues),
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-export const failedWith = (message: string) => new AppFailed({ kind: "failed", message });
+export const failedWith = (message: string) => AppFailed.make({ kind: "failed", message });
 
 /** A thrown or rejected value, as an app's failure. */
-export const failedOf = (e: unknown) => new AppFailed({ kind: "failed", message: messageOf(e), cause: e });
+export const failedOf = (e: unknown) => AppFailed.make({ kind: "failed", message: messageOf(e), cause: e });
 
 export type Secrets = Readonly<Record<string, string>>;
 
 export interface Linked {
   readonly secrets: Secrets;
-  /** The owner's id in the app; "" until the owner pairs by a message. */
-  readonly owner: string;
+  /** The user's id in the app; "" until the user pairs by a message. */
+  readonly user: string;
 }
 
 export interface Progress {

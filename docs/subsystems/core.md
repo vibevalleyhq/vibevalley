@@ -9,7 +9,7 @@
 | `SpaceState` 的折叠（`apply`、`reduce`）、前后状态对 `Transition` 与序号 `seq` | 事实何时发出、各表如何持久化（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
 | 派生帧 `StateFrame`（`frameOf`）与单次特效计算（`effectsOf`） | 地块画面规则与游戏账本计算（[游戏](docs/subsystems/game.md)、[农场的皮](docs/subsystems/farm.md)） |
 | 三条 SSE 流：`/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 频道 WebSocket 订阅（[频道](docs/subsystems/channel.md)）、帮工 `/mcp`、语音线路（[语音](docs/subsystems/voice.md)） |
-| 接口表 `endpoints`、权限 `can`、幂等键 `requestKey`、试跑 `dryRun` 与 CLI 映射 | 各接口业务实现、「连接到本机」配对鉴权（[连接到本机](docs/subsystems/lan.md)）、模型工具（[管家](docs/subsystems/orchestrator.md)） |
+| 接口表 `endpoints`、权限 `can`、幂等键 `requestKey`、试跑 `dryRun` 与 CLI 映射 | 各接口业务实现、「连接到本机」配对鉴权（[连接到本机](docs/subsystems/lan.md)）、模型工具（[助手](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
 
@@ -29,10 +29,10 @@
 ### 核心状态与事实
 
 - **单一内存投影，按事实演进**：`SpaceState` 只在 `Core.apply(...facts)` 中修改。未改变状态的事实不广播、不递增 `seq`、不触发特效。
-- **「事实」专指 `Core.apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，频道路由输入叫 `ChannelRouteInput`，排序键叫 `RowKeys`。
+- **「事实」专指 `Core.apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，一条频道消息和它的听众叫 `ChannelHearers`，排序键叫 `RowKeys`。
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
 - **批次原子可见，单条保留因果**：`apply(...facts)` 先在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态并递增一次 `seq`。`reduce` 不得修改传入的旧状态。持有快照锁到事实发布完毕之间不主动让出调度，保证 oar 的同步回调不会遇到一个悬挂的写锁；这段只做同步折叠与发布，不放异步工作。
-- **先落库，后发事实**：各模块先提交 SQLite 事务或文件，再调 `Core.apply`。Core 不存 `state.json` 文件，重启时从空状态由各模块从数据库恢复。
+- **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Core.apply`。Core 不存 `state.json` 文件，重启时从空状态由各模块从数据库恢复。
 - **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。
 - **界面文案只在出帧时填充**：`frameOf(state, effects)` 在状态副本上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。
 
@@ -64,7 +64,7 @@
 
 **施加一条事实**
 
-1. 拥有者模块提交 SQLite 事务或文件后，调用 `Core.apply(...facts)`。
+1. 拥有者模块提交数据库事务或文件后，调用 `Core.apply(...facts)`。
 2. `Core` 盖上当前时间戳并运行 `reduce`；若状态未变则直接结束。
 3. 原子替换可见状态、递增 `seq`，按序向 `/events`、`facts`、`transitions` 广播事实与特效。
 4. `/state` 连接在 200ms 窗口后调用 `frameOf` 生成 `StateFrame` 推给客户端。
@@ -96,6 +96,6 @@
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts`、`apps/server/src/core/golden.test.ts`：事实去重、`seq` 递增、批次原子提交、低调度预算下的同步回调与黄金数据测试。
+- `apps/server/src/core/core.test.ts`：事实去重、`seq` 递增、批次原子提交与低调度预算下的同步回调测试。
 - `packages/protocol/src/api.test.ts`、`apps/server/src/http/api.test.ts`、`apps/server/src/flows/request.test.ts`：接口命名规范、`requestKey` 幂等与帧 `seq` 同步测试。
-- `apps/cli/src/main.test.ts`、`apps/cli/src/golden.test.ts`：CLI 全接口覆盖、试跑与错误 `next` 测试。
+- `apps/cli/src/main.test.ts`：CLI 全接口覆盖、试跑与错误 `next` 测试。

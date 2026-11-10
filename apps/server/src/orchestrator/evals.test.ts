@@ -117,7 +117,8 @@ describe("the orchestrator's evals", () => {
         const create = tools.find((tool) => tool.name === "issue_create");
         const list = tools.find((tool) => tool.name === "issue_list");
         if (!create || !list) throw new Error("Issue tools are missing");
-        expect(yield* issues.list()).toEqual([]);
+        const issues2 = yield* issues.list();
+        expect(issues2).toEqual([]);
         const before = yield* list.execute({ text: "白屏", repo }, { id: "read" });
         expect(before.content).not.toEqual([{ type: "text", text: noResult }]);
         const start = c.id !== "note-without-starting";

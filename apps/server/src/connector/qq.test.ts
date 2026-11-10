@@ -55,9 +55,9 @@ describe("QQ sign-in", () => {
 
   it("a refused AppID or secret says QQ's own reason", async () => {
     const server = createServer((_req, res) => {
-      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ code: 100016, message: "invalid appid or secret" }));
+      res.writeHead(200, { "content-type": "application/json" }).end(`{"code":100016,"message":"invalid appid or secret"}`);
     });
-    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    await Effect.runPromise(Effect.callback<void>((resume) => void server.listen(0, "127.0.0.1", () => resume(Effect.void))));
     try {
       const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
       const refused = await Effect.runPromise(Effect.flip(new QQClient(http, url, url + "/token").check({ appId: "a1", secret: "bad" })));

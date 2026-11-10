@@ -9,7 +9,7 @@ import type { BoardCard, Lane } from "./cards";
 export interface IssueMove {
   readonly id: string;
   readonly status: IssueStatus;
-  /** What the owner said with it: the findings of reject, what a reopen asks for. */
+  /** What the user said with it: the findings of reject, what a reopen asks for. */
   readonly text?: string;
   /** Fields edited and not saved, saved first so the move sees them (starting a todo). */
   readonly edit?: IssueUpdate;
@@ -30,7 +30,7 @@ export const issueMove = defineIntent<IssueMove, AppliedIssue>({
  */
 export function sendMove(moves: Intents<IssueMove, AppliedIssue>, move: IssueMove): Sent<IssueMove, AppliedIssue> {
   const kept = moves.all().find((m) => m.input.id === move.id);
-  if (kept && same(kept.input, move)) return { key: kept.key, done: kept.status === "failed" ? moves.retry(kept.key) : Promise.resolve(kept) };
+  if (kept && same(kept.input, move)) return { key: kept.key, done: kept.phase === "failed" ? moves.retry(kept.key) : Promise.resolve(kept) };
   if (kept) moves.drop(kept.key);
   return moves.send(move);
 }
@@ -43,7 +43,7 @@ export interface CardMove {
 }
 
 const cardMoveOf = (m: Intent<IssueMove, AppliedIssue>): CardMove =>
-  m.status === "failed" ? { key: m.key, state: "failed", ...(m.reason === undefined ? {} : { reason: m.reason }) } : { key: m.key, state: "moving" };
+  m.phase === "failed" ? { key: m.key, state: "failed", reason: m.fault.reason } : { key: m.key, state: "moving" };
 
 /** The newest move of an issue, for its page. */
 export function issueMoveOf(id: string, moves: readonly Intent<IssueMove, AppliedIssue>[]): CardMove | undefined {
@@ -51,10 +51,10 @@ export function issueMoveOf(id: string, moves: readonly Intent<IssueMove, Applie
   return m && cardMoveOf(m);
 }
 
-/** The issue as its page shows it: the status the owner moved it to while the move is on its way, the rest the frame's. */
+/** The issue as its page shows it: the status the user moved it to while the move is on its way, the rest the frame's. */
 export function movedIssue(issue: Issue, moves: readonly Intent<IssueMove, AppliedIssue>[]): Issue {
   const m = moves.findLast((x) => x.input.id === issue.id);
-  return m && m.status === "pending" && m.input.status !== issue.status ? { ...issue, status: m.input.status } : issue;
+  return m && m.phase !== "failed" && m.input.status !== issue.status ? { ...issue, status: m.input.status } : issue;
 }
 
 /** The newest move of each card, laid over the board's cards. */

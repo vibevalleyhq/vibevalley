@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import { Channel, type Spoken } from "#/channel/channel.ts";
-import { inboxLines } from "#/mailbox/prompts.ts";
+import { envelopeLines } from "#/mailbox/prompts.ts";
 
 import { answers, channelLine } from "./prompts.ts";
 import { callerOf, participant, refuse, said, sessionSchemaTool, tool, type Orchestrator, type SessionInput, type Who } from "./schemas.ts";
@@ -21,7 +21,7 @@ export const channelTools = Effect.gen(function* () {
       case "held": {
         const shown = s.shown ?? [];
         const more = s.more ?? 0;
-        return answers.spoken.held(s.target, shown.length, more, inboxLines(shown));
+        return answers.spoken.held(s.target, shown.length, more, envelopeLines(shown));
       }
       case "confirm":
         return answers.spoken.confirm(s.target, s.lastRead);
@@ -37,14 +37,16 @@ export const channelTools = Effect.gen(function* () {
       "channel.message.send",
       Effect.fn("Tool.messageSend")(function* (p: SessionInput<"channel.message.send">) {
         const c = yield* callerOf(who);
-        return spokenText(
-          yield* chat.speak(participant(c), p.text, {
-            ...(p.id ? { target: p.id } : {}),
-            ...(p.anyway === true ? { anyway: true } : {}),
-            ...(p.confirm === true ? { confirm: true } : {}),
-            ...(p.replyTo !== undefined ? { reply: p.replyTo } : {}),
-          }),
-        );
+        const spoken = yield* chat.post({
+          _tag: "Agent",
+          from: participant(c),
+          text: p.text,
+          ...(p.id ? { target: p.id } : {}),
+          ...(p.anyway === true ? { anyway: true } : {}),
+          ...(p.confirm === true ? { confirm: true } : {}),
+          ...(p.replyTo !== undefined ? { reply: p.replyTo } : {}),
+        });
+        return spokenText(spoken);
       }),
     );
 
@@ -66,7 +68,7 @@ export const channelTools = Effect.gen(function* () {
           const [first] = r.messages;
           if (!first) return p.unread === true ? answers.readChat.noUnread(r.target) : answers.readChat.empty(r.target);
           const older = r.older ? answers.readChat.olderNote(first.number) : "";
-          return answers.readChat.head(r.target, older) + inboxLines(r.messages);
+          return answers.readChat.head(r.target, older) + envelopeLines(r.messages);
         },
         Effect.catch((e) => Effect.succeed(answers.readChat.failed(said(e)))),
       ),

@@ -1,2 +1,6 @@
 vp run packages:build
 vp staged
+vp run effect:check
+vp run practice:check
+vp run paths:check
+vp run health:verify

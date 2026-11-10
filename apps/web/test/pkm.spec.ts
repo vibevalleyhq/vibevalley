@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test } from "./fixtures";
 
+test.use({ timezoneId: "Asia/Shanghai" });
+
 const outline = "- first thought\n- second thought\n  - under it\n- third thought\n";
 
 test("a page is written in place: Enter starts a block, Tab nests it, and the server gets them in order", async ({ page, api }) => {
@@ -80,6 +82,7 @@ test("the search lists pages and blocks by page and opens one at its block", asy
 });
 
 test("regression: /pkm marks today's journal and the calendar opens a day", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-09T12:00:00+08:00") });
   await page.goto("/pkm");
   const today = page.getByTestId("pkm-day").first();
   await expect(today.getByTestId("pkm-block")).toHaveCount(1);

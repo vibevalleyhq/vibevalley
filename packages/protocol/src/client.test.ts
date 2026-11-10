@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { VibeValleyApi, VibeValleyApiError } from "./client";
@@ -37,11 +38,13 @@ describe("the API client error boundary", () => {
   });
 
   it("decodes a real ApiError and its next steps", async () => {
-    const body = JSON.stringify({
-      _tag: "Missing",
-      what: "没有这张工单",
-      next: [{ say: "看工单", run: ["issue", "list"] }],
-    });
+    const body = Result.getOrThrow(
+      Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))({
+        _tag: "Missing",
+        what: "没有这张工单",
+        next: [{ say: "看工单", run: ["issue", "list"] }],
+      }),
+    );
     const error = await failure(404, body);
     expect([error.status, error.tag, error.reason, error.body]).toEqual([404, "Missing", "没有这张工单", body]);
     expect(error.error).toEqual({

@@ -247,7 +247,7 @@ export const dispatchedNotice = (open: (id: string | undefined) => void) => (got
 /** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its refiner asked) and sends a helper to draft it. */
 export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined) => void }) {
   const [d, setD] = createSignal(untrack(() => draftOf(props.item)));
-  // Until the owner edits a field, a draft coming back fills them.
+  // Until the user edits a field, a draft coming back fills them.
   const [edited, setEdited] = createSignal(false);
   const act = createAct();
   const moves = useIntents(issueMove);
@@ -259,7 +259,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const repoList = useRepos();
   const repos = () => ready(repoList, []).map((p) => p.name);
 
-  // The issue as the server has it now replaces the draft, unless the owner has started changing it.
+  // The issue as the server has it now replaces the draft, unless the user has started changing it.
   createEffect(
     () => draftOf(props.item),
     (fresh) => {
@@ -273,17 +273,15 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     setEdited(true);
   };
 
-  const update = (x: Draft): IssueUpdate => {
-    return {
-      title: x.title,
-      description: x.description,
-      repo: x.repo,
-      agent: x.agent,
-      priority: x.priority,
-      deliver: x.deliver,
-      criteria: criteriaList(x.criteria),
-    };
-  };
+  const update = (x: Draft): IssueUpdate => ({
+    title: x.title,
+    description: x.description,
+    repo: x.repo,
+    agent: x.agent,
+    priority: x.priority,
+    deliver: x.deliver,
+    criteria: criteriaList(x.criteria),
+  });
 
   // Saving goes with the act (edit): the server saves the fields before it acts on them. Taken when asked, so a call
   // that waits does not read them later.

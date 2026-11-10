@@ -17,8 +17,10 @@ export const mcpRoute = HttpRouter.use((router) =>
         // The caller going away aborts the Web request, as the SDK's handler listens for.
         const gone = new AbortController();
         return Effect.gen(function* () {
-          const request = yield* HttpServerRequest.toWeb(yield* HttpServerRequest.HttpServerRequest, { signal: gone.signal });
-          return HttpServerResponse.fromWeb(yield* mcp.handle(request));
+          const httpServerRequest = yield* HttpServerRequest.HttpServerRequest;
+          const request = yield* HttpServerRequest.toWeb(httpServerRequest, { signal: gone.signal });
+          const handle2 = yield* mcp.handle(request);
+          return HttpServerResponse.fromWeb(handle2);
         }).pipe(Effect.onInterrupt(() => Effect.sync(() => gone.abort())));
       }),
     );

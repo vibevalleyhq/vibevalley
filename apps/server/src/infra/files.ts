@@ -19,7 +19,7 @@ export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand:
   cause: Schema.Defect(),
 }) {}
 
-const notWritten = (cause: unknown) => new NotWritten({ message: messageOf(cause), cause });
+const notWritten = (cause: unknown) => NotWritten.make({ message: messageOf(cause), cause });
 
 // Publish hash-named files only after writing all bytes; cancellation must not leave a partial file at the hash.
 export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, bytes: Uint8Array) {
@@ -40,8 +40,12 @@ export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, b
   );
 }, Effect.mapError(notWritten));
 
-/** An owner's file (config.json, settings.json) read by read. */
-export const readOrSetAside = <A>(file: string, read: (text: string) => A, startsFrom: string): Effect.Effect<A | undefined, never, FileSystem.FileSystem> =>
+/** A user's file (config.json, settings.json); one whose read fails is set aside and read as undefined. */
+export const readOrSetAside = <A, E>(
+  file: string,
+  read: (text: string) => Effect.Effect<A, E>,
+  startsFrom: string,
+): Effect.Effect<A | undefined, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const text = yield* fs.readFileString(file).pipe(
@@ -53,15 +57,16 @@ export const readOrSetAside = <A>(file: string, read: (text: string) => A, start
       Effect.orDie,
     );
     if (text === undefined) return undefined;
-    return yield* Effect.try({ try: () => read(text), catch: messageOf }).pipe(
+    return yield* read(text).pipe(
       Effect.catch(
-        Effect.fnUntraced(function* (failure) {
+        Effect.fnUntraced(function* (e) {
+          const failure = messageOf(e);
           const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
           yield* fs
             .rename(file, aside)
             .pipe(
               Effect.catch((moved) =>
-                Effect.die(new Inconsistent({ message: `${file} cannot be read, and could not be kept aside as ${aside}: ${moved.message}` })),
+                Effect.die(Inconsistent.make({ message: `${file} cannot be read, and could not be kept aside as ${aside}: ${moved.message}` })),
               ),
             );
           yield* Effect.logWarning(`${file} could not be read (${failure}): kept as ${aside}, ${startsFrom}`);

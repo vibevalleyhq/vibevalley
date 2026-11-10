@@ -1,16 +1,17 @@
-import { Effect } from "effect";
+import { DateTime, Effect } from "effect";
 import { Command, Flag } from "effect/cli";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, optionalText, show, words } from "#/farm.ts";
+import { ask, change, given, nameArg, optionalText, words } from "#/farm.ts";
+import { show } from "#/format.ts";
 import { exit, Failure } from "#/output.ts";
 
 const whenText = (w: T.CronWhen) => {
   switch (w.kind) {
     case "once":
-      return `once ${new Date(w.at).toISOString()}`;
+      return `once ${DateTime.formatIso(DateTime.makeUnsafe(w.at))}`;
     case "every":
       return `every ${w.minutes}m`;
     case "daily":
@@ -36,7 +37,7 @@ const whenOf = (o: { every: number | undefined; daily: string | undefined; cron:
   return given_.length === 1 && one !== undefined
     ? Effect.succeed(one)
     : Effect.fail(
-        new Failure({
+        Failure.make({
           code: exit.usage,
           tag: "InvalidValue",
           text: t("cli.cron.when"),

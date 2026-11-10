@@ -36,7 +36,7 @@
       "id": "s_voice",
       "category": "starter",
       "title": "说话",
-      "detail": "用语音和管家说一次话",
+      "detail": "用语音和助手说一次话",
       "tiers": [1],
       "coins": [20]
     },

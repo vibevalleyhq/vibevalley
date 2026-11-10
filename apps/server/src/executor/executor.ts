@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Config, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
+import { Clock, Config, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -26,7 +26,7 @@ export interface Execution {
   readonly failure?: string;
 }
 
-interface StartExecution {
+export interface StartExecution {
   readonly agent: T.Agent;
   readonly owner: ExecutionOwner;
   readonly cwd: string;
@@ -35,7 +35,7 @@ interface StartExecution {
   readonly options: Partial<SessionOptions>;
 }
 
-interface ExecutionObserver {
+export interface ExecutionObserver {
   readonly connection: (connection: T.ToolConnection) => void;
   readonly event: (event: Event) => void;
   readonly input: (input: ExecutionInput) => void;
@@ -46,7 +46,7 @@ interface ExecutionObserver {
 }
 
 export type ExecutionInput = { readonly kind: "consumed" | "returned"; readonly inputId: string };
-type DeliveredInput =
+export type DeliveredInput =
   | { readonly kind: "accepted"; readonly landed: "prompted" | "steered" | "queued"; readonly inputId?: string }
   | { readonly kind: "rejected"; readonly code: string; readonly reason: string };
 
@@ -58,22 +58,31 @@ class NotClosed extends Schema.TaggedError<NotClosed, { readonly brand: unique s
   cause: Schema.Defect(),
 }) {}
 
-interface Allocation extends Omit<Execution, "pendingTasks"> {
+type AllocationPhase =
+  | { readonly _tag: "spawning" }
+  | { readonly _tag: "unobserved"; readonly agent: Subagent }
+  | { readonly _tag: "observing"; readonly agent: Subagent; readonly stop: () => void }
+  | { readonly _tag: "detached"; readonly agent: Subagent }
+  | { readonly _tag: "closing"; readonly attached: boolean; readonly wait: Deferred.Deferred<void, NotClosed>; readonly failure?: string };
+
+interface Allocation {
+  readonly owner: ExecutionOwner;
   tasks: TaskMap;
   readonly subagents: Subagents;
   readonly resources: Set<RuntimeSession>;
   readonly servers: readonly string[];
-  agent?: Subagent;
   sessionId: string;
-  attached: boolean;
-  detached: boolean;
-  closing: boolean;
-  failure?: string;
-  closingWait?: Deferred.Deferred<void, NotClosed>;
-  stop?: () => void;
+  phase: AllocationPhase;
 }
 
-const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause), cause });
+const agentOf = (phase: AllocationPhase): Subagent | undefined =>
+  phase._tag === "unobserved" || phase._tag === "observing" || phase._tag === "detached" ? phase.agent : undefined;
+
+const isAttached = (phase: AllocationPhase): boolean => phase._tag === "observing" || phase._tag === "detached" || (phase._tag === "closing" && phase.attached);
+
+const failureOf = (phase: AllocationPhase): string | undefined => (phase._tag === "closing" ? phase.failure : undefined);
+
+const notClosed = (cause: unknown) => NotClosed.make({ message: messageOf(cause), cause });
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 const closeWaitMs = 15_000;
 
@@ -116,14 +125,17 @@ const pendingTasks = (allocation: Allocation) =>
   [...allocation.tasks.values()].filter((task) => task.ambient !== true && (task.status === "running" || task.status === "pending" || task.status === "paused"))
     .length;
 
-const view = (allocation: Allocation): Execution => ({
-  owner: { ...allocation.owner },
-  sessionId: allocation.sessionId,
-  attached: allocation.attached,
-  closing: allocation.closing,
-  pendingTasks: pendingTasks(allocation),
-  ...(allocation.failure === undefined ? {} : { failure: allocation.failure }),
-});
+const view = (allocation: Allocation): Execution => {
+  const failure = failureOf(allocation.phase);
+  return {
+    owner: { ...allocation.owner },
+    sessionId: allocation.sessionId,
+    attached: isAttached(allocation.phase),
+    closing: allocation.phase._tag === "closing",
+    pendingTasks: pendingTasks(allocation),
+    ...(failure === undefined ? {} : { failure }),
+  };
+};
 
 export class Executor extends Context.Service<
   Executor,
@@ -138,7 +150,7 @@ export class Executor extends Context.Service<
     readonly find: (id: string) => Execution | undefined;
     readonly all: () => readonly Execution[];
   }
->()("vibevalley/Executor") {
+>()("@vibevalley/server/executor/executor") {
   static readonly layer = Layer.effect(
     Executor,
     Effect.suspend(() => make),
@@ -158,13 +170,21 @@ const make = Effect.gen(function* () {
   const later = yield* FiberMap.runtime(timers)();
   const allocations = new Map<string, Allocation>();
 
+  const stopObserving = (allocation: Allocation) => {
+    if (allocation.phase._tag !== "observing") return;
+    const { agent, stop } = allocation.phase;
+    allocation.phase = { _tag: "detached", agent };
+    stop();
+  };
+
   // Closing outlives an interrupted caller; all later callers receive the same disposal result.
   const closeAllocation = (allocation: Allocation): Effect.Effect<void, NotClosed> =>
     Effect.suspend(() => {
-      if (allocation.closingWait) return Deferred.await(allocation.closingWait);
-      const closing = Deferred.makeUnsafe<void, NotClosed>();
-      allocation.closingWait = closing;
-      allocation.closing = true;
+      if (allocation.phase._tag === "closing") return Deferred.await(allocation.phase.wait);
+      const wait = Deferred.makeUnsafe<void, NotClosed>();
+      const attached = isAttached(allocation.phase);
+      if (allocation.phase._tag === "observing") allocation.phase.stop();
+      allocation.phase = { _tag: "closing", attached, wait };
       const close = Effect.gen(function* () {
         const crew = yield* Effect.exit(Effect.tryPromise({ try: () => allocation.subagents.close(), catch: notClosed }));
         // oar may already have closed its Subagent after a failed prompt; that no-op does not confirm disposal.
@@ -178,23 +198,28 @@ const make = Effect.gen(function* () {
       });
       forkHere(
         close.pipe(
-          Effect.onExit((exit) => Deferred.done(closing, exit)),
+          Effect.onExit((exit) => Deferred.done(wait, exit)),
           Effect.ignore({ log: "Debug" }),
         ),
       );
-      return Deferred.await(closing);
+      return Deferred.await(wait);
     });
+
+  const setClosingFailure = (allocation: Allocation, failure: string) => {
+    if (allocation.phase._tag === "closing") {
+      allocation.phase = { ...allocation.phase, failure };
+    }
+  };
 
   const closeOwned = Effect.fnUntraced(function* (allocation: Allocation) {
     yield* closeAllocation(allocation).pipe(
       Effect.mapError((e) => {
-        allocation.failure = t("server.session.life.notStopped", { why: e.message });
-        return refused(allocation.failure);
+        const failure = t("server.session.life.notStopped", { why: e.message });
+        setClosingFailure(allocation, failure);
+        return refused(failure);
       }),
     );
-    allocation.detached = true;
-    allocation.stop?.();
-    delete allocation.stop;
+    stopObserving(allocation);
     if (allocations.get(allocation.owner.id) === allocation) allocations.delete(allocation.owner.id);
     yield* Metric.update(running, allocations.size);
   });
@@ -210,7 +235,7 @@ const make = Effect.gen(function* () {
         onSuccess: () => ({ refused: why, retained: false }),
         onFailure: (e) => {
           const failure = t("shared.join.clauses", { a: why, b: reasonOf(e) });
-          allocation.failure = failure;
+          setClosingFailure(allocation, failure);
           return { refused: failure, retained: true };
         },
       }),
@@ -224,10 +249,7 @@ const make = Effect.gen(function* () {
 
   const detach = (id: string) => {
     const allocation = allocations.get(id);
-    if (!allocation) return;
-    allocation.detached = true;
-    allocation.stop?.();
-    delete allocation.stop;
+    if (allocation) stopObserving(allocation);
   };
 
   yield* Effect.addFinalizer(() =>
@@ -251,13 +273,17 @@ const make = Effect.gen(function* () {
     start: Effect.fn("Executor.start")(function* ({ agent, owner, cwd, input, resume, options }): Effect.fn.Return<Started> {
       const id = owner.id;
       const prior = allocations.get(id);
-      if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
-      let refusal = "";
-      const resolved = yield* Effect.option(runtimes.resolve(agent).pipe(Effect.tapError((e) => Effect.sync(() => (refusal = reasonOf(e))))));
-      if (Option.isNone(resolved)) return { refused: refusal, retained: false };
+      if (prior) return { refused: failureOf(prior.phase) ?? t("server.session.life.notReturned"), retained: true };
+      const resolved = yield* runtimes.resolve(agent).pipe(
+        Effect.match({
+          onFailure: (e) => ({ _tag: "refused" as const, refused: reasonOf(e) }),
+          onSuccess: (value) => ({ _tag: "resolved" as const, value }),
+        }),
+      );
+      if (resolved._tag === "refused") return { refused: resolved.refused, retained: false };
       const r = resolved.value;
       const raced = allocations.get(id);
-      if (raced) return { refused: raced.failure ?? t("server.session.life.notReturned"), retained: true };
+      if (raced) return { refused: failureOf(raced.phase) ?? t("server.session.life.notReturned"), retained: true };
       const base = r.runtime;
       const resources = new Set<RuntimeSession>();
       const mine: OarRuntime = {
@@ -298,9 +324,7 @@ const make = Effect.gen(function* () {
         resources,
         servers: [...new Set(options.mcpServers?.map((server) => server.name) ?? [])],
         sessionId: "",
-        attached: false,
-        detached: false,
-        closing: false,
+        phase: { _tag: "spawning" },
       };
       allocations.set(id, allocation);
       yield* Metric.update(running, allocations.size);
@@ -320,7 +344,7 @@ const make = Effect.gen(function* () {
             .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: messageOf(e) })),
         );
         if (spawned.kind !== "spawned") return yield* failedAllocation(allocation, t("shared.join.aside", { text: spawned.reason, aside: spawned.code }));
-        allocation.agent = spawned.agent;
+        allocation.phase = { _tag: "unobserved", agent: spawned.agent };
         allocation.sessionId = spawned.agent.session.id;
         const verb = resume ? "woke" : "sent";
         const how = r.model ? ", model " + r.model : ", the runtime's default model";
@@ -330,7 +354,8 @@ const make = Effect.gen(function* () {
       return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation), { log: "Warn" }) : Effect.void)));
     }),
     deliver: Effect.fn("Executor.deliver")(function* (id, text, inputId) {
-      const agent = allocations.get(id)?.agent;
+      const allocation = allocations.get(id);
+      const agent = allocation ? agentOf(allocation.phase) : undefined;
       if (!agent) return { kind: "rejected", code: "closed", reason: t("server.session.life.noHelper", { id }) };
       if (agent.session.status().value.kind === "idle") {
         return yield* Effect.tryPromise({
@@ -354,7 +379,8 @@ const make = Effect.gen(function* () {
         : ({ kind: "accepted", landed: delivered.landed, inputId: delivered.inputId } as const);
     }),
     interrupt: Effect.fn("Executor.interrupt")(function* (id) {
-      const agent = allocations.get(id)?.agent;
+      const allocation = allocations.get(id);
+      const agent = allocation ? agentOf(allocation.phase) : undefined;
       if (!agent) return { kind: "failed", reason: t("server.session.life.noHelper", { id }) };
       return yield* Effect.promise(() => agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) })));
     }),
@@ -362,14 +388,18 @@ const make = Effect.gen(function* () {
     failed,
     observe: (id, observer) => {
       const allocation = allocations.get(id);
-      if (!allocation?.agent) return;
-      detach(id);
-      allocation.detached = false;
-      allocation.attached = true;
-      const session = allocation.agent.session;
+      const agent = allocation ? agentOf(allocation.phase) : undefined;
+      if (!allocation || !agent) return;
+      stopObserving(allocation);
+      const session = agent.session;
+      // Observing before subscribing: a subscription hands over what it already has at once, and that belongs to this observer.
+      const stops: (() => void)[] = [];
+      const phase: AllocationPhase = { _tag: "observing", agent, stop: () => stops.forEach((stop) => stop()) };
+      allocation.phase = phase;
+      const isObserving = () => allocation.phase === phase;
       const stopEvents = session.events(
         (event) => {
-          if (allocation.detached) return;
+          if (!isObserving()) return;
           const before = pendingTasks(allocation);
           switch (event.kind) {
             case "task_started":
@@ -391,10 +421,10 @@ const make = Effect.gen(function* () {
       );
       const inputStates = new Map<string, ExecutionInput["kind"]>();
       const stopConnections = observeToolConnections(session, allocation.owner.runtime, allocation.servers, (connection) => {
-        if (!allocation.detached) observer.connection(connection);
+        if (isObserving()) observer.connection(connection);
       });
       const stopInputs = observeSessionView(session, (view) => {
-        if (allocation.detached) return;
+        if (!isObserving()) return;
         const placed = new Set(
           view.messages.flatMap((message) => (message.kind === "input" && message.input.inputId !== undefined ? [message.input.inputId] : [])),
         );
@@ -415,27 +445,21 @@ const make = Effect.gen(function* () {
       const stopReports = allocation.subagents.onReport((report) => {
         if (report.sessionId === session.id)
           queueMicrotask(() => {
-            if (!allocation.detached) observer.report(report);
+            if (isObserving()) observer.report(report);
           });
-      });
-      // A turn can finish between spawn and observation; its unread report still belongs to this execution.
-      void allocation.subagents.wait({ timeoutMs: 0 }).then((early) => {
-        for (const report of early) if (report.sessionId === session.id && !allocation.detached) observer.report(report);
       });
       const stopStalls = watchStalls(
         session,
         observer.stallMs,
-        (silentForMs, at) => !allocation.detached && observer.stalled(silentForMs, at),
+        (silentForMs, at) => isObserving() && observer.stalled(silentForMs, at),
         (wait) => void later(id, wait),
         () => clock.currentTimeMillisUnsafe(),
       );
-      allocation.stop = () => {
-        stopEvents();
-        stopConnections();
-        stopInputs();
-        stopReports();
-        stopStalls();
-      };
+      stops.push(stopEvents, stopConnections, stopInputs, stopReports, stopStalls);
+      // A turn can finish between spawn and observation; its unread report still belongs to this execution.
+      void allocation.subagents.wait({ timeoutMs: 0 }).then((early) => {
+        for (const report of early) if (report.sessionId === session.id && isObserving()) observer.report(report);
+      });
     },
     detach,
     find: (id) => {

@@ -2,7 +2,7 @@ import { Effect, Semaphore, Predicate } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
@@ -38,15 +38,15 @@ export function merging(d: MergeDeps) {
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
     const issue = sessions.sessionOf(id)?.issue;
     if (issue && n.failure.kind === "conflict") yield* d.setConflict(issue, { base: n.failure.base, files: [...n.failure.files] });
-    let [owner, line] = [n.owner, n.notice];
+    let [user, line] = [n.user, n.notice];
     if (n.fix) {
       const untold = yield* chat
-        .tellSession(ownerId, id, n.fix, "")
+        .post({ _tag: "Tell", from: userId, session: id, text: n.fix, sendKey: "" })
         .pipe(Effect.match({ onSuccess: () => "", onFailure: (e) => t("server.issue.merge.tellFailed", { why: reasonOf(e) }) }));
-      [owner, line] = [owner + untold, line + untold];
+      [user, line] = [user + untold, line + untold];
     }
     yield* core.notice("warn", line);
-    return refused(owner);
+    return refused(user);
   });
   const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, MergeFailure | RepoError>) =>
     sessions
@@ -73,7 +73,13 @@ export function merging(d: MergeDeps) {
       .submitPullRequest(place, issue, pullRequestConclusion(said))
       .pipe(Effect.mapError((e) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(e.message))));
     const thread = yield* chat.issueThread(issue.id, issue.title).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
-    yield* chat.notice(thread, t("server.issue.prDelivered", { url: pr.url }), "issue_pr_delivery", `issue-pr:${issue.id}:${pr.url}`);
+    yield* chat.post({
+      _tag: "Notice",
+      channel: thread,
+      text: t("server.issue.prDelivered", { url: pr.url }),
+      code: "issue_pr_delivery",
+      sendKey: `issue-pr:${issue.id}:${pr.url}`,
+    });
     yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
     return { pullRequest: pr, text: t("shared.join.labeled", { label: "PR", text: pr.url }), commits: 0 };
   });
@@ -87,7 +93,7 @@ export function merging(d: MergeDeps) {
         if (m === "none") return yield* Effect.fail(refused(why));
       }
       const last = latestSessionIdOf(issue);
-      if (issue.repo && (!last || !sessions.present(last)) && (yield* list).some((child) => child.parent === issue.id)) {
+      if (issue.repo && (!last || !sessions.isReachable(last)) && (yield* list).some((child) => child.parent === issue.id)) {
         const place = yield* repos.workplace(issue.repo, issue.number, true, "").pipe(Effect.mapError((error) => refused(error.message)));
         if (issue.pullRequest?.state === "open" || repos.usesPullRequests(issue.repo))
           return (yield* pullRequestOf(place, issue, issue.description).pipe(Effect.mapError((error) => refused(error.message)))).text;
@@ -109,7 +115,7 @@ export function merging(d: MergeDeps) {
   const finishPullRequest = Effect.fnUntraced(function* (issue: T.Issue, state: T.PullRequestState) {
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = latestSessionIdOf(issue);
-    if (id && sessions.present(id))
+    if (id && sessions.isReachable(id))
       yield* sessions
         .handOver(id, closed, (place) => repos.finishPullRequest(place.repo, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));

@@ -64,24 +64,25 @@ describe("a talk with a helper profile", () => {
       const { in: saidIn } = yield* Said;
       yield* (yield* Agent).save(lab());
       const dm = yield* channels.direct("lab");
-      expect(yield* channels.direct("lab")).toBe(dm);
+      const direct2 = yield* channels.direct("lab");
+      expect(direct2).toBe(dm);
       const channel = channelOf(core.state().chat, dm);
       expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", null, undefined]);
       const answers = () => saidIn(dm).filter((m) => m.kind === "report").length;
-      yield* channels.say("你好，记得这段对话", dm, "");
+      yield* channels.post({ _tag: "User", text: "你好，记得这段对话", channel: dm, sendKey: "" });
       yield* until(() => answers() === 1, "the first answer");
-      const first = sessions.presentSessions().find((s) => s.channel === dm);
+      const first = sessions.hired().find((s) => s.channel === dm);
       expect(first).toMatchObject({ agent: "lab", channel: dm });
       expect(first?.issue).toBeUndefined();
       expect(first?.repo).toBeUndefined();
       yield* TestClock.adjust(10 * 60_000);
       yield* until(() => disposed === 1, "the idle execution suspended");
-      expect(sessions.presentSessions().find((s) => s.channel === dm)?.id).toBe(first?.id);
-      yield* channels.say("接着聊", dm, "");
+      expect(sessions.hired().find((s) => s.channel === dm)?.id).toBe(first?.id);
+      yield* channels.post({ _tag: "User", text: "接着聊", channel: dm, sendKey: "" });
       yield* until(() => answers() === 2, "the resumed answer");
       expect(
         sessions
-          .presentSessions()
+          .hired()
           .filter((s) => s.channel === dm)
           .map((s) => s.id),
       ).toEqual([first?.id]);
@@ -89,9 +90,12 @@ describe("a talk with a helper profile", () => {
       expect(resumes[1]).toBe(nativeIds[0]);
       expect(inputs[0]).toContain("你好，记得这段对话");
       expect(inputs[1]).toContain("接着聊");
-      expect(yield* issues.list()).toEqual([]);
-      expect(yield* issues.history()).toEqual([]);
-      expect(yield* db.run(sql`select id from issue_assignment`)).toEqual([]);
+      const issues2 = yield* issues.list();
+      expect(issues2).toEqual([]);
+      const history2 = yield* issues.history();
+      expect(history2).toEqual([]);
+      const rows = yield* db.run(sql`select id from issue_assignment`);
+      expect(rows).toEqual([]);
       expect(saidIn(channels.defaultChannel())).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -128,11 +132,11 @@ describe("a talk with a helper profile", () => {
       const said = (yield* Said).in;
       yield* (yield* Agent).save(lab());
       const dm = yield* channels.direct("lab");
-      yield* channels.say("第一句", dm, "");
+      yield* channels.post({ _tag: "User", text: "第一句", channel: dm, sendKey: "" });
       yield* Effect.promise(() => opening.promise);
-      yield* channels.say("启动中的第二句", dm, "");
+      yield* channels.post({ _tag: "User", text: "启动中的第二句", channel: dm, sendKey: "" });
       opened.resolve();
-      yield* until(() => sessions.presentSessions().some((s) => s.channel === dm), "the context registered");
+      yield* until(() => sessions.hired().some((s) => s.channel === dm), "the context registered");
       releaseFirst.resolve();
       yield* until(() => said(dm).filter((m) => m.kind === "report").length === 2, "both inputs answered");
       expect(starts).toBe(1);
@@ -181,7 +185,7 @@ describe("a talk with a helper profile", () => {
         const said = (yield* Said).in;
         yield* (yield* Agent).save(lab());
         const dm = yield* channels.direct("lab");
-        yield* channels.say("重启之前", dm, "");
+        yield* channels.post({ _tag: "User", text: "重启之前", channel: dm, sendKey: "" });
         yield* until(() => said(dm).some((m) => m.kind === "report"), "the first report");
         const db = yield* Db;
         const sql = yield* SqlClient.SqlClient;
@@ -190,7 +194,7 @@ describe("a talk with a helper profile", () => {
           (rows) => rows.length === 1 && rows[0]?.state === "consumed",
           "the input receipt persisted before restart",
         );
-        const context = sessions.presentSessions().find((s) => s.channel === dm);
+        const context = sessions.hired().find((s) => s.channel === dm);
         if (!context) throw new Error("the conversation has no session");
         yield* (yield* Core).apply({ type: "progressChanged", station: { id: context.id, station: 3 } });
         return { dm, session: context.id };
@@ -201,14 +205,16 @@ describe("a talk with a helper profile", () => {
         const sessions = yield* Session;
         const said = (yield* Said).in;
         yield* channels.start;
-        expect(yield* channels.direct("lab")).toBe(first.dm);
-        expect(sessions.presentSessions().find((s) => s.channel === first.dm)?.id).toBe(first.session);
+        const direct2 = yield* channels.direct("lab");
+        expect(direct2).toBe(first.dm);
+        expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);
         expect((yield* Core).state().plays?.[first.session]?.station).toBe(0);
-        yield* channels.say("重启之后", first.dm, "");
+        yield* channels.post({ _tag: "User", text: "重启之后", channel: first.dm, sendKey: "" });
         yield* until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");
         expect(resumes[1]).toBeTruthy();
         expect(inputs[1]).toContain("重启之后");
-        expect(yield* (yield* Issue).list()).toEqual([]);
+        const found = yield* (yield* Issue).list();
+        expect(found).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(farm({ config, runtime }).layer));
     });
   });
@@ -240,11 +246,11 @@ describe("a talk with a helper profile", () => {
       yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
       const existing = yield* channels.direct("lab");
       const starting = yield* channels.direct("lab2");
-      yield* channels.say("B first", existing, "");
+      yield* channels.post({ _tag: "User", text: "B first", channel: existing, sendKey: "" });
       yield* until(() => said(existing).filter((m) => m.kind === "report").length === 1, "the existing conversation ready");
-      yield* channels.say("A first", starting, "");
+      yield* channels.post({ _tag: "User", text: "A first", channel: starting, sendKey: "" });
       yield* Effect.promise(() => opening.promise);
-      const delivery = yield* Effect.forkScoped(channels.say("B next", existing, ""));
+      const delivery = yield* Effect.forkScoped(channels.post({ _tag: "User", text: "B next", channel: existing, sendKey: "" }));
       yield* until(() => said(existing).some((m) => m.text === "B next"), "the followup committed under the channel lock");
       releaseOpening.resolve();
       yield* Fiber.join(delivery).pipe(Effect.timeout(3_000));

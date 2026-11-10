@@ -7,8 +7,9 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
 import { Db, causeMessage } from "#/infra/db.ts";
-import { channelType, senderKind, type ChannelRouteResult } from "#/mailbox/envelope.ts";
+import { channelType, actorKindOf, type ChannelRouteResult } from "#/mailbox/envelope.ts";
 import { NotRecorded, Session } from "#/session/session.ts";
 import { issueExists } from "#db/issue.sql.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
@@ -48,7 +49,8 @@ interface WorkOptions {
   readonly breaker: WakeBreaker;
   readonly dispatch: (session: string) => void;
   readonly issueOf: (id: string) => T.Issue | undefined;
-  readonly orchestratorOf: (channel: string) => Effect.Effect<string>;
+  /** The orchestrator in a channel (envelope.ts orchestratorIn): who what names no one there goes to. */
+  readonly orchestratorIn: (channel: string) => Effect.Effect<string>;
 }
 
 const readTrigger = Schema.decodeUnknownSync(Schema.fromJsonString(S.Trigger));
@@ -58,23 +60,25 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     const db = yield* Db;
     const sessions = yield* Session;
     const agents = yield* Agent;
-    const { writtenLocked, received, stored, defaultChannel, open, reach, breaker, dispatch, issueOf, orchestratorOf } = options;
+    const { writtenLocked, received, stored, defaultChannel, open, reach, breaker, dispatch, issueOf, orchestratorIn } = options;
 
     const writeDelivery = (input: InsertDelivery) =>
-      qd.insertDelivery({
-        session_id: input.session,
-        envelope_id: input.row.envelope_id,
-        scope: input.row.scope,
-        channel_id: input.row.channel_id || null,
-        message_id: input.row.message_id,
-        source: input.row.source,
-        urgency: input.row.urgency,
-        reason: input.row.reason,
-        wakes: input.row.wakes,
-        held_by: input.row.held_by,
-        payload_json: JSON.stringify(input.row.payload),
-        created_at: input.row.created_at,
-      });
+      Effect.flatMap(jsonText(input.row.payload), (payloadJson) =>
+        qd.insertDelivery({
+          session_id: input.session,
+          envelope_id: input.row.envelope_id,
+          scope: input.row.scope,
+          channel_id: input.row.channel_id || null,
+          message_id: input.row.message_id,
+          source: input.row.source,
+          urgency: input.row.urgency,
+          reason: input.row.reason,
+          wakes: input.row.wakes,
+          held_by: input.row.held_by,
+          payload_json: payloadJson,
+          created_at: input.row.created_at,
+        }),
+      );
     const markRoute = (input: InsertDelivery) =>
       qr
         .markRouted({
@@ -89,11 +93,6 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       const drafts = yield* Effect.forEach(inputs, (input) =>
         Effect.gen(function* () {
           const { trigger } = input;
-          const profile = agents.agent(input.session);
-          if (profile?.role === "orchestrator" && !sessions.sessionOf(input.session))
-            yield* sessions
-              .register({ id: profile.id, agent: profile.id, name: profile.name, role: profile.role, runtime: profile.runtime, brief: profile.duty })
-              .pipe(Effect.mapError((error) => refused(error.message)));
           const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? (yield* defaultChannel);
           const scope = deliveryScope(destination, input.issue);
           const urgency =
@@ -101,7 +100,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             urgencyOf({
               source: trigger.source,
               actor: trigger.actor.kind,
-              recipient: input.role ?? profile?.role ?? "worker",
+              recipient: input.role ?? agents.agent(input.session)?.role ?? "worker",
               event: input.event ?? triggerEvent(trigger),
               canSteer: true,
             });
@@ -120,7 +119,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         const deliveries = brakes(
           group.map((draft) => draft.candidate),
           {
-            fromKind: senderKind(first.input.trigger.actor.kind),
+            fromKind: actorKindOf(first.input.trigger.actor.kind),
             orchestrators: agents.orchestrators().map((agent) => agent.id),
             hops: reach.hops(first.scope),
             cooling: group.filter((draft) => at - reach.lastWake(draft.input.session) < agentWakeCooldownMs).map((draft) => draft.input.session),
@@ -166,21 +165,9 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         received(entry.receipt);
         if (entry.input.previous) open.remove(entry.input.previous, entry.input.trigger.id);
         for (const added of entry.added) stored(entry.input.session, { ...entry.row, position: added.position });
-        if (entry.input.trigger.actor.kind === "owner" && entry.row.wakes) breaker.reset(entry.input.session);
+        if (entry.input.trigger.actor.kind === "user" && entry.row.wakes) breaker.reset(entry.input.session);
       }
       return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "" };
-    }, writtenLocked);
-
-    const insert = Effect.fn("Mailbox.insert")(function* (input: InsertDelivery) {
-      const inserted = yield* db.attemptTx(
-        Effect.gen(function* () {
-          const rows = yield* writeDelivery(input);
-          const receipt = yield* markRoute(input);
-          return { rows, receipt };
-        }),
-      );
-      received(inserted.receipt);
-      for (const row of inserted.rows) stored(input.session, { ...input.row, position: row.position });
     }, writtenLocked);
 
     const registerInitialInputs = Effect.fn("Mailbox.registerInitialInputs")(function* (session: T.Session, launch: string, inputs: readonly T.Trigger[]) {
@@ -215,7 +202,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             }),
           ),
         )
-        .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+        .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
       for (const entry of committed) received(entry.receipt);
       for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
     }, writtenLocked);
@@ -229,11 +216,11 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       const prepared = yield* Effect.forEach(rows, (talk) =>
         Effect.gen(function* () {
           const recorded = yield* db.one(qr.triggerById({ id: talk.row.envelope_id }));
-          if (!recorded) return yield* Effect.die(new Inconsistent({ message: `talk ${talk.row.envelope_id} has no recorded trigger` }));
+          if (!recorded) return yield* Effect.die(Inconsistent.make({ message: `talk ${talk.row.envelope_id} has no recorded trigger` }));
           const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(recorded.trigger_json).pipe(
-            Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
+            Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })),
           );
-          const urgency = urgencyOf({ source: trigger.source, actor: "owner", recipient: "worker", event: "conversation", canSteer: true });
+          const urgency = urgencyOf({ source: trigger.source, actor: "user", recipient: "worker", event: "conversation", canSteer: true });
           const row: DeliveryDraft = {
             envelope_id: talk.row.envelope_id,
             scope: deliveryScope(talk.row.channel_id, talk.row.subject_kind === "issue" ? (talk.row.subject_id ?? undefined) : undefined),
@@ -267,7 +254,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             }),
           ),
         )
-        .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+        .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
       for (const entry of committed) {
         received(entry.receipt);
         for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
@@ -298,7 +285,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     ) {
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
+        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorIn(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward([
         {
           trigger,
@@ -330,7 +317,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       if (issue.status === "backlog") return;
       const assigned = assignedAgentOf(issue);
       const worker = latestSessionIdOf(issue);
-      const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.present(worker) ? worker : undefined;
+      const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.isReachable(worker) ? worker : undefined;
       const closing = issue.status === "done" || (issue.status === "canceled" && issue.canceled !== "lost");
       const inputs = yield* db.run(qi.pendingIssueInputs({ issue_id: id, recipient: recipient ?? null, closing }));
       if (closing) {
@@ -339,7 +326,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           (input) =>
             Effect.gen(function* () {
               const trigger = readTrigger(input.trigger_json);
-              if (trigger.actor.kind === "owner") yield* retire(issue, trigger, input.session_id, "closed", true);
+              if (trigger.actor.kind === "user") yield* retire(issue, trigger, input.session_id, "closed", true);
               else yield* db.run(qi.returnIssueInput({ trigger_id: trigger.id, reason: "closed" }));
             }),
           { discard: true },
@@ -357,7 +344,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
                 ? "budget"
                 : !recipient
                   ? "session"
-                  : waitsForHuman(issue) && trigger.actor.kind !== "owner" && !human
+                  : waitsForHuman(issue) && trigger.actor.kind !== "user" && !human
                     ? "human"
                     : undefined;
             if (reason) {
@@ -391,7 +378,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       if (forwarded && recipient) dispatch(recipient);
     });
 
-    const registered = Effect.fn("Mailbox.registered")(function* (trigger: string) {
+    const isRouted = Effect.fn("Mailbox.isRouted")(function* (trigger: string) {
       return (yield* db.run(qr.isRouted({ envelope_id: trigger }))).routed;
     });
 
@@ -404,8 +391,8 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         if (existing.state === "held") yield* flush(existing.issue_id);
         return;
       }
-      if (!audience && (yield* registered(trigger.id))) return;
-      const threads = audience && trigger.actor.kind !== "owner" ? [] : trigger.threads;
+      if (!audience && (yield* isRouted(trigger.id))) return;
+      const threads = audience && trigger.actor.kind !== "user" ? [] : trigger.threads;
       const matches = yield* db.run(qs.subscribedIssues({ keys: [...threads] }));
       const ids = new Set(matches.map((row) => row.issue_id));
       yield* Effect.forEach(
@@ -437,7 +424,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           }),
         );
         yield* writtenLocked(Effect.sync(() => received(receipt)));
-        yield* flush(issue, trigger.actor.kind === "owner");
+        yield* flush(issue, trigger.actor.kind === "user");
         return;
       }
       if (audience) {
@@ -447,13 +434,13 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       }
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
+        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorIn(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward([{ trigger, session: recipient, commit: Effect.void }]);
       dispatch(recipient);
       return undefined;
     });
 
-    const returnInput = Effect.fn("Mailbox.returnOwnedInput")(function* (session: string, delivery: string, reason: string) {
+    const decline = Effect.fn("Mailbox.returnOwnedInput")(function* (session: string, delivery: string, reason: string) {
       const payload = yield* db.one(qd.deliveryPayload({ session_id: session, envelope_id: delivery }));
       if (!payload) return false;
       const source = yield* db.one(qr.triggerById({ id: readPayload(payload.payload_json).trigger.id }));
@@ -479,13 +466,12 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       receive,
       flush,
       ownerOf,
-      returnInput,
-      registered,
+      decline,
+      isRouted,
       queuedInputs,
       issueInputs,
       retireDispatches,
       forward,
-      insert,
       registerInitialInputs,
       registerTalk,
       hand,

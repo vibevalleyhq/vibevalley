@@ -1,0 +1,15 @@
+{
+  "noItem": "素材库里没有 {id}",
+  "oneSource": "给且只给一样：附件（attachment）、网址（url）或工作目录里的文件（path）",
+  "agentAttachment": "附件是用户上传的；帮工和助手放东西进素材库，给网址（url）或工作目录里的文件（path）",
+  "userFetch": "你放进素材库的是上传好的附件（attachment）；从网址或文件拿东西进来，交给助手或帮工",
+  "badUrl": "{url} 不是一个公网的 https 地址：素材库只从公网的 https 地址下载",
+  "notFetched": "没能从 {url} 下载：{why}",
+  "slow": "下载超过 60 秒还没完，放弃了",
+  "tooBig": "文件超过 {mb} MB，素材库放不下",
+  "noPlace": "你没有工作目录：给一个网址（url）",
+  "outside": "{path} 不在你的工作目录里：只能放工作目录里的文件",
+  "notFile": "{path} 不是工作目录里的一个文件",
+  "unreadable": "读不了 {path}：{why}",
+  "preview": { "remove": "从素材库拿掉「{name}」；发过它的消息仍能打开它" }
+}

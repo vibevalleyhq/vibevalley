@@ -53,7 +53,7 @@ const gitlabPulls = jsonOrNone(Schema.Array(gitlabMerge));
 const gitlabPull = jsonOrNone(gitlabMerge);
 const received = Schema.decodeUnknownEffect(Schema.Struct({ number: Schema.Int, url: Schema.String.check(Schema.isPattern(/^https:\/\//u)) }));
 
-const failure = (stage: string) => new RepoError({ message: t("server.repo.publish.platformFailed", { stage }) });
+const failure = (stage: string) => RepoError.make({ message: t("server.repo.publish.platformFailed", { stage }) });
 
 export const hosting = (repo: HostedRepo, command: GitHubRun) => {
   const github = repo.platform === "github";
@@ -71,19 +71,30 @@ export const hosting = (repo: HostedRepo, command: GitHubRun) => {
   });
   const find = Effect.fnUntraced(function* (branch: string, base: string) {
     if (github) {
-      const parsed = githubPulls(
-        yield* request("pr", "list", "--repo", repo.name, "--head", branch, "--base", base, "--state", "open", "--json", "url,number,isCrossRepository,state"),
+      const response2 = yield* request(
+        "pr",
+        "list",
+        "--repo",
+        repo.name,
+        "--head",
+        branch,
+        "--base",
+        base,
+        "--state",
+        "open",
+        "--json",
+        "url,number,isCrossRepository,state",
       );
+      const parsed = githubPulls(response2);
       if (!parsed || parsed.length > 1) return yield* failure("list decode");
       const first = parsed.find((pr) => !pr.isCrossRepository && pr.state === "OPEN");
       return first ? yield* receipt(first.number, first.url) : undefined;
     }
-    const parsed = gitlabPulls(
-      yield* request(
-        "api",
-        `${project}/merge_requests?state=opened&source_branch=${encodeURIComponent(branch)}&target_branch=${encodeURIComponent(base)}&per_page=2`,
-      ),
+    const response = yield* request(
+      "api",
+      `${project}/merge_requests?state=opened&source_branch=${encodeURIComponent(branch)}&target_branch=${encodeURIComponent(base)}&per_page=2`,
     );
+    const parsed = gitlabPulls(response);
     if (!parsed || parsed.length > 1) return yield* failure("list decode");
     const first = parsed.find((mr) => mr.source_project_id === mr.target_project_id && (mr.state === "opened" || mr.state === "locked"));
     return first ? yield* receipt(first.iid, first.web_url) : undefined;

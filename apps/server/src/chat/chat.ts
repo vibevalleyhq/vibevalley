@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
-import { Clock, Effect, Fiber, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
+import { Clock, Console, Effect, Fiber, FiberHandle, Formatter, Option, Predicate, Queue, Schema, Stream } from "effect";
 import { FetchHttpClient } from "effect/http";
 
 import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
@@ -49,13 +49,13 @@ function show(e: BrainEvent, prompt: () => void) {
       write("\n");
       return;
     case "tool_execution_start":
-      console.log(dim("→ " + e.toolName + " " + short(JSON.stringify(e.args ?? {}))));
+      write(dim("→ " + e.toolName + " " + short(Formatter.formatJson(e.args ?? {}))) + "\n");
       return;
     case "tool_execution_end":
-      console.log(dim((e.isError ? "✗ " : "✓ ") + short(e.result.content.map((c) => (c.type === "text" ? c.text : "")).join(""))));
+      write(dim((e.isError ? "✗ " : "✓ ") + short(e.result.content.map((c) => (c.type === "text" ? c.text : "")).join(""))) + "\n");
       return;
     case "compaction_end":
-      if (e.compaction) console.log(dim(t("server.chat.compacted", { archive: e.compaction.archive ?? "" })));
+      if (e.compaction) write(dim(t("server.chat.compacted", { archive: e.compaction.archive ?? "" })) + "\n");
       return;
     case "agent_settled":
       write(
@@ -89,7 +89,7 @@ const terminal = Stream.callback<Typed>((queue) =>
   ),
 );
 
-/** The owner is done: /exit, Ctrl+C with nothing under way, or the input's end. */
+/** The user is done: /exit, Ctrl+C with nothing under way, or the input's end. */
 class Quit extends Schema.TaggedError<Quit, { readonly brand: unique symbol }>()("Quit", {}) {}
 
 const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));
@@ -128,14 +128,15 @@ export const ownChat = (values: OwnChat) =>
       reminders: !asked,
       todos: memoryStore(),
     });
-    for (const why of agent.mcpStatus().failed) console.error(dim(why));
+    yield* Effect.forEach(agent.mcpStatus().failed, (why) => Console.error(dim(why)), { discard: true });
     let prompt = () => {};
     const events = yield* agent.events;
     const shown = (e: BrainEvent) => Effect.sync(() => show(e, () => prompt()));
     const said = (text: string) => Effect.map(Clock.currentTimeMillis, (at) => userMessage(text, at));
     if (values.p !== undefined) {
+      const said2 = yield* said(values.p);
       // The answer is shown to its end before the question's command does.
-      const answer = yield* Effect.forkChild(agent.ask(yield* said(values.p)));
+      const answer = yield* Effect.forkChild(agent.ask(said2));
       yield* Stream.runForEach(
         Stream.takeUntil(events, (e) => e.type === "agent_settled"),
         shown,
@@ -144,7 +145,7 @@ export const ownChat = (values: OwnChat) =>
       return;
     }
     yield* Effect.forkScoped(Stream.runForEach(events, shown));
-    console.log(
+    yield* Console.log(
       dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.chat.hello", { skills: (yield* agent.skills).length, tools: agent.mcpStatus().toolCount })),
     );
     prompt = () => write("› ");
@@ -153,20 +154,22 @@ export const ownChat = (values: OwnChat) =>
       Effect.gen(function* () {
         if (typedIn.kind === "interrupt") {
           if (!agent.busy()) {
-            console.log();
-            return yield* new Quit();
+            yield* Console.log();
+            return yield* Quit.make();
           }
           return yield* agent.stop;
         }
         const text = typedIn.text;
-        if (text === "/exit") return yield* new Quit();
+        if (text === "/exit") return yield* Quit.make();
         if (text === "/reset") {
           yield* agent.reset;
-          console.log(dim(t("server.chat.forgot")));
+          yield* Console.log(dim(t("server.chat.forgot")));
           return prompt();
         }
-        if (text) yield* agent.send(yield* said(text));
-        else prompt();
+        if (text) {
+          const message = yield* said(text);
+          yield* agent.send(message);
+        } else prompt();
       }),
     );
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
@@ -226,17 +229,17 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
           }),
           (s) => Effect.promise(() => s.dispose()),
         );
-        console.log(dim(`${id} · ${session.id}${values.resume ? t("server.chat.resumed") : ""}\n` + t("server.chat.direct")));
+        yield* Console.log(dim(`${id} · ${session.id}${values.resume ? t("server.chat.resumed") : ""}\n` + t("server.chat.direct")));
         session.events(
           (e) => {
             const line = render(e);
-            if (line !== undefined) console.log(line);
+            if (line !== undefined) write(line + "\n");
           },
           { cursor: { sessionId: session.id, afterSeq: -1 } },
         );
         const said = (r: unknown, words: "rejected" | "notSent") => {
           const why = Predicate.hasProperty(r, "reason") && typeof r.reason === "string" ? r.reason : "";
-          if (Predicate.hasProperty(r, "kind") && r.kind === "rejected") console.log(dim(t(`server.chat.${words}`, { why })));
+          if (Predicate.hasProperty(r, "kind") && r.kind === "rejected") write(dim(t(`server.chat.${words}`, { why })) + "\n");
         };
         // One turn at a time: a line typed while it runs is steered into it or queued after it. Interrupting the turn's
         // fiber aborts the prompt (its signal).
@@ -254,13 +257,13 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
             const busy = Option.isSome(under) && under.value.pollUnsafe() === undefined;
             if (typedIn.kind === "interrupt") {
               if (!busy) {
-                console.log();
-                return yield* new Quit();
+                yield* Console.log();
+                return yield* Quit.make();
               }
               return yield* FiberHandle.clear(turns);
             }
             const text = typedIn.text;
-            if (text === "/exit") return yield* new Quit();
+            if (text === "/exit") return yield* Quit.make();
             if (!text) return busy ? undefined : write("› ");
             if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text), { log: "Warn" }), { onlyIfMissing: false });
             const steering = session.steer ? session.steer(text) : session.queue(text);

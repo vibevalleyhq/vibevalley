@@ -3,16 +3,16 @@ import { join } from "node:path";
 
 import type { Session as RuntimeSession } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
-import { describe, expect, it } from "@effect/vitest";
-import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Stream } from "effect";
+import { describe, expect, it, layer } from "@effect/vitest";
+import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Formatter, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
+import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import type { LaunchActivity } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { watchStalls } from "#/executor/executor.ts";
 import { Repo } from "#/repo/repo.ts";
@@ -22,9 +22,9 @@ import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
-import type { DeliveryInput } from "./signals.ts";
+import type { SessionNews, DeliveryInput } from "./signals.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
-const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
+const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byUserComment: false });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
 const worker = (turns: ScriptedTurn[]) =>
@@ -32,7 +32,7 @@ const worker = (turns: ScriptedTurn[]) =>
     id: "pi",
     turn: async (turn) => {
       turns.push(turn);
-      await turn.tool("bash", JSON.stringify({ command: `cd ${turn.options.cwd} && touch done.txt` }), () => {
+      await turn.tool("bash", Formatter.formatJson({ command: `cd ${turn.options.cwd} && touch done.txt` }), () => {
         writeFileSync(join(turn.options.cwd, `done-${turns.length}.txt`), "done\n");
         gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "add", "-A");
         gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "commit", "-qm", `做完第 ${turns.length} 轮`);
@@ -69,7 +69,7 @@ describe("sessions", () => {
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const sending = yield* Effect.forkChild(
-        sessions.send(lab(), "interrupted", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true }),
+        sessions.hire(lab(), "interrupted", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true }),
       );
       yield* Effect.promise(() => opening);
       const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending));
@@ -78,7 +78,7 @@ describe("sessions", () => {
       yield* Fiber.join(interrupting);
       expect(disposed).toBe(1);
       expect(sessions.noRoom("pi", "demo")).toBe("");
-      const again = yield* sessions.send(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+      const again = yield* sessions.hire(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       expect(again.session).toBeDefined();
       expect(again.refused).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(world({ config: testConfig(), runtimes: [runtime], repos: ["demo"] })));
@@ -106,7 +106,7 @@ describe("sessions", () => {
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+      const sent = yield* sessions.hire(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
@@ -168,13 +168,13 @@ describe("sessions", () => {
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+      const sent = yield* sessions.hire(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
       const resumed = yield* sessions.deliver(id, "resume the work", delivery({ kind: "comment" }));
       expect(resumed.kind).toBe("refused");
-      expect(JSON.stringify(resumed)).toContain("did not stop");
+      expect(Formatter.formatJson(resumed)).toContain("did not stop");
       expect(opens).toBe(2);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect((yield* sessions.deliver(id, "do not start again", delivery({ kind: "comment" }))).kind).toBe("refused");
@@ -210,7 +210,7 @@ describe("sessions", () => {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
       const sessions = yield* Session;
       const core = yield* Core;
-      const sent = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+      const sent = yield* sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the report");
       const before = { lastText: sessions.lastTextOf(id), cwd: sessions.cwdOf(id)! };
@@ -224,7 +224,7 @@ describe("sessions", () => {
           ),
         );
         expect(result._tag).toBe("Failure");
-        expect(JSON.stringify(result)).toContain("did not stop");
+        expect(Formatter.formatJson(result)).toContain("did not stop");
         expect(sessions.lastTextOf(id)).toBe(before.lastText);
         expect(existsSync(before.cwd)).toBe(true);
       }
@@ -238,10 +238,11 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const core = yield* Core;
-      const seen: LaunchActivity[] = [];
-      const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
+      const seen: SessionNews[] = [];
+      const news = yield* sessions.news;
+      const following = yield* Effect.forkScoped(Stream.runForEach(news, (a) => Effect.sync(() => seen.push(a))));
 
-      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", {
+      const hired = yield* sessions.hire(lab(), "给打卡接口加分页", "demo", {
         context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
         worktree: true,
       });
@@ -271,7 +272,7 @@ describe("sessions", () => {
       yield* until(() => core.session(id)?.runs === 2 && phase(core, id) === "done", "the second run");
       const both = yield* waitFor(sessions.issueRuns("i1"), (rs) => rs.length === 2, "both runs of the issue");
       expect(both.map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
-      expect(seen.some((a) => a.kind === "handedOff" && a.id === id)).toBe(true);
+      expect(seen.some((a) => a._tag === "HandedOff" && a.id === id)).toBe(true);
 
       const repos = yield* Repo;
       const merged = yield* sessions.handOver(id, "merged", (place) => repos.merge(place));
@@ -319,20 +320,21 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const core = yield* Core;
-      const sent = yield* sessions.send(lab(), "first", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
+      const sent = yield* sessions.hire(lab(), "first", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       expect((yield* sessions.deliver(id, "second", delivery({ kind: "comment" }))).kind).toBe("run");
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect(phase(core, id)).toBe("done");
-      expect(yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.succeed({ text: "", commits: 0 })))).toMatchObject({ _tag: "Refused" });
+      const handOverFailure = yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.succeed({ text: "", commits: 0 })));
+      expect(handOverFailure).toMatchObject({ _tag: "Refused" });
       for (const step of ["pending", "started"]) {
         if (step === "started") {
           holding = false;
           for (const deliver of pending.splice(0)) deliver();
           yield* until(() => phase(core, id) === "working", "the buffered turn started");
         }
-        const got = yield* sessions.send(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } });
+        const got = yield* sessions.hire(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } });
         expect([got.session, got.refused !== undefined, opens]).toEqual([undefined, true, 1]);
       }
       complete();
@@ -390,9 +392,10 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
-      const got = yield* sessions.send(lab(), "another", "demo", {
+      const got = yield* sessions.hire(lab(), "another", "demo", {
         context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
-        hiring: () => Effect.mapError(sql.unsafe("select no_such_column from issue_assignment"), (cause) => new NotRecorded({ message: cause.message, cause })),
+        hiring: () =>
+          Effect.mapError(sql.unsafe("select no_such_column from issue_assignment"), (cause) => NotRecorded.make({ message: cause.message, cause })),
       });
       expect(got.refused).toContain("工单没记下来");
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
@@ -403,13 +406,13 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const exit = yield* Effect.exit(
-        sessions.send(lab(), "another", "demo", {
+        sessions.hire(lab(), "another", "demo", {
           context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
           hiring: () => Effect.die(new Error("registration bug")),
         }),
       );
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
-      const next = yield* sessions.send(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i3"), number: 3 } } });
+      const next = yield* sessions.hire(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i3"), number: 3 } } });
       expect(next.session).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
   });
@@ -438,7 +441,7 @@ describe("sessions", () => {
       const core = yield* Core;
       const events = yield* core.subscribe;
       const exit = yield* Effect.exit(
-        sessions.send(lab(), "work", "demo", {
+        sessions.hire(lab(), "work", "demo", {
           context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
           hiring: () => Effect.die(new Error("registration bug")),
         }),
@@ -451,11 +454,11 @@ describe("sessions", () => {
       );
       const errors = seen.filter((e) => e.type === "notice" && e.level === "error");
       expect(errors).toHaveLength(1);
-      expect(JSON.stringify(errors)).toContain("did not stop");
+      expect(Formatter.formatJson(errors)).toContain("did not stop");
       expect(closes).toBe(1);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
-      expect(sessions.presentSessions()).toEqual([]);
-      const next = yield* sessions.send(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
+      expect(sessions.hired()).toEqual([]);
+      const next = yield* sessions.hire(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
       expect(next).toMatchObject({ retainedWork: true });
       expect(next.session).toBeUndefined();
     }).pipe(
@@ -478,7 +481,7 @@ it.live("regression: failed CLI authentication revokes the credential and starts
   });
   return Effect.gen(function* () {
     const sessions = yield* Session;
-    const hired = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true });
+    const hired = yield* sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true });
     expect(hired.session).toBeUndefined();
     expect(hired.refused).toContain("认证请求失败");
     expect(started).toBe(0);
@@ -521,7 +524,7 @@ it.live("regression: session service shutdown revokes issued credentials", () =>
     const who = yield* Effect.scoped(
       Effect.gen(function* () {
         const sessions = yield* Session;
-        const result = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("scope"), number: 1 } }, worktree: true });
+        const result = yield* sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("scope"), number: 1 } }, worktree: true });
         expect(result.session).toBeDefined();
         expect(sessions.who(token)).not.toBe("");
         return sessions.who;
@@ -588,7 +591,7 @@ for (const mode of ["refused", "failed", "interrupted"] as const) {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const agent = { ...starter("lab"), effort: "", runtime: mode === "refused" ? "missing" : "pi" };
-      const send = sessions.send(agent, "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true });
+      const send = sessions.hire(agent, "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true });
       if (mode === "interrupted") {
         const starting = yield* Effect.forkChild(send);
         yield* Effect.promise(() => entered.promise);
@@ -619,11 +622,12 @@ it.live("regression: reopening a session rotates its credential before deliverin
   return Effect.gen(function* () {
     const sessions = yield* Session;
     yield* (yield* Agent).save(lab());
-    const result = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("rotation"), number: 1 } }, worktree: true });
+    const result = yield* sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("rotation"), number: 1 } }, worktree: true });
     const id = result.session!.id;
     yield* until(() => sessions.sessionOf(id)?.phase._tag !== "working", "first turn ended");
-    expect(yield* sessions.suspend(id)).toBe(true);
-    expect((yield* sessions.deliver(id, "again", { trigger: { kind: "comment" }, envelopeIds: [], byOwnerComment: true })).kind).toBe("run");
+    const suspend2 = yield* sessions.suspend(id);
+    expect(suspend2).toBe(true);
+    expect((yield* sessions.deliver(id, "again", { trigger: { kind: "comment" }, envelopeIds: [], byUserComment: true })).kind).toBe("run");
     expect(tokens.length).toBe(2);
     expect(tokens[1] !== tokens[0]).toBe(true);
     expect(sessions.who(tokens[0]!)).toBe("");
@@ -646,5 +650,18 @@ it.live("regression: reopening a session rotates its credential before deliverin
         }),
       }),
     ),
+  );
+});
+
+layer(world({ runtimes: [], repos: [] }), { timeout: "30 seconds" })("orchestrator profiles", (it) => {
+  it.effect("regression: an orchestrator profile has its session as soon as it is kept, and its new name as soon as it is renamed", () =>
+    Effect.gen(function* () {
+      const agents = yield* Agent;
+      const sessions = yield* Session;
+      const lead = yield* agents.create({ ...starter(defaultOrchestrator), id: "", name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime });
+      expect(sessions.sessionOf(lead.id)?.name).toBe("前端组长");
+      yield* agents.save({ ...lead, name: "前端总管" });
+      expect(sessions.sessionOf(lead.id)?.name).toBe("前端总管");
+    }),
   );
 });

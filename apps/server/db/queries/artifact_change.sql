@@ -12,4 +12,4 @@ values (sqlc.arg(artifact_id), sqlc.arg(seq), sqlc.arg(batch_id), sqlc.arg(actor
 delete from artifact_change where created_at < sqlc.arg(before);
 
 -- name: ArtifactChangesAfter :many
-select * from artifact_change where artifact_id = sqlc.arg(artifact_id) and seq > sqlc.arg(seq) order by seq limit sqlc.arg(n);
+select * from artifact_change where artifact_id = sqlc.arg(artifact_id) and seq > sqlc.arg(seq) order by seq limit sqlc.arg(n)::int;

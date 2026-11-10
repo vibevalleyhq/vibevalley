@@ -1,26 +1,26 @@
 import { Clock, Deferred, Effect, Queue, type Scope } from "effect";
 import { Socket } from "effect/socket";
 
-import { type MossLink, type MossTransport, nodeMossTransport } from "@vibevalley/provider/moss/server";
+import type { RealtimeEvents, RealtimeLink } from "#/provider/vendors.ts";
+
+/** The upstream line of a bound account: opening it, and taking the key out of what comes back. */
+export interface MossLine {
+  readonly connect: (on: RealtimeEvents) => RealtimeLink;
+  readonly redact: (text: string) => string;
+}
 
 export interface MossRelayHooks {
   /** Invoked when the upstream MOSS WebSocket opens; may return a cleanup function invoked when the relay ends. */
-  readonly onOpen?: (link: MossLink, sendToPage: (frame: string) => void) => (() => void) | void;
+  readonly onOpen?: (link: RealtimeLink, sendToPage: (frame: string) => void) => (() => void) | void;
   /** Invoked for each text frame from the browser page; returns the frame to forward to MOSS (or undefined to drop). */
-  readonly onPageText?: (data: string, link: MossLink, sendToPage: (frame: string) => void) => string | undefined;
+  readonly onPageText?: (data: string, link: RealtimeLink, sendToPage: (frame: string) => void) => string | undefined;
   /** Invoked for each text frame from MOSS Live before it is forwarded to the browser page. */
-  readonly onMossText?: (data: string, link: MossLink, sendToPage: (frame: string) => void) => void;
+  readonly onMossText?: (data: string, link: RealtimeLink, sendToPage: (frame: string) => void) => void;
 }
 
 type Down = string | Uint8Array | Socket.CloseEvent;
 
-export const relay = (
-  page: Socket.Socket,
-  key: string,
-  transport: MossTransport = nodeMossTransport,
-  hooks?: MossRelayHooks,
-  model = "moss-live-1.0",
-): Effect.Effect<void, never, Scope.Scope> =>
+export const relay = (page: Socket.Socket, line: MossLine, hooks?: MossRelayHooks): Effect.Effect<void, never, Scope.Scope> =>
   Effect.gen(function* () {
     const down = yield* Queue.bounded<Down>(64);
     const overflow = yield* Deferred.make<void>();
@@ -46,31 +46,27 @@ export const relay = (
       downBytes += bytes;
     };
     const sendToPage = (frame: string) => enqueue(frame);
-    const link: MossLink = yield* Effect.acquireRelease(
+    const link: RealtimeLink = yield* Effect.acquireRelease(
       Effect.sync(() =>
-        transport.connect(
-          key,
-          {
-            open: () => {
-              if (closed) return;
-              open = true;
-              closeHook = hooks?.onOpen?.(link, sendToPage);
-              for (const frame of waiting.splice(0)) link.send(frame);
-              waitingBytes = 0;
-            },
-            text: (data) => {
-              if (closed) return;
-              if (Buffer.byteLength(data) > 256 * 1024) return fail();
-              const safe = key ? data.replaceAll(key, "[redacted]") : data;
-              hooks?.onMossText?.(safe, link, sendToPage);
-              enqueue(safe);
-            },
-            binary: enqueue,
-            // Vendor close reasons may contain credentials or private request content.
-            down: () => enqueue(new Socket.CloseEvent(1011, "Realtime connection closed")),
+        line.connect({
+          open: () => {
+            if (closed) return;
+            open = true;
+            closeHook = hooks?.onOpen?.(link, sendToPage);
+            for (const frame of waiting.splice(0)) link.send(frame);
+            waitingBytes = 0;
           },
-          model,
-        ),
+          text: (data) => {
+            if (closed) return;
+            if (Buffer.byteLength(data) > 256 * 1024) return fail();
+            const safe = line.redact(data);
+            hooks?.onMossText?.(safe, link, sendToPage);
+            enqueue(safe);
+          },
+          binary: enqueue,
+          // Vendor close reasons may contain credentials or private request content.
+          down: () => enqueue(new Socket.CloseEvent(1011, "Realtime connection closed")),
+        }),
       ),
       (connection) =>
         Effect.sync(() => {

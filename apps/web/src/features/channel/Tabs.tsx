@@ -204,7 +204,8 @@ export function CronCard(props: { s: CronView }) {
       props.s.whenText,
       props.s.pending ? props.s.nextText : t("web.channel.crons.next", { next: props.s.nextText }),
       ...(props.s.agent ? [t("web.channel.crons.direct", { agent: props.s.agent })] : []),
-      ...(props.s.by === "orchestrator" ? [t("web.channel.crons.byOrchestrator")] : []),
+      // Only an orchestrator has the cron tool, so an agent's cron is the orchestrator's.
+      ...(props.s.by === "agent" ? [t("web.channel.crons.byOrchestrator")] : []),
     ].join(" · ");
   return (
     <div

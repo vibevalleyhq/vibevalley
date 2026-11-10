@@ -20,7 +20,7 @@ export interface ModelClient {
 /** id empty is defaultModel; the key is the caller's to find. */
 export function deepseek(id: string, key: string | (() => string | undefined), service: Llm["Service"]): ModelClient {
   const apiKey = typeof key === "string" ? () => key : key;
-  if (!apiKey()) throw new MissingKey({ message: "no DeepSeek API key" });
+  if (!apiKey()) throw MissingKey.make({ message: "no DeepSeek API key" });
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
   const fallback = models.find((m) => m.id === defaultModel);

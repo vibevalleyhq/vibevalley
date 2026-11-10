@@ -2,7 +2,7 @@
   "id": "keep-branch-on-complete",
   "createdAt": 1792271460000,
   "model": "deepseek-flash",
-  "want": "主人说 #41 就这样、先别合、分支留着，管家照常完成，把改动合进了主分支。应该先用 issue_update 把 deliver 改成 branch，再挪到已完成。",
+  "want": "用户说 #41 就这样、先别合、分支留着，助手照常完成，把改动合进了主分支。应该先用 issue_update 把 deliver 改成 branch，再挪到已完成。",
   "memory": "",
   "tools": [
     "channel_create",
@@ -34,7 +34,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：#41 就这样吧，先别合，分支留着",
+    "content": "[来源：用户]\n用户说：#41 就这样吧，先别合，分支留着",
     "display": true,
     "details": {
       "channel": "general"

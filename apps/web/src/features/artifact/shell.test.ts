@@ -17,5 +17,6 @@ test("a frame's message is the shell's selection only in its one shape", () => {
     { vibevalley: "selection", anchor: { ...anchor, prefix: "x".repeat(65) } },
   ])
     expect(selectionOf(other)).toBeUndefined();
-  expect(shellPath("a", 2)).toBe("/api/v1/artifact/a/2?shell=1");
+  expect(shellPath("a", 2)).toBe("/api/v1/artifact/a/2?shell=1&display=page&theme=light");
+  expect(shellPath("a", 2, "slides", "dark")).toBe("/api/v1/artifact/a/2?shell=1&display=slides&theme=dark");
 });

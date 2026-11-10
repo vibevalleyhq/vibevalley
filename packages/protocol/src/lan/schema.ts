@@ -3,13 +3,6 @@ import { Schema } from "effect";
 import type { Codec } from "../codec";
 import type * as T from "../shapes";
 
-export const LanDevice: Codec<T.LanDevice> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  pairedAt: Schema.Finite,
-  lastSeen: Schema.optionalKey(Schema.Finite),
-});
-
 export const LanPaired: Codec<T.LanPaired> = Schema.Struct({
   device: Schema.String,
   key: Schema.String,
@@ -34,7 +27,6 @@ export const LanStatus: Codec<T.LanStatus> = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
   problem: Schema.String,
   pairing: Schema.optionalKey(LanPairing),
-  devices: Schema.mutable(Schema.Array(LanDevice)),
 });
 
 export const SetOpenRequest: Codec<T.SetOpenRequest> = Schema.Struct({

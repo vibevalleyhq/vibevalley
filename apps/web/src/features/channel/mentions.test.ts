@@ -14,9 +14,9 @@ test("an @ right after Chinese opens the names; one in a Latin word or an addres
 test("the @ menu finds a Chinese name by its pinyin", async () => {
   await pinyinLoaded;
   const all = [
-    { token: "@orchestrator", name: "管家", note: "" },
+    { token: "@orchestrator", name: "助手", note: "" },
     { token: "@w3", name: "老周", note: "" },
   ];
-  expect(offeredFor(all, "gj").map((n) => n.token)).toEqual(["@orchestrator"]);
+  expect(offeredFor(all, "zs").map((n) => n.token)).toEqual(["@orchestrator"]);
   expect(offeredFor(all, "laozhou").map((n) => n.token)).toEqual(["@w3"]);
 });

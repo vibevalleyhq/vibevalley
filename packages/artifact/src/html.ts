@@ -1,16 +1,14 @@
-import { Option, Schema } from "effect";
 import { type DefaultTreeAdapterTypes as P, parse, parseFragment } from "parse5";
 
 import { list, t } from "@vibevalley/i18n";
-import { ArtifactKindValues, artifactPath, type HtmlAnchor } from "@vibevalley/protocol";
+import { ArtifactKindValues, type HtmlAnchor } from "@vibevalley/protocol";
 import { htmlSandbox, isOneOf } from "@vibevalley/protocol/rules";
-import { HtmlShellMessage } from "@vibevalley/protocol/schema";
 
 /** The largest artifact body, bytes, and title, characters. */
 export const artifactMax = 5 * 1024 * 1024;
 const artifactTitleMax = 80;
 
-/** Why a title, a kind or a hand-in's size is refused, in the owner's words. "" when they are right. */
+/** Why a title, a kind or a hand-in's size is refused, in the user's words. "" when they are right. */
 export function artifactProblem(a: { readonly title?: string; readonly kind?: string; readonly size?: number }): string {
   if (a.title !== undefined) {
     const n = [...a.title.trim()].length;
@@ -34,8 +32,7 @@ export const htmlSources = {
 } as const;
 
 /** An HTML artifact is someone else's page: it must never run as one of the farm's. */
-export const htmlPolicy = [
-  `sandbox ${htmlSandbox}`,
+const htmlLimits = [
   "default-src 'none'",
   ["script-src 'unsafe-inline'", ...htmlSources.script].join(" "),
   ["style-src 'unsafe-inline'", ...htmlSources.style].join(" "),
@@ -46,6 +43,10 @@ export const htmlPolicy = [
   "form-action 'none'",
   "base-uri 'none'",
 ].join("; ");
+export const htmlPolicy = `sandbox ${htmlSandbox}; ${htmlLimits}`;
+
+/** The same page opened on its own to be printed (a deck saved as a PDF): it may open the print dialog, nothing more. */
+const htmlPrintPolicy = `sandbox ${htmlSandbox} allow-modals; ${htmlLimits}`;
 
 /** An html artifact's version never changes once made: cached for good. A blocks one is not served as a file. */
 export const artifactHeaders: Record<string, string> = {
@@ -56,76 +57,10 @@ export const artifactHeaders: Record<string, string> = {
   "content-security-policy": htmlPolicy,
 };
 
+export const artifactPrintHeaders: Record<string, string> = { ...artifactHeaders, "content-security-policy": htmlPrintPolicy };
+
 export const demoPieces = 6;
 export const demoJitter = 0.3;
-
-const shellScript = String.raw`(() => {
-  const hidden = new Set(["HEAD", "SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "TEXTAREA", "TITLE"]);
-  const context = 32;
-  const texts = () => {
-    const out = [];
-    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => {
-        for (let p = n.parentElement; p; p = p.parentElement) if (hidden.has(p.tagName)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) out.push(n);
-    return out;
-  };
-  const indexOf = (nodes, container, offset) => {
-    const point = document.createRange();
-    point.setStart(container, offset);
-    let at = 0;
-    for (const t of nodes) {
-      if (t === container) return at + offset;
-      if (point.comparePoint(t, 0) >= 0) return at;
-      at += t.data.length;
-    }
-    return at;
-  };
-  const anchor = () => {
-    const sel = document.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
-    const range = sel.getRangeAt(0);
-    const nodes = texts();
-    const whole = nodes.map((t) => t.data).join("");
-    const from = indexOf(nodes, range.startContainer, range.startOffset);
-    const to = indexOf(nodes, range.endContainer, range.endOffset);
-    const exact = whole.slice(from, to);
-    if (exact.trim() === "") return null;
-    return { kind: "text", exact, prefix: whole.slice(Math.max(0, from - context), from), suffix: whole.slice(to, to + context) };
-  };
-  let timer = 0;
-  document.addEventListener("selectionchange", () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      let found = null;
-      try {
-        found = anchor();
-      } catch {
-        found = null;
-      }
-      if (found) parent.postMessage({ vibevalley: "selection", anchor: found }, "*");
-    }, 150);
-  });
-})();`;
-
-/** The page as the workbench shows it: the shell after everything else, so it runs once the page's own text is there. */
-export const withShell = (page: string) => `${page}\n<script>${shellScript}</script>\n`;
-
-export const shellPath = (id: string, version: number) => `${artifactPath(id, version)}?shell=1`;
-
-const decodeShellMessage = Schema.decodeUnknownOption(HtmlShellMessage);
-const wordsMax = 10_000;
-const contextMax = 64;
-
-/** The words the owner selected, as the message tells of them; undefined when it is no such message. */
-export function selectionOf(data: unknown): HtmlAnchor | undefined {
-  const anchor = Option.getOrUndefined(decodeShellMessage(data))?.anchor;
-  if (!anchor) return undefined;
-  return anchor.exact.length > wordsMax || anchor.prefix.length > contextMax || anchor.suffix.length > contextMax ? undefined : anchor;
-}
 
 interface At {
   readonly node: number;
@@ -397,7 +332,7 @@ function refusalText(f: HtmlRefusal): string {
 
 const shownMax = 8;
 
-/** Why a page is refused, in the owner's words; "" when it may be kept. */
+/** Why a page is refused, in the user's words; "" when it may be kept. */
 export function htmlProblem(check: HtmlCheck): string {
   if (check.refused.length === 0) return "";
   const shown = check.refused.slice(0, shownMax).map((f) => "\n- " + refusalText(f));

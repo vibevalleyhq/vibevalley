@@ -6,7 +6,7 @@ import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle }
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import { actsForOwner } from "#/base/actor.ts";
+import { actsForUser } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import { Channel, type Info } from "#/channel/channel.ts";
 import { explicitMandate, inferredMandate, mandateNoteFits } from "#/issue/creation.ts";
@@ -27,7 +27,7 @@ import {
   issuePrSubmitted,
   issueReportDescription,
   issueReportRecorded,
-  ownerAgentWord,
+  userAgentWord,
   sessionLine,
 } from "./prompts.ts";
 import {
@@ -68,7 +68,7 @@ export const issueTools = Effect.gen(function* () {
 
   // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
-    const all = run.presentSessions();
+    const all = run.hired();
     return all.find((session) => session.id === key) ?? all.find((session) => session.name === key) ?? all.find((session) => key.includes(session.name));
   };
 
@@ -102,14 +102,14 @@ export const issueTools = Effect.gen(function* () {
 
   const whoOf = (issue: T.Issue) => {
     const agent = assignedAgentOf(issue);
-    return workerOf(issue)?.name ?? (agent === defaultOrchestrator ? ownerAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
+    return workerOf(issue)?.name ?? (agent === defaultOrchestrator ? userAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
   };
 
   const nobodyOn = (issue: T.Issue) => answers.nobodyOn(issue.number);
 
   const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
 
-  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for this input, else by the farm's rule.
+  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the user picked for this input, else by the farm's rule.
   const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<T.Agent, string> {
     const key = name.trim();
     const a = yield* runtimes.choose(brief, key, picked);
@@ -120,7 +120,7 @@ export const issueTools = Effect.gen(function* () {
 
   const roster = tool("session.list", () =>
     Effect.sync(() => {
-      const all = run.presentSessions();
+      const all = run.hired();
       return all.length === 0
         ? answers.roster.empty
         : all.map((session) => sessionLine(session, clock.currentTimeMillisUnsafe(), numberOf(session))).join("\n");
@@ -131,7 +131,7 @@ export const issueTools = Effect.gen(function* () {
     Effect.sync(() => {
       // Listed without @: an @ wakes someone, and models copy what they read.
       const lines = [answers.sessionList.intro];
-      for (const h of run.presentSessions())
+      for (const h of run.hired())
         lines.push(
           answers.sessionList.row(
             h.id,
@@ -176,7 +176,7 @@ export const issueTools = Effect.gen(function* () {
       Schema.decodeUnknownEffect(IssueHandbackInput),
       Effect.fn("Tool.issueHandback")(function* ({ envelope, reason }) {
         const caller = yield* callerOf(who);
-        yield* mailbox.returnInput(caller.session, envelope, reason);
+        yield* mailbox.decline(caller.session, envelope, reason);
         return issueHandbackRecorded;
       }),
     );
@@ -189,7 +189,8 @@ export const issueTools = Effect.gen(function* () {
       Schema.decodeUnknownEffect(IssuePrSubmitInput),
       Effect.fn("Tool.issuePrSubmit")(function* ({ summary }) {
         const caller = yield* callerOf(who);
-        return issuePrSubmitted(yield* issue.submitPullRequest(caller.session, summary));
+        const pullRequestSubmitted = yield* issue.submitPullRequest(caller.session, summary);
+        return issuePrSubmitted(pullRequestSubmitted);
       }),
     );
 
@@ -198,13 +199,9 @@ export const issueTools = Effect.gen(function* () {
     Effect.fn("Tool.issueGet")(function* (item: T.Issue) {
       const w = workerOf(item);
       const timeline = yield* Effect.orElseSucceed(issue.timeline(item.id), () => undefined);
-      const lines = [issueDetail(item, whoOf(item), timeline, yield* Clock.currentTimeMillis)];
-      if (w)
-        lines.push(
-          sessionLine(w, yield* Clock.currentTimeMillis, item.number),
-          answers.check.workdir(run.cwdOf(w.id) ?? ""),
-          answers.check.lastReport(run.lastTextOf(w.id)),
-        );
+      const now = yield* Clock.currentTimeMillis;
+      const lines = [issueDetail(item, whoOf(item), timeline, now)];
+      if (w) lines.push(sessionLine(w, now, item.number), answers.check.workdir(run.cwdOf(w.id) ?? ""), answers.check.lastReport(run.lastTextOf(w.id)));
       return lines.join("\n");
     }),
   );
@@ -215,14 +212,15 @@ export const issueTools = Effect.gen(function* () {
       Effect.fn("Tool.issueDiff")(
         function* (item: T.Issue) {
           const c = yield* callerOf(who);
-          return changesText(yield* issue.changes(item.id, c.actor));
+          const changes2 = yield* issue.changes(item.id, c.actor);
+          return changesText(changes2);
         },
         Effect.catch((e) => Effect.succeed(answers.changes.failed(said(e)))),
       ),
     );
 
   // Review is judging what came back against what the issue asked for; a pass only makes it ready, completing it stays
-  // the owner's (issue_status_update to done).
+  // the user's (issue_status_update to done).
   const issueReview = tool(
     "issue.review",
     Effect.fn("Tool.issueReview")(
@@ -246,7 +244,10 @@ export const issueTools = Effect.gen(function* () {
           return yield* withIssue(p.id, (item) => {
             const w = workerOf(item);
             if (!w) return Effect.succeed(nobodyOn(item));
-            return Effect.as(chat.tellSession(participant(c), w.id, p.text, ""), answers.tell.told(item.number, w.name));
+            return Effect.as(
+              chat.post({ _tag: "Tell", from: participant(c), session: w.id, text: p.text, sendKey: "" }),
+              answers.tell.told(item.number, w.name),
+            );
           });
         },
         Effect.catch((e) => Effect.succeed(answers.tell.failed(said(e)))),
@@ -271,7 +272,7 @@ export const issueTools = Effect.gen(function* () {
     Effect.fn("Tool.issueList")(function* (p: Orchestrator<"issue.list">) {
       const { limit: _, ...rest } = p;
       const found = yield* issue.query(rest);
-      if (found.length === 0) return p.wantsOwner === true ? answers.issues.noneWaiting : answers.issues.none;
+      if (found.length === 0) return p.wantsUser === true ? answers.issues.noneWaiting : answers.issues.none;
       const now = yield* Clock.currentTimeMillis;
       const limit = p.limit != null && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? answers.issues.moreNote(found.length - limit) : "";
@@ -298,7 +299,11 @@ export const issueTools = Effect.gen(function* () {
             if (!byName) return answers.issueCreate.noChannel(p.channel);
             channel = byName;
           } else channel = yield* chat.topOf(c.here);
-          const parent = p.parent ? yield* issue.get(yield* issue.idOf(p.parent)) : undefined;
+          let parent: T.Issue | undefined;
+          if (p.parent) {
+            const parentId = yield* issue.idOf(p.parent);
+            parent = yield* issue.get(parentId);
+          }
           const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
           const repo = (p.repo ?? parent?.repo ?? "").trim() || channel.repo;
           if (p.start === true && !repo) return answers.issueCreate.noDefaultRepo(channel.name);
@@ -321,7 +326,7 @@ export const issueTools = Effect.gen(function* () {
                 ...(p.priority ? { priority: p.priority } : {}),
                 ...(p.deliver ? { deliver: p.deliver } : {}),
               },
-              actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
+              actsForUser(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
             )
             .pipe(Effect.mapError((e) => answers.issueCreate.notRecordedFailed(said(e))));
           const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
@@ -397,7 +402,7 @@ export const issueTools = Effect.gen(function* () {
           p.id,
           Effect.fnUntraced(
             function* (item: T.Issue) {
-              // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
+              // Sent out with nobody named yet: chosen by the farm's rule, the user's pick first; another one named hands it over.
               let agent: string | undefined;
               if (p.agent || (to === "todo" && item.status === "backlog" && !assignedAgentOf(item))) {
                 const chosen = yield* choose(item.title + "\n" + item.description, p.agent ?? "", p.agent ? "" : c.picked);
@@ -407,7 +412,8 @@ export const issueTools = Effect.gen(function* () {
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);
-              return answers.issueStatus.moved(issueLine(done, whoOf(done), yield* Clock.currentTimeMillis).slice(2));
+              const now = yield* Clock.currentTimeMillis;
+              return answers.issueStatus.moved(issueLine(done, whoOf(done), now).slice(2));
             },
             Effect.catch((e) => Effect.succeed(answers.issueStatus.notMoved(typeof e === "string" ? e : said(e)))),
           ),

@@ -18,6 +18,9 @@ const alive = (pid: number) => {
 
 export class HomeTaken extends Schema.TaggedError<HomeTaken, { readonly brand: unique symbol }>()("HomeTaken", { message: Schema.String }) {}
 
+/** The lock file could not be read or written for another reason (permissions, a missing home). */
+export class HomeUnavailable extends Schema.TaggedError<HomeUnavailable, { readonly brand: unique symbol }>()("HomeUnavailable", { cause: Schema.Defect() }) {}
+
 /** Takes the home, or throws HomeTaken; the function it returns gives it back. */
 export function leaseHome(home: string): () => void {
   const path = join(realpathSync(home), ".vibevalley.lock");
@@ -39,9 +42,9 @@ export function leaseHome(home: string): () => void {
     } catch (e) {
       if (errnoOf(e) !== "EEXIST") throw e;
       const pid = Number(readFileSync(path, "utf8"));
-      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken({ message: t("server.base.homeTaken", { home }) });
+      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw HomeTaken.make({ message: t("server.base.homeTaken", { home }) });
       unlinkSync(path);
     }
   }
-  throw new HomeTaken({ message: t("server.base.homeUnlocked", { home }) });
+  throw HomeTaken.make({ message: t("server.base.homeUnlocked", { home }) });
 }

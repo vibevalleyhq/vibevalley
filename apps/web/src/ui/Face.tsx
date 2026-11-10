@@ -42,7 +42,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-sm)",
     backgroundColor: "#cfe6f5",
   },
-  ownerFaceSpan: {
+  userFaceSpan: {
     display: "inline-flex",
     flexShrink: "0",
     alignItems: "center",
@@ -124,16 +124,16 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
   );
 }
 
-/** The owner: owner badge in a wheat square. */
-export function OwnerFace(props: { size?: number }) {
+/** The user: user badge in a wheat square. */
+export function UserFace(props: { size?: number }) {
   return (
     <span
-      // The owner is who reads the page: their mark is quiet, the helpers' faces are what is looked for.
-      {...stylex.attrs(viewStyles.ownerFaceSpan)}
+      // The user is who reads the page: their mark is quiet, the helpers' faces are what is looked for.
+      {...stylex.attrs(viewStyles.userFaceSpan)}
       style={{ width: `${props.size ?? 24}px`, height: `${props.size ?? 24}px` }}
       aria-hidden="true"
     >
-      {t("web.base.owner")}
+      {t("web.base.user")}
     </span>
   );
 }

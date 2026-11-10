@@ -9,7 +9,7 @@
 - 改了 `apps/server/db/migrations` 或 `apps/server/db/queries`：新库能建、能读写。
 - 改了开机的流程（`apps/server/src/main.ts`、`services.ts`、`http/app.ts`）。
 
-真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人；这里用 `--scripted-helper`：pi 换成服务端测试里照工单字眼干活的帮工（`apps/server/src/testing/worker.ts`），别的农机都当没装。帮工的更多行为照样写测试（[地基](docs/subsystems/foundation.md)「测试」）。
+真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问用户；这里用 `--scripted-helper`：pi 换成服务端测试里照工单字眼干活的帮工（`apps/server/src/testing/worker.ts`），别的农机都当没装。帮工的更多行为照样写测试（[地基](docs/subsystems/foundation.md)「测试」）。
 
 ## 准备
 
@@ -54,7 +54,7 @@
 
 ### 真实帮工的 CLI 与连接观测
 
-仅在主人已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/runtime/access.test.ts`、`src/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/issue/watch.test.ts`，以及 CLI 的 `src/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
+仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/runtime/access.test.ts`、`src/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/issue/watch.test.ts`，以及 CLI 的 `src/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
 
 1. 把下列脚本存到独立临时证据目录的 `worker.sh`。它只创建沙箱项目，凭证文件只写入假令牌，不读取真实令牌。
 

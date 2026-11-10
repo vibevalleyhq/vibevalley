@@ -1,6 +1,6 @@
 # 地基
 
-服务端、客户端和脚本共用的工程骨架：pnpm 工作区、Effect 服务分层、概念分目录的协议契约、SQLite 代码生成与测试金字塔。
+服务端、客户端和脚本共用的工程骨架：pnpm 工作区、Effect 服务分层、概念分目录的协议契约、Postgres 查询生成与测试金字塔。
 
 ## 管什么，不管什么
 
@@ -9,8 +9,8 @@
 | 工作区、依赖 catalog、构建与类型检查 | 各包的对外约定（各包 `README.md`） |
 | 服务端 13 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
 | `packages/protocol` 的概念目录、Schema 与客户端生成 | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
-| SQLite 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
-| 测试金字塔、虚拟时钟、黄金数据与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
+| Postgres 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
+| 测试金字塔、虚拟时钟与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
 | 词典（`packages/i18n`）与模型提示（`prompts.ts`）分工 | 界面用词标准（[用语表](docs/README.md#用语)） |
 
 ## 在哪
@@ -25,9 +25,9 @@
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
-| `apps/server/db/migrations/0001_schema.up.sql` | 唯一 SQLite 表结构基线 |
-| `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `scripts/sqlite-generate.ts` 生成代码 |
-| `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待、黄金数据与测试金字塔分级 |
+| `apps/server/db/migrations/0001_schema.up.sql` | 唯一的 Postgres 表结构基线 |
+| `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `scripts/pg-generate.ts` 生成代码 |
+| `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待与测试金字塔分级 |
 | `packages/i18n/`、`scripts/i18n.ts` | 中英双语词典 JSON、生成的 `src/catalogs.ts` 与词条检查工具 |
 
 共用原语清单见生成的 [primitives.md](docs/reference/primitives.md)。
@@ -45,16 +45,19 @@
 
 ### 模块和服务
 
+架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
+
 - **13 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
-- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `orchestrator`（带 `forOwner`），`/mcp` 为对应 `session`，定时与巡查为 `system`。落库枚举统一用 `actor_kind`。
+- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，助手工具为 `agent` 带 `role: "orchestrator"` 与 `forUser`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
+- **模块之间的路径记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员，存在 `scripts/service-paths.json`；`vp run paths:check` 在提交前的钩子里跑，多一条路就失败：要么走已有的门，要么 `vp run paths:write` 写下来并在 PR 里说明；少了的路由 `paths:write` 去掉，不能悄悄回来。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### Effect 与错误处理
 
-- **服务方法具名追踪**：写成 `Effect.fn("<服务>.<方法>")`（`vibevalley/service-method-names` 检查）；高频热点用 `Effect.fnUntraced`。
+- **服务方法具名追踪**：写成 `Effect.fn("<服务>.<方法>")`（`vibevalley/service-method-names` 检查）；高频热点用 `Effect.fnUntraced`。一个联合进、按种类分给处理函数的门（`Channel.post`），每个分支返回的处理函数都以这个方法的名字开 span，种类记在 span 的属性上。
 - **Promise 止步于外部库边界**：外部异步调用必须用 `Effect.tryPromise({ try, catch })` 包装并绑定 `AbortSignal`（`vibevalley/promise-boundary` 检查）。出站请求统一走 Effect `HttpClient`。
 - **时间与定时归属作用域**：
   - 禁止在 `apps/server/src` 直接调 `Date.now()` 或 `setTimeout`（`vibevalley/no-wall-clock` 检查）。
@@ -66,9 +69,9 @@
 
 - **按概念组织契约**：`packages/protocol/src/<概念>/` 包含 `shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`，由 `schema.test.ts` 校验字段一致。
 - **生成文件不手改**：`db/generated/`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md) 和 [primitives.md](docs/reference/primitives.md) 由脚本生成并由 `docs:verify` 校验。
-- **单连接进程内 SQLite**：`infra/db.ts` 用 `node:sqlite` 打开 `vibevalley.db`。时间存毫秒 `real`，布尔存 `0`/`1`，枚举存 `text check (列 in (...))`，新建行主键用 `base/ids.ts` 的 UUIDv7（`newId()`）。
+- **一种 SQL，两种驱动，单连接**：`infra/db.ts` 在配了 `database.url` 时连那个 Postgres（`@effect/sql-pg`），否则在 `db` 目录里跑 PGlite（`@effect/sql-pglite`，同一种方言，跑在进程里；`memory` 时从每个进程建一次的带表结构的模板拷一份，约 0.1 秒）。两种都只开一条连接：服务按一次一写写成。时间存毫秒 `double precision`，没有 `bigint` 列（Postgres 的驱动把它当字符串交回来），布尔是 `boolean`，枚举存 `text check (列 in (...))`，JSON 存成文本、查询里 `::jsonb` 了再看里面，新建行主键用 `base/ids.ts` 的 UUIDv7（`newId()`）。全文搜索经表结构里的 `term_vector`、`term_query` 两个函数和 GIN 索引：词由 `gse` 切好、只按空格分，词原样保留。
 - **SQL 按表隔离**：`db/queries/<表>.sql` 只写所属表，跨模块只读查询受 `modules.test.ts` 的 `foreignReads` 约束。服务通过 `Db` 服务调用生成函数（`vibevalley/db-door` 检查）。
-- **单一表结构基线，内部不留兼容**：`0001_schema.up.sql` 是唯一迁移文件。启动时若 `db.schema` 哈希不匹配，自动将旧库移至 `db.<旧哈希>-<时间>` 并建新库。
+- **单一表结构基线，内部不留兼容**：`0001_schema.up.sql` 是唯一迁移文件。PGlite 的库在启动时若 `db.schema` 哈希不匹配，自动将旧库移至 `db.<旧哈希>-<时间>` 并建新库；`database.url` 的库是用户的，不挪不清：空库建表并记下哈希（`vibevalley_baseline`），哈希不同或已有别的表就拒绝启动。
 
 ### 边界审计
 
@@ -90,7 +93,7 @@
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |
 | 宿主 | `host.ts` | Electron、移动模拟器 | — | — | `apps/desktop/test`、`apps/mobile` |
-| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 管家 evals，花钱前先问主人 |
+| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 助手 evals，花钱前先问用户 |
 
 - **不靠睡眠等待**：禁止在测试中写死 `setTimeout`、`Effect.sleep` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 检查）；等待状态用 `until`、`waitFor`、`whenState`，时间窗口用 `TestClock` 拨进。
 - **页面测试按 `data-testid` 定位**：禁止用界面中文文案或 CSS 类名做选择器（`vibevalley/no-copy-selector` 检查）；每页在浅色与深色主题下通过 `apps/web/test/a11y.spec.ts` 检查。
@@ -102,9 +105,9 @@
 
 ### 话放在哪
 
-- **对主人的话进词典，对模型的话进 `prompts.ts`**：
+- **对用户的话进词典，对模型的话进 `prompts.ts`**：
   - 界面与通知文案写在 `packages/i18n/locales/{zh,en}/<命名空间>.json`，代码调 `t("key")`（`vibevalley/no-cjk-literal` 拦截硬编码中文）。
-  - 模型提示写在各模块 `prompts.ts`（中文编写，要求模型按 `ownersLanguage` 回答）。
+  - 模型提示写在各模块 `prompts.ts`（中文编写，要求模型按 `usersLanguage` 回答）。
 - **语言按进程生效**：语言存于 `settings.json` 的 `locale`，服务端启动和保存时调 `setLocale`；页面从 `index.html` 的 `data-locale` 读取并通过 `host.locale` 同步给桌面壳。
 
 ## 怎么走
@@ -121,10 +124,10 @@
 2. 在 `apps/server/src/http/handlers/<概念>.ts` 实现接口。
 3. 运行 `vp run api:client` 和 `vp run capabilities` 更新生成的客户端与能力表。
 
-**修改纯函数规则与黄金数据**
+**修改纯函数规则**
 
 1. 修改模块内或 `packages/protocol/src/rules/` 中的纯函数。
-2. 运行 `vp run golden:update <模块>` 更新 `testdata/*.jsonl.gz`，检查 `git diff`。
+2. 在它旁边的 `*.test.ts` 里用手写的例子写出改了的行为。
 
 ## 和谁打交道
 
@@ -136,8 +139,9 @@
 
 - **按限界上下文切成 13 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
 - **契约按概念分目录，不拆多包**：消除单大文件合并冲突，同时避免拆成十几个子包的构建开销。
-- **用内置 `node:sqlite` 替代 PGlite**：零外部二进制、建库仅需几毫秒且自带 FTS5，由 `scripts/sqlite-generate.ts` 生成类型化查询；放弃需加载数十 MB WASM 的 PGlite。
+- **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。
+- **规则用手写的例子测，不录黄金数据**：录下的 `*.jsonl.gz` 有几十 MB，改了只看得到二进制，规则一改就整份重写，说不出哪里变对了、哪里变错了；拿不出它抓到过真问题的证据，就去掉了。
 - **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
 
 ## 怎么验证

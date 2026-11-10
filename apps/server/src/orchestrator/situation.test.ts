@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { patrolText } from "#/inbox/prompts.ts";
 
-import { intake, orchestratorInboxLines, situationDelta } from "./situation.ts";
+import { intake, orchestratorEnvelopeLines, situationDelta } from "./situation.ts";
 
 describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
@@ -29,9 +29,9 @@ describe("the orchestrator's rules", () => {
     for (const [name, now, want] of cases) expect({ name, got: situationDelta(before, now) }).toEqual({ name, got: want });
   });
 
-  it("cut what others said long, never the owner's words", () => {
+  it("cut what others said long, never the user's words", () => {
     const line = (text: string) =>
-      orchestratorInboxLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "session", name: "测试小吴", text }]);
+      orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#general:3", from: "w1", fromKind: "agent", fromRole: "worker", name: "测试小吴", text }]);
     const head = "[target=#general:3 msg=4 from=w1 测试小吴] ";
     const cases: [string, string, string][] = [
       ["799", "a".repeat(799), "a".repeat(799)],
@@ -41,8 +41,8 @@ describe("the orchestrator's rules", () => {
       ["spaces around do not count", "  " + "a".repeat(800) + "\n", "a".repeat(800)],
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });
-    const owner = orchestratorInboxLines([{ id: "m4", number: 4, target: "#ops", from: "owner", fromKind: "owner", name: "主人", text: "字".repeat(900) }]);
-    expect(owner).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
+    const user = orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#ops", from: "user", fromKind: "user", name: "用户", text: "字".repeat(900) }]);
+    expect(user).toBe("[target=#ops msg=4 from=用户] " + "字".repeat(900));
   });
 
   it("give every source its head", () => {
@@ -55,6 +55,6 @@ describe("the orchestrator's rules", () => {
         { key: "a", text: "一" },
         { key: "b", text: "二" },
       ]),
-    ).toBe("【巡查】#ops 里有几件事放着没人管：\n- 一\n- 二\n\n看看要不要提醒主人（一两句，说在 #ops）、催帮工或者叫停；都不用管就什么也别说。");
+    ).toBe("【巡查】#ops 里有几件事放着没人管：\n- 一\n- 二\n\n看看要不要提醒用户（一两句，说在 #ops）、催帮工或者叫停；都不用管就什么也别说。");
   });
 });

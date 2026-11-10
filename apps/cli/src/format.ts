@@ -4,7 +4,7 @@ import { Flag, GlobalFlag } from "effect/cli";
 import { homeOf, savedLocale } from "@vibevalley/home";
 import { setLocale, t } from "@vibevalley/i18n";
 
-import { out, printBody } from "./output.ts";
+import { jsonText, out, printBody } from "./output.ts";
 
 setLocale(savedLocale(homeOf()));
 
@@ -17,4 +17,4 @@ export const FormatFlag = GlobalFlag.Setting("format")({
 });
 
 export const show = <A>(value: A, text: (value: A) => string) =>
-  Effect.flatMap(FormatFlag, (format) => (format === "json" ? printBody(JSON.stringify(value ?? null)) : out(text(value))));
+  Effect.flatMap(FormatFlag, (format) => (format === "json" ? Effect.flatMap(jsonText(value ?? null), printBody) : out(text(value))));

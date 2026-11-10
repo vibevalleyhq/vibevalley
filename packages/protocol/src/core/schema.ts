@@ -1,12 +1,13 @@
 import { Schema } from "effect";
 
-import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactOwnerMentionsChanged } from "../channel/schema";
+import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
 import type { Codec } from "../codec";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
 import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
+import { FactMachineChanged, Machine } from "../machine/schema";
 import { MediaJob, FactMediaChanged } from "../media/schema";
 import { RuntimeInfo } from "../runtime/schema";
 import {
@@ -31,6 +32,7 @@ const spaceFields = {
   progress: Schema.optionalKey(Progress),
   issues: Schema.mutable(Schema.Array(Issue)),
   connectors: Schema.mutable(Schema.Array(ConnectorStatus)),
+  machines: Schema.mutable(Schema.Array(Machine)),
 };
 
 export const SpaceState: Codec<T.SpaceState> = Schema.Struct({
@@ -68,7 +70,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactSessionPhaseChanged,
   FactMessageChanged,
   FactChannelChanged,
-  FactOwnerMentionsChanged,
+  FactUserMentionsChanged,
   FactSessionChanged,
   FactSessionReported,
   FactSessionLeft,
@@ -79,6 +81,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactCronChanged,
   FactCronRemoved,
   FactConnectorChanged,
+  FactMachineChanged,
   FactMediaChanged,
 ]);
 
@@ -115,7 +118,7 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactSessionPhaseChanged,
   FactMessageChanged,
   FactChannelChanged,
-  FactOwnerMentionsChanged,
+  FactUserMentionsChanged,
   FactSessionChanged,
   FactSessionReported,
   FactSessionLeft,
@@ -126,6 +129,7 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactCronChanged,
   FactCronRemoved,
   FactConnectorChanged,
+  FactMachineChanged,
   FactMediaChanged,
   ServerEventSnapshot,
   ServerEventStep,

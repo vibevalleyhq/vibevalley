@@ -7,7 +7,7 @@ import type { ModelClient } from "@vibevalley/ai/client";
 import { answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { orchestrator, session } from "#/base/actor.ts";
+import { orchestrator, worker } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Media } from "#/media/media.ts";
@@ -44,6 +44,7 @@ const configured = Effect.gen(function* () {
 });
 const farm = (llm: ModelClient) => {
   const media = Layer.fresh(Media.layer).pipe(
+    Layer.provideMerge(Layer.fresh(Provider.layer)),
     Layer.provideMerge(network),
     Layer.provideMerge(world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }) })),
   );
@@ -51,7 +52,7 @@ const farm = (llm: ModelClient) => {
   return Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(tools));
 };
 
-it.effect("owner-directed audio tools create attributed dialogue and a preview without silently cloning a voice", () => {
+it.effect("user-directed audio tools create attributed dialogue and a preview without silently cloning a voice", () => {
   const { llm, requests } = scriptedLLM([
     answer([toolCall("media_dialogue_create", dialogue), toolCall("media_voice_design_create", design)]),
     answer("Submitted"),
@@ -90,7 +91,7 @@ it.effect("owner-directed audio tools create attributed dialogue and a preview w
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });
 
-it.effect("regression: audio tools reject autonomous and worker callers; cloning and source upload remain owner-only", () => {
+it.effect("regression: audio tools reject autonomous and worker callers; cloning and source upload remain user-only", () => {
   const { llm } = scriptedLLM([answer("No operation")]);
   return Effect.gen(function* () {
     yield* configured;
@@ -109,7 +110,8 @@ it.effect("regression: audio tools reject autonomous and worker callers; cloning
     expect(
       available.some((tool) => tool.name === "media_clone_create" || tool.name === "media_transcription_create" || tool.name === "media_audio_cleanup"),
     ).toBe(false);
-    expect(tools.session(() => ({ ...caller(), session: "worker", actor: session("worker") })).filter((tool) => tool.name.startsWith("media_"))).toEqual([]);
-    expect(yield* (yield* Media).list()).toEqual([]);
+    expect(tools.session(() => ({ ...caller(), session: "worker", actor: worker("worker") })).filter((tool) => tool.name.startsWith("media_"))).toEqual([]);
+    const found = yield* (yield* Media).list();
+    expect(found).toEqual([]);
   }).pipe(Effect.scoped, Effect.provide(farm(llm)));
 });

@@ -7,7 +7,7 @@ export type InboxFrom = InboxFromSession | InboxFromOrchestrator;
 /** Told apart by `kind`. */
 export type InboxTarget = InboxTargetSession | InboxTargetIssue | InboxTargetChat;
 
-/** What an item says on each route the owner hears it on. */
+/** What an item says on each route the user hears it on. */
 export interface InboxWords {
   label: string;
   title: string;

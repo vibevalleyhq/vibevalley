@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 import type { AppliedIssue } from "@vibevalley/protocol";
 
 import { frameAt, testFrames } from "#/infra/testing.ts";
-import { bySeq, defineIntent, type Intent, intentsIn } from "#/state/intent.ts";
+import { bySeq, defineIntent, type IntentAt, type Intent, intentsIn } from "#/state/intent.ts";
 import { testRegistry } from "#/state/testing.ts";
 
 import type { BoardCard } from "./cards";
@@ -12,11 +12,13 @@ import { type IssueMove, issueMoveOf, movedCards, movedIssue, sendMove } from ".
 
 const todo = (n: number): BoardCard => ({ kind: "todo", id: `i${n}`, lane: "todo", issue: issue(n, `第 ${n} 件`, "todo", "medium") });
 
-const move = (id: string, over: Partial<Intent<IssueMove, AppliedIssue>> = {}): Intent<IssueMove, AppliedIssue> => ({
+const move = (
+  id: string,
+  over: Partial<Pick<Intent<IssueMove, AppliedIssue>, "key" | "input">> & ({ readonly phase?: "sending" } | IntentAt<AppliedIssue>) = {},
+): Intent<IssueMove, AppliedIssue> => ({
   key: `k-${id}`,
   input: { id, status: "todo", lane: "working" },
-  status: "pending",
-  queued: false,
+  phase: "sending",
   ...over,
 });
 
@@ -24,14 +26,18 @@ test("a card on its way shows in the lane it was dropped on, moving, and nothing
   const [a, b] = [todo(1), todo(2)];
   const shown = movedCards([a, b], [move("i1")]);
   expect(shown[0]).toEqual({ ...a, lane: "working", move: { key: "k-i1", state: "moving" } });
-  // The issue is the frame's, status and all: the overlay sets the lane the owner chose and no more.
+  // The issue is the frame's, status and all: the overlay sets the lane the user chose and no more.
   expect(shown[0]?.kind === "todo" && shown[0].issue).toBe(a.kind === "todo" && a.issue);
   expect(shown[1]).toBe(b);
 });
 
 test("a failed move stays in sight with why, and a card with no move is the frame's", () => {
   const [a] = [todo(1)];
-  expect(movedCards([a], [move("i1", { status: "failed", reason: "进行中满了" })])[0]?.move).toEqual({ key: "k-i1", state: "failed", reason: "进行中满了" });
+  expect(movedCards([a], [move("i1", { phase: "failed", fault: { tag: "Refused", reason: "进行中满了", retryable: false } })])[0]?.move).toEqual({
+    key: "k-i1",
+    state: "failed",
+    reason: "进行中满了",
+  });
   expect(movedCards([a], [])).toEqual([a]);
 });
 
@@ -44,7 +50,7 @@ test("of two moves of one card, the newer is shown", () => {
 
 test("a move made off the board (a button on the issue's page) keeps the card in its lane, moving", () => {
   const [a] = [todo(1)];
-  const offBoard: Intent<IssueMove, AppliedIssue> = { key: "k", input: { id: "i1", status: "backlog" }, status: "pending", queued: false };
+  const offBoard: Intent<IssueMove, AppliedIssue> = { key: "k", input: { id: "i1", status: "backlog" }, phase: "sending" };
   expect(movedCards([a], [offBoard])[0]).toMatchObject({ lane: "todo", move: { key: "k", state: "moving" } });
 });
 
@@ -52,7 +58,7 @@ test("the issue's page shows the status moved to while it is on its way, and the
   const i = issue(1, "第 1 件", "in_review", "medium");
   const going = move("i1", { input: { id: "i1", status: "canceled" } });
   expect(movedIssue(i, [going]).status).toBe("canceled");
-  expect(movedIssue(i, [{ ...going, status: "failed", reason: "不行" }]).status).toBe("in_review");
+  expect(movedIssue(i, [{ ...going, phase: "failed", fault: { tag: "Refused", reason: "不行", retryable: false } }]).status).toBe("in_review");
   expect(issueMoveOf("i1", [going])).toEqual({ key: "k-i1", state: "moving" });
   expect(issueMoveOf("i2", [going])).toBeUndefined();
 });

@@ -43,6 +43,8 @@ const TemplateFile = Schema.Struct({
   personaMode: Schema.optionalKey(S.PersonaMode),
   worktree: Schema.optionalKey(Schema.Boolean),
   look: Schema.optionalKey(LookFile),
+  /** Built-in skills (agent/skills/<id>) a profile from it has ticked. */
+  skills: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
 const WordsFile = Schema.Struct({
@@ -51,7 +53,7 @@ const WordsFile = Schema.Struct({
   tags: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
-/** Why a folder is not a template, in the owner's words: which file, and what in it. */
+/** Why a folder is not a template, in the user's words: which file, and what in it. */
 export class TemplateProblem extends Schema.TaggedError<TemplateProblem, { readonly brand: unique symbol }>()("TemplateProblem", { message: Schema.String }) {}
 
 /** A file's text, or none when there is no such file. */
@@ -66,7 +68,7 @@ const textOnDisk =
         (e) => e.reason._tag === "NotFound",
         () => Effect.undefined,
       ),
-      Effect.mapError((e) => new TemplateProblem({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
+      Effect.mapError((e) => TemplateProblem.make({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
     );
 
 const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, schema: S, dir: string, file: string) =>
@@ -75,7 +77,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, sche
     const text = yield* textOf(path);
     if (text === undefined) return undefined;
     return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(text).pipe(
-      Effect.mapError((e) => new TemplateProblem({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
+      Effect.mapError((e) => TemplateProblem.make({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
     );
   });
 
@@ -83,7 +85,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, sche
 export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplateSource): Effect.Effect<T.AgentTemplate, TemplateProblem> =>
   Effect.gen(function* () {
     const item = yield* readJson(textOf, TemplateFile, dir, "agent.json");
-    const problem = (message: string) => Effect.fail(new TemplateProblem({ message }));
+    const problem = (message: string) => Effect.fail(TemplateProblem.make({ message }));
     if (!item) return yield* problem(t("server.agent.template.noFile", { file: join(dir, "agent.json") }));
     if (!idPattern.test(item.id)) return yield* problem(t("server.agent.template.badId", { file: join(dir, "agent.json"), id: item.id }));
     if (item.version < 1) return yield* problem(t("server.agent.template.badVersion", { file: join(dir, "agent.json") }));
@@ -122,6 +124,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
       },
       persona,
       source,
+      skills: [...(item.skills ?? [])],
       installed: [],
     } satisfies T.AgentTemplate;
   });
@@ -177,7 +180,7 @@ export const profileOf = (item: T.AgentTemplate, id: string, name: string): T.Ag
   effort: item.effort,
   persona: item.persona,
   personaMode: item.personaMode,
-  skills: [],
+  skills: [...item.skills],
   mcpServers: [],
   disallowedTools: [],
   env: {},
@@ -196,5 +199,7 @@ export const updatedFrom = (item: T.AgentTemplate, a: T.Agent): T.Agent => ({
   persona: item.persona,
   personaMode: item.personaMode,
   worktree: item.worktree,
+  // The template's skills are ticked again; the ones the user ticked besides stay.
+  skills: [...new Set([...a.skills, ...item.skills])],
   from: { template: item.id, version: item.version },
 });

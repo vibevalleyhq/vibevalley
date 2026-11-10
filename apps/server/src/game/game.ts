@@ -4,11 +4,12 @@ import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol
 import * as S from "@vibevalley/protocol/schema";
 
 import { newId } from "#/base/ids.ts";
-import { jsonOrNone } from "#/base/json.ts";
+import { jsonOrNone, jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { Repo } from "#/repo/repo.ts";
+import { isHired } from "#/session/roster.ts";
 import * as q from "#db/game_ledger.sql.ts";
 
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
@@ -27,7 +28,7 @@ export class Game extends Context.Service<
   {
     /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
     readonly achievements: () => Achievement[];
-    /** The title the owner wears: an achievement and its tier; none of either is the plain title. */
+    /** The title the user wears: an achievement and its tier; none of either is the plain title. */
     readonly chooseTitle: (achievement: string | undefined, tier: number | undefined) => Effect.Effect<void>;
     /** The next session hired within ten seconds goes to this station, if it is still free. */
     readonly want: (station: number) => void;
@@ -39,7 +40,7 @@ export class Game extends Context.Service<
     /** How many runs' ends asked for a count. */
     readonly asked: () => number;
   }
->()("vibevalley/Game") {
+>()("@vibevalley/server/game/game") {
   static readonly layer = Layer.effect(
     Game,
     Effect.suspend(() => make),
@@ -72,7 +73,7 @@ const make = Effect.gen(function* () {
       const at = yield* Clock.currentTimeMillis;
       const entry = { ...input, at };
       const { kind, at: _, ...payload } = entry;
-      yield* db.attempt(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
+      yield* db.attempt(Effect.flatMap(jsonText(payload), (text) => q.addLedgerEntry({ id: newId(at), kind, at, payload: text })));
       const [next, news] = progressStep(folded, entry);
       folded = next;
       yield* core.apply({ type: "progressChanged", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
@@ -98,14 +99,11 @@ const make = Effect.gen(function* () {
     if (pending) return;
     pending = true;
     yield* Effect.forkIn(
-      Effect.sleep(countAfterRunMs).pipe(
-        Effect.andThen(
-          Effect.sync(() => {
-            pending = false;
-          }),
-        ),
-        Effect.andThen(refresh),
-      ),
+      Effect.gen(function* () {
+        yield* Effect.sleep(countAfterRunMs);
+        pending = false;
+        yield* refresh;
+      }),
       scope,
     );
   });
@@ -119,7 +117,7 @@ const make = Effect.gen(function* () {
       Effect.gen(function* () {
         if (fact.type === "progressChanged" && fact.commits === undefined && fact.station === undefined) return;
         if (fact.type === "sessionReported") yield* soon;
-        if (fact.type === "sessionChanged" && fact.session.role === "worker") {
+        if (fact.type === "sessionChanged" && isHired(fact.session)) {
           const wish = wanted;
           wanted = undefined;
           if (wish && wish.until > fact.at) yield* core.apply({ type: "progressChanged", station: { id: fact.session.id, station: wish.station } });
@@ -128,8 +126,9 @@ const make = Effect.gen(function* () {
       }),
     ),
   );
+  const user2 = yield* core.user;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* core.owner, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
+    Stream.runForEach(user2, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
   );
 
   return Game.of({

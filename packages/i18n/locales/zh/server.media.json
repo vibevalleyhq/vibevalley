@@ -5,7 +5,6 @@
   "speechUnknown": "没有收到完整的语音合成结果，供应商可能仍在处理或计费，没有重复提交。",
   "speechRejected": "MOSS 拒绝了语音合成请求，请检查账号权限与输入后再创建新任务。",
   "inputDeletePreview": "删除「{name}」的本机输入预留及未完成的上传。",
-  "inputDeleteBytes": "没有其他输入保留这份本机文件时，删除文件。",
   "remoteAccountChanged": "这份远端文件属于另一条连接或凭据，没有用替换后的账号发送请求。",
   "remoteUploadUnknown": "远端上传结果尚未确认，或这次上传已结束，不会再次提交；供应商处可能仍有文件。",
   "remoteUploadRejected": "MOSS 拒绝了这次文件上传，没有自动重试。",
@@ -19,7 +18,7 @@
   "understandingRejected": "MOSS 拒绝了理解请求，没有重复提交。",
   "remoteUnresolved": "部分上传没有取得文件 ID。已知文件已清理，请在供应商后台核对这些文件名：{files}",
   "understandingPhase": {
-    "authorized": "等待管家执行",
+    "authorized": "等待助手执行",
     "queued": "排队中",
     "uploading": "上传到 MOSS",
     "generating": "理解中",
@@ -44,7 +43,7 @@
   "inputChanged": "已保存的输入不能换成另一份内容，请创建新的输入。",
   "inputTimeout": "上传到本机已超时，不完整的文件已删除，没有向供应商发起请求。",
   "inputDisconnected": "上传到本机已中断，不完整的文件已删除，没有向供应商发起请求。",
-  "ownerRequired": "需要主人的委托才能提交生成，管家不会在自主巡查中发起可能计费的请求。",
+  "userRequired": "需要用户的委托才能提交生成，助手不会在自主巡查中发起可能计费的请求。",
   "invalid": "生图参数无效，请检查提示词、布局、尺寸和高级参数。",
   "missing": "找不到这次生成任务。",
   "corrupt": "生成任务记录无法读取，请保留本机数据后检查。",
@@ -79,5 +78,6 @@
     "unknown": "结果未知",
     "canceled": "已取消等待",
     "download_failed": "下载失败"
-  }
+  },
+  "imageMade": "画好了：{prompt}"
 }

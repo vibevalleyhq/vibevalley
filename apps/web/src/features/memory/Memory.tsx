@@ -441,12 +441,12 @@ export function MemoryPanel(props: { agent: string }) {
   const repos = () => [...new Set(all().flatMap((m) => (m.repo ? [m.repo] : [])))].toSorted();
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.repo === undefined : m.repo === shown()));
   const whose = (m: Memory) =>
-    m.author === "owner"
+    m.author === "user"
       ? t("web.memory.memory.yours")
-      : m.author === "orchestrator"
-        ? t("web.memory.memory.orchestrators")
-        : m.session
-          ? t("web.memory.memory.sessions", { name: sessions().get(m.session) ?? m.session })
+      : m.session
+        ? t("web.memory.memory.sessions", { name: sessions().get(m.session) ?? m.session })
+        : m.author === "agent"
+          ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");
   return (
     <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
@@ -603,7 +603,7 @@ function RecallPreview(props: { agent: string }) {
   );
 }
 
-/** Notes belong to the profile; authorship distinguishes the owner's words. */
+/** Notes belong to the profile; authorship distinguishes the user's words. */
 export function OrchestratorMemoryPanel(props: { agent: string }) {
   const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
@@ -611,27 +611,25 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
   const now = useNow();
   return (
     <Show when={view()} fallback={<Quiet>{t("web.memory.memory.orchestratorReading")}</Quiet>}>
-      {(v) => {
-        return (
-          <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-            <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
-            <WriteNote agent={props.agent} />
-            <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
-              <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
-                <For each={v().memories} keyed={(m) => m.id}>
-                  {(m) => (
-                    <MemoryItem
-                      memory={m()}
-                      onForget={() => forget(m().id)}
-                      meta={[m().author === "owner" ? t("web.memory.memory.told") : t("web.memory.memory.orchestratorOwn"), ago(m().at, now())]}
-                    />
-                  )}
-                </For>
-              </Show>
-            </Section>
-          </div>
-        );
-      }}
+      {(v) => (
+        <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
+          <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
+          <WriteNote agent={props.agent} />
+          <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
+            <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
+              <For each={v().memories} keyed={(m) => m.id}>
+                {(m) => (
+                  <MemoryItem
+                    memory={m()}
+                    onForget={() => forget(m().id)}
+                    meta={[m().author === "user" ? t("web.memory.memory.told") : t("web.memory.memory.orchestratorOwn"), ago(m().at, now())]}
+                  />
+                )}
+              </For>
+            </Show>
+          </Section>
+        </div>
+      )}
     </Show>
   );
 }

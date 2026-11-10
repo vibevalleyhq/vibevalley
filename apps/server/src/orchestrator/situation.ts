@@ -1,8 +1,8 @@
 import { t } from "@vibevalley/i18n";
-import { ownerId, quotaLow, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
+import { userId, quotaLow, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { head } from "#/base/clip.ts";
-import { type InboxMessage } from "#/mailbox/envelope.ts";
+import { type Envelope } from "#/mailbox/envelope.ts";
 import { messageLine } from "#/mailbox/prompts.ts";
 import { yuan } from "#/runtime/quota.ts";
 
@@ -10,8 +10,8 @@ import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts"
 
 /** Who woke the orchestrator: what the input's words are worth. */
 export type Source =
-  /** The owner's words alone: in a channel, on a call, over chat/completions, from a connector. */
-  | "owner"
+  /** The user's words alone: in a channel, on a call, over chat/completions, from a connector. */
+  | "user"
   /** A channel or a thread with a helper's words in it. */
   | "chat"
   | "issue"
@@ -20,7 +20,7 @@ export type Source =
 
 /** How an input of each source goes in. */
 export const intake: Readonly<Record<Source, { readonly head: string; readonly now: boolean; readonly trigger: RunTriggerKind }>> = {
-  owner: { head: sourceHead.owner, now: true, trigger: "comment" },
+  user: { head: sourceHead.user, now: true, trigger: "comment" },
   chat: { head: sourceHead.chat, now: false, trigger: "comment" },
   issue: { head: sourceHead.issue, now: false, trigger: "issue" },
   cron: { head: sourceHead.cron, now: false, trigger: "cron" },
@@ -98,13 +98,13 @@ export function situationDelta(before: string, now: string): string {
 /** In UTF-16 units: enough for a report's conclusion; the rest stays in the chat for channel_message_list. */
 const lineMax = 800;
 
-/** As inboxLines, but what others said past lineMax is cut, with where to read it whole. The owner's words stay whole. */
-export const orchestratorInboxLines = (messages: readonly InboxMessage[]) =>
+/** As envelopeLines, but what others said past lineMax is cut, with where to read it whole. The user's words stay whole. */
+export const orchestratorEnvelopeLines = (messages: readonly Envelope[]) =>
   messages
     .map((m) => {
       const text = m.text.trim();
       return messageLine(
-        m.number !== 0 && m.from !== ownerId && text.length > lineMax ? { ...m, text: head(text, lineMax) + lineWords.cut(text.length, m.target) } : m,
+        m.number !== 0 && m.from !== userId && text.length > lineMax ? { ...m, text: head(text, lineMax) + lineWords.cut(text.length, m.target) } : m,
       );
     })
     .join("\n");

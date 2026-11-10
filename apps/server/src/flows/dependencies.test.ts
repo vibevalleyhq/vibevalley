@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Issue } from "#/issue/issue.ts";
 import { issueBranch, Repo } from "#/repo/repo.ts";
 import { Session } from "#/session/session.ts";
@@ -40,8 +40,8 @@ it.live("regression: native child issues wait for prerequisites and start from t
     expect(child.stage.acts.map((act) => act.act)).toContain("start");
     expect((yield* issues.start(child.id, "")).queued).toBeDefined();
     yield* (yield* Issue).refreshQueue;
-    expect(sessions.presentSessions()).toEqual([]);
-    yield* service.setStatus(prerequisite.id, "canceled", "", "", owner);
+    expect(sessions.hired()).toEqual([]);
+    yield* service.setStatus(prerequisite.id, "canceled", "", "", user);
     yield* (yield* Issue).refreshQueue;
     const started = yield* await_(
       () => issues.get(child.id),
@@ -89,7 +89,7 @@ it.live("regression: child changes merge into the parent worktree and reach main
     expect(gitSync(place.cwd, "status", "--porcelain")).toBe("");
     const main = join(f.config.workRoot, "repos", "merge-family");
     expect(existsSync(join(main, "child.txt"))).toBe(false);
-    yield* service.setStatus(parent.id, "done", "", "", owner);
+    yield* service.setStatus(parent.id, "done", "", "", user);
     expect(readFileSync(join(main, "child.txt"), "utf8")).toBe("child result");
     expect((yield* issues.get(parent.id)).delivered).toBe("merged");
   }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -108,11 +108,12 @@ it.live("regression: automatic child merge preserves uncommitted parent work", (
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue = yield* Issue;
+    const issues = testIssues(issue);
     yield* (yield* Agent).save(lab());
     const parent = yield* issues.add({ title: "父工单", agent: "lab", repo: "dirty-parent" });
     const place = yield* (yield* Repo).workplace("dirty-parent", parent.number, true, "");
-    writeFileSync(join(place.cwd, "owner.txt"), "unfinished owner work");
+    writeFileSync(join(place.cwd, "user.txt"), "unfinished user work");
     const before = gitSync(place.cwd, "rev-parse", "HEAD");
     const child = yield* issues.add({ title: "子工单", parent: parent.id });
     yield* issues.start(child.id, "");
@@ -123,7 +124,7 @@ it.live("regression: automatic child merge preserves uncommitted parent work", (
     );
     expect((yield* issues.get(child.id)).delivered).toBeUndefined();
     expect(gitSync(place.cwd, "rev-parse", "HEAD")).toBe(before);
-    expect(readFileSync(join(place.cwd, "owner.txt"), "utf8")).toBe("unfinished owner work");
+    expect(readFileSync(join(place.cwd, "user.txt"), "utf8")).toBe("unfinished user work");
     expect(existsSync(join(place.cwd, "child.txt"))).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });

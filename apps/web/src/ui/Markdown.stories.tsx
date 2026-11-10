@@ -31,7 +31,7 @@ const sample = [
   "```",
 ].join("\n");
 
-const diagram = ["```mermaid", "flowchart LR", "  主人 --> 管家 --> 帮工", "  帮工 -->|交活| 主人", "```"].join("\n");
+const diagram = ["```mermaid", "flowchart LR", "  用户 --> 助手 --> 帮工", "  帮工 -->|交活| 用户", "```"].join("\n");
 
 const long = ["```ts", ...Array.from({ length: 30 }, (_, i) => `const n${i} = ${i};`), "```"].join("\n");
 

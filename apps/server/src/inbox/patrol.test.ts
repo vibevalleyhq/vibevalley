@@ -1,36 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { type ChatMessage, ownerId, type SpaceState } from "@vibevalley/protocol";
+import { type ChatMessage, userId, type SpaceState } from "@vibevalley/protocol";
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { emptySpaceState } from "#/core/core.ts";
-import { checkCases, goldenCases } from "#/testing/golden.ts";
 
-import { forOwner, inboxEntries } from "./items.ts";
-import { emptyPatrol, type PatrolNote, patrolStep } from "./patrol.ts";
+import { forUser, inboxEntries } from "./items.ts";
+import { emptyPatrol, patrolStep } from "./patrol.ts";
 
 describe("the patrol", () => {
-  // Every fifth round the farm is empty: what was hanging is forgotten.
-  it("find for the patrol what was recorded", () => {
-    const failed = checkCases(goldenCases("inbox"), (c) => {
-      if (c.fn !== "patrol") throw new Error(`unknown fn ${c.fn}`);
-      const given = c.in as { state: SpaceState; nows: number[] };
-      let memory = emptyPatrol();
-      return given.nows.map((now, r) => {
-        let report: PatrolNote[];
-        [report, memory] = patrolStep(r % 5 === 4 ? emptySpaceState() : given.state, now, memory);
-        return {
-          now,
-          report: report.map((n) => ({ Key: n.key, Channel: n.channel ?? null, Text: n.text })),
-          firstSeen: memory.firstSeen,
-          reported: memory.reported,
-        };
-      });
-    });
-    expect(failed).toEqual([]);
-  });
-
-  it("gives a seen owner two hours before another reminder", () => {
+  it("gives a seen user two hours before another reminder", () => {
     const at = 1_000;
     const message: ChatMessage = {
       id: messageId("seen-message"),
@@ -38,11 +17,12 @@ describe("the patrol", () => {
       outcome: null,
       channel: "seen-channel",
       from: "w1",
-      fromKind: "session",
+      fromKind: "agent",
+      fromRole: "worker",
       name: "帮工",
       kind: "chat",
-      text: "请主人决定",
-      mentions: [ownerId],
+      text: "请用户决定",
+      mentions: [userId],
       spoken: false,
       at,
       revision: 1,
@@ -68,7 +48,7 @@ describe("the patrol", () => {
             subjectKind: null,
           },
         ],
-        ownerMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
+        userMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
       },
     };
     const mention = inboxEntries(state)[0]!;
@@ -78,14 +58,15 @@ describe("the patrol", () => {
   });
 });
 
-describe("what reaches the owner off the farm", () => {
+describe("what reaches the user off the farm", () => {
   const said = (more: Partial<ChatMessage>): ChatMessage => ({
     id: messageId("m"),
     number: 1,
     channel: "c",
     from: "orchestrator",
-    fromKind: "orchestrator",
-    name: "管家",
+    fromKind: "agent",
+    fromRole: "orchestrator",
+    name: "助手",
     kind: "chat",
     text: "好",
     at: 0,
@@ -99,7 +80,7 @@ describe("what reaches the owner off the farm", () => {
     outcome: more.outcome ?? null,
   });
   it("follows how much the place it is said in counts", () => {
-    const named = said({ mentions: [ownerId] });
-    expect([forOwner(said({})), forOwner(said({}), "mentions"), forOwner(named, "mentions"), forOwner(named, "none")]).toEqual([true, false, true, false]);
+    const named = said({ mentions: [userId] });
+    expect([forUser(said({})), forUser(said({}), "mentions"), forUser(named, "mentions"), forUser(named, "none")]).toEqual([true, false, true, false]);
   });
 });

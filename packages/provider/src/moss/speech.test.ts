@@ -1,10 +1,12 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Formatter, Option, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { mossSpeechLanguages, mossSpeechModels } from "./speech-models.ts";
 import { createMossSpeechTask, generateMossSpeech, prepareMossSpeech } from "./speech.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = { model: "moss-tts-1.5-flash", text: "A synthetic speech sample.", voice: "voice-test", format: "mp3" };
 const result = {
@@ -27,9 +29,10 @@ it.effect.each(mossSpeechModels)("%s submits once with explicit credentials and 
       expect(request.method).toBe("POST");
       expect(request.url).toBe("https://api.mosi.cn/v1/audio/speech");
       expect(request.headers.authorization).toBe("Bearer test-key");
-      expect(yield* Effect.serviceOption(FetchHttpClient.RequestInit)).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
+      const serviceOption2 = yield* Effect.serviceOption(FetchHttpClient.RequestInit);
+      expect(serviceOption2).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model,
         input: input.text,
         voice_id: input.voice,
@@ -102,7 +105,8 @@ it.effect.each([
   { metadata: { enabled: "yes" } },
 ])("unsupported or invalid speech input %# never reaches the network", (patch) =>
   Effect.gen(function* () {
-    expect(yield* generateMossSpeech("test-key", { ...input, ...patch }).pipe(Effect.flip)).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+    const generateMossSpeechFailure = yield* generateMossSpeech("test-key", { ...input, ...patch }).pipe(Effect.flip);
+    expect(generateMossSpeechFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -113,7 +117,8 @@ it.effect.each([
 
 it.effect.each(["", " ", "key\nheader"])("invalid speech credentials %# never reach the network", (key) =>
   Effect.gen(function* () {
-    expect(yield* generateMossSpeech(key, input).pipe(Effect.flip)).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const generateMossSpeechFailure = yield* generateMossSpeech(key, input).pipe(Effect.flip);
+    expect(generateMossSpeechFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -135,7 +140,7 @@ it.effect.each([
   Effect.gen(function* () {
     const error = yield* generateMossSpeech("test-key", input).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/secret|token|test-key|audio\.example/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/secret|token|test-key|audio\.example/u);
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...result, ...patch }))),
 );
 
@@ -150,14 +155,15 @@ it.effect.each([400, 401, 403, 413, 422, 429, 302, 404, 500, 503])("HTTP %s is s
   return Effect.gen(function* () {
     const error = yield* generateMossSpeech("test-key", input).pipe(Effect.flip);
     expect(error).toMatchObject({ reason: "HttpStatus", status, outcome: [400, 401, 403, 413, 422, 429].includes(status) ? "Rejected" : "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/test-key|private/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/test-key|private/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect("a documented missing voice is a rejection, not an ambiguous routing failure", () =>
   Effect.gen(function* () {
-    expect(yield* generateMossSpeech("test-key", input).pipe(Effect.flip)).toMatchObject({
+    const generateMossSpeechFailure = yield* generateMossSpeech("test-key", input).pipe(Effect.flip);
+    expect(generateMossSpeechFailure).toMatchObject({
       reason: "HttpStatus",
       status: 404,
       code: "voice_not_found",
@@ -168,7 +174,8 @@ it.effect("a documented missing voice is a rejection, not an ambiguous routing f
 
 it.effect("speech JSON is bounded even when the vendor returns a successful status", () =>
   Effect.gen(function* () {
-    expect(yield* generateMossSpeech("test-key", input).pipe(Effect.flip)).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const generateMossSpeechFailure = yield* generateMossSpeech("test-key", input).pipe(Effect.flip);
+    expect(generateMossSpeechFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...result, padding: "x".repeat(1 << 20) }))),
 );
 
@@ -199,7 +206,8 @@ it.effect.each(["cancel", "timeout"])("%s while reading the speech body stops th
     if (action === "cancel") yield* Fiber.interrupt(fiber);
     else {
       yield* TestClock.adjust("300 seconds");
-      expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+      const fiber2 = yield* Fiber.join(fiber);
+      expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     }
     expect(canceled).toBe(true);
     expect(calls).toBe(1);
@@ -211,17 +219,19 @@ it.effect("async submission returns only the documented task ID and does not pol
   const http = HttpClient.make((request) => {
     calls++;
     if (request.body._tag !== "Uint8Array") return Effect.die("Expected JSON");
-    expect(JSON.parse(new TextDecoder().decode(request.body.body))).toMatchObject({ async: true, stream: false, delivery_method: "url" });
+    expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toMatchObject({ async: true, stream: false, delivery_method: "url" });
     return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ task_id: "task-one" }, { status: 202 })));
   });
   return Effect.gen(function* () {
-    expect(yield* createMossSpeechTask("test-key", input)).toEqual({ taskId: "task-one" });
+    const mossSpeechTaskCreated = yield* createMossSpeechTask("test-key", input);
+    expect(mossSpeechTaskCreated).toEqual({ taskId: "task-one" });
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
 
 it.effect("regression: a missing async task_id is unknown and never inferred from another field", () =>
   Effect.gen(function* () {
-    expect(yield* createMossSpeechTask("test-key", input).pipe(Effect.flip)).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossSpeechTaskCreatedFailure = yield* createMossSpeechTask("test-key", input).pipe(Effect.flip);
+    expect(mossSpeechTaskCreatedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ id: "task-one", status: "PENDING" }))),
 );

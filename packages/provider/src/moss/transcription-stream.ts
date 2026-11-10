@@ -48,10 +48,10 @@ function* slices(bytes: Uint8Array): Generator<Uint8Array> {
 
 const open = Effect.fn("Provider.openMossTranscriptionStream")(function* (key: string, input: unknown) {
   const request = yield* prepareMossTranscription(input);
-  if (!Schema.is(DiarizeModel)(request.model)) return yield* new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" });
-  if (!key.trim() || /\s/u.test(key)) return yield* new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+  if (!Schema.is(DiarizeModel)(request.model)) return yield* MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" });
+  if (!key.trim() || /\s/u.test(key)) return yield* MossAudioError.make({ reason: "Credentials", outcome: "NotSubmitted" });
   const body = yield* HttpBody.json({ ...request, response_format: "verbose_json", stream: true, async: false }).pipe(
-    Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+    Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
   );
   const http = yield* HttpClient.HttpClient;
   const response = yield* HttpClient.withScope(http).execute(
@@ -62,20 +62,20 @@ const open = Effect.fn("Provider.openMossTranscriptionStream")(function* (key: s
   );
   if (response.status < 200 || response.status >= 300) {
     yield* readMossResponse(response);
-    return yield* new MossAudioError({
+    return yield* MossAudioError.make({
       reason: "HttpStatus",
       status: response.status,
       outcome: [400, 401, 403, 413, 422, 429].includes(response.status) ? "Rejected" : "Unknown",
     });
   }
   if (response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() !== "text/event-stream")
-    return yield* new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
+    return yield* MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" });
 
   let wireBytes = 0;
   return response.stream.pipe(
     Stream.mapEffect((bytes) => {
       wireBytes += bytes.byteLength;
-      return wireBytes > maxWireBytes ? Effect.fail(new MossAudioError({ reason: "TooLarge", outcome: "Unknown" })) : Effect.succeed(bytes);
+      return wireBytes > maxWireBytes ? Effect.fail(MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" })) : Effect.succeed(bytes);
     }),
     Stream.flatMap((bytes) => Stream.fromIterable(slices(bytes), { chunkSize: 1 })),
   );
@@ -88,48 +88,48 @@ export function streamMossTranscription(key: string, input: unknown): Stream.Str
     let segmentCount = 0;
     let eventCount = 0;
     const decode = Effect.fnUntraced(function* (event: Sse.Event): Effect.fn.Return<MossTranscriptionEvent, MossAudioError> {
-      if (++eventCount > 100000) return yield* new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
-      const value = yield* decodeEvent(event.data).pipe(Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })));
-      if (event.event !== "message" && event.event !== value.type) return yield* new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
-      switch (value.type) {
+      if (++eventCount > 100000) return yield* MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" });
+      const eventDecoded = yield* decodeEvent(event.data).pipe(Effect.mapError(() => MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })));
+      if (event.event !== "message" && event.event !== eventDecoded.type) return yield* MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" });
+      switch (eventDecoded.type) {
         case "task.created":
-          if (eventCount !== 1) return yield* new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
-          return { type: value.type, taskId: value.task_id, model: value.model };
+          if (eventCount !== 1) return yield* MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" });
+          return { type: eventDecoded.type, taskId: eventDecoded.task_id, model: eventDecoded.model };
         case "transcript.text.delta":
-          deltaLength += value.delta.length;
-          if (deltaLength > maxTextLength) return yield* new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
-          return { type: value.type, text: value.delta };
+          deltaLength += eventDecoded.delta.length;
+          if (deltaLength > maxTextLength) return yield* MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" });
+          return { type: eventDecoded.type, text: eventDecoded.delta };
         case "transcript.segment.done":
-          segmentLength += value.text.length;
-          if (++segmentCount > 10000 || segmentLength > maxTextLength) return yield* new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
+          segmentLength += eventDecoded.text.length;
+          if (++segmentCount > 10000 || segmentLength > maxTextLength) return yield* MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" });
           return {
-            type: value.type,
-            index: value.content_index,
-            segment: { speaker: value.speaker, text: value.text, start: value.start, end: value.end },
-            ...(value.session_usage !== undefined ? { usage: audioUsage(value.session_usage) } : {}),
+            type: eventDecoded.type,
+            index: eventDecoded.content_index,
+            segment: { speaker: eventDecoded.speaker, text: eventDecoded.text, start: eventDecoded.start, end: eventDecoded.end },
+            ...(eventDecoded.session_usage !== undefined ? { usage: audioUsage(eventDecoded.session_usage) } : {}),
           };
         case "transcript.text.done":
-          if (value.text.length > maxTextLength) return yield* new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
-          return { type: value.type, text: value.text, ...(value.usage !== undefined ? { usage: audioUsage(value.usage) } : {}) };
+          if (eventDecoded.text.length > maxTextLength) return yield* MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" });
+          return { type: eventDecoded.type, text: eventDecoded.text, ...(eventDecoded.usage !== undefined ? { usage: audioUsage(eventDecoded.usage) } : {}) };
         case "error":
-          return yield* new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
+          return yield* MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" });
       }
     });
     return Stream.unwrap(open(key, input)).pipe(
       Stream.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-      Stream.catchTag("MossResponseTooLarge", () => Stream.fail(new MossAudioError({ reason: "TooLarge", outcome: "Unknown" }))),
+      Stream.catchTag("MossResponseTooLarge", () => Stream.fail(MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" }))),
       // Race the deadline per bounded transport chunk, not once per decoded event.
-      Stream.interruptWhen(Effect.sleep("900 seconds").pipe(Effect.andThen(Effect.fail(new MossAudioError({ reason: "Timeout", outcome: "Unknown" }))))),
+      Stream.interruptWhen(Effect.sleep("900 seconds").pipe(Effect.andThen(Effect.fail(MossAudioError.make({ reason: "Timeout", outcome: "Unknown" }))))),
       Stream.decodeText(),
       Stream.pipeThroughChannel(Sse.decode<MossAudioError | HttpClientError.HttpClientError, unknown>({ maxEventSize })),
       Stream.mapEffect(decode),
       // Only a complete transcript.text.done frame acknowledges success; EOF never does.
-      Stream.concat(Stream.fail(new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" }))),
+      Stream.concat(Stream.fail(MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" }))),
       Stream.takeUntil((event) => event.type === "transcript.text.done"),
       Stream.catchTags({
-        HttpClientError: () => Stream.fail(new MossAudioError({ reason: "Network", outcome: "Unknown" })),
-        SseError: () => Stream.fail(new MossAudioError({ reason: "TooLarge", outcome: "Unknown" })),
-        Retry: () => Stream.fail(new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })),
+        HttpClientError: () => Stream.fail(MossAudioError.make({ reason: "Network", outcome: "Unknown" })),
+        SseError: () => Stream.fail(MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" })),
+        Retry: () => Stream.fail(MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
       }),
     );
   });

@@ -10,6 +10,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
+import { jsonText } from "#/base/json.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import * as qr from "#db/session_run.sql.ts";
 import * as qi from "#db/session_run_issue.sql.ts";
@@ -102,7 +103,7 @@ export const makeInProcessRun = (
       if (closed) return;
       if (input) {
         // The loop hands a consumed input with the message_start it opened: anything else is a bug in the host.
-        if (e.type !== "message_start") return yield* Effect.die(new Inconsistent({ message: "run input requires a message start" }));
+        if (e.type !== "message_start") return yield* Effect.die(Inconsistent.make({ message: "run input requires a message start" }));
         yield* begin(input);
         if (input.heard && input.heard.length > 0) {
           heard = [...new Set([...heard, ...input.heard])];
@@ -147,7 +148,7 @@ export const makeInProcessRun = (
 
     const failedStart = Effect.fnUntraced(function* (input: RunInput, text: string, reason: string) {
       if (closed) return "";
-      if (run && !ending) return yield* new RunBusy({ message: "another in-process run is still running" });
+      if (run && !ending) return yield* RunBusy.make({ message: "another in-process run is still running" });
       yield* begin(input);
       journal.asked(text);
       outcome = "failed";
@@ -187,14 +188,25 @@ export const recording = Effect.gen(function* () {
   const db = yield* Db;
   const clock = yield* Clock.Clock;
   const tried = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-    db.attempt(effect).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+    db.attempt(effect).pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
   return {
-    start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
-      tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: clock.currentTimeMillisUnsafe() })),
+    // The times are read as each is asked for, before the row is written.
+    start: (id: string, session: string, issue: string, trigger: RunTrigger) => {
+      const at = clock.currentTimeMillisUnsafe();
+      return tried(
+        Effect.flatMap(jsonText(trigger), (triggeredBy) => qr.startRun({ id, session, issue: issue || null, triggered_by: triggeredBy, started_at: at })),
+      );
+    },
     link: (run: string, issue: string) => tried(qi.linkRunIssue({ run, issue })),
-    heard: (id: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id })),
+    heard: (id: string, heard: readonly string[]) => tried(Effect.flatMap(jsonText(heard), (text) => qr.heardInRun({ heard: text, id }))),
     issues: (run: string) => Effect.map(tried(qi.runIssues({ run })), (rows) => rows.map((row) => issueId(row.issue))),
-    finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
-      tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+    finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => {
+      const at = clock.currentTimeMillisUnsafe();
+      return tried(
+        Effect.flatMap(spent ? jsonText(spent) : Effect.succeed(null), (spentJson) =>
+          qr.endRun({ ended_at: at, outcome, summary: summary || null, spent: spentJson, id }),
+        ),
+      );
+    },
   };
 });

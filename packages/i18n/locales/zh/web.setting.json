@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "语言",
-    "line": "界面上的字、管家和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
+    "line": "界面上的字、助手和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
     "zh": "中文",
     "en": "English",
     "label": "界面语言"
@@ -22,13 +22,13 @@
     "key": "{label} 的 key",
     "keyHint": "key（不用或不改就空着）",
     "user": "{label} 的 user_id",
-    "userHint": "你在 EverOS 里的 user_id（空着就是 owner）",
+    "userHint": "你在 EverOS 里的 user_id（空着用默认的那个）",
     "read": "读",
     "readHint": "开工想起、帮工翻记性时也问它",
     "write": "写",
     "writeHint": "记下的也送一份过去",
     "everything": "读全部",
-    "everythingHint": "不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到"
+    "everythingHint": "不只读 VibeValley 替帮工记的，你在里面的记忆每个帮工都读得到"
   },
   "github": {
     "noGh": "没装 gh",
@@ -45,7 +45,6 @@
     "search": "搜索设置…",
     "general": "通用",
     "appearance": "外观",
-    "models": "模型",
     "about": "关于",
     "memory": "记性",
     "skills": "技能",
@@ -53,7 +52,8 @@
     "dictation": "听写",
     "chat": "聊天软件",
     "devices": "设备",
-    "width": "导航的宽窄（拖动，双击回默认）"
+    "width": "导航的宽窄（拖动，双击回默认）",
+    "accounts": "账号与钥匙"
   },
   "groups": {
     "options": "选项",
@@ -64,7 +64,6 @@
   "words": {
     "general": "语言 language 启动 打开 工作台 农场",
     "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
-    "models": "DeepSeek key 钥匙 模型 管家",
     "about": "版本 家目录 设置文件 version",
     "memory": "Nowledge EverOS 记性 记忆",
     "skills": "技能 skill",
@@ -73,14 +72,15 @@
     "dictation": "听写 转写 语音输入",
     "github": "gh PR 登录",
     "chat": "微信 飞书 QQ 连接器 配对",
-    "devices": "手机 配对 连接到本机 局域网"
+    "devices": "手机 配对 连接到本机 局域网 名字 密码 登录 退出",
+    "accounts": "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型"
   },
   "scope": {
     "farm": "对整个 VibeValley",
     "device": "只对这台设备"
   },
   "general": {
-    "languageHint": "界面、管家和帮工说的话都用它",
+    "languageHint": "界面、助手和帮工说的话都用它",
     "start": "启动时打开",
     "startHint": "打开应用、或者打开首页时先进哪里",
     "starts": {
@@ -101,8 +101,7 @@
     "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变"
   },
   "models": {
-    "intro": "管家和 VibeValley 自己的帮工用的模型。",
-    "deepseekHint": "管家和 VibeValley 自己的帮工用它"
+    "deepseekHint": "助手和 VibeValley 自己的帮工用它"
   },
   "memory": {
     "intro": "帮工还能去外面的记性里查、往里记。"
@@ -151,5 +150,35 @@
     "cliTaken": "{link} 已经有别的文件，没有换掉：先挪开它再装",
     "cliInstall": "安装",
     "cliRemove": "移除"
+  },
+  "missing": {
+    "deepseekKey": "还没填 DeepSeek 的钥匙",
+    "mossAccount": "还没有 MOSS 账号",
+    "mossKey": "MOSS 账号还没填钥匙",
+    "mossOff": "用到的 MOSS 账号停用了",
+    "binding": "还没选用哪个账号和模型",
+    "agora": "还缺声网的凭据",
+    "dictationUrl": "还没填听写的地址"
+  },
+  "feature": {
+    "orchestrator": "助手",
+    "image": "生图",
+    "understanding": "媒体理解",
+    "speech": "单人语音",
+    "speakers": "多人语音",
+    "voiceDesign": "音色设计",
+    "transcription": "音频转写",
+    "dictation": "听写",
+    "live": "MOSS Live",
+    "vision": "实时视觉",
+    "call": "通话"
+  },
+  "readiness": {
+    "ready": "{feature}：可以用了",
+    "lacks": "{feature}：{why}",
+    "fix": "去设置"
+  },
+  "accounts": {
+    "intro": "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。"
   }
 }

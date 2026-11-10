@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { lanKeyCookie } from "@vibevalley/protocol";
+import { deviceKeyCookie } from "@vibevalley/protocol";
 
 /** A pairing: the farm's address on the network (scheme, host and port) and the one-time code. */
 export interface PairLink {
@@ -35,7 +35,7 @@ function parseFarm(text: string): string | undefined {
   }
 }
 
-/** What the owner's list calls this phone until they rename it there. */
+/** What the user's list calls this phone until they rename it there. */
 export function deviceName(os: string, model: string | undefined): string {
   if (model) return model;
   return os === "ios" ? "iPhone" : os === "android" ? t("mobile.android") : t("mobile.phone");
@@ -43,7 +43,7 @@ export function deviceName(os: string, model: string | undefined): string {
 
 /** The script that puts the key where the page's requests carry it, before the page runs. */
 export const keyScript = (key: string) =>
-  `document.cookie = ${JSON.stringify(`${lanKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Strict`)}; true;`;
+  `document.cookie = ${JSON.stringify(`${deviceKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Strict`)}; true;`;
 
 /** The page's own pairing route: the farm no longer knows this phone's key. */
 export const isPairPage = (farm: string, url: string) => {

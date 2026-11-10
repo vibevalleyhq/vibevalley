@@ -24,7 +24,7 @@
     "url": "大模型的地址要是 http(s) 开头的完整地址，比如 https://api.openai.com/v1/chat/completions",
     "voiceId": "音色不能空着：选一个或填 MiniMax 的音色 id",
     "microsoft": "微软合成要填区域和音色名",
-    "persona": "管家的人设不能空着"
+    "persona": "助手的人设不能空着"
   },
   "defaults": {
     "failureMessage": "我这边卡了一下，你再说一遍？"

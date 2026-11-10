@@ -56,16 +56,16 @@ test("regression: changing an issue parameter preserves its page and unsaved fil
   await page.goto("/issues");
   const search = page.getByTestId("issue-search");
   await search.fill("router");
-  const owner = page.getByTestId("issues-page");
-  const original = await owner.elementHandle();
+  const user = page.getByTestId("issues-page");
+  const original = await user.elementHandle();
   await page.locator(`[data-testid="issue-card"][data-key="${one.id}"]`).click();
   await expect(page).toHaveURL(new RegExp(`/issues/${one.id}$`, "u"));
-  expect(await owner.evaluate((current, previous) => current === previous, original)).toBe(true);
+  expect(await user.evaluate((current, previous) => current === previous, original)).toBe(true);
   await page.getByTestId("issue-close").click();
   await expect(search).toHaveValue("router");
   await page.locator(`[data-testid="issue-card"][data-key="${two.id}"]`).click();
   await expect(page).toHaveURL(new RegExp(`/issues/${two.id}$`, "u"));
-  expect(await owner.evaluate((current, previous) => current === previous, original)).toBe(true);
+  expect(await user.evaluate((current, previous) => current === previous, original)).toBe(true);
 });
 
 test("regression: an invalid encoded route and an unknown page never become a writable default page", async ({ page }) => {

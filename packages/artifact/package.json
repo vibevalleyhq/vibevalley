@@ -26,6 +26,10 @@
     "./ops": {
       "types": "./dist/ops.d.ts",
       "default": "./src/ops.ts"
+    },
+    "./shell": {
+      "types": "./dist/shell.d.ts",
+      "default": "./src/shell.ts"
     }
   },
   "dependencies": {

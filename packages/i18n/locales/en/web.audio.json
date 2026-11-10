@@ -1,6 +1,6 @@
 {
   "title": "Audio studio",
-  "notice": "Requests may incur charges. Canceling stops local waiting, not remote billing. Unknown outcomes are never automatically submitted again. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in owner-only Media storage, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
+  "notice": "Requests may incur charges. Canceling stops local waiting, not remote billing. Unknown outcomes are never automatically submitted again. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in Media storage only you can reach, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
   "configure": "Configure this capability in AI services first.",
   "refresh": "Refresh accounts and configuration",
   "account": "Voice account",

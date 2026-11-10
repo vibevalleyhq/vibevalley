@@ -1,11 +1,11 @@
-import { writeFileSync } from "node:fs";
+import { statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { announce, announced, defaultHome, homeOf, savedLocale } from "./index";
+import { announce, announced, defaultHome, forgetSignIn, homeOf, keepSignIn, savedLocale, signedIn } from "./index";
 
 test("a home is VIBEVALLEY_HOME, else ~/.vibevalley with a channel's suffix", () => {
   expect(homeOf({ VIBEVALLEY_HOME: "/farm" })).toBe("/farm");
@@ -20,15 +20,26 @@ test("a server says where it listens in its home while it runs, and a stopped on
   withdraw();
   expect(announced(home)).toBeUndefined();
   // Left behind by a server that died: its pid is not running.
-  writeFileSync(join(home, "server.json"), JSON.stringify({ url: "http://127.0.0.1:1", pid: 2 ** 22 + 7 }));
+  writeFileSync(join(home, "server.json"), `{"url":"http://127.0.0.1:1","pid":${2 ** 22 + 7}}`);
   expect(announced(home)).toBeUndefined();
 });
 
 test("the saved language is settings.json's, Chinese when there is none or it is not one we speak", () => {
   const home = tempDir("vv-locale-");
   expect(savedLocale(home)).toBe("zh");
-  writeFileSync(join(home, "settings.json"), JSON.stringify({ locale: "en" }));
+  writeFileSync(join(home, "settings.json"), '{"locale":"en"}');
   expect(savedLocale(home)).toBe("en");
   writeFileSync(join(home, "settings.json"), "{");
   expect(savedLocale(home)).toBe("zh");
+});
+
+test("a sign-in is kept for this user alone, read back, and forgotten", () => {
+  const home = tempDir("vv-signin-");
+  expect(signedIn(home)).toBeUndefined();
+  keepSignIn({ home, server: "https://farm.example", key: "k", device: "d1" });
+  expect(signedIn(home)).toEqual({ server: "https://farm.example", key: "k", device: "d1" });
+  expect(statSync(join(home, "auth.json")).mode & 0o777).toBe(0o600);
+  forgetSignIn(home);
+  forgetSignIn(home);
+  expect(signedIn(home)).toBeUndefined();
 });

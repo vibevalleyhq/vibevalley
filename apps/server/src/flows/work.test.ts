@@ -2,14 +2,14 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Stream } from "effect";
+import { Effect, Formatter, Layer, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
 import { needOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { orchestrator, owner } from "#/base/actor.ts";
+import { orchestrator, user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Session } from "#/session/session.ts";
@@ -20,7 +20,7 @@ import { releaseHeld } from "#/testing/worker.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
 const lastText = (sessions: Session["Service"], id: string, summary: string) => sessions.lastTextOf(id) || summary;
-const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
+const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byUserComment: false });
 
 describe("a session's work", () => {
   it.live("is sent, works, reports and goes home", () => {
@@ -29,7 +29,8 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const session = mustHire(yield* issues.hire(lab(), "写 hello.py", "demo"));
+      const hired = yield* issues.hire(lab(), "写 hello.py", "demo");
+      const session = mustHire(hired);
       const report = yield* w.nextReport;
       const text = lastText(sessions, report.id, report.summary);
       yield* sessions.dismiss(session.id);
@@ -37,8 +38,8 @@ describe("a session's work", () => {
       expect(report.outcome).toBe("completed");
       expect(text).toMatch(/做完了：写 hello\.py/u);
       expect(text).toMatch(/原型/u);
-      // The farm's other news (its commits, the issue, the default channel and the owner's mentions in it) comes and goes beside the session's own.
-      const mine = w.facts.filter((x) => !["commits", "issueChanged", "messageChanged", "channelChanged", "ownerMentionsChanged", "progress"].includes(x.type));
+      // The farm's other news (its commits, the issue, the default channel and the user's mentions in it) comes and goes beside the session's own.
+      const mine = w.facts.filter((x) => !["commits", "issueChanged", "messageChanged", "channelChanged", "userMentionsChanged", "progress"].includes(x.type));
       expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["sessionChanged", "sessionLeft"]);
       expect(mine.some((x) => x.type === "sessionPhaseChanged" && x.phase._tag === "working")).toBe(true);
       expect(
@@ -64,9 +65,10 @@ describe("a session's work", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issue;
-      const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      const hired = yield* issues.hire(lab(), "写打卡并提交", "clock");
+      const session = mustHire(hired);
       yield* w.nextReport;
-      const said = yield* issues.setStatus(session.issue!, "done", "", "", owner);
+      const said = yield* issues.setStatus(session.issue!, "done", "", "", user);
       expect(session.branch).toMatch(/^vibevalley\//u);
       expect(said).toMatchObject({ status: "done", delivered: "merged" });
       yield* until(() => w.notes.some((note) => /1 个提交合进了 clock 的 main/u.test(note)), "the merge notice");
@@ -80,13 +82,15 @@ describe("a session's work", () => {
   it.live("goes in the ledger when merged", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const runPromise = Effect.runPromiseWith(context2);
       const w = yield* watch;
       const issues = yield* Issue;
       const sql = yield* SqlClient.SqlClient;
-      const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "ledger"));
+      const hired = yield* issues.hire(lab(), "写打卡并提交", "ledger");
+      const session = mustHire(hired);
       yield* w.nextReport;
-      yield* issues.setStatus(session.issue!, "done", "", "", owner);
+      yield* issues.setStatus(session.issue!, "done", "", "", user);
       const entries = () =>
         runPromise(
           sql<{
@@ -94,7 +98,8 @@ describe("a session's work", () => {
           }>`select count(*) as n from game_ledger where kind = 'harvested' and payload like ${`%"session":"${session.id}"%`}`.pipe(Effect.orDie),
         ).then((r) => r[0]!.n);
       yield* until(async () => (await entries()) > 0, "a harvested entry");
-      expect(yield* Effect.promise(entries)).toBe(1);
+      const entries2 = yield* Effect.promise(entries);
+      expect(entries2).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -108,7 +113,8 @@ describe("a session's work", () => {
         const w = yield* watch;
         // Waking reads the agent from the store, as in real use: keep the script-friendly one there.
         yield* (yield* Agent).save(lab());
-        session = mustHire(yield* (yield* Issue).hire(lab(), "先写一点并提交", "survivor"));
+        const hired = yield* (yield* Issue).hire(lab(), "先写一点并提交", "survivor");
+        session = mustHire(hired);
         yield* w.nextReport;
       }).pipe(Effect.scoped, Effect.provide(before.layer));
       const after = farm({ config });
@@ -119,9 +125,11 @@ describe("a session's work", () => {
         expect(back).toBeDefined();
         expect(back.phase._tag).toBe("done");
         expect(back.branch).toBe(session!.branch);
-        expect(yield* sessions.deliver(session!.id, "再加一句并提交", delivery({ kind: "comment" }))).toMatchObject({ kind: "run", woke: true });
+        const delivered2 = yield* sessions.deliver(session!.id, "再加一句并提交", delivery({ kind: "comment" }));
+        expect(delivered2).toMatchObject({ kind: "run", woke: true });
         yield* w.nextReport;
-        expect(yield* (yield* Issue).setStatus(session!.issue!, "done", "", "", owner)).toMatchObject({ status: "done", delivered: "merged" });
+        const setStatus2 = yield* (yield* Issue).setStatus(session!.issue!, "done", "", "", user);
+        expect(setStatus2).toMatchObject({ status: "done", delivered: "merged" });
       }).pipe(Effect.scoped, Effect.provide(after.layer));
     });
   });
@@ -135,7 +143,8 @@ describe("a session's work", () => {
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const w = yield* watch;
-        session = mustHire(yield* (yield* Issue).hire(lab(), "先写一点并提交", "survivor"));
+        const hired = yield* (yield* Issue).hire(lab(), "先写一点并提交", "survivor");
+        session = mustHire(hired);
         yield* w.nextReport;
       }).pipe(Effect.scoped, Effect.provide(before.layer));
       const after = farm({ config: { ...base, db: join(base.home, "db-again") } });
@@ -148,13 +157,41 @@ describe("a session's work", () => {
     });
   });
 
+  it.live("works on the server's own machine, the same one after a restart", () => {
+    const base = testConfig();
+    const config = { ...base, db: join(base.home, "db") };
+    let first: T.Machine | undefined;
+    // A farm on the same database, started for body and stopped after it.
+    const started = <A, E, R>(body: Effect.Effect<A, E, R>) =>
+      Effect.scoped(Effect.flatMap(Layer.build(farm({ config }).layer), (context) => Effect.provideContext(body, context)));
+    return Effect.gen(function* () {
+      yield* started(
+        Effect.gen(function* () {
+          const w = yield* watch;
+          first = (yield* Core).state().machines[0];
+          expect(first).toMatchObject({ here: true, online: true });
+          const hired = yield* (yield* Issue).hire(lab(), "先写一点并提交", "on-here");
+          const session = mustHire(hired);
+          expect(session.machine).toBe(first?.id);
+          yield* w.nextReport;
+        }),
+      );
+      yield* started(
+        Effect.gen(function* () {
+          expect((yield* Core).state().machines).toEqual([first]);
+        }),
+      );
+    });
+  });
+
   it.live("keeps every step in its trajectory", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const session = mustHire(yield* issues.hire(lab(), "看看目录", "steps"));
+      const hired = yield* issues.hire(lab(), "看看目录", "steps");
+      const session = mustHire(hired);
       yield* w.nextReport;
       const steps = (yield* sessions.events(session.id)) ?? [];
       yield* sessions.dismiss(session.id);
@@ -180,7 +217,8 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const session = mustHire(yield* issues.hire(lab(), "这一单必败", "fails"));
+      const hired = yield* issues.hire(lab(), "这一单必败", "fails");
+      const session = mustHire(hired);
       const report = yield* w.nextReport;
       const text = lastText(sessions, report.id, report.summary);
       yield* sessions.dismiss(session.id);
@@ -196,7 +234,8 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const session = mustHire(yield* issues.hire(lab(), "先发呆一会儿", "quiet"));
+      const hired = yield* issues.hire(lab(), "先发呆一会儿", "quiet");
+      const session = mustHire(hired);
       yield* until(() => {
         const need = needOf(sessions.sessionOf(session.id)!);
         return need?.kind === "quiet" && Date.now() - need.since >= 500;
@@ -216,7 +255,8 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "preview"));
+      const hired = yield* issues.hire(lab(), "写打卡并提交", "preview");
+      const session = mustHire(hired);
       yield* w.nextReport;
       const changes = yield* issues.changes(session.issue!, orchestrator(true));
       yield* sessions.dismiss(session.id);
@@ -234,22 +274,26 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       yield* (yield* Agent).save(lab());
-      const a = mustHire(yield* issues.hire(lab(), "写版本A并提交", "clash"));
-      const b = mustHire(yield* issues.hire(lab(), "写版本B并提交", "clash"));
+      const hired = yield* issues.hire(lab(), "写版本A并提交", "clash");
+      const a = mustHire(hired);
+      const hired2 = yield* issues.hire(lab(), "写版本B并提交", "clash");
+      const b = mustHire(hired2);
       yield* w.nextReport;
       yield* w.nextReport;
-      expect(yield* issues.setStatus(a.issue!, "done", "", "", owner)).toMatchObject({ status: "done", delivered: "merged" });
+      const setStatus2 = yield* issues.setStatus(a.issue!, "done", "", "", user);
+      expect(setStatus2).toMatchObject({ status: "done", delivered: "merged" });
       expect((yield* issues.changes(b.issue!, orchestrator(true))).conflicts).toEqual(["same.ts"]);
-      const failed = yield* Effect.flip(issues.setStatus(b.issue!, "done", "", "", owner));
-      expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/u);
+      const failed = yield* Effect.flip(issues.setStatus(b.issue!, "done", "", "", user));
+      expect(Formatter.formatJson(failed)).toMatch(/会冲突（same\.ts）/u);
       const stayed = yield* issues.get(b.issue!);
       expect(stayed.conflict).toEqual({ base: "main", files: ["same.ts"] });
-      yield* issues.setStatus(b.issue!, "todo", "", "", owner);
+      yield* issues.setStatus(b.issue!, "todo", "", "", user);
       yield* w.nextReport;
       // Issue rechecks its branch after the worker reports.
       const core = yield* Core;
       yield* until(() => core.state().issues.find((issue) => issue.id === b.issue)?.conflict === undefined, "the conflict mark cleared");
-      expect(yield* issues.setStatus(b.issue!, "done", "", "", owner)).toMatchObject({ status: "done", delivered: "merged" });
+      const setStatus3 = yield* issues.setStatus(b.issue!, "done", "", "", user);
+      expect(setStatus3).toMatchObject({ status: "done", delivered: "merged" });
       const repo = join(f.config.workRoot, "repos", "clash");
       expect(git(repo, "show", "main:same.ts")).toBe("export const v = 'A+B'");
       expect(git(repo, "status", "--porcelain")).toBe("");
@@ -265,12 +309,14 @@ describe("a session's work", () => {
         const w = yield* watch;
         const issues = yield* Issue;
         yield* (yield* Agent).save(lab());
-        const first = mustHire(yield* issues.hire(lab(), "写版本A并提交", "persistent-conflict"));
-        const second = mustHire(yield* issues.hire(lab(), "写版本B并提交", "persistent-conflict"));
+        const hired = yield* issues.hire(lab(), "写版本A并提交", "persistent-conflict");
+        const first = mustHire(hired);
+        const hired2 = yield* issues.hire(lab(), "写版本B并提交", "persistent-conflict");
+        const second = mustHire(hired2);
         yield* w.nextReport;
         yield* w.nextReport;
-        yield* issues.setStatus(first.issue!, "done", "", "", owner);
-        yield* issues.changes(second.issue!, owner);
+        yield* issues.setStatus(first.issue!, "done", "", "", user);
+        yield* issues.changes(second.issue!, user);
         yield* (yield* Session).dismiss(second.id);
         expect((yield* issues.get(second.issue!)).conflict).toEqual({ base: "main", files: ["same.ts"] });
         expect(Object.hasOwn((yield* (yield* Session).get(second.id))!, "conflict")).toBe(false);
@@ -278,7 +324,7 @@ describe("a session's work", () => {
       }).pipe(Effect.scoped, Effect.provide(f.layer));
       yield* Effect.gen(function* () {
         expect((yield* (yield* Issue).get(id)).conflict).toEqual({ base: "main", files: ["same.ts"] });
-        expect((yield* (yield* Issue).changes(id, owner)).conflicts).toEqual(["same.ts"]);
+        expect((yield* (yield* Issue).changes(id, user)).conflicts).toEqual(["same.ts"]);
       }).pipe(Effect.scoped, Effect.provide(farm({ config }).layer));
     });
   });
@@ -291,7 +337,10 @@ describe("a session's work", () => {
       const sessions = yield* Session;
       const agents = yield* Agent;
       const busy: T.Session[] = [];
-      for (const i of ["1", "2", "3"]) busy.push(mustHire(yield* issues.hire(lab(), "发呆 " + i, "crowded")));
+      for (const i of ["1", "2", "3"]) {
+        const idle = yield* issues.hire(lab(), "发呆 " + i, "crowded");
+        busy.push(mustHire(idle));
+      }
       expect((yield* issues.hire(lab(), "发呆 4", "crowded")).refused).toMatch(/仓库 crowded 里已经有 3 个帮工在干活/u);
       const settings = agents.settings("pi");
       yield* agents.saveSettings("pi", { ...settings, maxWorking: 3 });
@@ -299,7 +348,8 @@ describe("a session's work", () => {
       yield* agents.saveSettings("pi", settings);
       yield* releaseHeld(3);
       for (let i = 0; i < 3; i++) yield* w.nextReport;
-      const later = mustHire(yield* issues.hire(lab(), "随便做点什么", "crowded"));
+      const hired = yield* issues.hire(lab(), "随便做点什么", "crowded");
+      const later = mustHire(hired);
       yield* w.nextReport;
       for (const h of [...busy, later]) yield* sessions.dismiss(h.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -316,9 +366,9 @@ describe("a session's work", () => {
       for (const h of both) mustHire(h);
       yield* w.nextReport;
       yield* w.nextReport;
-      expect(sessions.presentSessions()).toHaveLength(2);
+      expect(sessions.hired()).toHaveLength(2);
       for (const h of core.state().sessions) yield* sessions.dismiss(h.id);
-      expect(sessions.presentSessions()).toHaveLength(0);
+      expect(sessions.hired()).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -330,11 +380,15 @@ describe("a session's work", () => {
       const sessions = yield* Session;
       const kinds: string[] = [];
       let id = "";
-      yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => a.id === id && kinds.push(a.kind))));
-      const session = mustHire(yield* issues.hire(lab(), "看看", "talk"));
+      const news = yield* sessions.news;
+      yield* Effect.forkScoped(
+        Stream.runForEach(news, (n) => Effect.sync(() => (n._tag === "Spoke" || n._tag === "HandedOff") && n.id === id && kinds.push(n._tag))),
+      );
+      const hired = yield* issues.hire(lab(), "看看", "talk");
+      const session = mustHire(hired);
       id = session.id;
-      yield* until(() => kinds.includes("handedOff"), "the turn handed off");
-      expect(kinds.filter((k) => k === "spoke" || k === "handedOff")).toEqual(["spoke", "handedOff"]);
+      yield* until(() => kinds.includes("HandedOff"), "the turn handed off");
+      expect(kinds).toEqual(["Spoke", "HandedOff"]);
       const server = f.turns[0]!.options.mcpServers?.find((server) => server.name === "vibevalley");
       if (!server || !("headers" in server)) throw new Error("the runtime received no authenticated MCP endpoint");
       const token = server.headers?.authorization?.replace("Bearer ", "") ?? "";
@@ -358,7 +412,8 @@ describe("a session's work", () => {
         const w = yield* watch;
         const sessions = yield* Session;
         yield* (yield* Agent).save(lab());
-        session = mustHire(yield* (yield* Issue).hire(lab(), "写打卡并提交", "runs"));
+        const hired = yield* (yield* Issue).hire(lab(), "写打卡并提交", "runs");
+        session = mustHire(hired);
         yield* w.nextReport;
         expect((yield* sessions.deliver(session.id, "再看看", delivery(said, ["m42"]))).kind).toBe("run");
         yield* w.nextReport;
@@ -399,14 +454,16 @@ describe("a session's work", () => {
       const issues = yield* Issue;
       const core = yield* Core;
       const found: boolean[] = [];
+      const subscribe2 = yield* core.subscribe;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* core.subscribe, (e) =>
+        Stream.runForEach(subscribe2, (e) =>
           e.type === "sessionChanged"
             ? Effect.map(Effect.exit(issues.get(e.session.issue ?? e.session.id)), (x) => void found.push(x._tag === "Success"))
             : Effect.void,
         ),
       );
-      mustHire(yield* issues.hire(lab(), "看看目录", "arrives"));
+      const hired = yield* issues.hire(lab(), "看看目录", "arrives");
+      mustHire(hired);
       yield* until(() => found.length > 0, "a session arrived");
       expect(found[0]).toBe(true);
       yield* w.nextReport;
@@ -421,7 +478,8 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const s = mustHire(yield* issues.hire(lab(), "看看目录", "rows"));
+      const hired = yield* issues.hire(lab(), "看看目录", "rows");
+      const s = mustHire(hired);
       yield* w.nextReport;
       yield* sessions.dismiss(s.id);
       const got = (yield* sessions.get(s.id))!;
@@ -433,7 +491,8 @@ describe("a session's work", () => {
       ]);
       expect((yield* sessions.list("")).filter((session) => session.role === "worker").map((session) => session.id)).toEqual([s.id]);
       expect((yield* sessions.list("")).some((session) => session.role === "orchestrator")).toBe(true);
-      expect(yield* sessions.list("lab")).toHaveLength(1);
+      const sessions2 = yield* sessions.list("lab");
+      expect(sessions2).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

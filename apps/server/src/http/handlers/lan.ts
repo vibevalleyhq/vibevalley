@@ -1,9 +1,8 @@
-import { Effect, Option } from "effect";
-import { HttpServerRequest } from "effect/http";
+import { Effect } from "effect";
 
 import type { LanHandlers } from "@vibevalley/protocol/api";
 
-import { deviceHeader, Lan } from "#/lan/lan.ts";
+import { Lan } from "#/lan/lan.ts";
 
 export const lanHandlers = Effect.gen(function* () {
   const lan = yield* Lan;
@@ -14,14 +13,7 @@ export const lanHandlers = Effect.gen(function* () {
     "lan.pairing.stop": () => Effect.sync(lan.stopPairing),
     "lan.pairing.previewStop": () => Effect.sync(lan.previewStopPairing),
     "lan.pairing.answer": (body) => lan.answer(body.allow),
-    "lan.device.delete": ({ id }) => lan.forget(id),
-    "lan.device.previewDelete": ({ id }) => lan.previewForget(id),
     "lan.pair": (body) => lan.pair(body.code, body.name),
-    // Only the lan listener says a device, by a header it never takes from the device.
-    "lan.me.get": () =>
-      Effect.flatMap(Effect.serviceOption(HttpServerRequest.HttpServerRequest), (request) =>
-        lan.me(Option.getOrUndefined(Option.map(request, (r) => r.headers[deviceHeader]))),
-      ),
   };
   return done;
 });

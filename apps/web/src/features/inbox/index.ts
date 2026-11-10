@@ -1,2 +1,2 @@
 export { Follow } from "./Follow";
-export { waitingOnOwner } from "./tray";
+export { waitingOnUser } from "./tray";

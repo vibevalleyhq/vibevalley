@@ -7,7 +7,8 @@ import { Deferred, Effect, Fiber, Stream } from "effect";
 import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 
-import { owner } from "#/base/actor.ts";
+import builtIn from "#/agent/templates/orchestrator/agent.json" with { type: "json" };
+import { user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { Memory } from "#/memory/memory.ts";
@@ -16,8 +17,8 @@ import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 
 import { Caller } from "./host.ts";
-import { Session, type RunFinished } from "./session.ts";
-import type { InputConsumed } from "./signals.ts";
+import { Session } from "./session.ts";
+import type { SessionNews } from "./signals.ts";
 describe("Caller", () => {
   it.effect("keeps what came before its reader, then streams until it ends", () =>
     Effect.gen(function* () {
@@ -27,7 +28,8 @@ describe("Caller", () => {
       caller.push("late");
       caller.end();
       caller.push("after the end");
-      expect(yield* Fiber.join(reading)).toBe("early late");
+      const reading2 = yield* Fiber.join(reading);
+      expect(reading2).toBe("early late");
     }),
   );
 
@@ -38,6 +40,35 @@ describe("Caller", () => {
       caller.fail(new Error("no model"));
       const read = yield* Effect.flip(Stream.mkString(caller.words));
       expect(read).toMatchObject({ _tag: "NotAnswered", message: "no model", cause: new Error("no model") });
+    }),
+  );
+  it.effect("ended before its reader, still hands over what it kept, once", () =>
+    Effect.gen(function* () {
+      const caller = new Caller();
+      caller.push("kept");
+      caller.end();
+      caller.fail(new Error("too late"));
+      const mkString2 = yield* Stream.mkString(caller.words);
+      expect(mkString2).toBe("kept");
+      const mkString3 = yield* Stream.mkString(caller.words);
+      expect(mkString3).toBe("");
+    }),
+  );
+
+  it.effect("failed while streaming, the reader gets the words before the failure", () =>
+    Effect.gen(function* () {
+      const caller = new Caller();
+      const heard: string[] = [];
+      const reading = yield* Effect.forkChild(
+        Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))),
+        { startImmediately: true },
+      );
+      caller.push("partly");
+      caller.fail(new Error("no model"));
+      caller.end();
+      const readingFailure = yield* Effect.flip(Fiber.join(reading));
+      expect(readingFailure).toMatchObject({ _tag: "NotAnswered", message: "no model" });
+      expect(heard).toEqual(["partly"]);
     }),
   );
 });
@@ -52,17 +83,25 @@ describe("AgentHost", () => {
         answer("看完了，一切正常"),
       ]);
       const memory = yield* Memory;
-      yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: owner });
-      const finished: RunFinished[] = [];
-      const consumed: InputConsumed[] = [];
+      yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: user });
+      const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
+      const consumed: Extract<SessionNews, { _tag: "Consumed" }>[] = [];
       const answeringRuns: (string | undefined)[] = [];
-      yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (run) => Effect.sync(() => void finished.push(run))));
-      yield* Effect.forkScoped(Stream.runForEach(yield* sessions.inputsConsumed, (input) => Effect.sync(() => void consumed.push(input))));
+      const news = yield* sessions.news;
+      yield* Effect.forkScoped(
+        Stream.runForEach(news, (n) =>
+          Effect.sync(() => {
+            if (n._tag === "RunFinished") finished.push(n);
+            else if (n._tag === "Consumed") consumed.push(n);
+          }),
+        ),
+      );
       const said: string[] = [];
       const states: string[] = [];
       const core = yield* Core;
+      const subscribe2 = yield* core.subscribe;
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* core.subscribe, () =>
+        Stream.runForEach(subscribe2, () =>
           Effect.sync(() => {
             const session = core.session("orchestrator");
             if (!session) return;
@@ -72,7 +111,7 @@ describe("AgentHost", () => {
         ),
       );
       const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", runtime: "vibevalley", brief: "" },
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
         inputType: "testInput",
         home: config.home,
         cwd: config.workRoot,
@@ -92,7 +131,7 @@ describe("AgentHost", () => {
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
       });
       const kept = yield* (yield* Db).one(qs.sessionByID({ id: "orchestrator" }));
-      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", ended_at: null });
+      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: builtIn.name, ended_at: null });
       const caller = new Caller();
       const heard: string[] = [];
       const reading = yield* Effect.forkChild(Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))));
@@ -102,8 +141,8 @@ describe("AgentHost", () => {
       yield* Fiber.join(reading);
       expect(said).toEqual(["我看一下", "看完了，一切正常"]);
       yield* until(() => finished.length === 1 && consumed.length === 1, "the public run events");
-      expect(finished).toEqual([{ id: expect.any(String), issues: [], outcome: "completed" }]);
-      expect(consumed).toEqual([{ session: "orchestrator", envelopeIds: ["m1"] }]);
+      expect(finished).toEqual([{ _tag: "RunFinished", id: expect.any(String), issues: [], outcome: "completed" }]);
+      expect(consumed).toEqual([{ _tag: "Consumed", session: "orchestrator", envelopeIds: ["m1"] }]);
       expect(answeringRuns).toEqual([finished[0]!.id, finished[0]!.id]);
       expect(requests[0]!.system).toContain("database preference");
       expect((yield* memory.list("orchestrator")).some((note) => note.text === "remembered in database")).toBe(true);
@@ -126,7 +165,7 @@ describe("AgentHost", () => {
       const sessions = yield* Session;
       const { llm } = scriptedLLM();
       const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", runtime: "vibevalley", brief: "" },
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
         inputType: "testInput",
         home: config.home,
         cwd: config.workRoot,
@@ -163,7 +202,50 @@ describe("AgentHost", () => {
       // Every later close waits for the one close, which is over.
       yield* host.close;
       expect(host.current().route).toBe("first");
-      expect(yield* Stream.mkString(caller.words)).toBe("");
+      const mkString2 = yield* Stream.mkString(caller.words);
+      expect(mkString2).toBe("");
+    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+  });
+  it.live("regression: a later close still waits for the cleanup when the first closing caller is interrupted", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sessions = yield* Session;
+      const { llm } = scriptedLLM();
+      const host = yield* sessions.host({
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
+        inputType: "testInput",
+        home: config.home,
+        cwd: config.workRoot,
+        instructions: "",
+        llm: () => llm,
+        tools: () => [],
+        first: "first",
+        quiet: () => true,
+        say: () => Effect.void,
+        channel: () => undefined,
+        fresh: () => {},
+        restored: () => ({ by: { kind: "" } }),
+        toolStart: (tool) => ({ text: tool, action: "other", tool }),
+      });
+      const building = yield* Deferred.make<void>();
+      const gate = yield* Deferred.make<void>();
+      yield* Effect.addFinalizer(() => Deferred.succeed(gate, undefined));
+      const submitting = yield* Effect.forkChild(
+        host.submit(
+          () => Effect.as(Effect.andThen(Deferred.succeed(building, undefined), Deferred.await(gate)), { text: "late" }),
+          { route: "late", run: { by: { kind: "" } } },
+          true,
+        ),
+      );
+      yield* Deferred.await(building);
+      const first = yield* Effect.forkChild(host.close, { startImmediately: true });
+      yield* Fiber.interrupt(first);
+      const second = yield* Effect.forkChild(host.close, { startImmediately: true });
+      yield* aTurn;
+      expect(second.pollUnsafe()).toBeUndefined();
+      yield* Deferred.succeed(gate, undefined);
+      expect((yield* Fiber.join(submitting)).ok).toBe(false);
+      yield* Fiber.join(second);
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
 });

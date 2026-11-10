@@ -1,0 +1,5 @@
+{
+  "noAttachment": "There is no attachment {id}: upload it first, then say it",
+  "emptyFile": "The file is empty",
+  "fileTooBig": "The file is too big: {mb} MB at most"
+}

@@ -8,7 +8,7 @@ const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyTo
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
-import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
+import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, userId } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus } from "#/base/dom.tsx";
@@ -21,7 +21,7 @@ import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { Link as A } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
-import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace, UserFace } from "#/ui/Face.tsx";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -454,10 +454,10 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
   const size = () => props.size ?? 30;
   return (
     <Switch fallback={<AgentFace agentId={agentId()} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={size()} />}>
-      <Match when={props.m.fromKind === "owner"}>
-        <OwnerFace size={size()} />
+      <Match when={props.m.fromKind === "user"}>
+        <UserFace size={size()} />
       </Match>
-      <Match when={props.m.fromKind === "orchestrator"}>
+      <Match when={props.m.fromRole === "orchestrator"}>
         <OrchestratorFace size={size()} agent={props.m.from} />
       </Match>
     </Switch>
@@ -466,7 +466,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
 
 function SenderName(props: { m: ChatMessage }) {
   return (
-    <Show when={props.m.fromKind === "session"} fallback={<>{props.m.name}</>}>
+    <Show when={props.m.fromRole === "worker"} fallback={<>{props.m.name}</>}>
       {props.m.name} <span {...stylex.attrs(viewStyles.senderNameSpan)}>@{props.m.from}</span>
     </Show>
   );
@@ -500,19 +500,19 @@ export function ChatRow(props: {
   );
 }
 
-/** What the owner can do to a message from the farm's window: the same requests as the workbench's tools. */
+type FarmMenuState = "closed" | "menu" | "confirmDelete" | "emojiPicker";
+
+/** What the user can do to a message from the farm's window: the same requests as the workbench's tools. */
 function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
   const core = useCore();
-  const [open, setOpen] = createSignal(false);
-  const [sure, setSure] = createSignal(false);
-  const [every, setEvery] = createSignal(false);
+  const [menu, setMenu] = createSignal<FarmMenuState>("closed");
+  const open = () => menu() !== "closed";
+  const sure = () => menu() === "confirmDelete";
+  const every = () => menu() === "emojiPicker";
   let plus: HTMLButtonElement | undefined;
   const act = createPixelAct();
   const reactions = useIntents(reactionSet);
-  const close = () => {
-    setOpen(false);
-    setEvery(false);
-  };
+  const close = () => setMenu("closed");
   const run = (call: () => Promise<unknown>) => {
     close();
     void act.run(call);
@@ -523,7 +523,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
       toasts.add({ type: ToastType.error, title: noticeTitle.error ?? reason, description: reason }),
     );
   };
-  const editable = () => props.m.from === ownerId && props.m.kind === "chat";
+  const editable = () => props.m.from === userId && props.m.kind === "chat";
   return (
     <div {...stylex.attrs(viewStyles.messageMenuDiv)}>
       <button
@@ -532,10 +532,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
         aria-label={t("web.farm.chat.actions.open")}
         title={t("web.farm.chat.actions.open")}
         aria-expanded={aria(open())}
-        onClick={() => {
-          setOpen(!open());
-          setSure(false);
-        }}
+        onClick={() => setMenu(open() ? "closed" : "menu")}
         {...styleProps(recipeStyles3.menuTrigger)}
       >
         <SpriteIcon name="button-more" size={16} />
@@ -563,7 +560,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               aria-label={t("web.farm.chat.actions.moreEmoji")}
               aria-expanded={aria(every())}
               {...stylex.attrs(recipeStyles2.messageMenuButton2)}
-              onClick={() => setEvery(!every())}
+              onClick={() => setMenu(every() ? "menu" : "emojiPicker")}
             >
               <SpriteIcon name="button-add" size={12} />
             </button>
@@ -601,7 +598,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               data-key="edit"
               {...stylex.attrs(recipeStyles2.messageMenuButton3)}
               onClick={() => {
-                setOpen(false);
+                close();
                 untrack(() => props.onEdit)();
               }}
             >
@@ -615,7 +612,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             data-sure={sure() ? "" : undefined}
             {...stylex.attrs(recipeStyles2.messageMenuButton4)}
             onClick={() => {
-              if (!sure()) return void setSure(true);
+              if (!sure()) return void setMenu("confirmDelete");
               const id = props.m.id;
               close();
               void act.run(() => api.channel.message.delete({ id }));
@@ -628,7 +625,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
       <Show when={every()}>
         <EmojiPicker
           anchor={plus}
-          onClose={() => setEvery(false)}
+          onClose={() => setMenu("menu")}
           onPick={(emoji) => {
             react(
               untrack(() => props.m),

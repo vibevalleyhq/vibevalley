@@ -1,4 +1,4 @@
-// PKM (docs/subsystems/pkm.md): the owner's notes as Logseq-style outlines in PARA folders. The files are the truth.
+// PKM (docs/subsystems/pkm.md): the user's notes as Logseq-style outlines in PARA folders. The files are the truth.
 
 export const PkmTierValues = ["inbox", "project", "area", "resource", "archive", "journal"] as const;
 /** Where a page sits in PARA, which is the folder its file is in. */
@@ -93,7 +93,7 @@ export interface PkmBacklinks {
 export const PkmCommentStatusValues = ["open", "suggested", "accepted", "rejected"] as const;
 export type PkmCommentStatus = (typeof PkmCommentStatusValues)[number];
 
-/** A remark on a block: the owner's (==span==^[remark] or comment:: in the file), or a rewrite proposed for it. */
+/** A remark on a block: the user's (==span==^[remark] or comment:: in the file), or a rewrite proposed for it. */
 export interface PkmComment {
   id: string;
   page: string;

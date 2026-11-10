@@ -1,9 +1,10 @@
-import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactOwnerMentionsChanged } from "../channel/shapes";
+import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/shapes";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes";
 import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
 import type { InboxItem } from "../inbox/shapes";
 import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes";
+import type { FactMachineChanged, Machine } from "../machine/shapes";
 import type { MediaJob, FactMediaChanged } from "../media/shapes";
 import type { RuntimeInfo } from "../runtime/shapes";
 import type {
@@ -49,6 +50,8 @@ export interface SpaceState {
   issues: Issue[];
   /** Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json. */
   connectors: ConnectorStatus[];
+  /** The machines helpers work on, as the machine module says them. */
+  machines: Machine[];
 }
 
 export interface SpaceView extends Omit<SpaceState, "sessions" | "crons" | "plays"> {
@@ -82,7 +85,7 @@ export type Fact =
   | FactMessageChanged
   | FactChannelChanged
   | FactChannelRemoved
-  | FactOwnerMentionsChanged
+  | FactUserMentionsChanged
   | FactSessionChanged
   | FactSessionReported
   | FactSessionLeft
@@ -92,6 +95,7 @@ export type Fact =
   | FactCronChanged
   | FactCronRemoved
   | FactConnectorChanged
+  | FactMachineChanged
   | FactMediaChanged;
 
 /** Told apart by `type`. */

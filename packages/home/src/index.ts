@@ -1,8 +1,8 @@
-import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Option, Predicate, Schema } from "effect";
+import { Option, Predicate, Result, Schema } from "effect";
 
 import type { Locale } from "@vibevalley/i18n";
 
@@ -23,7 +23,8 @@ const alive = (pid: number) => {
 };
 
 /** server.json: where the server using this home listens, and its process. */
-const announcement = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ url: Schema.String, pid: Schema.Finite })));
+const Announcement = Schema.fromJsonString(Schema.Struct({ url: Schema.String, pid: Schema.Finite }));
+const announcement = Schema.decodeUnknownOption(Announcement);
 
 const read = (path: string) => {
   try {
@@ -36,10 +37,10 @@ const read = (path: string) => {
 /** Says where this server listens, for as long as it does; the function it returns takes it back. */
 export function announce(home: string, url: string): () => void {
   const path = join(home, "server.json");
-  writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", { mode: 0o600 });
+  writeFileSync(path, Result.getOrThrow(Schema.encodeResult(Announcement)({ url, pid: process.pid })) + "\n", { mode: 0o600 });
   return () => {
     const said = Option.flatMap(Option.fromNullishOr(read(path)), announcement);
-    if (Option.isSome(said) && said.value.pid === process.pid) unlinkSync(path);
+    if (Option.isSome(said) && said.value.pid === process.pid) rmSync(path, { force: true });
   };
 }
 
@@ -59,3 +60,23 @@ export function savedLocale(home: string): Locale {
 
 /** The desktop app's socket in the home: the command line asks the app over it (desktopControl). */
 export const controlSocketOf = (home: string) => join(home, "desktop.sock");
+
+/** auth.json: the server the command line signed in to (`vibevalley auth login`) and the key it was given. */
+const SignIn = Schema.Struct({ server: Schema.String, key: Schema.String, device: Schema.String });
+export type SignIn = typeof SignIn.Type;
+const SignInJson = Schema.fromJsonString(SignIn);
+const signIn = Schema.decodeUnknownOption(SignInJson);
+
+/** The server this home signed in to and its key; undefined when it has not. */
+export function signedIn(home: string): SignIn | undefined {
+  return Option.getOrUndefined(Option.flatMap(Option.fromNullishOr(read(join(home, "auth.json"))), signIn));
+}
+
+/** Keeps the sign-in where only this user reads it: the key is the user's own, and works from anywhere. */
+export function keepSignIn({ home, ...given }: SignIn & { readonly home: string }): void {
+  writeFileSync(join(home, "auth.json"), Result.getOrThrow(Schema.encodeResult(SignInJson)(given)) + "\n", { mode: 0o600 });
+}
+
+export function forgetSignIn(home: string): void {
+  rmSync(join(home, "auth.json"), { force: true });
+}

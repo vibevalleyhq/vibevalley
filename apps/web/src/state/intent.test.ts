@@ -33,15 +33,19 @@ function setup(whileLost: "queue" | "refuse" = "queue") {
   return { frames, sent, intents, reply };
 }
 
-test("a refused one fails with the server's reason and stays, and a retry sends the same key", async () => {
+test("a refused one fails with the server's reason and structured fault, and a retry sends the same key", async () => {
   const { sent, intents, reply } = setup();
   const { key, done } = intents.send({ id: "12" });
-  expect(intents.all()).toMatchObject([{ key, status: "pending" }]);
-  reply(0).reject(new VibeValleyApiError(409, "Refused", "进行中满了"));
-  expect(await done).toMatchObject({ status: "failed", reason: "进行中满了" });
-  expect(intents.all()).toMatchObject([{ key, status: "failed", reason: "进行中满了" }]);
+  expect(intents.all()).toMatchObject([{ key, phase: "sending" }]);
+  const next = [{ say: "先叫停帮工", run: ["session", "stop", "w1"] }];
+  reply(0).reject(new VibeValleyApiError(409, "Refused", "进行中满了", { _tag: "Refused", reason: "进行中满了", next }));
+  expect(await done).toMatchObject({
+    phase: "failed",
+    fault: { tag: "Refused", reason: "进行中满了", next, retryable: false },
+  });
+  expect(intents.all()).toMatchObject([{ key, phase: "failed", fault: { reason: "进行中满了" } }]);
   const again = intents.retry(key);
-  expect(intents.all()).toMatchObject([{ key, status: "pending" }]);
+  expect(intents.all()).toMatchObject([{ key, phase: "sending" }]);
   expect(sent.map((s) => s.key)).toEqual([key, key]);
   reply(1).resolve({ seq: 0 });
   expect((await again)?.replied?.reply).toEqual({ seq: 0 });
@@ -62,12 +66,12 @@ test("a frame that came before the reply settles it once the reply comes, and on
   expect(sent).toHaveLength(1);
 });
 
-test("a reply before its frame keeps it pending until a frame that far comes", async () => {
+test("a reply before its frame keeps it in confirming until a frame that far comes", async () => {
   const { frames, intents, reply } = setup();
   const { key, done } = intents.send({ id: "12" });
   reply(0).resolve({ seq: 7 });
   await done;
-  expect(intents.all()).toMatchObject([{ key, status: "pending", replied: { reply: { seq: 7 } } }]);
+  expect(intents.all()).toMatchObject([{ key, phase: "confirming", replied: { reply: { seq: 7 } } }]);
   frames.set({ frame: frameAt(6) });
   expect(intents.all()).toHaveLength(1);
   frames.set({ frame: frameAt(7) });
@@ -79,11 +83,11 @@ test("no answer in time fails it and keeps it; a late reply still counts", async
   const { frames, intents, reply } = setup();
   const { key, done } = intents.send({ id: "12" });
   vi.advanceTimersByTime(1000);
-  expect(await done).toMatchObject({ key, status: "failed" });
-  expect(intents.all()).toMatchObject([{ key, status: "failed" }]);
+  expect(await done).toMatchObject({ key, phase: "failed" });
+  expect(intents.all()).toMatchObject([{ key, phase: "failed" }]);
   reply(0).resolve({ seq: 3 });
   await vi.runAllTimersAsync();
-  expect(intents.all()).toMatchObject([{ key, status: "failed", replied: { reply: { seq: 3 } } }]);
+  expect(intents.all()).toMatchObject([{ key, phase: "failed", replied: { reply: { seq: 3 } } }]);
   frames.set({ frame: frameAt(3) });
   expect(intents.all()).toEqual([]);
 });
@@ -92,20 +96,20 @@ test("while the link is lost a keyed kind queues and sends once when it is back;
   const { frames, sent, intents, reply } = setup();
   frames.set({ link: "lost" });
   const { key, done } = intents.send({ id: "12" });
-  expect(intents.all()).toMatchObject([{ key, status: "pending", queued: true }]);
+  expect(intents.all()).toMatchObject([{ key, phase: "queued" }]);
   frames.set({ link: "lost", count: 1 });
   expect(sent).toEqual([]);
   frames.set({ link: "open", frame: frameAt(1) });
   frames.set({ link: "open", frame: frameAt(2) });
   expect(sent.map((s) => s.key)).toEqual([key]);
-  expect(intents.all()).toMatchObject([{ key, status: "pending", queued: false }]);
+  expect(intents.all()).toMatchObject([{ key, phase: "sending" }]);
   reply(0).resolve({ seq: 2 });
   await done;
   expect(intents.all()).toEqual([]);
 
   const refusing = setup("refuse");
   refusing.frames.set({ link: "lost" });
-  expect(await refusing.intents.send({ id: "12" }).done).toMatchObject({ status: "failed" });
+  expect(await refusing.intents.send({ id: "12" }).done).toMatchObject({ phase: "failed" });
   expect(refusing.sent).toEqual([]);
 });
 

@@ -7,7 +7,7 @@ import { assignedAgentOf, isBusy, latestSessionIdOf } from "@vibevalley/protocol
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { actsForUser, type Actor } from "#/base/actor.ts";
 import { reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -18,7 +18,7 @@ import { Session } from "#/session/session.ts";
 import { maxChildren } from "./creation.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { verifyChild } from "./merge.ts";
-import { needsOwner } from "./prompts.ts";
+import { needsUser } from "./prompts.ts";
 import { isClosed } from "./status.ts";
 
 export const issueSplitting = (r: IssueLifecycle) =>
@@ -31,11 +31,11 @@ export const issueSplitting = (r: IssueLifecycle) =>
     const splitting = yield* Semaphore.make(1);
     const split = Effect.fn("Issue.split")(function* (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) {
       const parent = yield* get(id);
-      if (by.kind === "session") {
+      if (by.kind === "agent" && by.role === "worker") {
         const caller = sessions.sessionOf(by.id);
         if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id)
           return yield* Effect.fail(refused(t("server.issue.split.notCurrent")));
-      } else if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
+      } else if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       if (isClosed(parent.status)) return yield* Effect.fail(refused(t("server.issue.dependencies.closedParent")));
       const parentRepo = parent.repo;
       if (!parentRepo) return yield* Effect.fail(refused(t("server.issue.noRepo")));
@@ -77,7 +77,7 @@ export const issueSplitting = (r: IssueLifecycle) =>
         }),
       );
       const session = latestSessionIdOf(parent);
-      if (session && sessions.present(session)) {
+      if (session && sessions.isReachable(session)) {
         if (!sessions.sessionOf(session)?.branch) return yield* Effect.fail(refused(t("server.issue.split.needsBranch")));
         const changes = yield* changesOf(parent);
         if (changes && changes.uncommitted.length > 0) return yield* Effect.fail(refused(t("server.issue.split.commitFirst")));
@@ -102,7 +102,7 @@ export const issueSplitting = (r: IssueLifecycle) =>
             const parentRepo = parent.repo;
             if (!parentRepo || isClosed(parent.status)) return;
             const session = latestSessionIdOf(child);
-            if (!session || !sessions.present(session)) return;
+            if (!session || !sessions.isReachable(session)) return;
             const parentSession = latestSessionIdOf(parent);
             const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
             if (parentWorker && isBusy(parentWorker)) return;
@@ -115,7 +115,7 @@ export const issueSplitting = (r: IssueLifecycle) =>
                     const constraints = yield* verifyChild(repos, child, parent, all, place);
                     const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
                     const merged =
-                      parentSession && sessions.present(parentSession)
+                      parentSession && sessions.isReachable(parentSession)
                         ? yield* sessions
                             .withIdleWorkplace(parentSession, mergeIntoParent)
                             .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))

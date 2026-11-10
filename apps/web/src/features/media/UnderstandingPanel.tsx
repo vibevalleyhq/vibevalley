@@ -1,12 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
+import { Array as Arr } from "effect";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactId, MediaInput, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
+import type { ArtifactId, Attachment, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
 
 import { api, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { uploadMediaInput } from "#/infra/media.ts";
 import { providerQuery, ready, useQuery } from "#/infra/query.ts";
 import { Link } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
@@ -40,17 +40,18 @@ const viewStyles = stylex.create({
   link: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-water)", textDecorationLine: "underline" },
 });
 
-interface Selected {
-  file: File;
-  input?: MediaInput;
-}
-
-export function UnderstandingPanel() {
+/** Understanding one kept file (a library item): its bytes are taken as the input on submit, checked as an upload is. */
+export function UnderstandingPanel(props: { file: Attachment }) {
   const core = useCore();
   const query = useQuery(providerQuery);
   const status = () => ready(query, undefined);
-  const jobs = () => core()?.media?.filter((job) => job.kind === "understanding") ?? [];
-  const [selected, setSelected] = createSignal<Selected[]>([]);
+  const jobs = () => {
+    const file = props.file.id;
+    return Arr.filter(
+      core()?.media ?? [],
+      (job): job is MediaUnderstandingJob => job.kind === "understanding" && Arr.some(job.inputs, (input) => input.hash === file),
+    );
+  };
   const [prompt, setPrompt] = createSignal("");
   const [tokens, setTokens] = createSignal(512);
   const [channel, setChannel] = createSignal("");
@@ -72,7 +73,7 @@ export function UnderstandingPanel() {
     const configuration = status();
     const binding = configuration?.understanding;
     const approvedNow = approved();
-    const files = selected();
+    const file = props.file.id;
     const text = prompt();
     const maxOutputTokens = tokens();
     const target = channel();
@@ -87,25 +88,11 @@ export function UnderstandingPanel() {
             ? api.media.understanding.authorize(previous, { signal: controller.signal })
             : api.media.understanding.create(previous, { signal: controller.signal });
         if (!configuration || !binding || !approvedNow) return;
-        const ids = await Promise.all(
-          files.map(async (selected) => {
-            const file = selected.file;
-            const input =
-              selected.input ??
-              (await api.media.input.create(
-                { kind: file.type.startsWith("image/") ? "image" : "video", name: file.name, mime: file.type, size: file.size },
-                { signal: controller.signal },
-              ));
-            setSelected((items) => items.map((item) => (item.file === file ? { ...item, input } : item)));
-            const uploaded = input.phase === "ready" ? input : await uploadMediaInput(input.id, file, controller.signal);
-            setSelected((items) => items.map((item) => (item.file === file ? { ...item, input: uploaded } : item)));
-            return uploaded.id;
-          }),
-        );
+        const input = await api.media.input.adopt({ attachment: file }, { signal: controller.signal });
         const request: MediaUnderstandingRequest = {
           id: crypto.randomUUID(),
           prompt: text,
-          inputs: ids,
+          inputs: [input.id],
           connection: binding.connection,
           revision: configuration.revision,
           allowUpload: true,
@@ -133,26 +120,9 @@ export function UnderstandingPanel() {
           )}
         </Show>
         <fieldset disabled={act.busy() || submitted() !== undefined} {...stylex.attrs(viewStyles.form)} aria-label={t("web.media.understanding.title")}>
-          <Field label={t("web.media.understanding.files")}>
-            <TextInput
-              type="file"
-              multiple
-              accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,video/mp4,video/x-m4v,video/quicktime,video/x-msvideo,video/webm,video/x-matroska"
-              data-testid="understanding-files"
-              aria-label={t("web.media.understanding.files")}
-              onChange={(event) => {
-                setSelected(Array.from(event.currentTarget.files ?? [], (file) => ({ file })));
-                setConsent(undefined);
-              }}
-            />
-          </Field>
-          <For each={selected()} keyed={(item) => item.file}>
-            {(item) => (
-              <p {...stylex.attrs(viewStyles.identifierDetail)}>
-                {item().file.name} · {item().input?.phase === "ready" ? t("web.media.understanding.stored") : t("web.media.understanding.selected")}
-              </p>
-            )}
-          </For>
+          <p data-testid="understanding-file" {...stylex.attrs(viewStyles.identifierDetail)}>
+            {props.file.name}
+          </p>
           <Field label={t("web.media.understanding.prompt")}>
             <TextArea
               data-testid="understanding-prompt"
@@ -215,10 +185,7 @@ export function UnderstandingPanel() {
           <Button
             data-testid="understanding-submit"
             tone="primary"
-            disabled={
-              act.busy() ||
-              (submitted() === undefined && (!approved() || !status()?.understanding || !prompt().trim() || selected().length === 0 || selected().length > 5))
-            }
+            disabled={act.busy() || (submitted() === undefined && (!approved() || !status()?.understanding || !prompt().trim()))}
             onClick={() => void submit()}
           >
             {submitted() ? t("web.media.resubmit") : channel() ? t("web.media.understanding.authorize") : t("web.media.understanding.submit")}
@@ -286,8 +253,8 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
         </p>
         <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>
         <p {...stylex.attrs(viewStyles.source)} data-testid="understanding-source">
-          {props.job.source.kind === "owner"
-            ? t("web.media.sourceOwner")
+          {props.job.source.kind === "user"
+            ? t("web.media.sourceUser")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
         <Show when={props.job.phase === "authorized" && props.job.authorization}>

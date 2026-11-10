@@ -1,4 +1,4 @@
-import { Clock, Effect, FiberSet, type Scope } from "effect";
+import { Clock, DateTime, Effect, FiberSet, type Scope } from "effect";
 
 export interface Time {
   /** Unix milliseconds. */
@@ -62,5 +62,12 @@ export const afterRealTime = (ms: number, f: () => void, options: { readonly unr
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart. */
-export const localeMinute = (t: Date) => `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+/** To the minute, in this machine's zone: what an input says the time is, so that it does not change between two requests a
+ * few seconds apart. */
+export const localeMinute = (ms: number) => {
+  const t = localParts(ms);
+  return `${t.year}/${t.month}/${t.day} ${pad(t.hour)}:${pad(t.minute)}`;
+};
+
+/** An instant's calendar and clock in this machine's zone; month counts from 1. */
+export const localParts = (ms: number) => DateTime.toParts(DateTime.makeZonedUnsafe(ms, { timeZone: DateTime.zoneMakeLocal() }));

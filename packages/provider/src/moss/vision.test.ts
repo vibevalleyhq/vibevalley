@@ -1,6 +1,9 @@
+import { Formatter, Option, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { VisionSession, visionBufferedBytes, visionFrameBytes } from "./vision.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
 const fixture = () => {
@@ -17,7 +20,7 @@ const fixture = () => {
       ended++;
     },
   });
-  const receive = (event: object) => session.receive(JSON.stringify(event));
+  const receive = (event: object) => session.receive(Formatter.formatJson(event));
   const ready = (max = visionFrameBytes) => {
     session.begin();
     receive({
@@ -62,7 +65,7 @@ describe("MOSS visual realtime documented protocol", () => {
     expect(f.text).toEqual([]);
     expect(f.session.frame(jpeg, 0)).toBe(false);
     f.receive({ type: "session.created" });
-    expect(f.text).toEqual([JSON.stringify({ type: "session.configure", input_queue_capacity: 1, max_new_tokens: 512, include_usage: false })]);
+    expect(f.text).toEqual([Formatter.formatJson({ type: "session.configure", input_queue_capacity: 1, max_new_tokens: 512, include_usage: false })]);
     f.receive({ type: "session.configured", max_frame_bytes: 3 });
     expect(f.session.phase).toBe("connecting");
     f.receive({ type: "session.ready", turn_id: 0 });
@@ -75,13 +78,13 @@ describe("MOSS visual realtime documented protocol", () => {
     f.ready();
     expect(f.session.frame(jpeg, 0)).toBe(true);
     expect(f.binary).toEqual([]);
-    expect(JSON.parse(f.text[1] ?? "{}")).toEqual({ type: "input.frame", seq_no: 0, timestamp: 0, mime_type: "image/jpeg" });
+    expect(Option.getOrUndefined(bodyOf(f.text[1] ?? "{}"))).toEqual({ type: "input.frame", seq_no: 0, timestamp: 0, mime_type: "image/jpeg" });
     f.receive({ type: "input.frame.ready", seq_no: 0 });
     expect(f.binary).toEqual([jpeg]);
     expect(f.session.frame(jpeg, 1)).toBe(false);
     f.receive({ type: "input.frame.accepted", seq_no: 0, timestamp: 0, final: false, pending_events: 1, interrupts_current_turn: false });
     expect(f.session.prompt("What is visible?")).toBe(true);
-    expect(JSON.parse(f.text[2] ?? "{}")).toEqual({ type: "input.prompt", seq_no: 1, prompt: "What is visible?", final: false });
+    expect(Option.getOrUndefined(bodyOf(f.text[2] ?? "{}"))).toEqual({ type: "input.prompt", seq_no: 1, prompt: "What is visible?", final: false });
     f.receive({ type: "input.prompt.accepted", seq_no: 1, final: false, pending_events: 1, interrupts_current_turn: true });
     expect(f.session.frame(jpeg, 1)).toBe(true);
     expect(JSON.parse(f.text[3] ?? "{}").seq_no).toBe(2);
@@ -98,7 +101,7 @@ describe("MOSS visual realtime documented protocol", () => {
     f.receive({ type: "input.frame.ready", seq_no: 0 });
     expect(f.binary).toEqual([jpeg]);
     f.receive({ type: "input.frame.accepted", seq_no: 0 });
-    expect(JSON.parse(f.text[2] ?? "{}")).toEqual({ type: "input.prompt", seq_no: 1, prompt: "Summarize", final: true });
+    expect(Option.getOrUndefined(bodyOf(f.text[2] ?? "{}"))).toEqual({ type: "input.prompt", seq_no: 1, prompt: "Summarize", final: true });
     f.receive({ type: "input.prompt.accepted", seq_no: 1 });
     expect(f.session.frame(jpeg, 1)).toBe(false);
     expect(f.session.prompt("Another question")).toBe(false);
@@ -232,7 +235,7 @@ describe("MOSS visual realtime documented protocol", () => {
     expect(f.session.phase).toBe("error");
     expect(f.session.problem).toBe("invalid_request");
     expect(f.session.frame(jpeg, 1)).toBe(false);
-    expect(JSON.stringify(f.session.responses)).not.toContain("private-vendor-data");
+    expect(Formatter.formatJson(f.session.responses)).not.toContain("private-vendor-data");
   });
 
   it("regression: normal socket close without session.done is not successful completion", () => {

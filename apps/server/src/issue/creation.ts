@@ -1,3 +1,5 @@
+import { Formatter } from "effect";
+
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { executionsOf } from "@vibevalley/protocol/rules";
@@ -5,7 +7,7 @@ import { executionsOf } from "@vibevalley/protocol/rules";
 import type { WrittenKind, WrittenTemplate } from "#/agent/seed.ts";
 import type { AddIssueParams } from "#db/issue.sql.ts";
 
-import { isForOrchestrator } from "./status.ts";
+import { assignedOnDuty } from "./status.ts";
 
 export const maxChildren = 12;
 
@@ -19,9 +21,9 @@ export const issueRow = (id: string, req: T.IssueRequest, mandate: T.IssueMandat
   auto_submit_pr: mandate.autoSubmitPr,
   repo: req.repo?.trim() || null,
   parent: req.parent ?? null,
-  blocked_by: (req.blockedBy?.length ?? 0) > 0 ? JSON.stringify(req.blockedBy) : null,
-  constraints: req.constraints ? JSON.stringify(req.constraints) : null,
-  criteria: (req.criteria?.length ?? 0) > 0 ? JSON.stringify(req.criteria) : null,
+  blocked_by: (req.blockedBy?.length ?? 0) > 0 ? Formatter.formatJson(req.blockedBy) : null,
+  constraints: req.constraints ? Formatter.formatJson(req.constraints) : null,
+  criteria: (req.criteria?.length ?? 0) > 0 ? Formatter.formatJson(req.criteria) : null,
   priority: req.priority ?? "medium",
   created_at: at,
   cron: cron ?? null,
@@ -55,7 +57,7 @@ const recentTitleLength = 60;
 
 export function sentTitles(all: readonly T.Issue[], repo: string, orchestrator: (id: string) => boolean): string[] {
   const mine = all
-    .filter((i) => i.repo === repo && executionsOf(i).length > 0 && i.parent === undefined && i.cron === undefined && !isForOrchestrator(i, orchestrator))
+    .filter((i) => i.repo === repo && executionsOf(i).length > 0 && i.parent === undefined && i.cron === undefined && !assignedOnDuty(i, orchestrator))
     .toSorted((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];
   for (const i of mine) {

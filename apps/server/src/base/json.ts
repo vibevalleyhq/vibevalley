@@ -5,6 +5,9 @@ import { currentLocale } from "@vibevalley/i18n";
 /** Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. */
 export const jsonOf = <T, E = T>(schema: Schema.Codec<T, E>) => Schema.decodeUnknownSync(Schema.fromJsonString(schema));
 
+/** As JSON.stringify writes it; a cycle or a bigint fails instead of throws. */
+export const jsonText = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 /** Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. */
 export const jsonOrNone = <T, E = T>(schema: Schema.Codec<T, E>) => {
   const decode = Schema.decodeUnknownOption(Schema.fromJsonString(schema));

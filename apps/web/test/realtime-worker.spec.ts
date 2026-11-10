@@ -43,9 +43,10 @@ test("production Live web worker relays virtual audio and camera through the aut
   await page.getByTestId("moss-talk").click();
   await expect(page.getByTestId("moss-line")).toHaveAttribute("data-state", "live");
   await expect.poll(() => page.workers().length).toBeGreaterThan(before);
+  await page.getByTestId("moss-debug").locator("summary").click();
   await expect(page.getByTestId("moss-events")).toContainText("playback.completed");
   await expect(page.getByTestId("moss-said").locator("p")).toHaveCount(1);
-  await choose(page.getByTestId("live-visual").getByTestId("visual-source"), "camera");
+  await choose(page.getByTestId("vision-line").getByTestId("visual-source"), "camera");
   await page.getByTestId("live-visual-start").click();
   await expect(page.getByTestId("moss-said").locator("p")).toHaveCount(2);
   await page.getByTestId("moss-hang-up").click();

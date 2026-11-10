@@ -57,7 +57,7 @@ export default stories({
   title: "组件/帮工/档案卡",
   stories: {
     States: story({
-      note: "档案页上的一张卡：在干活的、闲着的、停用的（管家不派）、农机没装的、配置有问题的（列出会挡住派活的）。",
+      note: "档案页上的一张卡：在干活的、闲着的、停用的（助手不派）、农机没装的、配置有问题的（列出会挡住派活的）。",
       args: { state: "working" },
       grid: { rows: ["state", ["working", "idle", "disabled", "no runtime", "problems"]], cols: "pseudo" },
       render: (a) => (

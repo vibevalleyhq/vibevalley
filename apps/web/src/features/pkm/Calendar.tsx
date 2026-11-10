@@ -5,7 +5,9 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary } from "@vibevalley/protocol";
 
+import { createExternal } from "#/base/external.ts";
 import { api } from "#/infra/api.ts";
+import { localDay } from "#/infra/local-day.ts";
 import { useQueryClient } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { defineStored } from "#/state/stored.ts";
@@ -13,7 +15,7 @@ import { createAct } from "#/ui/act.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 
-import { dayKey, dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
+import { dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";
 
 const recipeStyles = stylex.create({
@@ -151,15 +153,15 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
   const queries = useQueryClient();
   const router = useRouter();
   const act = createAct();
-  const today = dayKey(Date.now());
-  const start = new Date();
-  const [month, setMonth] = createSignal({ year: start.getFullYear(), month: start.getMonth() });
+  const today = createExternal(localDay.subscribe, localDay.get);
+  const [chosen, setChosen] = createSignal<{ year: number; month: number }>();
+  const month = createMemo(() => chosen() ?? { year: Number(today().slice(0, 4)), month: Number(today().slice(5, 7)) - 1 });
   const journals = createMemo(() => new Map(props.pages.flatMap((p) => (p.day ? [[p.day, p.slug] as const] : []))));
-  const shift = (by: number) =>
-    setMonth(({ year, month: m }) => {
-      const d = new Date(year, m + by, 1);
-      return { year: d.getFullYear(), month: d.getMonth() };
-    });
+  const shift = (by: number) => {
+    const current = month();
+    const d = new Date(current.year, current.month + by, 1);
+    setChosen({ year: d.getFullYear(), month: d.getMonth() });
+  };
   const go = (day: string) => {
     const slug = journals().get(day);
     if (slug) return router.navigate(pkmHref(slug));
@@ -172,7 +174,9 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
   return (
     <div {...stylex.attrs(viewStyles.pkmCalendar)}>
       <div {...stylex.attrs(viewStyles.monthDiv)}>
-        <span {...stylex.attrs(viewStyles.monthSpan)}>{monthTitle(month().year, month().month)}</span>
+        <span data-testid="pkm-calendar-month" data-year={month().year} data-month={month().month + 1} {...stylex.attrs(viewStyles.monthSpan)}>
+          {monthTitle(month().year, month().month)}
+        </span>
         <IconButton icon="previous" size={12} label={t("web.pkm.calendar.previous")} testid="pkm-calendar-previous" onClick={() => shift(-1)} />
         <IconButton icon="next" size={12} label={t("web.pkm.calendar.next")} testid="pkm-calendar-next" onClick={() => shift(1)} />
       </div>
@@ -188,6 +192,7 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
                   type="button"
                   data-testid="pkm-day-cell"
                   data-key={d.day}
+                  data-today={d.day === today() ? "" : undefined}
                   data-journal={journals().has(d.day) ? "" : undefined}
                   aria-current={d.day === props.open ? "date" : undefined}
                   disabled={act.busy()}
@@ -196,11 +201,11 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
                     recipeStyles.monthButton,
                     d.inMonth ? recipeStyles.monthButtonVariant1Case2 : recipeStyles.monthButtonVariant1Case1,
                     d.day === props.open ? recipeStyles.monthButtonVariant2Case2 : recipeStyles.monthButtonVariant2Case1,
-                    d.day === today ? recipeStyles.monthButtonVariant3Case2 : recipeStyles.monthButtonVariant3Case1,
+                    d.day === today() ? recipeStyles.monthButtonVariant3Case2 : recipeStyles.monthButtonVariant3Case1,
                   )}
                 >
                   {Number(d.day.slice(8))}
-                  <span {...stylex.attrs(viewStyles.monthSpan2)}>{dayTitle(d.day, today)}</span>
+                  <span {...stylex.attrs(viewStyles.monthSpan2)}>{dayTitle(d.day, today())}</span>
                   <Show when={journals().has(d.day)}>
                     <span aria-hidden="true" {...stylex.attrs(viewStyles.monthSpan3)} />
                   </Show>

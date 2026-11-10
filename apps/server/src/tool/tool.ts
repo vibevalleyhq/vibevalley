@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Predicate } from "effect";
+import { Clock, Context, Effect, Formatter, Layer, Predicate } from "effect";
 
 import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { maybe, t } from "@vibevalley/i18n";
@@ -11,6 +11,7 @@ import { artifactTools } from "./artifact.ts";
 import { channelTools } from "./channel.ts";
 import { cronTools } from "./cron.ts";
 import { issueTools } from "./issue.ts";
+import { libraryTools } from "./library.ts";
 import { mediaTools } from "./media.ts";
 import { memoryTools } from "./memory.ts";
 import { pkmTools } from "./pkm.ts";
@@ -30,7 +31,7 @@ export class Tool extends Context.Service<
     readonly start: (name: string, args: unknown) => ToolStart;
     readonly sessionLine: (session: T.Session) => string;
   }
->()("vibevalley/Tool") {
+>()("@vibevalley/server/tool/tool") {
   static readonly layer = Layer.effect(
     Tool,
     Effect.suspend(() => make),
@@ -54,7 +55,7 @@ export function toolStart(name: string, args: unknown): ToolStart {
     text: about ? t("server.tool.about", { label, about }) : label,
     action: "other",
     tool: name,
-    input: args === undefined || args === null ? "{}" : JSON.stringify(args),
+    input: args === undefined || args === null ? "{}" : Formatter.formatJson(args),
   };
 }
 
@@ -98,6 +99,7 @@ const make = Effect.gen(function* () {
   const { memorySearch, memoryCreate } = yield* memoryTools;
   const notes = yield* pkmTools;
   const media = yield* mediaTools;
+  const library = yield* libraryTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
   const resourceRead = yield* resourceTools;
   const repoList = yield* repoTools;
@@ -127,6 +129,7 @@ const make = Effect.gen(function* () {
       memoryCreate(who, true),
       ...notes.orchestrator(who),
       ...media(who),
+      ...library.orchestrator(who),
       artifactList(who),
       artifactGet("orchestrator")(who),
       artifactContent("orchestrator")(who),
@@ -157,6 +160,7 @@ const make = Effect.gen(function* () {
       artifactContent("session")(who),
       sessionArtifactCreate(who),
       artifactVersion("session")(who),
+      ...library.session(who),
     ],
     start: toolStart,
     sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),

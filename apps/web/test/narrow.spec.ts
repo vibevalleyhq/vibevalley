@@ -5,7 +5,7 @@ const places = [
   "/chat",
   "/issues",
   "/artifacts",
-  "/media",
+  "/library",
   "/agents",
   "/agents/templates",
   "/runtimes",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Formatter } from "effect";
 import { HttpRouter } from "effect/http";
 
 import type { ApiError, Handlers } from "@vibevalley/protocol/api";
@@ -63,8 +63,8 @@ describe("the HTTP contract", () => {
       },
       async (handler) => {
         const post = (body: string) => handler(new Request("http://127.0.0.1/api/v1/channel/message/list", { method: "POST", body }));
-        expect((await post(JSON.stringify({ id: "general", limit: 20 }))).status).toBe(200);
-        const wrong = await post(JSON.stringify({ id: "general", limit: "20" }));
+        expect((await post(Formatter.formatJson({ id: "general", limit: 20 }))).status).toBe(200);
+        const wrong = await post(Formatter.formatJson({ id: "general", limit: "20" }));
         expect([wrong.status, await wrong.text()]).toEqual([400, expect.stringContaining("limit")]);
         expect((await post("{")).status).toBe(400);
         expect((await handler(new Request("http://127.0.0.1/api/v1/channel/message/list"))).status).toBe(404);
@@ -109,7 +109,8 @@ describe("a request key", () => {
       const once = requestKeys<number>();
       const refusal: ApiError = { _tag: "Refused", reason: "not now" };
       const work = Effect.suspend(() => (++runs === 1 ? Effect.fail(refusal) : Effect.succeed(runs)));
-      expect(yield* Effect.flip(once("k", work))).toEqual(refusal);
+      const onceFailure = yield* Effect.flip(once("k", work));
+      expect(onceFailure).toEqual(refusal);
       expect([yield* once("k", work), yield* once("k", work), runs]).toEqual([2, 2, 2]);
     }),
   );
@@ -117,7 +118,8 @@ describe("a request key", () => {
   it.effect("refuses a key longer than a sendKey may be", () =>
     Effect.gen(function* () {
       const once = requestKeys<number>();
-      expect(yield* Effect.flip(once("x".repeat(requestKeyMax + 1), Effect.succeed(1)))).toMatchObject({ _tag: "Refused" });
+      const onceFailure = yield* Effect.flip(once("x".repeat(requestKeyMax + 1), Effect.succeed(1)));
+      expect(onceFailure).toMatchObject({ _tag: "Refused" });
     }),
   );
 });

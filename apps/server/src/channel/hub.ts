@@ -2,40 +2,40 @@ import { Clock, Effect, PubSub, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { head } from "#/base/clip.ts";
-import { refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
-import { type InboxMessage } from "#/mailbox/envelope.ts";
+import { type Envelope, orchestratorIn } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
-import * as qf from "#db/channel_follow.sql.ts";
+import * as qmb from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import {
   type MsgRow,
-  senderKind,
+  speakerOf,
   channelType,
   subjectKind,
   toMessage,
   notifyOf,
-  inboxMore,
+  envelopeMore,
   type ThreadSubject,
   subjectOf,
   type ChannelEnvelopeRow,
 } from "./contracts.ts";
 import { keepChannels, targetOf } from "./messages.ts";
-import { channelAttachments, messageMutations } from "./mutations.ts";
+import { messageMutations } from "./mutations.ts";
 import { ChatModel, type ChannelRow } from "./rooms.ts";
 
 /** The channel a new farm opens with. */
@@ -56,18 +56,17 @@ export const channelHub = Effect.gen(function* () {
   const mailbox = yield* Mailbox;
   const sessions = yield* Session;
   const model = new ChatModel();
-  const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
+  const addMember = (channel: string, participant: string, reason: qmb.AddMemberParams["reason"], from: number) =>
     Effect.andThen(
-      db.run(qf.follow({ channel_id: channel, participant_id: participant, reason, from_number: from })),
-      Effect.sync(() => model.followed(channel, participant)),
+      db.run(qmb.addMember({ channel_id: channel, participant_id: participant, reason, from_number: from })),
+      Effect.sync(() => model.memberAdded(channel, participant)),
     );
   const reload = Effect.gen(function* () {
-    model.load(
-      yield* db.run(qc.allChannels()),
-      yield* db.run(qp.participants()),
-      yield* db.run(qr.readCursorsOf({ participant_id: ownerId })),
-      yield* db.run(qf.allFollows()),
-    );
+    const channels = yield* db.run(qc.allChannels());
+    const participants2 = yield* db.run(qp.participants());
+    const cursorsOf = yield* db.run(qr.readCursorsOf({ participant_id: userId }));
+    const follows = yield* db.run(qmb.allMembers());
+    model.load(channels, participants2, cursorsOf, follows);
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */
@@ -76,11 +75,11 @@ export const channelHub = Effect.gen(function* () {
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
   const said = yield* scopedPubSub<T.ChatMessage>();
-  const ownerReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
+  const userReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
 
   yield* Effect.forEach(
     [
-      [ownerId, "owner", t("server.channel.name.owner")],
+      [userId, "user", t("server.channel.name.user")],
       ["system", "system", "VibeValley"],
     ] as const,
     ([id, kind, name]) =>
@@ -91,10 +90,6 @@ export const channelHub = Effect.gen(function* () {
   const seat = Effect.fnUntraced(function* (id: string) {
     const agent = agents.agent(id);
     const name = agent?.name.trim() || t("server.channel.name.orchestrator");
-    if (agent?.role === "orchestrator")
-      yield* sessions
-        .register({ id: agent.id, role: agent.role, agent: agent.id, name, runtime: agent.runtime, brief: agent.duty })
-        .pipe(Effect.mapError((error) => refused(error.message)));
     if (model.participant(id)?.name === name && model.participant(id)?.kind === "orchestrator") return;
     const joined: qp.UpsertParticipantParams = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
     yield* db.run(qp.upsertParticipant(joined));
@@ -102,17 +97,14 @@ export const channelHub = Effect.gen(function* () {
   });
   const orchestratorIds = () => agents.orchestrators().map((a) => a.id);
   yield* Effect.forEach(orchestratorIds(), (id) => seat(id), { discard: true });
-  if (!(yield* db.one(qc.defaultID())))
+  if (!(yield* db.one(qc.defaultID()))) {
+    const id = newId();
     yield* db.run(
-      qc.createChannel({
-        id: newId(),
-        is_default: true,
-        name: firstChannelName,
-        description: null,
-        repo: null,
-        created_at: yield* Clock.currentTimeMillis,
-      }),
+      qc.createChannel({ id, is_default: true, name: firstChannelName, description: null, repo: null, created_at: yield* Clock.currentTimeMillis }),
     );
+    // The farm's first channel has the default orchestrator in it, as every new channel does (joinDefault).
+    yield* db.run(qmb.addMember({ channel_id: id, participant_id: defaultOrchestrator, reason: "manual", from_number: 0 }));
+  }
   yield* Effect.forEach(
     orchestratorIds(),
     (id) => Effect.flatMap(Clock.currentTimeMillis, (now) => db.run(qc.createDirect({ id: newId(), peer_id: id, created_at: now }))),
@@ -122,13 +114,18 @@ export const channelHub = Effect.gen(function* () {
   );
   yield* reload;
 
-  const orchestratorOfRow = (row: ChannelRow | undefined): string => {
-    if (!row) return defaultOrchestrator;
-    if (row.type === "thread") return orchestratorOfRow(row.parent_id !== null ? model.channel(row.parent_id) : undefined);
-    const own = row.type === "direct" ? row.peer_id : row.orchestrator;
-    // One no longer an orchestrator (its profile gone or made a helper) looks after nothing: the default one does.
-    return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
+  /** A place's channel or direct channel: itself, or the one a thread hangs in. */
+  const topOfRow = (row: ChannelRow | undefined): ChannelRow | undefined =>
+    row?.type === "thread" ? topOfRow(row.parent_id !== null ? model.channel(row.parent_id) : undefined) : row;
+  /** Who is in the channel a place is in; a direct channel has its other one instead. */
+  const membersOfRow = (row: ChannelRow | undefined): string[] => {
+    const top = topOfRow(row);
+    return top === undefined || top.type === "direct" ? [] : model.membersOf(top.id);
   };
+  const orchestratorInRow = (row: ChannelRow | undefined): string =>
+    orchestratorIn({ top: topOfRow(row), members: membersOfRow(row), isOrchestrator: agents.isOrchestrator });
+  /** In a channel from its start: the default orchestrator, so what is said there reaches someone until the user changes who is in it. */
+  const joinDefault = (channel: string) => addMember(channel, defaultOrchestrator, "manual", 0);
 
   /** A channel's name; none for a thread or what is not there. */
   const channelName = (id: string) => {
@@ -145,16 +142,16 @@ export const channelHub = Effect.gen(function* () {
     const ch = h.channel ? model.channel(h.channel) : undefined;
     return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
   };
-  const talkSession = (channel: string) => presentSessions().find((h) => directOfSession(h) === channel);
+  const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
   const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : model.defaultId());
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
-  /** Where the owner talks with peer alone, from either side. */
+  /** Where the user talks with peer alone, from either side. */
   const directWith = (who: string, other: string) => {
-    const peer = who === ownerId ? other : other === ownerId ? who : "";
+    const peer = who === userId ? other : other === userId ? who : "";
     return model.channels("direct").find((c) => c.peer_id === peer);
   };
   const sessionOf = (id: string) => sessions.sessionOf(id);
-  const presentSessions = () => sessions.presentSessions();
+  const hired = () => sessions.hired();
 
   const targetOfRow = (type: string, rootNumber: number | null, name: string | null, channelId: string | null, channelNameOf: string | null) => {
     const shown = name ?? channelNameOf;
@@ -169,14 +166,15 @@ export const channelHub = Effect.gen(function* () {
   const targetOfChannel = (row: ChannelRow) => targetOfRow(row.type, row.root_number, row.name, row.parent_id, null);
 
   const toChannel = (row: ChannelRow, unread = 0, title = "", last?: MsgRow): T.Channel => {
-    const read = model.ownerReadIn(row.id);
+    const read = model.userReadIn(row.id);
     const sk = subjectKind(row.subject_kind);
     return {
       id: row.id,
       type: channelType(row.type),
       default: row.is_default,
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
-      orchestrator: orchestratorOfRow(row),
+      orchestrator: orchestratorInRow(row),
+      ...(row.type === "direct" ? {} : { members: model.membersOf(row.id) }),
       category: row.category ?? "",
       ...(row.position !== null ? { position: row.position } : {}),
       ...(row.archived_at !== null ? { archived: row.archived_at } : {}),
@@ -199,16 +197,16 @@ export const channelHub = Effect.gen(function* () {
     };
   };
 
-  /** What a page lists a channel with: the owner's unread there, and a thread's title when its subject does not
+  /** What a page lists a channel with: the user's unread there, and a thread's title when its subject does not
    * name it (a page keeps no messages to name it by). */
   const counted = Effect.fnUntraced(function* (row: ChannelRow) {
-    // Set to none it counts nothing; to mentions, only what names the owner and is not handled yet.
+    // Set to none it counts nothing; to mentions, only what names the user and is not handled yet.
     const n =
       row.notify === "none"
         ? 0
         : row.notify === "mentions"
-          ? (yield* db.run(qm.ownerMentions())).filter((m) => m.channel_id === row.id).length
-          : (yield* db.run(qm.ownerUnread({ channel_id: row.id, read_number: model.ownerReadIn(row.id) ?? 0 }))).n;
+          ? (yield* db.run(qm.userMentions())).filter((m) => m.channel_id === row.id).length
+          : (yield* db.run(qm.userUnread({ channel_id: row.id, read_number: model.userReadIn(row.id) ?? 0 }))).n;
     const sk = subjectKind(row.subject_kind);
     let title = "";
     if (row.type === "thread" && row.name) title = row.name;
@@ -232,12 +230,12 @@ export const channelHub = Effect.gen(function* () {
     }
   });
 
-  const publishOwnerMentions = Effect.gen(function* () {
-    // A place set to none tells the owner of nothing, its mentions included.
+  const publishUserMentions = Effect.gen(function* () {
+    // A place set to none tells the user of nothing, its mentions included.
     const quiet = (id: string | null) => id !== null && model.channel(id)?.notify === "none";
-    const rows = (yield* db.run(qm.ownerMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
+    const rows = (yield* db.run(qm.userMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
     yield* core.apply({
-      type: "ownerMentionsChanged",
+      type: "userMentionsChanged",
       mentions: rows.map((r) => ({
         message: toMessage(r),
         channel: r.top_id ?? model.defaultId(),
@@ -271,7 +269,7 @@ export const channelHub = Effect.gen(function* () {
     return "";
   };
 
-  /** Inside the root message's transaction: a thread and its first follower appear together. */
+  /** Inside the root message's transaction: a thread and its first member appear together. */
   const threadFor = Effect.fn("Channel.threadFor")(function* (root: { id: string; number: number; channel: string }, subject: ThreadSubject) {
     const existing = model.threadOfRoot(root.id);
     if (existing) return existing;
@@ -302,9 +300,8 @@ export const channelHub = Effect.gen(function* () {
       position: null,
       archived_at: null,
       notify: "all",
-      orchestrator: null,
     });
-    if (subject.owner) yield* follow(id, subject.owner, "owner", root.number);
+    if (subject.owner) yield* addMember(id, subject.owner, "user", root.number);
     return id;
   });
 
@@ -312,7 +309,7 @@ export const channelHub = Effect.gen(function* () {
     Effect.andThen(
       db.run(qr.setReadCursor({ participant_id: who, channel_id: channel, read_number: upto, updated_at: now })),
       Effect.sync(() => {
-        if (who === ownerId) model.ownerReadTo(channel, upto);
+        if (who === userId) model.userReadTo(channel, upto);
       }),
     );
 
@@ -323,9 +320,9 @@ export const channelHub = Effect.gen(function* () {
   });
   const readThrough = Effect.fnUntraced(function* (who: string, channel: string, upto: number) {
     yield* tx(readUpTo(who, channel, upto));
-    if (who === ownerId) {
-      PubSub.publishUnsafe(ownerReadHub, { channel, number: upto, at: yield* Clock.currentTimeMillis });
-      yield* publishOwnerMentions;
+    if (who === userId) {
+      PubSub.publishUnsafe(userReadHub, { channel, number: upto, at: yield* Clock.currentTimeMillis });
+      yield* publishUserMentions;
     }
   });
 
@@ -376,17 +373,19 @@ export const channelHub = Effect.gen(function* () {
     reactions: null,
   });
 
-  const { filesAt, attachmentsOf, attach, attachment } = yield* channelAttachments;
+  const files = yield* Attachment;
+  const filesAt = files.pathOf;
+  const attachmentsOf = files.of;
   const deliveryTarget = (r: ChannelEnvelopeRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
-  const asInbox = (r: ChannelEnvelopeRow): InboxMessage => ({
+  const asEnvelope = (r: ChannelEnvelopeRow): Envelope => ({
     id: r.envelope_id,
     number: r.number,
     target: deliveryTarget(r),
     from: r.sender_id,
-    fromKind: senderKind(r.sender_kind),
+    ...speakerOf(r.sender_kind),
     name: r.name,
     text: r.body,
-    ...inboxMore(r, filesAt),
+    ...envelopeMore(r, filesAt),
   });
 
   const inboxRows = Effect.fn("Channel.deliveryUnread")(function* (who: string) {
@@ -401,31 +400,33 @@ export const channelHub = Effect.gen(function* () {
       yield* Effect.forEach([...recent].toReversed(), (c) => Effect.flatMap(counted(c), (channel) => core.apply({ type: "channelChanged", channel })), {
         discard: true,
       });
-      yield* publishOwnerMentions;
+      yield* publishUserMentions;
     }),
   );
 
-  const inboxOf = (row: MsgRow, target: string): InboxMessage => ({
+  const envelopeOf = (row: MsgRow, target: string): Envelope => ({
     id: S.messageId(row.id),
     number: row.number,
     target,
     from: row.sender_id,
-    fromKind: senderKind(row.sender_kind),
+    ...speakerOf(row.sender_kind),
     name: row.sender_name,
     text: row.body,
-    ...inboxMore(row, filesAt),
+    ...envelopeMore(row, filesAt),
   });
   return {
     model,
-    follow,
+    addMember,
     reload,
     tx,
     locked,
     said,
-    ownerReadHub,
+    userReadHub,
     seat,
     orchestratorIds,
-    orchestratorOfRow,
+    orchestratorInRow,
+    membersOfRow,
+    joinDefault,
     channelTags,
     directOfSession,
     talkSession,
@@ -433,13 +434,13 @@ export const channelHub = Effect.gen(function* () {
     channelIdOf,
     directWith,
     sessionOf,
-    presentSessions,
+    hired,
     targetOfRow,
     targetOfChannel,
     toChannel,
     counted,
     publishChannel,
-    publishOwnerMentions,
+    publishUserMentions,
     publishMessage,
     threadOf,
     threadOfSession,
@@ -455,11 +456,9 @@ export const channelHub = Effect.gen(function* () {
     messageRow,
     attachmentsOf,
     filesAt,
-    attach,
-    attachment,
-    asInbox,
+    asEnvelope,
     inboxRows,
-    inboxOf,
+    envelopeOf,
   };
 });
 

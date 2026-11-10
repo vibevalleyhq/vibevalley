@@ -1,6 +1,6 @@
 import type { CheckResult, CriterionCheck, Question } from "@vibevalley/protocol";
 
-const askLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/u;
+const askLine = /^[\s>*#_-]*(?:\*\*)?要问用户(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/u;
 const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/u;
 
 /** The questions a report's question lines ask, one per line; a line's options tail gives the options (at least two). */

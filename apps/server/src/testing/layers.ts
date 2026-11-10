@@ -9,6 +9,7 @@ import { tempDir } from "@vibevalley/testkit/temp";
 
 import { withCast } from "#/agent/agent.ts";
 import { builtInDir, profileOf, templateFrom } from "#/agent/template.ts";
+import builtInIndex from "#/agent/templates/index.json" with { type: "json" };
 import { Core } from "#/core/core.ts";
 import { defaults, ServerConfig } from "#/infra/config.ts";
 import { Database } from "#/infra/db.ts";
@@ -25,7 +26,7 @@ export const starter = (id: string): Agent => {
 };
 
 /** Every built-in template's profile but the default orchestrator's, in their order: what a test farm starts with. */
-const starters = () => (JSON.parse(readFileSync(join(builtInDir, "index.json"), "utf8")) as string[]).filter((id) => id !== defaultOrchestrator);
+const starters = () => builtInIndex.filter((id) => id !== defaultOrchestrator);
 
 export function testConfig(change: Partial<ServerConfig["Service"]> = {}): ServerConfig["Service"] {
   const home = tempDir("vibevalley-test-");

@@ -40,9 +40,9 @@ export const toOarMcp = (server: T.MCPServer): McpServer =>
 
 export const conflictBrief = (base: string, files: readonly string[]) => t("server.session.conflictBrief", { base, files: list(files) });
 
-/** Who settles a conflict when the work does not go in: the owner (an issue: told what to tell the helper), or the helper
+/** Who settles a conflict when the work does not go in: the user (an issue: told what to tell the helper), or the helper
  * at once (a child issue). */
-export type Settle = "owner" | "helper";
+export type Settle = "user" | "helper";
 
 export interface SessionLimits {
   readonly space: number;
@@ -57,9 +57,9 @@ export function noRoom(
   repo: string,
   limits: SessionLimits,
   except = "",
-  byOwnerComment = false,
+  byUserComment = false,
 ): string {
-  const room = roomLeft(sessions, repo, limits.space + (byOwnerComment ? 1 : 0), limits.perRepo, except);
+  const room = roomLeft(sessions, repo, limits.space + (byUserComment ? 1 : 0), limits.perRepo, except);
   if (room.farm === 0) return t("server.session.noRoom.farm", { max: limits.space });
   const onRuntime = sessions.filter((h) => isBusy(h) && h.id !== except && h.runtime === runtime).length;
   if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime)
@@ -87,13 +87,13 @@ export function notTakenIn(
   f: MergeFailure,
   name: string,
   settle: Settle,
-): { readonly fix: string; readonly owner: string; readonly notice: string; readonly short: string } {
+): { readonly fix: string; readonly user: string; readonly notice: string; readonly short: string } {
   switch (f.kind) {
     case "conflict": {
       const files = list(f.files);
       return {
         fix: settle === "helper" ? conflictBrief(f.base, f.files) : "",
-        owner: t("server.session.notTaken.conflictOwner", { base: f.base, files, name, brief: conflictBrief(f.base, f.files) }),
+        user: t("server.session.notTaken.conflictUser", { base: f.base, files, name, brief: conflictBrief(f.base, f.files) }),
         notice: t("server.session.notTaken.conflictNotice", { name, base: f.base, files }),
         short: t("server.session.notTaken.conflictShort", { base: f.base, files }),
       };
@@ -101,13 +101,13 @@ export function notTakenIn(
     case "check":
       return {
         fix: t("server.session.notTaken.checkFix", { reason: f.reasonText }),
-        owner: t("server.session.notTaken.owner", { why: f.reasonText, name }),
+        user: t("server.session.notTaken.user", { why: f.reasonText, name }),
         notice: t("server.session.notTaken.notice", { name, why: f.reasonText }),
         short: t("server.session.notTaken.checkShort"),
       };
     case "error": {
       const why = f.reasonText || f.message;
-      return { fix: "", owner: t("server.session.notTaken.owner", { why, name }), notice: t("server.session.notTaken.notice", { name, why }), short: why };
+      return { fix: "", user: t("server.session.notTaken.user", { why, name }), notice: t("server.session.notTaken.notice", { name, why }), short: why };
     }
   }
 }

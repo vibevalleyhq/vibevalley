@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect, Formatter, Schema } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -38,8 +38,10 @@ it.live("regression: machine triggers are immutable source records and do not be
     const page = yield* resources.read(defaultOrchestrator, { uri: first.card.readUri, limit: 16000 });
     expect(page.text).toContain("src/run.ts");
     expect(page.text).toContain(event.text);
-    expect(yield* ingress.record({ ...event, key: "self", selfEcho: true })).toBeUndefined();
-    expect(yield* chat.history(channel)).toEqual(before);
+    const recorded = yield* ingress.record({ ...event, key: "self", selfEcho: true });
+    expect(recorded).toBeUndefined();
+    const history2 = yield* chat.history(channel);
+    expect(history2).toEqual(before);
   }).pipe(Effect.scoped, Effect.provide(world())),
 );
 
@@ -47,7 +49,7 @@ it("regression: trigger control fields reject malformed values and preserve voic
   const trigger = triggerOf({
     source: "voice",
     key: "voice-control",
-    actor: { kind: "owner", id: "owner" },
+    actor: { kind: "user", id: "user" },
     addressed: "direct",
     threads: [],
     text: "voice input",
@@ -73,8 +75,8 @@ it("regression: trigger control fields reject malformed values and preserve voic
     { inputContext: { number: 7, target: 42 } },
   ])
     expect(Schema.is(S.Trigger)({ ...trigger, meta })).toBe(false);
-  const decoded = Schema.decodeUnknownSync(S.Trigger)(JSON.parse(JSON.stringify(trigger)));
-  const payload = readPayload(JSON.stringify(triggerPayload(decoded, "assigned")));
+  const decoded = Schema.decodeUnknownSync(S.Trigger)(JSON.parse(Formatter.formatJson(trigger)));
+  const payload = readPayload(Formatter.formatJson(triggerPayload(decoded, "assigned")));
   const message = inputOf({ envelope_id: trigger.id, payload });
   expect(payload.trigger.meta.issue).toBe("assigned");
   expect(decoded.meta.issue).toBe("original");

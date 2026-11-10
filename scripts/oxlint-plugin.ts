@@ -1314,6 +1314,19 @@ const serviceMethodNames = defineRule({
         c.callee.property.name === "withPermits"
       );
     };
+    /** A door that only picks the handler (one union in, one handler per kind): every branch returns a call to a function
+     * traced under the method's own name, so the span is opened there. */
+    const dispatches = (fn: Node, expected: string): boolean => {
+      const returned = returnedBy(fn);
+      return (
+        returned.length > 0 &&
+        returned.every((r) => {
+          if (r.type !== "CallExpression" || r.callee.type !== "Identifier") return false;
+          const traced = tracedAs(resolve(r.callee));
+          return traced !== undefined && traced !== "untraced" && traced.name === expected;
+        })
+      );
+    };
     const returnsEffect = (fn: Node, seen: Set<Node>): boolean => {
       if (seen.has(fn)) return false;
       seen.add(fn);
@@ -1362,7 +1375,8 @@ const serviceMethodNames = defineRule({
               const expected = `${service}.${method}`;
               if (traced.name !== expected)
                 context.report({ node: traced.at, messageId: "name", data: { ...data, given: traced.name === undefined ? "nothing" : `"${traced.name}"` } });
-            } else if (isFunction(value) && returnsEffect(value, new Set())) context.report({ node: p, messageId: "unnamed", data });
+            } else if (isFunction(value) && returnsEffect(value, new Set()) && !dispatches(value, `${service}.${method}`))
+              context.report({ node: p, messageId: "unnamed", data });
           }
       },
     };

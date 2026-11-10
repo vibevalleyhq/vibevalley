@@ -41,7 +41,7 @@ export class MergeFailure extends Schema.TaggedError<MergeFailure, { readonly br
   message: Schema.String,
 }) {
   static conflict(base: string, files: readonly string[]) {
-    return new MergeFailure({
+    return MergeFailure.make({
       kind: "conflict",
       reasonText: "",
       base,
@@ -50,10 +50,10 @@ export class MergeFailure extends Schema.TaggedError<MergeFailure, { readonly br
     });
   }
   static failedCheck(why: string) {
-    return new MergeFailure({ kind: "check", reasonText: why, base: "", files: [], message: why });
+    return MergeFailure.make({ kind: "check", reasonText: why, base: "", files: [], message: why });
   }
   static error(why: string) {
-    return new MergeFailure({ kind: "error", reasonText: why, base: "", files: [], message: why });
+    return MergeFailure.make({ kind: "error", reasonText: why, base: "", files: [], message: why });
   }
 }
 

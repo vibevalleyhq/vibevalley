@@ -121,7 +121,7 @@ export class FarmConnection {
     if (this.choice.kind === "pairing") this.publish({ ...this.choice, name });
   }
 
-  /** Opening a pairing link is already the owner's request to ask for entry. */
+  /** Opening a pairing link is already the user's request to ask for entry. */
   async openLink(text: string) {
     const link = parsePairLink(text);
     if (!link) return;

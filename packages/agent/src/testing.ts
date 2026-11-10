@@ -1,11 +1,12 @@
 import { rmSync } from "node:fs";
 
-import { Effect, Stream } from "effect";
+import { Clock, Effect, Stream } from "effect";
 
 import type { ModelClient } from "@vibevalley/ai/client";
 import type { Message } from "@vibevalley/ai/messages";
 import { type Reply, type Request, scriptedLlm, type Step, testModel } from "@vibevalley/ai/testing";
 import { tempDir } from "@vibevalley/testkit/temp";
+import { waitFor } from "@vibevalley/testkit/until";
 
 import { type Brain, type BrainEvent, type BrainOptions, makeBrain } from "./brain.ts";
 import { codingTools } from "./coding.ts";
@@ -68,15 +69,31 @@ export const withAgent = <A, E, R>(dir: string, steps: readonly Step[], body: (r
       const { llm, requests, append, pending } = scriptedLLM(steps);
       const agent = yield* makeBrain(testBrain(dir, llm, extra));
       const events: BrainEvent[] = [];
-      yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
+      const events2 = yield* agent.events;
+      yield* Effect.forkScoped(Stream.runForEach(events2, (e) => Effect.sync(() => void events.push(e))));
       return yield* body({
         agent,
         events,
         requests,
         script: { append, pending },
         has: (type) => events.some((e) => e.type === type),
-        // The events go out on a hub: the reader takes what was published before the answer once it has a turn.
-        ask: (text) => Effect.tap(agent.ask(userMessage(text, Date.now())), () => Effect.andThen(Effect.yieldNow, Effect.yieldNow)),
+        ask: Effect.fnUntraced(function* (text: string) {
+          const now = yield* Clock.currentTimeMillis;
+          const answer = yield* agent.ask(userMessage(text, now));
+          const current = agent.progress().current;
+          // A current run that is not settled began after ask's, so the answered run is the one before it.
+          const target = current.settled ? current.id : current.id - 1;
+          yield* waitFor(
+            Effect.sync(() => events.some((e) => e.type === "agent_settled" && e.run.id === target)),
+            (consumed) => consumed,
+            () =>
+              `agent_settled target=${target} current=${agent.progress().current.id}; events=${events
+                .slice(-12)
+                .map((e) => (e.type === "agent_settled" ? `${e.type}:${e.run.id}` : e.type))
+                .join(",")}`,
+          );
+          return answer;
+        }),
       });
     }),
   );

@@ -1,9 +1,10 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { everyone, ownerId, type Notify } from "@vibevalley/protocol";
+import { everyone, userId, type Notify } from "@vibevalley/protocol";
 import { cut, defaultOf, latestSessionIdOf, needOf, omitUndefined, oneLine, slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "#/base/clip.ts";
+import { isOnDuty } from "#/session/roster.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
 
@@ -15,15 +16,15 @@ export interface InboxEntry {
   readonly brief: string;
 }
 
-export function forOwner(m: T.ChatMessage, notify: Notify = "all"): boolean {
-  if (m.from === ownerId || notify === "none") return false;
-  if (notify === "mentions") return m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+export function forUser(m: T.ChatMessage, notify: Notify = "all"): boolean {
+  if (m.from === userId || notify === "none") return false;
+  if (notify === "mentions") return m.mentions.includes(userId) || m.mentions.includes(everyone);
   switch (m.kind) {
     case "report":
     case "dispatch":
       return true;
     case "chat":
-      return m.fromKind === "orchestrator" || m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+      return m.fromRole === "orchestrator" || m.mentions.includes(userId) || m.mentions.includes(everyone);
     case "notice":
       break;
   }
@@ -49,7 +50,7 @@ function gathered(state: T.SpaceState): Unworded[] {
   // The channel is the session's or the default one; a farm without channels has neither.
   const push = (e: Omit<Unworded, "channel"> & { readonly channel: string | undefined }) => out.push(omitUndefined(e));
   for (const h of state.sessions) {
-    if (h.role === "orchestrator") continue;
+    if (isOnDuty(h)) continue;
     const want = wantOf(h, state);
     if (!want) continue;
     const channel = h.channel ?? general;
@@ -156,8 +157,8 @@ function gathered(state: T.SpaceState): Unworded[] {
     });
   }
 
-  for (const { message: m, channel, address } of chat?.ownerMentions ?? []) {
-    const from: T.InboxFrom = m.fromKind === "session" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
+  for (const { message: m, channel, address } of chat?.userMentions ?? []) {
+    const from: T.InboxFrom = m.fromRole === "worker" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
     out.push({
       item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", channel: m.channel } },
       channel,
@@ -173,7 +174,7 @@ type Want =
   | { readonly kind: "review" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
-/** What a session questions of the owner. Its issue's stage says it, the one the issue page and the phone both read. */
+/** What a session questions of the user. Its issue's stage says it, the one the issue page and the phone both read. */
 function wantOf(h: T.Session, state: T.SpaceState): Want | undefined {
   const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && latestSessionIdOf(item) === h.id);
   if (!issue) {

@@ -12,8 +12,8 @@ export interface ProviderHandlers<R = never> {
 }
 
 export const providerEndpoints: readonly Endpoint[] = [
-  { op: "provider.get", about: [], input: undefined, result: S.ProviderStatus, can: ["owner"] },
-  { op: "provider.update", about: [], input: S.ProviderUpdate, result: S.ProviderStatus, can: ["owner"] },
-  { op: "provider.voice.list", about: ["connection"], input: S.ProviderVoiceRequest, result: S.ProviderVoiceListing, can: ["owner"] },
-  { op: "provider.model.list", about: [], input: S.ProviderModelRequest, result: S.ProviderModelListing, can: ["owner"] },
+  { op: "provider.get", about: [], input: undefined, result: S.ProviderStatus, can: ["user"] },
+  { op: "provider.update", about: [], input: S.ProviderUpdate, result: S.ProviderStatus, can: ["user"] },
+  { op: "provider.voice.list", about: ["connection"], input: S.ProviderVoiceRequest, result: S.ProviderVoiceListing, can: ["user"] },
+  { op: "provider.model.list", about: [], input: S.ProviderModelRequest, result: S.ProviderModelListing, can: ["user"] },
 ];

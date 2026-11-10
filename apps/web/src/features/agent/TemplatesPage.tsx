@@ -1,10 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
+import { Array as Arr, Option } from "effect";
 import { createSignal, For, Show } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
 
 import { aria } from "#/base/dom.tsx";
+import { useSkills } from "#/features/runtime/index.ts";
 import { api } from "#/infra/api.ts";
 import { useQueryClient, ready, useAgentTemplates, useRuntimes } from "#/infra/query.ts";
 import { useRouter, Link as A } from "#/infra/router.ts";
@@ -260,6 +262,15 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
   const router = useRouter();
   const client = useQueryClient();
   const template = () => props.template;
+  const library = useSkills();
+  // The built-in skills it ticks, by their names; an id the library doesn't have (an added template's typo) shows as itself.
+  const skills = () =>
+    Arr.map(template().skills, (id) =>
+      Option.getOrElse(
+        Arr.findFirst(ready(library, []), (s) => s.id === id),
+        () => ({ id, name: id, description: "" }),
+      ),
+    );
   const orchestrator = () => template().role === "orchestrator";
   // An orchestrator runs in the server itself; a helper's runtime may be missing from this machine.
   const here = () => orchestrator() || props.runtime?.installation.status === "available";
@@ -299,6 +310,11 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
             <span {...stylex.attrs(viewStyles.templateCardSpan3)}>{t(`web.agent.role.${template().role}`)}</span>
           </span>
           <span {...stylex.attrs(variantStyles.templateCardSpan2)}>{template().duty}</span>
+          <Show when={skills().length > 0}>
+            <span data-testid="template-skills" {...stylex.attrs(variantStyles.templateCardSpan2)}>
+              {t("web.agent.templates.skills", { skills: list(Arr.map(skills(), (s) => s.name)) })}
+            </span>
+          </Show>
           <span {...stylex.attrs(variantStyles.templateCardSpan3, here() ? variantStyles.templateCardSpanVariant : variantStyles.templateCardSpanVariant2)}>
             {orchestrator()
               ? t("web.agent.templates.onServer")
@@ -317,6 +333,13 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
               {list(template().tags)}
             </p>
           </Show>
+          <For each={skills()}>
+            {(s) => (
+              <p data-testid="template-skill" {...stylex.attrs(viewStyles.templateCardP)}>
+                {t("web.agent.templates.skill", { name: s.name, description: s.description })}
+              </p>
+            )}
+          </For>
           <p {...stylex.attrs(viewStyles.templateCardP2)}>{t("web.agent.personaLabel")}</p>
           <p {...stylex.attrs(viewStyles.templateCardP3)}>{template().persona || t("web.agent.templates.noPersona")}</p>
         </div>

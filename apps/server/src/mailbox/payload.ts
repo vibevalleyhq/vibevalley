@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 
-import { Schema } from "effect";
+import { Formatter, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
-import { senderKind } from "#/mailbox/envelope.ts";
-import type { InboxMessage, OrchestratorNews } from "#/mailbox/envelope.ts";
+import { actorKindOf } from "#/mailbox/envelope.ts";
+import type { Handed, Envelope } from "#/mailbox/envelope.ts";
 
 export type InputContext = T.TriggerContext;
 export interface DeliveryPayload {
@@ -26,6 +26,8 @@ const Payload: Schema.Codec<DeliveryPayload, S.Wire<DeliveryPayload>> = Schema.S
 export const readPayload = Schema.decodeUnknownSync(Schema.fromJsonString(Payload));
 
 export interface TriggerInput {
+  /** A channel message's own id, so its trigger and its deliveries share it; otherwise made from source and key. */
+  readonly id?: string;
   readonly source: T.TriggerSource;
   /** What makes this occurrence unique within its source: the same key is the same trigger. */
   readonly key: string;
@@ -42,9 +44,11 @@ export interface TriggerInput {
 }
 
 export const triggerOf = (input: TriggerInput): T.Trigger => {
-  const id = createHash("sha256")
-    .update(JSON.stringify([input.source, input.key]))
-    .digest("hex");
+  const id =
+    input.id ??
+    createHash("sha256")
+      .update(Formatter.formatJson([input.source, input.key]))
+      .digest("hex");
   const { issue, ...restMeta } = input.meta ?? {};
   return {
     id,
@@ -98,14 +102,15 @@ export function triggerPayload(trigger: T.Trigger, issue?: string, note?: string
   };
 }
 
-export function inputOf({ envelope_id, payload }: { readonly envelope_id: string; readonly payload: DeliveryPayload }): InboxMessage {
+export function inputOf({ envelope_id, payload }: { readonly envelope_id: string; readonly payload: DeliveryPayload }): Envelope {
   const { trigger, context } = payload;
   return {
     ...context,
     id: envelope_id,
     originTrigger: trigger.id,
     from: trigger.actor.id,
-    fromKind: senderKind(trigger.actor.kind),
+    fromKind: actorKindOf(trigger.actor.kind),
+    ...(trigger.actor.role !== undefined ? { fromRole: trigger.actor.role } : {}),
     name: trigger.actor.name ?? trigger.actor.id,
     text: [payload.note, trigger.card.truncated || context.number === 0 ? `${trigger.card.summary}\n${trigger.card.readUri}` : trigger.card.summary]
       .filter(Boolean)
@@ -113,19 +118,11 @@ export function inputOf({ envelope_id, payload }: { readonly envelope_id: string
   };
 }
 
-export function inputContext({
-  id: _id,
-  from: _from,
-  fromKind: _kind,
-  name: _name,
-  text: _text,
-  originTrigger: _origin,
-  ...context
-}: InboxMessage): InputContext {
+export function inputContext({ id: _id, from: _from, fromKind: _kind, name: _name, text: _text, originTrigger: _origin, ...context }: Envelope): InputContext {
   return context;
 }
 
-export const orchestratorSource = (source: T.TriggerSource): OrchestratorNews["source"] => {
+export const orchestratorSource = (source: T.TriggerSource): Handed["source"] => {
   switch (source) {
     case "cron":
     case "patrol":

@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Stream } from "effect";
+import { Effect, Formatter, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 
 import { PublicHttp } from "#/infra/publicHttp.ts";
@@ -112,7 +112,7 @@ export const network = Layer.unwrap(
           if (files.get(input.file_id)?.purpose !== "audio") return HttpClientResponse.fromWeb(request, new Response("", { status: 400 }));
           const id = `transcription-${++next}`;
           if (input.stream === true) {
-            const frame = (value: object) => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`);
+            const frame = (value: object) => new TextEncoder().encode(`data: ${Formatter.formatJson(value)}\n\n`);
             const initial = Stream.make(
               frame({ type: "task.created", task_id: id, object: "audio.transcription", status: "PROCESSING", model: input.model }),
               frame({ type: "transcript.text.delta", delta: "First synthetic speaker." }),
@@ -186,7 +186,7 @@ export const network = Layer.unwrap(
           if (input.input.includes("[speech:unknown]")) return HttpClientResponse.fromWeb(request, new Response("", { status: 503 }));
           if (input.stream === true) {
             const id = `stream-${++next}`;
-            const frame = (value: object) => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`);
+            const frame = (value: object) => new TextEncoder().encode(`data: ${Formatter.formatJson(value)}\n\n`);
             const mono = wav().subarray(44);
             const stereo = Buffer.alloc(mono.length * 2);
             for (let sample = 0; sample < mono.length / 2; sample++) {

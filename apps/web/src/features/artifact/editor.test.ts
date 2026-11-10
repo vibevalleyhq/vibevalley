@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
-import { type Block, type BlockAck, type BlockSnapshot, ownerId } from "@vibevalley/protocol";
+import { type Block, type BlockAck, type BlockSnapshot, userId } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 import { api } from "#/infra/api.ts";
@@ -21,7 +21,7 @@ const block = (rev: number, text: string, by = "helper", key = "a"): Block => ({
   updated: rev,
 });
 const snapshot = (blocks: Block[], seq = 1): BlockSnapshot => ({
-  artifact: { id, title: "shared", body: "blocks", by: ownerId, byName: "owner", version: 0, seq, versions: [], at: 0, updated: 0 },
+  artifact: { id, title: "shared", body: "blocks", by: userId, byName: "user", version: 0, seq, versions: [], at: 0, updated: 0 },
   blocks,
 });
 const editors: BlockEditor[] = [];
@@ -34,7 +34,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
-const opened = async (blocks = [block(1, "initial", ownerId)]) => {
+const opened = async (blocks = [block(1, "initial", userId)]) => {
   vi.spyOn(api.artifact.block, "list").mockResolvedValue(snapshot(blocks));
   const editor = new BlockEditor(api, id);
   editors.push(editor);
@@ -76,7 +76,7 @@ test("regression: leaving an unchanged focused block applies the newest deferred
 });
 
 test("regression: a deferred update cannot rebase queued local text behind an in-flight batch", async () => {
-  const editor = await opened([block(1, "first", ownerId), block(1, "second", ownerId, "b")]);
+  const editor = await opened([block(1, "first", userId), block(1, "second", userId, "b")]);
   const replies = [deferred<BlockAck>(), deferred<BlockAck>()];
   const submit = vi.spyOn(api.artifact, "submit").mockReturnValueOnce(replies[0]!.promise).mockReturnValueOnce(replies[1]!.promise);
   const [first, second] = editor.blocks;
@@ -87,7 +87,7 @@ test("regression: a deferred update cannot rebase queued local text behind an in
   editor.edited(second!, "second local", 12);
   editor.focus(second!, false);
   expect([second!.text, second!.rev]).toEqual(["second local", 1]);
-  replies[0]!.resolve({ batchId: "first", seq: 3, blocks: [block(2, "first local", ownerId)], results: [] });
+  replies[0]!.resolve({ batchId: "first", seq: 3, blocks: [block(2, "first local", userId)], results: [] });
   await vi.advanceTimersByTimeAsync(0);
   expect(submit.mock.calls[1]?.[0].ops).toEqual([{ op: "update_text", blockId: second!.id, baseRev: 1, text: [{ t: "second local", marks: {} }] }]);
   replies[1]!.resolve({
@@ -122,14 +122,14 @@ test("regression: composition keeps its text and original revision across a remo
 });
 
 test("regression: a late acknowledgement cannot move the next batch cursor behind a pushed update", async () => {
-  const editor = await opened([block(1, "first", ownerId), block(1, "second", ownerId, "b")]);
+  const editor = await opened([block(1, "first", userId), block(1, "second", userId, "b")]);
   const replies = [deferred<BlockAck>(), deferred<BlockAck>()];
   const submit = vi.spyOn(api.artifact, "submit").mockReturnValueOnce(replies[0]!.promise).mockReturnValueOnce(replies[1]!.promise);
   const mine = editor.blocks[0]!;
   editor.edited(mine, "local", 5);
   editor.flush();
   editor.receive({ seq: 5, blocks: [block(5, "newest", "helper", "b")] });
-  replies[0]!.resolve({ batchId: "first", seq: 2, blocks: [block(2, "local", ownerId)], results: [] });
+  replies[0]!.resolve({ batchId: "first", seq: 2, blocks: [block(2, "local", userId)], results: [] });
   await vi.advanceTimersByTimeAsync(0);
   editor.receive({ seq: 3, blocks: [block(3, "old", "helper", "b")] });
   editor.receive({ seq: 4, blocks: [{ ...block(4, "deleted", "helper", "b"), deleted: true }] });
@@ -137,7 +137,7 @@ test("regression: a late acknowledgement cannot move the next batch cursor behin
   editor.edited(mine, "local again", 11);
   editor.flush();
   expect(submit.mock.calls[1]?.[0].lastSeq).toBe(5);
-  replies[1]!.resolve({ batchId: "second", seq: 6, blocks: [block(3, "local again", ownerId)], results: [] });
+  replies[1]!.resolve({ batchId: "second", seq: 6, blocks: [block(3, "local again", userId)], results: [] });
   await vi.advanceTimersByTimeAsync(0);
 });
 
@@ -183,7 +183,7 @@ test("regression: a reset snapshot cannot rebase text already being edited", asy
 });
 
 test("regression: an unrelated batch does not delay a clean block's deferred update", async () => {
-  const editor = await opened([block(1, "first", ownerId), block(1, "second", ownerId, "b")]);
+  const editor = await opened([block(1, "first", userId), block(1, "second", userId, "b")]);
   const pending = deferred<BlockAck>();
   vi.spyOn(api.artifact, "submit").mockReturnValue(pending.promise);
   const [first, second] = editor.blocks;
@@ -193,7 +193,7 @@ test("regression: an unrelated batch does not delay a clean block's deferred upd
   editor.receive({ seq: 2, blocks: [block(2, "remote", "helper", "b")] });
   editor.focus(second!, false);
   expect([second!.text, second!.rev]).toEqual(["remote", 2]);
-  pending.resolve({ batchId: "first", seq: 3, blocks: [block(2, "local", ownerId)], results: [] });
+  pending.resolve({ batchId: "first", seq: 3, blocks: [block(2, "local", userId)], results: [] });
   await vi.advanceTimersByTimeAsync(0);
 });
 
@@ -206,7 +206,7 @@ test("regression: a reset snapshot preserves a new block whose insertion is in f
   expect(added.rev).toBe(0);
   await editor.load();
   expect(editor.blocks.map((b) => b.id)).toEqual([blockId("a"), added.id]);
-  pending.resolve({ batchId: "insert", seq: 2, blocks: [{ ...block(1, "", ownerId, added.id), orderKey: added.orderKey }], results: [] });
+  pending.resolve({ batchId: "insert", seq: 2, blocks: [{ ...block(1, "", userId, added.id), orderKey: added.orderKey }], results: [] });
   await vi.advanceTimersByTimeAsync(0);
   expect(editor.blocks[1]?.rev).toBe(1);
 });

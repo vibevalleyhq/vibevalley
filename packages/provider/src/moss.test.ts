@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect, Formatter, Schema } from "effect";
 
 import { type MossEvents, type MossTransport, verifyMoss } from "./moss/server.ts";
 
@@ -24,21 +24,23 @@ describe("checking a MOSS Live key", () => {
       const { transport, log } = fake((on, sent) => {
         on.open();
         const attached = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ action: Schema.String })))(sent[0]);
-        if (attached.action === "attach_session") on.text(JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }));
+        if (attached.action === "attach_session") on.text(Formatter.formatJson({ action: "session_attached", data: { session_id: "s1" } }));
       });
-      expect(yield* verifyMoss("sk-good", transport)).toEqual({ kind: "ok" });
+      const mossVerified = yield* verifyMoss("sk-good", transport);
+      expect(mossVerified).toEqual({ kind: "ok" });
       expect([log.closed, log.asked]).toEqual([1, 0]);
     }),
   );
 
   it.effect("says a refused key is refused, from what plain HTTPS answers", () =>
     Effect.gen(function* () {
-      const body = JSON.stringify({ error: { type: "permission_error", message: "iam api key auth failed" } });
+      const body = Formatter.formatJson({ error: { type: "permission_error", message: "iam api key auth failed" } });
       const { transport } = fake(
         (on) => on.down(""),
         () => Effect.succeed({ code: 403, body }),
       );
-      expect(yield* verifyMoss("sk-bad", transport)).toEqual({ kind: "refused", why: "iam api key auth failed" });
+      const mossVerified = yield* verifyMoss("sk-bad", transport);
+      expect(mossVerified).toEqual({ kind: "refused", why: "iam api key auth failed" });
     }),
   );
 
@@ -52,10 +54,14 @@ describe("checking a MOSS Live key", () => {
       const erring = fake((on) => {
         on.open();
         on.text(
-          JSON.stringify({ action: "error", data: { type: "error", error: { code: "invalid_public_request", message: "invalid or unsupported request" } } }),
+          Formatter.formatJson({
+            action: "error",
+            data: { type: "error", error: { code: "invalid_public_request", message: "invalid or unsupported request" } },
+          }),
         );
       });
-      expect(yield* verifyMoss("sk-x", erring.transport)).toEqual({ kind: "failed", why: "invalid or unsupported request" });
+      const mossVerified = yield* verifyMoss("sk-x", erring.transport);
+      expect(mossVerified).toEqual({ kind: "failed", why: "invalid or unsupported request" });
     }),
   );
   it.effect("regression: verifies the selected Live snapshot without leaking its credential in errors", () =>
@@ -66,13 +72,14 @@ describe("checking a MOSS Live key", () => {
           models.push(model);
           queueMicrotask(() => {
             on.open();
-            on.text(JSON.stringify({ action: "error", data: { error: "rejected private-fixture-key" } }));
+            on.text(Formatter.formatJson({ action: "error", data: { error: "rejected private-fixture-key" } }));
           });
           return { send: () => {}, close: () => {} };
         },
         status: () => Effect.die("No HTTP fallback after explicit protocol error"),
       };
-      expect(yield* verifyMoss("private-fixture-key", transport, "moss-live-1.0-2026-11-02")).toEqual({
+      const mossVerified = yield* verifyMoss("private-fixture-key", transport, "moss-live-1.0-2026-11-02");
+      expect(mossVerified).toEqual({
         kind: "failed",
         why: "rejected [redacted]",
       });

@@ -4,7 +4,7 @@ import { Cron as EffectCron, DateTime, Option } from "effect";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { actsForUser, type Actor } from "#/base/actor.ts";
 const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
 /** A day of the week by its number, Sunday 0. */
 const weekday = (d: number) => t(`server.cron.weekdays.${weekdayKeys[d] ?? "0"}`);
@@ -29,7 +29,7 @@ export function givenZone(tz: string): DateTime.TimeZone | undefined {
 /** The first run of the cron strictly after from. */
 function nextOf(cron: EffectCron.Cron, from: number): number | undefined {
   try {
-    return EffectCron.next(cron, new Date(from)).getTime();
+    return EffectCron.next(cron, from).getTime();
   } catch {
     return undefined;
   }
@@ -236,9 +236,9 @@ export const isMissed = (s: T.Cron, now: number) => now - (nextRun(s) ?? now) > 
 /** A one-off runs once: then it is off. */
 export const afterRun = (s: T.Cron, now: number): T.Cron => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
 
-/** Whether a cron waits for the owner's yes before it can come due. One set on the owner's word never waits. */
+/** Whether a cron waits for the user's yes before it can come due. One set on the user's word never waits. */
 export function needsOK(req: T.CronRequest, by: Actor): boolean {
-  return !actsForOwner(by) && (req.when.kind !== "once" || (req.agent ?? "").trim() !== "");
+  return !actsForUser(by) && (req.when.kind !== "once" || (req.agent ?? "").trim() !== "");
 }
 
 export function cronProblem(req: T.CronRequest, now: number): string {

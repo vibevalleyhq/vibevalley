@@ -8,7 +8,7 @@
     "tts": "speech"
   },
   "noAsrKey": "Microsoft recognition has no key yet: fill it in under Recognition on the Voice page",
-  "noLine": "The manager's voice line is not connected",
+  "noLine": "The assistant's voice line is not connected",
   "noDeepseekKey": "DeepSeek needs a DeepSeek key first: fill it in under Settings",
   "noLlmKey": "Your own model has no key yet: fill it in under Think on the Voice page",
   "noTtsKey": "Microsoft speech has no key yet: fill it in under Speak on the Voice page",
@@ -27,9 +27,9 @@
   "stopped": "The voice service has stopped",
   "grantGone": "This call's voice credentials have expired: connect again",
   "connecting": "This call is already connecting",
-  "lineFailed": "The manager's voice line cannot connect: {why}",
-  "joinFailed": "Could not bring the manager into the channel: {why}",
-  "leaveFailed": "Could not have the manager leave: {why}",
+  "lineFailed": "The assistant's voice line cannot connect: {why}",
+  "joinFailed": "Could not bring the assistant into the channel: {why}",
+  "leaveFailed": "Could not have the assistant leave: {why}",
   "manyCalls": "Several calls are connecting: update the app and try again",
   "noCall": "No call is connecting",
   "dictation": {

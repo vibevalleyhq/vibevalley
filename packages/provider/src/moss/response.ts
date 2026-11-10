@@ -9,7 +9,7 @@ export const readMossResponse = Effect.fn("Provider.readMossResponse")(function*
     Stream.catchReason("HttpClientError", "EmptyBodyError", () => Stream.empty),
     Stream.mapEffect((chunk) => {
       bytes += chunk.byteLength;
-      return bytes > 1 << 20 ? Effect.fail(new MossResponseTooLarge()) : Effect.succeed(chunk);
+      return bytes > 1 << 20 ? Effect.fail(MossResponseTooLarge.make()) : Effect.succeed(chunk);
     }),
     Stream.runCollect,
   );

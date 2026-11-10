@@ -1,10 +1,12 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Formatter, Option, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { deleteMossFile, getMossFile, listMossFiles, uploadMossFile } from "./files.ts";
 import { understandMossMedia } from "./understanding.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const file = { id: "file-test", object: "file", bytes: 3, created_at: 42, filename: "image.png", purpose: "image", status: "processed" };
 const input = { file: new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }), filename: "image.png", purpose: "image" };
@@ -19,7 +21,8 @@ it.effect("file upload keeps a Blob multipart body and the client owns its bound
     return Promise.resolve(Response.json(file));
   };
   return Effect.gen(function* () {
-    expect(yield* uploadMossFile("test-key", input)).toEqual(file);
+    const mossFileUploaded = yield* uploadMossFile("test-key", input);
+    expect(mossFileUploaded).toEqual(file);
     expect(sent).toHaveLength(1);
     const init = sent[0];
     expect(init?.method).toBe("POST");
@@ -52,7 +55,8 @@ it.effect.each([
   { path: "/private/image" },
 ])("invalid upload never reaches the transport %#", (invalid) =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(uploadMossFile("test-key", { ...input, ...invalid }))).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+    const mossFileUploadedFailure = yield* Effect.flip(uploadMossFile("test-key", { ...input, ...invalid }));
+    expect(mossFileUploadedFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -76,8 +80,10 @@ it.effect.each([
   `file${String.fromCharCode(0)}`,
 ])("file IDs cannot escape the fixed endpoint %#", (id) =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(getMossFile("test-key", id))).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
-    expect(yield* Effect.flip(deleteMossFile("test-key", id))).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+    const mossFileFailure = yield* Effect.flip(getMossFile("test-key", id));
+    expect(mossFileFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+    const mossFileDeletedFailure = yield* Effect.flip(deleteMossFile("test-key", id));
+    expect(mossFileDeletedFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -88,27 +94,28 @@ it.effect.each([
 
 it.effect("lookup and deletion require receipts for the requested file", () =>
   Effect.gen(function* () {
-    expect(yield* getMossFile("test-key", "file-test").pipe(Effect.provideService(HttpClient.HttpClient, answer(file)))).toEqual(file);
-    expect(
-      yield* deleteMossFile("test-key", "file-test").pipe(
-        Effect.provideService(HttpClient.HttpClient, answer({ id: "file-test", object: "file", deleted: true })),
-      ),
-    ).toEqual({ id: "file-test", object: "file", deleted: true });
-    expect(yield* Effect.flip(getMossFile("test-key", "file-other").pipe(Effect.provideService(HttpClient.HttpClient, answer(file))))).toMatchObject({
+    const mossFile = yield* getMossFile("test-key", "file-test").pipe(Effect.provideService(HttpClient.HttpClient, answer(file)));
+    expect(mossFile).toEqual(file);
+    const mossFileDeleted = yield* deleteMossFile("test-key", "file-test").pipe(
+      Effect.provideService(HttpClient.HttpClient, answer({ id: "file-test", object: "file", deleted: true })),
+    );
+    expect(mossFileDeleted).toEqual({ id: "file-test", object: "file", deleted: true });
+    const mossFileFailure = yield* Effect.flip(getMossFile("test-key", "file-other").pipe(Effect.provideService(HttpClient.HttpClient, answer(file))));
+    expect(mossFileFailure).toMatchObject({
       reason: "InvalidResponse",
       outcome: "Unknown",
     });
-    expect(
-      yield* Effect.flip(
-        deleteMossFile("test-key", "file-other").pipe(Effect.provideService(HttpClient.HttpClient, answer({ id: "file-test", object: "file", deleted: true }))),
-      ),
-    ).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossFileDeletedFailure = yield* Effect.flip(
+      deleteMossFile("test-key", "file-other").pipe(Effect.provideService(HttpClient.HttpClient, answer({ id: "file-test", object: "file", deleted: true }))),
+    );
+    expect(mossFileDeletedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }),
 );
 
 it.effect.each([{ bytes: 4 }, { purpose: "video" }])("upload receipts must match the submitted bytes and purpose %#", (change) =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(uploadMossFile("test-key", input))).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossFileUploadedFailure = yield* Effect.flip(uploadMossFile("test-key", input));
+    expect(mossFileUploadedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...file, ...change }))),
 );
 
@@ -116,7 +123,8 @@ it.effect.each([{ limit: 0 }, { limit: 201 }, { offset: -1 }, { offset: 100001 }
   "invalid pagination does not query %#",
   (page) =>
     Effect.gen(function* () {
-      expect(yield* Effect.flip(listMossFiles("test-key", page))).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
+      const mossFilesFailure = yield* Effect.flip(listMossFiles("test-key", page));
+      expect(mossFilesFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
     }).pipe(
       Effect.provideService(
         HttpClient.HttpClient,
@@ -141,7 +149,7 @@ it.effect.each([400, 401, 403, 413, 429, 302, 404, 500])("file HTTP %s is saniti
   return Effect.gen(function* () {
     const error = yield* Effect.flip(uploadMossFile("test-key", input));
     expect(error).toMatchObject({ reason: "HttpStatus", status, outcome: [400, 401, 403, 413, 429].includes(status) ? "Rejected" : "Unknown" });
-    expect(JSON.stringify(error)).not.toMatch(/test-key|private-url/u);
+    expect(Formatter.formatJson(error)).not.toMatch(/test-key|private-url/u);
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -153,7 +161,8 @@ it.effect("regression: files larger than the vendor upload limit are rejected wi
     }
   }
   return Effect.gen(function* () {
-    expect(yield* Effect.flip(uploadMossFile("test-key", { ...input, file: new Oversized() }))).toMatchObject({
+    const mossFileUploadedFailure = yield* Effect.flip(uploadMossFile("test-key", { ...input, file: new Oversized() }));
+    expect(mossFileUploadedFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });
@@ -167,7 +176,8 @@ it.effect("regression: files larger than the vendor upload limit are rejected wi
 
 it.effect.each(["", " ", "key\nheader"])("file credentials are explicit and validated %#", (key) =>
   Effect.gen(function* () {
-    expect(yield* Effect.flip(uploadMossFile(key, input))).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
+    const mossFileUploadedFailure = yield* Effect.flip(uploadMossFile(key, input));
+    expect(mossFileUploadedFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
   }).pipe(
     Effect.provideService(
       HttpClient.HttpClient,
@@ -178,21 +188,18 @@ it.effect.each(["", " ", "key\nheader"])("file credentials are explicit and vali
 
 it.effect("file metadata and list responses are bounded", () =>
   Effect.gen(function* () {
-    expect(
-      yield* Effect.flip(
-        getMossFile("test-key", "file-test").pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...file, filename: "x".repeat(1 << 20) }))),
-      ),
-    ).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
-    expect(
-      yield* Effect.flip(
-        listMossFiles("test-key", { limit: 1 }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ object: "list", data: [file, file] }))),
-      ),
-    ).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
-    expect(
-      yield* Effect.flip(
-        deleteMossFile("test-key", "file-test").pipe(Effect.provideService(HttpClient.HttpClient, answer({ id: "file-test", object: "file", deleted: false }))),
-      ),
-    ).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossFileFailure = yield* Effect.flip(
+      getMossFile("test-key", "file-test").pipe(Effect.provideService(HttpClient.HttpClient, answer({ ...file, filename: "x".repeat(1 << 20) }))),
+    );
+    expect(mossFileFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
+    const mossFilesFailure = yield* Effect.flip(
+      listMossFiles("test-key", { limit: 1 }).pipe(Effect.provideService(HttpClient.HttpClient, answer({ object: "list", data: [file, file] }))),
+    );
+    expect(mossFilesFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
+    const mossFileDeletedFailure = yield* Effect.flip(
+      deleteMossFile("test-key", "file-test").pipe(Effect.provideService(HttpClient.HttpClient, answer({ id: "file-test", object: "file", deleted: false }))),
+    );
+    expect(mossFileDeletedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   }),
 );
 
@@ -211,7 +218,8 @@ it.effect("canceling an upload interrupts only that transport and never resubmit
     const fiber = yield* uploadMossFile("test-key", input).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.forkChild);
     yield* Deferred.await(started);
     yield* Fiber.interrupt(fiber);
-    expect(yield* Deferred.isDone(stopped)).toBe(true);
+    const isDone2 = yield* Deferred.isDone(stopped);
+    expect(isDone2).toBe(true);
     expect(calls).toBe(1);
   }),
 );
@@ -223,7 +231,7 @@ it.effect("an uploaded file can be referenced for understanding and explicitly d
     expect(request.headers.authorization).toBe("Bearer test-key");
     if (request.url.endsWith("/responses")) {
       if (request.body._tag !== "Uint8Array") throw new Error("Expected JSON request");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model: "moss-vl-1.0",
         input: [
           {
@@ -294,7 +302,8 @@ it.effect("file request deadline includes response reading and cancels the strea
     const fiber = yield* uploadMossFile("test-key", input).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.flip, Effect.forkChild);
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
-    expect(yield* Fiber.join(fiber)).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
+    const fiber2 = yield* Fiber.join(fiber);
+    expect(fiber2).toMatchObject({ reason: "Timeout", outcome: "Unknown" });
     expect(canceled).toBe(true);
   }),
 );

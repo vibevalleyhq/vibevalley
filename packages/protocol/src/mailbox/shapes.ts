@@ -1,3 +1,4 @@
+import type { AgentRole } from "../agent/shapes";
 import type { QuotedBlock } from "../artifact/shapes";
 import type { ChannelType } from "../channel/shapes";
 import type { IssueId } from "../common/shapes";
@@ -6,7 +7,7 @@ import type { RunTrigger } from "../session/shapes";
 export const TriggerSourceValues = ["workbench", "channel", "connector", "voice", "github", "cron", "patrol"] as const;
 export type TriggerSource = (typeof TriggerSourceValues)[number];
 
-export const TriggerActorKindValues = ["owner", "collaborator", "bot", "ci", "session", "orchestrator", "system"] as const;
+export const TriggerActorKindValues = ["user", "collaborator", "bot", "ci", "agent", "system"] as const;
 export type TriggerActorKind = (typeof TriggerActorKindValues)[number];
 
 export const TriggerAddressingValues = ["direct", "mention", "thread_owner", "unaddressed"] as const;
@@ -22,6 +23,8 @@ export type VoiceMode = (typeof VoiceModeValues)[number];
 export interface TriggerActor {
   readonly kind: TriggerActorKind;
   readonly id: string;
+  /** The agent's role, when kind is agent. */
+  readonly role?: AgentRole;
   readonly name?: string;
 }
 

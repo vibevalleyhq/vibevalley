@@ -77,6 +77,6 @@
   "publish.refused": "分支发布被拒绝：{detail}",
   "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
   "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
-  "publish.ownerOnly": "只有本机主人可以发布已有分支",
+  "publish.userOnly": "只有本机的用户可以发布已有分支",
   "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。"
 }

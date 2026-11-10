@@ -5,21 +5,22 @@ import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
-import { defaultOrchestrator, orchestratorRuntime, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
 import { Agent, modelClient, noDeepSeekKey } from "#/agent/agent.ts";
 import { traitsOf } from "#/agent/prompts.ts";
 import { orchestrator } from "#/base/actor.ts";
+import { serverFile } from "#/base/assets.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
-import { ownersLanguage } from "#/base/prompts.ts";
-import { Channel, type OrchestratorNews } from "#/channel/channel.ts";
+import { usersLanguage } from "#/base/prompts.ts";
+import { Channel } from "#/channel/channel.ts";
 import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
 import { agentHome, reposDir, ServerConfig } from "#/infra/config.ts";
 import { localeMinute } from "#/infra/time.ts";
 import { Ingress } from "#/ingress/ingress.ts";
-import type { Picked } from "#/mailbox/envelope.ts";
+import type { Handed, Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
 import { Repo } from "#/repo/repo.ts";
@@ -34,29 +35,31 @@ import { Tool } from "#/tool/tool.ts";
 import type { Answer } from "./openai.ts";
 import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { makeResponses } from "./response.ts";
-import { deepseekModel, intake, orchestratorInboxLines, quotaText, situationDelta, type Source } from "./situation.ts";
+import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
+/** VibeValley's own skills for its orchestrators (imagegen/SKILL.md…), shipped with the server. */
+export const orchestratorSkills = serverFile("src/orchestrator/skills");
 const keepEvents = 1000;
 const notesShown = 8;
 const notesRecalled = 3;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */
 const resumeWithinMs = 30 * 60_000;
 
-/** What the owner chose beside the words (the sowing form, the chat's profile pick); empty for none. */
+/** What the user chose beside the words (the sowing form, the chat's profile pick); empty for none. */
 export type Pick = Picked;
 
 /** Where an input's answer goes and what it is worth; kept with it in the transcript. */
 interface Route {
   readonly channel: string;
   readonly envelope: string;
-  /** The profile the owner picked beside the words. */
+  /** The profile the user picked beside the words. */
   readonly agent?: string;
   readonly quiet?: boolean;
   readonly source: Source;
   /** The issue handed to the orchestrator that this input is; its run ends when the orchestrator's settles. */
   readonly issue?: string;
-  /** The owner's own words are in this input: only then may the orchestrator complete an issue or change one. */
-  readonly owner?: boolean;
+  /** The user's own words are in this input: only then may the orchestrator complete an issue or change one. */
+  readonly user?: boolean;
 }
 
 /** One input as its producer gives it: the intake table fills in the rest by its source. */
@@ -68,7 +71,7 @@ interface Intake {
   readonly line: string;
   readonly channel: string;
   readonly agent?: string;
-  readonly owner?: boolean;
+  readonly user?: boolean;
   readonly issue?: string;
   readonly envelope?: string;
   /** What started its run, when the producer knows better than its source (an issue's trigger, a missed cron). */
@@ -86,7 +89,7 @@ export class Orchestrator extends Context.Service<
     readonly answerer: (on: "api" | "phone") => (model: string) => Answer<NotAnswered> | undefined;
     readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
   }
->()("vibevalley/Orchestrator") {
+>()("@vibevalley/server/orchestrator/orchestrator") {
   static readonly layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));
 }
 
@@ -122,7 +125,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const toolsFor = (id: string) => (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.owner ?? false) };
+        return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.user ?? false) };
       });
 
     /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
@@ -148,14 +151,14 @@ const make = (options: OrchestratorOptions = {}) =>
           const llmOf = (): ModelClient => {
             if (options.llm) return options.llm();
             // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-            return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
+            return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), settings.deepseekApiKey, service);
           };
           // One of its own crons (not a helper's) comes due within that long: it will be woken then.
           const wakeSoon = (withinMs: number) => {
             const by = clock.currentTimeMillisUnsafe() + withinMs;
             return cron.list().some((s) => {
               const next = nextRun(s);
-              return next !== undefined && (s.agent || chat.orchestratorOf(s.channel)) === id && next <= by;
+              return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
             });
           };
           const profile = store.agent(id);
@@ -181,10 +184,11 @@ const make = (options: OrchestratorOptions = {}) =>
                 instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
                 llm: llmOf,
                 tools: toolsFor(id),
+                skills: [orchestratorSkills],
                 wakeSoon,
-                first: { channel: chat.defaultChannel(), envelope: "", source: "owner" },
+                first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
                 quiet: (r) => r.quiet ?? false,
-                say: (r, text, runId) => chat.orchestratorSays(r.channel, text, runId, id),
+                say: (r, text, runId) => chat.post({ _tag: "Run", from: id, channel: r.channel, text: text, run: runId }),
                 // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
                 channel: (r) => (r.quiet === true ? undefined : r.channel),
                 fresh: () => {
@@ -227,7 +231,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const situation = (channel: string) =>
       Effect.gen(function* () {
         const sessions = yield* agentLines;
-        const roster = run.presentSessions();
+        const roster = run.hired();
         const here = yield* chat.addressOf(channel);
         const byChannel = (yield* chat.channels()).map((c) => {
           const theirs = roster.filter((session) => (session.channel ?? chat.defaultChannel()) === c.id).map((session) => tool.sessionLine(session));
@@ -244,7 +248,7 @@ const make = (options: OrchestratorOptions = {}) =>
           sessions.join("\n"),
           byChannel.join("\n"),
           here.direct ? situationWords.direct(here.target) : here.target,
-          ownersLanguage(),
+          usersLanguage(),
         );
       });
 
@@ -258,11 +262,11 @@ const make = (options: OrchestratorOptions = {}) =>
 
     const news = (me: Instance): Effect.Effect<[string, string[]], ApiError> =>
       Effect.map(mailbox.orchestratorDigest(me.id), (digest) =>
-        digest.length === 0 ? ["", []] : [situationWords.news(orchestratorInboxLines(digest)), digest.map((m) => m.id)],
+        digest.length === 0 ? ["", []] : [situationWords.news(orchestratorEnvelopeLines(digest)), digest.map((m) => m.id)],
       );
 
     const recall = (i: Intake) =>
-      i.source !== "owner" || i.line.trim().length < 4
+      i.source !== "user" || i.line.trim().length < 4
         ? Effect.succeed("")
         : Effect.map(notes.search({ text: head(i.line, 200), limit: notesRecalled }), (hits) => situationWords.recalled(hits.map(toolAnswers.pkm.hit)));
 
@@ -277,21 +281,15 @@ const make = (options: OrchestratorOptions = {}) =>
           ...(i.agent ? { agent: i.agent } : {}),
           source: i.source,
           ...(i.issue ? { issue: i.issue } : {}),
-          ...(i.owner === true ? { owner: true } : {}),
+          ...(i.user === true ? { user: true } : {}),
         };
         const taken = yield* me.host.submit(
           (busy, memoryNews) =>
             Effect.gen(function* () {
               const [heard, ids] = yield* news(me);
               // The log shows the line; the model also gets the time, the farm and the news before it.
-              const text = [
-                situationWords.now(localeMinute(new Date(yield* Clock.currentTimeMillis))),
-                yield* situationNow(me, busy, i.channel),
-                memoryNews,
-                yield* recall(i),
-                heard,
-                asked,
-              ]
+              const now = yield* Clock.currentTimeMillis;
+              const text = [situationWords.now(localeMinute(now)), yield* situationNow(me, busy, i.channel), memoryNews, yield* recall(i), heard, asked]
                 .filter((p) => p !== "")
                 .join("\n\n");
               return { text, heard: [...new Set([...ids, ...i.envelopes])] };
@@ -310,7 +308,7 @@ const make = (options: OrchestratorOptions = {}) =>
         const words = taken.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: taken.why });
         const again = me.cannot.get(i.channel) === words;
         me.cannot.set(i.channel, words);
-        if (!again) yield* chat.orchestratorSays(i.channel, words, taken.run, me.id);
+        if (!again) yield* chat.post({ _tag: "Run", from: me.id, channel: i.channel, text: words, run: taken.run });
         return false;
       });
 
@@ -335,10 +333,10 @@ const make = (options: OrchestratorOptions = {}) =>
       return note;
     };
 
-    const heardInChat = (n: OrchestratorNews) =>
+    const heardInChat = (n: Handed) =>
       Effect.suspend(() => {
-        const fromPerson = n.messages.every((m) => m.from === ownerId);
-        const owner = n.messages.some((m) => m.from === ownerId);
+        const fromPerson = n.messages.every((m) => m.from === userId);
+        const user = n.messages.some((m) => m.from === userId);
         // The latest pick among them: it goes with its message.
         const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
         const response = n.messages.findLast((message) => message.responsePort);
@@ -347,33 +345,33 @@ const make = (options: OrchestratorOptions = {}) =>
         const line = n.source
           ? n.messages.map((message) => message.text.replace(new RegExp(`^@${n.agent}\\s*`, "u"), "")).join("\n")
           : voice?.voiceMode === "dictated"
-            ? pickedNote(picked) + lineWords.dictated + lineWords.owner(n.messages.map((message) => message.text).join("\n"))
+            ? pickedNote(picked) + lineWords.dictated + lineWords.user(n.messages.map((message) => message.text).join("\n"))
             : voice?.voiceMode === "conversation"
-              ? voiceNote + "\n" + lineWords.owner(n.messages.map((message) => message.text).join("\n"))
+              ? voiceNote + "\n" + lineWords.user(n.messages.map((message) => message.text).join("\n"))
               : n.messages.every((message) => message.number === 0)
-                ? pickedNote(picked) + lineWords.events(orchestratorInboxLines(n.messages))
+                ? pickedNote(picked) + lineWords.events(orchestratorEnvelopeLines(n.messages))
                 : fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
-                  ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
-                  : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
+                  ? pickedNote(picked) + lineWords.user(n.messages.map((m) => m.text).join("\n"))
+                  : pickedNote(picked) + lineWords.chat(n.target, orchestratorEnvelopeLines(n.messages));
         return take({
           envelopes: n.messages.map((message) => message.id),
           to: n.agent,
-          source: n.source ?? (fromPerson ? "owner" : "chat"),
+          source: n.source ?? (fromPerson ? "user" : "chat"),
           line,
           channel: n.channel,
           ...(picked.agent ? { agent: picked.agent } : {}),
           envelope:
-            n.messages.findLast((message) => message.from === ownerId)?.originTrigger ??
-            n.messages.findLast((message) => message.from === ownerId)?.id ??
+            n.messages.findLast((message) => message.from === userId)?.originTrigger ??
+            n.messages.findLast((message) => message.from === userId)?.id ??
             n.messages.at(-1)?.originTrigger ??
             n.messages.at(-1)?.id ??
             "",
-          owner,
+          user,
           ...(n.issue ? { issue: n.issue } : {}),
           ...(n.by ? { by: n.by } : {}),
           ...(caller ? { caller } : {}),
         }).pipe(
-          Effect.tap((taken) => (taken ? Effect.void : Effect.forEach(n.messages, (message) => mailbox.returnOne(n.agent, message.id), { discard: true }))),
+          Effect.tap((taken) => (taken ? Effect.void : Effect.forEach(n.messages, (message) => mailbox.handBack(n.agent, message.id), { discard: true }))),
         );
       });
 
@@ -385,14 +383,15 @@ const make = (options: OrchestratorOptions = {}) =>
 
     // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
-      yield* Effect.forkScoped(Stream.runForEach(yield* mailbox.forOrchestrator, (n) => logged("a line", heardInChat(n))));
+      const news = yield* mailbox.news;
+      yield* Effect.forkScoped(Stream.runForEach(news, (n) => (n._tag === "Handed" ? logged("a line", heardInChat(n)) : Effect.void)));
       // Each orchestrator goes on with the run a stop cut off.
       yield* Effect.forEach(
         store.orchestrators(),
         (a) =>
           Effect.gen(function* () {
             const me = yield* instanceOf(a.id);
-            if ((options.llm || settings.deepseekApiKey()) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
+            if ((options.llm !== undefined || settings.deepseekApiKey() !== undefined) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
           }),
         { discard: true },
       );

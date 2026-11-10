@@ -13,10 +13,12 @@ class DeepSeekError extends Schema.TaggedError<DeepSeekError, { readonly brand: 
 
 const decodeErrorBody = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ error: Schema.Record(Schema.String, Schema.Unknown) })));
 const decodeStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const encodeErrorBody = Schema.encodeOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 
 function statusMessage(status: number, text: string): string {
-  const parsed = decodeErrorBody(text);
-  if (Option.isSome(parsed)) return `${status}: ${JSON.stringify(parsed.value.error)}`;
+  const shown = Option.flatMap(decodeErrorBody(text), (body) => encodeErrorBody(body.error));
+  if (Option.isSome(shown)) return `${status}: ${shown.value}`;
   return `${status} ${text.trim() || "status code (no body)"}`;
 }
 
@@ -33,31 +35,29 @@ export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (conn
     );
     const res = yield* http
       .execute(request)
-      .pipe(Effect.mapError((cause) => new DeepSeekError({ reason: "network", message: `Connection error: ${cause.message}`, cause })));
+      .pipe(Effect.mapError((cause) => DeepSeekError.make({ reason: "network", message: `Connection error: ${cause.message}`, cause })));
     if (res.status >= 400) {
       const text = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
-      return yield* new DeepSeekError({ reason: "status", status: res.status, message: statusMessage(res.status, text) });
+      return yield* DeepSeekError.make({ reason: "status", status: res.status, message: statusMessage(res.status, text) });
     }
     const sse = new SseData();
     return res.stream.pipe(
-      Stream.mapError((e) => new DeepSeekError({ reason: "stream", message: `The stream broke: ${e.message}` })),
+      Stream.mapError((e) => DeepSeekError.make({ reason: "stream", message: `The stream broke: ${e.message}` })),
       Stream.decodeText(),
       Stream.splitLines,
       Stream.map((line) => sse.line(line)),
       Stream.filter(Predicate.isNotUndefined),
       Stream.mapEffect((data) =>
         decodeStreamChunk(data).pipe(
-          Effect.mapError(() => new DeepSeekError({ reason: "stream", message: `Not JSON in the stream: ${data.slice(0, 200)}` })),
+          Effect.mapError(() => DeepSeekError.make({ reason: "stream", message: `Not JSON in the stream: ${data.slice(0, 200)}` })),
           Effect.flatMap((chunk) => {
             const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
-            return error !== undefined && error !== null
-              ? Effect.fail(
-                  new DeepSeekError({
-                    reason: "stream",
-                    message: typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : JSON.stringify(error),
-                  }),
-                )
-              : Effect.succeed(decodeDeepSeekChunk(chunk));
+            if (error === undefined || error === null) return Effect.succeed(decodeDeepSeekChunk(chunk));
+            const message =
+              Predicate.hasProperty(error, "message") && typeof error.message === "string"
+                ? Effect.succeed(error.message)
+                : encodeJson(error).pipe(Effect.orElseSucceed(() => "The stream reported an error that is not JSON"));
+            return Effect.flatMap(message, (said) => Effect.fail(DeepSeekError.make({ reason: "stream", message: said })));
           }),
         ),
       ),

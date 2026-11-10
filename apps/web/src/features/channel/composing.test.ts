@@ -66,7 +66,7 @@ test("a line is on its way at once: the box empties, and every routing field goe
     flush();
     expect(s.box.text()).toBe("");
     const [line] = s.says.all();
-    expect(line).toMatchObject({ status: "pending", input: { id: "thread", agent: "a", repo: "p", station: 1, text: "同一句" } });
+    expect(line).toMatchObject({ phase: "sending", input: { id: "thread", agent: "a", repo: "p", station: 1, text: "同一句" } });
     await sending;
     expect(send).toHaveBeenCalledWith({ id: "thread", agent: "a", repo: "p", station: 1, text: "同一句", sendKey: line?.key });
   } finally {
@@ -81,11 +81,11 @@ test("a lost reply leaves the line failed and told; a retry after the composer i
   await s.box.send();
   expect(s.failed).toHaveBeenCalledWith("response lost");
   const [line] = s.says.all();
-  expect(line).toMatchObject({ status: "failed", input: { text: "还在吗" } });
+  expect(line).toMatchObject({ phase: "failed", input: { text: "还在吗" } });
   s.dispose();
   await s.says.retry(line?.key ?? "");
   expect(send.mock.calls.map(([body]) => body.sendKey)).toEqual([line?.key, line?.key]);
-  expect(s.says.all()).toMatchObject([{ key: line?.key, status: "pending", replied: {} }]);
+  expect(s.says.all()).toMatchObject([{ key: line?.key, phase: "confirming", replied: {} }]);
 });
 
 test("a composer closed while its line is on its way tells nobody of the outcome", async () => {
@@ -98,19 +98,16 @@ test("a composer closed while its line is on its way tells nobody of the outcome
   reply.reject(new Error("lost"));
   await sending;
   expect(s.failed).not.toHaveBeenCalled();
-  expect(s.says.all()).toMatchObject([{ status: "failed" }]);
+  expect(s.says.all()).toMatchObject([{ phase: "failed" }]);
 });
 
 test("a channel's lines on their way are the ones its messages do not have yet, oldest first", () => {
-  const said = (key: string, id: string, over: Partial<Intent<Said, void>> = {}): Intent<Said, void> => ({
-    key,
-    input: { id, text: key },
-    status: "pending",
-    queued: false,
-    ...over,
-  });
+  const said = (key: string, id: string, refused?: string): Intent<Said, void> =>
+    refused === undefined
+      ? { key, input: { id, text: key }, phase: "sending" }
+      : { key, input: { id, text: key }, phase: "failed", fault: { tag: "Refused", reason: refused, retryable: false } };
   const arrived = [{ sendKey: "b" }];
-  expect(pendingLines([said("a", "c1"), said("b", "c1"), said("x", "c2"), said("d", "c1", { status: "failed", reason: "不行" })], "c1", arrived)).toEqual([
+  expect(pendingLines([said("a", "c1"), said("b", "c1"), said("x", "c2"), said("d", "c1", "不行")], "c1", arrived)).toEqual([
     { key: "a", text: "a", state: "sending" },
     { key: "d", text: "d", state: "failed", reason: "不行" },
   ]);
@@ -154,6 +151,27 @@ test("a refused command is told and keeps its line; while the state stream is lo
     expect(stop).toHaveBeenCalledTimes(1);
     expect(s.failed).toHaveBeenCalledTimes(2);
     expect(s.box.text()).toBe("/stop");
+  } finally {
+    s.dispose();
+  }
+});
+
+test("Escape shuts the menu for the trigger it was at: typing on in it keeps it shut, a new one opens it", () => {
+  const s = setup();
+  try {
+    const escape = () => {
+      s.box.onKey({ key: "Escape", isComposing: false, shiftKey: false, preventDefault: () => {}, stopPropagation: () => {} });
+      flush();
+    };
+    s.type("/i");
+    expect(s.box.offered().length).toBeGreaterThan(0);
+    escape();
+    expect(s.box.offered()).toEqual([]);
+    s.type("/im");
+    expect(s.box.offered()).toEqual([]);
+    s.type("");
+    s.type("/");
+    expect(s.box.offered().length).toBeGreaterThan(0);
   } finally {
     s.dispose();
   }

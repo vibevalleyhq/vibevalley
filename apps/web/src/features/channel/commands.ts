@@ -1,23 +1,26 @@
 import { t } from "@vibevalley/i18n";
-import type { Channel } from "@vibevalley/protocol";
+import type { Channel, Feature, Readiness } from "@vibevalley/protocol";
 
 import { api, createRequestKey } from "#/infra/api.ts";
+import { fixOf } from "#/infra/readiness.ts";
 
 import type { Nameable } from "./mentions";
-const CommandNames = ["issue", "remember", "stop", "dm"] as const;
+const CommandNames = ["issue", "remember", "stop", "dm", "imagegen"] as const;
 type CommandName = (typeof CommandNames)[number];
 
 /** Where a command runs: the place the box writes to, and the orchestrator that looks after it. */
 interface CommandPlace {
   readonly channel: Channel | undefined;
   readonly orchestrator: string;
+  /** What is set up (SettingsStatus.readiness); unknown while the settings are on their way. */
+  readonly readiness: Record<Feature, Readiness> | undefined;
 }
 
 /** What came of a command: words to show, or a place to open. */
 type CommandDone = { readonly say: string } | { readonly open: string };
 
 /** Whether a command needs words after it (a title, a note, a profile). */
-const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true };
+const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true, imagegen: true };
 
 // A command that makes something keeps its request key per line until it went through.
 const keys = new Map<string, ReturnType<typeof createRequestKey>>();
@@ -44,11 +47,30 @@ const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<Comma
     return { say: t("web.channel.commands.done.stop") };
   },
   dm: async (who) => ({ open: `/chat/${await api.channel.direct.create({ agent: who })}` }),
+  // The line is said in the place as it is, to the orchestrator there alone: it loads its imagegen skill, and the image is
+  // posted back here when it is made.
+  imagegen: (text, at) => {
+    // Not set up: the line would only come back as a failed task, so the setting that fixes it opens instead.
+    const image = at.readiness?.image;
+    if (image?.ready === false) return Promise.resolve({ open: fixOf(image.missing).href });
+    const channel = at.channel;
+    if (channel === undefined) return Promise.reject(new Error(t("web.channel.commands.imagegen.nowhere")));
+    return once(`imagegen\n${channel.id}\n${text}`, (sendKey) =>
+      api.channel.message.send({ id: channel.id, text: `/imagegen ${text}`, to: at.orchestrator, sendKey }),
+    ).then(() => ({ say: t("web.channel.commands.done.imagegen") }));
+  },
 };
 
 /** The commands as the menu offers them, like names: /issue, /stop… */
-export const commandNameables = (): Nameable[] =>
-  CommandNames.map((name) => ({ token: `/${name}`, name: t(`web.channel.commands.${name}.name`), note: t(`web.channel.commands.${name}.note`) }));
+export const commandNameables = (readiness: Record<Feature, Readiness> | undefined): Nameable[] =>
+  CommandNames.map((name) => {
+    const image = readiness?.image;
+    const note =
+      name === "imagegen" && image?.ready === false
+        ? t("web.channel.commands.imagegen.notReady", { why: fixOf(image.missing).words })
+        : t(`web.channel.commands.${name}.note`);
+    return { token: `/${name}`, name: t(`web.channel.commands.${name}.name`), note, args: t(`web.channel.commands.${name}.args`) };
+  });
 
 /** The command being typed: / first in the box, the caret still in its word. */
 export function typedCommand(text: string, caret: number) {

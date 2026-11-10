@@ -22,7 +22,7 @@ const make = (change: Partial<Cron> = {}): Cron => ({
   tz: sh,
   enabled: true,
   created: at("2026-10-12T08:00:00"),
-  by: "owner",
+  by: "user",
   pending: false,
   ...change,
 });

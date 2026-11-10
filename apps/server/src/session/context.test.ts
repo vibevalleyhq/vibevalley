@@ -19,7 +19,7 @@ import { NotRecorded, Session } from "./session.ts";
 import type { DeliveryInput } from "./signals.ts";
 
 const profile = () => ({ ...starter("lab"), effort: "" });
-const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });
+const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byUserComment: false });
 
 describe("an agent's channel context", () => {
   it.live("regression: a channel context resumes without an issue or a repo checkout", () => {
@@ -41,7 +41,7 @@ describe("an agent's channel context", () => {
       const channel = (yield* Channel).defaultChannel();
       const agent = profile();
       yield* (yield* Agent).save(agent);
-      const hired = yield* sessions.send(agent, "discuss", "must-not-create", { context: { kind: "channel", channel } });
+      const hired = yield* sessions.hire(agent, "discuss", "must-not-create", { context: { kind: "channel", channel } });
       const session = hired.session;
       expect(session).toBeDefined();
       if (!session) return;
@@ -50,16 +50,19 @@ describe("an agent's channel context", () => {
       expect(session.repo).toBeUndefined();
       expect(session.channel).toBe(channel);
       expect(core.state().issues).toEqual([]);
-      expect(yield* repos.list()).toEqual([]);
+      const repos2 = yield* repos.list();
+      expect(repos2).toEqual([]);
       const cwd = turns[0]?.options.cwd ?? "";
       expect(dirname(cwd)).toBe(join(realpathSync(config.workRoot), "contexts"));
       expect(basename(cwd).startsWith(session.id + "-")).toBe(true);
       const native = executor.find(session.id)?.sessionId;
-      expect(yield* sessions.suspend(session.id)).toBe(true);
+      const suspend2 = yield* sessions.suspend(session.id);
+      expect(suspend2).toBe(true);
       expect(executor.find(session.id)).toBeUndefined();
       expect(sessions.sessionOf(session.id)?.id).toBe(session.id);
       expect(readFileSync(join(cwd, "notes.txt"), "utf8")).toBe("turn 1\n");
-      expect(yield* sessions.deliver(session.id, "continue", delivery({ kind: "comment", channel }))).toMatchObject({ kind: "run", woke: true });
+      const delivered = yield* sessions.deliver(session.id, "continue", delivery({ kind: "comment", channel }));
+      expect(delivered).toMatchObject({ kind: "run", woke: true });
       yield* until(() => core.session(session.id)?.runs === 2, "the continued answer");
       const kept = yield* waitFor(
         Effect.map(sessions.events(session.id), (events) => events ?? []),
@@ -98,7 +101,7 @@ describe("an agent's channel context", () => {
       const ids: string[] = [];
       for (let i = 0; i < maxRunning; i++) {
         const channel = (yield* chat.openChannel(`context-${i}`, "", "")).id;
-        const hired = yield* sessions.send(agent, "discuss", "", { context: { kind: "channel", channel } });
+        const hired = yield* sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } });
         const id = hired.session?.id;
         expect(id).toBeDefined();
         if (!id) return;
@@ -106,12 +109,14 @@ describe("an agent's channel context", () => {
         yield* until(() => core.session(id)?.phase._tag === "done", "an answer");
       }
       expect(executor.all()).toHaveLength(maxRunning);
-      expect(yield* sessions.makeRoom("pi", "")).toHaveProperty("evicted");
+      const room = yield* sessions.makeRoom("pi", "");
+      expect(room).toHaveProperty("evicted");
       expect(executor.all()).toHaveLength(maxRunning - 1);
-      expect(sessions.presentSessions().map((s) => s.id)).toEqual(ids);
+      expect(sessions.hired().map((s) => s.id)).toEqual(ids);
       for (const id of ids) yield* sessions.suspend(id);
-      expect(yield* sessions.makeRoom("pi", "")).toEqual({});
-      expect(sessions.presentSessions()).toHaveLength(maxRunning);
+      const room2 = yield* sessions.makeRoom("pi", "");
+      expect(room2).toEqual({});
+      expect(sessions.hired()).toHaveLength(maxRunning);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime] })));
   });
 
@@ -121,11 +126,11 @@ describe("an agent's channel context", () => {
       const sessions = yield* Session;
       const channel = (yield* Channel).defaultChannel();
       const agent = { ...profile(), runtime: "not-installed" };
-      const hired = yield* sessions.send(agent, "discuss", "", { context: { kind: "channel", channel } });
+      const hired = yield* sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } });
       expect(hired.session).toBeUndefined();
       expect(hired.retainedWork).toBeUndefined();
       expect(readdirSync(join(config.workRoot, "contexts"))).toEqual([]);
-      expect(sessions.presentSessions()).toEqual([]);
+      expect(sessions.hired()).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
 
@@ -156,18 +161,18 @@ describe("an agent's channel context", () => {
       const channel = (yield* Channel).defaultChannel();
       const agent = profile();
       yield* (yield* Agent).save(agent);
-      const hired = yield* sessions.send(agent, "first", "", {
+      const hired = yield* sessions.hire(agent, "first", "", {
         context: { kind: "channel", channel },
         hiring: () =>
           Effect.andThen(
             Effect.promise(() => written),
-            Effect.fail(new NotRecorded({ message: "registration failed" })),
+            Effect.fail(NotRecorded.make({ message: "registration failed" })),
           ),
       });
       expect(hired.session).toBeUndefined();
       expect(hired.retainedWork).toBe(true);
       expect(readFileSync(join(cwd, "kept.txt"), "utf8")).toBe("keep\n");
-      const again = yield* sessions.send(agent, "again", "", { context: { kind: "channel", channel } });
+      const again = yield* sessions.hire(agent, "again", "", { context: { kind: "channel", channel } });
       expect(again.session).toBeUndefined();
       expect(again.retainedWork).toBe(true);
       expect(opened).toBe(1);
@@ -199,7 +204,7 @@ describe("an agent's channel context", () => {
         const agent = profile();
         yield* (yield* Agent).save(agent);
         channel = (yield* Channel).defaultChannel();
-        const hired = yield* sessions.send(agent, "first", "", { context: { kind: "channel", channel } });
+        const hired = yield* sessions.hire(agent, "first", "", { context: { kind: "channel", channel } });
         id = hired.session?.id ?? "";
         expect(id).not.toBe("");
         yield* until(() => core.session(id)?.phase._tag === "done", "the answer before restart");
@@ -214,7 +219,8 @@ describe("an agent's channel context", () => {
         expect(sessions.sessionOf(id)?.channel).toBe(channel);
         expect(sessions.sessionOf(id)?.issue).toBeUndefined();
         expect(existsSync(join(cwd, "kept.txt"))).toBe(true);
-        expect(yield* sessions.deliver(id, "after restart", delivery({ kind: "comment", channel }))).toMatchObject({ kind: "run", woke: true });
+        const delivered = yield* sessions.deliver(id, "after restart", delivery({ kind: "comment", channel }));
+        expect(delivered).toMatchObject({ kind: "run", woke: true });
         yield* until(() => core.session(id)?.runs === 2, "the answer after restart");
         expect(turns[1]?.options.resume).toBe(native);
         yield* sessions.dismiss(id);
@@ -245,12 +251,12 @@ describe("an agent's channel context", () => {
       yield* Effect.gen(function* () {
         const sessions = yield* Session;
         const channel = (yield* Channel).defaultChannel();
-        const refused = yield* sessions.send(profile(), "first", "", {
+        const refused = yield* sessions.hire(profile(), "first", "", {
           context: { kind: "channel", channel },
           hiring: () =>
             Effect.andThen(
               Effect.promise(() => written),
-              Effect.fail(new NotRecorded({ message: "registration failed" })),
+              Effect.fail(NotRecorded.make({ message: "registration failed" })),
             ),
         });
         expect(refused.session).toBeUndefined();
@@ -261,7 +267,7 @@ describe("an agent's channel context", () => {
         const core = yield* Core;
         yield* sessions.restore;
         const channel = (yield* Channel).defaultChannel();
-        const hired = yield* sessions.send({ ...profile(), id: "other", name: "Other" }, "second", "", { context: { kind: "channel", channel } });
+        const hired = yield* sessions.hire({ ...profile(), id: "other", name: "Other" }, "second", "", { context: { kind: "channel", channel } });
         const id = hired.session?.id;
         expect(id).toBeDefined();
         if (!id) return;

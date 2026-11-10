@@ -2,7 +2,7 @@
   "id": "start-when-asked",
   "createdAt": 1792271040000,
   "model": "deepseek-flash",
-  "want": "主人要马上做，管家只记进了备选。应该记下并开工（start: true）。",
+  "want": "用户要马上做，助手只记进了备选。应该记下并开工（start: true）。",
   "memory": "",
   "scenario": { "repos": ["demo"] },
   "tools": [
@@ -35,7 +35,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：帮我在 demo 里把 README 写了",
+    "content": "[来源：用户]\n用户说：帮我在 demo 里把 README 写了",
     "display": true,
     "details": {
       "channel": "general"

@@ -6,7 +6,7 @@ export const en: Copy = {
   other: { label: "中文", href: "/", name: "中文" },
   title: "VibeValley · 码农场物语",
   description:
-    "A team of coding agents you direct by voice or chat, drawn as a pixel farm. The manager hands out the work, the helpers write and test the code in your projects, and you harvest what they grew. Runs on your own machine. Open source.",
+    "A team of coding agents you direct by voice or chat, drawn as a pixel farm. The assistant hands out the work, the helpers write and test the code in your projects, and you harvest what they grew. Runs on your own machine. Open source.",
   nav: { how: "How it plays", features: "What it does", screens: "The farm", start: "Get started", github: "GitHub" },
   hero: {
     name: "VibeValley",
@@ -50,12 +50,12 @@ export const en: Copy = {
       {
         icon: "act-speaking_text",
         title: "Say it",
-        text: 'Tell the manager: "Add an endpoint to clock-in that lists check-ins, with tests." Type it, or hold the button and say it.',
+        text: 'Tell the assistant: "Add an endpoint to clock-in that lists check-ins, with tests." Type it, or hold the button and say it.',
       },
       {
         icon: "icon-seeds",
         title: "Sow it",
-        text: "The manager picks a helper that fits and gives it a branch and a worktree of its own in the project: seeds in an empty plot.",
+        text: "The assistant picks a helper that fits and gives it a branch and a worktree of its own in the project: seeds in an empty plot.",
       },
       {
         icon: "act-run_command",
@@ -83,7 +83,7 @@ export const en: Copy = {
       {
         icon: "icon-board",
         title: "One chat for the farm",
-        text: "You, the manager and the helpers talk in one chat. Every job gets its own thread, where the helper confirms, asks and reports, and you can step in any time. Channels keep projects apart.",
+        text: "You, the assistant and the helpers talk in one chat. Every job gets its own thread, where the helper confirms, asks and reports, and you can step in any time. Channels keep projects apart.",
       },
       {
         icon: "icon-task-board",
@@ -93,7 +93,7 @@ export const en: Copy = {
       {
         icon: "button-mic",
         title: "Talk, and it is done",
-        text: "Hold the button and talk: the voice manager hears you out and hands your words to the same manager, who sends the work off.",
+        text: "Hold the button and talk: the voice assistant hears you out and hands your words to the same assistant, who sends the work off.",
       },
       {
         icon: "icon-tasks",
@@ -137,7 +137,7 @@ export const en: Copy = {
   screens: {
     title: "The farm",
     items: [
-      { image: "farm", caption: "The farm: the plots, the manager, and the farm chat at the bottom right" },
+      { image: "farm", caption: "The farm: the plots, the assistant, and the farm chat at the bottom right" },
       { image: "title", caption: "The title screen: day and night follow your clock" },
       { image: "chat", caption: "The chat page: channels, helpers, and a job\u2019s thread open on the right" },
     ],
@@ -155,7 +155,7 @@ export const en: Copy = {
     list: [
       "macOS on Apple silicon",
       "At least one coding agent installed and signed in: pi, Claude Code or Codex",
-      "A DeepSeek API key, for the manager",
+      "A DeepSeek API key, for the assistant",
       "To build it yourself: Bun 1.4 and Node 24",
     ],
     build: "Build the macOS app",

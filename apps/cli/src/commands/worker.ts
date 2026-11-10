@@ -21,7 +21,7 @@ const response = Schema.Struct({
   ),
   error: Schema.optionalKey(Schema.Unknown),
 });
-const refused = () => new Failure({ code: exit.refused, tag: "WorkerAccess", text: t("cli.worker.failed") });
+const refused = () => Failure.make({ code: exit.refused, tag: "WorkerAccess", text: t("cli.worker.failed") });
 const operations = {
   report: { tool: "issue_report", about: "cli.worker.report" },
   "pr-submit": { tool: "issue_pr_submit", about: "cli.worker.pr" },
@@ -63,7 +63,7 @@ export const workerCommand = Command.make("worker").pipe(
           const body = yield* reply.json.pipe(Effect.flatMap(Schema.decodeUnknownEffect(response)), Effect.mapError(refused));
           if (body.error !== undefined || !body.result) return yield* refused();
           if (body.result.isError === true)
-            return yield* new Failure({
+            return yield* Failure.make({
               code: exit.refused,
               tag: "WorkerTool",
               text:

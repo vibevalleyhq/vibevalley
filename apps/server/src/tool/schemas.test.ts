@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit, Formatter, Schema } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import { parameters, tool } from "./schemas.ts";
@@ -12,7 +12,7 @@ for (const [op, input] of [
   ["issue.create", { title: "audit", priority: "" }],
   ["issue.list", { status: "constructor" }],
 ] as const) {
-  it.effect(`regression: ${op} rejects invalid enum ${JSON.stringify(input)} before running`, () =>
+  it.effect(`regression: ${op} rejects invalid enum ${Formatter.formatJson(input)} before running`, () =>
     Effect.gen(function* () {
       let ran = false;
       const entry = tool(op, () => Effect.sync(() => ((ran = true), "ran")));

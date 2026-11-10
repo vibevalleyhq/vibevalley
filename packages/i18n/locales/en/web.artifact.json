@@ -1,7 +1,7 @@
 {
   "place": {
     "label": "Artifacts",
-    "hint": "What you, the helpers and the manager leave to be read: pages written together and web pages handed in"
+    "hint": "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in"
   },
   "card": {
     "version": "Version {version}",
@@ -58,7 +58,7 @@
     "helpersWriting": "helpers writing",
     "demo": "Demo: several helpers writing at once",
     "append": "Write a paragraph at the end",
-    "owner": "Owner",
+    "user": "You",
     "done": "Done",
     "notDone": "Not done",
     "writing": "{who} is writing",
@@ -108,7 +108,9 @@
   },
   "body": {
     "blocks": "Written together",
-    "html": "Web page"
+    "html": "Web page",
+    "slides": "Slides",
+    "motion": "Motion"
   },
   "edit": {
     "title": "Change words",
@@ -117,5 +119,27 @@
     "to": "Change to",
     "save": "Save as a new version",
     "saved": "Saved as version {version}"
+  },
+  "slides": {
+    "previous": "Previous slide",
+    "next": "Next slide",
+    "at": "{at} / {pages}",
+    "present": "Present full screen",
+    "presenter": "Presenter view",
+    "pdf": "Save as PDF",
+    "thumbnails": "Slides",
+    "slide": "Slide {at} {title}"
+  },
+  "presenter": {
+    "title": "Presenter view: {title}",
+    "missing": "No deck named: open the presenter view from an artifact's controls.",
+    "current": "This slide",
+    "next": "Next slide",
+    "end": "This is the last slide",
+    "notes": "Notes",
+    "noNotes": "No notes on this slide",
+    "clock": "Time so far",
+    "restart": "Restart timer",
+    "aside": "Next slide and notes"
   }
 }

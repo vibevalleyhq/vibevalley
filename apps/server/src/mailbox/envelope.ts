@@ -1,7 +1,7 @@
-import { Option, Schema } from "effect";
+import { Array as Arr, Formatter, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { ownerId, VoiceModeValues } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId, VoiceModeValues } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -62,14 +62,40 @@ export const metaOf = (raw: unknown): Meta =>
 export const metaText = (m: Meta | undefined) =>
   m === undefined
     ? null
-    : JSON.stringify(
+    : Formatter.formatJson(
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
-export const senderKind = (kind: string): T.ActorKind => (Schema.is(S.ActorKind)(kind) ? kind : "system");
+/** Who said it, read from the kind its participant is stored as; an agent comes with its role. */
+export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind; readonly fromRole?: T.AgentRole } => {
+  switch (participant) {
+    case "user":
+      return { fromKind: "user" };
+    case "orchestrator":
+      return { fromKind: "agent", fromRole: "orchestrator" };
+    case "session":
+    case "profile":
+      return { fromKind: "agent", fromRole: "worker" };
+    default:
+      return { fromKind: "system" };
+  }
+};
+/** Who started a trigger, as a message's speaker: a collaborator, a bot or CI outside the farm is the farm's own doing. */
+export const actorKindOf = (kind: T.TriggerActorKind): T.ActorKind => {
+  switch (kind) {
+    case "user":
+    case "agent":
+    case "system":
+      return kind;
+    case "collaborator":
+    case "bot":
+    case "ci":
+      return "system";
+  }
+};
 export const channelType = (type: string): T.ChannelType => (Schema.is(S.ChannelType)(type) ? type : "channel");
 
-export const inboxMore = (
+export const envelopeMore = (
   row: { readonly meta: string | null; readonly reply_number: number | null; readonly edited_at?: number | null; readonly deleted_at?: number | null },
   filesAt: (id: string) => string,
 ) => {
@@ -91,24 +117,25 @@ export const inboxMore = (
 };
 
 /** Where a message is: a channel by #name, a thread by its channel's name and the number of its root message, the
- * owner's direct channel as @owner. */
+ * user's direct channel as @user. */
 export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
-  if (c.type === "direct") return "@" + ownerId;
+  if (c.type === "direct") return "@" + userId;
   if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
   return "#" + (c.name ?? channelName);
 }
 
-/** What the owner picked beside a message in the farm's form: the profile and the repo the work is for. */
+/** What the user picked beside a message in the farm's form: the profile and the repo the work is for. */
 export interface Picked {
   readonly agent?: string;
   readonly repo?: string;
 }
 
-export interface InboxMessage extends T.TriggerContext {
+export interface Envelope extends T.TriggerContext {
   readonly id: string;
   readonly originTrigger?: string;
   readonly from: string;
   readonly fromKind: T.ActorKind;
+  readonly fromRole?: T.AgentRole;
   readonly name: string;
   readonly text: string;
 }
@@ -129,7 +156,7 @@ export const heldShown = 3;
 
 /** The chat's stored message as the mailbox reads it: who said it, where, and when. */
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
-type StoredSenderKind = "owner" | "orchestrator" | "session" | "profile" | "system";
+type StoredSenderKind = "user" | "orchestrator" | "session" | "profile" | "system";
 
 export interface ChannelEnvelopeRow {
   readonly envelope_id: string;
@@ -152,23 +179,42 @@ export interface ChannelEnvelopeRow {
 }
 
 /** Collaboration facts from which Mailbox computes audience, brakes, urgency and the durable deliveries. */
+/** The orchestrator in a place, for what names no orchestrator in particular there (a machine's event, a generic @ of
+ * one, work left to one): a direct channel's other one when it is an orchestrator; else, of the members of the channel
+ * the place is in, the default orchestrator when it is one of them, else the first orchestrator; else the default one. */
+export const orchestratorIn = (place: {
+  readonly top: { readonly type: string; readonly peer_id: string | null } | undefined;
+  readonly members: readonly string[];
+  readonly isOrchestrator: (agent: string) => boolean;
+}): string => {
+  const { top, members, isOrchestrator } = place;
+  if (top?.type === "direct") return top.peer_id !== null && isOrchestrator(top.peer_id) ? top.peer_id : defaultOrchestrator;
+  if (Arr.contains(members, defaultOrchestrator)) return defaultOrchestrator;
+  return Option.getOrElse(Arr.findFirst(members, isOrchestrator), () => defaultOrchestrator);
+};
+
 export interface ChannelAudience {
   readonly from: string;
   readonly fromKind: T.ActorKind;
   readonly kind: T.MessageKind;
   readonly mentions: readonly string[];
   readonly channel: Pick<T.Channel, "type" | "peer">;
+  /** The orchestrator in the place (orchestratorIn): who a generic @ of one names. */
   readonly orchestrator: string;
+  /** Who is in the channel the place is in: what is said there to no one in particular, and reports, go to them. */
+  readonly channelMembers: readonly string[];
   readonly orchestrators: readonly string[];
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
   readonly present?: readonly string[] | null;
-  readonly followers: readonly string[];
+  /** A thread's members: what the user says there goes to them. Empty outside a thread. */
+  readonly members: readonly string[];
   readonly outcome?: T.Outcome;
   readonly spoken?: boolean;
 }
 
-export interface ChannelRouteInput {
+/** A channel message and who hears it: what Mailbox.receive routes a channel trigger to. */
+export interface ChannelHearers {
   readonly row: ChannelEnvelopeRow;
   readonly audience: ChannelAudience;
   readonly addressed?: string;
@@ -180,14 +226,16 @@ export interface ChannelRouteResult {
   readonly heldNotice: string;
 }
 
-/** What came to an orchestrator in one channel, to wake it with. */
-export interface OrchestratorNews {
+/** What came to an orchestrator in one conversation, handed to it: the orchestrator module answers it (an
+ * orchestrator is told, where a worker is woken through its session). */
+export interface Handed {
+  readonly _tag: "Handed";
   /** The orchestrator it came to, by its profile id. */
   readonly agent: string;
   readonly channel: string;
   readonly type: T.ChannelType;
   readonly target: string;
-  readonly messages: InboxMessage[];
+  readonly messages: Envelope[];
   readonly source?: "issue" | "cron" | "patrol";
   readonly issue?: string;
   readonly by?: T.RunTrigger;

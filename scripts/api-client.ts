@@ -139,16 +139,22 @@ export class VibeValleyApi {
   /** The server's address; empty is the page's own origin, which serves it. */
   readonly base: string;
   private readonly fetcher: (url: string, init: RequestInit) => Promise<Response>;
+  /** A device key to send as a Bearer token: the command line's, signed in to a server through its gate. */
+  private readonly key: string | undefined;
 
-  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)) {
+  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init), key?: string) {
     this.base = base;
     this.fetcher = fetcher;
+    this.key = key;
   }
 ${[...groups].map(groupText).join("")}
   /** R is the answer api.ts gives the path; each method above names it. */
   private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
+    const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };
     const res = await this.fetcher(this.base + path, {
-      ...(input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+      ...(input === undefined
+        ? { method: "POST", headers }
+        : { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input) }),
       ...options,
     });
     const text = await res.text();

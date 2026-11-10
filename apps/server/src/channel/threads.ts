@@ -8,7 +8,7 @@ import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
-import * as qf from "#db/channel_follow.sql.ts";
+import * as qmb from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 
@@ -25,14 +25,14 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
     const mailbox = yield* Mailbox;
     const {
       model,
-      follow,
+      addMember,
       locked,
       seat,
-      orchestratorOfRow,
+      orchestratorInRow,
       directOfSession,
       channelOfSession,
       sessionOf,
-      presentSessions,
+      hired,
       threadOf,
       threadOfSession,
       setRead,
@@ -59,10 +59,11 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       if (thread) return yield* handedOn(h, thread);
       const channel = channelOfSession(h);
       const latest = (yield* db.run(qm.latestNumber({ channel_id: channel }))).n ?? 0;
-      yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      yield* setRead(h.id, channel, latest, now);
       const what = h.refining ? t("server.channel.dispatch.draft") : head(h.brief.replace(/\s+/gu, " "), 80);
-      // The dispatch note is the farm's, under the name of the orchestrator that looks after the channel.
-      const by = orchestratorOfRow(model.channel(channel));
+      // The dispatch note is the farm's, under the name of the orchestrator in the channel.
+      const by = orchestratorInRow(model.channel(channel));
       yield* seat(by);
       yield* write({
         channel: channel,
@@ -76,32 +77,32 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
 
     /** The issue already has its thread (reopened, or sent to another session). */
     const handedOn = Effect.fn("Channel.handedOn")(function* (h: T.Session, thread: string) {
-      const followers = model.followers(thread);
-      if (followers.includes(h.id)) return;
+      if (model.membersOf(thread).includes(h.id)) return;
       // A profile's talk: the session that answers there is not told of in it; it only follows.
-      if (model.channel(thread)?.type === "direct") return yield* follow(thread, h.id, "owner", model.channel(thread)?.last_number ?? 0);
+      if (model.channel(thread)?.type === "direct") return yield* addMember(thread, h.id, "user", model.channel(thread)?.last_number ?? 0);
       const channel = channelOfSession(h);
       const latest = (yield* db.run(qm.latestNumber({ channel_id: channel }))).n ?? 0;
-      yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      yield* setRead(h.id, channel, latest, now);
       // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
       const nth = ((yield* db.run(qm.dispatchesIn({ channel_id: thread }))).n ?? 0) + 2;
       const text = h.refining
         ? t("server.channel.dispatch.redraft", { id: h.id, name: h.name })
         : t("server.channel.dispatch.handedOn", { id: h.id, name: h.name, nth });
-      const by = orchestratorOfRow(model.channel(thread));
+      const by = orchestratorInRow(model.channel(thread));
       yield* seat(by);
-      yield* write({ channel: thread, from: by, kind: "dispatch", text, meta: { session: h.id }, follow: h.id });
+      yield* write({ channel: thread, from: by, kind: "dispatch", text, meta: { session: h.id }, member: h.id });
     });
 
     const sessionsLeft = Effect.gen(function* () {
-      const on = new Set<string>(presentSessions().map((h) => h.id));
+      const on = new Set<string>(hired().map((h) => h.id));
       const now = yield* Clock.currentTimeMillis;
       for (const p of model.participants()) {
         if (p.kind !== "session" || p.left_at !== null || on.has(p.id)) continue;
         yield* db.run(qp.participantLeft({ left_at: now, id: p.id }));
         model.left(p.id, now);
-        yield* mailbox.dropSession(p.id, "left");
-        yield* db.run(qf.unfollowAllOf({ at: now, participant_id: p.id }));
+        yield* mailbox.withdraw({ _tag: "Session", session: p.id, why: "left" });
+        yield* db.run(qmb.removeFromAll({ at: now, participant_id: p.id }));
       }
     });
 
@@ -124,17 +125,19 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
     // The sessions' news: hired and left open and close threads, a report is posted in the thread. One at a time, before the
     // next.
     const onSessionNews = Effect.fnUntraced(function* (n: SessionNews) {
+      // Runs, inputs and launches are the issues' and Mailbox's.
+      if (n._tag !== "Hired" && n._tag !== "Left" && n._tag !== "Reported") return;
       yield* locked(
         Effect.suspend(() => {
           if (closed) return Effect.void;
           switch (n._tag) {
-            case "hired":
-              return Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), {
+            case "Hired":
+              return Effect.forEach(hired(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), {
                 discard: true,
               });
-            case "left":
+            case "Left":
               return sessionsLeft;
-            case "reported":
+            case "Reported":
               return postReport(n.report.id, n.report.outcome, n.report.summary, n.report.spent, n.report.run);
           }
         }),
@@ -146,7 +149,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       if (written.heldNotice) yield* write({ channel: row.channel_id, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
     }, locked);
     const start = Effect.gen(function* () {
-      yield* locked(Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
+      yield* locked(Effect.forEach(hired(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
       // Each row once, in order: one that cannot be routed stays unrouted, and is not fetched again.
       let after = { after_channel: "", after_number: 0 };
       while (true) {

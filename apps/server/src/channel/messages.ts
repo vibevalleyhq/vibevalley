@@ -1,10 +1,10 @@
+import { DateTime } from "effect";
+
 import type * as T from "@vibevalley/protocol";
 
-import { compactCard } from "#/base/clip.ts";
 import { compareText, or } from "#/base/order.ts";
-import { type ChannelRouteInput, type Meta, metaOf, senderKind, targetOf, channelType } from "#/mailbox/envelope.ts";
-import type { ChannelMail } from "#/mailbox/mailbox.ts";
-import type { InputContext } from "#/mailbox/payload.ts";
+import { type ChannelHearers, type Meta, metaOf, speakerOf, targetOf, channelType } from "#/mailbox/envelope.ts";
+import type { InputContext, TriggerInput } from "#/mailbox/payload.ts";
 
 import { chatNamed } from "./mentions.ts";
 
@@ -14,9 +14,9 @@ export const keepChannels = 100;
 
 const isTop = (c: T.Channel) => c.type !== "thread";
 
-const emptyChat = (): T.Chat => ({ channels: [], ownerMentions: [] });
+const emptyChat = (): T.Chat => ({ channels: [], userMentions: [] });
 
-export const withOwnerMentions = (chat: T.Chat | undefined, ownerMentions: T.OwnerMention[]): T.Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
+export const withUserMentions = (chat: T.Chat | undefined, userMentions: T.UserMention[]): T.Chat => ({ ...(chat ?? emptyChat()), userMentions });
 
 /** A message said: news when its number is past what the state knows of its channel, or when the state does not keep that channel. */
 export function withMessage(chat: T.Chat | undefined, m: T.ChatMessage): [T.Chat | undefined, boolean] {
@@ -67,7 +67,14 @@ export function parseSearch(text: string): SearchQuery {
   const words = text
     .replace(filterPattern, (whole, key: string, value: string) => {
       const day = dayPattern.exec(value);
-      const at = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : undefined;
+      const at = day
+        ? DateTime.toEpochMillis(
+            DateTime.makeZonedUnsafe(
+              { year: Number(day[1]), month: Number(day[2]), day: Number(day[3]) },
+              { timeZone: DateTime.zoneMakeLocal(), adjustForTimeZone: true },
+            ),
+          )
+        : undefined;
       switch (key.toLowerCase()) {
         case "from":
           from = chatNamed[value.replace(/^@/u, "")] ?? value.replace(/^@/u, "");
@@ -114,27 +121,21 @@ const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, T.TriggerSourc
   github: "github",
 };
 
-const ingressActorKind = (raw: string): T.TriggerActorKind => {
-  switch (senderKind(raw)) {
-    case "owner":
-      return "owner";
-    case "session":
-      return "session";
-    case "orchestrator":
-      return "orchestrator";
-    case "system":
-      return "system";
-  }
+const actorOf = (participant: string, id: string, name: string): T.TriggerActor => {
+  const { fromKind, fromRole } = speakerOf(participant);
+  return { kind: fromKind, id, name, ...(fromRole !== undefined ? { role: fromRole } : {}) };
 };
 
 /** A committed channel message as the one trigger Mailbox routes, and what it needs to fan it out. */
-export const channelInput = (fact: ChannelRouteInput, context: InputContext): { readonly trigger: T.Trigger; readonly mail: ChannelMail } => {
+/** The trigger a channel message is recorded as: its own id, its words, where it was said and who it is for. */
+export const channelTrigger = (fact: ChannelHearers, context: InputContext): TriggerInput => {
   const meta = metaOf(fact.row.meta);
   const source = meta.ingressSource ? sourceByPurpose[meta.ingressSource] : "channel";
-  const trigger: T.Trigger = {
+  const input: TriggerInput = {
     id: fact.row.envelope_id,
+    key: fact.row.envelope_id,
     source,
-    actor: { kind: ingressActorKind(fact.row.sender_kind), id: fact.row.sender_id, name: fact.row.name },
+    actor: actorOf(fact.row.sender_kind, fact.row.sender_id, fact.row.name),
     addressed: fact.addressed
       ? "direct"
       : fact.audience.mentions.length > 0
@@ -145,7 +146,7 @@ export const channelInput = (fact: ChannelRouteInput, context: InputContext): { 
     threads: [`channel:${fact.row.channel_id}`, ...(fact.row.subject_kind === "issue" && fact.row.subject_id ? [`issue:${fact.row.subject_id}`] : [])],
     ...(fact.row.reply_number === null ? {} : { replyTo: `${fact.row.channel_id}:${fact.row.reply_number}` }),
     replyChannel: fact.row.channel_id,
-    card: compactCard(fact.row.body, `vv://trigger/${fact.row.envelope_id}`, 600),
+    text: fact.row.body,
     meta: {
       ...(meta.issue ? { issue: meta.issue } : {}),
       ...(meta.ingressRecipient ? { ingressRecipient: meta.ingressRecipient } : {}),
@@ -155,15 +156,7 @@ export const channelInput = (fact: ChannelRouteInput, context: InputContext): { 
       channelType: channelType(fact.row.channel_type),
     },
     at: fact.row.created_at,
+    data: { kind: "channel_message", message: fact.row.envelope_id, channel: fact.row.channel_id },
   };
-  return {
-    trigger,
-    mail: {
-      row: fact.row,
-      audience: fact.audience,
-      ...(fact.addressed ? { addressed: { recipient: fact.addressed, reason: "addressed", wakes: true } } : {}),
-      roles: fact.roles,
-      ...(fact.outcome === undefined ? {} : { outcome: fact.outcome }),
-    },
-  };
+  return input;
 };

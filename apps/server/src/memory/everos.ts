@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect, Redacted, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -90,15 +90,16 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   const told = new Set<string>();
 
   /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
+  const key = c.key === undefined ? "" : Redacted.value(c.key);
   const post = (path: "add" | "flush" | "search", body: Body, closing = false) => {
     const request = HttpClientRequest.post(`${c.url.replace(/\/+$/u, "")}/api/v2/memory/${path}`).pipe(
       HttpClientRequest.bodyJsonUnsafe(body),
-      c.key ? HttpClientRequest.bearerToken(c.key) : (r) => r,
+      key ? HttpClientRequest.bearerToken(key) : (r) => r,
     );
     const answer = Effect.gen(function* () {
       const res = yield* http.execute(request);
       const text = (yield* res.text).slice(0, 4 << 20);
-      if (res.status < 200 || res.status >= 300) return yield* new SourceError({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` });
+      if (res.status < 200 || res.status >= 300) return yield* SourceError.make({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` });
       return text;
     }).pipe(Effect.catchTag("HttpClientError", (e) => Effect.fail(sourceError(e))));
     return closing ? answer : life.alive(answer);
@@ -112,7 +113,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
 
   const flush = (session: string, repo: string, closing = false) => post("flush", { session_id: session, app_id: app, repo_id: scopeOf(repo) }, closing);
 
-  /** A profile's cases, or with kind issue the owner's episodes. */
+  /** A profile's cases, or with kind issue the user's episodes. */
   const findIn = Effect.fnUntraced(function* (agent: string, query: string, limit: number, kind: MemoryKind, repo: string) {
     const scope = scopeOf(repo);
     const body = {
@@ -123,9 +124,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
     };
     const text = yield* post("search", body);
-    const found = yield* Effect.mapError(
-      Schema.decodeEffect(FoundBodySchema)(text),
-      () => new SourceError({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
+    const found = yield* Effect.mapError(Schema.decodeEffect(FoundBodySchema)(text), () =>
+      SourceError.make({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
     );
     const ownership = (hit: { app_id?: string; repo_id?: string }): MemoryScope =>
       hit.app_id !== app || hit.repo_id !== scope ? { kind: "unknown" } : repo ? { kind: "repo", repo } : { kind: "global" };
@@ -174,7 +174,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
         .slice(0, recallCount)
         .map((h) => ({ id: h.id, line: recallWords.sourceLine("EverOS", clip(h.text, lineMost)), score: h.score }));
     }),
-    // A search over every profile has no one owner to ask with: it gives nothing here.
+    // A search over every profile has no one user to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {
       if (c.read !== true || q.text.trim() === "") return { found: [] };
       if (q.repo === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };
@@ -199,7 +199,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
           })),
       };
     }),
-    list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
+    list: () => Effect.fail(SourceError.make({ message: t("server.memory.everosList") })),
     // The brief once per session, then what the helper said. a failed run says so.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (c.write !== true || run.outcome === "interrupted") return;
@@ -236,7 +236,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       );
       return undefined;
     }),
-    forget: () => Effect.fail(new SourceError({ message: t("server.memory.everosForget") })),
+    forget: () => Effect.fail(SourceError.make({ message: t("server.memory.everosForget") })),
     can: { list: false, forget: false, transcripts: true },
   };
 }

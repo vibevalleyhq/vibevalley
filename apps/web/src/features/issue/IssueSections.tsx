@@ -294,7 +294,7 @@ const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; 
   unsure: { icon: "warn", label: t("web.issue.detail.result.unsure") },
 };
 
-/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on
+/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the user checks it (on
  * this page only). */
 export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const [ticked, setTicked] = createSignal<ReadonlySet<number>>(new Set());
@@ -448,7 +448,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const moves = useIntents(issueMove);
   const move = () => issueMoveOf(props.issue.id, moves.list());
   const busy = () => act.busy() || move()?.state === "moving";
-  // The orchestrator's answer is the owner's to take as done or put away; one that did not end well can only be put away.
+  // The orchestrator's answer is the user's to take as done or put away; one that did not end well can only be put away.
   const go = (a: IssueAction) => {
     const issue = props.issue;
     if (a.does === "move") void sendMove(moves, { id: issue.id, status: a.status });

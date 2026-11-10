@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import type { SpaceState, InboxItem, Session } from "@vibevalley/protocol";
 
-import { tabTitle, traySummary, waitingOnOwner } from "./tray";
+import { tabTitle, traySummary, waitingOnUser } from "./tray";
 
 const call = (id: string, kind: InboxItem["kind"], tray?: string): InboxItem => ({
   id,
@@ -33,11 +33,11 @@ describe("the tray", () => {
   });
 });
 
-describe("what waits on the owner", () => {
+describe("what waits on the user", () => {
   test("counts the calls at an issue, not the mentions, which the chat counts", () => {
     const mention: InboxItem = { ...call("m", "mention"), target: { kind: "chat", channel: "c1" } };
-    expect(waitingOnOwner([call("a", "review"), call("b", "ask"), mention])).toBe(2);
-    expect(waitingOnOwner([])).toBe(0);
+    expect(waitingOnUser([call("a", "review"), call("b", "ask"), mention])).toBe(2);
+    expect(waitingOnUser([])).toBe(0);
   });
 
   test("says it in the tab's title before the app's name", () => {

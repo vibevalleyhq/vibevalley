@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "Language",
-    "line": "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
+    "line": "The page's words, what the assistant and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
     "zh": "中文",
     "en": "English",
     "label": "Page language"
@@ -22,7 +22,7 @@
     "key": "{label}'s key",
     "keyHint": "key (leave empty if none or to keep)",
     "user": "{label}'s user_id",
-    "userHint": "Your user_id in EverOS (empty means owner)",
+    "userHint": "Your user_id in EverOS (empty uses the default one)",
     "read": "Read",
     "readHint": "Also asked when recalling at the start and when a helper looks things up",
     "write": "Write",
@@ -45,7 +45,6 @@
     "search": "Search settings…",
     "general": "General",
     "appearance": "Appearance",
-    "models": "Models",
     "about": "About",
     "memory": "Memory",
     "skills": "Skills",
@@ -53,7 +52,8 @@
     "dictation": "Dictation",
     "chat": "Chat apps",
     "devices": "Devices",
-    "width": "Navigation width (drag; double-click for the default)"
+    "width": "Navigation width (drag; double-click for the default)",
+    "accounts": "Accounts and keys"
   },
   "groups": {
     "options": "Options",
@@ -64,7 +64,6 @@
   "words": {
     "general": "language start open workbench farm",
     "appearance": "theme dark light size zoom scale font",
-    "models": "DeepSeek key model manager",
     "about": "version home folder settings file",
     "memory": "Nowledge EverOS memory recall",
     "skills": "skill library",
@@ -73,14 +72,15 @@
     "dictation": "dictation transcription voice input",
     "github": "gh PR login",
     "chat": "WeChat Feishu Lark QQ connectors pairing",
-    "devices": "phone pairing connect to this machine LAN"
+    "devices": "phone pairing connect to this machine LAN name password sign in sign out",
+    "accounts": "keys accounts DeepSeek MOSS Agora API key models"
   },
   "scope": {
     "farm": "For all of VibeValley",
     "device": "This device only"
   },
   "general": {
-    "languageHint": "The page, the manager and the helpers all speak it",
+    "languageHint": "The page, the assistant and the helpers all speak it",
     "start": "Open on start",
     "startHint": "Where the app, or the home page, opens",
     "starts": {
@@ -101,8 +101,7 @@
     "scaleHint": "Scales the whole workbench; the farm keeps its whole-number scaling"
   },
   "models": {
-    "intro": "The models the manager and VibeValley's own helpers use.",
-    "deepseekHint": "The manager and VibeValley's own helpers use it"
+    "deepseekHint": "The assistant and VibeValley's own helpers use it"
   },
   "memory": {
     "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."
@@ -151,5 +150,35 @@
     "cliTaken": "{link} is another program's file and was not replaced: move it away, then install",
     "cliInstall": "Install",
     "cliRemove": "Remove"
+  },
+  "missing": {
+    "deepseekKey": "No DeepSeek key yet",
+    "mossAccount": "No MOSS account yet",
+    "mossKey": "The MOSS account has no key yet",
+    "mossOff": "The MOSS account it uses is turned off",
+    "binding": "No account and model chosen for it yet",
+    "agora": "Agora's credentials are missing",
+    "dictationUrl": "No dictation address yet"
+  },
+  "feature": {
+    "orchestrator": "The assistant",
+    "image": "Image generation",
+    "understanding": "Media understanding",
+    "speech": "Speech",
+    "speakers": "Dialogue",
+    "voiceDesign": "Voice design",
+    "transcription": "Transcription",
+    "dictation": "Dictation",
+    "live": "MOSS Live",
+    "vision": "Live vision",
+    "call": "Calls"
+  },
+  "readiness": {
+    "ready": "{feature}: ready",
+    "lacks": "{feature}: {why}",
+    "fix": "Set it up"
+  },
+  "accounts": {
+    "intro": "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses."
   }
 }

@@ -1,5 +1,5 @@
 {
-  "orchestrator": "管家",
+  "orchestrator": "助手",
   "conflictFiles": "{files} 个文件和主分支冲突",
   "item": {
     "review": {
@@ -36,7 +36,7 @@
     },
     "cron-ask": {
       "label": "定时任务等你同意",
-      "title": "管家想定一个定时任务",
+      "title": "助手想定一个定时任务",
       "body": "「{text}」：同意了才开始",
       "tray": "定时任务「{text}」等你同意"
     }

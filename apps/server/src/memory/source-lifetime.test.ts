@@ -1,5 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
@@ -41,13 +41,15 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
   expect(connect).toHaveBeenCalledTimes(1);
 });
 
+const decodeSession = Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ session_id: Schema.String })));
+
 test("EverOS flushes completed writes but a canceled late response creates no new pending session", async () => {
   const requests: { path: string; session: string }[] = [];
   const { promise: held, resolve: release } = Promise.withResolvers<Response>();
   const { promise: started, resolve: entered } = Promise.withResolvers<void>();
   const fetch = async (url: string | URL | Request, init?: RequestInit) => {
     const href = url instanceof Request ? url.url : url.toString();
-    const body = JSON.parse(new TextDecoder().decode(init?.body as Uint8Array)) as { session_id: string };
+    const body = await Effect.runPromise(decodeSession(new TextDecoder().decode(init?.body as Uint8Array)));
     requests.push({ path: new URL(href).pathname, session: body.session_id });
     if (body.session_id === "vibevalley-late" && href.endsWith("/add")) {
       entered();
@@ -59,14 +61,14 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
   const run = <A, E>(e: Effect.Effect<A, E>) => Effect.provideService(e, FetchHttpClient.Fetch, fetch);
   const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, http);
   const turn = { agent: "lab", session: "done", repo: "demo", brief: "brief", outcome: "completed" as const, said: "done", summary: "done" };
-  expect(await ended(run(source.syncTurn(turn)))).toBe("completed");
-  const pending = ended(run(source.syncTurn({ ...turn, session: "late" })));
+  expect(await source.syncTurn(turn).pipe(run, ended)).toBe("completed");
+  const pending = source.syncTurn({ ...turn, session: "late" }).pipe(run, ended);
   await started;
   await Effect.runPromise(run(source.stop));
   release(new Response("{}", { status: 200 }));
   expect(await pending).toContain("stopped");
   await Effect.runPromise(run(source.stop));
-  expect(await ended(run(source.syncTurn({ ...turn, session: "later" })))).toContain("stopped");
+  expect(await source.syncTurn({ ...turn, session: "later" }).pipe(run, ended)).toContain("stopped");
   expect(requests).toEqual([
     { path: "/api/v2/memory/add", session: "vibevalley-done" },
     { path: "/api/v2/memory/add", session: "vibevalley-late" },

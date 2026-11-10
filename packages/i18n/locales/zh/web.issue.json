@@ -6,7 +6,7 @@
   "reading": "在读……",
   "never": "算了",
   "later": "先放着",
-  "orchestrator": "管家",
+  "orchestrator": "助手",
   "noHelper": "还没选帮工",
   "board": {
     "earlier": "更早的 {n} 张",
@@ -177,10 +177,10 @@
       "run/error": "出错",
       "run/end": "这一轮结束"
     },
-    "orchestratorStuck": "管家这一轮没答成：在频道里看它说了什么",
+    "orchestratorStuck": "助手这一轮没答成：在频道里看它说了什么",
     "job": "要做的",
     "from": "来自",
-    "fromCron": "定时任务：每次到点交给管家，答完等你看",
+    "fromCron": "定时任务：每次到点交给助手，答完等你看",
     "answered": "在它的频道里",
     "evidence": "依据",
     "unsure": "拿不准的",
@@ -281,7 +281,7 @@
     "heard": "中途听到 {n} 句"
   },
   "card": {
-    "orchestrator": "管家",
+    "orchestrator": "助手",
     "refining": "{name}在起草",
     "draft": "草稿",
     "queued": "排队中",
@@ -297,7 +297,7 @@
     "used": "用了 {took}",
     "run": "第 {n} 轮",
     "runs": "{n} 轮",
-    "orchestratorWorking": "管家在做",
+    "orchestratorWorking": "助手在做",
     "missingFlag": "记录缺失",
     "missing": "这一轮的记录缺失：{what}"
   },

@@ -87,15 +87,36 @@ export function extractMossToolAck(raw: string): string | undefined {
 export const mossOrchestratorTool = {
   type: "function",
   name: "ask_orchestrator",
-  description: "Consult the farm's orchestrator whenever the owner asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
+  description: "Consult the farm's orchestrator whenever the user asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
   parameters: {
     type: "object",
     properties: {
       question: {
         type: "string",
-        description: "The owner's exact request or question for the orchestrator.",
+        description: "The user's exact request or question for the orchestrator.",
       },
     },
     required: ["question"],
   },
 } as const;
+
+const MossFrame = Schema.Union([
+  Schema.Struct({
+    action: Schema.Literal("session.commentary.append"),
+    content: Schema.String,
+    status: Schema.Literal("completed"),
+    event_id: Schema.String,
+  }),
+  Schema.Struct({
+    action: Schema.Literal("session.update"),
+    session: Schema.Struct({ persona: Schema.Struct({ prompt: Schema.String }), instructions: Schema.String, tools: Schema.Array(Schema.Unknown) }),
+  }),
+  Schema.Struct({ action: Schema.Literal("response.create"), response: Schema.Struct({ call_ids: Schema.Array(Schema.String) }) }),
+  Schema.Struct({
+    action: Schema.Literal("conversation.item.create"),
+    item: Schema.Struct({ type: Schema.Literal("function_call_output"), call_id: Schema.String, output: Schema.String }),
+  }),
+]);
+
+/** A frame the farm says to MOSS Live, as its socket takes it; none for one that does not encode (each is built from strings). */
+export const mossFrame = Schema.encodeOption(Schema.fromJsonString(MossFrame));

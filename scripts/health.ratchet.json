@@ -63,7 +63,7 @@
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 5,
+    "lintOff": 4,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -192,7 +192,7 @@
   "packages/testkit": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 6,
+    "cast": 1,
     "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
@@ -214,7 +214,7 @@
     "doubleCast": 1,
     "cast": 2,
     "lintOff": 4,
-    "orDie": 5,
+    "orDie": 6,
     "ignored": 0,
     "swallowed": 0,
     "resultBranch": 0
@@ -439,6 +439,16 @@
     "swallowed": 0,
     "resultBranch": 0
   },
+  "web: features/library": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "web: features/media": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -520,6 +530,16 @@
     "resultBranch": 0
   },
   "web: features/setting": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
+  "web: features/user": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,

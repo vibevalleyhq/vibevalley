@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Formatter } from "effect";
 import { TestClock } from "effect/testing";
 
 import type { SessionEvent } from "@vibevalley/protocol";
@@ -24,13 +24,15 @@ describe("a session's log", () => {
       const dir = join(home, "events");
       mkdirSync(dir);
       const file = join(dir, "w1.json");
-      writeFileSync(file, JSON.stringify([{ seq: 4, time: 1, type: "assistant/message", text: "旧记录" }]));
+      writeFileSync(file, Formatter.formatJson([{ seq: 4, time: 1, type: "assistant/message", text: "旧记录" }]));
       const tr = yield* trajectories(home);
-      expect(yield* tr.events("w1")).toEqual([]);
+      const events2 = yield* tr.events("w1");
+      expect(events2).toEqual([]);
       expect(existsSync(file)).toBe(false);
       (yield* tr.openLog("w1")).said("新的记录");
       yield* tr.finish("w1");
-      expect(yield* read(file)).toMatchObject([{ seq: 0, revision: 0, text: "新的记录" }]);
+      const content = yield* read(file);
+      expect(content).toMatchObject([{ seq: 0, revision: 0, text: "新的记录" }]);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
@@ -66,9 +68,12 @@ describe("a session's log", () => {
       const kept = (yield* tr.events("w1"))!;
       expect(kept.map((s) => s.type + ":" + (s.output ?? ""))).toEqual(["run/start:", "user/message:", "tool/call:", "tool/result:a\nb", "run/end:"]);
       expect(kept[2]!.actionText).toBe("跑命令");
-      expect(yield* tr.events("w1", "r7")).toHaveLength(5);
-      expect(yield* tr.events("w1", "r8")).toHaveLength(0);
-      expect(yield* tr.events("../w1")).toBeUndefined();
+      const events2 = yield* tr.events("w1", "r7");
+      expect(events2).toHaveLength(5);
+      const events3 = yield* tr.events("w1", "r8");
+      expect(events3).toHaveLength(0);
+      const events4 = yield* tr.events("../w1");
+      expect(events4).toBeUndefined();
       expect((yield* tr.openLog("w1")).events()).toHaveLength(5);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
@@ -131,7 +136,8 @@ describe("a session's log", () => {
       yield* TestClock.adjust(400);
       expect(pushed.map(([id, e]) => [id, e.text])).toEqual([["w9", "好的"]]);
       yield* tr.finish("w9");
-      expect(yield* read(join(home, "events", "w9.json"))).toHaveLength(1);
+      const content = yield* read(join(home, "events", "w9.json"));
+      expect(content).toHaveLength(1);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

@@ -2,7 +2,7 @@
   "id": "note-without-starting",
   "createdAt": 1792270920000,
   "model": "deepseek-flash",
-  "want": "主人只说记一下，管家却记下就开工了。应该查重后记进备选，不填 start，回编号和「在备选里」。",
+  "want": "用户只说记一下，助手却记下就开工了。应该查重后记进备选，不填 start，回编号和「在备选里」。",
   "memory": "",
   "scenario": { "repos": ["demo"] },
   "tools": [
@@ -35,7 +35,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：记一下：demo 的登录页偶尔白屏",
+    "content": "[来源：用户]\n用户说：记一下：demo 的登录页偶尔白屏",
     "display": true,
     "details": {
       "channel": "general"

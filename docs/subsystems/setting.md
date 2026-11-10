@@ -2,7 +2,7 @@
 
 服务端的运行参数与凭据来自两类入口：
 - **静态配置（`ServerConfig`）**：开机时从默认值、`vibevalley.yaml` 和环境变量一次性加载，运行期只读。
-- **动态设置（`Setting`）**：主人在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
+- **动态设置（`Setting`）**：用户在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
 
 ## 管什么，不管什么
 
@@ -18,7 +18,7 @@
 |---|---|
 | `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
 | `apps/server/src/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
-| `apps/server/src/setting/` | `setting.ts`、`saving.ts`、`keys.ts`、`memorySources.ts`、`voice.ts` 与黄金数据 `testdata/` |
+| `apps/server/src/setting/` | `setting.ts`、`saving.ts`、`keys.ts`、`memorySources.ts`、`voice.ts` |
 | `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
 | `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`） |
 
@@ -38,7 +38,8 @@
 | 配置键 | 用途 | 默认值 |
 |---|---|---|
 | `work_root` | 空间：仓库（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
-| `db` | SQLite 数据库目录（设为 `memory` 则使用内存库） | `$VIBEVALLEY_HOME/db` |
+| `db` | PGlite 的数据目录（设为 `memory` 则使用内存库；配了 `database.url` 时不用） | `$VIBEVALLEY_HOME/db` |
+| `database.url` | 一个 Postgres（`postgres://…`）：库放在那里；可能带密码，按密钥读 | 空：用 PGlite |
 | `port` | 主 HTTP 与 `/mcp` 监听端口（仅绑定 `127.0.0.1`，`0` 为随机端口） | `8787` |
 | `web` | 在 `/` 托管的前端静态产物目录（也可由 `--web` 指定） | 无 |
 | `agent.model` / `agent.starters` | CLI 对话默认模型、新农场自动安装的内置模板 ID 列表 | 空 / 空 |
@@ -46,7 +47,7 @@
 | `agora.app_id` / `agora.app_certificate` | 声网 RTC 凭据（`AGORA_APP_ID` / `AGORA_APP_CERTIFICATE`） | 空 |
 | `voice.id` / `voice.line.port` / `voice.line.url` | 默认音色、语音线路端口与固定公网隧道地址 | 默认音色 / `8788` / 空 |
 | `lan.port` | 「连接到本机」局域网监听端口 | `8790` |
-| `git_emails` / `tokei` | 计入主人经验的额外 git 邮箱列表、tokei 命令路径 | 空 / `tokei` |
+| `git_emails` / `tokei` | 计入用户经验的额外 git 邮箱列表、tokei 命令路径 | 空 / `tokei` |
 | `cny_per_usd` | 美元单价折算人民币汇率 | `7.2` |
 | `patrol.heartbeat_minutes` / `cron.tick_ms` | Inbox 巡查间隔（分钟，`0` 关闭）、定时任务检查间隔（毫秒） | `10` / `20000` |
 | `session.stall_seconds` / `session.trajectory_days` | 帮工静默告警秒数、离场后轨迹保留天数（`0` 永久保留） | `240` / `30` |
@@ -73,7 +74,7 @@
 ## 和谁打交道
 
 - **全部服务端模块**：注入 `ServerConfig` 读取静态参数。
-- **管家、农机、语音与记性（`orchestrator`、`runtime`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
+- **助手、农机、语音与记性（`orchestrator`、`runtime`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
 
 ### 供应商配置
 
@@ -86,5 +87,5 @@ Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置
 
 ## 怎么验证
 
-- `apps/server/src/infra/config.test.ts`、`apps/server/src/setting/*.test.ts`：配置优先级、非法值拦截、密钥掩码与黄金数据测试。
+- `apps/server/src/infra/config.test.ts`、`apps/server/src/setting/*.test.ts`：配置优先级、非法值拦截、密钥掩码测试。
 - `apps/server/src/base/base.test.ts`、`apps/web/test/settings.spec.ts`：密钥脱敏与设置页端到端测试。

@@ -21,7 +21,6 @@ src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes,
 src/chat.ts        `chat [runtime]`: the server's conversation program, handed this terminal (VIBEVALLEY_CHAT); bare `vibevalley` is the help
 src/output.ts      stdout for the result, the failure as one JSON line on stderr, exit codes by kind
 src/testing.ts     a run in the process against a whole farm (@vibevalley/server/testing)
-src/testdata/      the golden answers: help, typical mistakes, refusals and dry runs (vp run golden:update cli)
 ```
 
 ## Rules
@@ -35,6 +34,16 @@ src/testdata/      the golden answers: help, typical mistakes, refusals and dry 
   the home's files are `@vibevalley/home`'s.
 - Run it from the repository with `vp run --filter @vibevalley/cli start <command…>`; the desktop app bundles it
   (`vp pack`, dist/) and installs it as `vibevalley` (`-beta`, `-alpha`).
+
+## Sign in to a server elsewhere
+
+`vibevalley auth login <server>` works like `gh auth login`: it asks the server's gate for a sign-in
+(`user.approval.create`), prints a code and `<server>/approve?code=…` (opened in a browser when at a terminal), and
+collects its key once the user approves it on any page that already holds a key. The server, the key and the device are
+kept in the home's `auth.json` (`0600`); every command after defaults to that server and sends the key as a Bearer token
+(`askAt`, `frames` in farm.ts), and to no other server. `auth status` says where it is signed in and whether the key still
+works; `auth logout` has the server take the key back and forgets it. The server on this computer answers without a
+key: `auth login` to it says so and keeps nothing.
 
 ## Publish an existing branch
 
@@ -53,12 +62,12 @@ The checkout may be outside the space. A published response includes the confirm
 | 子命令 | JSON 参数 |
 |---|---|
 | `report` | 必填 `summary`；可选 `prSubmit`、`questions`、`checks`、`remember`、`answer`。完整字段和类型见 `report --help` |
-| `pr-submit` | 可选 `summary`；需要主人明确授权 |
+| `pr-submit` | 可选 `summary`；需要用户明确授权 |
 | `context` | 省略参数读当前工单串；可选 `id`、`before`、`limit`、`unread` |
 | `read` | 必填 `uri`，可选 `offset`、`limit` |
 | `doctor` | 无参数，认证调用只读会话列表 |
 
-例如在完整命令后追加 `report '{"summary":"完成","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"tests passed"}]}'`。参数不能选择其他会话。缺失、无效或撤销凭证不会回退主人 HTTP；工具拒绝返回非零退出码，stderr 保留有界且脱敏的原因。
+例如在完整命令后追加 `report '{"summary":"完成","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"tests passed"}]}'`。参数不能选择其他会话。缺失、无效或撤销凭证不会回退用户 HTTP；工具拒绝返回非零退出码，stderr 保留有界且脱敏的原因。
 
 源码入口带绝对 Node 和 Vite+ 加载器路径；桌面包入口为 `Resources/cli/dist/worker.mjs`，仅此次 CLI 调用设置 `ELECTRON_RUN_AS_NODE=1`。生命周期与启动门槛见[会话](docs/subsystems/session.md)。
 

@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, type ArtifactId, ownerId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
+import { type Agent, type ArtifactId, userId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
 
 import { createExternal } from "#/base/external.ts";
 import { api } from "#/infra/api.ts";
@@ -382,17 +382,17 @@ const viewStyles = stylex.create({
   },
 });
 
-/** The owner's lines on the attribution bar. */
-const ownerColor = "#c8a46e";
+/** The user's lines on the attribution bar. */
+const userColor = "#c8a46e";
 
 /** Who wrote a block last, as the bar beside it shows. */
 function authorColor(updatedBy: string, agent: Agent | undefined) {
-  if (updatedBy === ownerId) return ownerColor;
+  if (updatedBy === userId) return userColor;
   if (agent?.look.trim) return hexColor(agent.look.trim);
   let h = 0;
   for (let i = 0; i < updatedBy.length; i++) h = (h * 31 + updatedBy.charCodeAt(i)) & 0x7fffffff;
   const trim = swatches.trim[h % swatches.trim.length];
-  return trim === undefined ? ownerColor : hexColor(trim);
+  return trim === undefined ? userColor : hexColor(trim);
 }
 
 /** A block as one drawing of the editor shows it; `block` is the editor's own, for its actions. */
@@ -481,7 +481,7 @@ export function BlocksView(props: {
         depth: editor.depthOf(b),
         number: numbers.get(b.id),
         writing,
-        showFace: writing || (b.updatedBy !== ownerId && b.updatedBy !== lastAuthor),
+        showFace: writing || (b.updatedBy !== userId && b.updatedBy !== lastAuthor),
         wanted: editor.focusId === b.id,
       };
       lastAuthor = b.updatedBy;
@@ -587,7 +587,7 @@ function SuggestionsList(props: {
               return b === undefined || b.rev !== s().baseRev;
             };
             const agent = () => props.agents.get(s().author);
-            const who = () => (s().author === ownerId ? t("web.artifact.blocks.owner") : (agent()?.name ?? s().author));
+            const who = () => (s().author === userId ? t("web.artifact.blocks.user") : (agent()?.name ?? s().author));
             const changeKind = () =>
               s().change.delete === true ? "delete" : s().change.type !== undefined ? "type" : s().change.attrs !== undefined ? "attrs" : "text";
             return (
@@ -712,7 +712,7 @@ const barHeight = (type: string) => (type === "divider" ? 16 : type === "heading
 
 function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefined; onQuote?: ((block: QuoteTarget) => void) | undefined }) {
   const r = () => props.row;
-  const writer = () => (r().updatedBy === ownerId ? t("web.artifact.blocks.owner") : (props.agent?.name ?? r().updatedBy));
+  const writer = () => (r().updatedBy === userId ? t("web.artifact.blocks.user") : (props.agent?.name ?? r().updatedBy));
   const mark = (): JSX.Element | undefined => {
     switch (r().type) {
       case "bulleted":

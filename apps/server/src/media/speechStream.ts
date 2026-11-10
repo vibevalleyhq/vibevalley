@@ -2,10 +2,10 @@ import { Effect, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { streamMossSpeech } from "@vibevalley/provider/moss/speech-stream";
 
 import { type ApiError, refused } from "#/base/errors.ts";
 import { bestEffort } from "#/infra/log.ts";
+import type { AudioFailure, SpeechEvent } from "#/provider/vendors.ts";
 
 import { releaseAudioResult, saveAudioStream, type MediaInputs } from "./audioResult.ts";
 export interface SpeechStreamSaved {
@@ -24,8 +24,7 @@ export interface SpeechStreamPorts {
 
 export const receiveSpeechStream = Effect.fn("Media.receiveSpeechStream")(function* (
   id: string,
-  key: string,
-  input: { model: string; text: string; voice: string; format: string },
+  events: Stream.Stream<SpeechEvent, AudioFailure>,
   ports: SpeechStreamPorts,
 ) {
   const chunks: Uint8Array[] = [];
@@ -86,7 +85,7 @@ export const receiveSpeechStream = Effect.fn("Media.receiveSpeechStream")(functi
       }),
     );
   });
-  yield* streamMossSpeech(key, input).pipe(
+  yield* events.pipe(
     Stream.runForEach((event) =>
       Effect.gen(function* () {
         switch (event.type) {
@@ -123,7 +122,7 @@ export const receiveSpeechStream = Effect.fn("Media.receiveSpeechStream")(functi
       }),
     ),
     Effect.timeout("5 minutes"),
-    Effect.catch((error) => save.pipe(Effect.andThen(Effect.fail(error)))),
+    Effect.tapError(() => save),
     Effect.onInterrupt(() => save.pipe(bestEffort("Partial speech stream could not be saved"))),
   );
   yield* save;

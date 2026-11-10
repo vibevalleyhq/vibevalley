@@ -7,7 +7,7 @@ import type * as T from "@vibevalley/protocol";
 import { channelOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { owner } from "#/base/actor.ts";
+import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Inbox } from "#/inbox/inbox.ts";
@@ -30,7 +30,8 @@ describe("an issue's thread", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const chat = yield* Channel;
       const mailbox = yield* Mailbox;
       yield* (yield* Agent).save(lab());
@@ -41,15 +42,15 @@ describe("an issue's thread", () => {
         (id) => id !== undefined,
         "the issue thread",
       ))!;
-      const followup = (yield* chat.say("这条还没处理", thread, "release-on-close")).message;
+      const followup = (yield* chat.post({ _tag: "User", text: "这条还没处理", channel: thread, sendKey: "release-on-close" })).message;
       yield* await_(
-        () => Effect.succeed(mailbox.pending(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
+        () => Effect.succeed(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
         (id) => id === thread,
         "the followup stored",
       );
-      yield* (yield* Issue).setStatus(issue.id, "canceled", "", "", owner);
+      yield* (yield* Issue).setStatus(issue.id, "canceled", "", "", user);
       const returned = yield* await_(
-        () => Effect.succeed(mailbox.pending(chat.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
+        () => Effect.succeed(mailbox.deliveriesOf(chat.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
         (rows) => rows.length === 1,
         "the unread followup returned",
       );
@@ -69,7 +70,8 @@ describe("an issue's thread", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const channels = yield* Channel;
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
@@ -78,22 +80,22 @@ describe("an issue's thread", () => {
       yield* issues.comment(issue.id, "先记下验收要求", "queued-comment");
       const thread = yield* channels.issueThread(issue.id, issue.title);
       expect((yield* channels.history(thread)).map((message) => message.text)).toEqual(["先记下验收要求"]);
-      expect(sessions.presentSessions()).toEqual([]);
+      expect(sessions.hired()).toEqual([]);
       expect((yield* issues.get(issue.id)).status).toBe("backlog");
       yield* issues.start(issue.id, "");
       yield* until(() => inputs.length > 0, "the queued input delivered with the first assignment");
       expect(inputs[0]).toContain("先记下验收要求");
-      const followup = (yield* channels.say("另一个需求", thread, "handback-source")).message;
-      const session = sessions.presentSessions()[0]!;
+      const followup = (yield* channels.post({ _tag: "User", text: "另一个需求", channel: thread, sendKey: "handback-source" })).message;
+      const session = sessions.hired()[0]!;
       const mailbox = yield* Mailbox;
       yield* await_(
-        () => Effect.succeed(mailbox.pending(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
+        () => Effect.succeed(mailbox.deliveriesOf(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
         (channel) => channel === thread,
         "the followup owned by the session",
       );
-      yield* (yield* Mailbox).returnInput(session.id, followup.id, "超出当前范围");
-      yield* (yield* Mailbox).returnInput(session.id, followup.id, "超出当前范围");
-      const returned = mailbox.pending(channels.orchestratorOf(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
+      yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
+      yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
+      const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
       expect(returned).toHaveLength(1);
       expect(returned[0]!.payload.trigger.id).toBe(followup.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -105,7 +107,8 @@ describe("an issue's thread", () => {
       runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const channels = yield* Channel;
       const sessions = yield* Session;
       const core = yield* Core;
@@ -125,7 +128,7 @@ describe("an issue's thread", () => {
       const inThread = (): T.ChatMessage[] => saidIn(thread!.id);
       const reportsBy = (session: string) => inThread().filter((m) => m.kind === "report" && m.from === session).length;
       yield* until(() => reportsBy(first) === 1, "the first session's report");
-      yield* channels.say("把输出改成中文", thread!.id, "");
+      yield* channels.post({ _tag: "User", text: "把输出改成中文", channel: thread!.id, sendKey: "" });
       yield* until(() => reportsBy(first) === 2, "the person's words wake the first session");
 
       yield* sessions.dismiss(first);
@@ -134,21 +137,24 @@ describe("an issue's thread", () => {
         (i) => i.closedAt !== undefined,
         "cancelled",
       );
-      const kept = yield* channels.say("先记一下：时区用东八区", thread!.id, "");
+      const kept = yield* channels.post({ _tag: "User", text: "先记一下：时区用东八区", channel: thread!.id, sendKey: "" });
       const woken = yield* sql<{
         n: number;
       }>`select count(*) as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`.pipe(Effect.orDie);
       expect(woken[0]!.n).toBe(0);
-      expect(yield* sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`).toHaveLength(1);
+      const rows = yield* sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`;
+      expect(rows).toHaveLength(1);
 
-      const second = latestSessionIdOf(yield* issues.setStatus(issue.id, "todo", "接着做", "", owner));
+      const setStatus2 = yield* issues.setStatus(issue.id, "todo", "接着做", "", user);
+      const second = latestSessionIdOf(setStatus2);
       if (second === undefined) throw new Error("the issue has no reopened session");
       yield* until(() => reportsBy(second) === 1, "the second session's report in the same thread");
-      expect(yield* channels.threadOfSession(second)).toBe(thread!.id);
+      const threadOfSession2 = yield* channels.threadOfSession(second);
+      expect(threadOfSession2).toBe(thread!.id);
       const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
       expect(handed?.text).toContain("@" + second);
       expect(handed?.text).toContain("第 2 次");
-      yield* channels.say("时区记得改", thread!.id, "");
+      yield* channels.post({ _tag: "User", text: "时区记得改", channel: thread!.id, sendKey: "" });
       yield* until(() => reportsBy(second) === 2, "the person's words wake the second session");
       expect(reportsBy(first)).toBe(2);
 
@@ -157,8 +163,8 @@ describe("an issue's thread", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // The issue hears the owner in its thread whichever way the words came: said in the thread, they answer its question and void a pass as a comment does.
-  it.live("hears the owner's words as a comment", () => {
+  // The issue hears the user in its thread whichever way the words came: said in the thread, they answer its question and void a pass as a comment does.
+  it.live("hears the user's words as a comment", () => {
     const first = Promise.withResolvers<void>();
     let turns = 0;
     const f = farm({
@@ -171,7 +177,8 @@ describe("an issue's thread", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = testIssues(yield* Issue);
+      const issue2 = yield* Issue;
+      const issues = testIssues(issue2);
       const channels = yield* Channel;
       const sessions = yield* Session;
       const inbox = yield* Inbox;
@@ -217,7 +224,7 @@ describe("an issue's thread", () => {
         "the question seen",
       );
 
-      yield* channels.say("用 8797", thread, "");
+      yield* channels.post({ _tag: "User", text: "用 8797", channel: thread, sendKey: "" });
       yield* await_(
         () => inbox.handoffState(question.id),
         (state) => state === undefined,
@@ -227,10 +234,10 @@ describe("an issue's thread", () => {
       yield* await_(get, (i) => i.status === "in_review", "handed back");
       yield* issues.review(issue.id, { pass: true });
       expect((yield* get()).reviewedAt).toBeDefined();
-      yield* channels.say("标题再短一点", thread, "");
+      yield* channels.post({ _tag: "User", text: "标题再短一点", channel: thread, sendKey: "" });
       yield* await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
 
-      const said = () => saidIn(thread).filter((m) => m.from === "owner" && m.text === "顺手把注释删掉").length;
+      const said = () => saidIn(thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;
       for (let i = 0; i < 2; i++) yield* issues.comment(issue.id, "顺手把注释删掉", "k1");
       yield* until(() => said() > 0, "the comment in the thread");
       expect(said()).toBe(1);

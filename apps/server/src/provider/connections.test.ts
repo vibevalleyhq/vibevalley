@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Array as Arr, Effect, Redacted } from "effect";
 
 import type { ProviderConnectionUpdate, ProviderUpdate } from "@vibevalley/protocol";
 
@@ -41,9 +41,12 @@ it.effect.each([
 it.effect("new unconfigured connections can be saved without implying any usable default", () =>
   Effect.gen(function* () {
     const saved = yield* connectionsOver(emptyProviders, { ...update, connections: [{ id: "moss", name: " MOSS ", adapter: "moss", enabled: true }] });
-    expect(saved).toEqual({
+    const { connections, ...uses } = saved;
+    expect(Arr.map(connections, ({ key, ...rest }) => ({ ...rest, key: Redacted.value(key) }))).toEqual([
+      { id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "" },
+    ]);
+    expect(uses).toEqual({
       revision: 1,
-      connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "" }],
       dictation: null,
       image: null,
       understanding: null,

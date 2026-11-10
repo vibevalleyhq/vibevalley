@@ -31,14 +31,14 @@ describe("a plot", () => {
       [{ state: "asking", acts: [{ act: "answer", does: "say" }] }, {}, "dry", "等你回答"],
       [{ state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] }, {}, "flowering", "等你验收"],
       [{ state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] }, { reviewedAt: 5 }, "carrot", "可收获"],
-      // Reworked after a failed acceptance and handed back: it waits on the owner again, its findings are not weeds yet.
+      // Reworked after a failed acceptance and handed back: it waits on the user again, its findings are not weeds yet.
       [
         { state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] },
         { findings: [{ id: "f", text: "再改", at: 1, resolved: false }] },
         "flowering",
         "等你验收",
       ],
-      // A child issue: it stands, but its parent issue is where the owner acts.
+      // A child issue: it stands, but its parent issue is where the user acts.
       [{ state: "reviewing", acts: [] }, {}, "flowering", undefined],
       // A conflict is not ripe, whatever the round came to.
       [{ state: "stuck", stuck: "conflict", lead: "resolve", acts: [{ act: "resolve", does: "say" }] }, {}, "withered", "有冲突"],

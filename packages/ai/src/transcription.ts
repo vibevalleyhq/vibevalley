@@ -45,7 +45,7 @@ export const transcribeAudio = Effect.fn("AI.transcribeAudio")(function* (model:
           ],
         },
       }),
-    catch: (cause) => new TranscriptionFailed({ cause }),
+    catch: (cause) => TranscriptionFailed.make({ cause }),
   });
   return { ...result, usage };
 });

@@ -33,10 +33,9 @@ export function shortTitle(text: string): string {
 }
 
 /** What its close says: done with what it delivered, or canceled and why. */
-export const closedText = (pick: Pick<Issue, "status" | "delivered" | "canceled">): string => {
-  return pick.delivered
+export const closedText = (pick: Pick<Issue, "status" | "delivered" | "canceled">): string =>
+  pick.delivered
     ? t("shared.doneWith", { what: t(`shared.delivered.${pick.delivered}`) })
     : pick.canceled
       ? t("shared.canceledFor", { why: t(`shared.canceled.${pick.canceled}`) })
       : t(`shared.status.${pick.status}`);
-};

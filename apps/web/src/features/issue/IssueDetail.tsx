@@ -278,7 +278,7 @@ const viewStyles = stylex.create({
 
 export { AnswerView, OrchestratorIssueDetail };
 
-/** The workbench's issue page, answering the owner top to bottom. the side holds the facts. */
+/** The workbench's issue page, answering the user top to bottom. the side holds the facts. */
 export function IssueDetail(props: {
   issue: Issue;
   sessions: Session[];

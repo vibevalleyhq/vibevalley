@@ -9,7 +9,7 @@ const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest
 
 export interface IssueHandlers<R = never> {
   readonly "issue.conversation.get": (a: { readonly id: string }) => Effect.Effect<string | null, ApiError, R>;
-  /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
+  /** To the issue's newest session, as the user: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
   readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<T.Applied, ApiError, R>;
   readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   /** One joined read of issues and their real sessions, including explicit missing records. */
@@ -38,90 +38,90 @@ export interface IssueHandlers<R = never> {
 }
 
 export const issueEndpoints: readonly Endpoint[] = [
-  { op: "issue.conversation.get", about: ["id"], input: input({ id: Schema.String }), result: Schema.NullOr(Schema.String), can: ["owner", "remote"] },
+  { op: "issue.conversation.get", about: ["id"], input: input({ id: Schema.String }), result: Schema.NullOr(Schema.String), can: ["user", "remote"] },
   {
     op: "issue.comment.create",
     about: ["id"],
     input: input({ id: Schema.String }, S.CommentRequest),
     result: S.Applied,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.diff.get",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.Changes,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.history.list",
     about: [],
     input: undefined,
     result: Schema.mutable(Schema.Array(S.IssueHistory)),
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "issue.list",
     about: [],
     input: S.IssueFilter,
     result: Schema.mutable(Schema.Array(S.Issue)),
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.review",
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueReviewRequest),
     result: S.Issue,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.split",
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueSplitRequest),
     result: Schema.String,
-    can: ["owner", "remote", "session"],
+    can: ["user", "remote", "session"],
   },
   {
     op: "issue.get",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.Issue,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.run.list",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: Schema.mutable(Schema.Array(S.Run)),
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "issue.timeline.get",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.IssueTimeline,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "issue.create",
     about: [],
     input: S.IssueRequest,
     result: S.AppliedIssue,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.update",
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueUpdate),
     result: S.AppliedIssue,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.delete",
     about: ["id"],
     input: issueDeleteInput,
     result: undefined,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
     dryRun: "issue.previewDelete",
   },
   {
@@ -129,14 +129,14 @@ export const issueEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: issueDeleteInput,
     result: S.Preview,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "issue.status.update",
     about: ["id"],
     input: issueStatusUpdateInput,
     result: S.AppliedIssue,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
     dryRun: "issue.status.previewUpdate",
   },
   {
@@ -144,14 +144,14 @@ export const issueEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: issueStatusUpdateInput,
     result: S.Preview,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["user", "remote", "orchestrator"],
   },
   {
     op: "issue.refine",
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueRefineRequest),
     result: S.Issue,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
 ];
 

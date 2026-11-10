@@ -1,11 +1,11 @@
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, SpaceView } from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "#/base/format.ts";
 import { matches } from "#/base/search.ts";
 
-import { endedAt, isForOrchestrator, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
+import { endedAt, assignedOnDuty, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -82,7 +82,7 @@ export const historyKey = (core: SpaceView | undefined): string =>
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
 
-/** `move`: the owner's move of it on its way (moves.ts), laid over the lane the frame gives. */
+/** `move`: the user's move of it on its way (moves.ts), laid over the lane the frame gives. */
 export type BoardCard = (
   | { kind: "todo"; id: string; lane: Lane; issue: Issue }
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
@@ -110,7 +110,7 @@ export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, or
     const base = { id: issue.id, lane: laneOf(issue.status), issue };
     const children = families.get(issue.id) ?? [];
     if (children.length > 0) cards.push({ kind: "family", ...base, children });
-    else if (isForOrchestrator(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
+    else if (assignedOnDuty(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
     else {
       if (executionsOf(issue).length === 0) cards.push({ kind: "todo", ...base });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
@@ -200,10 +200,10 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const first = sessions[0] ?? head;
       const phase = session?.phase;
       const now0 = session ?? head;
-      // The board says what the page says: the stage, when it waits on the owner.
+      // The board says what the page says: the stage, when it waits on the user.
       // A stuck issue says why on the board as on its page (conflict).
       const st = issue.stage;
-      if (stageWantsOwner(st.state))
+      if (stageWantsUser(st.state))
         flags.push({
           text: st.stuck
             ? t("shared.join.labeled", { label: t(`shared.stage.${st.state}`), text: t(`shared.stuck.${st.stuck}`) })

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
-import { type Channel, type ChatMessage, ownerId, VibeValleyApiError } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, userId, VibeValleyApiError } from "@vibevalley/protocol";
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { api } from "#/infra/api.ts";
 import { frameAt, testFrames } from "#/infra/testing.ts";
-import { type Intent, intentsIn } from "#/state/intent.ts";
+import { type Intent, type IntentAt, intentsIn } from "#/state/intent.ts";
 import { deferred, testRegistry } from "#/state/testing.ts";
 
 import { followed } from "./follow";
@@ -36,7 +36,8 @@ const message = (id: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
   number: 1,
   channel: "c",
   from: "a",
-  fromKind: "session",
+  fromKind: "agent",
+  fromRole: "worker",
   name: "a",
   kind: "chat",
   text: "hi",
@@ -51,7 +52,15 @@ const message = (id: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
   outcome: over.outcome ?? null,
 });
 
-const kept = <I>(input: I, over: Partial<Intent<I, never>> = {}): Intent<I, never> => ({ key: "k", input, status: "pending", queued: false, ...over });
+const kept = <I>(
+  input: I,
+  over: Partial<Pick<Intent<I, never>, "key" | "input">> & ({ readonly phase?: "sending" } | IntentAt<never>) = {},
+): Intent<I, never> => ({
+  key: "k",
+  input,
+  phase: "sending",
+  ...over,
+});
 
 const channel = (over: Partial<Channel> = {}): Channel => ({
   id: "c",
@@ -67,19 +76,19 @@ const channel = (over: Partial<Channel> = {}): Channel => ({
   subjectKind: over.subjectKind ?? null,
 });
 
-test("a reaction on its way shows as the owner's at once, beside the others', and only on its message", () => {
+test("a reaction on its way shows as the user's at once, beside the others', and only on its message", () => {
   const m = message("m", { reactions: [{ emoji: "👍", by: ["b"] }] });
   const other = message("n");
   const [shown, untouched] = markedMessages([m, other], [kept<ReactionMark>({ channel: "c", id: messageId("m"), emoji: "👍", on: true })], []);
-  expect(shown?.reactions).toEqual([{ emoji: "👍", by: ["b", ownerId] }]);
+  expect(shown?.reactions).toEqual([{ emoji: "👍", by: ["b", userId] }]);
   expect(untouched).toBe(other);
 });
 
 test("a reaction taken back goes, and the emoji with it when nobody else had it", () => {
   const m = message("m", {
     reactions: [
-      { emoji: "👍", by: [ownerId] },
-      { emoji: "🎉", by: [ownerId, "b"] },
+      { emoji: "👍", by: [userId] },
+      { emoji: "🎉", by: [userId, "b"] },
     ],
   });
   const marks = [
@@ -131,7 +140,7 @@ test("a reaction settles when the channel's copy shows it, not when the reply co
   reply.resolve(copy);
   await done;
   expect(intents.all()).toHaveLength(1);
-  copy = message("m", { reactions: [{ emoji: "👍", by: [ownerId] }] });
+  copy = message("m", { reactions: [{ emoji: "👍", by: [userId] }] });
   heard();
   expect(intents.all()).toEqual([]);
 });
@@ -148,7 +157,7 @@ test("a refused mark is let go and said, so the overlay goes and the server's st
 
 test("a refused unread mark drops its overlay and reports the reason through the shared mark path", async () => {
   const frame = frameAt(0);
-  const frames = testFrames({ frame: { ...frame, state: { ...frame.state, chat: { channels: [channel({ read: 10 })], ownerMentions: [] } } } });
+  const frames = testFrames({ frame: { ...frame, state: { ...frame.state, chat: { channels: [channel({ read: 10 })], userMentions: [] } } } });
   vi.spyOn(api.channel, "markUnread").mockRejectedValue(new VibeValleyApiError(409, "Refused", "not now"));
   const intents = intentsIn(testRegistry(frames), unreadMark);
   const said = deferred<string>();
@@ -169,7 +178,7 @@ test("a level picked again before the first showed replaces it, and settles on t
   expect(intents.all().map((i) => i.input.notify)).toEqual(["none"]);
   await Promise.resolve();
   const f = frameAt(1);
-  frames.set({ frame: { ...f, state: { ...f.state, chat: { channels: [channel({ notify: "none" })], ownerMentions: [] } } } });
+  frames.set({ frame: { ...f, state: { ...f.state, chat: { channels: [channel({ notify: "none" })], userMentions: [] } } } });
   expect(intents.all()).toEqual([]);
 });
 

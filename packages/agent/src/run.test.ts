@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Exit, Fiber, Scope, Stream } from "effect";
+import { Clock, Effect, Exit, Fiber, Formatter, Scope, Stream } from "effect";
+import { TestClock } from "effect/testing";
 
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
 import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { until } from "@vibevalley/testkit/until";
+import { gate, until } from "@vibevalley/testkit/until";
 
 import { type BrainEvent, type BrainOptions, makeBrain } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
@@ -64,8 +65,9 @@ const receiptAgent = Effect.fnUntraced(function* (steps: readonly Step[], extra:
     ...extra,
   });
   const receipts: RunResult[] = [];
+  const events2 = yield* agent.events;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* agent.events, (e) =>
+    Stream.runForEach(events2, (e) =>
       Effect.sync(() => {
         if (e.type === "agent_settled") receipts.push(e.run);
       }),
@@ -82,7 +84,9 @@ describe("a run's receipt", () => {
         [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
         { tools: [echo] },
       );
-      expect(yield* agent.ask(userMessage("one", Date.now()))).toBe("first");
+      const now = yield* Clock.currentTimeMillis;
+      const answer2 = yield* agent.ask(userMessage("one", now));
+      expect(answer2).toBe("first");
       yield* until(() => receipts.length === 1, "receipts.length === 1");
       expect(receipts[0]).toMatchObject({
         id: 1,
@@ -90,7 +94,9 @@ describe("a run's receipt", () => {
         usage: { input: 60, output: 12, cacheRead: 15 },
         contextTokens: 43,
       });
-      expect(yield* agent.ask(userMessage("two", Date.now()))).toBe("second");
+      const now2 = yield* Clock.currentTimeMillis;
+      const answer3 = yield* agent.ask(userMessage("two", now2));
+      expect(answer3).toBe("second");
       yield* until(() => receipts.length === 2, "receipts.length === 2");
       expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
       expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
@@ -103,10 +109,13 @@ describe("a run's receipt", () => {
       yield* Effect.scoped(
         Effect.gen(function* () {
           const { agent, receipts } = yield* receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
-          expect(yield* agent.ask(userMessage("fail", Date.now()))).toBe("failed words");
+          const now = yield* Clock.currentTimeMillis;
+          const answer2 = yield* agent.ask(userMessage("fail", now));
+          expect(answer2).toBe("failed words");
           yield* until(() => receipts.length === 1, "receipts.length === 1");
           expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
-          yield* agent.ask(userMessage("retry", Date.now()));
+          const now2 = yield* Clock.currentTimeMillis;
+          yield* agent.ask(userMessage("retry", now2));
           yield* until(() => receipts.length === 2, "receipts.length === 2");
           expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
         }),
@@ -143,11 +152,14 @@ describe("a run's receipt", () => {
           maxSteps: 3,
         },
       );
-      const answer = yield* Effect.forkChild(agent.ask(userMessage("A", Date.now())), { startImmediately: true });
+      const now = yield* Clock.currentTimeMillis;
+      const answer = yield* Effect.forkChild(agent.ask(userMessage("A", now)), { startImmediately: true });
       yield* until(() => entered, "entered");
-      yield* agent.later(userMessage("B", Date.now()));
+      const now2 = yield* Clock.currentTimeMillis;
+      yield* agent.later(userMessage("B", now2));
       release();
-      expect(yield* Fiber.join(answer)).toBe("");
+      const answer2 = yield* Fiber.join(answer);
+      expect(answer2).toBe("");
       yield* until(() => receipts.length === 1, "receipts.length === 1");
       expect(receipts[0]).toMatchObject({ id: 1, text: "", usage: { input: 9 } });
     }),
@@ -170,7 +182,8 @@ describe("a run's receipt", () => {
     Effect.gen(function* () {
       const { llm } = scriptedLLM([billed("partial", 7, 3, 2, { hangAfter: 7 })]);
       const dir = home();
-      const scope = yield* Scope.fork(yield* Effect.scope);
+      const scope2 = yield* Effect.scope;
+      const scope = yield* Scope.fork(scope2);
       const agent = yield* Scope.provide(
         makeBrain({
           name: "partial",
@@ -187,8 +200,10 @@ describe("a run's receipt", () => {
         scope,
       );
       const events: BrainEvent[] = [];
-      const reader = yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
-      yield* agent.send(userMessage("start", Date.now()));
+      const events2 = yield* agent.events;
+      const reader = yield* Effect.forkScoped(Stream.runForEach(events2, (e) => Effect.sync(() => void events.push(e))));
+      const now = yield* Clock.currentTimeMillis;
+      yield* agent.send(userMessage("start", now));
       yield* until(
         () => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"),
         'events.some((e) => e.type === "message_update" && messageText(e.message) === "partial")',
@@ -216,9 +231,9 @@ describe("a compaction", () => {
   it("replays its whole kept tail", async () => {
     const dir = home();
     const messages: BrainMessage[] = [
-      userMessage("old", Date.now()),
+      userMessage("old", 1798758000000),
       assistantMessage("old answer"),
-      userMessage("keep", Date.now()),
+      userMessage("keep", 1798758000001),
       assistantMessage("a"),
       assistantMessage("b"),
       assistantMessage("c"),
@@ -240,7 +255,7 @@ describe("a compaction", () => {
     // One after another, as the brain writes them.
     // oxlint-disable-next-line eslint/no-await-in-loop -- each line after the one before
     for (const m of [...messages, result.summary]) await appendSession(file, m);
-    expect(await loadSession(file)).toEqual(JSON.parse(JSON.stringify(result.messages)));
+    expect(await loadSession(file)).toEqual(JSON.parse(Formatter.formatJson(result.messages)));
     expect(result.summary.kept).toBe(5);
     expect(result.messages.length).toBe(6);
   });
@@ -285,7 +300,8 @@ describe("the agent's own todos", () => {
         Effect.gen(function* () {
           yield* r.ask("查三样");
           yield* until(() => sent.length === 3 && told === 3, "sent.length === 3 && told === 3");
-          expect(yield* store.load).toEqual([]);
+          const loaded = yield* store.load;
+          expect(loaded).toEqual([]);
         }),
       { todos: store, reminders: false },
     );
@@ -315,7 +331,8 @@ describe("the agent's own todos", () => {
       Array.from({ length: 4 }, () => reply),
       (r) =>
         Effect.gen(function* () {
-          expect(yield* r.ask("查")).toBe("派好了");
+          const answer2 = yield* r.ask("查");
+          expect(answer2).toBe("派好了");
           yield* until(() => started, "started");
           yield* r.agent.stop;
           const g = yield* store.load;
@@ -365,6 +382,39 @@ describe("the agent's own todos", () => {
       // The task was one change.
       expect(changed.length).toBe(1);
       expect(changed[0]!.type === "todos_changed" && changed[0]!.todos.length).toBe(2);
+    }),
+  );
+
+  it.effect("the fixture consumes its settled run without waiting for an already-started nudge", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1798758000000);
+      const release = gate();
+      let entered = false;
+      let returned = false;
+      yield* withAgent(
+        home(),
+        [
+          answer([toolCall("todo_add", { tasks: [{ id: "a", brief: "read" }] })]),
+          answer("first settled"),
+          () => {
+            entered = true;
+            return release.opened.then(() => answer("nudge settled"));
+          },
+        ],
+        (r) =>
+          Effect.gen(function* () {
+            const asking = yield* Effect.forkChild(Effect.tap(r.ask("start"), () => Effect.sync(() => (returned = true))));
+            yield* until(() => entered, "the next nudge has entered its model request");
+            yield* until(() => returned, "the fixture consumed the first run while the nudge is held");
+            const asking2 = yield* Fiber.join(asking);
+            expect(asking2).toBe("first settled");
+            expect(r.agent.progress().current).toMatchObject({ id: 2, settled: false });
+            expect(r.events.filter((e) => e.type === "agent_settled").map((e) => e.run.id)).toEqual([1]);
+            release.open();
+            yield* until(() => r.events.some((e) => e.type === "agent_settled" && e.run.id === 2), "the released nudge settles");
+          }).pipe(Effect.ensuring(Effect.sync(release.open))),
+        { todos: memoryStore(), maxNudges: 1, reminders: false },
+      );
     }),
   );
 

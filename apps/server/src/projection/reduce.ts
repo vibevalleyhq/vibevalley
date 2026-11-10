@@ -1,10 +1,10 @@
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
-import { withChannel, withMessage, withOwnerMentions } from "#/channel/messages.ts";
+import { withChannel, withMessage, withUserMentions } from "#/channel/messages.ts";
 import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "#/game/view.ts";
 import { withIssue, withIssueStatuses } from "#/issue/status.ts";
-import { sessionOf, withSession } from "#/session/roster.ts";
+import { isOnDuty, sessionOf, withSession } from "#/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
@@ -70,12 +70,12 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
       const kept = all.filter((c) => c.id !== f.id && c.parent !== f.id);
       return kept.length === all.length || !state.chat ? [state, false] : [{ ...state, chat: { ...state.chat, channels: kept } }, true];
     }
-    case "ownerMentionsChanged":
-      return same(state.chat?.ownerMentions, f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
+    case "userMentionsChanged":
+      return same(state.chat?.userMentions, f.mentions) ? [state, false] : [{ ...state, chat: withUserMentions(state.chat, f.mentions) }, true];
     case "sessionChanged": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
-      if (f.session.role === "orchestrator") return [{ ...state, sessions: [...others, f.session] }, true];
+      if (isOnDuty(f.session)) return [{ ...state, sessions: [...others, f.session] }, true];
       const plays = state.plays ?? {};
       const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
       return [{ ...state, sessions: [...others, f.session], plays: { ...plays, [f.session.id]: play } }, true];
@@ -146,6 +146,20 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
       if (i >= 0) all[i] = f.status;
       else all.push(f.status);
       return [{ ...state, connectors: all }, true];
+    }
+    case "machineChanged": {
+      const all: T.Machine[] = [];
+      let replaced = false;
+      for (const m of state.machines) {
+        if (m.id !== f.machine.id) all.push(m);
+        else if (same(m, f.machine)) return [state, false];
+        else {
+          all.push(f.machine);
+          replaced = true;
+        }
+      }
+      if (!replaced) all.push(f.machine);
+      return [{ ...state, machines: all }, true];
     }
   }
 }

@@ -10,6 +10,7 @@ import { Core } from "#/core/core.ts";
 import { handlers } from "#/http/handlers.ts";
 import { Lan } from "#/lan/lan.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { User } from "#/user/user.ts";
 import { Voice } from "#/voice/voice.ts";
 
 import { farm, lab } from "./farm.ts";
@@ -24,6 +25,7 @@ const withDoors = (f: ReturnType<typeof farm>) =>
   Layer.mergeAll(
     Layer.mock(Orchestrator)({ answerer: unused }),
     Layer.mock(Lan)({ status: unused, stopPairing: unused, previewStopPairing: unused, setUpstream: unused }),
+    Layer.mock(User)({ status: unused, devices: unused, byKey: unused, requests: unused }),
     Layer.mock(Voice)({ lines: unused }),
     Layer.mock(Connector)({}),
   ).pipe(Layer.provideMerge(f.layer));
@@ -43,15 +45,19 @@ describe("a request the page may send again", () => {
       // Without the key a second cancel is refused (the issue is closed); with it, the first answer comes back.
       const moved = yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" });
       expect(moved.status).toBe("canceled");
-      expect(yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" })).toEqual(moved);
-      expect(yield* Effect.flip(h["issue.status.update"]({ id: made.id, status: "canceled" }))).toMatchObject({ _tag: "Refused" });
+      const statusUpdate = yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" });
+      expect(statusUpdate).toEqual(moved);
+      const statusUpdateFailure = yield* Effect.flip(h["issue.status.update"]({ id: made.id, status: "canceled" }));
+      expect(statusUpdateFailure).toMatchObject({ _tag: "Refused" });
 
-      const said = (yield* (yield* Channel).say("开个串", undefined, "")).message;
+      const said = (yield* (yield* Channel).post({ _tag: "User", text: "开个串", sendKey: "" })).message;
       const thread = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
-      expect(yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" })).toBe(thread);
+      const threadCreate = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
+      expect(threadCreate).toBe(thread);
 
       const kept = yield* h["memory.create"]({ agent: "lab", text: "打卡页用中文", requestKey: "memory-1" });
-      expect(yield* h["memory.create"]({ agent: "lab", text: "打卡页用中文", requestKey: "memory-1" })).toEqual(kept);
+      const memoryCreate = yield* h["memory.create"]({ agent: "lab", text: "打卡页用中文", requestKey: "memory-1" });
+      expect(memoryCreate).toEqual(kept);
       expect((yield* h["memory.list"]({ agent: "lab" })).memories.filter((m) => m.text === "打卡页用中文")).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(withDoors(f)));
   });
@@ -79,7 +85,7 @@ describe("a request the page may send again", () => {
     const f = farm();
     return Effect.gen(function* () {
       const h = yield* handlers;
-      const said = (yield* (yield* Channel).say("点个赞", undefined, "")).message;
+      const said = (yield* (yield* Channel).post({ _tag: "User", text: "点个赞", sendKey: "" })).message;
       const liked = yield* h["channel.reaction.set"]({ id: said.id, emoji: "👍", on: true });
       const again = yield* h["channel.reaction.set"]({ id: said.id, emoji: "👍", on: true });
       expect([again.reactions, again.revision]).toEqual([liked.reactions, liked.revision]);

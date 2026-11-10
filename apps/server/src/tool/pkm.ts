@@ -14,10 +14,10 @@ const pageBlocksMax = 300;
 export const pkmTools = Effect.gen(function* () {
   const pkm = yield* Pkm;
   const agents = yield* Agent;
-  const table = (forOrchestrator: boolean) => (forOrchestrator ? tool : sessionSchemaTool);
+  const table = (asOrchestrator: boolean) => (asOrchestrator ? tool : sessionSchemaTool);
 
-  const pkmSearch = (forOrchestrator: boolean) =>
-    table(forOrchestrator)(
+  const pkmSearch = (asOrchestrator: boolean) =>
+    table(asOrchestrator)(
       "pkm.search",
       Effect.fn("Tool.pkmSearch")(function* (p: { readonly text: string; readonly tier?: T.PkmTier; readonly limit?: number }) {
         const hits = yield* pkm.search({ text: p.text, ...(p.tier ? { tier: p.tier } : {}), limit: p.limit ?? 10 });
@@ -25,8 +25,8 @@ export const pkmTools = Effect.gen(function* () {
       }),
     );
 
-  const pkmPage = (forOrchestrator: boolean) =>
-    table(forOrchestrator)(
+  const pkmPage = (asOrchestrator: boolean) =>
+    table(asOrchestrator)(
       "pkm.page.get",
       Effect.fn("Tool.pkmPage")(function* (p: { readonly page: string }) {
         return yield* answered(
@@ -37,8 +37,8 @@ export const pkmTools = Effect.gen(function* () {
       }),
     );
 
-  const pkmCapture = (who: Who, forOrchestrator: boolean) =>
-    table(forOrchestrator)(
+  const pkmCapture = (who: Who, asOrchestrator: boolean) =>
+    table(asOrchestrator)(
       "pkm.capture",
       Effect.fn("Tool.pkmCapture")(function* (p: { readonly text: string }) {
         const c = yield* callerOf(who);
@@ -47,8 +47,8 @@ export const pkmTools = Effect.gen(function* () {
       }),
     );
 
-  const pkmSuggest = (who: Who, forOrchestrator: boolean) =>
-    table(forOrchestrator)(
+  const pkmSuggest = (who: Who, asOrchestrator: boolean) =>
+    table(asOrchestrator)(
       "pkm.comment.suggest",
       Effect.fn("Tool.pkmSuggest")(function* (p: { readonly block: string; readonly suggested: string; readonly rationale?: string }) {
         const c = yield* callerOf(who);

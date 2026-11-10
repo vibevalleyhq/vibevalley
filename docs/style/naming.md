@@ -56,10 +56,18 @@
 | 取或算出某样东西的某一项 | `xOf` | `channelOf`、`quotaOf`、`summaryOf` |
 | 是非 | `isX`、`hasX`、`canX` | `isClosed`、`hasFarm` |
 | 从人或模型写的文字里读出结构 | `parseX` | `parseRefinement`、`parseSplit` |
-| 检查一份输入 | `xProblem`：没问题返回 `""`，有问题返回主人读的理由 | `cronProblem`、`channelNameProblem` |
-| 给主人看的一句话 | `xText` | `quotaText`、`dueText` |
+| 检查一份输入 | `xProblem`：没问题返回 `""`，有问题返回用户读的理由 | `cronProblem`、`channelNameProblem` |
+| 给用户看的一句话 | `xText` | `quotaText`、`dueText` |
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
+| 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
+| 服务开机时做的事 | `boot`（layer 和服务的成员同名）；`start` 只指开始干一件事 | `Mailbox.boot`；`issues.start`、`executor.start` |
+| 一个服务往外说发生了什么 | 一条流，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `Session.news`、`Mailbox.news`（`DeliveryNews`） |
+
+两条容易犯的：
+
+- **一个名字只答一个问题**：带标签的参数只用来给同一个动作不同的输入（`receive` 收下一个触发或开一个帮工，`withdraw` 撤回一个帮工、一封信或一张工单的待投递）；两个不同的问题（筛法、排序不同）起两个名字，不用标签把它们并成一个。
+- **命令不只答一个是非**：做没做成要么在错误通道里说为什么，要么返回做成的结果；只返回 `boolean` 的命令，调用方不知道没做成的原因。
 
 ## 单位、时刻和长短
 
@@ -77,7 +85,7 @@
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
 | 服务 | 概念的单数词，和模块的文件夹、表同一个词（照 Effect 自己的 `Database`）；照 Effect 的默认写法是类，接口写在类型参数里、不另起名，`layer` 是静态成员；它的类型是 `Issue["Service"]`（lint 的 `vibevalley/singular-service` 查） | `Issue`、`Channel`、`Session`；`Core`、`Orchestrator` |
-| 服务的标签和 `Effect.fn` 的名字 | `vibevalley/<概念>`；`<服务>.<方法>` | `"vibevalley/Issue"`；`"Issue.edit"` |
+| 服务的标签和 `Effect.fn` 的名字 | 包名加文件的路径（`deterministicKeys` 查）；`<服务>.<方法>` | `"@vibevalley/server/issue/issue"`；`"Issue.edit"` |
 | 服务端代码里和服务同名的线上形状 | 经命名空间读：`import type * as T from "@vibevalley/protocol"`，写 `T.Issue`；这样的文件里协议的类型都写成 `T.X`（lint 的 `vibevalley/protocol-namespace` 查） | `issue: T.Issue`、`(s: T.Session) => …` |
 | 带牌子的 id | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
@@ -97,11 +105,17 @@
 
 ## 现有的双关
 
-下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；其余的意思改名之前，写的时候带上限定。
+下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；右列的意思各起各的名字（不靠上下文区分，也不带限定凑合），改完把旧名字写进 `scripts/stale-names.ts`。
 
 | 词 | 指的是 | 也被用来指 |
 |---|---|---|
 | rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
+| changes | 代码的改动（用语表的「改动」：`Issue.changes`、`Repo.changes`、`T.Changes`） | 投递的变化流（`Mailbox.changes`）：改叫 `news` |
+| open | 形容词，还没了结（`openQuestions`、`openFindings`；`Lan.setOpen` 的开着） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个帮工的投递（`openDeliveries`）：改叫 `deliveriesOf` |
+| start | 开始干一件事（`issue.start`、`Executor.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
+| input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
+| present | — | 这个进程正拿着它、能交信（`Session.present`）：改叫 `isReachable`；核心状态里的帮工（`Session.presentSessions`）：改叫 `hired` |
+| orchestrator | 职务：助手能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和串都有成员（`members`，记在 `channel_member`），这里的助手问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |
 
 已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`repo.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、仓库的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 

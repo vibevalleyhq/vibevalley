@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { pressed } from "#/base/shortcuts.ts";
 import { QuickSwitcher, switcher } from "#/features/channel/index.ts";
-import { waitingOnOwner } from "#/features/inbox/index.ts";
+import { waitingOnUser } from "#/features/inbox/index.ts";
 import { NotesSearch } from "#/features/pkm/index.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
 import { Link as A, NavLink, useMatches } from "#/infra/router.ts";
@@ -280,7 +280,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
     >
       {props.children}
       <Show when={props.name}>{(name) => <span {...stylex.attrs(viewStyles.slotSpan)}>{name()}</span>}</Show>
-      {/* How many wait on the owner there: the place to go next, seen from anywhere. */}
+      {/* How many wait on the user there: the place to go next, seen from anywhere. */}
       <Show when={props.badge}>
         {(n) => (
           <span data-testid="rail-badge" {...stylex.attrs(viewStyles.railBadge)}>
@@ -301,7 +301,7 @@ const railGroups = ["work", "setup", "reference"] as const;
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const frames = useFrames();
-  const waiting = () => waitingOnOwner(frames.frame?.inbox ?? []);
+  const waiting = () => waitingOnUser(frames.frame?.inbox ?? []);
   const settings = settingsPlace;
   const updates = useUpdates();
   const ready = () => {
@@ -428,7 +428,8 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <main {...stylex.attrs(variantStyles.shellMain)}>
-        <Show when={!inFarm() && here()?.id !== "chat"}>
+        {/* The chat and the library draw their own one bar at the top: the place's name would be a second. */}
+        <Show when={!inFarm() && here()?.id !== "chat" && here()?.id !== "library"}>
           <Desk place={here()} />
         </Show>
         <div {...stylex.attrs(viewStyles.shellDiv)}>{props.children}</div>

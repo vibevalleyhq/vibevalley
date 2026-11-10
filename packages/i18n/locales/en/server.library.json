@@ -1,0 +1,15 @@
+{
+  "noItem": "The library has no {id}",
+  "oneSource": "Give exactly one of: an attachment, a url, or a path to a file in your working directory",
+  "agentAttachment": "Attachments are the user's uploads; helpers and assistants put things in the library by url or by a path in their working directory",
+  "userFetch": "You put uploaded attachments in the library; to bring something in from an address or a file, ask an assistant or a helper",
+  "badUrl": "{url} is not a public https address: the library downloads only from public https addresses",
+  "notFetched": "Could not download {url}: {why}",
+  "slow": "The download took more than 60 seconds and was given up",
+  "tooBig": "The file is larger than {mb} MB, more than the library keeps",
+  "noPlace": "You have no working directory: give a url",
+  "outside": "{path} is outside your working directory: only files in it can go in",
+  "notFile": "{path} is not a file in your working directory",
+  "unreadable": "Cannot read {path}: {why}",
+  "preview": { "remove": "Take \"{name}\" out of the library; messages that have it still open it" }
+}

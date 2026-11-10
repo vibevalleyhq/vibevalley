@@ -1,5 +1,7 @@
 import { Schema } from "effect";
 
+import { jsonText } from "../json.ts";
+
 export const visionFrameBytes = 256 * 1024;
 export const visionFrameIntervalMs = 1000;
 export const visionBufferedBytes = 512 * 1024;
@@ -30,7 +32,8 @@ const decode = Schema.decodeUnknownOption(Event);
 export interface VisionResponse {
   readonly id: string;
   readonly sequence: number;
-  readonly turn: number;
+  /** The turn it answers; none when the vendor named none, and then any turn's interruption ends it. */
+  readonly turn?: number;
   readonly text: string;
   readonly state: "streaming" | "done" | "interrupted";
 }
@@ -176,7 +179,13 @@ export class VisionSession {
           if (this.responses.length >= 64) return this.fail("response_limit");
           this.responses = [
             ...this.responses,
-            { id: event.response_id, sequence: event.response_seq, turn: event.turn_id ?? -1, text: event.delta, state: "streaming" },
+            {
+              id: event.response_id,
+              sequence: event.response_seq,
+              ...(event.turn_id === undefined || event.turn_id === null ? {} : { turn: event.turn_id }),
+              text: event.delta,
+              state: "streaming",
+            },
           ];
         } else this.responses = this.responses.map((response, i) => (i === index ? { ...response, text: response.text + event.delta } : response));
         break;
@@ -189,7 +198,7 @@ export class VisionSession {
         break;
       case "response.turn.interrupted":
         this.responses = this.responses.map((response) =>
-          response.state === "streaming" && (response.turn === event.turn_id || response.turn === -1) ? { ...response, state: "interrupted" } : response,
+          response.state === "streaming" && (response.turn === undefined || response.turn === event.turn_id) ? { ...response, state: "interrupted" } : response,
         );
         break;
       case "session.done":
@@ -227,7 +236,7 @@ export class VisionSession {
   }
 
   private send(event: object): void {
-    this.callbacks.sendText(JSON.stringify(event));
+    this.callbacks.sendText(jsonText(event));
   }
 
   private fail(problem: string): void {

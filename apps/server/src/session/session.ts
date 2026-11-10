@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream } from "effect";
+import { Array as Arr, Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Schema, Scope, Semaphore, Stream, String as Str } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -6,13 +6,14 @@ import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { session as sessionActor } from "#/base/actor.ts";
+import { worker as sessionActor } from "#/base/actor.ts";
 import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
-import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Repo } from "#/repo/repo.ts";
 import { type Merged, type MergeFailure, type RepoError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/repo/workplace.ts";
@@ -21,10 +22,10 @@ import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.t
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { sourceBrief } from "./prompts.ts";
-import { handsToOwner, summaryOf } from "./report.ts";
-import { sessionOnIssue } from "./roster.ts";
+import { handsToUser, summaryOf } from "./report.ts";
+import { isHired, isOnDuty, sessionOnIssue } from "./roster.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
-import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./signals.ts";
+import type { Delivered, DeliveryInput, RunFinished, SessionNews } from "./signals.ts";
 
 export type { SessionNews };
 export type { RunFinished, RunStore };
@@ -77,7 +78,7 @@ export class Session extends Context.Service<
     /** Room for one more on runtime in repo: refused when either is at its limit; a full farm sends home whoever has
      * been idle longest, and says who. */
     readonly makeRoom: (runtime: string, repo: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
-    readonly send: (agent: T.Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
+    readonly hire: (agent: T.Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
     readonly deliver: (id: string, text: string, input: DeliveryInput) => Effect.Effect<Delivered>;
     readonly stop: (id: string) => Effect.Effect<boolean>;
     /** Closes an idle execution, keeping the context and native session identity for its next input. */
@@ -93,13 +94,16 @@ export class Session extends Context.Service<
     readonly clearWorkplace: (issue: string, repo: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
     readonly sessionOf: (id: string) => T.Session | undefined;
-    readonly presentSessions: () => readonly T.Session[];
-    /** On the farm now: it can be handed a message. */
-    readonly present: (id: string) => boolean;
+    /** The helpers on the farm as the core state has them, whether or not this process holds them now. */
+    readonly hired: () => readonly T.Session[];
+    /** This process holds it now (between launches too): it can be handed a message. */
+    readonly isReachable: (id: string) => boolean;
     /** Its complete last answer, kept out of the core frame. */
     readonly lastTextOf: (id: string) => string;
     /** Its host-local working directory, kept out of the protocol shape. */
     readonly cwdOf: (id: string) => string | undefined;
+    /** A file in its working directory, read whole when it is at most max bytes: neither .. nor a link may lead out of it. */
+    readonly workFile: (id: string, path: string, max: number) => Effect.Effect<{ readonly name: string; readonly bytes: Uint8Array }, NotWorkFile>;
     /** The run it is in now; undefined between runs. */
     readonly runOf: (id: string) => string | undefined;
     /** Its report, from what it last said in full. */
@@ -122,16 +126,8 @@ export class Session extends Context.Service<
     readonly issueRuns: (issue: string) => Effect.Effect<T.Run[]>;
     /** A session's log, oldest first; a run's only when run is given. */
     readonly events: (id: string, run?: string) => Effect.Effect<T.SessionEvent[] | undefined>;
-    /** These four are subscribed before they return: nothing published after is missed. */
-    readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
-    /** A session hired, reported or gone, with the session as it stood after: what the issues and their child issues follow. */
+    /** Everything Session tells, subscribed before it returns: nothing told after is missed. */
     readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
-    readonly startedIssues: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
-    readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
-    readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
-    readonly inputsReturned: Effect.Effect<Stream.Stream<InputReturned>, never, Scope.Scope>;
-    /** Persists an Agent's Session identity before anything can record a Run or address its mailbox. */
-    readonly register: (session: SessionIdentity) => Effect.Effect<void, NotRecorded>;
     /** Whose token it is; "" when nobody's. */
     readonly who: (token: string) => string;
     /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
@@ -141,7 +137,7 @@ export class Session extends Context.Service<
     /** Brings back the sessions the farm had when it stopped, once every service is ready. */
     readonly restore: Effect.Effect<void, NotRecorded>;
   }
->()("vibevalley/Session") {
+>()("@vibevalley/server/session/session") {
   static readonly layer = Layer.effect(
     Session,
     Effect.suspend(() => make),
@@ -153,14 +149,14 @@ export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefin
   switch (fact.type) {
     case "sessionChanged": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
-      return session?.role === "worker" ? { _tag: "hired", session } : undefined;
+      return session !== undefined && isHired(session) ? { _tag: "Hired", session } : undefined;
     }
     case "sessionReported": {
       const session = after.sessions.find((h) => h.id === fact.id);
-      return session?.role === "worker" ? { _tag: "reported", report: fact, session } : undefined;
+      return session !== undefined && isHired(session) ? { _tag: "Reported", report: fact, session } : undefined;
     }
     case "sessionLeft":
-      return { _tag: "left", left: fact };
+      return { _tag: "Left", left: fact };
     default:
       return undefined;
   }
@@ -168,9 +164,15 @@ export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefin
 
 import { restoredSession, sessionState, runOf, endedSession, placeOf, heardOf, pendingReportOf } from "./history.ts";
 import { NotTakenIn, reasonText, sessionLaunch } from "./launch.ts";
-import { type Hand, type RunFinished, type RunStore, sessionRegistry } from "./registry.ts";
+import { type Hand, type RunStore, sessionRegistry } from "./registry.ts";
 import { sessionWatch } from "./watch.ts";
 export { runOf } from "./history.ts";
+/** Why a file a session names in its working directory is not read. */
+export class NotWorkFile extends Schema.TaggedError<NotWorkFile, { readonly brand: unique symbol }>()("NotWorkFile", {
+  reason: Schema.Literals(["noPlace", "notFile", "outside", "tooBig", "unreadable"]),
+  message: Schema.String,
+}) {}
+
 const make = Effect.gen(function* () {
   const r = yield* sessionRegistry;
   const wt = yield* sessionWatch(r);
@@ -181,13 +183,9 @@ const make = Effect.gen(function* () {
     mcpEndpoint,
     trajectories,
     admission,
-    launchesHub,
     newsHub,
+    tell,
     moves,
-    startedIssuesHub,
-    finishedHub,
-    consumedHub,
-    returnedHub,
     hands,
     executions,
     launchOf,
@@ -208,12 +206,13 @@ const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const memories = yield* Memory;
   const repos = yield* Repo;
-  const executor = yield* Executor;
+  const machines = yield* Machine;
+  const executor = machines.executions(machines.here());
   const db = yield* Db;
   yield* Effect.forkScoped(
     Stream.runForEach(moves, ({ fact, after }) => {
       const news = newsOf(fact, after);
-      if (news?._tag === "reported" && news.session?.role === "worker" && news.session.issue === undefined) {
+      if (news?._tag === "Reported" && news.session !== undefined && isHired(news.session) && news.session.issue === undefined) {
         const id = news.session.id;
         const deadline = fact.at + 10 * 60_000;
         void later(
@@ -237,14 +236,15 @@ const make = Effect.gen(function* () {
 
   const restore = Effect.gen(function* () {
     yield* expireLogs(config.session.trajectoryDays);
+    const runs2 = yield* db.run(qr.openRuns());
     // The runs still going when the server stopped stopped with it.
     yield* Effect.forEach(
-      yield* db.run(qr.openRuns()),
+      runs2,
       (r) =>
         Effect.gen(function* () {
           yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted"));
           const linked = yield* runs.issues(r.id);
-          PubSub.publishUnsafe(finishedHub, { id: r.id, issues: linked, outcome: "interrupted" } satisfies RunFinished);
+          tell({ _tag: "RunFinished", id: r.id, issues: linked, outcome: "interrupted" });
         }).pipe(bestEffort(`vibevalley: run ${r.id}`)),
       { discard: true },
     );
@@ -259,7 +259,7 @@ const make = Effect.gen(function* () {
         .filter((n) => Number.isFinite(n)),
     );
     for (const row of kept) {
-      if (row.role === "orchestrator") continue;
+      if (isOnDuty(row)) continue;
       const session = core.session(row.id) ?? restoredSession(row);
       const place = row.place ? placeOf(row.place) : undefined;
       if (!place || !(yield* Effect.orElseSucceed(fs.exists(place.cwd), () => false))) {
@@ -282,12 +282,14 @@ const make = Effect.gen(function* () {
         recalled: heardOf(row.recalled) ?? [],
         report: pendingReportOf(row.pending_report),
       };
+      const trajectory = yield* trajectories.openLog(session.id);
+      const journal = yield* logOf(session, trajectory);
       hands.set(session.id, {
         id: session.id,
         place: s.place,
         issue: session.issue ?? "",
         access: Semaphore.makeUnsafe(1),
-        journal: yield* logOf(session, yield* trajectories.openLog(session.id)),
+        journal,
         oarSessionId: s.oarSessionId,
         lastText: s.lastText,
         tracking: {},
@@ -323,7 +325,7 @@ const make = Effect.gen(function* () {
         yield* db.inTx(
           Effect.gen(function* () {
             const restored = core.session(session.id);
-            if (restored) yield* db.run(qs.keepSessionState(sessionState(restored)));
+            if (restored) yield* db.run(Effect.flatMap(sessionState(restored), qs.keepSessionState));
             yield* db.run(qs.clearPendingReport({ id: session.id }));
           }),
         );
@@ -332,6 +334,21 @@ const make = Effect.gen(function* () {
     }
     if (hands.size > 0) yield* Effect.logInfo(`vibevalley: brought back ${hands.size} helpers`);
   });
+  const workFile = Effect.fn("Session.workFile")(function* (id: string, path: string, max: number) {
+    const cwd = hands.get(id)?.place.cwd;
+    if (cwd === undefined) return yield* NotWorkFile.make({ reason: "noPlace", message: path });
+    const unreadable = (e: { readonly message: string }) => NotWorkFile.make({ reason: "unreadable", message: e.message });
+    const root = yield* Effect.mapError(fs.realPath(cwd), unreadable);
+    // realPath settles .. and every link, so what it answers is where the bytes really are.
+    const full = yield* Effect.mapError(fs.realPath(root + "/" + path), () => NotWorkFile.make({ reason: "notFile", message: path }));
+    if (full !== root && !Str.startsWith(root + "/")(full)) return yield* NotWorkFile.make({ reason: "outside", message: path });
+    const info = yield* Effect.mapError(fs.stat(full), unreadable);
+    if (info.type !== "File") return yield* NotWorkFile.make({ reason: "notFile", message: path });
+    if (Number(info.size) > max) return yield* NotWorkFile.make({ reason: "tooBig", message: path });
+    const bytes = yield* Effect.mapError(fs.readFile(full), unreadable);
+    return { name: Arr.lastNonEmpty(Str.split("/")(full)), bytes };
+  });
+
   const shape = Session.of({
     noRoom: roomFor,
     makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, repo): Effect.fn.Return<{ readonly refused: string } | { readonly evicted?: string }> {
@@ -345,8 +362,9 @@ const make = Effect.gen(function* () {
       const freeing = oldest.issue ? shape.dismiss(oldest.id) : shape.suspend(oldest.id);
       return yield* freeing.pipe(Effect.match({ onFailure: (e) => ({ refused: reasonOf(e) }), onSuccess: () => ({ evicted: oldest.name }) }));
     }),
-    send: Effect.fn("Session.send")(function* (agent, brief, where, opt) {
-      const permit = yield* Scope.fork(yield* Effect.scope);
+    hire: Effect.fn("Session.hire")(function* (agent, brief, where, opt) {
+      const scope2 = yield* Effect.scope;
+      const permit = yield* Scope.fork(scope2);
       yield* Effect.acquireRelease(Effect.interruptible(admission.take(1)), (taken) => admission.release(taken)).pipe(
         Effect.provideService(Scope.Scope, permit),
       );
@@ -365,19 +383,22 @@ const make = Effect.gen(function* () {
       if (full) return { refused: full };
       hired++;
       const id = sessionId(`w${hired}`);
-      let placeError = "";
-      const openedPlace = yield* Effect.option(
-        (issue && repo
+      const openedPlace = yield* (
+        issue && repo
           ? repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
           : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
-        ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message }))))),
+      ).pipe(
+        Effect.match({
+          onFailure: (e) => ({ ok: false as const, refused: t("server.session.life.noPlace", { name: agent.name, why: e.message }) }),
+          onSuccess: (place) => ({ ok: true as const, place }),
+        }),
       );
-      if (Option.isNone(openedPlace)) return { refused: placeError };
-      const place = openedPlace.value;
+      if (!openedPlace.ok) return { refused: openedPlace.refused };
+      const place = openedPlace.place;
       const releasePlace = place.repo ? repos.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
-      let committed = false;
-      let released = false;
-      let registeredRow = false;
+      /** How far hiring got, for what a failure leaves to undo: opening (nothing kept yet), recorded (its row kept), committed,
+       * or released (refuseStart already let its place go). */
+      let reached: "opening" | "recorded" | "committed" | "released" = "opening";
       const recalled = new Set<string>();
       const journal = yield* trajectories.openLog(id);
       const initial = opt.inputs ?? [];
@@ -423,6 +444,7 @@ const make = Effect.gen(function* () {
           refining: issue ? (opt.refining ?? false) : false,
           ...(issue ? { issue: issue.id } : {}),
           ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
+          machine: machines.here().id,
         };
         const refuseStart = (why: string, retained: boolean): Effect.Effect<Hired> =>
           Effect.gen(function* () {
@@ -430,7 +452,7 @@ const make = Effect.gen(function* () {
             if (retained) return { refused: why, retainedWork: true };
             yield* l.revokeAccess(h);
             const result = yield* releasePlace;
-            released = true;
+            reached = "released";
             if (result.kept) yield* core.notice("warn", result.reason);
             return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
           });
@@ -448,25 +470,29 @@ const make = Effect.gen(function* () {
               yield* logOf(session, journal);
               yield* db
                 .attempt(
-                  qs.keepHand({
-                    id,
-                    place: JSON.stringify(place),
-                    oar_session: opened.execution.sessionId ?? null,
-                    last_text: null,
-                    recalled: recalled.size > 0 ? JSON.stringify([...recalled]) : null,
-                  }),
+                  Effect.flatMap(
+                    Effect.all({ placeJson: jsonText(place), recalledJson: recalled.size > 0 ? jsonText([...recalled]) : Effect.succeed(null) }),
+                    ({ placeJson, recalledJson }) =>
+                      qs.keepHand({
+                        id,
+                        place: placeJson,
+                        oar_session: opened.execution.sessionId ?? null,
+                        last_text: null,
+                        recalled: recalledJson,
+                      }),
+                  ),
                 )
-                .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+                .pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
             }),
           );
-          registeredRow = true;
+          reached = "recorded";
           if (opt.hiring) yield* opt.hiring(session, launch);
           yield* Effect.uninterruptible(
             Effect.gen(function* () {
               hands.set(id, h);
               yield* core.apply({ type: "sessionChanged", session });
               attach(h, opened.execution, agent.runtime, launch);
-              committed = true;
+              reached = "committed";
             }),
           );
           return { session };
@@ -476,7 +502,7 @@ const make = Effect.gen(function* () {
               const failed = yield* failedOpening(id, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(error) }));
               if (!failed.retained) {
                 yield* forget(id);
-                registeredRow = false;
+                reached = "opening";
               }
               return yield* refuseStart(failed.refused, failed.retained);
             }),
@@ -485,7 +511,7 @@ const make = Effect.gen(function* () {
       });
       return yield* starting.pipe(
         Effect.onExit((exit) => {
-          if (exit._tag === "Success" || committed || released) return Effect.void;
+          if (exit._tag === "Success" || reached === "committed" || reached === "released") return Effect.void;
           return Effect.gen(function* () {
             yield* trajectories.finish(id);
             const allocation = executor.find(id);
@@ -497,7 +523,7 @@ const make = Effect.gen(function* () {
               );
               if (stopFailed) return;
             }
-            if (registeredRow) yield* forget(id);
+            if (reached === "recorded") yield* forget(id);
             yield* l.revokeAccess(h);
             const result = yield* releasePlace;
             if (result.kept) yield* core.notice("warn", result.reason);
@@ -604,7 +630,8 @@ const make = Effect.gen(function* () {
       if (live) return live;
       const r = yield* db.run(Effect.catchNoSuchElement(qs.sessionByID({ id })));
       if (Option.isNone(r) || r.value.ended_at === null) return undefined;
-      return endedSession(r.value, yield* db.run(qr.runsOfSession({ session: id })));
+      const runsOfSession2 = yield* db.run(qr.runsOfSession({ session: id }));
+      return endedSession(r.value, runsOfSession2);
     }),
     issueRuns: Effect.fn("Session.issueRuns")(function* (issue) {
       const rows = yield* db.run(qr.runsOfIssue({ issue_id: issue }));
@@ -612,10 +639,11 @@ const make = Effect.gen(function* () {
     }),
     events: (id, r) => trajectories.events(id, r),
     sessionOf: (id) => core.session(id),
-    presentSessions: () => core.state().sessions.filter((s) => s.role === "worker"),
-    present: (id) => hands.has(id),
+    hired: () => core.state().sessions.filter(isHired),
+    isReachable: (id) => hands.has(id),
     lastTextOf: (id) => hands.get(id)?.lastText ?? "",
     cwdOf: (id) => hands.get(id)?.place.cwd,
+    workFile,
     runOf: (id) => {
       const run = hands.get(id)?.run ?? executions.get(id)?.() ?? "";
       return run === "" ? undefined : run;
@@ -628,9 +656,11 @@ const make = Effect.gen(function* () {
       yield* h.access.withPermits(1)(
         Effect.gen(function* () {
           yield* flushRuns;
-          yield* db.attempt(qs.setPendingReport({ id, report: JSON.stringify(report) })).pipe(Effect.mapError((error) => refused(causeMessage(error))));
+          yield* db
+            .attempt(Effect.flatMap(jsonText(report), (text) => qs.setPendingReport({ id, report: text })))
+            .pipe(Effect.mapError((error) => error.pipe(causeMessage, refused)));
           h.report = report;
-          if (h.settling && handsToOwner(report)) {
+          if (h.settling && handsToUser(report)) {
             const pending = h.settling;
             delete h.settling;
             finishReport(h, pending.report, pending.completedBefore);
@@ -639,13 +669,7 @@ const make = Effect.gen(function* () {
       );
     }),
     onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
-    launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    startedIssues: Effect.map(PubSub.subscribe(startedIssuesHub), Stream.fromSubscription),
-    finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
-    inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
-    inputsReturned: Effect.map(PubSub.subscribe(returnedHub), Stream.fromSubscription),
-    register,
     who,
     setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
     host: Effect.fn("Session.host")(function* <R>(o: HostOptions<R>) {
@@ -669,11 +693,11 @@ const make = Effect.gen(function* () {
             });
         }),
       };
-      return yield* makeHost(
-        { ...o, memory: memories.forAgent(o.session.agent, o.session.id) },
-        yield* trajectories.openLog(o.session.id, o.keepEvents),
-        hostedRuns,
-      ).pipe(Effect.provideService(Core, core), Effect.provideService(FileSystem.FileSystem, fs));
+      const journal = yield* trajectories.openLog(o.session.id, o.keepEvents);
+      return yield* makeHost({ ...o, memory: memories.forAgent(o.session.agent, o.session.id) }, journal, hostedRuns).pipe(
+        Effect.provideService(Core, core),
+        Effect.provideService(FileSystem.FileSystem, fs),
+      );
     }),
     restore,
   });

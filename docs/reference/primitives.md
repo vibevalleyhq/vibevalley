@@ -46,7 +46,7 @@
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
 | `githubRepository` | `repo.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
-| `stageWantsOwner` | `stage.ts` | Questions the owner for something: the page leads with it, the board flags it. |
+| `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
 
 ## `apps/server/src/base`
 
@@ -54,11 +54,11 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `owner` | `actor.ts` |  |
+| `user` | `actor.ts` |  |
 | `system` | `actor.ts` |  |
-| `orchestrator` | `actor.ts` | forOwner: the owner's own words are in the run it acts in. |
-| `session` | `actor.ts` |  |
-| `actsForOwner` | `actor.ts` | On the owner's word: the owner, or the orchestrator in a run the owner's words are in. |
+| `orchestrator` | `actor.ts` | forUser: the user's own words are in the run it acts in. |
+| `worker` | `actor.ts` | A helper at work, by its session's id. |
+| `actsForUser` | `actor.ts` | On the user's word: the user, or the orchestrator in a run the user's words are in. |
 | `serverFiles` | `assets.ts` | What the package script copies beside the bundle: every path serverFile is given lies under one of these. |
 | `serverFile` | `assets.ts` |  |
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
@@ -76,6 +76,7 @@
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
+| `jsonText` | `json.ts` | As JSON.stringify writes it; a cycle or a bigint fails instead of throws. |
 | `jsonOrNone` | `json.ts` | Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. |
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
 | `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. |
@@ -86,7 +87,7 @@
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `numberIn` | `order.ts` |  |
-| `ownersLanguage` | `prompts.ts` |  |
+| `usersLanguage` | `prompts.ts` |  |
 | `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
 | `checksFromText` | `questions.ts` | The helper's text checks, one per criterion line; explicit issue_report.checks still win. |
 | `questionsFromText` | `questions.ts` |  |
@@ -100,30 +101,32 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `baselineSql` | `baseline.ts` |  |
 | `baselineHash` | `baseline.ts` |  |
-| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: SQLite prepares one at a time. A trigger's body (BEGIN … END;) stays one statement. |
+| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: a driver prepares one at a time. A function's body ($$ … $$) and a |
 | `ServerConfig` | `config.ts` |  |
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
 | `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
 | `pkmDir` | `config.ts` |  |
+| `hostName` | `config.ts` | This computer's name as people say it: its host name without .local. |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
 | `reposDir` | `config.ts` | Where the space's repositories are: each folder in it is one. |
 | `worktreesDir` | `config.ts` | Where the issues' worktrees are: <repo>.<issue number> under it. |
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
-| `dbFile` | `db.ts` | The database's file in its folder. |
 | `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>. The baseline it was made from is in <folder>.schema. |
-| `Database` | `db.ts` | The database as an SqlClient, with the schema in place and foreign keys on. |
+| `Database` | `db.ts` | The database as an SqlClient, with the schema in place: Postgres at database.url, or else PGlite in the home (in |
 | `causeMessage` | `db.ts` | What the database said, from under the SqlError around it. |
 | `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. |
 | `fileBlob` | `files.ts` |  |
 | `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` |  |
-| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read. |
+| `readOrSetAside` | `files.ts` | A user's file (config.json, settings.json); one whose read fails is set aside and read as undefined. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
+| `HomeUnavailable` | `lease.ts` | The lock file could not be read or written for another reason (permissions, a missing home). |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
 | `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
 | `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being done), and the caller carries on. |
@@ -135,7 +138,8 @@
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
 | `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
-| `localeMinute` | `time.ts` | To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart. |
+| `localeMinute` | `time.ts` | To the minute, in this machine's zone: what an input says the time is, so that it does not change between two requests a |
+| `localParts` | `time.ts` | An instant's calendar and clock in this machine's zone; month counts from 1. |
 
 ## `apps/server/src/testing`
 
@@ -147,6 +151,7 @@
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
+| `committedDelivery` | `deliveries.ts` | A delivery written and routed as Mailbox commits one, and nothing after: what a stop between commit and hand-off |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
@@ -165,7 +170,6 @@
 | `reposDir` | `git.ts` |  |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
-| `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |
 | `app` | `http.ts` |  |
 | `starter` | `layers.ts` | A built-in template as a farm whose agent.starters names it has it: under the template's own id. |
 | `testConfig` | `layers.ts` |  |
@@ -175,8 +179,8 @@
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
 | `network` | `network.ts` |  |
 | `realtimeFixture` | `realtime.ts` |  |
-| `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds. |
-| `allow` | `refuse.ts` |  |
+| `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds |
+| `allow` | `refuse.ts` | The write refuse stopped goes through again. |
 | `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |
 | `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |
@@ -184,7 +188,7 @@
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. |
 | `worldBelowIngress` | `world.ts` | Services below Ingress for module tests. |
 | `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
-| `testIssues` | `world.ts` | Issues a test adds are ones the owner sent, so their mandate is explicit. |
+| `testIssues` | `world.ts` | Issues a test adds are ones the user sent, so their mandate is explicit. |
 | `Said` | `world.ts` |  |
 | `said` | `world.ts` |  |
 
@@ -225,8 +229,8 @@
 | `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |
 | `inField` | `shortcuts.ts` |  |
 | `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
-| `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
-| `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
+| `useInterval` | `timer.ts` | fn every ms for as long as the reactive owner lives. |
+| `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 
 ## `apps/web/src/infra`
@@ -242,8 +246,10 @@
 | `useAgentProblems` | `agents.ts` |  |
 | `api` | `api.ts` | The page is served by the server it talks to: the same origin. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
+| `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
-| `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's). a new one after. |
+| `createRequestKey` | `api.ts` | The request key of one thing the user may send again (a form's create, a button's). a new one after. |
+| `attachmentData` | `attachment.ts` | A file's bytes as attachment.create takes them: base64. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
 | `formIssues` | `form/issues.ts` |  |
@@ -266,6 +272,8 @@
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
+| `nextLocalMidnight` | `local-day.ts` |  |
+| `localDay` | `local-day.ts` |  |
 | `uploadMediaInput` | `media.ts` |  |
 | `reveal` | `opening.ts` |  |
 | `retryRead` | `query.ts` |  |
@@ -292,6 +300,7 @@
 | `QueryProvider` | `query/solid.tsx` |  |
 | `useQuery` | `query/solid.tsx` |  |
 | `ready` | `query/solid.tsx` |  |
+| `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
 | `useRouter` | `router/context.tsx` |  |
 | `Router` | `router/context.tsx` |  |
 | `useLocation` | `router/context.tsx` |  |
@@ -349,7 +358,7 @@
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
 | `defineIntent` | `intent.ts` |  |
 | `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the repo map's sow, an artifact's reply). |
-| `sendReplacing` | `intent.ts` | A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). |
+| `sendReplacing` | `intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
 | `intentsIn` | `intent.ts` | A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. |
 | `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
 | `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
@@ -360,9 +369,11 @@
 | `setTheme` | `prefs.ts` |  |
 | `setScale` | `prefs.ts` |  |
 | `setStart` | `prefs.ts` |  |
+| `setLibraryTile` | `prefs.ts` |  |
 | `setWidth` | `prefs.ts` | A pane's width; none puts it back to its default. |
 | `rememberPick` | `prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
 | `usePrefs` | `prefs.ts` | One of the choices, following it. |
+| `shownTheme` | `prefs.ts` | The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. |
 | `followAppearance` | `prefs.ts` | Once, as the page starts: applied now and whenever the choice or the system's theme changes. |
 | `storedAtom` | `stored.ts` | A choice's atom, for a registry of the caller's (the tests); the page's are made by defineStored. |
 | `defineStored` | `stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
@@ -372,13 +383,10 @@
 
 ## `packages/testkit/src`
 
-测试共用：等待、黄金数据、金字塔、语法树
+测试共用：等待、金字塔、语法树
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `goldenCasesAt` | `golden.ts` | The cases of one file. |
-| `jsonDiff` | `golden.ts` | Where got and want differ, as JSON (a key holding undefined is no key); undefined when they agree. |
-| `checkCases` | `golden.ts` | Runs every case through rule and collects the first disagreements. |
 | `layers` | `pyramid.ts` |  |
 | `budgetMs` | `pyramid.ts` | What a test of each layer may take, in ms. |
 | `pyramid` | `pyramid.ts` | The layers of the files under root (a package's folder). |

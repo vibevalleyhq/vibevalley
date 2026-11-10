@@ -285,7 +285,7 @@ async function seed(api: VibeValleyApi, destination: string): Promise<Seed> {
   )
     .png()
     .toBuffer();
-  const image = await api.channel.attachment.create({ name: "garden.png", type: "image/png", data: png.toString("base64") });
+  const image = await api.attachment.create({ name: "garden.png", type: "image/png", data: png.toString("base64") });
   await api.channel.message.send({ id: channel, text: "Garden review: preserve these labels, attachments and spacing.", attachments: [image.id] });
   await api.channel.message.send({ id: channel, text: "Check both themes and the narrow layout before harvesting." });
   const artifact = await api.artifact.create({

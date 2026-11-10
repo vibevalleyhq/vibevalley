@@ -19,7 +19,7 @@ import type { Hired, HireOptions, Session } from "#/session/session.ts";
 import { splitBrief } from "./brief.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
-import { isForOrchestrator } from "./status.ts";
+import { assignedOnDuty } from "./status.ts";
 
 interface RefinementDeps {
   readonly core: Core["Service"];
@@ -78,7 +78,7 @@ export function refinement(d: RefinementDeps) {
   const draft = Effect.fn("Issue.refine")(
     function* (id: string, word: string, channel: string) {
       const item = yield* unsent(id);
-      if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));
+      if (assignedOnDuty(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));
       if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.refinement.onlyBacklog")));
       if (item.refining) return yield* Effect.fail(refused(t("server.issue.refinement.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);
@@ -87,12 +87,12 @@ export function refinement(d: RefinementDeps) {
       const thread = yield* chat.issueThread(item.id, item.title, channel || undefined);
       const history = yield* chat.history(thread, undefined, 40);
       const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
-      if (said) yield* chat.say(said, thread, "");
+      if (said) yield* chat.post({ _tag: "User", text: said, channel: thread, sendKey: "" });
       yield* beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
       const kept = where ? yield* sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
       if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: retained draft workplace`);
-      // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the owner's checkout.
+      // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the user's checkout.
       const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
       if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
       return yield* get(id);
@@ -106,7 +106,7 @@ export function refinement(d: RefinementDeps) {
     const id = h.issue;
     const said = sessions.lastTextOf(f.id);
     const thread = yield* chat.threadOfSession(f.id);
-    const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
+    const tell = (text: string) => (thread ? chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" }) : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
       if (!d) yield* tell(t("server.issue.refinement.unread", { name: h.name, problem }));

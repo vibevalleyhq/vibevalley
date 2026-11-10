@@ -4,25 +4,25 @@
 
 **VibeValley**（码农场物语）是一个用语音或打字指挥的编码 agent 团队，画成一座像素农场。
 
-你只和**管家**说话。管家把活派给**帮工**，帮工是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交。地里的庄稼跟着它们的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。你看过**收成清单**，才把它的分支合进主分支。
+你只和**助手**说话。助手把活派给**帮工**，帮工是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交。地里的庄稼跟着它们的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。你看过**收成清单**，才把它的分支合进主分支。
 
-你、管家和帮工在同一个群聊**田头**里说话：每件活下面挂着一个工单串，帮工在里面确认、提问、汇报，你随时插话。说到底，VibeValley 是跑在本机的 AI 版 Linear：工单派给编码 agent，它在项目里一轮一轮干活，你看过改动再合并；农场是穿在外面的皮（[概念](docs/concepts.md)）。
+你、助手和帮工在同一个群聊**田头**里说话：每件活下面挂着一个工单串，帮工在里面确认、提问、汇报，你随时插话。说到底，VibeValley 是跑在本机的 AI 版 Linear：工单派给编码 agent，它在项目里一轮一轮干活，你看过改动再合并；农场是穿在外面的皮（[概念](docs/concepts.md)）。
 
-![农场：田地、管家和右下角的田头](docs/images/farm.png)
+![农场：田地、助手和右下角的田头](docs/images/farm.png)
 
 > [!WARNING]
 > 帮工**没有权限确认、不开沙箱**，能在这台机器上执行任意命令。服务端只监听 `127.0.0.1`，不要把它暴露到网络上。只把你愿意交给编码 agent 的项目放进工作目录。
 
 ## 能做什么
 
-- **派活和收获**：对管家说「在 clock-in 里加一个查询打卡记录的接口，写测试」。管家挑一个合适的帮工，按档案设置给它开独立的分支和 worktree，或让它在项目目录里干活。做完后你看提交、diff 和会不会冲突，确认了再合进主分支；冲突了让它自己解决。
+- **派活和收获**：对助手说「在 clock-in 里加一个查询打卡记录的接口，写测试」。助手挑一个合适的帮工，按档案设置给它开独立的分支和 worktree，或让它在项目目录里干活。做完后你看提交、diff 和会不会冲突，确认了再合进主分支；冲突了让它自己解决。
 - **同时干好几件活**：最多 6 个帮工同时在地里干活；用 worktree 的帮工各有独立分支。
 - **地图**：每个项目是一座小岛，岛上的地对着它在做的工单和还能派活的空位，排队的活是院门外的种子袋；点空位就给这个项目写一张工单。
 - **看得见过程**：每个帮工的每一步都记成轨迹，包括收到的话、每条命令和输出、说的话。哪一步不对，可以就那一步写评论，它会接着改。
 - **拆成子工单**：长任务可以拆成有先后的子工单。互不依赖的子工单同时做，每一张过了检查才合进父工单分支，最后一次合进主分支。修 bug 时第一步先写一个**会失败的验收测试**，后面的子工单不能改它，最后一步要让它通过。
 - **频道、定时和巡查**：按项目开频道；「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活。
 - **帮工档案和记性**：给帮工捏人设、选农机和模型、装技能。帮工在汇报里写的「记住：……」，下次开工时会想起来。
-- **语音**：按住说话，语音管家（Agora Conversational AI）听你说完，交给同一个管家去派活。
+- **语音**：按住说话，语音助手（Agora Conversational AI）听你说完，交给同一个助手去派活。
 - **从外面派活**：把田头接到微信、飞书或 QQ，只认你自己的账号。手机或另一台电脑可以经「连接到本机」连进来，前提是你在本机点过头。
 - **管住花费**：每个农机的额度、今天花了多少、每日预算；额度快用完时提醒，用完了就不再派。
 - **农场本身**：像素村有昼夜和光照，有狗、会在路上走的帮工、成就和称号，还有一部能玩小游戏的手机。
@@ -37,7 +37,7 @@ flowchart LR
   app -- HTTP 命令 --> server
   server -- SSE：折好的核心状态 --> app
   subgraph server[TypeScript 服务端 127.0.0.1:8787]
-    manager[管家<br/>vibevalley 自己的 agent]
+    manager[助手<br/>vibevalley 自己的 agent]
     chat[田头<br/>SQLite]
     site[核心状态<br/>只由事实改变]
     sessions[帮工<br/>oar]
@@ -48,9 +48,9 @@ flowchart LR
   rt --> repo[(你的项目<br/>项目目录或工单的 worktree)]
 ```
 
-- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：管家、帮工、田头、项目和收获、稿子和笔记、语音、连接器都在这一个进程里，数据在 SQLite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
+- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：助手、帮工、田头、项目和收获、Artifact 和笔记、语音、连接器都在这一个进程里，数据在 SQLite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、稿子、笔记、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
+- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、Artifact、笔记、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
 - **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏、灵动岛和语音的快捷键。
 - **形状只写一次**：接口和数据形状按概念写在 `packages/protocol/src/<概念>/`（`shapes.ts`、`schema.ts`、`api.ts`），服务端、页面和命令行 import 同一份，两边不会对不上。
 
@@ -65,7 +65,7 @@ flowchart LR
 
 - macOS（Apple 芯片）。macOS 应用是主要的形态，单独跑的服务端也能用浏览器打开；手机版正在换成新的壳，暂时用不了。
 - 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
-- 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，管家要用。
+- 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，助手要用。
 - 构建要 [Vite+](https://viteplus.dev)（`vp`）：它照 `.node-version` 装 Node 24，带着 pnpm。
 - 可选：[Agora](https://www.agora.io/) 的凭据（用来语音），以及微信、飞书或 QQ 的机器人（从外面派活）。
 
@@ -95,17 +95,17 @@ vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0
 
 1. 在首页「设置」里填 DeepSeek 的钥匙。
 2. 在「农具」页里启用本机装好的农机。
-3. 把项目放进工作目录（默认 `~/vibevalley-dev`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，管家会帮你建。
-4. 在田头对管家说要做什么。
+3. 把项目放进工作目录（默认 `~/vibevalley-dev`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，助手会帮你建。
+4. 在田头对助手说要做什么。
 
 从派第一张工单到收获、处理冲突和失败、管住花费，见 [使用指南](docs/guide.md)。
 
 ## 目录
 
 ```
-apps/server/       TypeScript 服务端（Effect v4、SQLite）：src/ 按概念分的服务（工单、帮工、信箱、项目、频道、稿子、笔记、管家、连接器、游戏……），db/ 表结构和查询
+apps/server/       TypeScript 服务端（Effect v4、SQLite）：src/ 按概念分的服务（工单、帮工、信箱、项目、频道、Artifact、笔记、助手、连接器、游戏……），db/ 表结构和查询
 apps/cli/          命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端
-apps/web/          页面（Solid 2）：农场、像素村、田头、工单、稿子、笔记、配置页、语音；服务端在 / 提供
+apps/web/          页面（Solid 2）：农场、像素村、田头、工单、Artifact、笔记、配置页、语音；服务端在 / 提供
 apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
 apps/site/         官网 vibevalley.dev（Solid 2 静态生成）
 packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、命令行、页面和两个壳都 import 它
@@ -125,8 +125,8 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 
 - [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
 - [Effect](https://effect.website/)、[SQLite](https://www.sqlite.org/)、[Solid](https://www.solidjs.com/) 和 [Electron](https://www.electronjs.org/)：服务端、数据库、页面和桌面版。
-- [Agora Conversational AI](https://www.agora.io/)：语音管家；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
-- [DeepSeek](https://www.deepseek.com/)：管家用的模型。
+- [Agora Conversational AI](https://www.agora.io/)：语音助手；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
+- [DeepSeek](https://www.deepseek.com/)：助手用的模型。
 - [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）：像素字体。
 - [Hugeicons](https://hugeicons.com/)（MIT）、[LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）：像素图标和农机 logo 照它们的形状重画。
 - [openclaw-weixin](https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin)、[botpy](https://github.com/tencent-connect/botpy)（腾讯，MIT）：微信和 QQ 的连接器照它们写。

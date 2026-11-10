@@ -1,0 +1,21 @@
+{
+  "id": "reviewer",
+  "version": 1,
+  "role": "worker",
+  "name": "审查老严",
+  "duty": "审一个分支或一张工单的改动：只读不改，按严重程度列问题",
+  "tags": ["审查", "评审", "code review", "review", "检查", "改动"],
+  "runtime": "pi",
+  "worktree": true,
+  "look": {
+    "eye": "#ff9de2",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#2a2e33",
+    "trim": "#d9534f",
+    "hat": "#5b4636",
+    "species": "raccoon",
+    "outfit": "farmer"
+  },
+  "skills": ["reviewer"]
+}

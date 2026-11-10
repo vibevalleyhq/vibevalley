@@ -13,8 +13,8 @@ flowchart LR
   subgraph Server[apps/server · Effect · 127.0.0.1:8787]
     API[handlers<br/>VibeValleyApi、三条 SSE]
     SITE[Core<br/>核心状态 SpaceState]
-    FM[管家<br/>VibeValley agent + 派活工具]
-    CHAT[频道<br/>群聊 · SQLite]
+    FM[助手<br/>VibeValley agent + 派活工具]
+    CHAT[频道<br/>群聊 · Postgres]
     MB[Mailbox<br/>路由、刹车、投递]
     TK[工单<br/>派活、排队、父子依赖、合并]
     CREW[帮工<br/>oar 子 agent]
@@ -61,7 +61,7 @@ flowchart LR
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
 - **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 13 个有序模块（见 `apps/server/src/modules.ts`）：
-  1. `Platform`（`base`、`infra`、`core`、`setting`、`provider`）
+  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`storage`、`attachment`、`provider`）
   2. `Agents`（`agent`、`runtime`、`memory`；模型和循环在 `packages/ai`、`packages/agent`）
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`executor`、`session`）
@@ -76,12 +76,12 @@ flowchart LR
   13. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`）
   模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走 `Stream` 或窄端口。`apps/server/src/services.ts` 分两阶段组装：先构建所有服务并注册订阅，再按模块顺序执行启动任务。
 - **网关（`apps/server/src/http`、`mcp`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts` 提供三条 SSE 流；`src/mcp/` 为帮工提供 `/mcp`（[核心状态](docs/subsystems/core.md)）。
-- **存储（SQLite + 文件）**：进程内 `node:sqlite`，表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `scripts/sqlite-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
+- **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
 - **客户端（`apps/web`、`apps/desktop`、`apps/mobile`、`apps/cli`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。桌面壳（Electron）、浏览器和手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
 
 ## 核心状态
 
-`SpaceState`（`packages/protocol/src/core/shapes.ts`）汇总农场实时状态：通话、在场会话（管家与帮工）、最近 100 个频道和串、开着的与最近关闭的 50 张工单、定时任务、commit 数、游戏进度与地块动作（[核心状态](docs/subsystems/core.md)）。
+`SpaceState`（`packages/protocol/src/core/shapes.ts`）汇总农场实时状态：通话、在场会话（助手与帮工）、最近 100 个频道和串、开着的与最近关闭的 50 张工单、定时任务、commit 数、游戏进度与地块动作（[核心状态](docs/subsystems/core.md)）。
 
 - **唯一修改入口**：只有 `Core.apply` 可修改 `SpaceState`。纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`）计算新状态；不改变状态的事实不发送。
 - **派生帧 `StateFrame`**：`GET /api/v1/state` 至多每 200 毫秒推送一帧。纯函数 `frameOf`（`apps/server/src/projection/frame.ts`）在状态副本上填入界面文案（`phaseText`、`whenText`、工单 `stage` 与可执行动作 `acts`），并计算 `inbox`、`view` 和 `effects`。持久层和 `reduce` 不保存界面文案。
@@ -99,11 +99,11 @@ flowchart LR
 
 ## HTTP 接口
 
-`packages/protocol/src/api.ts` 汇总各概念的 `endpoints`。每个接口定义 `op`（如 `issue.status.update`，对应 `POST /api/v1/issue/status/update`）、`about`、输入与输出的 Schema，以及权限集合 `can`（`owner`、`remote`、`orchestrator`）。
+`packages/protocol/src/api.ts` 汇总各概念的 `endpoints`。每个接口定义 `op`（如 `issue.status.update`，对应 `POST /api/v1/issue/status/update`）、`about`、输入与输出的 Schema，以及权限集合 `can`（`user`、`remote`、`orchestrator`、`session`）。
 
 - 所有命令接口均使用 `POST /api/v1/<路径>`，参数统一放在 JSON 请求体中。
-- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（聊天附件）、`GET /api/v1/artifact/<id>/<version>`（网页稿子）、`GET /api/v1/rpc`（频道与稿子订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音管家入口）。
-- 「连接到本机」仅放行 `can` 含 `remote` 的接口与流（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
+- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（附件）、`GET /api/v1/artifact/<id>/<version>`（网页 Artifact）、`GET /api/v1/rpc`（频道与 Artifact 订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音助手入口）。
+- 从外面来的只经「连接到本机」那道门：配对来的设备只放 `can` 含 `remote` 的接口与流，登录来的设备是用户本人（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 
 ## 存了什么
 
@@ -115,16 +115,15 @@ Host：
 |---|---|
 | `.vibevalley.lock` | 家目录租约（记录持有进程的 pid） |
 | `server.json` | 当前运行服务端的地址与 pid（供 CLI 发现） |
-| `config.json` | 档案（管家和帮工）、技能书、农机设置 |
+| `config.json` | 档案（助手和帮工）、技能书、农机设置 |
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/vibevalley.db` | SQLite 数据库：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、稿子、游戏账本、记忆、定时任务、连接器、配对设备、笔记批注与撤销 |
+| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
 | `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
-| `agent/<档案 id>/` | 管家对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
+| `agent/<档案 id>/` | 助手对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
 | `logs/` | 帮工原始运行日志与桌面端服务端日志 |
-| `artifacts/<sha256>` | 网页稿子内容文件（按内容哈希去重，[稿子](docs/subsystems/artifact.md)） |
 
 Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
 - `repos/`：仓库的 git 仓库。

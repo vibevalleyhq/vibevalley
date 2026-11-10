@@ -69,7 +69,12 @@ export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
 export const Trigger: Codec<T.Trigger> = Schema.Struct({
   id: Schema.String,
   source: Schema.Literals(T.TriggerSourceValues),
-  actor: Schema.Struct({ kind: Schema.Literals(T.TriggerActorKindValues), id: Schema.String, name: Schema.optionalKey(Schema.String) }),
+  actor: Schema.Struct({
+    kind: Schema.Literals(T.TriggerActorKindValues),
+    id: Schema.String,
+    role: Schema.optionalKey(Schema.Literals(T.AgentRoleValues)),
+    name: Schema.optionalKey(Schema.String),
+  }),
   addressed: Schema.Literals(TriggerAddressingValues),
   threads: Schema.Array(Schema.String),
   replyTo: Schema.optionalKey(Schema.String),

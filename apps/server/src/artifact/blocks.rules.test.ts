@@ -1,3 +1,4 @@
+import { Formatter } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
@@ -19,7 +20,7 @@ const block = (b: Partial<Wire<Block>> & Pick<Wire<Block>, "id" | "orderKey" | "
     attrs: {},
     text: [],
     rev: 1,
-    updatedBy: "owner",
+    updatedBy: "user",
     updated: 0,
     ...b,
   });
@@ -91,7 +92,7 @@ describe("order keys", () => {
   });
 
   it("two blocks with the same key sort by id", () => {
-    const p = page("owner", 1, [
+    const p = page("user", 1, [
       block({ id: "b2", orderKey: "V", type: "paragraph" }),
       block({ id: "b1", orderKey: "V", type: "paragraph" }),
       block({ id: "b0", orderKey: "U", type: "paragraph" }),
@@ -268,7 +269,7 @@ describe("ops", () => {
     ] satisfies BlockOp["op"][];
     for (const op of ops)
       expect(
-        page("owner", 1, []).apply({
+        page("user", 1, []).apply({
           op,
           block: block({ id: "", orderKey: "", type: "" as BlockType }),
           newBlock: block({ id: "", orderKey: "", type: "" as BlockType }),
@@ -277,7 +278,7 @@ describe("ops", () => {
   });
 
   it("code has no marks", () => {
-    const p = page("owner", 1, []);
+    const p = page("user", 1, []);
     p.apply(branded<BlockOp>({ op: "insert_block", block: { ...para("c", "V", ""), type: "code", text: [bold("x := 1")] } }));
     expect(p.find("c")!.text).toEqual([{ t: "x := 1", marks: {} }]);
   });
@@ -317,7 +318,7 @@ const spansText = (spans: readonly TextSpan[]) =>
   spans
     .map(
       (s) =>
-        JSON.stringify(s.t) +
+        Formatter.formatJson(s.t) +
         (s.marks.bold === true ? "B" : "") +
         (s.marks.italic === true ? "I" : "") +
         (s.marks.code === true ? "C" : "") +

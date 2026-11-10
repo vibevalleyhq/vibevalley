@@ -1,4 +1,6 @@
-import { composerOn, expect, tab, test, choose } from "./fixtures";
+import { defaultOrchestrator } from "@vibevalley/protocol";
+
+import { composerOn, expect, tab, test } from "./fixtures";
 
 // A server of its own: a second orchestrator is the whole farm's, and the other files count one.
 test.use({ farm: "orchestrators" });
@@ -32,10 +34,49 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
   await page.goto(`/chat/${general.id}`);
   await page.getByTestId("channel-settings-open").click();
   const dialog = page.getByTestId("channel-settings-dialog");
-  await choose(dialog.getByTestId("channel-orchestrator"), id);
+  // The new one goes into the channel and the default one comes out: the channel's orchestrator is the new one.
+  await dialog.locator(`[data-testid="channel-member"][data-key="${id}"]`).click();
+  await dialog.locator(`[data-testid="channel-member"][data-key="${defaultOrchestrator}"]`).click();
   await dialog.getByTestId("submit").click();
   await expect(page.getByTestId("channel-orchestrator-line")).toHaveAttribute("data-key", id);
-  expect((await api.channel.list()).find((c) => c.id === general.id)!.orchestrator).toBe(id);
+  const kept = (await api.channel.list()).filter((c) => c.id === general.id);
+  expect(kept.map((c) => [c.members, c.orchestrator])).toEqual([[[id], id]]);
+
+  // /imagegen is said to the orchestrator in the place alone: in a channel no one is in, the default one still hears it.
+  // Without a model key it says it cannot start; that it says anything there is that the line reached it.
+  const drawings = await api.channel.create({ name: "drawings" });
+  await api.channel.update({ id: drawings, members: [] });
+  await page.goto(`/chat/${drawings}`);
+  const drawingsBox = await composerOn(page, drawings);
+  await drawingsBox.fill("/im");
+  await expect(page.getByTestId("mentions").locator('[role="option"][data-key="/imagegen"]')).toBeVisible();
+  // Images not set up yet: the line is not said, the settings that fix it open.
+  await drawingsBox.fill("/imagegen 一只在麦田里打盹的橘猫");
+  await drawingsBox.press("Enter");
+  await expect(page).toHaveURL(/\/settings\/accounts$/u);
+  expect(await api.channel.message.list({ id: drawings })).toEqual([]);
+  // Set up (the test runtime answers MOSS), the line goes to the orchestrator there.
+  const providers = await api.provider.get();
+  await api.provider.update({
+    revision: providers.revision,
+    connections: [{ id: "drawings-moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-only-key" }],
+    dictation: null,
+    live: null,
+    image: { connection: "drawings-moss", model: "moss-image-sft-1.0" },
+    understanding: null,
+    speech: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
+  });
+  await page.goto(`/chat/${drawings}`);
+  const again = await composerOn(page, drawings);
+  await again.fill("/imagegen 一只在麦田里打盹的橘猫");
+  await again.press("Enter");
+  await expect(page.getByTestId("messages").locator(`[data-testid="message"][data-from="${defaultOrchestrator}"]`).first()).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.goto("/agents");
   await page.locator(`[data-testid="agent-card"][data-key="${id}"]`).getByRole("link").click();

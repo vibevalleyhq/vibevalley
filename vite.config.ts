@@ -52,7 +52,7 @@ export default defineConfig({
   // vp dev, build and preview at the root mean the page.
   defaultPackage: "./apps/web",
   // Checks are tasks here and in each package's vite.config.ts: cached, so a run with nothing changed replays its
-  // result. What writes files or keeps running (golden:update, api:client, desktop:dev…) stays a package.json script.
+  // result. What writes files or keeps running (api:client, desktop:dev…) stays a package.json script.
   run: {
     tasks: {
       "scripts:test": "vp test run",
@@ -81,7 +81,7 @@ export default defineConfig({
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/built-types.ts"],
       "names:verify": "vpx scripts/stale-names.ts",
-      // db:check is a script: it reads db/migrations and db/queries through node:sqlite.
+      // db:check is a script: it reads db/migrations and db/queries through PGlite.
       "server:check": [
         "vp run packages:build",
         "vp check",
@@ -101,23 +101,14 @@ export default defineConfig({
       // The health package's tests, then the escape ratchet (scripts/health.config.ts); the report is `vp run health`.
       "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/health.config.ts --check"],
       // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
-      "effect:check": [
-        "vp run packages:build",
-        "effect-tsgo diagnostics --project apps/server/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project apps/cli/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/provider/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/pkm/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/artifact/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/home/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/bridge/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/testkit/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/health/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project apps/web/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project apps/desktop/tsconfig.json --strict",
-      ],
+      // Effect's diagnostics: the rules tsconfig.base.json names fail on any hit; the rest may only go down (scripts/effect.ratchet.json).
+      "effect:check": ["vp run packages:build", "vpx scripts/effect-check.ts"],
+      // The test and Effect practices the review lists (scripts/practice-audit.ts): the findings may only go down
+      // (scripts/practice.ratchet.json).
+      "practice:check": "vpx scripts/practice-audit.ts --check",
+      // Which server module uses which member of another module's service (scripts/service-paths.ts): a new path fails until
+      // it is written down on purpose (scripts/service-paths.json).
+      "paths:check": "vpx scripts/service-paths.ts --check",
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
       deadcode: "vpx scripts/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },

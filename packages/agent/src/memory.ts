@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { Effect } from "effect";
+import { DateTime, Effect } from "effect";
 
 import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import { memory as memoryWords } from "./prompts.ts";
@@ -42,7 +42,7 @@ export const fileMemory = (home: string, now: () => number): MemoryPort => ({
       const [snap, lines] = await Promise.all([readMemory(home), memoryFileLines(home)]);
       return { prompt: snap.prompt, lines };
     }),
-  remember: (note) => Effect.tryPromise({ try: () => remember(home, note, new Date(now())), catch: agentFailed }).pipe(Effect.asVoid),
+  remember: (note) => Effect.tryPromise({ try: () => remember(home, note, now()), catch: agentFailed }).pipe(Effect.asVoid),
   rewrite: (content) =>
     Effect.tryPromise({ try: () => rewriteMemory(home, content), catch: (e): AgentFailed => agentFailed(e) }).pipe(Effect.map((s) => s.lineCount)),
 });
@@ -124,9 +124,11 @@ export async function forgetLine(home: string, id: string) {
   if (i >= 0) await writeFile(file, [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
 }
 
-const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+/** YYYY-MM-DD where this machine is. */
+const localDate = (now: number) => DateTime.formatIsoDate(DateTime.makeZonedUnsafe(now, { timeZone: DateTime.zoneMakeLocal() }));
 
-export async function remember(home: string, note: string, now: Date): Promise<MemoryLine> {
+/** now: epoch milliseconds. */
+export async function remember(home: string, note: string, now: number): Promise<MemoryLine> {
   await mkdir(home, { recursive: true });
   const date = localDate(now);
   const cleaned = note.replace(/\s*\n\s*/gu, " ").trim();
@@ -144,10 +146,11 @@ async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot
 
 const archiveDir = (home: string) => join(home, "archive");
 
-/** Date.toISOString with its colons and dot made dashes. */
-const isoStamp = (now: Date) => now.toISOString().replace(/[:.]/gu, "-");
+/** The UTC ISO time with its colons and dot made dashes. */
+const isoStamp = (now: number) => DateTime.formatIso(DateTime.makeUnsafe(now)).replace(/[:.]/gu, "-");
 
-export async function archive(home: string, session: string, text: string, now: Date): Promise<string> {
+/** now: epoch milliseconds. */
+export async function archive(home: string, session: string, text: string, now: number): Promise<string> {
   await mkdir(archiveDir(home), { recursive: true });
   const path = join(archiveDir(home), `${session}-${isoStamp(now)}.md`);
   await writeFile(path, text);

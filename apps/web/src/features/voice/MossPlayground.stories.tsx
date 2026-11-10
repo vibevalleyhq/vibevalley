@@ -30,13 +30,13 @@ const poor: MossQos = {
 };
 
 const turns: MossLineState["turns"] = [
-  { who: "owner", key: "t1", text: "今天有什么要我看的？", done: true },
+  { who: "user", key: "t1", text: "今天有什么要我看的？", done: true },
   { who: "moss", key: "t1", text: "两块地熟了：修好登录、补齐看板的测试。要先看哪个？", done: true },
-  { who: "owner", key: "t2", text: "先看登录那个", done: false },
+  { who: "user", key: "t2", text: "先看登录那个", done: false },
 ];
 
 const events: MossLineState["events"] = [
-  { up: true, text: '{"type":"session.update","persona":"农场的管家"}' },
+  { up: true, text: '{"type":"session.update","persona":"农场的助手"}' },
   { up: false, text: '{"type":"session.created"}' },
   { up: false, text: '{"type":"input.speech.started"}' },
   { up: false, text: '{"type":"input.speech.stopped"}' },

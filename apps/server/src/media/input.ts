@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
-import { join } from "node:path";
 
-import { Effect, FileSystem, type PlatformError, Schema, type Scope, Stream } from "effect";
+import { Effect, FileSystem, Path, type PlatformError, Schema, type Scope, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { MediaInputRequest } from "@vibevalley/protocol/schema";
@@ -66,23 +65,23 @@ export const verifyMediaInput = Effect.fn("Media.verifyInput")(function* (path: 
     Stream.runForEach((chunk) =>
       Effect.gen(function* () {
         received += chunk.byteLength;
-        if (received > size) return yield* new MediaInputRejected({ reason: "Changed" });
+        if (received > size) return yield* MediaInputRejected.make({ reason: "Changed" });
         hash.update(chunk);
       }),
     ),
   );
-  if (received !== size || hash.digest("hex") !== expectedHash) return yield* new MediaInputRejected({ reason: "Changed" });
+  if (received !== size || hash.digest("hex") !== expectedHash) return yield* MediaInputRejected.make({ reason: "Changed" });
 });
 
 // Promote the complete file before closing this caller-owned scope; its temporary path is never a public asset ID.
 export const stageMediaInput = Effect.fn("Media.stageInput")(function* <E, R>(directory: string, metadata: unknown, source: Stream.Stream<Uint8Array, E, R>) {
   const input = yield* Schema.decodeUnknownEffect(MediaInputRequest)(metadata, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => new MediaInputRejected({ reason: "Metadata" })),
+    Effect.mapError(() => MediaInputRejected.make({ reason: "Metadata" })),
   );
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 });
   const temporary = yield* fs.makeTempDirectoryScoped({ directory, prefix: ".input-" });
-  const path = join(temporary, "content");
+  const path = (yield* Path.Path).join(temporary, "content");
   const hash = createHash("sha256");
   const prefix = new Uint8Array(16);
   let received = 0;
@@ -91,13 +90,13 @@ export const stageMediaInput = Effect.fn("Media.stageInput")(function* <E, R>(di
   yield* source.pipe(
     Stream.mapEffect((chunk) =>
       Effect.gen(function* () {
-        if (chunk.byteLength > input.size - received) return yield* new MediaInputRejected({ reason: "Size" });
+        if (chunk.byteLength > input.size - received) return yield* MediaInputRejected.make({ reason: "Size" });
         received += chunk.byteLength;
         const take = Math.min(prefix.length - prefixLength, chunk.byteLength);
         prefix.set(chunk.subarray(0, take), prefixLength);
         prefixLength += take;
         if (!checked && prefixLength === prefix.length) {
-          if (!matchesContainer(input.mime, prefix)) return yield* new MediaInputRejected({ reason: "Format" });
+          if (!matchesContainer(input.mime, prefix)) return yield* MediaInputRejected.make({ reason: "Format" });
           checked = true;
         }
         hash.update(chunk);
@@ -106,9 +105,10 @@ export const stageMediaInput = Effect.fn("Media.stageInput")(function* <E, R>(di
     ),
     Stream.run(fs.sink(path, { flag: "wx", mode: 0o600 })),
   );
-  if (received !== input.size) return yield* new MediaInputRejected({ reason: "Size" });
+  if (received !== input.size) return yield* MediaInputRejected.make({ reason: "Size" });
   if (input.kind === "audio") {
-    const audio = yield* inspectAudio(yield* fileBlob(path, input.mime)).pipe(Effect.mapError(() => new MediaInputRejected({ reason: "Format" })));
+    const fileBlob2 = yield* fileBlob(path, input.mime);
+    const audio = yield* inspectAudio(fileBlob2).pipe(Effect.mapError(() => MediaInputRejected.make({ reason: "Format" })));
     const mime = {
       wav: "audio/wav",
       mp3: "audio/mpeg",
@@ -119,7 +119,7 @@ export const stageMediaInput = Effect.fn("Media.stageInput")(function* <E, R>(di
       ogg: "audio/ogg",
       webm: "audio/webm",
     };
-    if (audio.duration > 3600 || mime[audio.format] !== input.mime) return yield* new MediaInputRejected({ reason: "Format" });
+    if (audio.duration > 3600 || mime[audio.format] !== input.mime) return yield* MediaInputRejected.make({ reason: "Format" });
   }
   return { ...input, path, hash: hash.digest("hex") };
 }, Effect.timeout("300 seconds"));
@@ -146,7 +146,7 @@ export interface StagedAudioResult {
 const audioBytes = (blob: Blob, start: number, end: number) =>
   Effect.tryPromise({
     try: () => blob.slice(start, end).arrayBuffer(),
-    catch: () => new MediaInputRejected({ reason: "Format" }),
+    catch: () => MediaInputRejected.make({ reason: "Format" }),
   }).pipe(Effect.map((bytes) => Buffer.from(bytes)));
 
 export const stageAudioResult = Effect.fn("Media.stageAudioResult")(function* (
@@ -154,23 +154,23 @@ export const stageAudioResult = Effect.fn("Media.stageAudioResult")(function* (
   name: string,
   format: T.MediaAudioFormat,
   source: Stream.Stream<Uint8Array, ApiError>,
-): Effect.fn.Return<StagedAudioResult, ApiError | MediaInputRejected | PlatformError.PlatformError, FileSystem.FileSystem | Scope.Scope> {
+): Effect.fn.Return<StagedAudioResult, ApiError | MediaInputRejected | PlatformError.PlatformError, FileSystem.FileSystem | Path.Path | Scope.Scope> {
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 });
   const temporary = yield* fs.makeTempDirectoryScoped({ directory, prefix: ".result-" });
-  const path = join(temporary, "content");
+  const path = (yield* Path.Path).join(temporary, "content");
   const hash = createHash("sha256");
   let size = 0;
   yield* source.pipe(
     Stream.mapEffect((chunk) => {
-      if (chunk.byteLength > audioResultMax - size) return Effect.fail(new MediaInputRejected({ reason: "Size" }));
+      if (chunk.byteLength > audioResultMax - size) return Effect.fail(MediaInputRejected.make({ reason: "Size" }));
       size += chunk.byteLength;
       hash.update(chunk);
       return Effect.succeed(chunk);
     }),
     Stream.run(fs.sink(path, { flag: "wx", mode: 0o600 })),
   );
-  if (size === 0) return yield* new MediaInputRejected({ reason: "Size" });
+  if (size === 0) return yield* MediaInputRejected.make({ reason: "Size" });
   const mime = audioResultMime[format];
   const blob = yield* fileBlob(path, mime);
   if (format === "mp3") {
@@ -186,13 +186,13 @@ export const stageAudioResult = Effect.fn("Media.stageAudioResult")(function* (
       }
       next = ranges.next(cached.subarray(range.offset - start, range.offset - start + range.length));
     }
-    if (!next.value) return yield* new MediaInputRejected({ reason: "Format" });
+    if (!next.value) return yield* MediaInputRejected.make({ reason: "Format" });
   }
   const audio =
     format === "pcm"
       ? undefined
-      : yield* (format === "wav" ? inspectWave(blob) : inspectAudio(blob)).pipe(Effect.mapError(() => new MediaInputRejected({ reason: "Format" })));
-  if (audio && audio.format !== format) return yield* new MediaInputRejected({ reason: "Format" });
+      : yield* (format === "wav" ? inspectWave(blob) : inspectAudio(blob)).pipe(Effect.mapError(() => MediaInputRejected.make({ reason: "Format" })));
+  if (audio && audio.format !== format) return yield* MediaInputRejected.make({ reason: "Format" });
   return {
     path,
     hash: hash.digest("hex"),

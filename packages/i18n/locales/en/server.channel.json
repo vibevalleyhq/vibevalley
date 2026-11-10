@@ -1,11 +1,11 @@
 {
   "name": {
-    "owner": "You",
-    "orchestrator": "Manager"
+    "user": "You",
+    "orchestrator": "Assistant"
   },
   "mention": {
-    "orchestrator": "@manager",
-    "owner": "@owner",
+    "orchestrator": "@assistant",
+    "user": "@user",
     "everyone": "@everyone"
   },
   "channelName": "A channel name has only letters, digits, - and _, up to 24 characters",
@@ -26,7 +26,7 @@
   "channelGone": "The channel cannot be found",
   "noHelper": "There is no helper {id}",
   "noChannel": "There is no channel {id}",
-  "notOrchestrator": "{id} is not a manager's profile: only a manager can look after a channel",
+  "notOrchestrator": "{id} is not an assistant's profile: only an assistant can look after a channel",
   "noMessageId": "There is no message {id}",
   "threadOnlyTitle": "A thread can only get a title",
   "defaultStays": "The default channel cannot be archived or deleted: make another one the default first",
@@ -37,19 +37,16 @@
   "connectorsThere": "a connector is bound to it",
   "queuedThere": "{n} tickets wait in the queue to start here",
   "issuesThere": "{n} tickets were worked here",
-  "noAttachment": "There is no attachment {id}: upload it first, then say it",
   "messageGone": "This message is deleted already",
   "notYours": "Only your own words can be changed",
   "badEmoji": "A reaction is one emoji or a short word, without spaces",
   "threadOnlyInChannel": "A thread opens only under a message in a channel",
-  "emptyFile": "The file is empty",
   "deletes": "Delete message {number} in {target} ({name}: {text}); its number stays",
   "deletesDeliveries": "{n} not yet handed are no longer sent",
   "defaultIsChannel": "Only a channel can be the default, not a direct channel or a thread",
   "noDirect": "{target}: there is no direct channel between you",
   "noChannelNamed": "There is no channel #{name}. There are: {tags}",
   "absent": "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
-  "fileTooBig": "The file is too big: {mb} MB at most",
   "noProfileNamed": "No profile is named {key}",
   "talkFailed": "Could not start this conversation: {why}",
   "profileDisabled": "{name} is disabled"

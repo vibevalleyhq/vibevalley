@@ -345,11 +345,11 @@ function Chat() {
   const thread = createMemo(() => (shown()?.type === "thread" ? shown() : undefined));
   const threadWidth = usePaneWidth("thread", 416, 320, 720);
   const [drawer, setDrawer] = createSignal(false);
-  const [creating, setCreating] = createSignal(false);
-  const [searching, setSearching] = createSignal(false);
+  /** The one dialog over the page: a new channel or the search; opening one closes the other. */
+  const [dialog, setDialog] = createSignal<"none" | "new" | "search">("none");
   // A message's address (?m=) lights it up in the pane it is in: the thread's, or the channel's.
   const point = () => pointedAt(router.path());
-  // An artifact opened beside the talk that made it (?artifact=), and the block the owner is about to speak about.
+  // An artifact opened beside the talk that made it (?artifact=), and the block the user is about to speak about.
   const [quoted, setQuoted] = createSignal<QuotedBlockDraft[]>([]);
   const artifact = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("artifact");
   createEffect(
@@ -373,7 +373,7 @@ function Chat() {
   const unquote = (blockId: string) => setQuoted((had) => had.filter((q) => q.ref.blockId !== blockId));
 
   const sidebar = () => (
-    <Sidebar channel={channel()} thread={thread()} onNew={() => setCreating(true)} onSearch={() => setSearching(true)} onPick={() => setDrawer(false)} />
+    <Sidebar channel={channel()} thread={thread()} onNew={() => setDialog("new")} onSearch={() => setDialog("search")} onPick={() => setDrawer(false)} />
   );
   return (
     <div {...stylex.attrs(viewStyles.chatDiv)}>
@@ -416,8 +416,12 @@ function Chat() {
           </div>
         )}
       </Show>
-      <NewChannelDialog open={creating()} onClose={() => setCreating(false)} onCreated={(newId) => router.navigate(`/chat/${newId}`)} />
-      <FarmSearch open={searching()} onClose={() => setSearching(false)} />
+      <NewChannelDialog
+        open={dialog() === "new"}
+        onClose={() => setDialog((d) => (d === "new" ? "none" : d))}
+        onCreated={(newId) => router.navigate(`/chat/${newId}`)}
+      />
+      <FarmSearch open={dialog() === "search"} onClose={() => setDialog((d) => (d === "search" ? "none" : d))} />
     </div>
   );
 }
@@ -430,6 +434,8 @@ const tabs: { tab: Tab; icon: IconName; label: string }[] = [
   { tab: "crons", icon: "clock", label: t("web.channel.tab.crons") },
 ];
 
+type HeaderOverlay = "none" | "threads" | "pins";
+
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
 function ChannelMain(props: {
   channel: Channel | undefined;
@@ -441,10 +447,11 @@ function ChannelMain(props: {
 }) {
   const router = useRouter();
   const [tab, setTab] = createSignal<Tab>("chat");
-  const [threadsOpen, setThreadsOpen] = createSignal(false);
+  const [overlay, setOverlay] = createSignal<HeaderOverlay>("none");
+  const threadsOpen = () => overlay() === "threads";
+  const pinsOpen = () => overlay() === "pins";
   const [search, setSearch] = createSignal<string>();
   const [settings, setSettings] = createSignal(false);
-  const [pinsOpen, setPinsOpen] = createSignal(false);
   const [membersOpen, setMembersOpen] = createSignal(false);
   const name = () => channelName(props.channel);
   const about = () =>
@@ -509,12 +516,12 @@ function ChannelMain(props: {
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
                 title={t("web.channel.threadList.title")}
-                onClick={() => setThreadsOpen(!threadsOpen())}
+                onClick={() => setOverlay(threadsOpen() ? "none" : "threads")}
               >
                 <Icon name="thread" size={20} />
               </button>
               <Show when={threadsOpen()}>
-                <ThreadList channel={c()} onPick={() => setThreadsOpen(false)} />
+                <ThreadList channel={c()} onPick={() => setOverlay("none")} />
               </Show>
             </div>
           )}
@@ -531,11 +538,11 @@ function ChannelMain(props: {
             aria-expanded={aria(pinsOpen())}
             title={t("web.channel.pins.open")}
             disabled={!props.channel}
-            onClick={() => setPinsOpen(!pinsOpen())}
+            onClick={() => setOverlay(pinsOpen() ? "none" : "pins")}
           >
             <Icon name="pin" size={20} />
           </button>
-          <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} onPick={() => setPinsOpen(false)} />}</Show>
+          <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} onPick={() => setOverlay("none")} />}</Show>
         </div>
         <button
           type="button"
@@ -547,7 +554,11 @@ function ChannelMain(props: {
           data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
-          onClick={() => setMembersOpen(!membersOpen())}
+          onClick={() => {
+            const next = !membersOpen();
+            setMembersOpen(next);
+            if (next) setTab("chat");
+          }}
         >
           {t("web.channel.members.open")}
         </button>

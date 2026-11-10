@@ -1,14 +1,14 @@
 import { expect, test } from "vite-plus/test";
 
-import { actsForOwner, type Actor, orchestrator, owner, session, system } from "./actor.ts";
+import { actsForUser, type Actor, orchestrator, user, worker, system } from "./actor.ts";
 
-test("only the owner, or the orchestrator in a run the owner's words are in, acts on the owner's word", () => {
+test("only the user, or the orchestrator in a run the user's words are in, acts on the user's word", () => {
   const cases: [Actor, boolean][] = [
-    [owner, true],
+    [user, true],
     [orchestrator(true), true],
     [orchestrator(false), false],
-    [session("w1"), false],
+    [worker("w1"), false],
     [system, false],
   ];
-  expect(cases.map(([a]) => actsForOwner(a))).toEqual(cases.map(([, yes]) => yes));
+  expect(cases.map(([a]) => actsForUser(a))).toEqual(cases.map(([, yes]) => yes));
 });

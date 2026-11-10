@@ -10,14 +10,15 @@ import { Ingress, type SourceEvent } from "#/ingress/ingress.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
+import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { farm, lab, until } from "./farm.ts";
 
-const signal = (key: string, kind: "owner" | "session" = "session", threads: readonly string[] = [], at = 0): SourceEvent => ({
+const signal = (key: string, kind: "user" | "agent" = "agent", threads: readonly string[] = [], at = 0): SourceEvent => ({
   source: "channel",
   key,
-  actor: { kind, id: kind === "owner" ? "owner" : "other-session" },
+  actor: { kind, id: kind === "user" ? "user" : "other-session" },
   addressed: "mention",
   threads,
   text: key,
@@ -29,23 +30,14 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
   return Effect.gen(function* () {
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
-    const profile = (yield* Agent).agent(defaultOrchestrator)!;
-    yield* (yield* Session).register({
-      id: profile.id,
-      agent: profile.id,
-      role: profile.role,
-      name: profile.name,
-      runtime: profile.runtime,
-      brief: profile.duty,
-    });
     const channel = (yield* Channel).defaultChannel();
     const inputs = (yield* Effect.forEach(
       Array.from({ length: 12 }, (_, n) => n),
       (n) => ingress.record(signal(`concurrent-${n}`)),
     )).filter((input) => input !== undefined);
     const writes = inputs.map((trigger) =>
-      mailbox.insert({
-        session: profile.id,
+      committedDelivery({
+        session: defaultOrchestrator,
         row: {
           envelope_id: trigger.id,
           scope: `channel:${channel}`,
@@ -66,32 +58,32 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
     yield* Effect.all([...writes, mailbox.restore, mailbox.restore], { concurrency: "unbounded", discard: true });
     expect(
       mailbox
-        .pending(profile.id)
+        .deliveriesOf(defaultOrchestrator)
         .map((row) => row.envelope_id)
         .toSorted(),
     ).toEqual(inputs.map((input) => input.id).toSorted());
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
 
-it.live("regression: independent input hops survive restore and only a new owner receipt resets them", () => {
+it.live("regression: independent input hops survive restore and only a new user receipt resets them", () => {
   const f = farm();
   return Effect.gen(function* () {
     const ingress = yield* Ingress;
     const mailbox = yield* Mailbox;
-    const accept = (key: string, kind: "owner" | "session" = "session") => ingress.accept(signal(key, kind));
-    for (const n of [1, 2, 3, 4, 5]) yield* accept(`before-owner-${n}`);
-    const rows = () => mailbox.pending(defaultOrchestrator);
+    const accept = (key: string, kind: "user" | "agent" = "agent") => ingress.accept(signal(key, kind));
+    for (const n of [1, 2, 3, 4, 5]) yield* accept(`before-user-${n}`);
+    const rows = () => mailbox.deliveriesOf(defaultOrchestrator);
     expect(rows().map((row) => row.held_by)).toEqual([null, null, null, null, "hop_limit"]);
     yield* mailbox.restore;
     const blocked = (yield* accept("after-restore"))!;
     expect(rows().find((row) => row.envelope_id === blocked.id)?.held_by).toBe("hop_limit");
-    yield* accept("owner-receipt", "owner");
-    const next = (yield* accept("after-owner-1"))!;
+    yield* accept("user-receipt", "user");
+    const next = (yield* accept("after-user-1"))!;
     expect(rows().find((row) => row.envelope_id === next.id)?.held_by).toBeNull();
-    yield* accept("owner-receipt", "owner");
+    yield* accept("user-receipt", "user");
     yield* mailbox.restore;
-    for (const n of [2, 3, 4]) yield* accept(`after-owner-${n}`);
-    const capped = (yield* accept("after-owner-5"))!;
+    for (const n of [2, 3, 4]) yield* accept(`after-user-${n}`);
+    const capped = (yield* accept("after-user-5"))!;
     expect(rows().find((row) => row.envelope_id === capped.id)?.held_by).toBe("hop_limit");
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
@@ -108,7 +100,8 @@ it.live("regression: queued triggers enter the first model request in receipt or
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "work", agent: "lab", repo: "fifo" });
@@ -149,22 +142,23 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = yield* issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
-    const first = (yield* ingress.accept(signal("first-wake", "session", threads)))!;
-    expect(mailbox.pending(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
+    const first = (yield* ingress.accept(signal("first-wake", "agent", threads)))!;
+    expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
     yield* until(
-      () => steers().some((text) => text.includes("first-wake")) && !mailbox.pending(started.session!).some((row) => row.envelope_id === first.id),
+      () => steers().some((text) => text.includes("first-wake")) && !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === first.id),
       "the first agent input consumed",
     );
     yield* mailbox.restore;
-    const second = (yield* ingress.accept(signal("future-source-clock", "session", threads, 9_000_000_000_000)))!;
-    expect(mailbox.pending(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
+    const second = (yield* ingress.accept(signal("future-source-clock", "agent", threads, 9_000_000_000_000)))!;
+    expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
     const queued = (yield* ingress.accept({
       source: "github",
       key: "queued-ci",
@@ -175,15 +169,15 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
       at: 0,
       meta: { kind: "ci", failed: true },
     }))!;
-    yield* ingress.accept(signal("owner-authorized-wave", "owner", threads));
-    yield* until(() => !mailbox.pending(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with an owner steer");
-    expect(steers().some((text) => text.includes("future-source-clock") && text.includes("owner-authorized-wave"))).toBe(true);
+    yield* ingress.accept(signal("user-authorized-wave", "user", threads));
+    yield* until(() => !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with a user steer");
+    expect(steers().some((text) => text.includes("future-source-clock") && text.includes("user-authorized-wave"))).toBe(true);
     expect(steers().some((text) => text.includes("queued-ci"))).toBe(false);
-    expect(mailbox.pending(started.session!).find((row) => row.envelope_id === queued.id)?.state).toBe("pending");
+    expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === queued.id)?.state).toBe("pending");
     const sessions = yield* Session;
     gate.resolve();
     yield* until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the original turn ended");
-    yield* ingress.accept(signal("owner-next-run", "owner", threads));
+    yield* ingress.accept(signal("user-next-run", "user", threads));
     yield* until(() => turns.length === 2, "a new turn takes the queued input");
     expect(turns[1]).toContain("queued-ci");
   }).pipe(Effect.ensuring(Effect.sync(gate.resolve)), Effect.scoped, Effect.provide(f.layer));

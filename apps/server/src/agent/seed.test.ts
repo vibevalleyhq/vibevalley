@@ -1,3 +1,4 @@
+import { Formatter } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import presetsEn from "#/runtime/presets.en.json";
@@ -26,8 +27,8 @@ describe("the seeds in each language", () => {
 
   it("the English ones are English", () => {
     const han = /\p{Script=Han}/u;
-    expect(JSON.stringify(seedsEn)).not.toMatch(han);
-    expect(JSON.stringify(catalogEn)).not.toMatch(han);
-    expect(JSON.stringify(presetsEn)).not.toMatch(han);
+    expect(Formatter.formatJson(seedsEn)).not.toMatch(han);
+    expect(Formatter.formatJson(catalogEn)).not.toMatch(han);
+    expect(Formatter.formatJson(presetsEn)).not.toMatch(han);
   });
 });

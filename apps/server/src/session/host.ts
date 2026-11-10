@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { Cause, Clock, Deferred, Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Semaphore, Stream } from "effect";
 
 import { type Brain, type BrainEvent, makeBrain, sessionUnfinished } from "@vibevalley/agent/brain";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -30,44 +30,87 @@ export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly bran
   cause: Schema.Defect(),
 }) {}
 
+type CallerState =
+  | { readonly _tag: "buffering"; readonly kept: string[] }
+  | { readonly _tag: "streaming"; readonly reader: Queue.Queue<string, NotAnswered | Cause.Done> }
+  | { readonly _tag: "ended"; readonly kept: readonly string[] }
+  | { readonly _tag: "failed"; readonly kept: readonly string[]; readonly failure: Cause.Cause<NotAnswered> };
+
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before. */
 export class Caller {
-  private kept: string[] = [];
-  private ended = false;
-  private failure: Cause.Cause<NotAnswered> | undefined;
-  private reader: Queue.Queue<string, NotAnswered | Cause.Done> | undefined;
+  private state: CallerState = { _tag: "buffering", kept: [] };
 
   push(text: string) {
-    if (this.ended) return;
-    if (this.reader) Queue.offerUnsafe(this.reader, text);
-    else this.kept.push(text);
+    switch (this.state._tag) {
+      case "buffering":
+        this.state.kept.push(text);
+        return;
+      case "streaming":
+        Queue.offerUnsafe(this.state.reader, text);
+        return;
+      case "ended":
+      case "failed":
+        return;
+    }
   }
 
   end() {
-    if (this.ended) return;
-    this.ended = true;
-    if (this.reader) Queue.endUnsafe(this.reader);
+    switch (this.state._tag) {
+      case "buffering":
+        this.state = { _tag: "ended", kept: this.state.kept };
+        return;
+      case "streaming":
+        Queue.endUnsafe(this.state.reader);
+        this.state = { _tag: "ended", kept: [] };
+        return;
+      case "ended":
+      case "failed":
+        return;
+    }
   }
 
   fail(cause: unknown) {
-    if (this.ended) return;
-    this.failure = Cause.fail(new NotAnswered({ message: messageOf(cause), cause }));
-    this.ended = true;
-    if (this.reader) Queue.failCauseUnsafe(this.reader, this.failure);
+    const failure = Cause.fail(NotAnswered.make({ message: messageOf(cause), cause }));
+    switch (this.state._tag) {
+      case "buffering":
+        this.state = { _tag: "failed", kept: this.state.kept, failure };
+        return;
+      case "streaming":
+        Queue.failCauseUnsafe(this.state.reader, failure);
+        this.state = { _tag: "failed", kept: [], failure };
+        return;
+      case "ended":
+      case "failed":
+        return;
+    }
   }
 
   readonly words: Stream.Stream<string, NotAnswered> = Stream.callback<string, NotAnswered>((queue) =>
     Effect.sync(() => {
-      for (const w of this.kept) Queue.offerUnsafe(queue, w);
-      this.kept = [];
-      if (this.failure) Queue.failCauseUnsafe(queue, this.failure);
-      else if (this.ended) Queue.endUnsafe(queue);
-      else this.reader = queue;
+      switch (this.state._tag) {
+        case "buffering":
+          for (const w of this.state.kept) Queue.offerUnsafe(queue, w);
+          this.state = { _tag: "streaming", reader: queue };
+          return;
+        case "ended":
+          for (const w of this.state.kept) Queue.offerUnsafe(queue, w);
+          this.state = { _tag: "ended", kept: [] };
+          Queue.endUnsafe(queue);
+          return;
+        case "failed":
+          for (const w of this.state.kept) Queue.offerUnsafe(queue, w);
+          Queue.failCauseUnsafe(queue, this.state.failure);
+          this.state = { _tag: "failed", kept: [], failure: this.state.failure };
+          return;
+        case "streaming":
+          this.state = { _tag: "streaming", reader: queue };
+          return;
+      }
     }),
   );
 }
 
-/** Why the agent did not start: the model missing a key, or the host closing. The message is what the owner reads. */
+/** Why the agent did not start: the model missing a key, or the host closing. The message is what the user reads. */
 class CannotStart extends Schema.TaggedError<CannotStart, { readonly brand: unique symbol }>()("CannotStart", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -92,6 +135,8 @@ export interface HostOptions<R> {
   readonly llm: () => ModelClient;
   /** The tools; each reads the route of the input taken last. */
   readonly tools: (current: () => R) => Tool[];
+  /** The folders of the skills it may load (<folder>/<name>/SKILL.md); none when absent. */
+  readonly skills?: readonly string[];
   readonly wakeSoon?: (withinMs: number) => boolean;
   /** The route before any input is taken. */
   readonly first: R;
@@ -133,6 +178,8 @@ export interface AgentHost<R> {
 }
 
 /** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at the latest. */
+const encodePretty = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+
 export const makeHost = <R>(
   o: HostOptions<R> & { readonly memory: MemoryPort },
   journal: Journal,
@@ -151,7 +198,7 @@ export const makeHost = <R>(
     let open = false;
     let prefixChanged: string[] = [];
     let closing = false;
-    const closed = yield* Deferred.make<void>();
+    let closer: Fiber.Fiber<void> | undefined;
     let brain: { readonly brain: Brain; readonly scope: Scope.Closeable; readonly following: Fiber.Fiber<void> } | undefined;
     /** Held from building an input to handing it over, so that each input's text follows the one before. */
     const inputs = yield* Semaphore.make(1);
@@ -218,7 +265,7 @@ export const makeHost = <R>(
     // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
     const settled = (aborted: boolean) =>
       Effect.suspend(() => {
-        if (aborted && !closing) journal.note("run/error", t("server.session.log.stoppedByOwner"));
+        if (aborted && !closing) journal.note("run/error", t("server.session.log.stoppedByUser"));
         input.caller?.end();
         input = { route: input.route, run: input.run };
         open = false;
@@ -301,8 +348,8 @@ export const makeHost = <R>(
     // Started on first use: loading it is not free, and a farm without a model works otherwise. Only ever under inputs.
     const start = Effect.gen(function* () {
       if (brain) return brain.brain;
-      if (closing) return yield* new CannotStart({ message: stopped() });
-      const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e), cause: e }) });
+      if (closing) return yield* CannotStart.make({ message: stopped() });
+      const llm = yield* Effect.try({ try: o.llm, catch: (e) => CannotStart.make({ message: messageOf(e), cause: e }) });
       const scope = yield* Scope.fork(owner);
       const made = yield* makeBrain({
         name: o.session.id,
@@ -312,7 +359,7 @@ export const makeHost = <R>(
         home: o.home,
         cwd: o.cwd,
         tools: o.tools(() => current().route),
-        noSkills: true,
+        ...(o.skills === undefined ? { noSkills: true } : { skills: o.skills }),
         noSubagents: true,
         reminders: false,
         ...(o.wakeSoon ? { wakeSoon: o.wakeSoon } : {}),
@@ -356,9 +403,12 @@ export const makeHost = <R>(
             onSuccess: (b) =>
               Effect.gen(function* () {
                 if (closing) return closeInput(hosted);
-                const { text, heard } = yield* build(b.busy() || (yield* b.queued), yield* b.memoryNews);
+                const busy = b.busy() || (yield* b.queued);
+                const memoryNews = yield* b.memoryNews;
+                const { text, heard } = yield* build(busy, memoryNews);
                 if (closing) return closeInput(hosted);
-                const message = customMessage(o.inputType, text, yield* Clock.currentTimeMillis, { details: hosted.route });
+                const now2 = yield* Clock.currentTimeMillis;
+                const message = customMessage(o.inputType, text, now2, { details: hosted.route });
                 local.set(message, { ...hosted, run: { ...run, ...(heard ? { heard } : {}) } });
                 yield* now ? b.send(message) : b.later(message);
                 return { ok: true } as const;
@@ -396,10 +446,12 @@ export const makeHost = <R>(
       yield* inProcess.close.pipe(Effect.catch((err) => log(`in-process run: ${err.message}`)));
     });
 
-    const close = Effect.suspend(() => {
-      if (closing) return Deferred.await(closed);
+    const close = Effect.gen(function* () {
       closing = true;
-      return closeOnce.pipe(Effect.ensuring(Deferred.done(closed, Exit.void)), Effect.andThen(Deferred.await(closed)));
+      // On the owner's scope, not the first caller's fiber: a caller that is interrupted stops waiting, and the close
+      // goes on for every other caller (the owner closing waits for it too).
+      closer ??= yield* Effect.forkIn(closeOnce, owner, { uninterruptible: true });
+      yield* Fiber.await(closer);
     });
 
     const markWrong = (on: number, want: string, model: string, tools: readonly string[]) =>
@@ -431,8 +483,11 @@ export const makeHost = <R>(
           expect: [],
         };
         const file = join(o.home, "evals", id + ".json");
-        yield* fs.makeDirectory(join(o.home, "evals"), { recursive: true }).pipe(Effect.mapError((err) => refused(messageOf(err))));
-        yield* fs.writeFileString(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 }).pipe(Effect.mapError((err) => refused(messageOf(err))));
+        yield* fs.makeDirectory(join(o.home, "evals"), { recursive: true }).pipe(Effect.mapError((err) => err.pipe(messageOf, refused)));
+        yield* encodePretty(evalCase).pipe(
+          Effect.flatMap((text) => fs.writeFileString(file, text + "\n", { mode: 0o600 })),
+          Effect.mapError((err) => err.pipe(messageOf, refused)),
+        );
         return { id, file };
       });
 
@@ -449,7 +504,7 @@ export const makeHost = <R>(
 
 const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.role === "custom" && m.customType === inputType;
 
-/** The input that began the turn asked. the message puts what the owner adds before them). */
+/** The input that began the turn asked. the message puts what the user adds before them). */
 function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;

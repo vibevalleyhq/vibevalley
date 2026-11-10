@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
-import { Effect } from "effect";
+import { Clock, Effect, Formatter } from "effect";
 
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
@@ -68,8 +68,8 @@ async function draft(turn: ScriptedTurn, input: string) {
       return "";
     });
   }
-  let [title, criteria, questions] = ["看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问主人：用 8787 还是 8797？\n\n"];
-  if (input.includes("主人的回答：用 8797")) [title, criteria, questions] = ["看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""];
+  let [title, criteria, questions] = ["看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问用户：用 8787 还是 8797？\n\n"];
+  if (input.includes("用户的回答：用 8797")) [title, criteria, questions] = ["看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""];
   turn.say(
     "看过代码了。\n\n" +
       questions +
@@ -92,7 +92,7 @@ async function answer(turn: ScriptedTurn, input: string) {
   }
   if (input.includes("乱写")) return turn.say("看了一圈，说不清。\n\n结论：没查出来");
   const found = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
-  turn.say("查过了。\n\n```json\n" + JSON.stringify(found) + "\n```\n\n结论：查清楚了");
+  turn.say("查过了。\n\n```json\n" + Formatter.formatJson(found) + "\n```\n\n结论：查清楚了");
 }
 
 /** The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. */
@@ -143,7 +143,7 @@ export const helper = (turns: ScriptedTurn[] = [], before?: (turn: ScriptedTurn,
       }
       let notes = "";
       if (input.includes("先问清楚") && !input.includes("用 8797"))
-        notes += "\n\n要问主人：用 8787 还是 8797？" + (input.includes("给选项") ? "（选项：用 8787｜用 8797）" : "");
+        notes += "\n\n要问用户：用 8787 还是 8797？" + (input.includes("给选项") ? "（选项：用 8787｜用 8797）" : "");
       // Its brief as an agent remembers it: an answer later in the session is still checked against the brief's criteria.
       const brief = turns.findLast((t) => t.options === turn.options && t.input.includes(criteriaHead))?.input ?? "";
       const criteria = brief
@@ -172,5 +172,5 @@ export const installedOnly =
     mcpServers: null,
     tools: null,
     settings: { enabled: true, binPath: "", defaultModel: "", defaultEffort: "", env: {} },
-    checkedAt: Date.now(),
+    checkedAt: await Effect.runPromise(Clock.currentTimeMillis),
   });

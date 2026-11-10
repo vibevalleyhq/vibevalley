@@ -1,7 +1,7 @@
 import { pcm16RmsLevel } from "../audio.ts";
 import { appendVoiceTurn, type VoiceTurn } from "./turns.ts";
 
-export type MossTurn = VoiceTurn<"owner" | "moss">;
+export type MossTurn = VoiceTurn<"user" | "moss">;
 
 export const heard = (turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] => {
   if (key && turns.some((turn) => turn.who === who && turn.key === key)) {
@@ -34,7 +34,7 @@ export interface MossQos {
   aheadMs: number;
   /** Times the answer ran dry: a piece came after the one before had finished playing, in the same answer. */
   gaps: number;
-  /** From the end of the owner's words (input.speech.stopped) to MOSS's first sound arriving, ms: the last and the mean. */
+  /** From the end of the user's words (input.speech.stopped) to MOSS's first sound arriving, ms: the last and the mean. */
   replyMs?: number;
   replyMeanMs?: number;
   replies: number;

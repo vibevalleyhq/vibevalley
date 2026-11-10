@@ -67,7 +67,7 @@ export default stories({
                     </Button>
                   }
                 >
-                  还没有工单。写一句要做的事，管家会帮你拆开。
+                  还没有工单。写一句要做的事，助手会帮你拆开。
                 </Empty>
               </Match>
               <Match when={a.state === "loading"}>

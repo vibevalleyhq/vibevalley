@@ -1,5 +1,7 @@
 import { Schema, Predicate } from "effect";
 
+import { jsonText } from "./json.ts";
+
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
 /** An object's parameters in the shape the model has always been shown (brain/tool.ts's objectSchema): no properties is an open object. */
@@ -37,7 +39,7 @@ function shaped(node: JsonSchema): JsonSchema {
     case "boolean":
       return { type: node.type };
     default:
-      throw new Error(`a tool parameter the model is not shown: ${JSON.stringify(node)}`);
+      throw new Error(`a tool parameter the model is not shown: ${jsonText(node)}`);
   }
 }
 
@@ -143,7 +145,7 @@ export function toolArguments(name: string, args: unknown, schema: JsonSchema): 
   const problems = problemsOf(coerced, schema, "");
   if (problems.length === 0) return { ok: coerced };
   return {
-    refused: `Validation failed for tool "${name}":\n${problems.map((p) => `  - ${p}`).join("\n")}\n\nReceived arguments:\n${JSON.stringify(args, null, 2)}`,
+    refused: `Validation failed for tool "${name}":\n${problems.map((p) => `  - ${p}`).join("\n")}\n\nReceived arguments:\n${jsonText(args, { indent: true })}`,
   };
 }
 

@@ -39,16 +39,13 @@ export const triggerJournal = Effect.gen(function* () {
       const saved = yield* db.attempt(q.triggerById({ id: trigger.id }));
       return yield* decodeTrigger(saved.trigger_json);
     },
-    Effect.mapError((cause) => refused(causeMessage(cause))),
+    Effect.mapError((cause) => cause.pipe(causeMessage, refused)),
   );
 
   return {
     readTrigger,
     recordTrigger: Effect.fn("Mailbox.recordTrigger")((input: TriggerInput) =>
       keep(triggerOf(input), input.key, { text: input.text, data: input.data ?? null }),
-    ),
-    recordChannelTrigger: Effect.fn("Mailbox.recordChannelTrigger")((trigger: T.Trigger, text: string, channel: string) =>
-      keep(trigger, trigger.id, { text, data: { kind: "channel_message", message: trigger.id, channel } }),
     ),
     knownGitHubEvents: Effect.fn("Mailbox.knownGitHubEvents")(function* (repo: string, pr: number): Effect.fn.Return<readonly KnownGitHubEvent[]> {
       const rows = yield* db.run(q.knownGitHubEvents({ repo, pr_number: pr }));

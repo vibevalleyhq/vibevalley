@@ -11,7 +11,8 @@ import { Agent } from "#/agent/agent.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { Executor, type Started } from "#/executor/executor.ts";
+import { type Started } from "#/executor/executor.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Repo } from "#/repo/repo.ts";
 import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/repo/workplace.ts";
@@ -19,6 +20,7 @@ import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/rep
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
 import { workerInstructions, channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
+import { isHired } from "./roster.ts";
 import type { Delivered, DeliveryInput } from "./signals.ts";
 import type { SessionWatch } from "./watch.ts";
 import { WorkerAccess } from "./worker.ts";
@@ -26,10 +28,10 @@ import { WorkerAccess } from "./worker.ts";
 /** Work that did not go in (see handOver); the session stays. */
 export class NotTakenIn extends Schema.TaggedError<NotTakenIn, { readonly brand: unique symbol }>()("NotTakenIn", {
   failure: MergeFailure,
-  /** What the helper is sent back with; "" when the owner settles it. */
+  /** What the helper is sent back with; "" when the user settles it. */
   fix: Schema.String,
-  /** What the owner is told; also the message. */
-  owner: Schema.String,
+  /** What the user is told; also the message. */
+  user: Schema.String,
   notice: Schema.String,
   short: Schema.String,
   message: Schema.String,
@@ -46,7 +48,8 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     const store = yield* Agent;
     const memories = yield* Memory;
     const repos = yield* Repo;
-    const executor = yield* Executor;
+    const machines = yield* Machine;
+    const executor = machines.executions(machines.here());
     const cli = yield* (yield* WorkerAccess).pipe(Effect.orElseSucceed(() => undefined));
     const clock = yield* Clock.Clock;
     const {
@@ -84,11 +87,12 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
         if (access?.authenticated !== true) {
           return { refused: t("server.session.life.workerAuthenticationFailed"), retained: false };
         }
+        const houseRules = owner.issue ? yield* repos.houseRules() : "";
         const text = [
           workerInstructions(access.command),
           instructions(agent, store.skills()),
           owner.issue
-            ? workplaceRules(place, yield* repos.houseRules(), owner.id, repos.usesPullRequests(place.repo))
+            ? workplaceRules(place, houseRules, owner.id, repos.usesPullRequests(place.repo))
             : channelRules(place.cwd, owner.channel ?? "", owner.id),
         ]
           .filter((s) => s !== "")
@@ -156,7 +160,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     });
 
     const capacity = (): Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "phase">[] => {
-      const visible = core.state().sessions.filter((s) => s.role === "worker");
+      const visible = core.state().sessions.filter(isHired);
       return [
         ...visible.map((s) => {
           const h = hands.get(s.id);
@@ -210,60 +214,56 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     const deliver = Effect.fn("Session.deliver")(function* (id: string, text: string, input: DeliveryInput): Effect.fn.Return<Delivered> {
       const h = hands.get(id);
       if (!h) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
-      return yield* h.access.withPermits(1)(
-        admission.withPermits(1)(
-          Effect.gen(function* (): Effect.fn.Return<Delivered> {
-            const session = core.session(id);
-            if (hands.get(id) !== h || !session) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
-            const execution = executor.find(id);
-            if (execution?.closing === true) return { kind: "refused", reason: t("server.session.life.stillClosing", { name: session.name }) };
-            const starts = !isBusy(session);
-            let recall = "";
-            if (starts) {
-              const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byOwnerComment);
-              if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
-              recall = yield* remind(session.agent, id, h.place.repo, text, h.recalled);
-            }
-            if (execution?.attached !== true || !h.launch) {
-              expect(h, input);
-              const d = yield* wake(h, session, text, recall);
-              if (d.kind === "refused") unexpect(h);
-              return d;
-            }
-            const launch = h.launch;
-            const inputId = newId();
-            h.inputs.set(inputId, input.envelopeIds);
-            if (starts) expect(h, input);
-            const sent = yield* executor.deliver(id, withRecall(recall, text), inputId);
-            if (sent.kind === "accepted" && sent.landed === "prompted") {
-              h.inputs.delete(inputId);
-              return { kind: "run", launch };
-            }
-            if (starts) unexpect(h);
-            if (sent.kind !== "accepted") {
-              h.inputs.delete(inputId);
-              return { kind: "refused", reason: t("server.session.life.notReceived", { name: session.name, why: sent.reason }) };
-            }
-            if (sent.landed === "queued") {
-              if (sent.inputId === undefined) h.inputs.delete(inputId);
-              expect(h, input, sent.inputId);
-              return { kind: "queued", launch };
-            }
-            if (sent.inputId === undefined) {
-              h.inputs.delete(inputId);
-              consume(h, input.envelopeIds);
-            }
-            return { kind: "steered", launch };
-          }),
-        ),
-      );
+      return yield* Effect.gen(function* (): Effect.fn.Return<Delivered> {
+        const session = core.session(id);
+        if (hands.get(id) !== h || !session) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
+        const execution = executor.find(id);
+        if (execution?.closing === true) return { kind: "refused", reason: t("server.session.life.stillClosing", { name: session.name }) };
+        const starts = !isBusy(session);
+        let recall = "";
+        if (starts) {
+          const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byUserComment);
+          if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
+          recall = yield* remind(session.agent, id, h.place.repo, text, h.recalled);
+        }
+        if (execution?.attached !== true || !h.launch) {
+          expect(h, input);
+          const d = yield* wake(h, session, text, recall);
+          if (d.kind === "refused") unexpect(h);
+          return d;
+        }
+        const launch = h.launch;
+        const inputId = newId();
+        h.inputs.set(inputId, input.envelopeIds);
+        if (starts) expect(h, input);
+        const sent = yield* executor.deliver(id, withRecall(recall, text), inputId);
+        if (sent.kind === "accepted" && sent.landed === "prompted") {
+          h.inputs.delete(inputId);
+          return { kind: "run", launch };
+        }
+        if (starts) unexpect(h);
+        if (sent.kind !== "accepted") {
+          h.inputs.delete(inputId);
+          return { kind: "refused", reason: t("server.session.life.notReceived", { name: session.name, why: sent.reason }) };
+        }
+        if (sent.landed === "queued") {
+          if (sent.inputId === undefined) h.inputs.delete(inputId);
+          expect(h, input, sent.inputId);
+          return { kind: "queued", launch };
+        }
+        if (sent.inputId === undefined) {
+          h.inputs.delete(inputId);
+          consume(h, input.envelopeIds);
+        }
+        return { kind: "steered", launch };
+      }).pipe(admission.withPermits(1), h.access.withPermits(1));
     });
 
     const handOver = Effect.fn("Session.handOver")(function* (
       id: string,
       closed: T.SessionClose,
       use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | RepoError>,
-      settle: Settle = "owner",
+      settle: Settle = "user",
     ) {
       const h = hands.get(id);
       if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing(t("server.session.life.helperRef", { id }), [lookIn.session]));
@@ -280,7 +280,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
             Effect.mapError((e) => {
               const f = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reasonText(e));
               const words = notTakenIn(f, current.name, settle);
-              return new NotTakenIn({ failure: f, ...words, message: words.owner });
+              return NotTakenIn.make({ failure: f, ...words, message: words.user });
             }),
           );
           if (merged.pullRequest) return merged;

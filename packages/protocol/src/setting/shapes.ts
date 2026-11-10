@@ -37,12 +37,33 @@ export interface SettingsStatus {
   ttsKey: KeyStatus;
   dictation: Dictation;
   dictationKey: KeyStatus;
-  /** Whether a recording has somewhere to go: MOSS with its key, or an own address. */
-  dictationReady: boolean;
-  /** A configured connection is bound to MOSS Live; this does not verify the remote service. */
-  mossReady: boolean;
+  /** Whether each feature has what it needs set up, and what it lacks when not. This does not verify the remote services. */
+  readiness: Record<Feature, Readiness>;
   memorySources: MemorySource[];
 }
+
+/** What the user sets up and uses: the orchestrator's thinking, each media use, dictation, the call and its live parts. */
+export const FeatureValues = [
+  "orchestrator",
+  "image",
+  "understanding",
+  "speech",
+  "speakers",
+  "voiceDesign",
+  "transcription",
+  "dictation",
+  "live",
+  "vision",
+  "call",
+] as const;
+export type Feature = (typeof FeatureValues)[number];
+
+/** What a feature lacks: a key, a MOSS account (none, keyless, turned off), the use bound to none, the call's Agora
+ * credentials, dictation's own address. */
+export const MissingValues = ["deepseekKey", "mossAccount", "mossKey", "mossOff", "binding", "agora", "dictationUrl"] as const;
+export type Missing = (typeof MissingValues)[number];
+
+export type Readiness = { ready: true } | { ready: false; missing: Missing };
 
 export interface MemorySource {
   kind: MemorySourceKind;

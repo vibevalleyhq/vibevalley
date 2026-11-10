@@ -70,11 +70,11 @@ const Task = Schema.fromJsonString(
 export const getMossAudioTask = Effect.fn("Provider.getMossAudioTask")(
   function* (key: string, id: string): Effect.fn.Return<MossAudioTask, MossAudioError, HttpClient.HttpClient> {
     const checked = yield* Schema.decodeEffect(AudioId)(id).pipe(
-      Effect.mapError(() => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" })),
+      Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
     );
     const raw = yield* audioRequest(key, HttpClientRequest.get(`https://api.mosi.cn/v1/audio/tasks/${checked}`));
-    const task = yield* Schema.decodeEffect(Task)(raw).pipe(Effect.mapError(() => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" })));
-    if (task.id !== checked) return yield* new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
+    const task = yield* Schema.decodeEffect(Task)(raw).pipe(Effect.mapError(() => MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })));
+    if (task.id !== checked) return yield* MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" });
     const base = { id: task.id, createdAtSeconds: task.created_at, updatedAtSeconds: task.updated_at };
     switch (task.status) {
       case "PENDING":
@@ -106,6 +106,8 @@ export const getMossAudioTask = Effect.fn("Provider.getMossAudioTask")(
         }
     }
   },
-  Effect.timeout("30 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(new MossAudioError({ reason: "Timeout", outcome: "Unknown" }))),
+  Effect.timeoutOrElse({
+    duration: "30 seconds",
+    orElse: () => Effect.fail(MossAudioError.make({ reason: "Timeout", outcome: "Unknown" })),
+  }),
 );

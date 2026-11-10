@@ -26,7 +26,7 @@ Host（本机宿主 ~/.vibevalley：全局设置、模型密钥、农机探测�
     ├── Issue（空间工单：可无 Repo，或关联一个 Repo 切出 Worktree，可拆分子工单）
     │   ├── Assignment（责任指派 → Agent 档案）
     │   └── IssueThread（工单评论串 → Channel）
-    ├── Pkm & Artifact（空间知识与产出：<space>/pkm/* 笔记库、共创稿子）
+    ├── Pkm & Artifact（空间知识与产出：<space>/pkm/* 笔记库、共创 Artifact）
     └── Space DB（空间状态库 <space>/.vibevalley/space.db：工单、会话、频道、记忆、索引）
 ```
 
@@ -46,19 +46,19 @@ Host（本机宿主 ~/.vibevalley：全局设置、模型密钥、农机探测�
 | **仓库（Repo）** | `Repo` | `Repo` | GitHub 仓库用全名 `<owner>/<repo>`（如 `vibevalleyhq/vibevalley`）；本地自建仓库用 `<repo>` | `<space>/repos/<owner>/<repo>` | 1. 只管主分支（`main`）检出、远端同步、`.vibevalley/setup` 与 `.vibevalley/check` 门禁脚本；<br>2. 帮工不在 `Repo` 主检出目录直接改代码（除非档案显式关闭 `worktree`） |
 | **工作树（Worktree）** | `Worktree` / `Workplace` | `Workplace` | `<repo>#<issueNumber>` | `<space>/worktrees/<owner>/<repo>.<issueNumber>` | 1. 由 `Issue` 在指定 `Repo` 上开工时从基线分支切出，对应分支 `vibevalley/issue-<issueNumber>`；<br>2. 首次切出自动运行 `.vibevalley/setup`；<br>3. 同工单重开或换帮工复用同一 `Worktree`；合并或 PR 合入后自动清理 |
 | **工单（Issue）** | `Issue` | `Issue` | 内部 UUID + 空间内递增编号 `#<number>` | `<space>/.vibevalley/space.db`（`issue` 表） | 1. `Issue` 归属 `Space`，通过可选字段 `repo?: RepoId` 关联目标仓库；<br>2. 状态机固定为 `backlog`（待规划）→ `todo`（待办）→ `in_progress`（处理中）→ `in_review`（待验收）→ `done` / `canceled`；<br>3. 父工单可经 `issue.split` 拆分为带 `blockedBy` 依赖的子工单，子工单通过门禁后先合入父分支 |
-| **笔记（Pkm）** | `Pkm` (`PkmPage` / `PkmBlock`) | `Pkm` | 页面相对路径（如 `notes/architecture.md`） | `<space>/pkm/{daily,notes,sources}` | 1. Markdown 文件是唯一真相，SQLite 仅存反链、术语与评论索引；<br>2. 归属当前 `Space`，供管家立项与帮工查阅空间背景知识 |
-| **稿子（Artifact）** | `Artifact` | `Artifact` | `ArtifactId` | `<space>/.vibevalley/artifacts/` + `space.db` | 挂在频道或工单上的可交付块文档（`blocks`）或交互式网页（`html`），按版本或块操作（`op`）留痕 |
+| **笔记（Pkm）** | `Pkm` (`PkmPage` / `PkmBlock`) | `Pkm` | 页面相对路径（如 `notes/architecture.md`） | `<space>/pkm/{daily,notes,sources}` | 1. Markdown 文件是唯一真相，SQLite 仅存反链、术语与评论索引；<br>2. 归属当前 `Space`，供助手立项与帮工查阅空间背景知识 |
+| **Artifact（Artifact）** | `Artifact` | `Artifact` | `ArtifactId` | `<space>/.vibevalley/artifacts/` + `space.db` | 挂在频道或工单上的可交付块文档（`blocks`）或交互式网页（`html`），按版本或块操作（`op`）留痕 |
 
 #### 2.3 执行与协同实体（谁在 `Space` 里干活）
 
 | 概念 | 代码名 | 业务定义与职责 | 与 `Space` 资产的关系 |
 |---|---|---|---|
-| **档案（Agent）** | `Agent` | 持久化的智能体身份配方：绑定农机（`runtime`）、模型、人设（`persona`）、工具集（`toolsets`）与技能（`skills`） | 按 `role` 分为 **`orchestrator`（管家）** 与 **`worker`（帮工档案）** |
-| **管家（Orchestrator）** | `Orchestrator` | 主人在 `Space` 里的总助：常驻频道听主人说话，查阅 `<space>/pkm`，创建/起草/拆分/初审 `Issue`，调度帮工 | 工作目录指向 `<space>/repos`，不直接绑死单个 `Worktree` |
+| **档案（Agent）** | `Agent` | 持久化的智能体身份配方：绑定农机（`runtime`）、模型、人设（`persona`）、工具集（`toolsets`）与技能（`skills`） | 按 `role` 分为 **`orchestrator`（助手）** 与 **`worker`（帮工档案）** |
+| **助手（Orchestrator）** | `Orchestrator` | 用户在 `Space` 里的总助：常驻频道听用户说话，查阅 `<space>/pkm`，创建/起草/拆分/初审 `Issue`，调度帮工 | 工作目录指向 `<space>/repos`，不直接绑死单个 `Worktree` |
 | **帮工（Session）** | `Session` | 某个 `Agent` 档案接活后生成的持续执行上下文，跨多轮对话、休眠与服务重启保留身份 | 处理工单时工作目录绑定该工单的 `Worktree`（`<space>/worktrees/...`）；私聊时绑定独立会话目录 |
 | **一轮（Run）** | `Run` | `Session` 从一次触发（`RunTrigger`）开始、到调用 `issue_report` 汇报结束的完整执行回合 | 每一轮消费信箱中的 `Trigger`，产出代码提交、结构化验收检查（`checks`）、待答问题（`questions`）与新增记性（`remember`） |
 | **农机（Runtime）** | `RuntimeInfo` | 驱动 `Session` 的底层编码程序：内置 `vibevalley`（进程内 `Brain`）或经 `@botiverse/oar` 驱动的 `claude`、`codex`、`pi` | 受宿主的并发槽位与每个 `Repo` 的空位上限（`maxSessions`）约束 |
-| **接入与信箱（Ingress & Mailbox）** | `Ingress` / `Mailbox` | 将 7 类输入源（主人消息、GitHub PR CI 与评审、定时任务 `Cron`、外部聊天连接器）标准化为 `Trigger` 并路由投递 | 把外部 GitHub PR 的 CI 失败日志或评审意见精准投递回对应 `Issue` 的在场 `Session` |
+| **接入与信箱（Ingress & Mailbox）** | `Ingress` / `Mailbox` | 将 7 类输入源（用户消息、GitHub PR CI 与评审、定时任务 `Cron`、外部聊天连接器）标准化为 `Trigger` 并路由投递 | 把外部 GitHub PR 的 CI 失败日志或评审意见精准投递回对应 `Issue` 的在场 `Session` |
 
 ### 3. 核心业务流转不变量（四个基本关系）
 

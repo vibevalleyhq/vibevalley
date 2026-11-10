@@ -1,5 +1,5 @@
 {
-  "orchestrator": "The manager",
+  "orchestrator": "The assistant",
   "conflictFiles": "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
   "item": {
     "review": {
@@ -36,7 +36,7 @@
     },
     "cron-ask": {
       "label": "A scheduled task to approve",
-      "title": "The manager wants to set a scheduled task",
+      "title": "The assistant wants to set a scheduled task",
       "body": "\"{text}\": it starts once you approve",
       "tray": "The scheduled task \"{text}\" waits for your approval"
     }

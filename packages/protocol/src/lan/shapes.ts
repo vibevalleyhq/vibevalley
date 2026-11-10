@@ -1,13 +1,3 @@
-/** The cookie a paired browser keeps its lan key in; the lan listener takes it as it takes the Bearer header. */
-export const lanKeyCookie = "vibevalley_lan_key";
-
-export interface LanDevice {
-  id: string;
-  name: string;
-  pairedAt: number;
-  lastSeen?: number;
-}
-
 export interface LanPaired {
   device: string;
   key: string;
@@ -25,7 +15,6 @@ export interface LanStatus {
   url?: string;
   problem: string;
   pairing?: LanPairing;
-  devices: LanDevice[];
 }
 
 export interface LanPairing {

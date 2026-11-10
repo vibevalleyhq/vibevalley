@@ -18,7 +18,7 @@ test("two pages on one channel each get a line said in it, once", async ({ page,
     const messages = p.getByTestId("messages");
     await expect(messages.getByTestId("message").filter({ hasText: mine })).toHaveCount(1);
     // Without a model key the orchestrator answers that it has none: a second line, said by the server.
-    await expect(messages.locator('[data-testid="message"][data-from-kind="orchestrator"]').first()).toBeVisible({ timeout: 15_000 });
+    await expect(messages.locator('[data-testid="message"][data-from-role="orchestrator"]').first()).toBeVisible({ timeout: 15_000 });
   }
 
   // Said from elsewhere (the command line, a chat app), it reaches both too.

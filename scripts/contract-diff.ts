@@ -11,7 +11,6 @@ export interface Changed {
 export const contractKinds: readonly { readonly kind: string; readonly is: (path: string) => boolean }[] = [
   { kind: "protocol", is: (p) => p.startsWith("packages/protocol/src/") && !p.endsWith(".test.ts") },
   { kind: "schema", is: (p) => p === "apps/server/db/migrations/0001_schema.up.sql" || p.startsWith("apps/server/db/queries/") },
-  { kind: "golden data", is: (p) => /\/testdata\/.*\.jsonl\.gz$/u.test(p) },
 ];
 
 /** The area a path is in: an app's or package's folder, its module under apps/server/src or apps/web/src/features. */

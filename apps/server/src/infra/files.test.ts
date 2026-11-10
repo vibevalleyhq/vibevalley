@@ -16,17 +16,26 @@ it.effect("regression: interrupted attachment writes cannot publish a partial ha
     const partial = FileSystem.FileSystem.of({
       ...fs,
       writeFile: (path, data) =>
-        fs.writeFile(path, data.subarray(0, 1)).pipe(Effect.andThen(Deferred.succeed(started, undefined)), Effect.andThen(Effect.never)),
+        Effect.gen(function* () {
+          yield* fs.writeFile(path, data.subarray(0, 1));
+          yield* Deferred.succeed(started, undefined);
+          return yield* Effect.never;
+        }),
     });
     const fiber = yield* writeOnce(target, bytes).pipe(Effect.provideService(FileSystem.FileSystem, partial), Effect.forkChild);
     yield* Deferred.await(started);
-    expect(yield* fs.exists(target)).toBe(false);
+    const exists2 = yield* fs.exists(target);
+    expect(exists2).toBe(false);
     yield* Fiber.interrupt(fiber);
-    expect(yield* fs.readDirectory(directory)).toEqual([]);
+    const directory2 = yield* fs.readDirectory(directory);
+    expect(directory2).toEqual([]);
     yield* Effect.all([writeOnce(target, bytes), writeOnce(target, bytes)], { concurrency: 2 });
-    expect(Buffer.from(yield* fs.readFile(target))).toEqual(bytes);
+    const file = yield* fs.readFile(target);
+    expect(Buffer.from(file)).toEqual(bytes);
     yield* writeOnce(target, Buffer.from("do not replace"));
-    expect(Buffer.from(yield* fs.readFile(target))).toEqual(bytes);
-    expect(yield* fs.readDirectory(directory)).toEqual(["hash"]);
+    const file2 = yield* fs.readFile(target);
+    expect(Buffer.from(file2)).toEqual(bytes);
+    const directory3 = yield* fs.readDirectory(directory);
+    expect(directory3).toEqual(["hash"]);
   }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
 );

@@ -4,6 +4,7 @@ import type { Handlers } from "@vibevalley/protocol/api";
 
 import { agentHandlers } from "./handlers/agent.ts";
 import { artifactHandlers } from "./handlers/artifact.ts";
+import { attachmentHandlers } from "./handlers/attachment.ts";
 import { channelHandlers } from "./handlers/channel.ts";
 import { connectorHandlers } from "./handlers/connector.ts";
 import { coreHandlers } from "./handlers/core.ts";
@@ -11,6 +12,7 @@ import { cronHandlers } from "./handlers/cron.ts";
 import { gameHandlers } from "./handlers/game.ts";
 import { issueHandlers } from "./handlers/issue.ts";
 import { lanHandlers } from "./handlers/lan.ts";
+import { libraryHandlers } from "./handlers/library.ts";
 import { mediaHandlers } from "./handlers/media.ts";
 import { memoryHandlers } from "./handlers/memory.ts";
 import { orchestratorHandlers } from "./handlers/orchestrator.ts";
@@ -20,6 +22,7 @@ import { repoHandlers } from "./handlers/repo.ts";
 import { runtimeHandlers } from "./handlers/runtime.ts";
 import { sessionHandlers } from "./handlers/session.ts";
 import { settingHandlers } from "./handlers/setting.ts";
+import { userHandlers } from "./handlers/user.ts";
 import { voiceHandlers } from "./handlers/voice.ts";
 
 /** Every endpoint's answer, put together from each concept's (http/handlers/<concept>.ts). */
@@ -31,6 +34,7 @@ export const handlers = Effect.gen(function* () {
     ...(yield* voiceHandlers),
     ...(yield* connectorHandlers),
     ...(yield* lanHandlers),
+    ...(yield* userHandlers),
     ...(yield* repoHandlers),
     ...(yield* channelHandlers),
     ...(yield* settingHandlers),
@@ -41,6 +45,8 @@ export const handlers = Effect.gen(function* () {
     ...(yield* runtimeHandlers),
     ...(yield* sessionHandlers),
     ...(yield* artifactHandlers),
+    ...(yield* libraryHandlers),
+    ...(yield* attachmentHandlers),
     ...(yield* pkmHandlers),
     ...(yield* cronHandlers),
     ...(yield* issueHandlers),

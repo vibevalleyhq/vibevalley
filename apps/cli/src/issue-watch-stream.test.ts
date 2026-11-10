@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Sink, Stdio } from "effect";
+import { Effect, Fiber, Schema, Sink, Stdio } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import type { Issue, IssueWatch, SessionEvent } from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { IssueWatch as WatchSchema, issueId, sessionId } from "@vibevalley/protocol/schema";
 import { until } from "@vibevalley/testkit/until";
 
 import { observeIssue } from "./issue-watch.ts";
@@ -30,7 +30,11 @@ const issue: Issue = {
 };
 const event = (seq: number, revision = 0, run = "one"): SessionEvent => ({ seq, revision, run, time: 0, type: "assistant/message", text: "hello" });
 const state: IssueWatch = { kind: "state", issue, sessions: [], sessionIds: ["w1"], settled: true, omittedSessions: 0 };
-const encode = (rows: IssueWatch[]) => rows.map((r) => `data: ${JSON.stringify(r)}\n\n`).join("");
+const encode = (rows: IssueWatch[]) =>
+  Effect.map(
+    Effect.forEach(rows, (r) => Schema.encodeEffect(Schema.fromJsonString(WatchSchema))(r)),
+    (lines) => lines.map((line) => `data: ${line}\n\n`).join(""),
+  );
 
 it.effect("regression: reconnect supplements history once and follow survives handoff until observer cancellation", () =>
   Effect.gen(function* () {
@@ -42,15 +46,16 @@ it.effect("regression: reconnect supplements history once and follow survives ha
       { kind: "history", session: "w1", events: [event(700), event(700, 1), event(701, 0, "two")] },
       { ...state, issue: { ...issue, stage: { state: "working", acts: [] } }, settled: false },
     ];
+    const [firstBody, secondBody] = [yield* encode(first), yield* encode(second)];
     const fetcher: typeof fetch = (_url, init) => {
       attempts++;
       signal = init?.signal ?? undefined;
-      if (attempts === 1) return Promise.resolve(new Response(encode(first)));
+      if (attempts === 1) return Promise.resolve(new Response(firstBody));
       return Promise.resolve(
         new Response(
           new ReadableStream({
             start(controller) {
-              controller.enqueue(new TextEncoder().encode(encode(second)));
+              controller.enqueue(new TextEncoder().encode(secondBody));
             },
           }),
         ),

@@ -1,10 +1,8 @@
-import { join } from "node:path";
-
-import { Clock, Context, Effect, FileSystem, Layer, Option, Ref, Semaphore } from "effect";
+import { Clock, Context, Effect, FileSystem, Layer, Option, Path, Ref, Schema, Semaphore } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 
 import { list, t } from "@vibevalley/i18n";
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
 
@@ -61,7 +59,7 @@ export class Pkm extends Context.Service<
     readonly journal: (day: string) => Effect.Effect<T.PkmPage, ApiError>;
     readonly radar: (staleDays: number | undefined) => Effect.Effect<T.PkmRadar>;
     readonly comments: (page: string | undefined) => Effect.Effect<T.PkmComment[], ApiError>;
-    /** by: who proposes it, the owner or an agent's id. */
+    /** by: who proposes it, the user or an agent's id. */
     readonly suggest: (req: T.PkmProposalRequest, by: string) => Effect.Effect<T.PkmProposal, ApiError>;
     readonly resolve: (req: T.PkmResolveRequest) => Effect.Effect<T.PkmPage, ApiError>;
     readonly clip: (req: T.PkmClipRequest) => Effect.Effect<T.PkmClip, ApiError>;
@@ -71,7 +69,7 @@ export class Pkm extends Context.Service<
     readonly undo: () => Effect.Effect<T.PkmUndo, ApiError>;
     readonly scan: () => Effect.Effect<T.PkmScan>;
   }
->()("vibevalley/Pkm") {
+>()("@vibevalley/server/pkm/pkm") {
   static readonly layer = Layer.effect(
     Pkm,
     Effect.suspend(() => make),
@@ -101,12 +99,18 @@ const commentOf = (row: q.CommentResult): T.PkmComment => ({
 /** The props a new page writes: its title too when the file's name would not say it. */
 const titled = (title: string, props: Record<string, string>) => (titleOfFile(fileNameOf(title)) === title || props.title ? props : { title, ...props });
 
+/** A page's blocks as AddTerms takes them. */
+const encodeTermRows = Schema.encodeEffect(
+  Schema.fromJsonString(Schema.Array(Schema.Struct({ block: Schema.String, page: Schema.String, terms: Schema.String }))),
+);
+
 /** A file of the vault that could not be read or written, told as it is. */
 const notOnDisk = (e: PlatformError) => refused(e.message);
 
 export const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const fs = yield* FileSystem.FileSystem;
+  const { join } = yield* Path.Path;
   const db = yield* Db;
   const root = pkmDir(config);
   // Every read that may read a file again and every write, one at a time: a page is read, changed and written whole.
@@ -123,7 +127,7 @@ export const make = Effect.gen(function* () {
     );
   const vault = (): Effect.Effect<Vault> => Ref.get(pages);
 
-  /** The remarks the owner wrote in a page's file, kept so their status outlives a reading. */
+  /** The remarks the user wrote in a page's file, kept so their status outlives a reading. */
   const keepRemarks = (page: Page) =>
     Effect.gen(function* () {
       const at = yield* now;
@@ -135,12 +139,12 @@ export const make = Effect.gen(function* () {
             page: page.slug,
             block: node.id,
             span: span.text,
-            author: ownerId,
+            author: userId,
             body: span.remark,
             created_at: at,
           });
         if (node.props.comment)
-          remarks.push({ id: `prop:${node.id}`, page: page.slug, block: node.id, span: null, author: ownerId, body: node.props.comment, created_at: at });
+          remarks.push({ id: `prop:${node.id}`, page: page.slug, block: node.id, span: null, author: userId, body: node.props.comment, created_at: at });
       }
       yield* Effect.forEach(remarks, (r) => db.run(q.keepRemark(r)), { discard: true });
     });
@@ -152,11 +156,12 @@ export const make = Effect.gen(function* () {
     Effect.andThen(
       db.run(terms.clearPageTerms({ page: page.slug })),
       db.run(
-        terms.addTerms({
-          rows: JSON.stringify(
+        Effect.flatMap(
+          encodeTermRows(
             flatBlocks(page.blocks).map((b) => ({ block: b.id, page: page.slug, terms: termsList(`${page.title}\n${b.path}\n${b.body}`).join(" ") })),
           ),
-        }),
+          (rows) => terms.addTerms({ rows }),
+        ),
       ),
     );
   const unindexed = (slug: string) => db.run(terms.clearPageTerms({ page: slug }));
@@ -202,7 +207,8 @@ export const make = Effect.gen(function* () {
       files,
       (file) =>
         Effect.gen(function* () {
-          const mtime = Option.getOrElse(yield* mtimeOf(file), () => 0);
+          const mtimeOf2 = yield* mtimeOf(file);
+          const mtime = Option.getOrElse(mtimeOf2, () => 0);
           const was = byFile.get(file);
           // One that cannot be read now stays as it was held, or is left out until it can.
           const page =
@@ -236,8 +242,12 @@ export const make = Effect.gen(function* () {
   const fresh = (ref: string) =>
     Effect.gen(function* () {
       yield* ready;
-      const held = pageOf(yield* vault(), ref);
-      if (!held) return yield* Effect.fail(noPage(ref, yield* vault()));
+      const vault2 = yield* vault();
+      const held = pageOf(vault2, ref);
+      if (!held) {
+        const latest = yield* vault();
+        return yield* Effect.fail(noPage(ref, latest));
+      }
       const mtime = yield* mtimeOf(held.file);
       if (Option.isNone(mtime)) {
         yield* Ref.update(pages, (m) => {
@@ -246,7 +256,8 @@ export const make = Effect.gen(function* () {
           return next;
         });
         yield* unindexed(held.slug);
-        return yield* Effect.fail(noPage(ref, yield* vault()));
+        const vault3 = yield* vault();
+        return yield* Effect.fail(noPage(ref, vault3));
       }
       if (mtime.value === held.mtime) return held;
       const page = yield* readPage(held.file, mtime.value, held);
@@ -271,7 +282,8 @@ export const make = Effect.gen(function* () {
         discard: true,
       }).pipe(Effect.mapError(notOnDisk));
       if (from !== page.file) yield* fs.remove(abs(from)).pipe(Effect.ignore({ log: "Warn", message: `pkm: ${from} could not be removed after the move` }));
-      const mtime = Option.getOrElse(yield* mtimeOf(page.file), () => 0);
+      const mtimeOf2 = yield* mtimeOf(page.file);
+      const mtime = Option.getOrElse(mtimeOf2, () => 0);
       const written: Page = { ...parse(text, page.file, mtime), blocks: pinned };
       // Writing a block's id is not a change to undo.
       if (what !== "pin") {
@@ -332,7 +344,8 @@ export const make = Effect.gen(function* () {
       const title = req.title.trim();
       if (title === "") return yield* Effect.fail(refused(t("server.pkm.noTitle")));
       yield* ready;
-      const there = pageOf(yield* vault(), title);
+      const vault2 = yield* vault();
+      const there = pageOf(vault2, title);
       if (there) {
         const page = yield* fresh(there.slug);
         const tier = req.tier ?? page.tier;
@@ -368,25 +381,32 @@ export const make = Effect.gen(function* () {
       return yield* locked(Effect.flatMap(fresh(ref), viewOf));
     }),
     save: Effect.fn("Pkm.save")(function* (req) {
-      return wireOf(yield* locked(upsert(req, "save")));
+      const locked2 = yield* locked(upsert(req, "save"));
+      return wireOf(locked2);
     }),
     move: Effect.fn("Pkm.move")(function* (req) {
       return yield* locked(
         Effect.gen(function* () {
           const page = yield* fresh(req.page);
-          return wireOf(yield* upsert({ title: page.title, tier: req.tier }, "move"));
+          const upserted = yield* upsert({ title: page.title, tier: req.tier }, "move");
+          return wireOf(upserted);
         }),
       );
     }),
     apply: Effect.fn("Pkm.apply")(function* (req) {
-      return wireOf(yield* locked(mutate(req.page, req.ops, "apply")));
+      const locked2 = yield* locked(mutate(req.page, req.ops, "apply"));
+      return wireOf(locked2);
     }),
     search: Effect.fn("Pkm.search")(function* (req) {
       yield* locked(ready);
       const text = req.text?.trim() ?? "";
-      if (text === "") return search(yield* vault(), req);
+      if (text === "") {
+        const whole = yield* vault();
+        return search(whole, req);
+      }
       const rows = yield* db.run(terms.matchTerms({ words: queryWords(text) }));
-      return search(yield* vault(), req, new Map(rows.map((r) => [r.block, r.score])));
+      const vault2 = yield* vault();
+      return search(vault2, req, new Map(rows.map((r) => [r.block, r.score])));
     }),
     capture: Effect.fn("Pkm.capture")(function* (text, by, page) {
       const blocks = outlineOf(text, newId);
@@ -395,7 +415,8 @@ export const make = Effect.gen(function* () {
         return yield* locked(
           Effect.gen(function* () {
             const there = yield* fresh(page);
-            return wireOf(yield* write({ ...there, blocks: [...there.blocks, ...blocks] }, "capture"));
+            const written = yield* write({ ...there, blocks: [...there.blocks, ...blocks] }, "capture");
+            return wireOf(written);
           }),
         );
       // Into the journal as things to come back to: LATER and #inbox on each, the agent's name on the first.
@@ -403,18 +424,22 @@ export const make = Effect.gen(function* () {
         const said = i === 0 && by ? t("server.pkm.notedBy", { text: b.body, name: by }) : b.body;
         return { ...b, marker: b.marker ?? ("LATER" as const), body: /(?:^|\s)#inbox\b/u.test(said) ? said : `${said} #inbox` };
       });
-      const title = journalTitle(yield* now);
+      const now2 = yield* now;
+      const title = journalTitle(now2);
       return yield* locked(
         Effect.gen(function* () {
           yield* ready;
-          const there = pageOf(yield* vault(), title);
+          const vault2 = yield* vault();
+          const there = pageOf(vault2, title);
           if (there) {
             const journal = yield* fresh(there.slug);
-            return wireOf(yield* write({ ...journal, blocks: [...journal.blocks, ...marked] }, "capture"));
+            const written2 = yield* write({ ...journal, blocks: [...journal.blocks, ...marked] }, "capture");
+            return wireOf(written2);
           }
           const file = fileOf("journal", title);
           const empty = parse("", file, 0);
-          return wireOf(yield* write({ ...empty, slug: slugOf(title), title, tier: "journal", props: titled(title, empty.props), blocks: marked }, "capture"));
+          const written = yield* write({ ...empty, slug: slugOf(title), title, tier: "journal", props: titled(title, empty.props), blocks: marked }, "capture");
+          return wireOf(written);
         }),
       );
     }),
@@ -434,7 +459,8 @@ export const make = Effect.gen(function* () {
           // Written since it was read (the app, another editor): not overwritten.
           if (page.mtime !== req.updated) return yield* Effect.fail(refused(t("server.pkm.changedSince", { page: page.title })));
           const read = parse(req.markdown, page.file, 0);
-          return wireOf(yield* write({ ...page, props: titled(page.title, read.props), blocks: read.blocks }, "edit"));
+          const written = yield* write({ ...page, props: titled(page.title, read.props), blocks: read.blocks }, "edit");
+          return wireOf(written);
         }),
       );
     }),
@@ -443,15 +469,22 @@ export const make = Effect.gen(function* () {
       return yield* locked(
         Effect.gen(function* () {
           yield* ready;
-          const there = pageOf(yield* vault(), title);
-          if (there) return wireOf(yield* fresh(there.slug));
-          return wireOf(yield* upsert({ title, tier: "journal", markdown: "- \n" }, "journal"));
+          const vault2 = yield* vault();
+          const there = pageOf(vault2, title);
+          if (there) {
+            const journal = yield* fresh(there.slug);
+            return wireOf(journal);
+          }
+          const upserted = yield* upsert({ title, tier: "journal", markdown: "- \n" }, "journal");
+          return wireOf(upserted);
         }),
       );
     }),
     radar: Effect.fn("Pkm.radar")(function* (staleDays) {
       yield* locked(rescan);
-      return radar(yield* vault(), yield* now, staleDays ?? 14);
+      const vault2 = yield* vault();
+      const now2 = yield* now;
+      return radar(vault2, now2, staleDays ?? 14);
     }),
     comments: Effect.fn("Pkm.comments")(function* (ref) {
       if (ref === undefined || ref === "") return (yield* db.run(q.openComments({ page: null }))).map(commentOf);
@@ -462,7 +495,8 @@ export const make = Effect.gen(function* () {
       return yield* locked(
         Effect.gen(function* () {
           yield* ready;
-          const at = blockOf(yield* vault(), req.block);
+          const vault2 = yield* vault();
+          const at = blockOf(vault2, req.block);
           if (!at) return yield* Effect.fail(missing(t("server.pkm.noBlock", { id: req.block }), [lookIn.pkm]));
           const page = yield* fresh(at.page.slug);
           const node = find(page.blocks, req.block) ?? at.node;
@@ -479,7 +513,7 @@ export const make = Effect.gen(function* () {
           // The block's id goes into its file, so the suggestion still finds it once the file is read again.
           if (!node.explicit) yield* write(page, "pin");
           const row = yield* db.one(q.comment({ id }));
-          if (!row) return yield* Effect.die(new Inconsistent({ message: "a suggestion just written must read back" }));
+          if (!row) return yield* Effect.die(Inconsistent.make({ message: "a suggestion just written must read back" }));
           return { comment: commentOf(row), kept: kept.kept, restored: kept.restored } satisfies T.PkmProposal;
         }),
       );
@@ -490,7 +524,8 @@ export const make = Effect.gen(function* () {
           const row = yield* db.one(q.comment({ id: req.id }));
           if (!row) return yield* Effect.fail(missing(t("server.pkm.noComment", { id: req.id }), [lookIn.pkm]));
           yield* ready;
-          const at = blockOf(yield* vault(), row.block);
+          const vault2 = yield* vault();
+          const at = blockOf(vault2, row.block);
           const page = yield* fresh(at?.page.slug ?? row.page);
           const when = yield* now;
           if (!req.accept) {
@@ -513,7 +548,8 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           yield* ready;
           const highlights = req.highlights ?? [];
-          const there = clipOf(yield* vault(), url);
+          const vault2 = yield* vault();
+          const there = clipOf(vault2, url);
           if (there) {
             const quotes = highlights.map((h): T.PkmBlockOp => ({
               op: "append",
@@ -535,6 +571,7 @@ export const make = Effect.gen(function* () {
             highlights.length > 0
               ? highlights.map((h) => `  - > ${h.text}\n    source-anchor:: ${slug}#${h.anchor}`)
               : [`  - ${gist}\n    source-anchor:: ${slug}#L1`];
+          const clippedAt = yield* now;
           const page = yield* upsert(
             {
               title,
@@ -544,7 +581,7 @@ export const make = Effect.gen(function* () {
                 "source-url": url,
                 ...(req.author ? { author: req.author } : {}),
                 "read-status": "unread",
-                "clipped-at": journalTitle(yield* now).replace(/_/gu, "-"),
+                "clipped-at": journalTitle(clippedAt).replace(/_/gu, "-"),
                 snapshot,
                 tags: (req.tags ?? ["clipped"]).map((tag) => (tag.startsWith("[[") ? tag : `[[${tag}]]`)).join(", "),
                 tldr: gist,
@@ -561,7 +598,8 @@ export const make = Effect.gen(function* () {
       return yield* locked(
         Effect.gen(function* () {
           yield* ready;
-          const found = clustered(yield* vault(), req.topic);
+          const vault2 = yield* vault();
+          const found = clustered(vault2, req.topic);
           const lines = found.map(({ page, node }) => `  - ${t("server.pkm.clusterLine", { title: page.title, id: node.id })}`);
           const page = yield* upsert(
             {
@@ -632,7 +670,8 @@ export const make = Effect.gen(function* () {
     }),
     markdown: Effect.fn("Pkm.markdown")(function* (ref) {
       const page = yield* locked(fresh(ref));
-      return exportMarkdown(yield* vault(), page, (tldr) => t("server.pkm.summary", { tldr }));
+      const vault2 = yield* vault();
+      return exportMarkdown(vault2, page, (tldr) => t("server.pkm.summary", { tldr }));
     }),
     undo: Effect.fn("Pkm.undo")(function* () {
       return yield* locked(

@@ -67,10 +67,13 @@ export class VibeValleyApi {
   /** The server's address; empty is the page's own origin, which serves it. */
   readonly base: string;
   private readonly fetcher: (url: string, init: RequestInit) => Promise<Response>;
+  /** A device key to send as a Bearer token: the command line's, signed in to a server through its gate. */
+  private readonly key: string | undefined;
 
-  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)) {
+  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init), key?: string) {
     this.base = base;
     this.fetcher = fetcher;
+    this.key = key;
   }
 
   readonly server = {
@@ -147,6 +150,9 @@ export class VibeValleyApi {
     input: {
       create: (a: T.MediaInputRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
         this.call<T.MediaInput>("/api/v1/media/input/create", a, options),
+      /** A kept attachment (a library item) taken as an input, checked as an upload is. */
+      adopt: (a: { attachment: string }, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
+        this.call<T.MediaInput>("/api/v1/media/input/adopt", a, options),
       get: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> => this.call<T.MediaInput>("/api/v1/media/input/get", a, options),
       list: (options?: { signal?: AbortSignal }): Promise<T.MediaInput[]> => this.call<T.MediaInput[]>("/api/v1/media/input/list", undefined, options),
       delete: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/media/input/delete", a, options),
@@ -198,7 +204,7 @@ export class VibeValleyApi {
     /** What channel.delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("/api/v1/channel/previewDelete", a, options),
-    /** The owner's read moved back to just before this message. */
+    /** The user's read moved back to just before this message. */
     markUnread: (a: { id: string } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("/api/v1/channel/markUnread", a, options),
     /** Every channel and direct channel, the default first. */
@@ -208,7 +214,7 @@ export class VibeValleyApi {
       /** What deleteTask would do, refused as it would be; nothing changes. */
       list: (a: { id: string; before?: number; limit?: number }, options?: { signal?: AbortSignal }): Promise<T.ChatMessage[]> =>
         this.call<T.ChatMessage[]>("/api/v1/channel/message/list", a, options),
-      /** The owner's own words, changed; nobody is told again. */
+      /** The user's own words, changed; nobody is told again. */
       update: (a: T.MessageEdit, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
         this.call<T.ChatMessage>("/api/v1/channel/message/update", a, options),
       /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
@@ -224,7 +230,7 @@ export class VibeValleyApi {
       set: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/default/set", a, options),
     },
     reaction: {
-      /** The owner's reaction on or off; as it already is, nothing changes. */
+      /** The user's reaction on or off; as it already is, nothing changes. */
       set: (a: T.ReactionSet, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
         this.call<T.ChatMessage>("/api/v1/channel/reaction/set", a, options),
     },
@@ -246,7 +252,7 @@ export class VibeValleyApi {
       set: (a: T.OnSet, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a, options),
     },
     direct: {
-      /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
+      /** The user's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
       create: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<string> => this.call<string>("/api/v1/channel/direct/create", a, options),
     },
     notify: {
@@ -255,10 +261,6 @@ export class VibeValleyApi {
     unread: {
       /** The places the caller has not read all of, the newest first. */
       list: (options?: { signal?: AbortSignal }): Promise<T.ChannelUnread[]> => this.call<T.ChannelUnread[]>("/api/v1/channel/unread/list", undefined, options),
-    },
-    attachment: {
-      create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
-        this.call<T.Attachment>("/api/v1/channel/attachment/create", a, options),
     },
   };
 
@@ -320,7 +322,7 @@ export class VibeValleyApi {
         this.call<string | null>("/api/v1/issue/conversation/get", a, options),
     },
     comment: {
-      /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
+      /** To the issue's newest session, as the user: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
       create: (a: { id: string } & T.CommentRequest, options?: { signal?: AbortSignal }): Promise<T.Applied> =>
         this.call<T.Applied>("/api/v1/issue/comment/create", a, options),
     },
@@ -367,13 +369,13 @@ export class VibeValleyApi {
     get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a, options),
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a, options),
-    /** Its title, as the owner renames it. */
-    update: (a: { id: T.ArtifactId; title: string }, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+    /** Its title, as the user renames it. */
+    update: (a: T.ArtifactUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("/api/v1/artifact/update", a, options),
     delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a, options),
     previewDelete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("/api/v1/artifact/previewDelete", a, options),
-    /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
+    /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
     submit: (a: { id: T.ArtifactId } & T.BlockSubmit, options?: { signal?: AbortSignal }): Promise<T.BlockAck> =>
       this.call<T.BlockAck>("/api/v1/artifact/submit", a, options),
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
@@ -391,7 +393,7 @@ export class VibeValleyApi {
         this.call<T.Artifact>("/api/v1/artifact/version/create", a, options),
     },
     html: {
-      /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
+      /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
       edit: (a: T.ArtifactHtmlEdit, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/html/edit", a, options),
     },
     block: {
@@ -414,10 +416,10 @@ export class VibeValleyApi {
       /** The open and resolved suggestions on an artifact, oldest first. */
       list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion[]> =>
         this.call<T.Suggestion[]>("/api/v1/artifact/suggestion/list", a, options),
-      /** A change an agent proposes to a block the owner wrote. */
+      /** A change an agent proposes to a block the user wrote. */
       create: (a: { id: T.ArtifactId } & T.SuggestionCreate, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("/api/v1/artifact/suggestion/create", a, options),
-      /** The owner takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+      /** The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
       accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("/api/v1/artifact/suggestion/accept", a, options),
       reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
@@ -560,7 +562,7 @@ export class VibeValleyApi {
     comment: {
       list: (a: { page?: string }, options?: { signal?: AbortSignal }): Promise<T.PkmComment[]> =>
         this.call<T.PkmComment[]>("/api/v1/pkm/comment/list", a, options),
-      /** A rewrite of a block for the owner to accept: it keeps every [[link]] and ((ref)) the block had. */
+      /** A rewrite of a block for the user to accept: it keeps every [[link]] and ((ref)) the block had. */
       suggest: (a: T.PkmProposalRequest, options?: { signal?: AbortSignal }): Promise<T.PkmProposal> =>
         this.call<T.PkmProposal>("/api/v1/pkm/comment/suggest", a, options),
       /** Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays. */
@@ -620,21 +622,67 @@ export class VibeValleyApi {
       answer: (a: T.AnswerPairingRequest, options?: { signal?: AbortSignal }): Promise<T.LanStatus> =>
         this.call<T.LanStatus>("/api/v1/lan/pairing/answer", a, options),
     },
+  };
+
+  readonly user = {
+    get: (options?: { signal?: AbortSignal }): Promise<T.UserStatus> => this.call<T.UserStatus>("/api/v1/user/get", undefined, options),
+    update: (a: T.UserUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.UserStatus> => this.call<T.UserStatus>("/api/v1/user/update", a, options),
+    login: (a: T.UserLoginRequest, options?: { signal?: AbortSignal }): Promise<T.UserLogin> => this.call<T.UserLogin>("/api/v1/user/login", a, options),
+    /** Takes back the key the request came with. */
+    logout: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/user/logout", undefined, options),
+    password: {
+      /** Only on this machine: never through the gate. */
+      set: (a: T.UserPasswordRequest, options?: { signal?: AbortSignal }): Promise<T.UserStatus> =>
+        this.call<T.UserStatus>("/api/v1/user/password/set", a, options),
+    },
     device: {
-      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/device/delete", a, options),
-      /** What deleteDevice would do, refused as it would be; nothing changes. */
+      list: (options?: { signal?: AbortSignal }): Promise<T.UserDevice[]> => this.call<T.UserDevice[]>("/api/v1/user/device/list", undefined, options),
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.UserDevice[]> =>
+        this.call<T.UserDevice[]>("/api/v1/user/device/delete", a, options),
+      /** What deleting the device would do, refused as it would be; nothing changes. */
       previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("/api/v1/lan/device/previewDelete", a, options),
+        this.call<T.Preview>("/api/v1/user/device/previewDelete", a, options),
     },
-    me: {
-      get: (options?: { signal?: AbortSignal }): Promise<T.LanDevice> => this.call<T.LanDevice>("/api/v1/lan/me/get", undefined, options),
+    approval: {
+      /** A device asks to be signed in (the command line's auth login); no key needed. */
+      create: (a: T.ApprovalCreateRequest, options?: { signal?: AbortSignal }): Promise<T.ApprovalCreated> =>
+        this.call<T.ApprovalCreated>("/api/v1/user/approval/create", a, options),
+      /** The asking device collects its key once approved; no key needed, the claim is its proof. */
+      collect: (a: T.ApprovalCollectRequest, options?: { signal?: AbortSignal }): Promise<T.ApprovalCollected> =>
+        this.call<T.ApprovalCollected>("/api/v1/user/approval/collect", a, options),
+      list: (options?: { signal?: AbortSignal }): Promise<T.Approval[]> => this.call<T.Approval[]>("/api/v1/user/approval/list", undefined, options),
+      answer: (a: T.ApprovalAnswerRequest, options?: { signal?: AbortSignal }): Promise<T.Approval[]> =>
+        this.call<T.Approval[]>("/api/v1/user/approval/answer", a, options),
     },
+  };
+
+  readonly library = {
+    item: {
+      /** Newest first. */
+      list: (a: T.LibraryListRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem[]> =>
+        this.call<T.LibraryItem[]>("/api/v1/library/item/list", a, options),
+      add: (a: T.LibraryAddRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem> =>
+        this.call<T.LibraryItem>("/api/v1/library/item/add", a, options),
+      /** Only the item goes: a message that has the file still opens it. */
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/library/item/delete", a, options),
+      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/library/item/previewDelete", a, options),
+    },
+  };
+
+  readonly attachment = {
+    /** Kept once by its bytes: the same file again is the same attachment. */
+    create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
+      this.call<T.Attachment>("/api/v1/attachment/create", a, options),
   };
 
   /** R is the answer api.ts gives the path; each method above names it. */
   private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
+    const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };
     const res = await this.fetcher(this.base + path, {
-      ...(input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+      ...(input === undefined
+        ? { method: "POST", headers }
+        : { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input) }),
       ...options,
     });
     const text = await res.text();

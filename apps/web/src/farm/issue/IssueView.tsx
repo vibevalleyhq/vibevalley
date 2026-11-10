@@ -917,7 +917,7 @@ const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: string; la
   unsure: { icon: "mark-warn", label: t("web.farm.plot.result.unsure") },
 };
 
-/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on
+/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the user checks it (on
  * this page only). */
 function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const [ticked, setTicked] = createSignal<ReadonlySet<number>>(new Set());

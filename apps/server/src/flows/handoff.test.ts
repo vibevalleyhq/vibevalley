@@ -6,22 +6,26 @@ import { Inbox } from "#/inbox/inbox.ts";
 
 import { farm } from "./farm.ts";
 
-it.effect("regression: owner read cursors and later replies suppress external notifications", () => {
+it.effect("regression: user read cursors and later replies suppress external notifications", () => {
   const f = farm();
   return Effect.gen(function* () {
     const chat = yield* Channel;
     const inbox = yield* Inbox;
     const channel = chat.defaultChannel();
-    const agent = chat.orchestratorOf(channel);
-    yield* chat.orchestratorSays(channel, "需要你确认", "read-receipt", agent);
+    const agent = chat.orchestratorIn(channel);
+    yield* chat.post({ _tag: "Run", from: agent, channel: channel, text: "需要你确认", run: "read-receipt" });
     const message = (yield* chat.history(channel)).at(-1)!;
-    expect(yield* inbox.handoffState(message.id)).toBe("unseen");
+    const handoffState2 = yield* inbox.handoffState(message.id);
+    expect(handoffState2).toBe("unseen");
     yield* chat.markRead(channel, message.number);
-    expect(yield* inbox.handoffState(message.id)).toBe("seen");
-    yield* chat.say("确认", channel, "owner-reply");
-    expect(yield* inbox.handoffState(message.id)).toBeUndefined();
-    yield* chat.orchestratorSays(channel, "又有一项变化", "incremental-update", agent);
+    const handoffState3 = yield* inbox.handoffState(message.id);
+    expect(handoffState3).toBe("seen");
+    yield* chat.post({ _tag: "User", text: "确认", channel: channel, sendKey: "user-reply" });
+    const handoffState4 = yield* inbox.handoffState(message.id);
+    expect(handoffState4).toBeUndefined();
+    yield* chat.post({ _tag: "Run", from: agent, channel: channel, text: "又有一项变化", run: "incremental-update" });
     const update = (yield* chat.history(channel)).at(-1)!;
-    expect(yield* inbox.handoffState(update.id)).toBe("unseen");
+    const handoffState5 = yield* inbox.handoffState(update.id);
+    expect(handoffState5).toBe("unseen");
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });

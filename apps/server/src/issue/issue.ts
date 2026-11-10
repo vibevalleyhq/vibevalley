@@ -6,7 +6,7 @@ import { assignedAgentOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@v
 
 import { Agent } from "#/agent/agent.ts";
 import { templateCatalog } from "#/agent/seed.ts";
-import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { actsForUser, type Actor } from "#/base/actor.ts";
 import { type ApiError, missing, lookIn, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -24,11 +24,11 @@ import { type Dispatched, issueDispatch } from "./dispatch.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
-import { needsOwner } from "./prompts.ts";
+import { needsUser } from "./prompts.ts";
 import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
-import { conflictOf, isClosed, isForOrchestrator, pickIssues } from "./status.ts";
+import { conflictOf, isClosed, assignedOnDuty, pickIssues } from "./status.ts";
 
 export class Issue extends Context.Service<
   Issue,
@@ -40,7 +40,7 @@ export class Issue extends Context.Service<
     readonly onBoard: () => readonly T.Issue[];
     readonly get: (id: string) => Effect.Effect<T.Issue, ApiError>;
     readonly add: (req: T.IssueRequest, mandate: T.IssueMandate) => Effect.Effect<T.Issue, ApiError>;
-    /** On the owner's word only (actsForOwner). */
+    /** On the user's word only (actsForUser). */
     readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Effect.Effect<T.Issue, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
@@ -54,10 +54,10 @@ export class Issue extends Context.Service<
     readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Effect.Effect<T.Preview, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
+    /** An issue's id from what the user and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
     readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
     readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
-    /** The owner's look counts for the game; anyone else's does not. */
+    /** The user's look counts for the game; anyone else's does not. */
     readonly changes: (id: string, by: Actor) => Effect.Effect<T.Changes, ApiError>;
     readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<T.Issue, ApiError>;
     readonly refine: (id: string, word: string, channel: string) => Effect.Effect<T.Issue, ApiError>;
@@ -70,7 +70,7 @@ export class Issue extends Context.Service<
     readonly refreshQueue: Effect.Effect<void>;
     readonly submitPullRequest: (session: string, summary?: string) => Effect.Effect<string, ApiError>;
   }
->()("vibevalley/Issue") {
+>()("@vibevalley/server/issue/issue") {
   static readonly layer = Layer.effect(
     Issue,
     Effect.suspend(() => make),
@@ -122,7 +122,7 @@ const make = Effect.gen(function* () {
     unqueue,
     recordReport,
     judged,
-    ownerSaid,
+    userSaid,
     setQueued,
     drop,
     savePullRequest,
@@ -162,7 +162,7 @@ const make = Effect.gen(function* () {
     const latest = latestSessionIdOf(issue);
     const session = latest === undefined ? undefined : sessions.sessionOf(latest);
     const thread = yield* chat.issueThread(issue.id, issue.title, session?.channel);
-    yield* chat.say(text, thread, sendKey);
+    yield* chat.post({ _tag: "User", text: text, channel: thread, sendKey: sendKey });
   });
 
   /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
@@ -178,7 +178,7 @@ const make = Effect.gen(function* () {
       { discard: true },
     );
     const last = latestSessionIdOf(item);
-    if (last === undefined || !sessions.present(last)) return;
+    if (last === undefined || !sessions.isReachable(last)) return;
     if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing(t("server.issue.helperRef", { id: last }), [lookIn.session]));
   });
 
@@ -198,57 +198,58 @@ const make = Effect.gen(function* () {
 
   const onSessionNews = Effect.fn("Issue.onSessionNews")(function* (n: SessionNews) {
     switch (n._tag) {
-      case "left":
+      case "Left":
         yield* closeIfOpen(n.left.id, n.left.closed);
         return;
-      case "reported": {
+      case "Reported": {
         const e = n.report;
         const issue = yield* recordReport(e.id, e.outcome, e.questions, e.checks, e.answer);
         yield* handedBack(e);
         if (issue) {
           const conflict = (yield* get(issue)).conflict;
-          if (conflict) yield* setConflict(issue, yield* sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base)));
+          if (conflict) {
+            const rechecked = yield* sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base));
+            yield* setConflict(issue, rechecked);
+          }
         }
         yield* joinChildren();
         return;
       }
-      case "hired":
+      case "IssueStarted":
+        yield* unqueue(n.issue);
+        return;
+      case "RunFinished":
+        // However the orchestrator's turn ended, the issue waits on the user: a turn that did not fail is not an answer yet.
+        yield* Effect.forEach(n.issues, (id) => endRun(id).pipe(bestEffort(`vibevalley: run ${n.id} finished on issue ${id}`)), { discard: true });
+        return;
+      default:
+        // A hire is the channels' to follow; inputs and launches are Mailbox's.
         return;
     }
   });
 
-  const onOwnerInThread = Effect.fn("Issue.onOwnerInThread")(function* (thread: string) {
+  const onUserInThread = Effect.fn("Issue.onUserInThread")(function* (thread: string) {
     const issue = yield* Effect.option(get(thread));
     if (Option.isNone(issue)) return;
     const item = issue.value;
     if (isClosed(item.status)) return;
-    yield* ownerSaid(item.id);
+    yield* userSaid(item.id);
   });
 
   yield* loadKept;
   const news = yield* sessions.news;
-  const ownerWords = yield* chat.ownerInThread;
-  const finished = yield* sessions.finishedRuns;
-  yield* Effect.forkScoped(Stream.runForEach(yield* sessions.startedIssues, (id) => unqueue(id).pipe(bestEffort(`issue: run started on ${id}`))));
-  // One at a time: a report and the owner's word on it do not cross.
+  const userWords = yield* chat.userInThread;
+  // One at a time: a report and the user's word on it do not cross.
   yield* Effect.forkScoped(
     Stream.runForEach(
       Stream.merge(
         news,
-        Stream.map(ownerWords, (w) => ({ _tag: "owner" as const, thread: w.thread, message: w.message })),
+        Stream.map(userWords, (w) => ({ _tag: "UserSaid" as const, thread: w.thread, message: w.message })),
       ),
       (n) =>
-        n._tag === "owner"
-          ? onOwnerInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the owner's words in ${n.thread}`))
+        n._tag === "UserSaid"
+          ? onUserInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the user's words in ${n.thread}`))
           : onSessionNews(n).pipe(bestEffort(`vibevalley: issues after ${n._tag}`)),
-    ),
-  );
-  yield* Effect.forkScoped(
-    // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
-    Stream.runForEach(finished, (run) =>
-      Effect.forEach(run.issues, (id) => endRun(id).pipe(bestEffort(`vibevalley: run ${run.id} finished on issue ${id}`)), {
-        discard: true,
-      }),
     ),
   );
 
@@ -268,8 +269,9 @@ const make = Effect.gen(function* () {
     return milestonesOf(issue, runs, names);
   });
 
+  const subscribe2 = yield* core.subscribe;
   yield* Effect.forkScoped(
-    Stream.runForEach(yield* core.subscribe, (fact) =>
+    Stream.runForEach(subscribe2, (fact) =>
       Effect.gen(function* () {
         if (fact.type !== "issueChanged" && fact.type !== "sessionLeft" && !(fact.type === "sessionChanged" && fact.session.issue !== undefined)) return;
         yield* refreshQueue();
@@ -287,7 +289,8 @@ const make = Effect.gen(function* () {
     }),
     query: Effect.fn("Issue.query")(function* (f) {
       const all = yield* everyIssue;
-      return pickIssues(all, f, yield* Clock.currentTimeMillis);
+      const now = yield* Clock.currentTimeMillis;
+      return pickIssues(all, f, now);
     }),
     get,
     timeline,
@@ -297,7 +300,7 @@ const make = Effect.gen(function* () {
     /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
      * next round goes by them. */
     edit: Effect.fn("Issue.edit")(function* (id, upd, by) {
-      if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
+      if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       const whileOpen =
         upd.title === undefined &&
         upd.description === undefined &&
@@ -342,10 +345,11 @@ const make = Effect.gen(function* () {
     }),
     idOf,
     stop: Effect.fn("Issue.stop")(function* (id) {
-      yield* sessions.stop(yield* liveSession(id));
+      const liveSession2 = yield* liveSession(id);
+      yield* sessions.stop(liveSession2);
     }),
     setStatus: Effect.fn("Issue.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
-      if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
+      if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       const item = yield* get(ref);
       // Read by its number too: every write below goes by its id.
       const id = item.id;
@@ -354,11 +358,13 @@ const make = Effect.gen(function* () {
         case "start":
           if (taker) yield* shape.edit(id, { agent: taker.id }, by);
           yield* start(id, channel);
-          yield* chat.notice(
-            yield* chat.issueThread(id, item.title, channel || undefined),
-            t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
-            "issue_confirmed",
-          );
+          const issueThread2 = yield* chat.issueThread(id, item.title, channel || undefined);
+          yield* chat.post({
+            _tag: "Notice",
+            channel: issueThread2,
+            text: t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
+            code: "issue_confirmed",
+          });
           break;
         case "unqueue":
           yield* setQueued(id, false, chat.defaultChannel());
@@ -382,7 +388,7 @@ const make = Effect.gen(function* () {
         case "revive":
           yield* revive(id);
           break;
-        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice, touches no git and opens no pull request.
+        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the user's choice, touches no git and opens no pull request.
         case "complete": {
           // Completing is the acceptance: whatever it was sent back for is settled.
           const unresolved = item.findings.some((f) => !f.resolved);
@@ -399,7 +405,7 @@ const make = Effect.gen(function* () {
             // Written down before its session goes home, so that leaving does not take it for canceled.
             yield* complete(id, acceptedDelivery);
             const last = latestSessionIdOf(item);
-            if (last !== undefined && sessions.present(last)) yield* sessions.dismiss(last, "keep", "completed");
+            if (last !== undefined && sessions.isReachable(last)) yield* sessions.dismiss(last, "keep", "completed");
             break;
           }
           // The session's leaving closes the issue too, but later: closed here, the answer already says so.
@@ -424,8 +430,11 @@ const make = Effect.gen(function* () {
       return yield* get(id);
     }),
     previewStatus: Effect.fn("Issue.previewStatus")(function* (id, to, text, opt = {}, edit) {
-      const item = yield* withEdit(yield* get(id), edit);
-      return { does: yield* movesWords(yield* settledMove(item, to, text, opt)) };
+      const found = yield* get(id);
+      const item = yield* withEdit(found, edit);
+      const move = yield* settledMove(item, to, text, opt);
+      const does = yield* movesWords(move);
+      return { does };
     }),
     previewRemove: Effect.fn("Issue.previewRemove")(function* (id) {
       const item = yield* unsent(id);
@@ -444,21 +453,22 @@ const make = Effect.gen(function* () {
       if (!changes) return yield* Effect.fail(refused(t("server.issue.notStarted")));
       yield* setConflict(id, conflictOf(changes));
       const session = latestSessionIdOf(item);
-      if (by.kind === "owner" && session && sessions.present(session)) yield* core.did({ kind: "reviewed", session });
+      if (by.kind === "user" && session && sessions.isReachable(session)) yield* core.did({ kind: "reviewed", session });
       return changes;
     }),
     review: Effect.fn("Issue.review")(function* (id, req) {
       const item = yield* get(id);
-      const why = isForOrchestrator(item, store.isOrchestrator)
+      const why = assignedOnDuty(item, store.isOrchestrator)
         ? t("server.issue.orchestratorAnswers")
         : item.status !== "in_review"
           ? t("server.issue.nothingToAccept")
           : "";
       if (why) return yield* Effect.fail(refused(why, nextSteps(item)));
       if (req.pass) {
+        const now = yield* Clock.currentTimeMillis;
         yield* judged(
           id,
-          yield* Clock.currentTimeMillis,
+          now,
           item.findings.map((f) => ({ ...f, resolved: true })),
         );
         return yield* get(id);
@@ -490,7 +500,8 @@ const make = Effect.gen(function* () {
     templates: Effect.fn("Issue.templates")(function* (name) {
       const stack = yield* repos.stack(name);
       if (!stack) return yield* Effect.fail(missing(t("server.issue.repoRef", { name }), [lookIn.repo]));
-      return { repo: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
+      const all = yield* everyIssue;
+      return { repo: name, stack, recent: sentTitles(all, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     }),
     hire,
     refreshPullRequests: refreshPullRequests(),

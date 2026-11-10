@@ -15,7 +15,7 @@ import type { RepoError } from "#/repo/workplace.ts";
 
 import { githubInputs, type GitHubPullIngress } from "./github.ts";
 
-interface OwnerInput {
+interface UserInput {
   readonly source: "connector" | "voice";
   readonly channel?: string;
   readonly envelope: string;
@@ -32,7 +32,7 @@ export interface SourceEvent extends TriggerInput {
 export class Ingress extends Context.Service<
   Ingress,
   {
-    readonly owner: (input: OwnerInput) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+    readonly user: (input: UserInput) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
     readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
     readonly accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError | ApiError>;
     readonly refreshGitHub: Effect.Effect<void>;
@@ -40,7 +40,7 @@ export class Ingress extends Context.Service<
     readonly record: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, ApiError>;
     readonly read: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
   }
->()("vibevalley/Ingress") {
+>()("@vibevalley/server/ingress/ingress") {
   static readonly layer = Layer.effect(
     Ingress,
     Effect.suspend(() => make),
@@ -59,11 +59,11 @@ const make = Effect.gen(function* () {
   });
   const accept = Effect.fn("Ingress.accept")(function* (event: SourceEvent) {
     const trigger = yield* record(event);
-    if (trigger) yield* mailbox.receive(trigger);
+    if (trigger) yield* mailbox.receive({ _tag: "Trigger", trigger });
     return trigger;
   });
   const github = yield* githubInputs(accept);
-  /** What the blocks the owner pointed at read now: the version quoted, and whether they changed or went. */
+  /** What the blocks the user pointed at read now: the version quoted, and whether they changed or went. */
   const quote = (refs: SayMore["blockRefs"]): Effect.Effect<T.QuotedBlock[]> =>
     Effect.forEach(refs ?? [], (ref) =>
       Effect.gen(function* () {
@@ -80,9 +80,13 @@ const make = Effect.gen(function* () {
     ).pipe(Effect.map((all) => all.flatMap((b) => (b === undefined ? [] : [b]))));
 
   return Ingress.of({
-    owner: Effect.fn("Ingress.owner")(function* (input) {
+    user: Effect.fn("Ingress.user")(function* (input) {
       yield* core.open();
-      return yield* chat.say(input.text, input.channel, input.envelope, {
+      return yield* chat.post({
+        _tag: "User",
+        text: input.text,
+        channel: input.channel,
+        sendKey: input.envelope,
         source: input.source,
         ...(input.picked ? { picked: input.picked } : {}),
         ...(input.responsePort ? { responsePort: input.responsePort } : {}),
@@ -94,7 +98,11 @@ const make = Effect.gen(function* () {
       const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
       const blocks = yield* quote(more?.blockRefs);
       yield* core.open();
-      yield* chat.say(text, channel, sendKey, {
+      yield* chat.post({
+        _tag: "User",
+        text: text,
+        channel: channel,
+        sendKey: sendKey,
         ...more,
         ...(blocks.length > 0 ? { blocks } : {}),
         ...(picked.agent || picked.repo ? { picked } : {}),

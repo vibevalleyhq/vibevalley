@@ -67,14 +67,15 @@ describe("the subscriptions", () => {
     Effect.gen(function* () {
       const { address, chat } = yield* farm;
       const general = chat.defaultChannel();
-      for (const text of ["早", "在吗"]) yield* chat.say(text, undefined, "");
+      for (const text of ["早", "在吗"]) yield* chat.post({ _tag: "User", text: text, sendKey: "" });
       const rpc = yield* client(address);
       const first = (yield* chat.history(general)).find((m) => m.text === "早")!;
       const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(rpc["channel.follow"]({ id: general, after: first.revision }), 2)));
-      yield* chat.say("看看进度", undefined, "");
+      yield* chat.post({ _tag: "User", text: "看看进度", sendKey: "" });
       const got = yield* Fiber.join(following);
       expect(got.map((e) => (e._tag === "Message" ? e.message.text : e._tag))).toEqual(["在吗", "看看进度"]);
-      expect(yield* Effect.flip(Stream.runDrain(rpc["channel.follow"]({ id: "no-such-channel", after: 0 })))).toMatchObject({ _tag: "Refused" });
+      const drainOutcomeFailure = yield* Effect.flip(Stream.runDrain(rpc["channel.follow"]({ id: "no-such-channel", after: 0 })));
+      expect(drainOutcomeFailure).toMatchObject({ _tag: "Refused" });
     }).pipe(Effect.scoped),
   );
 
@@ -82,11 +83,15 @@ describe("the subscriptions", () => {
     Effect.gen(function* () {
       const { address } = yield* farm;
       const [, port] = address.split(":");
-      expect(yield* upgrade(address, {})).toBe(101);
-      expect(yield* upgrade(address, { origin: `http://${address}` })).toBe(101);
-      expect(yield* upgrade(address, { origin: "https://evil.example" })).toBe(403);
+      const upgraded = yield* upgrade(address, {});
+      expect(upgraded).toBe(101);
+      const upgraded2 = yield* upgrade(address, { origin: `http://${address}` });
+      expect(upgraded2).toBe(101);
+      const upgraded3 = yield* upgrade(address, { origin: "https://evil.example" });
+      expect(upgraded3).toBe(403);
+      const upgraded4 = yield* upgrade(address, { host: `evil.example:${port}`, origin: `http://evil.example:${port}` });
       // A name made to resolve here is its own origin: the host has to be a loopback name.
-      expect(yield* upgrade(address, { host: `evil.example:${port}`, origin: `http://evil.example:${port}` })).toBe(403);
+      expect(upgraded4).toBe(403);
     }).pipe(Effect.scoped),
   );
 

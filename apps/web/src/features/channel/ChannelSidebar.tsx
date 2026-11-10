@@ -543,7 +543,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   );
 }
 
-/** The profiles the owner can talk with alone, the orchestrators first: picking one opens its direct channel, made the
+/** The profiles the user can talk with alone, the orchestrators first: picking one opens its direct channel, made the
  * first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();

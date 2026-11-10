@@ -3,7 +3,15 @@ import { Effect, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
+import {
+  ArtifactDisplayValues,
+  ArtifactKindValues,
+  CronWhenKindValues,
+  DeliverableValues,
+  LibraryFileKindValues,
+  LibraryOriginKindValues,
+  PkmTierValues,
+} from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -36,11 +44,19 @@ export const agentOnly: Partial<Record<Op, readonly string[]>> = {
   "artifact.version.create": ["file"],
 };
 
+const libraryList = Schema.Struct({
+  origin: Schema.optionalKey(Schema.Literals(LibraryOriginKindValues).annotate({ description: params.library.origin })),
+  type: Schema.optionalKey(Schema.Literals(LibraryFileKindValues).annotate({ description: params.library.type })),
+  text: Schema.optionalKey(Schema.String.annotate({ description: params.library.text })),
+});
+const libraryName = Schema.optionalKey(Schema.String.annotate({ description: params.library.name }));
+
 const artifactText = {
   content: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.content })),
   note: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.note })),
 };
 const artifactKind = Schema.Literals(ArtifactKindValues).annotate({ description: params.artifact.kind });
+const artifactDisplay = Schema.optionalKey(Schema.Literals(ArtifactDisplayValues).annotate({ description: params.artifact.display }));
 const artifactId = Schema.String.annotate({ description: params.artifact.id }).pipe(
   Schema.decodeTo(S.ArtifactId, {
     decode: SchemaGetter.transform((s: string) => S.artifactId(s.trim())),
@@ -141,12 +157,15 @@ export const parameters = {
   "media.job.cancel": S.MediaJobRequest,
   "media.job.download": S.MediaJobRequest,
   "media.job.list": Schema.Struct({}),
+  "library.item.list": libraryList,
+  "library.item.add": Schema.Struct({ name: libraryName, url: Schema.String.annotate({ description: params.library.url }) }),
   "artifact.content.get": artifactRead,
   "artifact.create": Schema.Struct({
     ...artifactText,
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.channel })),
     issue: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.issue })),
     kind: artifactKind,
+    display: artifactDisplay,
     title: Schema.String.annotate({ description: params.artifact.title }),
   }).annotate({ requiredOrder: ["title", "kind"] }),
   "artifact.get": Schema.Struct({ id: artifactId }),
@@ -204,7 +223,7 @@ export const parameters = {
     repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.repo })),
     status: Schema.optionalKey(statusField(params.issueList.status)),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.text })),
-    wantsOwner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsOwner })),
+    wantsUser: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsUser })),
   }),
   "issue.review": Schema.Struct({
     findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueReview.findings })),
@@ -273,6 +292,7 @@ export const sessionParameters = {
     ...artifactText,
     file: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.file })),
     kind: artifactKind,
+    display: artifactDisplay,
     title: Schema.String.annotate({ description: params.artifact.title }),
   }).annotate({ requiredOrder: ["title", "kind"] }),
   "artifact.get": Schema.Struct({ id: artifactId }),
@@ -322,6 +342,12 @@ export const sessionParameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "session.list": Schema.Struct({}),
+  "library.item.list": libraryList,
+  "library.item.add": Schema.Struct({
+    name: libraryName,
+    path: Schema.optionalKey(Schema.String.annotate({ description: params.library.path })),
+    url: Schema.optionalKey(Schema.String.annotate({ description: params.library.url })),
+  }),
   ...pkmParameters,
 };
 
@@ -389,7 +415,7 @@ export interface Caller {
   readonly repo: string;
   /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
-  /** The profile the owner picked for this input, if any: dispatch prefers it. */
+  /** The profile the user picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
   /** The ingress envelope currently being handled; empty when this run was not opened by one. */
   readonly envelope: string;
@@ -404,19 +430,31 @@ export class ToolRefusal extends Schema.TaggedError<ToolRefusal, { readonly bran
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-export const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
+export const refuse = (message: string) => Effect.fail(ToolRefusal.make({ message }));
 
-const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
+const toFailed = (e: unknown): ToolFailed => ToolFailed.make({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
 
 export const said = (e: unknown) => toFailed(e).message;
 
-export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
+export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => ToolRefusal.make({ message: said(e), cause: e }) });
 
 /** An answer, or the refusal prefix and why. */
 export const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
 
 // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
 export const participant = (c: Caller) => c.session || c.agent;
+
+/** A tool's run as one step of a turn: its input read, its body run, in a span, its log lines marked with the tool. */
+const toolRun = <A, E>(name: string, read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>, body: (input: A) => Effect.Effect<string, E>) =>
+  Effect.fnUntraced(
+    function* (args: unknown) {
+      const input = yield* read(args);
+      return yield* body(input);
+    },
+    Effect.mapError(toFailed),
+    Effect.annotateLogs({ tool: name }),
+    Effect.withSpan(`Tool.${name}`),
+  );
 
 // A tool's arguments are read by its Schema before it runs. the model's JSON Schema is made from the same one.
 const toolOf =
@@ -431,7 +469,7 @@ const toolOf =
       name: toolName(op),
       description: words[op],
       parameters: shown[op] ?? {},
-      run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+      run: toolRun(toolName(op), read, body),
     });
   };
 
@@ -447,11 +485,10 @@ export const customTool = <A, E>(
   parameters: JsonSchema,
   read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>,
   body: (input: A) => Effect.Effect<string, E>,
-) => {
-  return effectTool({
+) =>
+  effectTool({
     name,
     description,
     parameters,
-    run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+    run: toolRun(name, read, body),
   });
-};

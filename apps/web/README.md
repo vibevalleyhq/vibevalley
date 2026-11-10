@@ -28,7 +28,7 @@ src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, M
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the repo map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, channel, session, agent, memory,
-                    orchestrator, repo, runtime, artifact, media, pkm, voice, lan, connector, inbox, setting, provider, catalog. A feature holds its
+                    orchestrator, repo, runtime, artifact, media, pkm, voice, lan, user, connector, inbox, setting, provider, catalog. A feature holds its
                     pages, its reads, its rules (pure, each with its test) and its words; index.ts is what the rest may use
 src/farm/           the pixel farm at /farm, inside the shell (its README: who owns which folder, the store, the canvas's screen)
                     and map/, the repos page's map: app/ hands it to features/repo as its ReposSkin

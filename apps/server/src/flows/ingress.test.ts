@@ -10,9 +10,10 @@ import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Mailbox, type InsertDelivery } from "#/mailbox/mailbox.ts";
 import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
+import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
@@ -36,7 +37,7 @@ it.live("regression: the mandate grants its worker access to the original trigge
     const source = (yield* ingress.record({
       source: "workbench",
       key: "mandate-source",
-      actor: { kind: "owner", id: "owner" },
+      actor: { kind: "user", id: "user" },
       addressed: "direct",
       threads: [],
       text: "original requirement",
@@ -48,7 +49,8 @@ it.live("regression: the mandate grants its worker access to the original trigge
     expect((yield* resource.read(started.session!, { uri: source.card.readUri })).text).toContain("original requirement");
     const other = yield* issues.add({ title: "unrelated work", repo: "unrelated", agent: "lab" }, explicitMandate());
     const second = yield* testIssues(issues).start(other.id, "");
-    expect(yield* Effect.flip(resource.read(second.session!, { uri: source.card.readUri }))).toMatchObject({ _tag: "ResourceError" });
+    const resourceFailure = yield* Effect.flip(resource.read(second.session!, { uri: source.card.readUri }));
+    expect(resourceFailure).toMatchObject({ _tag: "ResourceError" });
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
 
@@ -59,25 +61,18 @@ it.live("regression: chat triggers keep their original payload through edits and
     const ingress = yield* Ingress;
     const mailbox = yield* Mailbox;
     const sql = yield* SqlClient.SqlClient;
-    const profile = (yield* Agent).agent(defaultOrchestrator)!;
-    yield* (yield* Session).register({
-      id: profile.id,
-      agent: profile.id,
-      role: profile.role,
-      name: profile.name,
-      runtime: profile.runtime,
-      brief: profile.duty,
-    });
-    const before = yield* chat.say("previous message", undefined, "before");
-    const current = yield* ingress.owner({ source: "voice", text: "original voice input", envelope: "voice-source" });
-    yield* chat.say("next message", undefined, "after");
+    const before = yield* chat.post({ _tag: "User", text: "previous message", sendKey: "before" });
+    const current = yield* ingress.user({ source: "voice", text: "original voice input", envelope: "voice-source" });
+    yield* chat.post({ _tag: "User", text: "next message", sendKey: "after" });
     yield* chat.edit(current.message.id, "edited voice input");
     yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
     yield* (yield* Mailbox).replay;
-    expect(yield* mailbox.registered(current.message.id)).toBe(false);
+    const registered2 = yield* mailbox.isRouted(current.message.id);
+    expect(registered2).toBe(false);
     yield* chat.start;
     yield* mailbox.start;
-    expect(yield* mailbox.registered(current.message.id)).toBe(true);
+    const registered3 = yield* mailbox.isRouted(current.message.id);
+    expect(registered3).toBe(true);
     const source = yield* ingress.read(current.message.id);
     expect(source?.trigger.source).toBe("voice");
     expect(source?.payload.text).toBe("original voice input");
@@ -101,7 +96,8 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const sessions = yield* Session;
     const mailbox = yield* Mailbox;
     const chat = yield* Channel;
@@ -125,7 +121,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
       replyChannel: thread,
       at: 1,
     }))!;
-    const delivery: Parameters<Mailbox["Service"]["insert"]>[0] = {
+    const delivery: InsertDelivery = {
       session,
       row: {
         envelope_id: trigger.id,
@@ -143,15 +139,15 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
         payload: { trigger, context: { number: 0, target: trigger.card.readUri }, channelType: "thread" },
       },
     };
-    yield* mailbox.insert(delivery);
+    yield* committedDelivery(delivery);
     yield* mailbox.restore;
-    expect(mailbox.pending(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
+    expect(mailbox.deliveriesOf(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
     yield* mailbox.start;
     expect(inputs.some((input) => input.includes(trigger.card.readUri))).toBe(false);
     yield* (yield* Ingress).accept({
       source: "connector",
       key: "resume-machine-work",
-      actor: { kind: "owner", id: "owner" },
+      actor: { kind: "user", id: "user" },
       addressed: "thread_owner",
       threads: [`issue:${issue.id}`],
       replyChannel: thread,
@@ -159,9 +155,9 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
       at: 2,
     });
     yield* until(() => inputs.some((input) => input.includes(trigger.card.readUri)), "the machine card delivered");
-    yield* until(() => mailbox.pending(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
-    yield* mailbox.insert(delivery);
-    expect(mailbox.pending(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
+    yield* until(() => mailbox.deliveriesOf(session).every((row) => row.envelope_id !== trigger.id), "the actual input consumed");
+    yield* committedDelivery(delivery);
+    expect(mailbox.deliveriesOf(session).some((row) => row.envelope_id === trigger.id)).toBe(false);
     const messages = yield* await_(
       () => chat.history(thread),
       (items) => items.some((message) => message.kind === "report"),
@@ -171,7 +167,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
 
-it.live("regression: issue input waits without a session and an owner followup releases frozen machine input", () => {
+it.live("regression: issue input waits without a session and a user followup releases frozen machine input", () => {
   const inputs: string[] = [];
   const f = farm({
     runtime: scriptedRuntime({
@@ -183,7 +179,8 @@ it.live("regression: issue input waits without a session and an owner followup r
     }),
   });
   return Effect.gen(function* () {
-    const issues = testIssues(yield* Issue);
+    const issue2 = yield* Issue;
+    const issues = testIssues(issue2);
     const sessions = yield* Session;
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
@@ -191,21 +188,21 @@ it.live("regression: issue input waits without a session and an owner followup r
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "subscription work", repo: "source-routing", agent: "lab" });
     yield* mailbox.subscribe(issue.id, ["github:source-routing#7"]);
-    const ownerEvent = {
+    const userEvent = {
       source: "connector" as const,
-      key: "queued-owner",
-      actor: { kind: "owner" as const, id: "owner" },
-      text: "queued-owner-detail",
+      key: "queued-user",
+      actor: { kind: "user" as const, id: "user" },
+      text: "queued-user-detail",
       threads: ["github:source-routing#7"],
       addressed: "thread_owner" as const,
       at: 1,
     };
-    const queued = (yield* ingress.accept(ownerEvent))!;
-    expect(sessions.presentSessions()).toHaveLength(0);
+    const queued = (yield* ingress.accept(userEvent))!;
+    expect(sessions.hired()).toHaveLength(0);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
     const started = yield* issues.start(issue.id, "");
-    yield* until(() => inputs.some((input) => input.includes("queued-owner-detail")), "the queued input delivered");
-    expect(inputs[0]).toContain("queued-owner-detail");
+    yield* until(() => inputs.some((input) => input.includes("queued-user-detail")), "the queued input delivered");
+    expect(inputs[0]).toContain("queued-user-detail");
     yield* until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the worker handed back");
     const automatic = (yield* ingress.accept({
       source: "github",
@@ -221,9 +218,9 @@ it.live("regression: issue input waits without a session and an owner followup r
       reason: "human",
     });
     expect(inputs.some((input) => input.includes("frozen-ci-detail"))).toBe(false);
-    yield* ingress.accept(ownerEvent);
+    yield* ingress.accept(userEvent);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.state).toBe("held");
-    yield* ingress.accept({ ...ownerEvent, key: "release-owner", text: "release-owner-detail", at: 3 });
+    yield* ingress.accept({ ...userEvent, key: "release-user", text: "release-user-detail", at: 3 });
     yield* until(() => inputs.some((input) => input.includes("frozen-ci-detail")), "the frozen input released");
     expect((yield* issues.list()).map((item) => item.id)).toEqual([issue.id]);
     expect((yield* sql<{ session_id: string }>`select session_id from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.session_id).toBe(started.session);

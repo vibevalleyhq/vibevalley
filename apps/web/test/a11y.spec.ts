@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"] as const)
       "/issues",
       `/issues/${issue.id}`,
       "/artifacts",
-      "/media",
+      "/library",
       "/agents",
       `/agents/${agent.id}`,
       "/agents/templates",
@@ -57,8 +57,8 @@ for (const theme of ["light", "dark"] as const)
 for (const theme of ["light", "dark"] as const)
   test(`image generation form is accessible in ${theme} at desktop and mobile widths`, async ({ page }) => {
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
-    await page.goto("/media");
-    await expect(page.getByTestId("media-page")).toBeVisible();
+    await page.goto("/library?make=image");
+    await expect(page.getByTestId("image-panel")).toBeVisible();
     await expect(page.locator("#opening")).toHaveCount(0);
     await page.locator("summary").click();
     const screenshots = join(import.meta.dirname, "../.screens");
@@ -96,7 +96,7 @@ for (const theme of ["light", "dark"] as const)
     await expect.poll(async () => (await api.media.job.get({ id: `audit-canceled-${theme}` })).phase).toBe("generating");
     await api.media.job.cancel({ id: `audit-canceled-${theme}` });
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
-    await page.goto("/media");
+    await page.goto("/library?make=image");
     await expect(page.locator("#opening")).toHaveCount(0);
     const card = page.locator(`[data-testid="media-job"][data-id="${ready.id}"]`);
     await expect(card).toHaveAttribute("data-phase", "ready");
@@ -142,8 +142,8 @@ for (const theme of ["light", "dark"] as const)
     for (const width of [1280, 390]) {
       await test.step(`audit: configured image binding at ${width}px`, async () => {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 800 });
-        await page.getByTestId("provider-image-notice").evaluate((element) => element.scrollIntoView({ block: "center" }));
-        await expect(page.getByTestId("provider-image-notice")).toBeInViewport();
+        await page.locator('[data-testid="provider-use"][data-key="image"]').evaluate((element) => element.scrollIntoView({ block: "center" }));
+        await expect(page.locator('[data-testid="provider-use"][data-key="image"]')).toBeInViewport();
         await settled(page);
         expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()).violations).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
@@ -159,8 +159,8 @@ for (const theme of ["light", "dark"] as const)
         await page.getByTestId("provider-understanding-model").click();
         await expect(page.getByRole("option")).toHaveCount(2);
         await page.keyboard.press("Escape");
-        await page.getByTestId("provider-speech-notice").evaluate((element) => element.scrollIntoView({ block: "center" }));
-        await expect(page.getByTestId("provider-speech-notice")).toBeInViewport();
+        await page.locator('[data-testid="provider-use"][data-key="speech"]').evaluate((element) => element.scrollIntoView({ block: "center" }));
+        await expect(page.locator('[data-testid="provider-use"][data-key="speech"]')).toBeInViewport();
         await expect(page.getByTestId("provider-speech-model")).toHaveAttribute("data-value", "moss-tts-1.0-pro-2026-02-07");
         await settled(page);
         await page.screenshot({ path: join(screenshots, `provider-speech-${theme}-${width}.png`), fullPage: true });
@@ -192,8 +192,7 @@ for (const theme of ["light", "dark"] as const)
       await expect.poll(async () => (await api.media.job.get({ id })).phase).toBe(phase);
     }
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
-    await page.goto("/media");
-    await page.getByTestId("media-mode-understanding").click();
+    await page.goto(`/library?understand=${input.hash}`);
     await expect(page.locator("#opening")).toHaveCount(0);
     const screenshots = join(import.meta.dirname, "../.screens");
     mkdirSync(screenshots, { recursive: true });
@@ -205,7 +204,7 @@ for (const theme of ["light", "dark"] as const)
       for (const phase of ["form", "ready", "incomplete", "unknown", "canceled"]) {
         const target =
           phase === "form"
-            ? page.getByTestId("understanding-files")
+            ? page.getByTestId("understanding-file")
             : page.locator(`[data-testid="understanding-job"][data-id="understanding-audit-${theme}-${phase}"]`);
         await target.evaluate((element) => element.scrollIntoView({ block: "center" }));
         await settled(page);

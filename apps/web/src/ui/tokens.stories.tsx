@@ -289,7 +289,7 @@ export default stories({
       ),
     }),
     Type: story({
-      args: { sample: "工单派给帮工，主人看改动 Ship it" },
+      args: { sample: "工单派给帮工，用户看改动 Ship it" },
       render: (a) => (
         <div {...stylex.attrs(viewStyles.tokensStoriesDiv5)}>
           <For each={sizes}>

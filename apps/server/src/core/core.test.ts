@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Fiber, Layer, PubSub, Queue, Scheduler, Stream } from "effect";
+import { Clock, Effect, Fiber, Formatter, Layer, PubSub, Queue, Scheduler, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vite-plus/test";
 
@@ -83,19 +83,19 @@ describe("core", () => {
       crons: [],
       issues: [],
     };
-    writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
+    writeFileSync(join(config.home, "state.json"), Formatter.formatJson(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
       expect([s.call, s.callReason]).toEqual(["idle", ""]);
       expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
       expect(s.sessions).toEqual([]);
-      expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(JSON.stringify(was));
+      expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(Formatter.formatJson(was));
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
   });
 
   it.effect("regression: a legacy state file is neither decoded nor rewritten", () => {
     const config = testConfig();
-    const raw = JSON.stringify({ call: "idle", sessions: {} });
+    const raw = Formatter.formatJson({ call: "idle", sessions: {} });
     writeFileSync(join(config.home, "state.json"), raw);
     return Effect.gen(function* () {
       yield* Effect.scoped(
@@ -166,7 +166,8 @@ describe("core", () => {
         2,
       ]);
       yield* TestClock.adjust(stateEveryMs * 2);
-      expect(yield* Queue.size(frames)).toBe(0);
+      const size2 = yield* Queue.size(frames);
+      expect(size2).toBe(0);
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     ),
@@ -220,7 +221,8 @@ describe("core", () => {
       yield* TestClock.adjust(5);
       for (let i = 0; i < 128; i++) yield* activity(core, "orchestrator", i % 2 === 0 ? "thinking" : "speaking");
       yield* TestClock.adjust(200);
-      expect(yield* Fiber.join(seen)).toBe(128);
+      const seen2 = yield* Fiber.join(seen);
+      expect(seen2).toBe(128);
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     ),
@@ -247,7 +249,8 @@ describe("core", () => {
 
   it.effect("regression: a scheduler yield cannot leave the core locked against a synchronous callback", () =>
     Effect.gen(function* () {
-      const runSync = Effect.runSyncWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const runSync = Effect.runSyncWith(context2);
       const core = yield* Core;
       const rounds = Array.from({ length: 32 }, (_, i) => i);
       const writer = Effect.forEach(rounds, (i) => core.apply({ type: "callChanged", state: "live", reason: `writer-${i}` }), { discard: true }).pipe(
@@ -267,7 +270,8 @@ describe("core", () => {
 
   it.effect("apply stays synchronous for oar callbacks", () =>
     Effect.gen(function* () {
-      const runSync = Effect.runSyncWith(yield* Effect.context());
+      const context2 = yield* Effect.context();
+      const runSync = Effect.runSyncWith(context2);
       const core = yield* Core;
       yield* core.apply({ type: "sessionChanged", session: helper });
       yield* Effect.sync(() => runSync(core.apply({ type: "sessionPhaseChanged", id: helper.id, phase: phaseOf("thinking") })));
@@ -281,7 +285,8 @@ describe("core", () => {
 describe("bounded streams", () => {
   it.effect("keeps the source order", () =>
     Effect.gen(function* () {
-      expect(yield* bounded(Stream.make(1, 2, 3), "test").pipe(Stream.runCollect)).toEqual([1, 2, 3]);
+      const bounded2 = yield* bounded(Stream.make(1, 2, 3), "test").pipe(Stream.runCollect);
+      expect(bounded2).toEqual([1, 2, 3]);
     }),
   );
 

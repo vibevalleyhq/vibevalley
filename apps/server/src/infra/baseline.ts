@@ -4,10 +4,11 @@ import { readFileSync } from "node:fs";
 import { serverFile } from "#/base/assets.ts";
 
 const baselineFile = serverFile("db/migrations/0001_schema.up.sql");
-const baselineSql = () => readFileSync(baselineFile, "utf8");
+export const baselineSql = () => readFileSync(baselineFile, "utf8");
 export const baselineHash = () => createHash("sha256").update(baselineSql()).digest("hex").slice(0, 16);
 
-/** The baseline as single statements, in order: SQLite prepares one at a time. A trigger's body (BEGIN … END;) stays one statement. */
+/** The baseline as single statements, in order: a driver prepares one at a time. A function's body ($$ … $$) and a
+ * string stay inside the statement they are in. */
 export function baselineStatements(sql: string = baselineSql()): string[] {
   const out: string[] = [];
   let cur = "";
@@ -15,10 +16,17 @@ export function baselineStatements(sql: string = baselineSql()): string[] {
   const code = (text: string) => text.replace(/--[^\n]*/gu, "").trim();
   while (i < sql.length) {
     const ch = sql[i];
-    if (!ch) break;
+    if (ch === undefined) break;
     if (ch === "-" && sql[i + 1] === "-") {
       const end = sql.indexOf("\n", i);
       const stop = end === -1 ? sql.length : end;
+      cur += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    if (ch === "$" && sql[i + 1] === "$") {
+      const end = sql.indexOf("$$", i + 2);
+      const stop = end === -1 ? sql.length : end + 2;
       cur += sql.slice(i, stop);
       i = stop;
       continue;
@@ -33,9 +41,7 @@ export function baselineStatements(sql: string = baselineSql()): string[] {
     cur += ch;
     i += 1;
     if (ch !== ";") continue;
-    const text = code(cur);
-    if (/^create\s+trigger/iu.test(text) && !/\bend\s*;$/iu.test(text)) continue;
-    if (text !== ";") out.push(cur.trim());
+    if (code(cur) !== ";") out.push(cur.trim());
     cur = "";
   }
   if (code(cur) !== "") out.push(cur.trim());

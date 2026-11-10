@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 import { agentCommand } from "./commands/agent.ts";
 import { appCommand } from "./commands/app.ts";
 import { artifactCommand } from "./commands/artifact.ts";
+import { authCommand } from "./commands/auth.ts";
 import { channelCommand } from "./commands/channel.ts";
 import { chatCommand } from "./commands/chat.ts";
 import { cronCommand } from "./commands/cron.ts";
@@ -19,7 +20,8 @@ import { repoCommand } from "./commands/repo.ts";
 import { runtimeCommand } from "./commands/runtime.ts";
 import { sessionCommand } from "./commands/session.ts";
 import { WorkerAccessFlag, workerCommand } from "./commands/worker.ts";
-import { DryRunFlag, FormatFlag, ServerFlag } from "./farm.ts";
+import { ServerFlag } from "./farm.ts";
+import { DryRunFlag, FormatFlag } from "./format.ts";
 import { Ended, err, exit, Failure, out, printFailure } from "./output.ts";
 
 const version = "0.1.0";
@@ -41,6 +43,7 @@ const root = Command.make("vibevalley").pipe(
     chatCommand,
     doctorCommand,
     appCommand,
+    authCommand,
   ]),
   Command.withGlobalFlags([ServerFlag, DryRunFlag, FormatFlag, WorkerAccessFlag]),
 );
@@ -49,7 +52,7 @@ const root = Command.make("vibevalley").pipe(
 function usageOf(e: CliError.CliError): Failure {
   const path = e._tag === "ShowHelp" ? e.commandPath.slice(1) : [];
   const errors = e._tag === "ShowHelp" ? e.errors : [e];
-  return new Failure({
+  return Failure.make({
     code: exit.usage,
     tag: errors[0]?._tag ?? e._tag,
     text: errors.map((x) => x.message).join(t("cli.and")) || e.message,
@@ -84,7 +87,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
       if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.succeed(exit.ok);
       // The conversation said what it had to on the terminal: only its code is left.
       if (Schema.is(Ended)(e)) return Effect.succeed(e.code);
-      const f = Schema.is(Failure)(e) ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
+      const f = Schema.is(Failure)(e) ? e : CliError.isCliError(e) ? usageOf(e) : Failure.make({ code: exit.other, tag: "Error", text: String(e) });
       return Effect.as(printFailure(f), f.code);
     }),
   );
@@ -98,6 +101,6 @@ const codeOf = (end: Exit.Exit<unknown, unknown>) =>
 if (import.meta.main ?? process.argv[1] === new URL(import.meta.url).pathname) {
   run(process.argv.slice(2)).pipe(
     Effect.provide([NodeServices.layer, FetchHttpClient.layer]),
-    NodeRuntime.runMain({ disableErrorReporting: true, teardown: (end) => process.exit(codeOf(end)) }),
+    NodeRuntime.runMain({ disableErrorReporting: true, teardown: (end) => end.pipe(codeOf, (code) => process.exit(code)) }),
   );
 }

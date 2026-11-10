@@ -1,7 +1,7 @@
 {
   "place": {
-    "label": "稿子",
-    "hint": "你和帮工、管家留下要看的东西：一起写的稿子、交上来的网页，都在这里"
+    "label": "Artifact",
+    "hint": "你和帮工、助手留下要看的东西：一起写的 Artifact、交上来的网页，都在这里"
   },
   "card": {
     "version": "第 {version} 稿",
@@ -15,14 +15,14 @@
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
     "deleted": "删掉了「{title}」",
-    "gone": "这份稿子已经删掉了，或者没有这份稿子。",
+    "gone": "这份 Artifact 已经删掉了，或者没有这份 Artifact。",
     "frame": "「{title}」第 {version} 稿",
-    "list": "全部稿子",
+    "list": "全部 Artifact",
     "new": "新建",
-    "none": "还没有稿子：写个标题新建一篇，或者让帮工交一份上来。",
-    "all": "全部稿子",
+    "none": "还没有 Artifact：写个标题新建一篇，或者让帮工交一份上来。",
+    "all": "全部 Artifact",
     "forIssue": "为 #{number} 做的",
-    "untitled": "没起名的稿子",
+    "untitled": "没起名的 Artifact",
     "find": "按标题找",
     "nothingFound": "没有标题对得上的",
     "title": "标题",
@@ -30,7 +30,7 @@
     "copyLink": "复制链接",
     "copied": "链接复制好了",
     "group": {
-      "delivered": "帮工和管家交的",
+      "delivered": "帮工和助手交的",
       "mine": "我写的"
     },
     "rail": "这篇的旁注",
@@ -48,7 +48,7 @@
     "none": "还没在对话里说过：自己写的这篇，还没交给谁看。"
   },
   "issue": {
-    "title": "稿子"
+    "title": "Artifact"
   },
   "blocks": {
     "memoryItem": "记性",
@@ -58,7 +58,7 @@
     "helpersWriting": "帮工在写",
     "demo": "演示：几个帮工一起写",
     "append": "在末尾写一段",
-    "owner": "主人",
+    "user": "你",
     "done": "做完了",
     "notDone": "没做完",
     "writing": "{who} 在写",
@@ -74,9 +74,9 @@
     "start": "从这里开始写……"
   },
   "canvas": {
-    "label": "打开的稿子",
+    "label": "打开的 Artifact",
     "close": "关掉",
-    "openPage": "在稿子页打开",
+    "openPage": "在 Artifact 页打开",
     "quote": "带话"
   },
   "suggestions": {
@@ -108,7 +108,9 @@
   },
   "body": {
     "blocks": "一起写的",
-    "html": "网页"
+    "html": "网页",
+    "slides": "幻灯片",
+    "motion": "动画"
   },
   "edit": {
     "title": "改字",
@@ -117,5 +119,27 @@
     "to": "改成",
     "save": "存成新的一稿",
     "saved": "存成了第 {version} 稿"
+  },
+  "slides": {
+    "previous": "上一页",
+    "next": "下一页",
+    "at": "{at} / {pages}",
+    "present": "全屏放映",
+    "presenter": "演讲者视图",
+    "pdf": "存成 PDF",
+    "thumbnails": "每一页",
+    "slide": "第 {at} 页 {title}"
+  },
+  "presenter": {
+    "title": "演讲者视图：{title}",
+    "missing": "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
+    "current": "这一页",
+    "next": "下一页",
+    "end": "这是最后一页",
+    "notes": "备注",
+    "noNotes": "这一页没有备注",
+    "clock": "讲了多久",
+    "restart": "重新计时",
+    "aside": "下一页和备注"
   }
 }

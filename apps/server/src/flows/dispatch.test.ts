@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Formatter, Layer, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { scriptedLLM } from "@vibevalley/agent/testing";
@@ -27,7 +27,7 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
       yield* testIssues(issues).start(item.id, (yield* Channel).defaultChannel());
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql<{ id: string }>`select id from mailbox_trigger
-        where trigger_json->'meta'->>'issue' = ${item.id} and trigger_json->'meta'->'dispatch' = 'true'
+        where trigger_json::jsonb->'meta'->>'issue' = ${item.id} and trigger_json::jsonb->'meta'->'dispatch' = 'true'
         order by seq desc limit 1`;
       triggerId = rows[0]?.id ?? "";
       issueId = item.id;
@@ -54,13 +54,15 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
     // A second replay of the same unrouted row acknowledges no second delivery.
     yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
     yield* (yield* Issue).refreshQueue;
-    expect(yield* sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`).toEqual(deliveries);
-    expect(yield* sql`select id from channel_message where body = ${source.payload.text}`).toHaveLength(0);
+    const rows = yield* sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`;
+    expect(rows).toEqual(deliveries);
+    const rows2 = yield* sql`select id from channel_message where body = ${source.payload.text}`;
+    expect(rows2).toHaveLength(0);
     const release = Promise.withResolvers<void>();
     const { llm } = scriptedLLM([() => release.promise.then(() => answer("finished"))]);
     const config = yield* ServerConfig;
     const channel = source.trigger.replyChannel ?? (yield* Channel).defaultChannel();
-    const by = yield* Schema.decodeEffect(Schema.fromJsonString(S.RunTrigger))(JSON.stringify(source.trigger.meta.trigger)).pipe(Effect.orDie);
+    const by = yield* Schema.decodeEffect(Schema.fromJsonString(S.RunTrigger))(Formatter.formatJson(source.trigger.meta.trigger)).pipe(Effect.orDie);
     const host = yield* (yield* Session).host({
       session: { id: defaultOrchestrator, role: "orchestrator", agent: defaultOrchestrator, name: "orchestrator", runtime: "vibevalley", brief: "" },
       inputType: "dispatchTest",

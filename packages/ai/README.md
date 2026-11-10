@@ -8,5 +8,4 @@
 - 浏览器安全入口 `./audio` 提供 WAV/RMS，`./realtime/moss`、`./realtime/playback`、`./realtime/moss-session`、`./realtime/turns` 提供无 DOM 的 MOSS 会话、样本级播放对账和轮次。它们不加载 npm Core、服务端模型工厂或长期密钥。
 - MOSS 的 tagged-v1、chunk/run/turn 完成回执与样本级 cut 保留在专有运行逻辑中；设备、Worklet、Worker、页面 socket 与应用说话人归 web voice。`realtime/sdk.test.ts` 用安装的 SDK 和假 transport 验证其边界，原因见 [语音](docs/subsystems/voice.md#为什么这样)。
 - DeepSeek 的唯一网络实现、请求编码和厂商字段解码在 Provider；`Llm`/`ModelClient` 及消息/工具契约不变。语言调用不经过 SDK Core，差异依据见 [模型边界](docs/subsystems/brain.md#模型边界)。
-- 黄金数据在 `src/testdata`，从 pi-ai 录下；有意改了请求或读流，`vp run golden:update -- ai` 重写，看过 diff 再留。
 - 测试：`vp run --filter @vibevalley/ai test`（在 `server:check` 里）。

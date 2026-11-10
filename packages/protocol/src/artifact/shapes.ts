@@ -16,13 +16,17 @@ export const BlockTypeValues = [
 ] as const;
 export type BlockType = (typeof BlockTypeValues)[number];
 
-/** What the owner and the agents leave for people to read (docs/subsystems/artifact.md). */
+/** What the user and the agents leave for people to read (docs/subsystems/artifact.md). */
 export const ArtifactBodyValues = ["blocks", "html"] as const;
 export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 
 /** What a maker hands in: a whole HTML page, or Markdown, which is read into blocks. */
 export const ArtifactKindValues = ["html", "markdown"] as const;
 export type ArtifactKind = (typeof ArtifactKindValues)[number];
+
+/** How the workbench shows an html artifact: a page as it is, a deck of slides, or an animation on a timeline. */
+export const ArtifactDisplayValues = ["page", "slides", "motion"] as const;
+export type ArtifactDisplay = (typeof ArtifactDisplayValues)[number];
 
 /** A version's content, a GET like an attachment's: an <iframe src> can only GET. */
 export const artifactPrefix = "/api/v1/artifact/";
@@ -37,13 +41,15 @@ export interface ArtifactCard {
   version: number;
   /** What this version changed, in the maker's words. */
   note: string;
+  /** html: how it is shown, as it was when announced (a card said before there were displays has none: page). */
+  display?: ArtifactDisplay;
 }
 
 export interface ArtifactVersion {
   version: number;
   size: number;
   note: string;
-  /** Who made it: a profile's id, or the owner's. */
+  /** Who made it: a profile's id, or the user's. */
   by: string;
   byName: string;
   at: number;
@@ -56,7 +62,9 @@ export interface Artifact {
   id: ArtifactId;
   title: string;
   body: ArtifactBody;
-  /** The channel or thread it was announced in; none for one the owner started on the page. */
+  /** html: how it is shown; blocks: none. */
+  display?: ArtifactDisplay;
+  /** The channel or thread it was announced in; none for one the user started on the page. */
   channel?: string;
   /** The message that first announced it: a blocks one's comments are the replies to it. */
   said?: { channel: string; number: number };
@@ -73,10 +81,12 @@ export interface Artifact {
   updated: number;
 }
 
-/** Without content, an empty blocks artifact to write in, not announced (the owner's New). */
+/** Without content, an empty blocks artifact to write in, not announced (the user's New). */
 export interface ArtifactRequest {
   title: string;
   kind: ArtifactKind;
+  /** html only; none: page. */
+  display?: ArtifactDisplay;
   content?: string;
   note?: string;
   channel?: string;
@@ -97,7 +107,7 @@ export interface HtmlAnchor {
   suffix: string;
 }
 
-/** The owner's words in place of the anchored ones, in the version they were read in; kept as the next version. */
+/** The user's words in place of the anchored ones, in the version they were read in; kept as the next version. */
 export interface ArtifactHtmlEdit {
   id: ArtifactId;
   version: number;
@@ -105,11 +115,25 @@ export interface ArtifactHtmlEdit {
   text: string;
 }
 
-// The page's own scripts can send the same message, so a selection is only ever data: saving is the owner's button.
-export interface HtmlShellMessage {
-  vibevalley: "selection";
-  anchor: HtmlAnchor;
+/** Its title or how it is shown, as the user changes them; display is for html ones only. */
+export interface ArtifactUpdateRequest {
+  id: ArtifactId;
+  title?: string;
+  display?: ArtifactDisplay;
 }
+
+// The page's own scripts can send the same messages, so what a page says is only ever data for the shell to show:
+// saving a selection is the user's button, and no message makes the workbench do anything outside the frame.
+/** What the page (its vv runtime) tells the shell around it. */
+export type HtmlShellMessage =
+  | { vibevalley: "selection"; anchor: HtmlAnchor }
+  /** The page is laid out: slides say how many and each one's title and notes, motion its length in seconds. */
+  | { vibevalley: "ready"; display: ArtifactDisplay; pages?: number; titles?: string[]; notes?: string[]; duration?: number }
+  /** Where it is now: the slide shown (0-based), or the time (seconds). */
+  | { vibevalley: "at"; page?: number; time?: number };
+
+/** What the shell tells the page's runtime: show a slide, go to a time, play or pause. */
+export type HtmlShellCommand = { vibevalley: "goto"; page: number } | { vibevalley: "seek"; time: number } | { vibevalley: "play" } | { vibevalley: "pause" };
 
 export interface ArtifactListRequest {
   channel?: string;
@@ -331,7 +355,7 @@ export interface SuggestionChange {
   readonly delete?: boolean;
 }
 
-/** A change an agent proposed to a block the owner wrote; the owner accepts or rejects it. */
+/** A change an agent proposed to a block the user wrote; the user accepts or rejects it. */
 export interface Suggestion {
   readonly id: SuggestionId;
   readonly artifactId: ArtifactId;
@@ -366,7 +390,7 @@ export interface BlockOpResult {
   text?: TextSpan[];
   yours?: TextSpan[];
   reason?: string;
-  /** When an agent changed a block the owner wrote: the suggestion it made instead. */
+  /** When an agent changed a block the user wrote: the suggestion it made instead. */
   suggestion?: SuggestionId;
 }
 

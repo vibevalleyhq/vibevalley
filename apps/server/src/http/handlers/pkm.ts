@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { ownerId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import type { PkmHandlers } from "@vibevalley/protocol/api";
 
 import { Pkm } from "#/pkm/pkm.ts";
@@ -22,7 +22,7 @@ export const pkmHandlers = Effect.gen(function* () {
     "pkm.journal.open": ({ day }) => pkm.journal(day),
     "pkm.radar.get": ({ staleDays }) => pkm.radar(staleDays),
     "pkm.comment.list": ({ page }) => pkm.comments(page),
-    "pkm.comment.suggest": (req) => pkm.suggest(req, ownerId),
+    "pkm.comment.suggest": (req) => pkm.suggest(req, userId),
     "pkm.comment.resolve": (req) => pkm.resolve(req),
     "pkm.clip.create": (req) => pkm.clip(req),
     "pkm.cluster.create": (req) => pkm.cluster(req),

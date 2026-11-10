@@ -21,10 +21,10 @@ test("a sentence said shows in the list through the state stream, and the orches
   await box.fill("run the tests once");
   await box.press("Enter");
   const messages = page.getByTestId("messages");
-  await expect(messages.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: "run the tests once" })).toBeVisible();
+  await expect(messages.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: "run the tests once" })).toBeVisible();
   await expect(box).toHaveValue("");
   // Without a model key the orchestrator answers that it has none; the page takes that as any answer.
-  await expect(messages.locator('[data-testid="message"][data-from-kind="orchestrator"]').first()).toBeVisible({ timeout: 15_000 });
+  await expect(messages.locator('[data-testid="message"][data-from-role="orchestrator"]').first()).toBeVisible({ timeout: 15_000 });
 });
 
 test("the direct channel with the orchestrator: listed apart, talked in alone, with no one to @", async ({ page, api }) => {

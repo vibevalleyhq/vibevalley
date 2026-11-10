@@ -99,7 +99,7 @@ export default stories({
       info({ installation: { status: "checking" }, models: null, usage: null, skills: null, mcpServers: null, tools: null }),
     ),
     停用了: scene(
-      "主人停用了它：管家不会派活给它。",
+      "用户停用了它：助手不会派活给它。",
       info({ settings: { enabled: false, binPath: "", defaultModel: "opus", defaultEffort: "medium", env: {} }, stop: "今天的预算花完了" }),
     ),
   },

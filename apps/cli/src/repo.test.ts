@@ -1,45 +1,37 @@
-import { createServer } from "node:http";
-
+import { NodeHttpServer } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
+import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { endpoints } from "@vibevalley/protocol/api";
 
 import { cli } from "./testing.ts";
 
+const json = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 it.live("repo pr submit sends the explicit checkout and dry-run to the server", () =>
   Effect.gen(function* () {
     const bodies: string[] = [];
     const paths: (string | undefined)[] = [];
-    const server = createServer((req, res) => {
-      let body = "";
-      req.setEncoding("utf8");
-      req.on("data", (chunk: string) => {
-        body += chunk;
-      });
-      req.on("end", () => {
+    yield* HttpServer.serveEffect()(
+      Effect.gen(function* () {
+        const req = yield* HttpServerRequest.HttpServerRequest;
+        const body = yield* req.text;
         bodies.push(body);
         paths.push(req.url);
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            platform: "gitlab",
-            repository: "team/repo",
-            branch: "feat/topic",
-            sha: "a".repeat(40),
-            base: "main",
-            check: "preview",
-            pushed: false,
-          }),
-        );
-      });
-    });
-    yield* Effect.acquireRelease(
-      Effect.promise<void>(() => new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))),
-      () => Effect.sync(() => server.close()),
+        return yield* HttpServerResponse.json({
+          platform: "gitlab",
+          repository: "team/repo",
+          branch: "feat/topic",
+          sha: "a".repeat(40),
+          base: "main",
+          check: "preview",
+          pushed: false,
+        });
+      }),
     );
-    const address = server.address();
-    if (address === null || typeof address === "string") throw new Error("No server address");
+    const { address } = yield* HttpServer.HttpServer;
+    if (address._tag === "UnixPathAddress") return yield* Effect.die(new Error("No server address"));
     const req = { cwd: "/external/checkout", branch: "feat/topic", sha: "a".repeat(40), base: "main", title: "Title", body: "Body", dryRun: true };
     const result = yield* cli([
       "repo",
@@ -65,11 +57,13 @@ it.live("repo pr submit sends the explicit checkout and dry-run to the server", 
     ]);
     expect(result.code).toBe(0);
     expect(paths).toEqual(["/api/v1/repo/pr/submit"]);
-    expect(bodies.map((body) => JSON.parse(body))).toEqual([req]);
-    expect(JSON.parse(result.out)).toMatchObject({ check: "preview", pushed: false });
-  }).pipe(Effect.scoped),
+    const sent = yield* Effect.forEach(bodies, (body) => json(body));
+    expect(sent).toEqual([req]);
+    const shown = yield* json(result.out);
+    expect(shown).toMatchObject({ check: "preview", pushed: false });
+  }).pipe(Effect.scoped, Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it("existing branch publication is exposed only to the owner", () => {
-  expect(endpoints.find((e) => e.op === "repo.pr.submit")?.can).toEqual(["owner"]);
+it("existing branch publication is exposed only to the user", () => {
+  expect(endpoints.find((e) => e.op === "repo.pr.submit")?.can).toEqual(["user"]);
 });

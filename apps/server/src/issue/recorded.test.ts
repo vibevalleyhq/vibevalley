@@ -20,16 +20,16 @@ describe("an issue as a brief", () => {
   });
 
   it("an answer issue's brief is read only and ends with the block its conclusion comes back in", () => {
-    const brief = issueBrief({ title: "查一下打卡为什么慢", description: "主人觉得最近慢了", deliver: "answer", criteria: [] });
-    expect(brief.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n主人觉得最近慢了\n\n")).toBe(true);
+    const brief = issueBrief({ title: "查一下打卡为什么慢", description: "用户觉得最近慢了", deliver: "answer", criteria: [] });
+    expect(brief.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n用户觉得最近慢了\n\n")).toBe(true);
     expect(brief).toContain('"conclusion"');
     expect(brief).toContain('"evidence"');
     expect(issueBrief({ title: "写打卡", description: "", deliver: "change", criteria: [] })).toBe("写打卡");
   });
 
   it("a brief written as one long line keeps a short title and all of it as the description", () => {
-    const brief = "通读 vibevalley 仓库，给主人一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
-    expect(splitBrief(brief)).toEqual(["通读 vibevalley 仓库，给主人一份整体架构和当前进度的评估", brief]);
+    const brief = "通读 vibevalley 仓库，给用户一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
+    expect(splitBrief(brief)).toEqual(["通读 vibevalley 仓库，给用户一份整体架构和当前进度的评估", brief]);
   });
 
   it("the story of an issue, newest first", () => {
@@ -114,7 +114,7 @@ describe("a pull request", () => {
 describe("drafts", () => {
   it("are read from the last block", () => {
     const said =
-      '看过了。\n\n```json\n{"title": "旧的"}\n```\n\n要问主人：端口用哪个？\n\n```json\n' +
+      '看过了。\n\n```json\n{"title": "旧的"}\n```\n\n要问用户：端口用哪个？\n\n```json\n' +
       `{"title": " 看板拖卡改用 issue.status ", "why": "旧接口收不了", "todo": ["改 board.dart", " "], "criteria": "拖到待办就开工", "notDoing": [], "files": ["app/lib/workbench/issues/board.dart"]}` +
       "\n```\n\n结论：写好了";
     const { draft, problem } = parseRefinement(said);
@@ -135,7 +135,7 @@ describe("drafts", () => {
 
   it("briefs", () => {
     const first = refinementBrief({ title: "新工单", description: "", criteria: [] }, "看板拖卡还在调旧接口", "board");
-    for (const want of [refinementOpening, "仓库：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："])
+    for (const want of [refinementOpening, "仓库：board", "用户想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问用户："])
       expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");
     const refined = {
@@ -150,13 +150,13 @@ describe("drafts", () => {
       "标题：看板拖卡改用 issue.status",
       "为什么：\n旧接口",
       "- 拖到待办就开工",
-      "你上一版问主人的：\n- 端口用哪个？",
-      "主人的回答：用 8797",
+      "你上一版问用户的：\n- 端口用哪个？",
+      "用户的回答：用 8797",
     ])
       expect(answer).toContain(want);
     const again = refinementBrief({ ...refined, questions: [] }, "也改测试", "board");
-    expect(again).toContain("主人这次说：也改测试");
-    expect(again).not.toContain("主人的回答");
+    expect(again).toContain("用户这次说：也改测试");
+    expect(again).not.toContain("用户的回答");
   });
 });
 
@@ -201,7 +201,7 @@ describe("templates", () => {
         }
   });
 
-  it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {
+  it("issue.list's filter keeps the open ones by default, and what waits on the user the longest waiting first", () => {
     const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
       ({ title, status, repo: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
     const waiting = (since: number) => ({ stage: { state: "reviewing" as const, acts: [], since } });
@@ -218,7 +218,7 @@ describe("templates", () => {
     expect(titles({ status: "done" })).toEqual(["老的"]);
     expect(titles({ text: "修登录 页面" })).toEqual(["修登录 页面"]);
     expect(titles({ repo: "web" })).toEqual(["别处的"]);
-    expect(titles({ wantsOwner: true })).toEqual(["修登录 页面", "修登录 按钮"]);
+    expect(titles({ wantsUser: true })).toEqual(["修登录 页面", "修登录 按钮"]);
   });
 
   it("recent titles are the repo's own sent issues", () => {
@@ -243,7 +243,7 @@ describe("templates", () => {
       issue("没派过", "app", 8, { sent: false }),
       issue("计划里的一步", "app", 8, { parent: issueId("g") }),
       issue("定时任务", "app", 8, { cron: "s1" }),
-      issue("给管家", "app", 8, { agent: defaultOrchestrator }),
+      issue("给助手", "app", 8, { agent: defaultOrchestrator }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),
       issue("二", "app", 2),

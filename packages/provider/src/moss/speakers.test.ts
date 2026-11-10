@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 
 import { mossSpeakersModels } from "./speakers-models.ts";
 import { createMossSpeakersTask, prepareMossSpeakers } from "./speakers.ts";
+
+const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
 
 const input = {
   model: "moss-ttsd-1.0",
@@ -26,9 +28,10 @@ it.effect.each(mossSpeakersModels)("%s maps voices and ordered dialogue without 
       expect(request.method).toBe("POST");
       expect(request.url).toBe("https://api.mosi.cn/v1/audio/speech/speakers");
       expect(request.headers.authorization).toBe("Bearer account-one");
-      expect(yield* Effect.serviceOption(FetchHttpClient.RequestInit)).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
+      const serviceOption2 = yield* Effect.serviceOption(FetchHttpClient.RequestInit);
+      expect(serviceOption2).toMatchObject({ _tag: "Some", value: { redirect: "manual" } });
       if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(JSON.parse(new TextDecoder().decode(request.body.body))).toEqual({
+      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
         model,
         speakers: [
           { id: "host", voice_id: "voice-one" },
@@ -43,7 +46,8 @@ it.effect.each(mossSpeakersModels)("%s maps voices and ordered dialogue without 
     }),
   );
   return Effect.gen(function* () {
-    expect(yield* createMossSpeakersTask("account-one", { ...input, model })).toEqual({ taskId: "dialogue-one", retryAfterSeconds: 3 });
+    const mossSpeakersTaskCreated = yield* createMossSpeakersTask("account-one", { ...input, model });
+    expect(mossSpeakersTaskCreated).toEqual({ taskId: "dialogue-one", retryAfterSeconds: 3 });
     expect(calls).toBe(1);
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 });
@@ -80,7 +84,8 @@ it.effect.each([
   { webhook_url: "https://example.com/callback" },
 ])("invalid speaker mapping %# is rejected before billing", (patch) =>
   Effect.gen(function* () {
-    expect(yield* createMossSpeakersTask("account-one", { ...input, ...patch }).pipe(Effect.flip)).toMatchObject({
+    const mossSpeakersTaskCreatedFailure = yield* createMossSpeakersTask("account-one", { ...input, ...patch }).pipe(Effect.flip);
+    expect(mossSpeakersTaskCreatedFailure).toMatchObject({
       reason: "InvalidInput",
       outcome: "NotSubmitted",
     });
@@ -96,7 +101,8 @@ it.effect("Unicode text bounds count code points across all segments", () =>
   Effect.gen(function* () {
     const request = yield* prepareMossSpeakers({ ...input, segments: [{ speaker: "host", text: "𝄞".repeat(10000) }] });
     expect(request.segments[0]?.text).toHaveLength(20000);
-    expect(yield* prepareMossSpeakers({ ...input, segments: [{ speaker: "host", text: "𝄞".repeat(10001) }] }).pipe(Effect.flip)).toMatchObject({
+    const mossSpeakersPreparedFailure = yield* prepareMossSpeakers({ ...input, segments: [{ speaker: "host", text: "𝄞".repeat(10001) }] }).pipe(Effect.flip);
+    expect(mossSpeakersPreparedFailure).toMatchObject({
       reason: "InvalidInput",
     });
   }),

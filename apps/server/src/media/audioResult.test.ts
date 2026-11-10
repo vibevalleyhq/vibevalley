@@ -1,11 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, FileSystem } from "effect";
+import { Deferred, Effect, Exit, Fiber, FileSystem } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { attachmentMax, type MediaAudioFormat } from "@vibevalley/protocol";
 
-import { Channel } from "#/channel/channel.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { world } from "#/testing/world.ts";
 
@@ -24,9 +24,10 @@ const downloadSpeech = Effect.fnUntraced(function* (url: string, format: MediaAu
     const result = yield* saveAudioResult("download-test", url, format, inputs).pipe(Effect.provideService(PublicHttp, http));
     expect(result.resultInput).toBeNull();
     if (!result.attachment) return yield* Effect.die("Expected a small attachment");
-    const attachment = yield* (yield* Channel).attachment(result.attachment.id);
+    const attachment = yield* (yield* Attachment).get(result.attachment.id);
     if (!attachment) return yield* Effect.die("Missing saved attachment");
-    return Buffer.from(yield* (yield* FileSystem.FileSystem).readFile(attachment.path));
+    const file = yield* (yield* FileSystem.FileSystem).readFile(attachment.path);
+    return Buffer.from(file);
   }).pipe(Effect.scoped, Effect.provide(world()));
 });
 
@@ -40,7 +41,8 @@ it.effect.each(["wav", "mp3"] as const)("downloads complete %s audio without cre
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(bytes, { headers: { "content-type": type } })));
   });
   return Effect.gen(function* () {
-    expect(yield* downloadSpeech(`https://audio.example.com/result.${format}?token=private`, format)).toEqual(bytes);
+    const downloadSpeech2 = yield* downloadSpeech(`https://audio.example.com/result.${format}?token=private`, format);
+    expect(downloadSpeech2).toEqual(bytes);
   }).pipe(Effect.provideService(PublicHttp, http));
 });
 
@@ -54,7 +56,8 @@ it.effect.each([
   "file:///etc/passwd",
 ])("unsafe speech URL %s never reaches transport", (address) =>
   Effect.gen(function* () {
-    expect(yield* downloadSpeech(address, "wav").pipe(Effect.flip)).toMatchObject({ _tag: "Refused" });
+    const downloadSpeechFailure = yield* downloadSpeech(address, "wav").pipe(Effect.flip);
+    expect(downloadSpeechFailure).toMatchObject({ _tag: "Refused" });
   }).pipe(
     Effect.provideService(
       PublicHttp,
@@ -114,12 +117,14 @@ it.effect("regression: WAV chunk padding and extensible PCM are validated", () =
   const padded = Buffer.concat([original.subarray(0, 36), Buffer.from("4a554e4b010000000000", "hex"), original.subarray(36)]);
   padded.writeUInt32LE(padded.length - 8, 4);
   return Effect.gen(function* () {
-    expect(
-      yield* downloadSpeech("https://audio.example.com/pcm.wav", "wav").pipe(Effect.provideService(PublicHttp, answer(extensible, "audio/x-wav"))),
-    ).toEqual(extensible);
-    expect(yield* downloadSpeech("https://audio.example.com/padded.wav", "wav").pipe(Effect.provideService(PublicHttp, answer(padded, "audio/wave")))).toEqual(
-      padded,
+    const downloadSpeech2 = yield* downloadSpeech("https://audio.example.com/pcm.wav", "wav").pipe(
+      Effect.provideService(PublicHttp, answer(extensible, "audio/x-wav")),
     );
+    expect(downloadSpeech2).toEqual(extensible);
+    const downloadSpeech3 = yield* downloadSpeech("https://audio.example.com/padded.wav", "wav").pipe(
+      Effect.provideService(PublicHttp, answer(padded, "audio/wave")),
+    );
+    expect(downloadSpeech3).toEqual(padded);
     extensible[59] = 0;
     yield* downloadSpeech("https://audio.example.com/bad.wav", "wav").pipe(Effect.flip, Effect.provideService(PublicHttp, answer(extensible, "audio/wav")));
   });
@@ -132,9 +137,10 @@ it.effect("regression: MP3 frames and metadata must be complete rather than just
   const invalidTag = Buffer.from(tagged);
   invalidTag[6] = 128;
   return Effect.gen(function* () {
-    expect(yield* downloadSpeech("https://audio.example.com/tagged.mp3", "mp3").pipe(Effect.provideService(PublicHttp, answer(tagged, "audio/mp3")))).toEqual(
-      tagged,
+    const downloadSpeech2 = yield* downloadSpeech("https://audio.example.com/tagged.mp3", "mp3").pipe(
+      Effect.provideService(PublicHttp, answer(tagged, "audio/mp3")),
     );
+    expect(downloadSpeech2).toEqual(tagged);
     yield* Effect.forEach(
       [mp3.subarray(0, 4), mp3.subarray(0, mp3.length - 1), Buffer.concat([mp3, Buffer.from("trailing")]), invalidHeader, invalidTag, tagged.subarray(0, 10)],
       (bytes) => downloadSpeech("https://audio.example.com/bad.mp3", "mp3").pipe(Effect.flip, Effect.provideService(PublicHttp, answer(bytes, "audio/mpeg"))),
@@ -166,7 +172,8 @@ it.effect("regression: format, MIME, declared length and actual audio must match
 it.effect("a stalled speech body is canceled at the download deadline", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>();
-    let canceled = false;
+    // The body's cancel comes after the download has given up, on the stream's own turn.
+    const canceled = yield* Deferred.make<void>();
     const http = HttpClient.make((request) =>
       Deferred.succeed(started, undefined).pipe(
         Effect.as(
@@ -175,7 +182,7 @@ it.effect("a stalled speech body is canceled at the download deadline", () =>
             new Response(
               new ReadableStream<Uint8Array>({
                 cancel() {
-                  canceled = true;
+                  Deferred.doneUnsafe(canceled, Exit.void);
                 },
               }),
               { headers: { "content-type": "audio/wav" } },
@@ -192,6 +199,6 @@ it.effect("a stalled speech body is canceled at the download deadline", () =>
     yield* Deferred.await(started);
     yield* TestClock.adjust("300 seconds");
     expect((yield* Fiber.join(fiber))._tag).toBe("Refused");
-    expect(canceled).toBe(true);
+    yield* Deferred.await(canceled);
   }),
 );

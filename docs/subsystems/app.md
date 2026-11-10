@@ -49,7 +49,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 ### 宿主与多端
 
 - **宿主接口封闭，缺省能力为 `null`**：页面通过 `currentHost()` 检测能力是否存在，不分支判断宿主类型。跨进程调用经 `@vibevalley/bridge` 按 Schema 校验。
-- **远端浏览器先配对**：非回环地址访问且无 `vibevalley_lan_key` cookie 时跳转 `/pair`；配对后写入 `SameSite=Strict` cookie（[连接到本机](docs/subsystems/lan.md)）。
+- **远端浏览器先拿钥匙**：非回环地址打开页面时先问 `user.get`（钥匙可能在 HttpOnly 的 Cookie 里，页面读不到）；没有钥匙的，设过密码就去 `/login`，没设去 `/pair`（`features/user/entry.ts`）。配对把钥匙写进 `SameSite=Strict` 的 cookie，登录由门写进 HttpOnly 的 cookie（[连接到本机](docs/subsystems/lan.md)）。
 - **手机壳单连接串行切换**：`FarmConnection` 串行管理农场选择与系统钥匙串写入，切农场时取消在途入线；手机通话走原生声网 SDK（`apps/mobile/src/rtc.ts`）保持锁屏不断线。
 
 ### 发布渠道
@@ -95,7 +95,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 1. `vp run package:mac` 构建页面与桌面壳，用 `pnpm deploy --prod` 和 `vp pack` 打包服务端，产出 `.dmg`、`.zip` 与 `release.json`。
 2. 打包应用启动时及每 4 小时检查同渠道最新 Release，下载 `.zip` 并校验大小、SHA-512 与 `Info.plist` 版本。
-3. 若新版本 `dbSchema` 与本地一致，退出或点「重启更新」时自动替换 `.app`；若 `dbSchema` 变化，仅在「关于」页由主人确认后替换。
+3. 若新版本 `dbSchema` 与本地一致，退出或点「重启更新」时自动替换 `.app`；若 `dbSchema` 变化，仅在「关于」页由用户确认后替换。
 
 ## 和谁打交道
 
@@ -108,7 +108,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 - **一份 Solid 2 页面服务三个宿主**：UI 与纯函数规则只写一遍，按 id `reconcile` 细粒度更新，避免高频帧触发整树重渲染。
 - **状态中间层收拢到 Effect Atom，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
 - **按概念分 feature，单向分层且出口显式**：跨 feature 只走 `index.ts` 并禁止成环；像素农场作为皮肤层放在 `features` 之上。
-- **四渠道完全隔离并自带 CLI**：正式版与开发版/测试版可同机并排运行，互不争抢 SQLite 库，用户无需另装 Node 即可使用 CLI。
+- **四渠道完全隔离并自带 CLI**：正式版与开发版/测试版可同机并排运行，互不争抢库，用户无需另装 Node 即可使用 CLI。
 
 ## 还没做的
 
@@ -121,4 +121,4 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 - `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、分层方向与故事覆盖测试。
 - `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
 - `vp run desktop:test`、`apps/desktop/src/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。
-- `vp run migration:verify --baseline <原始工作树> --run`：在四份生产构建图生成后，依次采集静态场景、浏览器行为、隔离真实服务端场景和 Electron/Android 宿主证据；`.test/style-migration/acceptance.json` 只在清单完整、A/A 稳定、A/B 零像素差异且没有失效、失败或跳过的收据时通过。命令要求 Android SDK、JDK 17 和已生成的原生工程；不发布网站，不碰主人的农场或模拟器数据。
+- `vp run migration:verify --baseline <原始工作树> --run`：在四份生产构建图生成后，依次采集静态场景、浏览器行为、隔离真实服务端场景和 Electron/Android 宿主证据；`.test/style-migration/acceptance.json` 只在清单完整、A/A 稳定、A/B 零像素差异且没有失效、失败或跳过的收据时通过。命令要求 Android SDK、JDK 17 和已生成的原生工程；不发布网站，不碰用户的农场或模拟器数据。

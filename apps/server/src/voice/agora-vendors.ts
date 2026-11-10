@@ -32,7 +32,7 @@ export interface VendorMessages {
   readonly unusable: (why: string) => string;
 }
 
-/** settings: the Settings section the owner fixes it in, when a setting does; the page offers to go there. */
+/** settings: the Settings section the user fixes it in, when a setting does; the page offers to go there. */
 export const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({
   _tag: "VoiceUnavailable",
   reason,
@@ -47,7 +47,7 @@ export class CallStepFailed extends Schema.TaggedError<CallStepFailed, { readonl
   cause: Schema.Defect(),
 }) {}
 
-export const callStepFailed = (cause: unknown) => new CallStepFailed({ message: errorMessage(cause), cause });
+export const callStepFailed = (cause: unknown) => CallStepFailed.make({ message: errorMessage(cause), cause });
 
 export const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
 

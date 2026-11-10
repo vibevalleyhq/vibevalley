@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Effect, Fiber, FileSystem, Layer } from "effect";
+import { Effect, Fiber, FileSystem, Formatter, Layer } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
@@ -40,15 +40,16 @@ function fixture(platform: T.PublishPlatform = "github", script = "#!/bin/sh\nex
     Effect.sync(() => {
       calls.push(args);
       if (args[0] === "auth") return { ok: true, missing: false, out: "" };
-      if (args.includes("defaultBranchRef")) return { ok: true, missing: false, out: JSON.stringify({ defaultBranchRef: { name: "main" } }) };
-      if (args[1] === "projects/team%2Frepo") return { ok: true, missing: false, out: JSON.stringify({ default_branch: "main" }) };
+      if (args.includes("defaultBranchRef")) return { ok: true, missing: false, out: Formatter.formatJson({ defaultBranchRef: { name: "main" } }) };
+      if (args[1] === "projects/team%2Frepo") return { ok: true, missing: false, out: Formatter.formatJson({ default_branch: "main" }) };
       const item =
         platform === "github"
           ? { number: 7, url, isCrossRepository: false, state: "OPEN" }
           : { iid: 7, web_url: url, source_project_id: 1, target_project_id: 1, state: "opened" };
-      if (args[1] === "list" || args[1]?.includes("?state=opened") === true) return { ok: true, missing: false, out: JSON.stringify(created ? [item] : []) };
+      if (args[1] === "list" || args[1]?.includes("?state=opened") === true)
+        return { ok: true, missing: false, out: Formatter.formatJson(created ? [item] : []) };
       created = true;
-      return { ok: true, missing: false, out: platform === "github" ? url : JSON.stringify(item) };
+      return { ok: true, missing: false, out: platform === "github" ? url : Formatter.formatJson(item) };
     });
   const pushed: string[][] = [];
   const hooks: RepoHooks = {
@@ -88,7 +89,8 @@ for (const platform of ["github", "gitlab"] as const) {
 it.effect("preview does not run the check or contact the Git network", () => {
   const f = fixture("github", "#!/bin/sh\nexit 1\n");
   return Effect.gen(function* () {
-    expect(yield* (yield* Repo).submitBranch({ ...f.req, dryRun: true })).toMatchObject({ pushed: false, check: "preview" });
+    const branchSubmitted = yield* (yield* Repo).submitBranch({ ...f.req, dryRun: true });
+    expect(branchSubmitted).toMatchObject({ pushed: false, check: "preview" });
     expect(f.pushed).toEqual([]);
     expect(f.calls.map((args) => args[0])).toEqual(["auth", "repo"]);
   }).pipe(Effect.provide(f.layer));
@@ -230,15 +232,19 @@ it.effect("worktrees list their branch and safe removal preserves dirty files an
   return Effect.gen(function* () {
     const r = repository(f.cwd);
     yield* r.addWorktree(other, "feat/other", f.req.sha);
-    expect(yield* r.worktrees).toContain("branch refs/heads/feat/other\0");
+    const worktrees2 = yield* r.worktrees;
+    expect(worktrees2).toContain("branch refs/heads/feat/other\0");
     write(join(other, "keep"), "uncommitted");
-    expect(yield* r.removeWorktree(other, false)).not.toBe("");
+    const worktreeRemoved = yield* r.removeWorktree(other, false);
+    expect(worktreeRemoved).not.toBe("");
     expect(readFileSync(join(other, "keep"), "utf8")).toBe("uncommitted");
     const fs = yield* FileSystem.FileSystem;
     yield* fs.remove(join(other, "keep"));
-    expect(yield* r.removeWorktree(other, false)).toBe("");
+    const worktreeRemoved2 = yield* r.removeWorktree(other, false);
+    expect(worktreeRemoved2).toBe("");
     expect(existsSync(f.cwd)).toBe(true);
-    expect(yield* r.head).toBe(f.req.sha);
+    const head2 = yield* r.head;
+    expect(head2).toBe(f.req.sha);
   }).pipe(Effect.provide(NodeServices.layer));
 });
 

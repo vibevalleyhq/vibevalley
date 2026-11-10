@@ -16,12 +16,12 @@ export function queryDecoder<T, E>(schema: Schema.Codec<T, E>) {
       const result = await Effect.runPromiseExit(decode(input), { signal });
       if (Exit.isSuccess(result)) return result.value;
       // Schema issues can contain credentials; cache only the boundary failure.
-      throw new QueryDecodeError({});
+      throw QueryDecodeError.make({});
     },
     check: (input: T): T => {
       const result = check(input);
       if (Exit.isSuccess(result)) return result.value;
-      throw new QueryDecodeError({});
+      throw QueryDecodeError.make({});
     },
   };
 }

@@ -110,7 +110,7 @@ export function FarmLog() {
   const rows = (): Row[] =>
     [
       ...general()
-        .messages.filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromKind === "orchestrator"))
+        .messages.filter((m) => m.kind === "chat" && (m.fromKind === "user" || m.fromRole === "orchestrator"))
         .map((message) => ({ kind: "said" as const, message })),
       ...reports().map((message) => ({ kind: "report" as const, message })),
     ].toSorted((a, b) => b.message.at - a.message.at);
@@ -141,7 +141,7 @@ export function FarmLog() {
 }
 
 function Said(props: { m: ChatMessage }) {
-  const you = () => props.m.fromKind === "owner";
+  const you = () => props.m.fromKind === "user";
   return (
     <>
       <Show when={you()} fallback={<OrchestratorFace size={32} agent={props.m.from} />}>

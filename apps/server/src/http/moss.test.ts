@@ -1,7 +1,7 @@
 import { request } from "node:http";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Formatter, Layer, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { mossLinePath, visionLinePath } from "@vibevalley/protocol";
@@ -25,7 +25,7 @@ const echo = () => {
         send: (frame) => {
           if (connection.closed) return;
           if (typeof frame !== "string") on.binary?.(frame);
-          else if (frame.includes("attach_session")) on.text(JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }));
+          else if (frame.includes("attach_session")) on.text(Formatter.formatJson({ action: "session_attached", data: { session_id: "s1" } }));
         },
         close: () => {
           connection.closed = true;
@@ -76,7 +76,8 @@ describe("a page's line to MOSS Live", () => {
     Effect.gen(function* () {
       const address = yield* farm(echo().transport);
       expect((yield* upgrade(address, { origin: "http://elsewhere.example" })).status).toBe(403);
-      expect(yield* upgrade(address)).toEqual({ status: 409, body: t("server.provider.capabilityUnbound", { capability: t("server.provider.use.live") }) });
+      const upgraded = yield* upgrade(address);
+      expect(upgraded).toEqual({ status: 409, body: t("server.provider.capabilityUnbound", { capability: t("server.provider.use.live") }) });
     }).pipe(Effect.scoped),
   );
 
@@ -90,7 +91,7 @@ describe("a page's line to MOSS Live", () => {
         fetch(`http://${address}/api/v1/provider/update`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
+          body: Formatter.formatJson({
             revision: 0,
             connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "sk-test-key" }],
             dictation: null,
@@ -110,7 +111,7 @@ describe("a page's line to MOSS Live", () => {
       yield* Effect.addFinalizer(() => Effect.sync(() => ws.close()));
       ws.binaryType = "arraybuffer";
       ws.onopen = () => {
-        ws.send(JSON.stringify({ action: "attach_session" }));
+        ws.send(Formatter.formatJson({ action: "attach_session" }));
         ws.send(new Uint8Array([0, 1, 2, 3]));
       };
       ws.onmessage = (e) => got.push(typeof e.data === "string" ? e.data : e.data instanceof ArrayBuffer ? e.data.byteLength : -1);
@@ -124,7 +125,7 @@ describe("a page's line to MOSS Live", () => {
       yield* Effect.promise(() => whenTrue(() => competingClose !== 0, "competing Live line refused"));
       expect(competingClose).toBe(1013);
       ws.close();
-      expect(got).toEqual([JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }), 4]);
+      expect(got).toEqual([Formatter.formatJson({ action: "session_attached", data: { session_id: "s1" } }), 4]);
       expect(moss.keys).toEqual(["sk-test-key"]);
     }).pipe(Effect.scoped),
   );
@@ -139,7 +140,7 @@ describe("a page's line to MOSS Live", () => {
           const response = await fetch(`http://${address}/api/v1/${path}`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+            ...(body === undefined ? {} : { body: Formatter.formatJson(body) }),
           });
           if (response.status === 204) return undefined;
           expect(response.status).toBe(200);
@@ -162,12 +163,13 @@ describe("a page's line to MOSS Live", () => {
       yield* post("setting/update", { voice: { answer: { vendor: "moss" } } });
       const grant = Schema.decodeUnknownEffect(Schema.Struct({ channel: Schema.String, uid: Schema.String }));
       const call = Schema.decodeUnknownEffect(Schema.Struct({ agentId: Schema.String }));
-      const firstGrant = yield* grant(yield* post("voice/grant/create"));
+      const response2 = yield* post("voice/grant/create");
+      const firstGrant = yield* grant(response2);
       const first = new WebSocket(`ws://${address}${mossLinePath}`);
       yield* Effect.addFinalizer(() => Effect.sync(() => first.close()));
       let firstAttached = false;
       let firstClosed = false;
-      first.onopen = () => first.send(JSON.stringify({ action: "attach_session" }));
+      first.onopen = () => first.send(Formatter.formatJson({ action: "attach_session" }));
       first.onmessage = () => {
         firstAttached = true;
       };
@@ -175,18 +177,21 @@ describe("a page's line to MOSS Live", () => {
         firstClosed = true;
       };
       yield* Effect.promise(() => whenTrue(() => firstAttached, "first relay attached"));
-      const firstCall = yield* call(yield* post("voice/call/start", firstGrant));
+      const response3 = yield* post("voice/call/start", firstGrant);
+      const firstCall = yield* call(response3);
       first.close();
       yield* Effect.promise(() => whenTrue(() => firstClosed && moss.connections[0]?.closed === true, "first relay released"));
-      const nextGrant = yield* grant(yield* post("voice/grant/create"));
+      const response4 = yield* post("voice/grant/create");
+      const nextGrant = yield* grant(response4);
       const next = new WebSocket(`ws://${address}${mossLinePath}`);
       yield* Effect.addFinalizer(() => Effect.sync(() => next.close()));
       next.binaryType = "arraybuffer";
       const received: (string | number)[] = [];
-      next.onopen = () => next.send(JSON.stringify({ action: "attach_session" }));
+      next.onopen = () => next.send(Formatter.formatJson({ action: "attach_session" }));
       next.onmessage = (event) => received.push(typeof event.data === "string" ? event.data : event.data instanceof ArrayBuffer ? event.data.byteLength : -1);
       yield* Effect.promise(() => whenTrue(() => received.length === 1, "replacement relay attached"));
-      const nextCall = yield* call(yield* post("voice/call/start", nextGrant));
+      const response5 = yield* post("voice/call/start", nextGrant);
+      const nextCall = yield* call(response5);
       yield* post("voice/call/stop", firstCall);
       expect(moss.connections[1]?.closed).toBe(false);
       next.send(new Uint8Array([7, 8, 9]));
@@ -213,7 +218,7 @@ const visual = () => {
     connect: (key, on, model) => {
       const connection = { key, model, sent: [] as (string | Uint8Array)[], closed: false };
       connections.push(connection);
-      const emit = (event: object) => on.text(JSON.stringify(event));
+      const emit = (event: object) => on.text(Formatter.formatJson(event));
       queueMicrotask(() => {
         on.open();
         emit({ type: "session.created", session_id: "visual-fixture", model, configure_timeout_s: 10 });
@@ -266,7 +271,7 @@ const configureVision = (address: string, revision: number, key: string) =>
     fetch(`http://${address}/api/v1/provider/update`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+      body: Formatter.formatJson({
         revision,
         connections: [{ id: "visual", name: "Visual", adapter: "moss", enabled: true, key }],
         dictation: null,
@@ -306,17 +311,17 @@ describe("independent visual realtime relay", () => {
         if (typeof event.data !== "string") return;
         received.push(event.data);
         const response = control(event.data);
-        if (response.type === "session.created") ws.send(JSON.stringify({ type: "session.configure", input_queue_capacity: 1 }));
-        if (response.type === "session.ready") ws.send(JSON.stringify({ type: "input.frame", seq_no: 0, timestamp: 0, mime_type: "image/jpeg" }));
+        if (response.type === "session.created") ws.send(Formatter.formatJson({ type: "session.configure", input_queue_capacity: 1 }));
+        if (response.type === "session.ready") ws.send(Formatter.formatJson({ type: "input.frame", seq_no: 0, timestamp: 0, mime_type: "image/jpeg" }));
         if (response.type === "input.frame.ready") ws.send(new Uint8Array([255, 216, 255, 217]));
-        if (response.type === "input.frame.accepted") ws.send(JSON.stringify({ type: "input.prompt", seq_no: 1, prompt: "Describe", final: false }));
+        if (response.type === "input.frame.accepted") ws.send(Formatter.formatJson({ type: "input.prompt", seq_no: 1, prompt: "Describe", final: false }));
       };
       yield* Effect.promise(() => whenTrue(() => received.some((frame) => frame.includes("response.done")), "visual output"));
       expect(fixture.connections.map(({ key, model }) => ({ key, model }))).toEqual([{ key: "visual-old-private", model: "moss-vl-realtime-1.0-2026-09-09" }]);
       expect(received.join("")).not.toContain("private");
       expect((yield* configureVision(address, 1, "visual-new-private")).status).toBe(200);
       expect(fixture.connections).toHaveLength(1);
-      ws.send(JSON.stringify({ type: "session.abort" }));
+      ws.send(Formatter.formatJson({ type: "session.abort" }));
       yield* Effect.promise(() => whenTrue(() => received.some((frame) => frame.includes("session.done")), "visual terminal event"));
       ws.close();
       yield* Effect.promise(() => whenTrue(() => fixture.connections[0]?.closed === true, "old connection released"));
@@ -348,7 +353,7 @@ describe("independent visual realtime relay", () => {
         connect: (key, on) => {
           queueMicrotask(() => {
             on.open();
-            on.text(JSON.stringify({ type: "error", code: "invalid_request", message: `Rejected ${key}` }));
+            on.text(Formatter.formatJson({ type: "error", code: "invalid_request", message: `Rejected ${key}` }));
             on.down(`Rejected ${key}`);
           });
           return { send: () => {}, close: () => {} };

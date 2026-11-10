@@ -67,7 +67,7 @@ export class Playback {
     return this.finished(run);
   }
 
-  /** The owner talked over a run, or MOSS stopped it: the pieces to stop now, and how far it got on the clock. */
+  /** The user talked over a run, or MOSS stopped it: the pieces to stop now, and how far it got on the clock. */
   cut(run: string, turn: string, now: number): { stop: Queued[]; actions: PlaybackAction[] } {
     const stop = this.playing.filter((p) => p.run === run);
     if (stop.length === 0 && !this.runs.has(run)) return { stop, actions: [] };

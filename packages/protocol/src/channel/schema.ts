@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";
+import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/schema";
 import * as T from "../shapes";
@@ -19,14 +20,13 @@ export const Embed: Codec<T.Embed> = Schema.Struct({
 
 export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
 
-export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Finite });
-
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: MessageId,
   number: Schema.Finite,
   channel: Schema.String,
   from: Schema.String,
   fromKind: ActorKind,
+  fromRole: Schema.optionalKey(Schema.Literals(T.AgentRoleValues)),
   name: Schema.String,
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,
@@ -61,6 +61,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   default: Schema.Boolean,
   peer: Schema.optionalKey(Schema.String),
   orchestrator: Schema.optionalKey(Schema.String),
+  members: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   parent: Schema.optionalKey(Schema.String),
   category: Schema.String,
   position: Schema.optionalKey(Schema.Finite),
@@ -82,7 +83,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   at: Schema.Finite,
 });
 
-export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
+export const UserMention: Codec<T.UserMention> = Schema.Struct({
   message: ChatMessage,
   channel: Schema.String,
   address: Schema.String,
@@ -90,7 +91,7 @@ export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
 
 export const Chat: Codec<T.Chat> = Schema.Struct({
   channels: Schema.mutable(Schema.Array(Channel)),
-  ownerMentions: Schema.mutable(Schema.Array(OwnerMention)),
+  userMentions: Schema.mutable(Schema.Array(UserMention)),
 });
 
 export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([Schema.TaggedStruct("Message", { message: ChatMessage }), Schema.TaggedStruct("Reset", {})]);
@@ -105,6 +106,7 @@ export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
   repo: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),
+  to: Schema.optionalKey(Schema.String),
 });
 
 export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
@@ -113,7 +115,7 @@ export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   before: Schema.optionalKey(Schema.String),
-  orchestrator: Schema.optionalKey(Schema.String),
+  members: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
 export const ChannelRequest: Codec<T.ChannelRequest> = Schema.Struct({
@@ -137,8 +139,6 @@ export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.
 export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: MessageId, emoji: Schema.String, on: Schema.Boolean });
 
 export const OnSet: Codec<T.OnSet> = Schema.Struct({ id: Schema.String, on: Schema.Boolean });
-
-export const AttachmentUpload: Codec<T.AttachmentUpload> = Schema.Struct({ name: Schema.String, type: Schema.String, data: Schema.String });
 
 export const MessageSearch: Codec<T.MessageSearch> = Schema.Struct({ text: Schema.String, channel: Schema.optionalKey(Schema.String) });
 
@@ -171,8 +171,8 @@ export const FactChannelRemoved: Codec<T.FactChannelRemoved> = Schema.Struct({
   id: Schema.String,
 });
 
-export const FactOwnerMentionsChanged: Codec<T.FactOwnerMentionsChanged> = Schema.Struct({
-  type: Schema.Literal("ownerMentionsChanged"),
+export const FactUserMentionsChanged: Codec<T.FactUserMentionsChanged> = Schema.Struct({
+  type: Schema.Literal("userMentionsChanged"),
   at: Schema.Finite,
-  mentions: Schema.mutable(Schema.Array(OwnerMention)),
+  mentions: Schema.mutable(Schema.Array(UserMention)),
 });

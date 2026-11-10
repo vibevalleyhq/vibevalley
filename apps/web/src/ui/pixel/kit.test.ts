@@ -34,7 +34,7 @@ test("a paused toast keeps what was left of its timeout", () => {
 });
 
 test("mentions become links outside code", () => {
-  expect(withMentions("@w3 看看 `@w4` 和 @管家")).toBe("[@w3](#mention) 看看 `@w4` 和 [@管家](#mention)");
+  expect(withMentions("@w3 看看 `@w4` 和 @助手")).toBe("[@w3](#mention) 看看 `@w4` 和 [@助手](#mention)");
   expect(withMentions("a@w3 @someone")).toBe("a@w3 @someone");
 });
 

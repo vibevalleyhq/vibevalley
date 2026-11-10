@@ -1,14 +1,14 @@
-import { Clock, Duration, Effect, Option, PubSub, Schedule, Schema, Semaphore, Stream } from "effect";
+import { Clock, Duration, Effect, Option, PubSub, Random, Schedule, Schema, Semaphore, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
-import { dayMs, ownerId } from "@vibevalley/protocol";
+import { dayMs, userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { type ApiError, lookIn, refused, messageOf } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { jsonOf } from "#/base/json.ts";
+import { jsonOf, jsonText } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { bounded } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
@@ -38,7 +38,7 @@ interface BlockStore {
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
   readonly fill: (id: T.ArtifactId, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
   readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-  /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. */
+  /** A batch of ops from actor (the user, or a helper's profile id), in order, in one transaction. */
   readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
   /** A new block at the end of the top level, as actor; text is inline Markdown (code takes it as it is). */
   readonly append: (
@@ -68,9 +68,9 @@ interface BlockStore {
   readonly follow: (id: T.ArtifactId, after: number) => Stream.Stream<T.ArtifactEvent, ApiError>;
   /** An artifact's suggestions, oldest first. */
   readonly suggestions: (id: T.ArtifactId) => Effect.Effect<T.Suggestion[], ApiError>;
-  /** An agent proposes a change to a block the owner wrote. */
+  /** An agent proposes a change to a block the user wrote. */
   readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError>;
-  /** The owner takes a suggestion, if the block still stands at the rev it was read at. */
+  /** The user takes a suggestion, if the block still stands at the rev it was read at. */
   readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
   readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
   /** The whole list now, then after each change (artifact.suggestion.follow). */
@@ -134,7 +134,8 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
 
     const blocks = Effect.fn("BlockStore.blocks")(function* (id: T.ArtifactId) {
       yield* found(id);
-      return ordered(yield* blocksOf(id));
+      const blocksOf2 = yield* blocksOf(id);
+      return ordered(blocksOf2);
     });
 
     /** A batch already taken: its results then, its blocks now. */
@@ -160,7 +161,8 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
             const seen = yield* db.run(Effect.catchNoSuchElement(qc.artifactChangeByBatch({ batch_id: body.batchId })));
             if (Option.isSome(seen)) return yield* again(id, seen.value);
             const now = yield* Clock.currentTimeMillis;
-            const p = new Page(id, actor, now, yield* blocksOf(id));
+            const blocksOf2 = yield* blocksOf(id);
+            const p = new Page(id, actor, now, blocksOf2);
             // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
             const revisions = new Map<string, T.TextSpan[]>();
             for (const op of body.ops) {
@@ -181,7 +183,10 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
               (op) =>
                 Effect.gen(function* () {
                   const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
-                  if (fresh && Option.isSome(yield* db.run(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
+                  if (fresh) {
+                    const owner = yield* db.run(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh })));
+                    if (Option.isSome(owner)) taken.add(fresh);
+                  }
                 }),
               { discard: true },
             );
@@ -193,19 +198,21 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
               changed,
               (b) =>
                 db.run(
-                  qb.putArtifactBlock({
-                    id: b.id,
-                    artifact_id: id,
-                    parent_id: b.parentId ?? null,
-                    order_key: b.orderKey,
-                    type: b.type,
-                    attrs: JSON.stringify(b.attrs),
-                    spans: JSON.stringify(b.text),
-                    rev: b.rev,
-                    deleted: !(b.deleted !== true),
-                    updated_by: b.updatedBy,
-                    updated_at: b.updated,
-                  }),
+                  Effect.flatMap(Effect.all({ attrs: jsonText(b.attrs), spans: jsonText(b.text) }), ({ attrs, spans }) =>
+                    qb.putArtifactBlock({
+                      id: b.id,
+                      artifact_id: id,
+                      parent_id: b.parentId ?? null,
+                      order_key: b.orderKey,
+                      type: b.type,
+                      attrs,
+                      spans,
+                      rev: b.rev,
+                      deleted: !(b.deleted !== true),
+                      updated_by: b.updatedBy,
+                      updated_at: b.updated,
+                    }),
+                  ),
                 ),
               { discard: true },
             );
@@ -213,29 +220,33 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
               p.revisions,
               (r) =>
                 db.run(
-                  qr.addArtifactBlockRevision({
-                    id: newId(),
-                    block_id: r.block,
-                    rev: r.rev,
-                    spans: JSON.stringify(r.spans),
-                    actor,
-                    kind: r.kind,
-                    created_at: now,
-                  }),
+                  Effect.flatMap(jsonText(r.spans), (spans) =>
+                    qr.addArtifactBlockRevision({
+                      id: newId(),
+                      block_id: r.block,
+                      rev: r.rev,
+                      spans,
+                      actor,
+                      kind: r.kind,
+                      created_at: now,
+                    }),
+                  ),
                 ),
               { discard: true },
             );
             const seq = row.seq + 1;
             yield* db.run(
-              qc.addArtifactChange({
-                artifact_id: id,
-                seq,
-                batch_id: body.batchId,
-                actor,
-                block_ids: JSON.stringify(p.changed),
-                results: JSON.stringify(results),
-                created_at: now,
-              }),
+              Effect.flatMap(Effect.all({ blockIds: jsonText(p.changed), resultsJson: jsonText(results) }), ({ blockIds, resultsJson }) =>
+                qc.addArtifactChange({
+                  artifact_id: id,
+                  seq,
+                  batch_id: body.batchId,
+                  actor,
+                  block_ids: blockIds,
+                  results: resultsJson,
+                  created_at: now,
+                }),
+              ),
             );
             yield* db.run(qa.artifactAccepted({ id, seq, updated_at: now }));
             return { batchId: body.batchId, seq, results, blocks: changed };
@@ -254,17 +265,20 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
     const one = (ack: T.BlockAck, id: string): [T.Block | undefined, T.BlockOpResult | undefined] => [blockIn(ack, id), ack.results[0]];
 
     const append = Effect.fn("BlockStore.append")(function* (artifact: T.ArtifactId, actor: string, type: T.BlockType, attrs: T.BlockAttrs, text: string) {
-      const last = new Page(artifact, actor, 0, yield* blocksOf(artifact)).children("").at(-1)?.orderKey ?? "";
+      const blocksOf2 = yield* blocksOf(artifact);
+      const last = new Page(artifact, actor, 0, blocksOf2).children("").at(-1)?.orderKey ?? "";
       const b: T.BlockInput = { id: S.blockId(newId()), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
-      return one(yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
+      const lockedSubmitted = yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] });
+      return one(lockedSubmitted, b.id);
     }, lock.withPermits(1));
 
     const updateText = Effect.fn("BlockStore.updateText")(function* (artifact: T.ArtifactId, actor: string, block: T.BlockId, baseRev: number, text: string) {
       const type = (yield* blocksOf(artifact)).find((b) => b.id === block)?.type ?? "paragraph";
-      return one(
-        yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }] }),
-        block,
-      );
+      const lockedSubmitted = yield* submitLocked(artifact, actor, {
+        batchId: newId(),
+        ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }],
+      });
+      return one(lockedSubmitted, block);
     }, lock.withPermits(1));
 
     const attrsFor = (type: T.BlockType, req: Pick<T.BlockCreate, "level" | "checked" | "language">): T.BlockAttrs => {
@@ -287,7 +301,8 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       if (!isAppendType(type)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
       const problem = attrProblem(type, req);
       if (problem) return yield* Effect.fail(refused(problem));
-      const page = new Page(artifact, actor, 0, yield* blocksOf(artifact));
+      const blocksOf2 = yield* blocksOf(artifact);
+      const page = new Page(artifact, actor, 0, blocksOf2);
       const parent = req.parentId?.trim() ?? "";
       if (parent !== "") {
         const block = page.find(parent);
@@ -325,7 +340,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       const block = S.blockId(req.block.trim());
       const now = (yield* blocksOf(artifact)).find((b) => b.id === block);
       if (!now) return yield* Effect.fail(refused(t("server.artifact.op.noBlock", { id: block })));
-      if (actor !== ownerId && now.updatedBy === ownerId) {
+      if (actor !== userId && now.updatedBy === userId) {
         const wanted = req.type?.trim();
         if (wanted !== undefined && !isAppendType(wanted)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
         const attrs: T.BlockAttrs = {};
@@ -369,7 +384,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
     const deleteBlock = Effect.fn("Artifact.deleteBlock")(function* (artifact: T.ArtifactId, actor: string, req: T.BlockDelete) {
       const block = S.blockId(req.block.trim());
       const now = (yield* blocksOf(artifact)).find((b) => b.id === block);
-      if (now && actor !== ownerId && now.updatedBy === ownerId) {
+      if (now && actor !== userId && now.updatedBy === userId) {
         const made = yield* suggest(artifact, actor, { block, baseRev: now.rev, change: { delete: true } });
         return {
           status: "rejected" as const,
@@ -468,15 +483,17 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       const now = yield* Clock.currentTimeMillis;
       const id = newId();
       yield* db.run(
-        qs.addArtifactSuggestion({
-          id,
-          artifact_id: artifact,
-          block_id: req.block,
-          author: actor,
-          at_rev: Math.trunc(req.baseRev),
-          change: JSON.stringify(req.change),
-          created_at: now,
-        }),
+        Effect.flatMap(jsonText(req.change), (change) =>
+          qs.addArtifactSuggestion({
+            id,
+            artifact_id: artifact,
+            block_id: req.block,
+            author: actor,
+            at_rev: Math.trunc(req.baseRev),
+            change,
+            created_at: now,
+          }),
+        ),
       );
       const made = yield* db.one(qs.artifactSuggestionByID({ id }));
       if (!made) return yield* Effect.fail(refused(t("server.artifact.suggestion.missing", { id })));
@@ -559,7 +576,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
 
     let demoOn = false;
     /** About ticks of the tick, a bit more or less so the writers interleave. */
-    const wait = (ticks: number) => Effect.sleep(ticks * (1 + demoJitter * (2 * Math.random() - 1)) * demoTickMs);
+    const wait = (ticks: number) => Effect.flatMap(Random.next, (r) => Effect.sleep(ticks * (1 + demoJitter * (2 * r - 1)) * demoTickMs));
 
     /** Inserts b at the end of the top level, or at the end of a section; the key is picked under the batch lock, so two writers cannot pick the same place. */
     const demoInsert = Effect.fn("BlockStore.demoInsert")(function* (
@@ -568,8 +585,9 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       b: Omit<T.BlockInput, "orderKey">,
       at?: { headings: string[]; section: number },
     ) {
+      const blocksOf2 = yield* blocksOf(artifact);
       // Tombstones too: their keys still hold their places.
-      const top = new Page(artifact, writer, 0, yield* blocksOf(artifact)).children("");
+      const top = new Page(artifact, writer, 0, blocksOf2).children("");
       let after = top.at(-1)?.orderKey ?? "";
       let before = "";
       if (at && at.section + 1 < at.headings.length) {
@@ -599,7 +617,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
         for (let n = 1; n <= demoPieces; n++) {
           yield* wait(1);
           const [, r] = yield* updateText(artifact, writer, b.id, rev, chars.slice(0, Math.floor((chars.length * n) / demoPieces)).join(""));
-          // The owner wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
+          // The user wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
           if (r?.status !== "applied") break;
           rev = r.rev ?? rev;
         }
@@ -653,7 +671,8 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       blocks,
       fill,
       markdown: Effect.fn("Artifact.markdown")(function* (id) {
-        return markdownOf(yield* blocks(id));
+        const blocks2 = yield* blocks(id);
+        return markdownOf(blocks2);
       }),
       submit,
       append,

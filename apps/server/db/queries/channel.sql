@@ -36,25 +36,25 @@ select * from channel order by coalesce(last_number, 0) desc, id desc limit sqlc
 
 -- name: TouchChannel :exec
 update channel
-set last_number = max(coalesce(last_number, 0), sqlc.arg(number)::int),
+set last_number = greatest(coalesce(last_number, 0), sqlc.arg(number)::int),
     reply_count = reply_count + case when type = 'thread' then 1 else 0 end
 where id = sqlc.arg(id);
 
--- name: InboxOf :many
+-- name: UnreadOf :many
 -- A participant's unread: the channel it is in and the threads it follows, newest first.
 with unread as (
   select c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, coalesce(ch.name, c.name, '')::text as channel_name,
          count(m.id)::int as unread,
-         max(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = sqlc.arg(participant)))::bool as mentions_you,
+         bool_or(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = sqlc.arg(participant)))::bool as mentions_you,
          coalesce(max(m.number), 0)::int as latest
   from channel c
   left join channel ch on ch.id = c.parent_id
   join channel_message m on m.channel_id = c.id
   left join channel_read_cursor rc on rc.participant_id = sqlc.arg(participant) and rc.channel_id = c.id
-  left join channel_follow f on f.channel_id = c.id and f.participant_id = sqlc.arg(participant) and f.unfollowed_at is null
+  left join channel_member f on f.channel_id = c.id and f.participant_id = sqlc.arg(participant) and f.left_at is null
   where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
     and (c.id = sqlc.arg(channel) or f.participant_id is not null)
-    and m.number > max(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
+    and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
     and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
   group by c.id, ch.name
 )
@@ -84,18 +84,15 @@ update channel set archived_at = sqlc.narg(archived_at) where id = sqlc.arg(id) 
 -- name: SetNotify :exec
 update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 
--- name: SetOrchestrator :exec
-update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id) and type = 'channel';
-
--- name: OrchestratorForChannel :one
+-- name: TopPlace :one
+-- A place's channel or direct channel: itself, or the one a thread hangs in.
 with recursive places as (
-  select id, type, peer_id, parent_id, orchestrator from channel where id = sqlc.arg(id)
+  select id, type, peer_id, parent_id from channel where id = sqlc.arg(id)
   union
-  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator
+  select c.id, c.type, c.peer_id, c.parent_id
   from channel c join places p on c.id = p.parent_id where p.type = 'thread'
 )
-select (case when type = 'direct' then peer_id else orchestrator end)::text? as agent
-from places where type <> 'thread' limit 1;
+select id::channel.id as id, type::channel.type as type, peer_id::channel.peer_id? as peer_id from places where type <> 'thread' limit 1;
 
 
 -- name: ChannelInUse :one
@@ -105,7 +102,7 @@ select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as c
        (select count(distinct i.id) from issue i
         left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'
         left join mailbox_trigger t on t.id = m.trigger_id
-        where i.queued_at is not null and (t.trigger_json ->> 'replyChannel' = sqlc.arg(id)))::int as queued,
+        where i.queued_at is not null and (t.trigger_json::jsonb ->> 'replyChannel' = sqlc.arg(id)))::int as queued,
        (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
 
 -- name: DeleteThreadsOf :exec

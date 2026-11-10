@@ -97,7 +97,7 @@ export const CardColors = {
   bug: "#b44b36",
   stuck: "#4a728c",
   rest: "#cdbb92",
-  // Handed back and waiting: on its acceptance, or on the owner's answer.
+  // Handed back and waiting: on its acceptance, or on the user's answer.
   wait: "#b4cb7c",
   barFill: "#7ea64f",
   barTrack: "#e2c995",

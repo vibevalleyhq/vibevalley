@@ -1,6 +1,6 @@
 import { expect, gate, settled, test } from "./fixtures";
 
-test("the opening preserves the owner's theme underneath, and stays until the first frame or a while", async ({ page }) => {
+test("the opening preserves the user's theme underneath, and stays until the first frame or a while", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: "dark" })));
   // No frame comes: the cover holds, then lets the page show as it is.
   await page.route("**/api/v1/state**", () => undefined);

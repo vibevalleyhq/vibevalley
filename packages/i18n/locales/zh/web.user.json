@@ -1,0 +1,57 @@
+{
+  "login": {
+    "title": "登录",
+    "intro": "用在跑着 VibeValley 的那台电脑上设的密码登录，这台设备就能看帮工、派活、在频道里说话。",
+    "noPassword": "那台电脑上还没设密码：先在那台电脑的「设置 › 设备」里设一个，或者用配对码连进来。",
+    "password": "密码",
+    "device": "这台设备叫",
+    "deviceHint": "在设备列表里看到的名字",
+    "submit": "登录",
+    "signing": "正在登录……",
+    "pairInstead": "用配对码连进来"
+  },
+  "account": {
+    "title": "名字和密码",
+    "name": "名字",
+    "nameHint": "VibeValley 称呼你用的名字",
+    "save": "保存",
+    "nameSaved": "名字存好了",
+    "password": "密码",
+    "passwordHint": "从别的设备登录时用，至少 8 个字",
+    "setPassword": "设密码",
+    "changePassword": "改密码",
+    "passwordSaved": "密码设好了",
+    "passwordHere": "密码只能在跑着 VibeValley 的那台电脑上设。",
+    "thisDevice": "这台设备：{name}",
+    "signOut": "退出"
+  },
+  "devices": {
+    "title": "你的设备",
+    "count": "{n} 台",
+    "paired": "配对于 {at} · 上次来 {seen}",
+    "pairedNever": "配对于 {at} · 还没来过",
+    "login": "登录于 {at} · 上次来 {seen}",
+    "loginNever": "登录于 {at} · 还没来过",
+    "thisOne": "{name}（这台）",
+    "remove": "收回",
+    "removeWhich": "收回 {name} 的钥匙"
+  },
+  "guess": {
+    "android": "安卓手机",
+    "windows": "Windows 电脑",
+    "device": "一台设备"
+  },
+  "approvals": {
+    "page": "让一台设备登录",
+    "hint": "在那台设备的终端里运行了 vibevalley auth login：对一下码，一样就同意。",
+    "title": "等你同意的登录",
+    "none": "现在没有设备在等。在那台设备上运行 vibevalley auth login，这里会出现它的码。",
+    "wants": "{name} 想登录",
+    "left": "还有 {m} 分钟过期",
+    "allow": "同意",
+    "refuse": "拒绝",
+    "from": "从 {from} 发来，{at}",
+    "fromHere": "从这台电脑发来，{at}",
+    "onlyYours": "只同意你自己刚在终端里运行 vibevalley auth login 出的码：别人发给你的码、你不认得的地址，都点拒绝——同意了，那台设备就能以你的身份做任何事。"
+  }
+}

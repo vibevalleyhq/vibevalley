@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 
 import { cli, farm, lookIn, memoriesOf, workingFarm } from "./testing.ts";
 
-const json = (text: string): unknown => JSON.parse(text);
+const json = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const cliCommands = [
   "agent create",
@@ -96,7 +96,7 @@ describe("the command line", () => {
       expect(shown.split("\n").at(-1)).toMatch(/^ {2}vibevalley issue status 1 /u);
       const edited = yield* cli(at("issue", "edit", "1", "--title", "改一下"));
       expect(edited.out).toMatch(/^#1 {2}backlog {2}改一下$/u);
-      const asJson = json((yield* cli(at("issue", "show", "1", "--format", "json"))).out) as { number: number; criteria: string[] };
+      const asJson = (yield* json((yield* cli(at("issue", "show", "1", "--format", "json"))).out)) as { number: number; criteria: string[] };
       expect([asJson.number, asJson.criteria]).toEqual([1, ["能打开"]]);
       for (const title of ["二", "三", "四"]) yield* cli(at("issue", "create", title));
       const list = yield* cli(at("issue", "list"));

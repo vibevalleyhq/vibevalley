@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Formatter, Schema } from "effect";
 
 import type { MossTransport } from "@vibevalley/provider/moss/server";
 import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
@@ -29,7 +29,7 @@ export const realtimeFixture: MossTransport = {
     let promptPending = false;
     let responseSequence = 0;
     const emit = (event: object) => {
-      if (!closed) on.text(JSON.stringify(event));
+      if (!closed) on.text(Formatter.formatJson(event));
     };
     const liveAnswer = (run: string, turn: string, text: string) => {
       emit({ action: "response.audio.started", data: { run_id: run, turn_id: turn } });

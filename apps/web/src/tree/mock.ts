@@ -25,7 +25,7 @@ export interface MemoryItem {
   /** One of the next to be forgotten (the memory's `fading`). */
   readonly fading: boolean;
   readonly case?: MemoryCase;
-  /** A seed the owner has sown into the skill book. */
+  /** A seed the user has sown into the skill book. */
   readonly sown?: boolean;
 }
 
@@ -75,7 +75,7 @@ const reposZh = ["vibevalley", "字幕面板", "官网", "billing"] as const;
 const notesZh: readonly [string, ...string[]] = [
   "表名用单数：issue、issue_assignment",
   "改完 db/queries 要跑 vp run db:generate",
-  "主人不要兼容层，旧数据直接作废",
+  "用户不要兼容层，旧数据直接作废",
   "页面不折事实，要新数据就加 protocol 字段",
   "提交说明一句话说改完以后的行为",
   "不要开 next dev，先 lint、typecheck 再 build",
@@ -101,7 +101,7 @@ const casesZh: readonly [MemoryCase, ...MemoryCase[]] = [
   { intent: "官网首页换成像素风", approach: "复用 public/pixel 的图", insight: "图片放大用整数倍，不然像素会糊" },
   { intent: "billing 补退款", approach: "先补黄金数据，再改规则", insight: "退款金额要从原单的分算，不能反推" },
   { intent: "修 SSE 断线不重连", approach: "加心跳和指数退避", insight: "代理会吞掉空闲超过 60 秒的连接" },
-  { intent: "管家派活时带上仓库", approach: "在工具描述里写明默认仓库", insight: "改了工具描述要跑 evals" },
+  { intent: "助手派活时带上仓库", approach: "在工具描述里写明默认仓库", insight: "改了工具描述要跑 evals" },
   { intent: "农场的时钟和真实时间对齐", approach: "日钟的速度可调，默认 600 秒一天", insight: "测试里把速度设成 0" },
   { intent: "手机壳扫码配对", approach: "一台设备一把钥匙", insight: "配对页不能放 /mcp" },
 ];
@@ -129,7 +129,7 @@ const reposEn = ["vibevalley", "subtitle-panel", "site", "billing"] as const;
 const notesEn: readonly [string, ...string[]] = [
   "Table names are singular: issue, issue_assignment",
   "After changing db/queries, run vp run db:generate",
-  "The owner wants no compatibility layers; old data is dropped",
+  "The user wants no compatibility layers; old data is dropped",
   "The page folds no facts; new data is a protocol field",
   "A commit subject says the behavior after the change",
   "No next dev: lint and typecheck, then build",
@@ -204,7 +204,7 @@ function random(seed: number) {
 
 const day = 86_400_000;
 
-/** The made-up tree; `stage` from the address (`/tree?stage=3`) lets the owner see each stage. */
+/** The made-up tree; `stage` from the address (`/tree?stage=3`) lets the user see each stage. */
 export function mockTree(now: number, stage?: TreeStage): MemoryTree {
   const en = currentLocale() === "en";
   const [agents, repos, notes, cases, skills] = en ? [agentsEn, reposEn, notesEn, casesEn, skillsEn] : [agentsZh, reposZh, notesZh, casesZh, skillsZh];

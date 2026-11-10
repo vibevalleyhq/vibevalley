@@ -81,6 +81,7 @@ const sessionFields = {
   issue: Schema.optionalKey(IssueId),
   refining: Schema.Boolean,
   toolConnections: Schema.optionalKey(Schema.mutable(Schema.Array(ToolConnection))),
+  machine: Schema.optionalKey(Schema.String),
 };
 
 export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase });

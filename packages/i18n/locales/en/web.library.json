@@ -1,0 +1,88 @@
+{
+  "title": "Library",
+  "hint": "Files that were generated, that you uploaded, and that helpers brought back.",
+  "upload": "Upload",
+  "uploading": "Uploading…",
+  "make": "Generate",
+  "makeTitle": "Generate",
+  "empty": "Nothing here yet",
+  "emptyHow": "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
+  "nothingShown": "Nothing matches these filters.",
+  "drop": "Let go to put it in the library",
+  "rail": {
+    "label": "Filters",
+    "where": "From",
+    "kind": "Kind",
+    "channels": "From channels",
+    "agents": "From helpers",
+    "anyWhere": "Any origin",
+    "anyKind": "Any kind"
+  },
+  "origin": {
+    "all": "All",
+    "generated": "Generated",
+    "uploaded": "Uploaded",
+    "fetched": "Brought back"
+  },
+  "kind": {
+    "all": "All",
+    "image": "Images",
+    "audio": "Audio",
+    "video": "Video",
+    "other": "Other"
+  },
+  "search": "Search names",
+  "sortLabel": "Sort",
+  "sort": {
+    "recent": "Recent",
+    "name": "Name",
+    "size": "Size"
+  },
+  "tileSize": "Thumbnail size",
+  "grid": "Files",
+  "job": {
+    "image": "image",
+    "speech": "speech",
+    "speakers": "dialogue",
+    "voiceDesign": "voice design",
+    "clone": "voice clone",
+    "transcription": "transcription",
+    "understanding": "understanding"
+  },
+  "from": {
+    "generated": "Generated · {job}",
+    "uploadedHere": "You uploaded it here",
+    "uploadedIn": "You sent it in {channel}",
+    "fetchedUrl": "{agent} brought it back from {url}",
+    "fetchedPath": "{agent} brought it back from {path} in its working directory"
+  },
+  "inspector": {
+    "label": "Details",
+    "kind": "Kind",
+    "pixels": "Size",
+    "bytes": "File size",
+    "length": "Length",
+    "from": "From",
+    "added": "Added",
+    "openChannel": "See it in {channel}",
+    "selected": "{n} selected",
+    "clear": "Clear selection",
+    "more": "More"
+  },
+  "download": "Download",
+  "sendTo": "Send to a channel",
+  "sentTo": "Sent to {channel}",
+  "remove": "Remove from library",
+  "removeAsk": "Remove “{name}” from the library? Messages that have it still open it.",
+  "removeSome": "Remove these {n} from the library? Messages that have them still open them.",
+  "removeSure": "Remove",
+  "keep": "Keep",
+  "understand": "Understand",
+  "understandTitle": "Understand “{name}”",
+  "understood": "What it shows",
+  "makeTabs": {
+    "image": "Image",
+    "speech": "Speech",
+    "audio": "Audio workbench"
+  }
+}

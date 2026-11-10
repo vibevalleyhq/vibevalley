@@ -5,18 +5,19 @@ import { Clock, Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { session as sessionActor } from "#/base/actor.ts";
+import { worker as sessionActor } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
-import { Executor, type Execution, type StartFailure } from "#/executor/executor.ts";
+import { type Execution, type StartFailure } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 
 import { type Journal } from "./journal.ts";
 import { reactionTo, phaseFact, type Op, since } from "./reaction.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
-import { handsToOwner, readReport } from "./report.ts";
+import { handsToUser, readReport } from "./report.ts";
 import type { LaunchActivity } from "./signals.ts";
 
 export const sessionWatch = (r: SessionRegistry) =>
@@ -25,13 +26,14 @@ export const sessionWatch = (r: SessionRegistry) =>
     const core = yield* Core;
     const memories = yield* Memory;
     const runtimes = yield* Runtime;
-    const executor = yield* Executor;
+    const machines = yield* Machine;
+    const executor = machines.executions(machines.here());
     const clock = yield* Clock.Clock;
     const { fire, apply, notice, signal, launchOf, save, startRun, inputChanged, endRun } = r;
     const stallMs = config.session.stallSeconds * 1000;
 
     const closedLaunch = (h: Hand) => {
-      if (h.launch) signal({ kind: "closed", id: h.id, launch: h.launch });
+      if (h.launch) signal({ _tag: "Closed", id: h.id, launch: h.launch });
       h.launch = "";
     };
 
@@ -79,10 +81,10 @@ export const sessionWatch = (r: SessionRegistry) =>
         } else if (event.kind === "reasoning" || event.kind === "text_delta" || event.kind === "tool_call_started") {
           if (!h.spoke) {
             h.spoke = true;
-            signals.push({ kind: "spoke", id: h.id, launch: h.launch });
+            signals.push({ _tag: "Spoke", id: h.id, launch: h.launch });
           }
-        } else if (event.kind === "compaction_started") signals.push({ kind: "compacting", id: h.id, on: true });
-        else if (event.kind === "compaction_ended") signals.push({ kind: "compacting", id: h.id, on: false });
+        } else if (event.kind === "compaction_started") signals.push({ _tag: "Compacting", id: h.id, on: true });
+        else if (event.kind === "compaction_ended") signals.push({ _tag: "Compacting", id: h.id, on: false });
       }
       const reaction = reactionTo(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
       h.tracking = reaction.tracking;
@@ -106,7 +108,7 @@ export const sessionWatch = (r: SessionRegistry) =>
     };
 
     const applyReport = (h: Hand, report: SubagentReport, completedBefore: number) => {
-      if (report.outcome.kind === "completed" && !handsToOwner(h.report) && (executor.find(h.id)?.pendingTasks ?? 0) > 0) {
+      if (report.outcome.kind === "completed" && !handsToUser(h.report) && (executor.find(h.id)?.pendingTasks ?? 0) > 0) {
         h.settling = { report, completedBefore };
         const channel = core.session(h.id)?.channel;
         apply({
@@ -115,7 +117,7 @@ export const sessionWatch = (r: SessionRegistry) =>
           ...(channel !== undefined ? { channel } : {}),
           phase: { _tag: "working", since: clock.currentTimeMillisUnsafe(), doing: { action: "wait", label: "" } },
         });
-        signal({ kind: "settling", id: h.id, launch: h.launch });
+        signal({ _tag: "Settling", id: h.id, launch: h.launch });
         return;
       }
       delete h.settling;
@@ -127,7 +129,7 @@ export const sessionWatch = (r: SessionRegistry) =>
       if (!session) return;
       const read = readReport(report.outcome, report.text);
       const declared = h.report;
-      const canRest = read.outcome === "completed" && session.issue !== undefined && !handsToOwner(declared);
+      const canRest = read.outcome === "completed" && session.issue !== undefined && !handsToUser(declared);
       h.report = undefined;
       const summary = declared?.summary.trim() || read.summary;
       const spent = session.spent ? since(session.spent, h.tracking.runFrom) : undefined;
@@ -171,7 +173,7 @@ export const sessionWatch = (r: SessionRegistry) =>
           ).pipe(bestEffort(`vibevalley: ${h.id}'s declared memories were not kept`)),
         );
       if (read.needsYou) notice("error", t("server.session.life.stoppedNeedsYou", { name: session.name, why: read.failure }));
-      if (launch) signal({ kind: read.outcome === "completed" && !waiting ? "handedOff" : "ended", id: h.id, launch, outcome: read.outcome, spoke });
+      if (launch) signal({ _tag: read.outcome === "completed" && !waiting ? "HandedOff" : "Ended", id: h.id, launch, outcome: read.outcome, spoke });
       runtimes.usageSoon(session.runtime);
       save();
     };

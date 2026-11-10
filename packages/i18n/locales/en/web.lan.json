@@ -10,10 +10,6 @@
     "address": "Address",
     "add": "Add a device",
     "close": "Turn off",
-    "devices": "Paired devices",
-    "deviceCount": "{n}",
-    "removeWhich": "Remove {name}",
-    "remove": "Remove",
     "copied": "Copied: open it in the other computer's browser.",
     "notCopied": "Cannot copy: select the link and copy it yourself.",
     "qr": "Pairing QR code",
@@ -25,28 +21,21 @@
     "asking": "\"{name}\" wants to connect to this computer. Let in, it can use VibeValley on this computer as you do.",
     "letIn": "Let it in",
     "refuse": "Refuse",
-    "paired": "Paired {at} · last seen {seen}",
-    "pairedNever": "Paired {at} · never seen",
     "notes": {
-      "0": "Helpers can run commands on this computer, so only paired devices may connect; pairing needs your approval here.",
-      "1": "A paired device uses VibeValley on this computer as you do. The switch and the devices are managed only on this computer.",
+      "0": "Helpers can run commands on this computer, so only devices holding a key may connect: pairing needs your approval here, signing in needs the password set here.",
+      "1": "A paired device sees helpers, sends work and talks as you do, but the switch and the settings are managed only on this computer; a signed-in device is you, and only the password is set on this computer alone.",
       "2": "The connection is plain HTTP: people on the same network may see what goes over it. Turn it on only on networks you trust, such as your home Wi-Fi or your own hotspot.",
       "3": "When the computer's address changes (another network), devices cannot connect; add the device here and scan again, without approving again."
     }
   },
-  "devices": {
-    "android": "Android phone",
-    "windows": "Windows PC",
-    "device": "A device"
-  },
   "pair": {
     "title": "Connect to that computer",
-    "intro": "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the channels. Pairing needs the owner's approval on that computer.",
+    "intro": "This device connects to VibeValley on that computer and, as on that computer, sees helpers, sends work and talks in the channels. Pairing needs approval on that computer.",
     "code": "Pairing code",
     "codeHint": "On that computer, press Add a device under Connect to this machine",
     "name": "This device is called",
-    "nameHint": "The name the owner sees in the list of devices",
-    "ask": "Ask the owner to let it in",
-    "waiting": "Waiting for the owner on that computer to approve…"
+    "nameHint": "The name shown in the list of devices",
+    "ask": "Ask to be let in",
+    "waiting": "Waiting for approval on that computer…"
   }
 }

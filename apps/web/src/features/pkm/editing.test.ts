@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import type { PkmBlock } from "@vibevalley/protocol";
 
-import { applied, commandAction, completed, completionAt, editAction, pasteAction } from "./editing";
+import { applied, commandAction, completed, completionAt, editAction, offered, pasteAction } from "./editing";
 
 const block = (id: string, body = id, depth = 0, parent?: string): PkmBlock => ({ id, depth, body, props: {}, path: "", ...(parent ? { parent } : {}) });
 const keys = { key: "", shiftKey: false, altKey: false, metaKey: false, ctrlKey: false };
@@ -109,6 +109,15 @@ describe("completion at the caret", () => {
   test("regression: a list closed with Escape (the caret as -1) stays closed", () => {
     expect(completionAt("tagged #pk", -1)).toBeUndefined();
     expect(completionAt("see [[Cet", -1)).toBeUndefined();
+  });
+
+  test("a list closed with Escape stays shut while the caret is in its trigger, and opens again once it left", () => {
+    const shut = { kind: "page", from: 4 } as const;
+    expect(offered({ value: "see [[Cet", caret: 9, shut: shut })).toEqual({ completion: undefined, shut });
+    expect(offered({ value: "see [[Cetu", caret: 10, shut: shut })).toEqual({ completion: undefined, shut });
+    expect(offered({ value: "see [[Cet]] #pk", caret: 15, shut: shut })).toEqual({ completion: { kind: "tag", query: "pk", from: 12 }, shut: undefined });
+    expect(offered({ value: "see ", caret: 4, shut: shut })).toEqual({ completion: undefined, shut: undefined });
+    expect(offered({ value: "see [[Cet", caret: 9, shut: undefined })).toEqual({ completion: { kind: "page", query: "Cet", from: 4 }, shut: undefined });
   });
 
   test("writes the choice in without doubling a closer already there", () => {

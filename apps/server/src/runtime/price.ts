@@ -5,6 +5,7 @@ import { getModel } from "@vibevalley/ai/models";
 
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { localParts } from "#/infra/time.ts";
 import * as q from "#db/runtime_spend.sql.ts";
 
 import type { PiDefault } from "./pi.ts";
@@ -87,14 +88,15 @@ export function price(runtime: string, model: string, pi: PiDefault): Price | un
 }
 
 const dayOf = (at: number) => {
-  const date = new Date(at);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const date = localParts(at);
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 };
 
 export const spending = Effect.gen(function* () {
   const db = yield* Db;
   const clock = yield* Clock.Clock;
-  let day = dayOf(yield* Clock.currentTimeMillis);
+  const startedAt = yield* Clock.currentTimeMillis;
+  let day = dayOf(startedAt);
   let today: Record<string, number> = Object.fromEntries((yield* db.run(q.spendForDay({ day }))).map((row) => [row.runtime, row.cny]));
   const pending = new Map<string, q.AddSpendParams>();
   const changed = yield* Queue.sliding<void>(1);

@@ -28,7 +28,7 @@ export interface Tunnel {
   readonly close: () => void;
 }
 
-/** Why the voice line cannot be had now; the message is the owner's. */
+/** Why the voice line cannot be had now; the message is the user's. */
 export class LineFailed extends Schema.TaggedError<LineFailed, { readonly brand: unique symbol }>()("LineFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -40,7 +40,7 @@ const cloudflared = (port: number) =>
     try {
       child = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      return resume(Effect.fail(new LineFailed({ message: messageOf(e), cause: e })));
+      return resume(Effect.fail(LineFailed.make({ message: messageOf(e), cause: e })));
     }
     const close = () => child.kill();
     let settled = false;
@@ -50,7 +50,7 @@ const cloudflared = (port: number) =>
       cancel();
       resume(e);
     };
-    const failWith = (message: string) => settle(Effect.fail(new LineFailed({ message })));
+    const failWith = (message: string) => settle(Effect.fail(LineFailed.make({ message })));
     // A real process: its deadline is real time.
     const cancel = afterRealTime(30_000, () => {
       close();
@@ -167,7 +167,7 @@ export const makeVoiceLine = (env: VoiceLineEnv) =>
         ));
     // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
     const opening = yield* Semaphore.make(1);
-    const lineClosed = () => new LineFailed({ message: t("server.voice.lineClosed") });
+    const lineClosed = () => LineFailed.make({ message: t("server.voice.lineClosed") });
     const base = Effect.suspend(() => {
       if (env.url) return Effect.succeed(env.url.replace(/\/+$/u, ""));
       closing?.();
@@ -187,8 +187,8 @@ export const makeVoiceLine = (env: VoiceLineEnv) =>
     });
     const open = Effect.gen(function* () {
       if (isStopped()) return yield* lineClosed();
-      if (lineProblem) return yield* new LineFailed({ message: lineProblem });
-      if (!line) return yield* new LineFailed({ message: t("server.voice.lineNotOpen") });
+      if (lineProblem) return yield* LineFailed.make({ message: lineProblem });
+      if (!line) return yield* LineFailed.make({ message: t("server.voice.lineNotOpen") });
       const url = yield* base;
       if (isStopped()) return yield* lineClosed();
       const id = randomBytes(8).toString("hex");

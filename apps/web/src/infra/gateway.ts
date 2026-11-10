@@ -9,7 +9,9 @@ import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 const makeClient = RpcClient.make(Subscriptions);
 
 // The client lives as long as the runtime.
-class SubscriptionsClient extends Context.Service<SubscriptionsClient, Effect.Success<typeof makeClient>>()("vibevalley/web/SubscriptionsClient") {
+class SubscriptionsClient extends Context.Service<SubscriptionsClient, Effect.Success<typeof makeClient>>()(
+  "@vibevalley/web/infra/gateway/SubscriptionsClient",
+) {
   static readonly layer = Layer.effect(SubscriptionsClient, makeClient).pipe(
     Layer.provide(RpcClient.layerProtocolSocket({ retryTransientErrors: true })),
     Layer.provide(Socket.layerWebSocket(Effect.sync(() => `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${rpcPath}`))),
@@ -35,7 +37,8 @@ function run<E>(
   let stopped = false;
   const fiber = runtime.runFork(
     Effect.gen(function* () {
-      yield* Stream.runForEach(stream(yield* SubscriptionsClient), (e) => Effect.sync(() => on(e)));
+      const subscriptionsClient = yield* SubscriptionsClient;
+      yield* Stream.runForEach(stream(subscriptionsClient), (e) => Effect.sync(() => on(e)));
     }).pipe(Effect.ignore({ log: "Debug" }), Effect.ensuring(Effect.sync(() => void (stopped || ended?.())))),
   );
   return () => {

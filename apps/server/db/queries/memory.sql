@@ -27,7 +27,7 @@ do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.
 delete from memory where agent = sqlc.arg(agent) and id = sqlc.arg(id);
 
 -- name: ClearManagedNotes :exec
-delete from memory where agent = sqlc.arg(agent) and kind = 'note' and author <> 'owner';
+delete from memory where agent = sqlc.arg(agent) and kind = 'note' and author <> 'user';
 
 -- name: StaleTerms :many
 -- What an older cut left; memory.recutTerms cuts it again.
@@ -38,9 +38,9 @@ update memory set terms = sqlc.arg(terms), terms_of = sqlc.arg(version) where id
 
 -- name: MatchMemories :many
 -- bound: one agent's current memories that share a word.
--- How well each of an agent's memories shares any of words, higher for a better match (FTS5's bm25, which is lower for a
--- better one). The words go in as phrases, quoted, so none reads as an operator.
-select memory.id, (-bm25(memory_term))::real as score
-from memory_term join memory on memory.rowid = memory_term.rowid
-where memory_term match (select group_concat('"' || replace(value, '"', '""') || '"', ' OR ') from json_each(sqlc.arg(words)::text[]))
+-- How well each of an agent's memories shares any of words, higher for a better match. term_query quotes each word, so
+-- none reads as an operator.
+select memory.id, ts_rank(term_vector(memory.terms), term_query(sqlc.arg(words)::text[], false))::float8 as score
+from memory
+where term_vector(memory.terms) @@ term_query(sqlc.arg(words)::text[], false)
   and memory.agent = sqlc.arg(agent) and memory.replaced_by is null;

@@ -1,5 +1,5 @@
 import { type AgoraClient } from "agora-agents";
-import { Clock, Context, Effect, Fiber, FiberSet, Layer, Queue, Schema, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, Fiber, FiberSet, Formatter, Layer, Option, Queue, Redacted, Schema, type Scope, Stream } from "effect";
 import { HttpClient } from "effect/http";
 import { Socket } from "effect/socket";
 
@@ -8,8 +8,7 @@ import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, type VoiceCall } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { decodeMossFrame } from "@vibevalley/provider/moss";
-import { type MossLink, type MossTransport, verifyMoss } from "@vibevalley/provider/moss/server";
-import { transcriptionModel, TranscriptionRequestError } from "@vibevalley/provider/transcription";
+import { TranscriptionRequestError } from "@vibevalley/provider/transcription";
 
 import { messageOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -19,7 +18,8 @@ import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, callbackLog } from "#/infra/log.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
-import { Provider } from "#/provider/provider.ts";
+import { type Account, Provider } from "#/provider/provider.ts";
+import type { RealtimeEvents, RealtimeLink, RealtimeTransport } from "#/provider/vendors.ts";
 import { type AgoraCredentials, Setting } from "#/setting/setting.ts";
 
 import {
@@ -44,10 +44,13 @@ import {
 } from "./agora.ts";
 import { type LineFailed, makeVoiceLine, type Tunnel, tunnelAnswers } from "./line.ts";
 import { relay } from "./moss-relay.ts";
-import { extractMossToolAck, extractMossToolCalls, mossOrchestratorTool } from "./moss-tools.ts";
+import { extractMossToolAck, extractMossToolCalls, mossFrame, mossOrchestratorTool } from "./moss-tools.ts";
 import { mossInstructions, noticeLine, onCallLine } from "./prompts.ts";
 
 export { agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, tunnelAnswers, vendorsFor, voiceAgentUid, voiceUnknown };
+
+/** The Agora credentials as Agora's token signer and REST client take them. */
+const plainAgora = (c: AgoraCredentials) => ({ appId: c.appId, appCertificate: Redacted.value(c.appCertificate) });
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
@@ -58,10 +61,15 @@ const aborted = (signal: AbortSignal) =>
     return Effect.sync(() => signal.removeEventListener("abort", done));
   });
 
+const sendMoss = (link: RealtimeLink, frame: Parameters<typeof mossFrame>[0]) => {
+  const text = mossFrame(frame);
+  if (Option.isSome(text)) link.send(text.value);
+};
+
 const mapTranscriptionFailure = (e: AudioFailure | TranscriptionFailed): ApiError => {
   switch (e._tag) {
     case "UnsupportedFormat":
-      return { _tag: "Refused", reason: t("server.voice.dictation.format", { format: JSON.stringify(e.format) }) };
+      return { _tag: "Refused", reason: t("server.voice.dictation.format", { format: Formatter.format(e.format) }) };
     case "EmptyAudio":
       return { _tag: "Refused", reason: t("server.voice.dictation.empty") };
     case "AudioTooLong":
@@ -83,27 +91,32 @@ const mapTranscriptionFailure = (e: AudioFailure | TranscriptionFailed): ApiErro
   }
 };
 
+/** A grant is issued with its token, starting while its call is being set up, and on once a call owns it. */
+type GrantPhase = { readonly _tag: "issued" } | { readonly _tag: "starting" } | { readonly _tag: "on"; readonly agent: string };
+
 type Grant =
   | {
       readonly kind: "agora";
       readonly credentials: AgoraCredentials;
       expires: number;
-      starting: boolean;
-      agent: string;
+      phase: GrantPhase;
     }
   | {
       readonly kind: "moss";
       expires: number;
-      starting: boolean;
-      agent: string;
+      phase: GrantPhase;
     };
 
+/** The MOSS Live line a call speaks through: waiting (pieces held, its link maybe open but not yet set up), ready once the
+ * session is updated, closed for good. A call and the page's relay share it, so it is one object whose phase moves on. */
+type MossPhase =
+  | { readonly _tag: "waiting"; readonly link?: RealtimeLink; readonly pending: string[] }
+  | { readonly _tag: "ready"; readonly link: RealtimeLink }
+  | { readonly _tag: "closed" };
 interface MossLine {
-  link?: MossLink;
-  ready: boolean;
-  closed: boolean;
-  readonly pending: string[];
+  phase: MossPhase;
 }
+const waitingLine = (): MossLine => ({ phase: { _tag: "waiting", pending: [] } });
 
 /** A call's agent session: what it says goes through it, with the session's own ConvoAI token. */
 type CallSession = ReturnType<ReturnType<typeof agentFor>["createSession"]>;
@@ -116,13 +129,14 @@ interface Call {
   readonly session?: CallSession | undefined;
   readonly say: (piece: string) => Effect.Effect<void, CallStepFailed>;
   readonly release: () => void;
-  /** A quick/realtime model answers on its own, so its words reach the default channel through `said` and the owner's reach `heard`. */
+  /** A quick/realtime model answers on its own, so its words reach the default channel through `said` and the user's reach `heard`. */
   readonly quick: boolean;
   /** Said at every pickup; not worth keeping in the chat. */
   readonly greeting: string;
+  /** Aborted once the call is ending: what it still does checks this, and its requests are cut. */
   readonly life: AbortController;
-  ending: boolean;
 }
+const ending = (call: Call) => call.life.signal.aborted;
 
 export interface RealtimeLine {
   readonly run: (page: Socket.Socket) => Effect.Effect<void, never, Scope.Scope>;
@@ -136,7 +150,7 @@ export class Voice extends Context.Service<
     /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
     readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
     readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
-    /** What the owner said on a call: the orchestrator overhears it when Agora's model or MOSS answers. */
+    /** What the user said on a call: the orchestrator overhears it when Agora's model or MOSS answers. */
     readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
     /** The relay without a call id: the one call on. */
     readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -151,7 +165,7 @@ export class Voice extends Context.Service<
     /** Words read out on the call that is on, queued after what is being said; false when no call is on. */
     readonly speak: (text: string) => Effect.Effect<boolean>;
   }
->()("vibevalley/Voice") {
+>()("@vibevalley/server/voice/voice") {
   static readonly layer = (options?: VoiceOptions) => Layer.effect(Voice, make(options));
 }
 
@@ -163,7 +177,7 @@ export interface VoiceOptions {
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
   /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
-  readonly moss?: MossTransport;
+  readonly moss?: RealtimeTransport;
 }
 
 /** Something to tell on the call: updates, and what rang when the call answers a ring. */
@@ -191,6 +205,8 @@ const make = (options: VoiceOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     const runHere: Run = yield* FiberSet.makeRuntimePromise();
     const now = () => clock.currentTimeMillisUnsafe();
+    /** A bound account's realtime line, through the transport this Voice was given. */
+    const lineOf = (account: Account) => ({ connect: (on: RealtimeEvents) => account.realtime.connect(on, options.moss), redact: account.realtime.redact });
 
     const grants = new Map<string, Grant>();
     const calls = new Map<string, Call>();
@@ -201,7 +217,7 @@ const make = (options: VoiceOptions = {}) =>
 
     // Pending grants have the same validity as their signed token; active calls own their grant until stop.
     const prune = () => {
-      for (const [k, g] of grants) if (!g.starting && !g.agent && g.expires <= now()) grants.delete(k);
+      for (const [k, g] of grants) if (g.phase._tag === "issued" && g.expires <= now()) grants.delete(k);
     };
 
     // Asked each time: credentials saved from the title screen work without a restart.
@@ -211,17 +227,15 @@ const make = (options: VoiceOptions = {}) =>
     };
 
     let commentarySequence = 0;
-    const deliverMossPiece = (piece: string, link: MossLink) => {
+    const deliverMossPiece = (piece: string, link: RealtimeLink) => {
       const characters = Array.from(piece.trim());
       for (let start = 0; start < characters.length; start += 2000)
-        link.send(
-          JSON.stringify({
-            action: "session.commentary.append",
-            content: characters.slice(start, start + 2000).join(""),
-            status: "completed",
-            event_id: `brief-${now()}-${commentarySequence++}`,
-          }),
-        );
+        sendMoss(link, {
+          action: "session.commentary.append",
+          content: characters.slice(start, start + 2000).join(""),
+          status: "completed",
+          event_id: `brief-${now()}-${commentarySequence++}`,
+        });
     };
 
     yield* Effect.addFinalizer(() =>
@@ -246,18 +260,18 @@ const make = (options: VoiceOptions = {}) =>
 
     const callOf = (agentId: string) => {
       const call = calls.get(agentId);
-      return call && !call.ending ? Effect.succeed(call) : Effect.fail(failed(t("server.voice.hungUp")));
+      return call && !ending(call) ? Effect.succeed(call) : Effect.fail(failed(t("server.voice.hungUp")));
     };
 
-    const liveCall = () => [...calls].find(([, c]) => !c.ending)?.[0];
+    const liveCall = () => [...calls].find(([, c]) => !ending(c))?.[0];
 
-    // Queued after what is being said (APPEND): never over the owner; the owner may talk over it.
+    // Queued after what is being said (APPEND): never over the user; the user may talk over it.
     const speakOn = Effect.fnUntraced(
       function* (agentId: string, text: string) {
         const call = calls.get(agentId);
-        if (!call || call.ending) return false;
+        if (!call || ending(call)) return false;
         for (const piece of speakPieces(text)) {
-          if (stopped || call.ending || calls.get(agentId) !== call) return false;
+          if (stopped || ending(call) || calls.get(agentId) !== call) return false;
           yield* call.say(piece);
         }
         return true;
@@ -287,9 +301,9 @@ const make = (options: VoiceOptions = {}) =>
         const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
           Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
-          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.undefined : Effect.fail(e))),
+          Effect.catch((e) => (stopped || ending(call) || calls.get(on) !== call ? Effect.undefined : Effect.fail(e))),
         );
-        if (said === undefined || stopped || call.ending || calls.get(on) !== call) break;
+        if (said === undefined || stopped || ending(call) || calls.get(on) !== call) break;
         if (said) {
           tries = 0;
           yield* speakOn(on, said);
@@ -306,8 +320,9 @@ const make = (options: VoiceOptions = {}) =>
       if (!stopped && (texts.length > 0 || ring)) Queue.offerUnsafe(told, { texts, ring });
     };
 
+    const news2 = yield* inbox.news;
     yield* Effect.forkScoped(
-      Stream.runForEach(yield* inbox.news, (items) =>
+      Stream.runForEach(news2, (items) =>
         Effect.sync(() => {
           if (liveCall()) tell(items.map((i) => noticeLine(i.words.title, i.words.body)));
         }),
@@ -317,13 +332,14 @@ const make = (options: VoiceOptions = {}) =>
     const heard = Effect.fn("Voice.heard")(function* (agentId: string, text: string, picked: string, sendKey: string) {
       const call = yield* callOf(agentId);
       if (!call.quick) return;
-      yield* ingress.owner({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
+      yield* ingress.user({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
     });
 
     return Voice.of({
       session: Effect.fn("Voice.session")(function* () {
         const currentVoice = settings.voice();
-        const channel = newChannel(yield* Clock.currentTimeMillis);
+        const now2 = yield* Clock.currentTimeMillis;
+        const channel = newChannel(now2);
         const uid = newUid();
         if (currentVoice.answer.vendor === "moss") {
           yield* provider.live().pipe(Effect.mapError(() => unavailable(t("server.voice.moss.noKey"), "moss")));
@@ -332,14 +348,13 @@ const make = (options: VoiceOptions = {}) =>
           grants.set(keyOf(channel, uid), {
             kind: "moss",
             expires: now() + tokenSeconds * 1000,
-            starting: false,
-            agent: "",
+            phase: { _tag: "issued" },
           });
           return { appId: "moss", channel, uid, token: "moss" };
         }
         const c = yield* creds();
         const issued = yield* Effect.try({
-          try: () => sign(c, channel, uid),
+          try: () => sign(plainAgora(c), channel, uid),
           catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
         });
         if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
@@ -348,8 +363,7 @@ const make = (options: VoiceOptions = {}) =>
           kind: "agora",
           credentials: c,
           expires: now() + tokenSeconds * 1000,
-          starting: false,
-          agent: "",
+          phase: { _tag: "issued" },
         });
         return issued;
       }),
@@ -362,7 +376,7 @@ const make = (options: VoiceOptions = {}) =>
           return { appId: "moss", channel, uid, token: "moss" };
         }
         const issued = yield* Effect.try({
-          try: () => sign(g.credentials, channel, uid),
+          try: () => sign(plainAgora(g.credentials), channel, uid),
           catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
         });
         g.expires = now() + tokenSeconds * 1000;
@@ -373,15 +387,14 @@ const make = (options: VoiceOptions = {}) =>
         const key = keyOf(channel, uid);
         const g = grants.get(key);
         if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
-        if (g.starting || g.agent) return yield* Effect.fail(unavailable(t("server.voice.connecting")));
+        if (g.phase._tag !== "issued") return yield* Effect.fail(unavailable(t("server.voice.connecting")));
         if (g.kind === "moss") {
           yield* provider.live().pipe(Effect.mapError(() => unavailable(t("server.voice.moss.noKey"), "moss")));
           if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
           const voice = settings.voice();
           const id = `moss-${channel}`;
-          g.agent = id;
-          g.starting = false;
-          activeMoss ??= { ready: false, closed: false, pending: [] };
+          g.phase = { _tag: "on", agent: id };
+          activeMoss ??= waitingLine();
           const target = activeMoss;
           calls.set(id, {
             kind: "moss",
@@ -389,30 +402,30 @@ const make = (options: VoiceOptions = {}) =>
             moss: target,
             say: (piece) =>
               Effect.gen(function* () {
-                if (target.closed || piece.length > 16000 || (!target.ready && target.pending.length >= 8))
+                const line = target.phase;
+                if (line._tag === "closed" || piece.length > 16000 || (line._tag === "waiting" && line.pending.length >= 8))
                   return yield* callStepFailed(new Error("MOSS commentary unavailable or full"));
-                if (target.ready && target.link) deliverMossPiece(piece, target.link);
-                else target.pending.push(piece);
+                if (line._tag === "ready") deliverMossPiece(piece, line.link);
+                else line.pending.push(piece);
               }),
             release: () => {
-              if (target.closed) return;
-              target.closed = true;
-              target.pending.length = 0;
-              target.link?.close();
+              const line = target.phase;
+              if (line._tag === "closed") return;
+              target.phase = { _tag: "closed" };
+              line.link?.close();
               if (activeMoss === target) activeMoss = undefined;
             },
             quick: true,
             greeting: (about ? "" : voice.greeting).trim(),
             // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
-            ending: false,
           });
           if (about) tell([], about);
           yield* core.did({ kind: "talked" });
           return { agentId: id };
         }
 
-        g.starting = true;
+        g.phase = { _tag: "starting" };
         let release = () => {};
         let callLine: CallLine | undefined;
         let openingLine: Fiber.Fiber<CallLine, LineFailed> | undefined;
@@ -434,9 +447,14 @@ const make = (options: VoiceOptions = {}) =>
             };
           }
           const forCall = about ? { ...voice, greeting: "" } : voice;
-          const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
+          const vendors = vendorsFor(
+            forCall,
+            { asrKey: Redacted.value(vendorKeys.asrKey), llmKey: Redacted.value(vendorKeys.llmKey), ttsKey: Redacted.value(vendorKeys.ttsKey) },
+            deepseekApiKey === undefined ? "" : Redacted.value(deepseekApiKey),
+            callLine,
+          );
           if ("_tag" in vendors) return yield* Effect.fail(vendors);
-          const agora = clientOf(g.credentials, voice.area, runHere, options.fetch);
+          const agora = clientOf(plainAgora(g.credentials), voice.area, runHere, options.fetch);
           client = agora;
           const session = agentFor(agora, forCall, vendors).createSession({
             channel,
@@ -452,8 +470,7 @@ const make = (options: VoiceOptions = {}) =>
             catch: (e) => failed(t("server.voice.joinFailed", { why: messageOf(e) })),
           });
           if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
-          g.agent = id;
-          g.starting = false;
+          g.phase = { _tag: "on", agent: id };
           calls.set(id, {
             kind: "agora",
             grant: key,
@@ -469,7 +486,6 @@ const make = (options: VoiceOptions = {}) =>
             greeting: forCall.greeting.trim(),
             // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
-            ending: false,
           });
           committed = true;
           if (about) tell([], about);
@@ -514,7 +530,6 @@ const make = (options: VoiceOptions = {}) =>
         const call = calls.get(agentId);
         if (call?.kind === "moss") {
           grants.delete(call.grant);
-          call.ending = true;
           call.life.abort();
           call.release();
           calls.delete(agentId);
@@ -524,10 +539,12 @@ const make = (options: VoiceOptions = {}) =>
         let client: AgoraClient;
         if (call && call.client) {
           grants.delete(call.grant);
-          call.ending = true;
           call.life.abort();
           client = call.client;
-        } else client = clientOf(yield* creds(), settings.voice().area, runHere, options.fetch);
+        } else {
+          const credentials = yield* creds();
+          client = clientOf(plainAgora(credentials), settings.voice().area, runHere, options.fetch);
+        }
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
           catch: callStepFailed,
@@ -540,7 +557,7 @@ const make = (options: VoiceOptions = {}) =>
       }),
       heard,
       heardCurrent: Effect.fn("Voice.heardCurrent")(function* (text, picked, sendKey) {
-        const live = [...calls].filter(([, c]) => !c.ending);
+        const live = [...calls].filter(([, c]) => !ending(c));
         if (live.length > 1) return yield* Effect.fail(failed(t("server.voice.manyCalls")));
         const [only] = live;
         if (!only) return yield* Effect.fail(failed(t("server.voice.noCall")));
@@ -549,7 +566,7 @@ const make = (options: VoiceOptions = {}) =>
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
         if (call.quick && text.trim() !== call.greeting)
-          yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""), {
+          yield* Effect.ignore(chat.post({ _tag: "Call", from: defaultOrchestrator, text: text, sendKey: "" }), {
             log: "Warn",
             message: "vibevalley: voice: the orchestrator's spoken words were not kept",
           });
@@ -557,7 +574,7 @@ const make = (options: VoiceOptions = {}) =>
       verifyMoss: Effect.fn("Voice.verifyMoss")(function* () {
         const connection = yield* provider.live().pipe(Effect.option);
         if (connection._tag === "None") return { problem: t("server.voice.moss.noKey") };
-        const r = yield* verifyMoss(connection.value.key, options.moss, connection.value.model);
+        const r = yield* connection.value.realtime.verify(options.moss);
         switch (r.kind) {
           case "ok":
             return { problem: "" };
@@ -573,7 +590,7 @@ const make = (options: VoiceOptions = {}) =>
       }),
       visionLine: Effect.fn("Voice.visionLine")(function* () {
         const connection = yield* provider.vision();
-        return { run: (page: Socket.Socket) => relay(page, connection.key, options.moss, undefined, connection.model) };
+        return { run: (page: Socket.Socket) => relay(page, lineOf(connection)) };
       }),
       mossLine: Effect.fn("Voice.mossLine")(function* () {
         const connection = yield* provider.live();
@@ -589,7 +606,7 @@ const make = (options: VoiceOptions = {}) =>
                 Effect.sync(() => {
                   if (liveLineActive) return undefined;
                   liveLineActive = true;
-                  activeMoss ??= { ready: false, closed: false, pending: [] };
+                  activeMoss ??= waitingLine();
                   return activeMoss;
                 }),
                 (target) =>
@@ -598,13 +615,10 @@ const make = (options: VoiceOptions = {}) =>
                     liveLineActive = false;
                     active = false;
                     awaitingAck.clear();
-                    target.closed = true;
-                    target.ready = false;
-                    target.pending.length = 0;
+                    target.phase = { _tag: "closed" };
                     if (activeMoss === target) activeMoss = undefined;
                     for (const [id, call] of calls) {
                       if (call.moss !== target) continue;
-                      call.ending = true;
                       call.life.abort();
                       grants.delete(call.grant);
                       calls.delete(id);
@@ -621,95 +635,91 @@ const make = (options: VoiceOptions = {}) =>
                 return;
               }
               const forkMoss = yield* FiberSet.makeRuntime();
-              yield* relay(
-                page,
-                connection.key,
-                options.moss,
-                {
-                  onOpen: (link) => {
-                    if (acquired.closed) {
-                      link.close();
-                      return;
-                    }
-                    acquired.link = link;
-                    return () => {
-                      active = false;
-                      awaitingAck.clear();
-                    };
-                  },
-                  onPageText: (data) => {
-                    const decoded = decodeMossFrame(data);
-                    if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
-                    // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
-                    const v = settings.voice();
-                    if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !c.ending)) return data;
-                    toolsEnabled = true;
-                    return JSON.stringify({
+              yield* relay(page, lineOf(connection), {
+                onOpen: (link) => {
+                  const line = acquired.phase;
+                  if (line._tag === "closed") {
+                    link.close();
+                    return;
+                  }
+                  acquired.phase = line._tag === "waiting" ? { ...line, link } : { _tag: "ready", link };
+                  return () => {
+                    active = false;
+                    awaitingAck.clear();
+                  };
+                },
+                onPageText: (data) => {
+                  const decoded = decodeMossFrame(data);
+                  if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
+                  // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
+                  const v = settings.voice();
+                  if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !ending(c))) return data;
+                  toolsEnabled = true;
+                  return Option.getOrUndefined(
+                    mossFrame({
                       action: "session.update",
                       session: {
                         persona: { prompt: v.persona },
                         instructions: mossInstructions(v.greeting),
                         tools: [mossOrchestratorTool],
                       },
-                    });
-                  },
-                  onMossText: (data, link) => {
-                    const decoded = decodeMossFrame(data);
-                    if (
-                      decoded._tag === "Some" &&
-                      decoded.value.action === "session.updated" &&
-                      decoded.value.data?.error === "" &&
-                      activeMoss === acquired &&
-                      !acquired.closed
-                    ) {
-                      acquired.ready = true;
-                      for (const piece of acquired.pending.splice(0)) deliverMossPiece(piece, link);
-                    }
-                    const ack = extractMossToolAck(data);
-                    if (ack && awaitingAck.delete(ack)) link.send(JSON.stringify({ action: "response.create", response: { call_ids: [ack] } }));
-                    for (const toolCall of extractMossToolCalls(data)) {
-                      if (!active || acquired.closed || !toolsEnabled || executed.has(toolCall.callId)) continue;
-                      if (executed.size >= 64 || inFlight >= 4) {
-                        link.close();
-                        return;
-                      }
-                      executed.add(toolCall.callId);
-                      inFlight++;
-                      forkMoss(
-                        response.brief(toolCall.question).pipe(
-                          Effect.catch(() => Effect.succeed(t("server.voice.moss.toolFailed"))),
-                          Effect.tap((answer) =>
-                            Effect.sync(() => {
-                              if (!active || acquired.closed) return;
-                              awaitingAck.add(toolCall.callId);
-                              link.send(
-                                JSON.stringify({
-                                  action: "conversation.item.create",
-                                  item: { type: "function_call_output", call_id: toolCall.callId, output: answer || t("server.voice.moss.toolFailed") },
-                                }),
-                              );
-                            }),
-                          ),
-                          Effect.ignore({ log: "Warn", message: "vibevalley: voice: ask_orchestrator tool result failed" }),
-                          Effect.ensuring(
-                            Effect.sync(() => {
-                              inFlight--;
-                            }),
-                          ),
-                        ),
-                      );
-                    }
-                  },
+                    }),
+                  );
                 },
-                connection.model,
-              );
+                onMossText: (data, link) => {
+                  const decoded = decodeMossFrame(data);
+                  if (
+                    decoded._tag === "Some" &&
+                    decoded.value.action === "session.updated" &&
+                    decoded.value.data?.error === "" &&
+                    activeMoss === acquired &&
+                    acquired.phase._tag === "waiting"
+                  ) {
+                    const held = acquired.phase.pending;
+                    acquired.phase = { _tag: "ready", link };
+                    for (const piece of held) deliverMossPiece(piece, link);
+                  }
+                  const ack = extractMossToolAck(data);
+                  if (ack && awaitingAck.delete(ack)) sendMoss(link, { action: "response.create", response: { call_ids: [ack] } });
+                  for (const toolCall of extractMossToolCalls(data)) {
+                    if (!active || acquired.phase._tag === "closed" || !toolsEnabled || executed.has(toolCall.callId)) continue;
+                    if (executed.size >= 64 || inFlight >= 4) {
+                      link.close();
+                      return;
+                    }
+                    executed.add(toolCall.callId);
+                    inFlight++;
+                    forkMoss(
+                      response.brief(toolCall.question).pipe(
+                        Effect.orElseSucceed(() => t("server.voice.moss.toolFailed")),
+                        Effect.tap((answer) =>
+                          Effect.sync(() => {
+                            if (!active || acquired.phase._tag === "closed") return;
+                            awaitingAck.add(toolCall.callId);
+                            sendMoss(link, {
+                              action: "conversation.item.create",
+                              item: { type: "function_call_output", call_id: toolCall.callId, output: answer || t("server.voice.moss.toolFailed") },
+                            });
+                          }),
+                        ),
+                        Effect.ignore({ log: "Warn", message: "vibevalley: voice: ask_orchestrator tool result failed" }),
+                        Effect.ensuring(
+                          Effect.sync(() => {
+                            inFlight--;
+                          }),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              });
             }),
         };
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const connection = yield* provider.dictation().pipe(Effect.mapError((error) => unavailable(error.reason, "dictation")));
         const input = yield* transcriptionAudio(audio64, given).pipe(Effect.mapError(mapTranscriptionFailure));
-        const selected = yield* transcriptionModel(connection, input.format).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+        const selected = yield* connection.transcriber(input.format);
         const result = yield* transcribeAudio(selected, input.audio).pipe(Effect.mapError(mapTranscriptionFailure));
         return { text: result.text };
       }, Effect.scoped),

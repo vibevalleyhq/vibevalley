@@ -211,7 +211,7 @@ const viewStyles = stylex.create({
 
 export type DictationState = "unset" | DictationPhase;
 
-/** One field's hold on the page's recorder: the words go into it at its caret, for the owner to read before sending. */
+/** One field's hold on the page's recorder: the words go into it at its caret, for the user to read before sending. */
 export function useDictation(field: {
   input: () => HTMLTextAreaElement | HTMLInputElement | undefined;
   value: () => string;
@@ -223,7 +223,7 @@ export function useDictation(field: {
   // Unknown until the settings are read; the server says what is missing then.
   const settings = useSettings();
   const router = useRouter();
-  const off = () => ready(settings, undefined)?.dictationReady === false;
+  const off = () => ready(settings, undefined)?.readiness.dictation.ready === false;
   const toggle = () =>
     // Like an event handler, it reads the field as it is when the words come.
     void dictation.toggle(me, (words) => {

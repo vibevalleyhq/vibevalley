@@ -21,7 +21,7 @@ export interface Doing {
   label: string;
 }
 
-/** A Doing as the frame tells it: its action in the owner's words. */
+/** A Doing as the frame tells it: its action in the user's words. */
 export interface DoingView extends Doing {
   actionText: string;
 }
@@ -65,6 +65,8 @@ export interface Session {
   issue?: IssueId;
   refining: boolean;
   toolConnections?: ToolConnection[];
+  /** The machine it works on; none for an agent hosted in the server's process. */
+  machine?: string;
 }
 
 /** reduce never sees these: the words are the frame's (projection/frame.ts). */

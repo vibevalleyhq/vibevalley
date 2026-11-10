@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes.
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Clock, Effect, Option, Schema } from "effect";
+import { Clock, Effect, Option, Redacted, Schema } from "effect";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
@@ -92,7 +92,8 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart. The SDK's connect is the one call.
   const connect = () => {
-    const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
+    const key = c.key === undefined ? "" : Redacted.value(c.key);
+    const wire = new StreamableHTTPClientTransport(new URL(c.url), key ? { requestInit: { headers: { Authorization: `Bearer ${key}` } } } : {});
     transport = wire;
     const one = new Client({ name: app, version: "1" });
     return one
@@ -130,7 +131,7 @@ export function nowledge(c: MemorySourceConfig): Source {
         });
         const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(ToolAnswer)(res));
         const text = (parsed?.content ?? []).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-        if (parsed?.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
+        if (parsed?.isError === true) return yield* SourceError.make({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );
@@ -148,7 +149,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     };
     const text = yield* call("memory_search", args);
     return yield* Effect.mapBoth(Schema.decodeEffect(SearchResponse)(text), {
-      onFailure: () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
+      onFailure: () => SourceError.make({ message: "memory_search answered what it should not: " + head(text, 200) }),
       onSuccess: (r): Hit[] => r.results ?? [],
     });
   });
@@ -158,7 +159,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, repo), source_app: app });
     // The new memory's id, at the top or under memory. none when it found the same memory there already.
     const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
-    if (!added) return yield* new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) });
+    if (!added) return yield* SourceError.make({ message: "memory_add answered what it should not: " + head(answer, 200) });
     return added.memory_id || added.id || added.memory?.id || "";
   });
 
@@ -193,9 +194,11 @@ export function nowledge(c: MemorySourceConfig): Source {
         (h): Effect.Effect<MemoryScope> => {
           const id = hitID(h);
           if (!id) return Effect.succeed({ kind: "unknown" });
-          return call("get_memory_by_id", { memory_id: id }).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(DetailResponse)),
-            Effect.map((detail) => scopeOf(detail.labels)),
+          return Effect.gen(function* () {
+            const answer = yield* call("get_memory_by_id", { memory_id: id });
+            const detail = yield* Schema.decodeEffect(DetailResponse)(answer);
+            return scopeOf(detail.labels);
+          }).pipe(
             // An unreadable detail does not turn an unknown repo into a global memory.
             Effect.orElseSucceed((): MemoryScope => ({ kind: "unknown" })),
           );
@@ -233,7 +236,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const at = yield* Clock.currentTimeMillis;
       return { id, agent: n.agent, kind: "note", text: n.text, author: "system", at, recalled: 0, fading: false, ...(repo ? { repo } : {}) } satisfies T.Memory;
     }),
-    forget: () => Effect.fail(new SourceError({ message: t("server.memory.nowledgeForget") })),
+    forget: () => Effect.fail(SourceError.make({ message: t("server.memory.nowledgeForget") })),
     can: { list: true, forget: false, transcripts: false },
   };
 }

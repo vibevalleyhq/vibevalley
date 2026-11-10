@@ -1,18 +1,19 @@
 import * as stylex from "@stylexjs/stylex";
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary } from "@vibevalley/protocol";
 
 import { Keyed } from "#/base/dom.tsx";
+import { createExternal } from "#/base/external.ts";
 import { api } from "#/infra/api.ts";
+import { localDay } from "#/infra/local-day.ts";
 import { ready, useQueryClient } from "#/infra/query.ts";
 import { useSearch, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Icon } from "#/ui/Icon.tsx";
 
 import { Calendar } from "./Calendar";
-import { dayKey } from "./days";
 import { Opened } from "./PageView";
 import { Sidebar } from "./Sidebar";
 import { refreshVault, usePkmVault } from "./vault";
@@ -198,22 +199,32 @@ const daysShown = 5;
 /** Today's journal first (made if there is none), to write in at once; then the earlier days that have one. */
 function Days(props: { pages: readonly PkmPageSummary[] }) {
   const queries = useQueryClient();
-  const today = dayKey(Date.now());
+  const today = createExternal(localDay.subscribe, localDay.get);
   const act = createAct();
   const [opened, setOpened] = createSignal<string>();
-  onSettled(() => {
-    void act.run(async () => {
-      setOpened((await api.pkm.journal.open({ day: today })).slug);
-      void refreshVault(queries);
-    });
-  });
+  createEffect(
+    () => today(),
+    (day) => {
+      let active = true;
+      setOpened(undefined);
+      void act.run(async () => {
+        const page = await api.pkm.journal.open({ day });
+        if (!active) return;
+        setOpened(page.slug);
+        void refreshVault(queries);
+      });
+      return () => {
+        active = false;
+      };
+    },
+  );
   const before = () =>
     props.pages
-      .filter((p) => p.day !== undefined && p.day < today)
+      .filter((p) => p.day !== undefined && p.day < today())
       .toSorted((a, b) => (b.day ?? "").localeCompare(a.day ?? ""))
       .slice(0, daysShown);
   return (
-    <div data-testid="pkm-days" {...stylex.attrs(variantStyles.daysDiv)}>
+    <div data-testid="pkm-days" aria-busy={act.busy() ? "true" : "false"} {...stylex.attrs(variantStyles.daysDiv)}>
       <div {...stylex.attrs(viewStyles.daysDiv)}>
         <div {...stylex.attrs(viewStyles.daysDiv2)}>
           <A href="/pkm?nav" {...stylex.attrs(variantStyles2.daysA)}>
@@ -227,7 +238,7 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
         </For>
       </div>
       <aside aria-label={t("web.pkm.rail.label")} {...stylex.attrs(viewStyles.daysAside)}>
-        <Calendar pages={props.pages} open={today} />
+        <Calendar pages={props.pages} open={today()} />
       </aside>
     </div>
   );

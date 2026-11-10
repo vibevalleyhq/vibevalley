@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { Effect, Predicate } from "effect";
+import { Effect, Formatter, Option, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -81,7 +81,7 @@ function checkedOf(e: Expect): Checked | string {
     case "silent":
       return { kind: "silent" };
     default:
-      return `unknown kind ${JSON.stringify(e.kind)}`;
+      return `unknown kind ${Formatter.format(e.kind)}`;
   }
 }
 
@@ -106,7 +106,7 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
   const words = wordsOf(turn);
   const called = (tool: string, args = "", lacks?: string) =>
     calls.some((c) => {
-      const json = JSON.stringify(c.arguments);
+      const json = Formatter.formatJson(c.arguments);
       return c.name === tool && json.includes(args) && (lacks === undefined || !json.includes(lacks));
     });
   const missed: string[] = [];
@@ -137,7 +137,7 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
         ok = !words.includes(c.contains);
         break;
     }
-    if (!ok) missed.push(JSON.stringify(e));
+    if (!ok) missed.push(Formatter.formatJson(e));
   }
   return missed;
 }
@@ -157,9 +157,13 @@ export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { custo
 
 export const committed = join(import.meta.dirname, "..", "orchestrator", "testdata", "evals");
 
-/** Arguments as one string whatever order their keys came in. */
-const argsKey = (args: unknown): string =>
-  JSON.stringify(args, (_, v: unknown) => (Predicate.isObject(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v));
+const encodeArgsKey = Schema.encodeOption(
+  Schema.fromJsonString(Schema.Unknown, {
+    replacer: (_, v: unknown) => (Predicate.isObject(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v),
+  }),
+);
+/** Arguments as one string whatever order their keys came in; a model's arguments are parsed JSON, so they always write. */
+const argsKey = (args: unknown): string => Option.getOrElse(encodeArgsKey(args), () => "");
 
 /** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. */
 export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
@@ -177,7 +181,7 @@ export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): T
       Effect.suspend(() => {
         const next = recorded.get(t.name + " " + argsKey(args))?.shift();
         if (!next) return Effect.succeed({ content: [{ type: "text" as const, text: noResult }] });
-        if (next.isError) return Effect.fail(new ToolFailed({ message: next.content.map((c) => (c.type === "text" ? c.text : "")).join("") }));
+        if (next.isError) return Effect.fail(ToolFailed.make({ message: next.content.map((c) => (c.type === "text" ? c.text : "")).join("") }));
         return Effect.succeed({ content: next.content });
       }),
   }));

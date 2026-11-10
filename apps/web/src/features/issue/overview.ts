@@ -21,8 +21,8 @@ export const stageTone: Record<IssueStageKind, Tone> = {
   canceled: "faint",
 };
 
-/** The block that asks the owner for the one thing: its head and what it says under it. */
-interface OwnerQuestion {
+/** The block that asks the user for the one thing: its head and what it says under it. */
+interface UserQuestion {
   head: string;
   line?: string;
   tone: Tone;
@@ -46,8 +46,8 @@ function criteriaRows(issue: Issue): CriterionRow[] {
   });
 }
 
-/** The one thing the owner is asked for, worded; undefined when nothing is asked of the owner. */
-function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQuestion | undefined {
+/** The one thing the user is asked for, worded; undefined when nothing is asked of the user. */
+function userQuestion(stage: IssueStage, issue: Issue, head: Session): UserQuestion | undefined {
   const who = head.name;
   const said = head.lastRun?.summary;
   switch (stage.state) {
@@ -124,8 +124,8 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     repo: issue.repo ?? head.repo,
     parentText: parent?.title ?? issue.parent ?? "",
-    ask: ownerQuestion(stage, issue, head),
-    /** The lead act and the rest the owner may do, as the server says. */
+    ask: userQuestion(stage, issue, head),
+    /** The lead act and the rest the user may do, as the server says. */
     lead: stage.lead,
     others: stage.acts.map((a) => a.act).filter((a) => a !== stage.lead),
     criteria: rows,

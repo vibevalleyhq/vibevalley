@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { cli, farm } from "./testing.ts";
 
-const json = (text: string): unknown => JSON.parse(text);
+const json = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 describe("the hand-written commands", () => {
   it.live("note, read, search and edit the notes as Markdown, the endpoint's JSON with --format json", () =>
@@ -24,7 +24,8 @@ describe("the hand-written commands", () => {
       const page = yield* cli(at("pkm", "page", "export", "garden"));
       expect(page.out).toBe("# Garden\n\n- bulbs\n### tomatoes\n\n- basil");
       const asJson = yield* cli(at("pkm", "page", "show", "garden", "--format", "json"));
-      expect(json(asJson.out)).toMatchObject({ page: { slug: "garden" } });
+      const shownJson = yield* json(asJson.out);
+      expect(shownJson).toMatchObject({ page: { slug: "garden" } });
 
       const found = yield* cli(at("pkm", "search", "basil"));
       expect(found.out).toBe("Garden › tomatoes: basil");
@@ -45,7 +46,7 @@ describe("the hand-written commands", () => {
     Effect.gen(function* () {
       const server = yield* farm;
       const doctor = yield* cli(["doctor", "--server", server], "", { VIBEVALLEY_HOME: "/nonexistent-home" });
-      const checks = json(doctor.out) as { check: string; ok: boolean }[];
+      const checks = (yield* json(doctor.out)) as { check: string; ok: boolean }[];
       expect(checks.map((c) => c.check)).toEqual(["farm", "server", "app", "runtimes", "model", "lan"]);
       expect(checks.find((c) => c.check === "app")).toMatchObject({ ok: true, open: false });
 
@@ -54,7 +55,7 @@ describe("the hand-written commands", () => {
 
       const gone = yield* cli(["doctor", "--server", "http://127.0.0.1:9"]);
       expect(gone.code).toBe(5);
-      expect((json(gone.out) as { check: string; ok: boolean }[]).map((c) => [c.check, c.ok])).toEqual([
+      expect(((yield* json(gone.out)) as { check: string; ok: boolean }[]).map((c) => [c.check, c.ok])).toEqual([
         ["farm", true],
         ["server", false],
       ]);

@@ -1,6 +1,7 @@
-import { Effect, Layer, Ref, Stream } from "effect";
+import { Effect, Layer, Option, Ref, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
+import { jsonText, parsedJson } from "./json.ts";
 import { Llm } from "./llm.ts";
 import type { AssistantMessage, Context, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
@@ -92,7 +93,7 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
     if (block.type === "toolCall") {
       content.push(block);
       events.push({ type: "toolcall_start", contentIndex: i, partial: message() });
-      events.push({ type: "toolcall_delta", contentIndex: i, delta: JSON.stringify(block.arguments), partial: message() });
+      events.push({ type: "toolcall_delta", contentIndex: i, delta: jsonText(block.arguments), partial: message() });
       events.push({ type: "toolcall_end", contentIndex: i, toolCall: block, partial: message() });
       continue;
     }
@@ -163,7 +164,7 @@ export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) 
 
 /** One chat/completions stream chunk, as DeepSeek writes it. */
 export const chunk = (delta: Record<string, unknown>, finish: string | null = null, more: Record<string, unknown> = {}) =>
-  `data: ${JSON.stringify({ id: "r", model: "deepseek-flash", choices: [{ index: 0, delta, finish_reason: finish }], ...more })}\n\n`;
+  `data: ${jsonText({ id: "r", model: "deepseek-flash", choices: [{ index: 0, delta, finish_reason: finish }], ...more })}\n\n`;
 
 export interface Sent {
   url: string;
@@ -179,7 +180,7 @@ export const http = (sent: Sent[], body: string | ReadableStream<Uint8Array>, st
       sent.push({
         url: url.toString(),
         authorization: request.headers.authorization,
-        body: b._tag === "Uint8Array" ? JSON.parse(new TextDecoder().decode(b.body)) : undefined,
+        body: b._tag === "Uint8Array" ? Option.getOrUndefined(parsedJson(new TextDecoder().decode(b.body))) : undefined,
       });
       return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body, { status })));
     }),

@@ -1,4 +1,6 @@
+import type { AgentRole } from "../agent/shapes";
 import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes";
+import type { Attachment } from "../attachment/shapes";
 import type { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
@@ -10,6 +12,8 @@ export interface ChatMessage {
   channel: string;
   from: string;
   fromKind: ActorKind;
+  /** The speaking agent's role, when fromKind is agent. */
+  fromRole?: AgentRole;
   name: string;
   agent?: string;
   kind: MessageKind;
@@ -20,7 +24,7 @@ export interface ChatMessage {
   outcome: Outcome | null;
   spent?: Spent;
   spoken: boolean;
-  /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
+  /** The key the user's send carried, on the user's own messages: a page knows its line by it. */
   sendKey?: string;
   at: number;
   /** Its channel's revision when it was last written or changed: of two copies, the higher one is now. */
@@ -61,18 +65,6 @@ export interface Reaction {
   by: string[];
 }
 
-/** id is the sha256 of its bytes, served at attachmentPath. */
-export interface Attachment {
-  id: string;
-  name: string;
-  /** A media type: image/png, application/pdf… */
-  type: string;
-  size: number;
-}
-
-/** The one read that is not a POST, since an <img src> can only GET. */
-export const attachmentPath = (id: string) => `/api/v1/attachment/${id}`;
-
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
 
@@ -84,10 +76,14 @@ export interface Channel {
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
   default: boolean;
-  /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
+  /** A direct channel's other participant: an orchestrator, or a helper profile. The user talks with it there alone. */
   peer?: string;
-  /** The orchestrator that looks after the place, by its profile id, as the server resolves it. The owner's words there go to it. */
+  /** The orchestrator in the place, by its profile id, as the server resolves it: a direct channel's other one, else one
+   * of the members of the channel it is in, else the default one. What names no orchestrator in particular there (a
+   * generic @ of it, work left to one) goes to it. */
   orchestrator?: string;
+  /** Who is in a channel or follows a thread, by participant id: what is said there to no one in particular goes to them. */
+  members?: string[];
   /** A thread's channel. */
   parent?: string;
   /** A channel's group in the sidebar. */
@@ -95,7 +91,7 @@ export interface Channel {
   /** Its place in the sidebar, lowest first; none comes after the placed. */
   position?: number;
   archived?: number;
-  /** What of it counts for the owner; absent is all. */
+  /** What of it counts for the user; absent is all. */
   notify: Notify;
   /** The message a thread hangs under, and its number there. */
   root?: MessageId;
@@ -108,7 +104,7 @@ export interface Channel {
   lastNumber?: number;
   replies: number;
   read?: number;
-  /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
+  /** What the user has not read here: others' messages past read, notices left out; absent when none. */
   unread?: number;
   /** A thread not on an issue, by the server: a talk thread's session, else the head of the message it hangs under. */
   title: string;
@@ -119,7 +115,7 @@ export interface Channel {
 
 /** A place a participant has not read all of, as channel.unread.list gives it to its caller. */
 export interface ChannelUnread {
-  /** Its address: #channel, #channel:n for a thread, @owner for the orchestrator's direct channel. */
+  /** Its address: #channel, #channel:n for a thread, @user for the orchestrator's direct channel. */
   channel: string;
   unread: number;
   /** Something there names the caller. */
@@ -136,7 +132,7 @@ export interface ChannelLast {
   at: number;
 }
 
-export interface OwnerMention {
+export interface UserMention {
   message: ChatMessage;
   channel: string;
   address: string;
@@ -145,7 +141,7 @@ export interface OwnerMention {
 /** The channels, not what is said in them: a page follows a channel for that (rpc.ts). */
 export interface Chat {
   channels: Channel[];
-  ownerMentions: OwnerMention[];
+  userMentions: UserMention[];
 }
 
 /** What a channel's follower gets: each message said there, by its number; Reset when it is too far behind to catch up. */
@@ -168,12 +164,14 @@ export interface SayRequest {
   blocks?: BlockRef[];
   /** The number of the message there it answers. */
   replyTo?: number;
-  /** Ids from channel.attachment.create. */
+  /** Ids from attachment.create. */
   attachments?: string[];
   station?: number;
   agent?: string;
   repo?: string;
   sendKey?: string;
+  /** The orchestrator it is said to, by profile id: only it hears it (a skill asked of the orchestrator in the place, /imagegen). */
+  to?: string;
 }
 
 export interface ChannelUpdate {
@@ -185,8 +183,8 @@ export interface ChannelUpdate {
   category?: string;
   /** Placed before this channel in the sidebar; empty is last. */
   before?: string;
-  /** The orchestrator that looks after the channel, by its profile id; empty is the default one. */
-  orchestrator?: string;
+  /** The agents in the channel, by profile id: what is said there to no one in particular goes to them. Only orchestrators can be. */
+  members?: string[];
 }
 
 export interface ChannelRequest {
@@ -211,7 +209,7 @@ export interface NotifyRequest {
   notify: Notify;
 }
 
-/** The owner's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
+/** The user's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
 export interface ReactionSet {
   id: MessageId;
   emoji: string;
@@ -223,15 +221,6 @@ export interface OnSet {
   id: string;
   on: boolean;
 }
-
-/** At most attachmentMax bytes, as base64. */
-export interface AttachmentUpload {
-  name: string;
-  type: string;
-  data: string;
-}
-
-export const attachmentMax = 25 * 1024 * 1024;
 
 export interface MessageSearch {
   text: string;
@@ -267,8 +256,8 @@ export interface FactChannelRemoved {
   id: string;
 }
 
-export interface FactOwnerMentionsChanged {
-  type: "ownerMentionsChanged";
+export interface FactUserMentionsChanged {
+  type: "userMentionsChanged";
   at: number;
-  mentions: OwnerMention[];
+  mentions: UserMention[];
 }

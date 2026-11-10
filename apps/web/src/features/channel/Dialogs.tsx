@@ -1,9 +1,10 @@
 import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
+import { Array as Arr, Order } from "effect";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, defaultOrchestrator, type Notify } from "@vibevalley/protocol";
+import { type Channel, type Notify } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { autofocus } from "#/base/dom.tsx";
@@ -13,8 +14,9 @@ import { useCore } from "#/infra/frame.ts";
 import { ready, useRepos } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
+import { Checkbox } from "#/ui/Checkbox.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
-import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
+import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { channelName } from "./places";
@@ -134,14 +136,14 @@ export function createChannelForm(channel?: Channel) {
     repo: channel?.repo ?? "",
     category: channel?.category ?? "",
     notify: channel?.notify ?? "all",
-    orchestrator: channel?.orchestrator ?? defaultOrchestrator,
+    members: Arr.sort(channel?.members ?? [], Order.String),
   }));
   const [name, setName] = createSignal(was.name);
   const [description, setDescription] = createSignal(was.description);
   const [repo, setRepo] = createSignal(was.repo);
   const [category, setCategory] = createSignal(was.category);
   const [notify, setNotify] = createSignal<Notify>(was.notify);
-  const [orchestrator, setOrchestrator] = createSignal(was.orchestrator);
+  const [members, setMembers] = createSignal<readonly string[]>(was.members);
   const [error, setError] = createSignal<string>();
   // A refusal is said in the form, beside what it refuses, rather than in a toast.
   const act = createAct(setError);
@@ -150,14 +152,14 @@ export function createChannelForm(channel?: Channel) {
   /** The channel's id once it went through; undefined, with the reason in error, when refused. */
   const save = (): Promise<string | undefined> => {
     setError(undefined);
-    // Read as the owner saves: the form may change while the call waits.
+    // Read as the user saves: the form may change while the call waits.
     const now = {
       name: name().trim(),
       description: description(),
       repo: repo(),
       category: category().trim(),
       notify: notify(),
-      orchestrator: orchestrator(),
+      members: Arr.sort(members(), Order.String),
     };
     return act.run(async () => {
       if (!channel)
@@ -170,7 +172,7 @@ export function createChannelForm(channel?: Channel) {
           repo: now.repo,
           category: now.category,
           ...(now.name !== was.name ? { name: now.name } : {}),
-          ...(now.orchestrator !== was.orchestrator ? { orchestrator: now.orchestrator } : {}),
+          ...(Arr.join(now.members, "\n") !== Arr.join(was.members, "\n") ? { members: now.members } : {}),
         });
       if (now.notify !== was.notify) await api.channel.notify.set({ id: channel.id, notify: now.notify });
       return channel.id;
@@ -191,9 +193,10 @@ export function createChannelForm(channel?: Channel) {
     setCategory,
     notify,
     setNotify,
-    /** The orchestrator that looks after the channel, by its profile id. */
-    orchestrator,
-    setOrchestrator,
+    /** The orchestrators in the channel, by profile id. */
+    members,
+    /** Puts one in the channel, or takes it out. */
+    setMember: (id: string, on: boolean) => setMembers((m) => (on ? Arr.dedupe([...m, id]) : Arr.filter(m, (x) => x !== id))),
     busy,
     error,
     /** Pressing save now would be sent: not busy, and a new channel has a name. */
@@ -296,17 +299,19 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
           <Field label={t("web.channel.dialog.repo")} hint={t("web.channel.dialog.repoNone")}>
             <RepoInput value={form.repo()} onChange={form.setRepo} />
           </Field>
-          <Show when={orchestrators().length > 1}>
-            <Field label={t("web.channel.manage.orchestrator")} hint={t("web.channel.manage.orchestratorHint")}>
-              <Select
-                label={t("web.channel.manage.orchestrator")}
-                testid="channel-orchestrator"
-                value={form.orchestrator()}
-                onChange={(v) => form.setOrchestrator(v)}
-                options={orchestrators().map((a) => ({ value: a.id, label: a.name }))}
-              />
-            </Field>
-          </Show>
+          <Field label={t("web.channel.manage.members")} hint={t("web.channel.manage.membersHint")}>
+            <For each={orchestrators()}>
+              {(a) => (
+                <Checkbox
+                  testid="channel-member"
+                  data-key={a.id}
+                  label={a.name}
+                  checked={form.members().includes(a.id)}
+                  onChange={(on) => form.setMember(a.id, on)}
+                />
+              )}
+            </For>
+          </Field>
           <Field label={t("web.channel.manage.category")} hint={t("web.channel.manage.categoryHint")}>
             <TextInput data-testid="channel-category" value={form.category()} onInput={(e) => form.setCategory(e.currentTarget.value)} list="chat-categories" />
             <datalist id="chat-categories">
@@ -325,11 +330,11 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
   );
 }
 
-/** Archiving, and deleting once the owner has read what it does: the server's dry run, or why it refuses. */
+/** Archiving, and deleting once the user has read what it does: the server's dry run, or why it refuses. */
 function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: () => void }) {
   const [does, setDoes] = createSignal<readonly string[]>();
   const [error, setError] = createSignal<string>();
-  // The refusal is said under the buttons, where the owner pressed.
+  // The refusal is said under the buttons, where the user pressed.
   const steps = createAct(setError);
   const busy = steps.busy;
   const act = (step: "archive" | "preview" | "delete") => {

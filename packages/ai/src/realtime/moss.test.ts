@@ -1,10 +1,14 @@
+import { Option } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { mossAudioTag, mossFrameSamples, mossTaggedFrameBytes, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
 
+import { jsonText, parsedJson } from "../json.ts";
 import { heard, levelOf, type MossTurn } from "./moss-session.ts";
 import { MossEngine } from "./moss.ts";
 import { Playback } from "./playback.ts";
+
+const parsed = (text: string) => Option.getOrUndefined(parsedJson(text));
 
 describe("heard", () => {
   it("revises a turn's words in place and starts a line for the next turn", () => {
@@ -18,19 +22,19 @@ describe("heard", () => {
     ]);
   });
 
-  it("names the owner's line when MOSS names its turn, and keeps the sides apart", () => {
+  it("names the user's line when MOSS names its turn, and keeps the sides apart", () => {
     let turns: MossTurn[] = [];
-    turns = heard(turns, "owner", "", "hi", false);
+    turns = heard(turns, "user", "", "hi", false);
     turns = heard(turns, "moss", "m1", "yes", false);
-    turns = heard(turns, "owner", "o1", "hi there", true);
+    turns = heard(turns, "user", "o1", "hi there", true);
     expect(turns).toEqual([
-      { who: "owner", key: "o1", text: "hi there", done: true },
+      { who: "user", key: "o1", text: "hi there", done: true },
       { who: "moss", key: "m1", text: "yes", done: false },
     ]);
   });
 
   it("ignores empty words", () => {
-    expect(heard([], "owner", "o1", "", false)).toEqual([]);
+    expect(heard([], "user", "o1", "", false)).toEqual([]);
   });
 });
 
@@ -138,18 +142,18 @@ describe("MossEngine end-to-end session state machine", () => {
     expect(engine.phase).toBe("connecting");
 
     engine.socketOpened();
-    expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({ action: "attach_session", memory_scope: "session" });
+    expect(parsed(sentText.at(-1) ?? "{}")).toEqual({ action: "attach_session", memory_scope: "session" });
 
-    engine.socketText(JSON.stringify({ action: "session_attached", data: { session_id: "s1", memory_scope: "session", delegation: "none" } }));
-    expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({
+    engine.socketText(jsonText({ action: "session_attached", data: { session_id: "s1", memory_scope: "session", delegation: "none" } }));
+    expect(parsed(sentText.at(-1) ?? "{}")).toEqual({
       action: "session.update",
       session: { persona: { prompt: "calm" }, instructions: "speak concisely" },
     });
 
-    engine.socketText(JSON.stringify({ action: "session.updated", data: { error: "", tools: [] } }));
+    engine.socketText(jsonText({ action: "session.updated", data: { error: "", tools: [] } }));
     expect(readyCount).toBe(1);
     expect(engine.phase).toBe("live");
-    expect(sentText.slice(-2).map((s) => JSON.parse(s))).toEqual([
+    expect(sentText.slice(-2).map(parsed)).toEqual([
       { action: "media.mode", binary_protocol: "tagged-v1" },
       { action: "mic_state", enabled: true },
     ]);
@@ -158,21 +162,21 @@ describe("MossEngine end-to-end session state machine", () => {
     expect(engine.micLevel).toBe(42);
     expect(sentBinary).toEqual([mossTaggedFrameBytes]);
 
-    engine.socketText(JSON.stringify({ action: "input.speech.stopped" }));
+    engine.socketText(jsonText({ action: "input.speech.stopped" }));
     nowMs = 1320;
-    engine.socketText(JSON.stringify({ action: "response.audio.context", data: { chunk_id: "c1", run_id: "r1", turn_id: "t1" } }));
+    engine.socketText(jsonText({ action: "response.audio.context", data: { chunk_id: "c1", run_id: "r1", turn_id: "t1" } }));
     const pcm48k = new Int16Array(4800).fill(0x4000);
     engine.socketBinary(pcm48k.buffer);
     expect(engine.qos.replyMs).toBe(320);
     expect(engine.mossLevel).toBeGreaterThan(0);
 
     nowSec = 0.05;
-    engine.socketText(JSON.stringify({ action: "response.interrupted", data: { run_id: "r1", turn_id: "t1", text: "Hold on" } }));
+    engine.socketText(jsonText({ action: "response.interrupted", data: { run_id: "r1", turn_id: "t1", text: "Hold on" } }));
     expect(cutRuns).toEqual(["r1"]);
     expect(engine.turns).toEqual([{ who: "moss", key: "t1", text: "Hold on", done: true }]);
     expect(sentText.some((text) => text.includes("playback.stopped"))).toBe(false);
     engine.audioStopped("r1", "t1", 50);
-    expect(JSON.parse(sentText.at(-1) ?? "{}")).toEqual({
+    expect(parsed(sentText.at(-1) ?? "{}")).toEqual({
       action: "playback.stopped",
       run_id: "r1",
       turn_id: "t1",

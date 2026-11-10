@@ -1,21 +1,17 @@
-import { createHash } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
-
-import { Clock, Context, Effect, FileSystem, Layer, Semaphore, type Stream } from "effect";
+import { Clock, Context, Effect, Layer, Semaphore, type Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { ArtifactDisplayValues, userId } from "@vibevalley/protocol";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, lookIn, missing, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
-import { writeOnce } from "#/infra/files.ts";
 import * as qa from "#db/artifact.sql.ts";
 import * as qv from "#db/artifact_version.sql.ts";
 
@@ -24,7 +20,7 @@ import { htmlCheck, htmlProblem } from "./check.ts";
 import { htmlEdit } from "./edit.ts";
 import { artifactProblem } from "./policy.ts";
 
-/** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator). */
+/** Who makes it. from: who says so in the channel (the user, a session, an orchestrator). */
 interface Maker {
   readonly from: string;
   readonly by: string;
@@ -43,15 +39,16 @@ export class Artifact extends Context.Service<
     readonly create: (maker: Maker, req: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError>;
     /** An html one's next version; a blocks one is refused, it is changed block by block. */
     readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError>;
-    /** The owner's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
+    /** The user's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
     readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError>;
-    readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
+    /** Its title, or how an html one is shown. */
+    readonly update: (req: T.ArtifactUpdateRequest) => Effect.Effect<T.Artifact, ApiError>;
     readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
-    /** It and its versions or blocks go. a content file goes when no other version keeps it. */
+    /** It and its versions or blocks go; the versions' attachments stay. */
     readonly remove: (id: T.ArtifactId) => Effect.Effect<void, ApiError>;
     readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.BlockSnapshot, ApiError>;
     readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-    /** A batch of ops from actor (the owner, or a helper's profile id): blocks.ts. */
+    /** A batch of ops from actor (the user, or a helper's profile id): blocks.ts. */
     readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
     readonly insertBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
     readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
@@ -67,7 +64,7 @@ export class Artifact extends Context.Service<
     /** Starts the demo and returns at once (blocks.ts). */
     readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   }
->()("vibevalley/Artifact") {
+>()("@vibevalley/server/artifact/artifact") {
   static readonly layer = Layer.effect(
     Artifact,
     Effect.suspend(() => make()),
@@ -81,23 +78,13 @@ const missingArtifact = (id: T.ArtifactId) => missing(t("server.artifact.missing
 
 const make = () =>
   Effect.gen(function* () {
-    const config = yield* ServerConfig;
     const chat = yield* Channel;
     const db = yield* Db;
-    const fs = yield* FileSystem.FileSystem;
+    const kept = yield* Attachment;
     // One change of an artifact's row at a time: a version's number is the latest's plus one.
     const lock = yield* Semaphore.make(1);
-    const dir = join(config.home, "artifacts");
-    const fileOf = (sha: string) => join(dir, sha);
-
-    const keep = (bytes: Buffer) => {
-      const sha = createHash("sha256").update(bytes).digest("hex");
-      return writeOnce(fileOf(sha), bytes).pipe(
-        Effect.provideService(FileSystem.FileSystem, fs),
-        Effect.as(sha),
-        Effect.mapError((e) => refused(t("server.artifact.notKept", { why: String(e.cause) }))),
-      );
-    };
+    // A version's bytes are an attachment: kept once, whoever else keeps the same page.
+    const keep = (bytes: Buffer, title: string) => Effect.map(kept.keep(bytes, `${title}.html`, "text/html"), (a) => a.id);
 
     const assemble = Effect.fnUntraced(function* (row: qa.ArtifactsResult) {
       const versions = row.body === "html" ? yield* db.run(qv.artifactVersions({ artifact_id: row.id })) : [];
@@ -105,6 +92,7 @@ const make = () =>
         id: S.artifactId(row.id),
         title: row.title,
         body: row.body,
+        ...(row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {}),
         ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
         ...(row.said_channel !== null && row.said_number !== null ? { said: { channel: row.said_channel, number: row.said_number } } : {}),
         ...(row.issue !== null ? { issue: S.issueId(row.issue) } : {}),
@@ -143,13 +131,27 @@ const make = () =>
 
     const words = (base: string, note: string | undefined) => (note ? t("server.artifact.withNote", { said: base, note }) : base);
 
-    /** An empty blocks one the owner starts on the page: nowhere to announce, nothing to read in. */
+    /** An empty blocks one the user starts on the page: nowhere to announce, nothing to read in. */
     const start = Effect.fn("Artifact.start")(function* (maker: Maker, title: string) {
       const id = S.artifactId(newId());
       const now = yield* Clock.currentTimeMillis;
-      const name = maker.by === ownerId ? t("server.channel.name.owner") : maker.by;
-      yield* db.run(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
-      return yield* assemble(yield* found(id));
+      const name = maker.by === userId ? t("server.channel.name.user") : maker.by;
+      yield* db.run(
+        qa.addArtifact({
+          id,
+          title,
+          body: "blocks",
+          display: null,
+          channel_id: null,
+          issue: null,
+          by_id: maker.by,
+          by_name: name,
+          version: 0,
+          created_at: now,
+        }),
+      );
+      const found2 = yield* found(id);
+      return yield* assemble(found2);
     });
 
     const create = Effect.fn("Artifact.create")(function* (maker: Maker, req: T.ArtifactRequest) {
@@ -164,17 +166,36 @@ const make = () =>
       const problem = artifactProblem({ title: req.title, kind, size: bytes.length }) || (kind === "html" ? htmlProblem(htmlCheck(req.content)) : "");
       if (problem) return yield* Effect.fail(refused(problem));
       const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
+      if (body === "blocks" && req.display !== undefined) return yield* Effect.fail(refused(t("server.artifact.displayHtmlOnly")));
+      const display = body === "html" ? (req.display ?? "page") : null;
       const channel = yield* chat.placeOf(maker.from, req.channel ?? "");
-      const sha = body === "html" ? yield* keep(bytes) : "";
+      const file = body === "html" ? yield* keep(bytes, title) : "";
       const id = S.artifactId(newId());
       const note = req.note?.trim() || undefined;
       const version = body === "html" ? 1 : 0;
-      const card: T.ArtifactCard = { id, title, body, version, note: note ?? "" };
+      const card: T.ArtifactCard = { id, title, body, version, note: note ?? "", ...(display === null ? {} : { display }) };
       // Said first: the name it goes by is the one the channel knows its maker by.
-      const said = yield* chat.announce(maker.from, channel, words(t("server.artifact.made", { title }), note), card);
+      const said = yield* chat.post({
+        _tag: "Announce",
+        from: maker.from,
+        channel: channel,
+        text: words(t("server.artifact.made", { title }), note),
+        made: { card },
+      });
       const now = yield* Clock.currentTimeMillis;
       yield* db.run(
-        qa.addArtifact({ id, title, body, channel_id: said.channel, issue: req.issue ?? null, by_id: maker.by, by_name: said.name, version, created_at: now }),
+        qa.addArtifact({
+          id,
+          title,
+          body,
+          display,
+          channel_id: said.channel,
+          issue: req.issue ?? null,
+          by_id: maker.by,
+          by_name: said.name,
+          version,
+          created_at: now,
+        }),
       );
       yield* db.run(qa.artifactSaid({ id, message_id: said.id }));
       if (body === "html") {
@@ -182,7 +203,7 @@ const make = () =>
           qv.addArtifactVersion({
             artifact_id: id,
             version: 1,
-            sha,
+            attachment_id: file,
             size: bytes.length,
             note: note ?? null,
             by_id: maker.by,
@@ -192,7 +213,8 @@ const make = () =>
         );
         yield* db.run(qv.artifactVersionAnnounced({ artifact_id: id, version: 1, message_id: said.id }));
       } else yield* blocks.fill(id, req.content, maker.by);
-      return yield* assemble(yield* found(id));
+      const found2 = yield* found(id);
+      return yield* assemble(found2);
     });
 
     const version = Effect.fn("Artifact.version")(function* (maker: Maker, req: T.ArtifactVersionRequest) {
@@ -201,23 +223,27 @@ const make = () =>
       const bytes = Buffer.from(req.content, "utf8");
       const problem = artifactProblem({ size: bytes.length }) || htmlProblem(htmlCheck(req.content));
       if (problem) return yield* Effect.fail(refused(problem));
-      const sha = yield* keep(bytes);
+      const file = yield* keep(bytes, row.title);
       const next = row.version + 1;
       const note = req.note?.trim() || undefined;
-      const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "" };
+      const shown = row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {};
+      const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "", ...shown };
       // Announced where the first one was: its comments stay in one place.
-      const said = yield* chat.announce(
-        maker.from,
-        row.channel_id ?? "",
-        words(t("server.artifact.versioned", { title: row.title, version: next }), note),
-        card,
-      );
+      const said = yield* chat.post({
+        _tag: "Announce",
+        from: maker.from,
+        channel: row.channel_id ?? "",
+        text: words(t("server.artifact.versioned", { title: row.title, version: next }), note),
+        made: {
+          card,
+        },
+      });
       const now = yield* Clock.currentTimeMillis;
       yield* db.run(
         qv.addArtifactVersion({
           artifact_id: row.id,
           version: next,
-          sha,
+          attachment_id: file,
           size: bytes.length,
           note: note ?? null,
           by_id: maker.by,
@@ -227,7 +253,8 @@ const make = () =>
       );
       yield* db.run(qv.artifactVersionAnnounced({ artifact_id: row.id, version: next, message_id: said.id }));
       yield* db.run(qa.artifactVersioned({ id: row.id, version: next, updated_at: now }));
-      return yield* assemble(yield* found(S.artifactId(row.id)));
+      const found2 = yield* found(S.artifactId(row.id));
+      return yield* assemble(found2);
     });
 
     const versionOf = Effect.fnUntraced(function* (id: T.ArtifactId, version: number | undefined) {
@@ -251,29 +278,35 @@ const make = () =>
           rows,
           (r) =>
             Effect.gen(function* () {
-              if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
+              if (!q.channel || r.channel_id === q.channel) {
+                const artifact = yield* assemble(r);
+                out.push(artifact);
+              }
             }),
           { discard: true },
         );
         return out;
       }),
       get: Effect.fn("Artifact.get")(function* (id) {
-        return yield* assemble(yield* found(id));
+        const found2 = yield* found(id);
+        return yield* assemble(found2);
       }),
       content: Effect.fn("Artifact.content")(function* (id, version) {
         const row = yield* found(id);
         if (row.body === "blocks") return { version: row.seq, content: yield* blocks.markdown(id), body: "blocks" as const };
         const { v } = yield* versionOf(id, version);
-        const content = yield* Effect.tryPromise({
-          try: () => readFile(fileOf(v.sha), "utf8"),
-          catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
-        });
+        const content = yield* kept.bytes(v.attachment_id).pipe(
+          Effect.mapBoth({
+            onSuccess: (bytes) => new TextDecoder().decode(bytes),
+            onFailure: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
+          }),
+        );
         return { version: v.version, content, body: "html" as const };
       }),
       file: Effect.fn("Artifact.file")(function* (id, version) {
         const row = yield* db.one(qa.artifact({ id }));
         const v = row?.body === "html" ? yield* db.one(qv.artifactVersion({ artifact_id: id, version })) : undefined;
-        return v ? fileOf(v.sha) : undefined;
+        return v ? kept.pathOf(v.attachment_id) : undefined;
       }),
       create: Effect.fn("Artifact.create")(function* (maker, req) {
         return yield* create(maker, req);
@@ -286,21 +319,29 @@ const make = () =>
         if (row.body !== "html") return yield* Effect.fail(refused(t("server.artifact.notHtml", { title: row.title })));
         // Over the latest only: a later version's changes would be lost under an edit of an older one.
         if (v.version !== row.version) return yield* Effect.fail(refused(t("server.artifact.edit.stale", { version: v.version, latest: row.version })));
-        const source = yield* Effect.tryPromise({
-          try: () => readFile(fileOf(v.sha), "utf8"),
-          catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
-        });
+        const source = yield* kept.bytes(v.attachment_id).pipe(
+          Effect.mapBoth({
+            onSuccess: (bytes) => new TextDecoder().decode(bytes),
+            onFailure: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
+          }),
+        );
         const edited = htmlEdit(source, req.anchor, req.text);
         if (!edited.ok) return yield* Effect.fail(refused(edited.why));
         const note = t("server.artifact.edit.note", { old: head(req.anchor.exact.trim(), 40), new: head(req.text.trim(), 40) });
         return yield* version(maker, { id: req.id, content: edited.source, note });
       }, lock.withPermits(1)),
-      rename: Effect.fn("Artifact.rename")(function* (id, title) {
-        yield* found(id);
-        const problem = artifactProblem({ title });
-        if (problem) return yield* Effect.fail(refused(problem));
-        yield* db.run(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
-        return yield* assemble(yield* found(id));
+      update: Effect.fn("Artifact.update")(function* (req) {
+        const row = yield* found(req.id);
+        if (req.title !== undefined) {
+          const problem = artifactProblem({ title: req.title });
+          if (problem) return yield* Effect.fail(refused(problem));
+        }
+        if (req.display !== undefined && row.body !== "html") return yield* Effect.fail(refused(t("server.artifact.displayHtmlOnly")));
+        const now = yield* Clock.currentTimeMillis;
+        if (req.title !== undefined) yield* db.run(qa.artifactRenamed({ id: req.id, title: req.title.trim(), updated_at: now }));
+        if (req.display !== undefined) yield* db.run(qa.artifactShown({ id: req.id, display: req.display, updated_at: now }));
+        const found2 = yield* found(req.id);
+        return yield* assemble(found2);
       }, lock.withPermits(1)),
       previewRemove: Effect.fn("Artifact.previewRemove")(function* (id) {
         const row = yield* found(id);
@@ -312,21 +353,14 @@ const make = () =>
       }),
       remove: Effect.fn("Artifact.remove")(function* (id) {
         yield* found(id);
-        const versions = yield* db.run(qv.artifactVersions({ artifact_id: id }));
+        // Its versions' attachments stay: the same bytes may be a message's file or a library item.
         yield* db.run(qa.deleteArtifact({ id }));
-        yield* Effect.forEach(
-          new Set(versions.map((v) => v.sha)),
-          (sha) =>
-            Effect.gen(function* () {
-              const users = yield* db.one(qv.artifactShaUsers({ sha }));
-              if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
-            }),
-          { discard: true },
-        );
       }, lock.withPermits(1)),
       blocks: Effect.fn("Artifact.blocks")(function* (id) {
         const list = yield* blocks.blocks(id);
-        return { artifact: yield* assemble(yield* found(id)), blocks: list };
+        const row = yield* found(id);
+        const artifact = yield* assemble(row);
+        return { artifact, blocks: list };
       }),
       markdown: blocks.markdown,
       submit: blocks.submit,

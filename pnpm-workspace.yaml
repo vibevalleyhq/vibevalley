@@ -28,7 +28,9 @@ catalog:
   "@botiverse/oar": "0.86.0"
   "@earendil-works/pi-ai": "1.5.0"
   "@effect/platform-node": "4.1.2"
-  "@effect/sql-sqlite-node": "4.1.2"
+  "@effect/sql-pg": "4.1.2"
+  "@effect/sql-pglite": "4.1.2"
+  "@electric-sql/pglite": "0.5.16"
   "@effect/vitest": "4.1.2"
   "@floating-ui/dom": "^1.8.0"
   "@larksuiteoapi/node-sdk": "^1.76.0"
@@ -220,6 +222,7 @@ minimumReleaseAgeExclude:
   - tsrs@0.21.0-ts7.1.0-beta
   - "@ai-sdk/gateway@4.0.137"
   - ai@7.0.164
+  - "@electric-sql/pglite@0.5.16"
 
 # effect-tsgo looks up every integration before any command and stops at one it cannot resolve: here oxlint-tsgolint
 # through vite-plus is packages/tsrs, which has no tsgolint binary. Drop this once @effect/tsgo skips it on its own.

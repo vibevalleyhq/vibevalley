@@ -53,9 +53,9 @@ test("a sentence said in the farm chat shows in the window, and the orchestrator
   const box = await composerOn(chat, general);
   await box.fill("add a night mode to the clock-in page");
   await box.press("Enter");
-  await expect(chat.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: "add a night mode" })).toBeVisible();
+  await expect(chat.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: "add a night mode" })).toBeVisible();
   await expect(box).toHaveValue("");
-  await expect(chat.locator('[data-testid="message"][data-from-kind="orchestrator"]').first()).toBeVisible({ timeout: 15_000 });
+  await expect(chat.locator('[data-testid="message"][data-from-role="orchestrator"]').first()).toBeVisible({ timeout: 15_000 });
 });
 
 // Sent words show at once, before the server has them, and once when it does.

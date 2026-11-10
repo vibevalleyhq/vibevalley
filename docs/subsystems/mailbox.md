@@ -20,38 +20,38 @@
 | `apps/server/src/mailbox/work.ts` | 工单蓄水池（Tier 1）、退回转交（`handback`）与投递写入（`forward`） |
 | `apps/server/src/mailbox/triggers.ts` | 服务内部的触发器记录、读取、来源查询与 cron 重放 |
 | `apps/server/src/mailbox/payload.ts`、`envelope.ts` | 共享形状、编码与纯转换，不读写数据库 |
-| `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与管家流推送 |
+| `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与助手流推送 |
 
 ## 模型和不变量
 
-- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`、`recordChannelTrigger`、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。`unreadSummary` 统一读取未读摘要。
+- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`（频道消息的触发带上它自己的 id）、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。`unreadSummary` 统一读取未读摘要。
 - **跨模块入口由检查限定**：外部只导入 `mailbox.ts` 服务或 `payload.ts`、`envelope.ts`、`prompts.ts` 共享契约。共享契约不能导入数据库、基础设施或模块内部实现；`modules.test.ts` 同时检查直接导入、重导出与字面量动态导入。
 - **来源先落库，投递行与路由回执同事务提交**：
   - 上游经 Mailbox 记录 `Trigger`，来源游标可与它在同一事务内提交；提交后再调用 `Mailbox.receive`。
   - `Mailbox` 在同一事务内写入 `mailbox_delivery` 并更新 `mailbox_trigger` 的路由回执；中途崩溃时于重启后重放。
 - **至少投递一次，真实入模才算消费（`consumed`）**：
-  - 投递交给会话时标为 `handed`；仅当收到 `Session.inputsConsumed` 回执时才标为 `consumed`。
+  - 投递交给会话时标为 `handed`；仅当 `Session.news` 传来 `Consumed` 回执时才标为 `consumed`。
   - 若回合结束、会话关闭或服务重启时仍未收到回执，`handed` 自动退回 `pending` 重新投递。
 - **两级缓冲（工单蓄水池 Tier 1 → 会话信箱 Tier 2）**：
   - 发往工单的输入先匹配 `mailbox_subscription` 进入 `mailbox_issue`。
-  - 工单排队或处于等待主人状态时，自动输入保持 `held`（同一工单仅留最新一条 cron 输入）。
-  - 工单就绪或主人新发言放行时，转入当前负责会话的 `mailbox_delivery`。
-- **三道刹车仅约束 agent 唤醒 agent，主人发言随时放行并重置**：
-  - **跳数限制（`hopLimit` = 4）**：同一频道或工单作用域内，自上次主人发言起连续自动唤醒不超过 4 次。
+  - 工单排队或处于等待用户状态时，自动输入保持 `held`（同一工单仅留最新一条 cron 输入）。
+  - 工单就绪或用户新发言放行时，转入当前负责会话的 `mailbox_delivery`。
+- **三道刹车仅约束 agent 唤醒 agent，用户发言随时放行并重置**：
+  - **跳数限制（`hopLimit` = 4）**：同一频道或工单作用域内，自上次用户发言起连续自动唤醒不超过 4 次。
   - **冷却窗口（`agentWakeCooldownMs` = 60s）**：同一帮工被其他 agent 唤醒至少间隔 60 秒。
-  - **空唤醒熔断（`wakeBreaker` = 3）**：同一帮工连续 3 次被唤醒却未开口即结束，暂停自动唤醒直至主人再次对它发言。
+  - **空唤醒熔断（`wakeBreaker` = 3）**：同一帮工连续 3 次被唤醒却未开口即结束，暂停自动唤醒直至用户再次对它发言。
   - 被拦截的投递记录 `held_by`，可随下一次合法运行一并带上。
 
 ## 怎么走
 
 1. `Channel`、`Ingress`、`Issue` 或 `Cron` 经 Mailbox 服务持久化 `Trigger`，提交后调用 `Mailbox.receive`。
 2. `Mailbox` 在信箱写锁内计算受众、检查工单蓄水门禁与三道刹车，原子写入 `mailbox_delivery` 与路由回执。
-3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或推入管家的 `forOrchestrator` 流。
-4. 会话换人或关单时，未消费的主人追问以确定性返回编号转交新负责人或管家。
+3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或把一段对话交给助手：`Mailbox.news` 的 `Handed`（助手由助手模块来答，帮工经 `Session.deliver` 唤醒）。
+4. 会话换人或关单时，未消费的用户追问以确定性返回编号转交新负责人或助手。
 
 ## 和谁打交道
 
-- **底层依赖（`session`、`agent`、`core`）**：调用 `Session.deliver` 投递输入，订阅 `Session.inputsConsumed` 与 `Session.news` 推进状态机。
+- **底层依赖（`session`、`agent`、`core`）**：调用 `Session.deliver` 投递输入，订阅 `Session.news`（`Consumed`、`Returned` 和启动的 `Spoke`、`Ended`、`HandedOff`、`Settling`、`Closed`、`Compacting`）推进状态机。
 - **上层调用方（`channel`、`issue`、`cron`、`ingress`、`orchestrator`）**：不反向 import 上层服务；对频道与工单的只读查询经窄查询完成。
 
 ## 为什么这样

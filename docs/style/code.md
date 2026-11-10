@@ -13,7 +13,7 @@
 ## 叫法
 
 - 代码、接口和服务端的文档用实际的概念：`Issue`、`Session`、`Repo`（[概念](docs/concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
-- 对主人说的话写进词典（`packages/i18n/locales`），中英各一份，代码里写 `t("key")`；对模型说的写进 `prompts.ts`，用中文（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。用农场的叫法（[用语表](docs/README.md#用语)）。
+- 对用户说的话写进词典（`packages/i18n/locales`），中英各一份，代码里写 `t("key")`；对模型说的写进 `prompts.ts`，用中文（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。用农场的叫法（[用语表](docs/README.md#用语)）。
 - 注释用英文。
 
 ## 没有值
@@ -28,11 +28,11 @@
 | `null` | 只在外面说 `null` 的地方：库表的列（`db/generated`）、DOM 和浏览器的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
 
 - 不写 `T | null | undefined`：外面来的 `null` 在进门的那一处换成 `undefined`（`jsonOrNone`、`?? undefined`），里面只认一种。
-- 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、测试的黄金数据、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
+- 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
 - 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。数字和布尔不这样：`0`、`false` 是值，写 `??`（lint 的 `prefer-nullish-coalescing` 查）。
 - 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/server/src/base/order.ts`、`apps/web/src/base/search.ts`），不写 `a - b || …`。
 - 给人看的话只在帧上：核心形状（`Session`、`Cron`、`Doing`）只有事实，帧用视图形状（`SessionView`、`CronView`、`SpaceView`）带上必有的说法；读说法的函数收视图形状，只读事实的收核心形状（视图形状能当核心形状用）。
-- 闭合的一组词在库里是带 `check (列 in (…))` 的 `text` 列（`schema.test.ts` 查），`scripts/sqlite-generate.ts` 生成的查询读出来就是词的联合；从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`（页面），都不写 `as`。
+- 闭合的一组词在库里是带 `check (列 in (…))` 的 `text` 列（`schema.test.ts` 查），`scripts/pg-generate.ts` 生成的查询读出来就是词的联合；从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`（页面），都不写 `as`。
 
 ## 检查管着的写法
 

@@ -10,7 +10,6 @@
   },
   "scripts": {
     "prepare": "vp config --hooks --no-agent && vp run packages:build",
-    "golden:update": "vpx scripts/golden-update.ts",
     "desktop:dev": "vp run --filter @vibevalley/desktop dev",
     "notes:catalog": "vpx scripts/agent-notes.ts --write",
     "site:deploy": "vp run --filter @vibevalley/site deploy",
@@ -20,7 +19,10 @@
     "api:client": "vpx scripts/api-client.ts",
     "i18n:gen": "vpx scripts/i18n.ts gen",
     "health": "vpx packages/health/src/cli.ts --config scripts/health.config.ts",
-    "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write"
+    "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write",
+    "effect:write": "vpx scripts/effect-check.ts --write",
+    "practice:write": "vpx scripts/practice-audit.ts --write",
+    "paths:write": "vpx scripts/service-paths.ts --write"
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",

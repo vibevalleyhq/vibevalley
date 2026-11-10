@@ -527,7 +527,7 @@ export function ChatWindow() {
     if (c.phase !== "live" || here?.default !== true) return [];
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
-      .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
+      .map((m) => ({ speaker: m.fromKind === "user" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, spoken, tick()).map((turn) => ({ ...turn }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
@@ -597,6 +597,7 @@ export function ChatWindow() {
                   data-key={item().message.id}
                   data-from={item().message.from}
                   data-from-kind={item().message.fromKind}
+                  data-from-role={item().message.fromRole}
                   data-kind={item().message.kind}
                   data-deleted={item().message.deleted !== undefined ? "" : undefined}
                   data-edited={item().message.edited !== undefined ? "" : undefined}
@@ -618,7 +619,7 @@ export function ChatWindow() {
                   aria-label={p().state === "failed" ? t("web.farm.chat.notSentLine") : t("web.farm.chat.sending")}
                   data-testid="message"
                   data-key={p().key}
-                  data-from-kind="owner"
+                  data-from-kind="user"
                   data-state={p().state}
                 >
                   <ChatRow mine first title={p().state === "failed" ? (p().reason ?? t("web.farm.chat.notSentLine")) : t("web.farm.chat.sending")}>
@@ -632,7 +633,7 @@ export function ChatWindow() {
                         data-testid="pending-retry"
                         onClick={() => {
                           setProblem(undefined);
-                          void says.retry(p().key).then((end) => end?.status === "failed" && notSent(end.reason));
+                          void says.retry(p().key).then((end) => end?.phase === "failed" && notSent(end.fault.reason));
                         }}
                         {...stylex.attrs(viewStyles.pendingRetry)}
                       >
@@ -690,7 +691,7 @@ export function ChatWindow() {
                     setProblem(undefined);
                     const c = shown();
                     if (!c) return;
-                    void sendOnce(says, { id: c.id, text: line }).then((end) => end?.status === "failed" && notSent(end.reason));
+                    void sendOnce(says, { id: c.id, text: line }).then((end) => end?.phase === "failed" && notSent(end.fault.reason));
                   }}
                   {...stylex.attrs(viewStyles.chatWindowButton)}
                 >
@@ -794,7 +795,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <RunSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
+    props.m.fromRole === "orchestrator" && props.m.kind !== "dispatch" ? <RunSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
   return (
     <Switch
       fallback={
@@ -822,10 +823,10 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.fromKind === "session" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={props.m.fromRole === "worker" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
-      <Match when={props.m.fromKind === "owner"}>
+      <Match when={props.m.fromKind === "user"}>
         <ChatBubble m={props.m} mine first={props.first} after={chip()} />
       </Match>
     </Switch>

@@ -34,6 +34,11 @@ export const SpacePaths: Codec<T.SpacePaths> = Schema.Struct({
   pkm: Schema.String,
 });
 
+export const Readiness: Codec<T.Readiness> = Schema.Union([
+  Schema.Struct({ ready: Schema.Literal(true) }),
+  Schema.Struct({ ready: Schema.Literal(false), missing: Schema.Literals(T.MissingValues) }),
+]);
+
 export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   file: Schema.String,
   home: Schema.String,
@@ -50,8 +55,7 @@ export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   ttsKey: KeyStatus,
   dictation: Dictation,
   dictationKey: KeyStatus,
-  dictationReady: Schema.Boolean,
-  mossReady: Schema.Boolean,
+  readiness: Schema.Record(Schema.Literals(T.FeatureValues), Readiness),
   memorySources: Schema.mutable(Schema.Array(MemorySource)),
 });
 

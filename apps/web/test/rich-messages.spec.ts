@@ -3,7 +3,7 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { expect, test } from "./fixtures";
 
 const ts = ["```ts", ...Array.from({ length: 24 }, (_, i) => `const n${i}: number = ${i};`), "```"].join("\n");
-const flow = ["```mermaid", "flowchart LR", "  Owner --> Orchestrator --> Helper", "```"].join("\n");
+const flow = ["```mermaid", "flowchart LR", "  User --> Orchestrator --> Helper", "```"].join("\n");
 const kept = ["```ts", ...Array.from({ length: 24 }, (_, i) => `const kept${i}: number = ${i};`), "```"].join("\n");
 const broken = ["```mermaid", "flowchart LR", "  A -->", "```"].join("\n");
 

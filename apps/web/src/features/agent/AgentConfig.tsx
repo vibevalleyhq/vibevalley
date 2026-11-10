@@ -725,7 +725,15 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
                     </Show>
                   </span>
                   <span {...stylex.attrs(viewStyles.skillPickerSpan)}>
-                    <span {...stylex.attrs(viewStyles.skillPickerSpan2)}>{s.name}</span>
+                    <span {...stylex.attrs(viewStyles.skillPickerSpan2)}>
+                      {s.name}
+                      <Show when={s.builtIn === true}>
+                        <span data-testid="built-in-mark" {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>
+                          {" · "}
+                          {t("web.runtime.library.builtInTag")}
+                        </span>
+                      </Show>
+                    </span>
                     <span {...stylex.attrs(viewStyles.runtimeChoiceSpan)}>{s.description}</span>
                   </span>
                 </button>

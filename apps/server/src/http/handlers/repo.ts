@@ -15,7 +15,7 @@ export const repoHandlers = Effect.gen(function* () {
     "repo.pr.submit": (body) =>
       Effect.gen(function* () {
         const request = yield* Effect.serviceOption(HttpServerRequest.HttpServerRequest);
-        if (Option.isNone(request) || request.value.headers.authorization !== undefined) return yield* Effect.fail(refused(t("server.repo.publish.ownerOnly")));
+        if (Option.isNone(request) || request.value.headers.authorization !== undefined) return yield* Effect.fail(refused(t("server.repo.publish.userOnly")));
         return yield* repos.submitBranch(body).pipe(Effect.mapError((e) => refused(e.message)));
       }),
     "github.refresh": () => Effect.tap(repos.refreshGitHub(), () => issues.refreshPullRequests),

@@ -2,7 +2,7 @@ import { Clock, Effect, FiberSet } from "effect";
 import { HttpClient } from "effect/http";
 
 import type * as T from "@vibevalley/protocol";
-import { everyone, ownerId } from "@vibevalley/protocol";
+import { everyone, userId } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
 import { Inconsistent } from "#/base/errors.ts";
@@ -15,11 +15,11 @@ import * as qc from "#db/channel.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
-import { metaOf, metaText, type MsgRow, senderKind, messageKind, channelType, type Write, type Written, type ChannelRouteInput } from "./contracts.ts";
+import { metaOf, metaText, type MsgRow, speakerOf, messageKind, channelType, type Write, type Written, type ChannelHearers } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import type { ChannelHub } from "./hub.ts";
 import { mentionsIn } from "./mentions.ts";
-import { channelInput } from "./messages.ts";
+import { channelTrigger } from "./messages.ts";
 
 export const channelWriting = (r: ChannelHub) =>
   Effect.gen(function* () {
@@ -29,22 +29,23 @@ export const channelWriting = (r: ChannelHub) =>
     const mailbox = yield* Mailbox;
     const {
       model,
-      follow,
+      addMember,
       tx,
       locked,
       orchestratorIds,
-      orchestratorOfRow,
+      orchestratorInRow,
+      membersOfRow,
       channelOfSession,
-      presentSessions,
+      hired,
       publishChannel,
-      publishOwnerMentions,
+      publishUserMentions,
       publishMessage,
       ownerOf,
       threadFor,
       readUpTo,
       change,
       channelEnvelope,
-      asInbox,
+      asEnvelope,
     } = r;
     // Work set off by a timer belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
@@ -52,14 +53,14 @@ export const channelWriting = (r: ChannelHub) =>
     const settle = Effect.fn("Channel.settle")(function* (inserted: MsgRow) {
       let row = inserted;
       const ch = model.channel(row.channel_id);
-      if (!ch) return yield* Effect.die(new Inconsistent({ message: `no channel ${row.channel_id}` }));
+      if (!ch) return yield* Effect.die(Inconsistent.make({ message: `no channel ${row.channel_id}` }));
       const meta = metaOf(row.meta);
       const orchestrators = orchestratorIds();
-      const here = orchestratorOfRow(ch);
+      const here = orchestratorInRow(ch);
       // No one else is in a direct channel to be named.
       const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
-      const sessionsNow = presentSessions();
-      // Participants are sessions, agents and the owner alike: a mention is any of them.
+      const sessionsNow = hired();
+      // Participants are sessions, agents and the user alike: a mention is any of them.
       const present: readonly string[] = sessionsNow.map((h) => h.id);
       const known = new Set(model.participants().map((p) => p.id));
       const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
@@ -67,7 +68,7 @@ export const channelWriting = (r: ChannelHub) =>
         mentions,
         (m) =>
           Effect.gen(function* () {
-            const how = orchestrators.includes(m) || m === ownerId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
+            const how = orchestrators.includes(m) || m === userId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
             named.push({ id: m, how });
             yield* db.run(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
           }),
@@ -77,39 +78,40 @@ export const channelWriting = (r: ChannelHub) =>
         row = { ...row, meta: metaText({ ...meta, mentions }) };
         yield* db.run(qm.updateMessageMeta({ meta: row.meta, id: row.id }));
       }
-      let followers: string[] = [];
+      let members: string[] = [];
       if (ch.type === "thread") {
-        // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
-        if (row.sender_id !== "system" && row.kind !== "dispatch") yield* follow(ch.id, row.sender_id, "replied", row.number);
+        // A dispatch handing the issue to its next session makes no one a member: the orchestrator would be woken by every word in it.
+        if (row.sender_id !== "system" && row.kind !== "dispatch") yield* addMember(ch.id, row.sender_id, "replied", row.number);
         yield* Effect.forEach(
           named,
           (m) =>
             Effect.gen(function* () {
-              if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) yield* follow(ch.id, m.id, "mentioned", row.number - 1);
+              if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) yield* addMember(ch.id, m.id, "mentioned", row.number - 1);
             }),
           { discard: true },
         );
-        followers = model.followers(ch.id);
+        members = model.membersOf(ch.id);
       }
       const audience = sessionsNow.filter((h) => ch.type === "thread" || channelOfSession(h) === ch.id).map((h) => h.id);
       const heard = {
         from: row.sender_id,
-        fromKind: senderKind(row.sender_kind),
+        fromKind: speakerOf(row.sender_kind).fromKind,
         kind: messageKind(row.kind),
         mentions,
         channel: { type: channelType(ch.type), ...(ch.peer_id !== null ? { peer: ch.peer_id } : {}) },
         orchestrator: here,
+        channelMembers: membersOfRow(ch),
         orchestrators,
         threadOwner: ownerOf(ch),
         sessions: audience,
         present,
-        followers,
+        members,
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
         spoken: meta.spoken === true && meta.ingressSource !== "voice",
       };
       const addressed = meta.ingressRecipient;
       const recipients = [...new Set([...present, ...orchestrators, ...(addressed ? [addressed] : [])])];
-      const fact: ChannelRouteInput = {
+      const fact: ChannelHearers = {
         row: channelEnvelope(row),
         audience: heard,
         ...(addressed ? { addressed } : {}),
@@ -117,18 +119,19 @@ export const channelWriting = (r: ChannelHub) =>
 
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
       };
-      const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
+      const input = channelTrigger(fact, inputContext(asEnvelope(fact.row)));
       const routed = yield* Effect.gen(function* () {
-        const original = yield* mailbox.recordChannelTrigger(trigger, fact.row.body, fact.row.channel_id);
-        return yield* mailbox.receive(original, mail);
-      }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${trigger.id}`, error), { heldNotice: "" })));
+        const original = yield* mailbox.recordTrigger(input);
+        return yield* mailbox.receive({ _tag: "Trigger", trigger: original, to: fact });
+      }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${fact.row.envelope_id}`, error), { heldNotice: "" })));
       const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
       if (routed.heldNotice && (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0) written.heldNotice = routed.heldNotice;
       written.absent = named.filter((m) => m.how !== "delivered").map((m) => m.id);
       return written;
     });
 
-    const post = Effect.fnUntraced(function* (w: Write, heard: (row: MsgRow) => Effect.Effect<Written>): Effect.fn.Return<Written> {
+    /** Routing follows the committed message, so startup can replay an interrupted handoff. */
+    const write = Effect.fnUntraced(function* (w: Write): Effect.fn.Return<Written> {
       const written = yield* tx(
         Effect.gen(function* () {
           if (w.sendKey) {
@@ -137,7 +140,7 @@ export const channelWriting = (r: ChannelHub) =>
           }
           // The row as MessageByID would read it back: the sender's name and kind are the participant's.
           const sender = model.participant(w.from);
-          if (!sender) return yield* Effect.die(new Inconsistent({ message: `no participant ${w.from}` }));
+          if (!sender) return yield* Effect.die(Inconsistent.make({ message: `no participant ${w.from}` }));
           const id = newId();
           const meta = metaText(w.meta);
           const created_at = yield* Clock.currentTimeMillis;
@@ -180,20 +183,17 @@ export const channelWriting = (r: ChannelHub) =>
           };
           const out: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
           if (w.readBy) yield* readUpTo(w.readBy, w.channel, number);
-          if (w.follow) yield* follow(w.channel, w.follow, "owner", number);
+          if (w.member) yield* addMember(w.channel, w.member, "user", number);
           if (w.thread) out.thread = yield* threadFor({ id, number, channel: w.channel }, w.thread);
           return out;
         }),
       );
       if (written.again) return written;
-      const routed = yield* heard(written.row);
+      const routed = yield* settle(written.row);
       const complete = { ...routed, thread: written.thread };
       yield* after(w.channel, complete, w.answers);
       return complete;
     });
-
-    /** Routing follows the committed message, so startup can replay an interrupted handoff. */
-    const write = (w: Write) => post(w, settle);
 
     /** The previews of a message's links, read after it is out (the server's own requests take seconds) and then put on
      * it as a change. */
@@ -230,7 +230,7 @@ export const channelWriting = (r: ChannelHub) =>
       embedLater(written.row);
       yield* publishChannel(channel);
       const meta = metaOf(written.row.meta);
-      if (written.row.sender_id === ownerId || meta.mentions?.includes(ownerId) === true) yield* publishOwnerMentions;
+      if (written.row.sender_id === userId || meta.mentions?.includes(userId) === true) yield* publishUserMentions;
       if (written.thread) yield* publishChannel(written.thread);
       if (written.heldNotice) yield* write({ channel, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
     });

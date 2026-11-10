@@ -1,7 +1,7 @@
 # apps/server
 
 The farm's server: every service, the HTTP API, the three state streams, `/mcp` for the helpers, and the page at `/`.
-Effect v4 on Node 24, run from source with vpx (`vp run start`) and bundled with `vp pack` for the desktop app (`vp run build`, dist/); the database is SQLite (`node:sqlite`). How it is built and why:
+Effect v4 on Node 24, run from source with vpx (`vp run start`) and bundled with `vp pack` for the desktop app (`vp run build`, dist/); the database is Postgres: the one at `database.url`, or else PGlite in the home (the same dialect, in process). How it is built and why:
 [foundation](docs/subsystems/foundation.md); what each service does: [the subsystems](docs/subsystems/README.md).
 
 ```
@@ -13,11 +13,11 @@ src/handlers.ts    every endpoint's answer, put together from src/http/handlers/
 src/http/          the router over the endpoint table, the streams, /mcp and /v1/chat/completions, the page
 src/base/          what touches nothing outside: ids, JSON, order, redaction
 src/infra/         what deals with the process and the machine: configuration, database, files, the home's lease, logs, time
-src/<module>/      one service each (modules.ts): core setting provider agent runtime memory repo executor session mailbox channel media artifact pkm
+src/<module>/      one service each (modules.ts): core setting user provider agent runtime memory repo executor session mailbox channel media artifact pkm
                    issue cron ingress resource inbox orchestrator tool game, and http mcp lan connector voice at the top
 src/flows/         tests that go through several services: a whole farm and a helper that works by the words of its job
-src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories, golden data
-db/                migrations/0001_schema.up.sql (the one schema), queries/<table>.sql, generated/ (scripts/sqlite-generate.ts)
+src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories
+db/                migrations/0001_schema.up.sql (the one schema), queries/<table>.sql, generated/ (scripts/pg-generate.ts)
 ```
 
 The desktop bundle emits `dist/main.mjs` from `src/main.ts` and `dist/chat.mjs` from `src/chat/main.ts`.

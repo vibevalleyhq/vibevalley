@@ -1,4 +1,5 @@
 import type { IssueId, SessionId } from "../common/shapes";
+import type { Repo } from "../repo/shapes";
 import type { Doing } from "../session/shapes";
 
 export const AchievementCategoryValues = ["starter", "harvest", "craft", "thrift", "team", "secret"] as const;
@@ -127,11 +128,6 @@ export type LedgerEntry =
   | LedgerEntryMoment
   | LedgerEntryLevel
   | LedgerEntryTitled;
-
-export interface Repo {
-  path: string;
-  commits: number;
-}
 
 export interface ProgressTitle {
   id: string;

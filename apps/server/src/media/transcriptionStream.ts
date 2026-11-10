@@ -2,10 +2,10 @@ import { Clock, Effect, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { streamMossTranscription } from "@vibevalley/provider/moss/transcription-stream";
 
 import { type ApiError, refused } from "#/base/errors.ts";
 import { bestEffort } from "#/infra/log.ts";
+import type { AudioFailure, TranscriptionEvent } from "#/provider/vendors.ts";
 
 export interface TranscriptionCheckpoint {
   result: Extract<T.MediaAudioResult, { kind: "transcription" }>;
@@ -18,8 +18,7 @@ interface Ports {
 }
 
 export const receiveTranscriptionStream = Effect.fn("Media.receiveTranscriptionStream")(function* (
-  key: string,
-  input: { model: string; fileId: string; diarize?: boolean; keyterms?: readonly string[] },
+  events: Stream.Stream<TranscriptionEvent, AudioFailure>,
   ports: Ports,
 ) {
   let text = "";
@@ -37,7 +36,7 @@ export const receiveTranscriptionStream = Effect.fn("Media.receiveTranscriptionS
       last = now;
       dirty = false;
     });
-  yield* streamMossTranscription(key, input).pipe(
+  yield* events.pipe(
     Stream.runForEach((event) =>
       Effect.gen(function* () {
         switch (event.type) {

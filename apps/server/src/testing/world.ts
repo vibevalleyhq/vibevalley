@@ -95,7 +95,7 @@ const on =
   <B, E2, R2>(below: Layer.Layer<B, E2, R2>) =>
     layer.pipe(Layer.provideMerge(below));
 
-/** Issues a test adds are ones the owner sent, so their mandate is explicit. */
+/** Issues a test adds are ones the user sent, so their mandate is explicit. */
 export const testIssues = (issues: Issue["Service"]) => ({
   ...issues,
   add: (request: IssueRequest) => issues.add(request, explicitMandate()),
@@ -109,7 +109,7 @@ export class Said extends Context.Service<
     readonly in: (channel: string) => ChatMessage[];
     readonly all: () => ChatMessage[];
   }
->()("vibevalley/testing/Said") {}
+>()("@vibevalley/server/testing/world/Said") {}
 
 export const said = Layer.effect(
   Said,

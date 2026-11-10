@@ -1,0 +1,5 @@
+{
+  "name": "Yan the Reviewer",
+  "duty": "Reviews a branch's or an issue's changes: reads, never edits, lists findings by severity",
+  "tags": ["review", "code review", "check", "changes"]
+}

@@ -16,13 +16,13 @@ export const gameEndpoints: readonly Endpoint[] = [
     about: [],
     input: undefined,
     result: Schema.mutable(Schema.Array(S.Achievement)),
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
   {
     op: "game.title.set",
     about: [],
     input: S.ChooseTitleRequest,
     result: undefined,
-    can: ["owner", "remote"],
+    can: ["user", "remote"],
   },
 ];

@@ -1,4 +1,4 @@
-import type { Attachment } from "../channel/shapes";
+import type { Attachment } from "../attachment/shapes";
 import type { MediaAudioJob } from "./audio-shapes";
 
 export const mediaInputContentPath = (id: string) => `/api/v1/media/input/${encodeURIComponent(id)}/content`;
@@ -39,7 +39,7 @@ export interface MediaImageRequest {
 export const MediaPhaseValues = ["queued", "generating", "downloading", "ready", "failed", "unknown", "canceled", "download_failed"] as const;
 export type MediaPhase = (typeof MediaPhaseValues)[number];
 
-export type MediaSource = { kind: "owner" } | { kind: "orchestrator"; agent: string; channel: string };
+export type MediaSource = { kind: "user" } | { kind: "orchestrator"; agent: string; channel: string };
 
 export interface MediaImageUsage {
   images: number;

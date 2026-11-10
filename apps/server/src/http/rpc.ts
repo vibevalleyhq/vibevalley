@@ -11,7 +11,7 @@ import { sameOrigin } from "#/lan/lan.ts";
 
 const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/u;
 
-/** A WebSocket is not held back by CORS: any page the owner opens could connect, so only the farm's own page may. */
+/** A WebSocket is not held back by CORS: any page the user opens could connect, so only the farm's own page may. */
 export const fromTheFarm = (headers: Headers.Headers): boolean => {
   const host = headers.host ?? "";
   return loopback.test(host) && sameOrigin(headers);

@@ -1,1 +1,1 @@
-export { withShell } from "@vibevalley/artifact/html";
+export { shellThemeOf, withShell } from "@vibevalley/artifact/shell";

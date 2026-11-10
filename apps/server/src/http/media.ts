@@ -6,11 +6,12 @@ import { ApiError, errorStatus } from "@vibevalley/protocol/api";
 import { MediaInput } from "@vibevalley/protocol/schema";
 
 import { refused } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
 import { Media } from "#/media/media.ts";
 
 import { fromTheFarm } from "./rpc.ts";
 
-// This route is deliberately absent from the LAN listener: only the local owner can upload new inputs.
+// This route is deliberately absent from the LAN listener: only the local user can upload new inputs.
 export const mediaUploads = HttpRouter.add(
   "PUT",
   "/api/v1/media/input/:id/content",
@@ -81,7 +82,7 @@ export const mediaSpeechStream = HttpRouter.add(
     const { id = "" } = yield* HttpRouter.params;
     const events = yield* (yield* Media).speechEvents(id);
     const encoder = new TextEncoder();
-    return HttpServerResponse.stream(events.pipe(Stream.map((event) => encoder.encode(`${JSON.stringify(event)}\n`))), {
+    return HttpServerResponse.stream(events.pipe(Stream.mapEffect((event) => Effect.map(jsonText(event), (text) => encoder.encode(`${text}\n`)))), {
       contentType: "application/x-ndjson",
       headers: { "cache-control": "no-store", "x-accel-buffering": "no", "x-content-type-options": "nosniff" },
     });

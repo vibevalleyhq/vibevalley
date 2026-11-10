@@ -43,13 +43,14 @@ const records = Effect.gen(function* () {
       id: "orchestrator",
       role: "orchestrator",
       agent: "orchestrator",
-      name: "管家",
+      name: "助手",
       runtime: "vibevalley",
       brief: "",
       repo: null,
       issue: null,
       channel: null,
       hired_at: 0,
+      machine: null,
     }),
   );
   const trajectories = yield* makeTrajectories(config.home, () => {});
@@ -153,12 +154,13 @@ describe("the orchestrator's runs", () => {
       let broken = true;
       const store: RunStore = {
         ...persisted,
-        finish: (...a) => (broken ? Effect.fail(new NotRecorded({ message: "disk full" })) : persisted.finish(...a)),
+        finish: (...a) => (broken ? Effect.fail(NotRecorded.make({ message: "disk full" })) : persisted.finish(...a)),
       };
       const x = yield* makeInProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), store);
       yield* x.observe(user("一"), { by: { kind: "comment" } });
       const first = currentRun();
-      expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(NotRecorded);
+      const observeFailure = yield* Effect.flip(x.observe(end()));
+      expect(observeFailure).toBeInstanceOf(NotRecorded);
       expect(currentRun()).toBe("");
       broken = false;
       yield* x.observe(user("二"), { by: { kind: "comment" } });

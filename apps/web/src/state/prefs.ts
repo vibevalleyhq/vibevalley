@@ -24,13 +24,24 @@ const PrefsSchema = Schema.Struct({
   theme: orFallback(ThemeChoice, "system"),
   scale: orFallback(Schema.Literals(ScaleValues), 100),
   start: orFallback(Schema.Literals(StartValues), "workbench"),
-  /** A pane's width the owner dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
+  /** A pane's width the user dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
   widths: orFallback(Schema.Record(Schema.String, Schema.Finite), {}),
+  /** The library's thumbnail row height, in px (features/library). */
+  libraryTile: orFallback(Schema.Finite, 160),
 });
 
 type Prefs = typeof PrefsSchema.Type;
 
-const prefs = defineStored("prefs", PrefsSchema, { pick: "auto", repo: "", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} });
+const prefs = defineStored("prefs", PrefsSchema, {
+  pick: "auto",
+  repo: "",
+  pet: "dog",
+  theme: "system",
+  scale: 100,
+  start: "workbench",
+  widths: {},
+  libraryTile: 160,
+});
 
 /** The choices now; read in a computation or a component, it follows them. */
 export const prefsNow = prefs.get;
@@ -44,6 +55,7 @@ export const setPet = (pet: string) => set({ pet });
 export const setTheme = (theme: ThemeChoice) => set({ theme });
 export const setScale = (scale: Scale) => set({ scale });
 export const setStart = (start: Start) => set({ start });
+export const setLibraryTile = (libraryTile: number) => set({ libraryTile });
 /** A pane's width; none puts it back to its default. */
 export const setWidth = (pane: string, width: number | undefined) =>
   prefs.update((p) => {
@@ -65,11 +77,17 @@ export const usePrefs =
 
 const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
-// The theme goes on <html> as data-theme ("system" worked out from the system's own) and is told to the host so its own parts follow.
+/** The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. */
+export const shownTheme = (): "light" | "dark" => {
+  const { theme } = prefs.get();
+  return theme === "system" ? (dark().matches ? "dark" : "light") : theme;
+};
+
+// The theme goes on <html> as data-theme and is told to the host so its own parts follow.
 function apply() {
   const { theme, scale } = prefsNow();
   const root = document.documentElement;
-  root.dataset.theme = theme === "system" ? (dark().matches ? "dark" : "light") : theme;
+  root.dataset.theme = shownTheme();
   root.style.setProperty("--workbench-zoom", String(scale / 100));
   currentHost().theme?.(theme);
 }

@@ -1,8 +1,7 @@
-import { randomInt } from "node:crypto";
-
 import { AgoraClient, Area as AgoraArea } from "agora-agents";
 import agoraToken from "agora-token";
 import { Effect, Schedule, Schema } from "effect";
+import { SecureRandom } from "effect/crypto";
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 export const tokenSeconds = 3600;
 export interface AgoraCredentials {
@@ -77,7 +76,17 @@ export const sign = (c: AgoraCredentials, channel: string, uid: string) => ({
   token: RtcTokenBuilder.buildTokenWithRtm(c.appId, c.appCertificate, channel, uid, RtcRole.PUBLISHER, tokenSeconds, tokenSeconds),
 });
 
+/** A uniform integer in [0, n) for n up to 2^32: a draw at or past the last whole multiple of n is drawn again. */
+const randomBelow = (n: number): number => {
+  const limit = 2 ** 32 - (2 ** 32 % n);
+  for (;;) {
+    const bytes = SecureRandom.randomBytesUnsafe(4);
+    const value = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0);
+    if (value < limit) return value % n;
+  }
+};
+
 /** now is in milliseconds. */
 export const newChannel = (now: number) =>
-  `vibevalley-${now}-${Array.from({ length: 6 }, () => "0123456789abcdefghijklmnopqrstuvwxyz"[randomInt(36)]).join("")}`;
-export const newUid = () => String(randomInt(9_999_000) + 1000);
+  `vibevalley-${now}-${Array.from({ length: 6 }, () => "0123456789abcdefghijklmnopqrstuvwxyz"[randomBelow(36)]).join("")}`;
+export const newUid = () => String(randomBelow(9_999_000) + 1000);

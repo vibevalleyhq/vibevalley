@@ -59,7 +59,7 @@ function watchForDev(h: DevHooks): () => void {
   for (const dir of [join(h.repo, "apps/server/src"), join(h.repo, "apps/server/db"), ...packages])
     watchers.push(
       watch(dir, { recursive: true }, (_event, file) => {
-        // The tests' own files and the golden data do not change what runs.
+        // The tests' own files and their data do not change what runs.
         if (file && (file.endsWith(".test.ts") || file.includes("testdata"))) return;
         server();
       }),

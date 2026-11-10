@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Array as Arr, Effect, Formatter, Layer, Redacted } from "effect";
 
 import { ServerConfig } from "#/infra/config.ts";
 import { testConfig } from "#/testing/layers.ts";
@@ -13,13 +13,16 @@ import { defaultVoice } from "./voice.ts";
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
 
+/** A key as a call would send it; undefined when there is none. */
+const reveal = (key: Redacted.Redacted | undefined) => (key === undefined ? undefined : Redacted.value(key));
+
 const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Setting>) =>
   body.pipe(Effect.provide(Setting.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
 const file = (config: ServerConfig["Service"]) => JSON.parse(readFileSync(join(config.home, "settings.json"), "utf8")) as Record<string, unknown>;
 
 describe("settings", () => {
   it.effect("a key saved here wins over the configuration's, and only its end is ever shown", () => {
-    const config = testConfig({ deepseek: { apiKey: "sk-from-the-env-0000" } });
+    const config = testConfig({ deepseek: { apiKey: Redacted.make("sk-from-the-env-0000") } });
     return run(
       config,
       Effect.gen(function* () {
@@ -30,9 +33,11 @@ describe("settings", () => {
         expect(after.deepseekApiKey).toEqual({ source: "settings", hint: "…1234" });
         expect(after.agoraAppId).toEqual({ source: "settings", value: appId });
         expect(after.agoraAppCertificate).toEqual({ source: "settings", hint: "…2222" });
-        expect(JSON.stringify(after)).not.toContain("sk-saved");
-        expect(s.deepseekApiKey()).toBe("sk-saved-in-settings-1234");
-        expect(s.agora()).toEqual({ appId, appCertificate: cert });
+        expect(Formatter.formatJson(after)).not.toContain("sk-saved");
+        expect(reveal(s.deepseekApiKey())).toBe("sk-saved-in-settings-1234");
+        const agora = s.agora();
+        expect(agora?.appId).toBe(appId);
+        expect(reveal(agora?.appCertificate)).toBe(cert);
         expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);
         expect(file(config)).toEqual({ deepseekApiKey: "sk-saved-in-settings-1234", agoraAppId: appId, agoraAppCertificate: cert });
         const cleared = yield* s.save({ deepseekApiKey: "" });
@@ -117,8 +122,9 @@ describe("settings", () => {
         const after = yield* s.save({ voice: { tts }, ttsKey: " azure-speech-key-9f3a " });
         expect(after.voice.tts).toEqual(tts);
         expect(after.ttsKey).toEqual({ source: "settings", hint: "…9f3a" });
-        expect(JSON.stringify(after)).not.toContain("azure-speech-key");
-        expect(s.voiceConfig().keys).toEqual({ asrKey: "", llmKey: "", ttsKey: "azure-speech-key-9f3a" });
+        expect(Formatter.formatJson(after)).not.toContain("azure-speech-key");
+        const { asrKey, llmKey, ttsKey } = s.voiceConfig().keys;
+        expect(Arr.map([asrKey, llmKey, ttsKey], reveal)).toEqual(["", "", "azure-speech-key-9f3a"]);
         expect(file(config).voice).toEqual({ tts });
       }),
     );
@@ -130,11 +136,11 @@ describe("settings", () => {
       config,
       Effect.gen(function* () {
         const setting = yield* Setting;
-        expect(setting.status().mossReady).toBe(false);
+        expect(setting.status().readiness.live).toEqual({ ready: false, missing: "mossAccount" });
         yield* setting.updateProviders(() =>
           Effect.succeed({
             revision: 1,
-            connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-private-key" }],
+            connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: Redacted.make("test-private-key") }],
             dictation: { connection: "moss", model: "moss-transcribe-1.0" },
             image: { connection: "moss", model: "moss-image-sft-1.0-2026-10-09" },
             understanding: { connection: "moss", model: "moss-vl-1.0-2026-07-08" },
@@ -146,8 +152,8 @@ describe("settings", () => {
             vision: { connection: "moss", model: "moss-vl-realtime-1.0" },
           }),
         );
-        expect(setting.status()).toMatchObject({ mossReady: true, dictationReady: true });
-        expect(JSON.stringify(setting.status())).not.toContain("test-private-key");
+        expect(setting.status()).toMatchObject({ readiness: { live: { ready: true }, dictation: { ready: true } } });
+        expect(Formatter.formatJson(setting.status())).not.toContain("test-private-key");
         expect(file(config)).not.toHaveProperty("mossKey");
         expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);
       }),
@@ -157,7 +163,8 @@ describe("settings", () => {
           config,
           Effect.gen(function* () {
             const setting = yield* Setting;
-            expect(setting.providers().connections[0]?.key).toBe("test-private-key");
+            const key = setting.providers().connections[0]?.key;
+            expect(key === undefined ? undefined : Redacted.value(key)).toBe("test-private-key");
             expect(setting.providers().revision).toBe(1);
             expect(setting.providers().image).toEqual({ connection: "moss", model: "moss-image-sft-1.0-2026-10-09" });
             expect(setting.providers().understanding).toEqual({ connection: "moss", model: "moss-vl-1.0-2026-07-08" });
@@ -183,7 +190,9 @@ describe("settings", () => {
         expect((yield* s.save({ memorySources: [nowledge] })).memorySources[0]!.key).toEqual({ source: "settings", hint: "…9876" });
         const { key: _key, ...keyless } = nowledge;
         yield* s.save({ memorySources: [{ ...keyless, write: false }] });
-        expect(s.memorySources()).toEqual([{ kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, key: "nmem-secret-9876" }]);
+        expect(Arr.map(s.memorySources(), ({ key, ...source }) => ({ ...source, key: reveal(key) }))).toEqual([
+          { kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, key: "nmem-secret-9876" },
+        ]);
         yield* s.save({ deepseekApiKey: "sk-other-key-0000" });
         expect(s.memorySources()).toHaveLength(1);
         yield* s.save({ memorySources: [] });
@@ -194,7 +203,7 @@ describe("settings", () => {
 
   it.effect("an unreadable or invalid settings file is kept aside untouched, and the settings start empty", () =>
     Effect.gen(function* () {
-      const cases = ["{not json", JSON.stringify({ deepseekApiKey: 7, agoraAppId: appId })];
+      const cases = ["{not json", Formatter.formatJson({ deepseekApiKey: 7, agoraAppId: appId })];
       for (const raw of cases) {
         const config = testConfig();
         const path = join(config.home, "settings.json");
@@ -204,7 +213,7 @@ describe("settings", () => {
           Effect.gen(function* () {
             const s = yield* Setting;
             expect(s.agora()).toBeUndefined();
-            // A save after it writes a new file; the one set aside keeps the owner's bytes.
+            // A save after it writes a new file; the one set aside keeps the user's bytes.
             yield* s.save({ dictation: { via: "own", url: "http://127.0.0.1:1/v1", model: "m" } });
           }),
         );

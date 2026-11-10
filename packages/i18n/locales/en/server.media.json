@@ -5,7 +5,6 @@
   "speechUnknown": "No complete speech result was received. The provider may still be processing or charging. Speech was not submitted again.",
   "speechRejected": "MOSS rejected the speech request. Check account access and input before creating a new task.",
   "inputDeletePreview": "Delete the local input reservation for {name} and any unfinished upload.",
-  "inputDeleteBytes": "Delete the local file if no other input retains it.",
   "remoteAccountChanged": "This remote file belongs to a different connection or credential. No request was sent with a replacement account.",
   "remoteUploadUnknown": "The remote upload outcome is unresolved, or this upload has already ended. It will not be submitted again; a remote file may still exist.",
   "remoteUploadRejected": "MOSS rejected this file upload. It was not retried.",
@@ -19,7 +18,7 @@
   "understandingRejected": "MOSS rejected the understanding request. It was not repeated.",
   "remoteUnresolved": "Some uploads have no confirmed file ID. Known files were cleaned, but inspect these names in the provider console: {files}",
   "understandingPhase": {
-    "authorized": "Awaiting orchestrator",
+    "authorized": "Awaiting the assistant",
     "queued": "Queued",
     "uploading": "Uploading to MOSS",
     "generating": "Understanding",
@@ -44,7 +43,7 @@
   "inputChanged": "A saved input cannot be replaced with different bytes. Create a new input instead.",
   "inputTimeout": "The local upload timed out. Its partial file was removed; no provider request was made.",
   "inputDisconnected": "The local upload was interrupted. Its partial file was removed; no provider request was made.",
-  "ownerRequired": "Generation requires the owner's mandate. Autonomous patrols cannot submit potentially billable requests.",
+  "userRequired": "Generation requires the user's mandate. Autonomous patrols cannot submit potentially billable requests.",
   "invalid": "Invalid image parameters. Check the prompt, layout, dimensions and advanced options.",
   "missing": "This generation task was not found.",
   "corrupt": "The generation record cannot be read. Preserve local data before investigating.",
@@ -79,5 +78,6 @@
     "unknown": "Outcome unknown",
     "canceled": "Waiting canceled",
     "download_failed": "Download failed"
-  }
+  },
+  "imageMade": "Here it is: {prompt}"
 }

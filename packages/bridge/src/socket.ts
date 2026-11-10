@@ -1,6 +1,12 @@
 import type { Socket } from "node:net";
 
+import { Option, Result, Schema } from "effect";
+
 import type { Link } from "./index";
+
+const Json = Schema.fromJsonString(Schema.Unknown);
+const parse = Schema.decodeOption(Json);
+const stringify = Schema.encodeResult(Json);
 
 export function socketLink(socket: Socket): Link {
   const ears = new Set<(m: unknown) => void>();
@@ -12,19 +18,16 @@ export function socketLink(socket: Socket): Link {
       const line = rest.slice(0, at);
       rest = rest.slice(at + 1);
       if (line.trim() === "") continue;
-      let message: unknown;
-      try {
-        message = JSON.parse(line);
-      } catch {
-        // Not a message: the bridge reads only what decodes, so a line that does not parse is one it would drop.
-        continue;
-      }
-      for (const fn of ears) fn(message);
+      const message = parse(line);
+      if (Option.isNone(message)) continue;
+      for (const fn of ears) fn(message.value);
     }
   });
   return {
     send: (message) => {
-      if (!socket.destroyed) socket.write(JSON.stringify(message) + "\n");
+      if (socket.destroyed) return;
+      // A message that is not JSON is the sender's mistake: it throws to the one sending it.
+      socket.write(Result.getOrThrow(stringify(message)) + "\n");
     },
     receive: (fn) => {
       ears.add(fn);

@@ -4,7 +4,6 @@ import type { VoiceUnavailable } from "@vibevalley/protocol/api";
 import { alreadyStopping, clientOf, newChannel, newUid, type Run, retrying, sign, tokenSeconds } from "@vibevalley/provider/agora/server";
 
 import { orchestratorModel } from "#/orchestrator/situation.ts";
-import type { VoiceKeys } from "#/setting/setting.ts";
 
 import {
   agentFor,
@@ -18,6 +17,7 @@ import {
   type VendorMessages,
   type Vendors,
   voiceAgentUid,
+  type VoiceKeys,
 } from "./agora-vendors.ts";
 
 export {

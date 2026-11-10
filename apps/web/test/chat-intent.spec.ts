@@ -30,7 +30,7 @@ test("a line shows at once as sending while the server takes its time, and once 
   await expect(page.locator('[data-testid="pending-line"][data-state="sending"]')).toHaveCount(1);
   server.open();
   await expect(page.getByTestId("pending-line")).toHaveCount(0);
-  await expect(page.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: "hold on a moment" })).toHaveCount(1);
+  await expect(page.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: "hold on a moment" })).toHaveCount(1);
   expect(await said(api, channel, "hold on a moment")).toBe(1);
 });
 
@@ -57,7 +57,7 @@ test("a line that never reached the server waits failed in its channel, and sent
   await composerOn(page, channel);
   await page.locator('[data-testid="pending-line"][data-state="failed"]').getByTestId("pending-retry").click();
   await expect(page.getByTestId("pending-line")).toHaveCount(0);
-  await expect(page.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: "say this once" })).toHaveCount(1);
+  await expect(page.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: "say this once" })).toHaveCount(1);
   expect(sent.map((s) => s.sendKey)).toEqual([sent[0]?.sendKey, sent[0]?.sendKey]);
   expect(await said(api, channel, "say this once")).toBe(1);
 });
@@ -88,7 +88,7 @@ test("a line said while the state stream is down waits, and goes once when it is
   down = false;
   await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
   await expect(page.getByTestId("pending-line")).toHaveCount(0);
-  await expect(page.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: "after the outage" })).toHaveCount(1);
+  await expect(page.locator('[data-testid="message"][data-from-kind="user"]').filter({ hasText: "after the outage" })).toHaveCount(1);
   expect(sent).toHaveLength(1);
   expect(await said(api, channel, "after the outage")).toBe(1);
 });

@@ -27,7 +27,8 @@ it.effect("downloads send no credentials and return only checked PNG bytes", () 
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(bytes, { headers: { "content-type": "image/png" } })));
   });
   return Effect.gen(function* () {
-    expect(yield* downloadImage("https://example.com/image.png", 256, 256)).toEqual(bytes);
+    const downloadImage2 = yield* downloadImage("https://example.com/image.png", 256, 256);
+    expect(downloadImage2).toEqual(bytes);
   }).pipe(Effect.provideService(PublicHttp, http));
 });
 

@@ -1,0 +1,57 @@
+{
+  "login": {
+    "title": "Sign in",
+    "intro": "Sign in with the password set on the computer running VibeValley, and this device sees helpers, sends work and talks in the channels.",
+    "noPassword": "No password is set on that computer yet: set one there under Settings › Devices, or connect with a pairing code.",
+    "password": "Password",
+    "device": "This device is called",
+    "deviceHint": "The name shown in the list of devices",
+    "submit": "Sign in",
+    "signing": "Signing in…",
+    "pairInstead": "Connect with a pairing code"
+  },
+  "account": {
+    "title": "Name and password",
+    "name": "Name",
+    "nameHint": "What VibeValley calls you",
+    "save": "Save",
+    "nameSaved": "Name saved",
+    "password": "Password",
+    "passwordHint": "For signing in from other devices; at least 8 characters",
+    "setPassword": "Set password",
+    "changePassword": "Change password",
+    "passwordSaved": "Password set",
+    "passwordHere": "The password can only be set on the computer running VibeValley.",
+    "thisDevice": "This device: {name}",
+    "signOut": "Sign out"
+  },
+  "devices": {
+    "title": "Your devices",
+    "count": "{n}",
+    "paired": "Paired {at} · last seen {seen}",
+    "pairedNever": "Paired {at} · never seen",
+    "login": "Signed in {at} · last seen {seen}",
+    "loginNever": "Signed in {at} · never seen",
+    "thisOne": "{name} (this one)",
+    "remove": "Take back",
+    "removeWhich": "Take back the key of {name}"
+  },
+  "guess": {
+    "android": "Android phone",
+    "windows": "Windows PC",
+    "device": "A device"
+  },
+  "approvals": {
+    "page": "Let a device sign in",
+    "hint": "Ran vibevalley auth login in that device's terminal? Check the code; approve if it matches.",
+    "title": "Sign-ins waiting for you",
+    "none": "No device is waiting. Run vibevalley auth login on that device and its code shows up here.",
+    "wants": "{name} wants to sign in",
+    "left": "Expires in {m} min",
+    "allow": "Approve",
+    "refuse": "Refuse",
+    "from": "Asked from {from}, {at}",
+    "fromHere": "Asked from this computer, {at}",
+    "onlyYours": "Approve only a code you just got from vibevalley auth login in your own terminal: refuse a code someone sent you or an address you do not know; once approved, that device can do anything as you."
+  }
+}

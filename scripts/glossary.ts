@@ -5,7 +5,7 @@ import { basename, resolve } from "node:path";
 const see = "See docs/README.md 用语";
 
 export interface GlossaryRow {
-  /** The word the owner reads (term). */
+  /** The word the user reads (term). */
   readonly term: string;
   readonly english: string;
   readonly code: string;
@@ -138,7 +138,7 @@ export function wordProblems(glossary: Glossary, locale: "zh" | "en", messages: 
     for (const a of [...avoided, ...farm].toSorted((x, y) => y.word.length - x.word.length)) {
       const found = han.test(a.word) ? text.includes(a.word) : hasLatin(text, a.word);
       if (!found) continue;
-      problems.push(`${locale}: ${key} says ${a.word}, which the owner is not told (docs/README.md:${a.line}). Fix: say ${a.use}. ${see}`);
+      problems.push(`${locale}: ${key} says ${a.word}, which the user is not told (docs/README.md:${a.line}). Fix: say ${a.use}. ${see}`);
       if (han.test(a.word)) text = text.split(a.word).join("\u0000".repeat(a.word.length));
     }
   }

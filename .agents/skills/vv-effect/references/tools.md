@@ -32,7 +32,6 @@
 | 时间 | `TestClock`（`import { TestClock } from "effect/testing"`）：`TestClock.adjust("1 minute")`、`setTime` |
 | 等一个条件成立 | `@vibevalley/testkit/until`，不用 `sleep` |
 | 一个整农场 | `apps/server/src/testing/world.ts`；帮工是 oar 的 `scriptedRuntime`，模型是照脚本回答的 `Llm`（`@vibevalley/ai/testing`） |
-| 规则的黄金数据 | `@vibevalley/testkit/golden`，有意改了规则 `vp run golden:update <模块>` |
 | 贵的资源跨测试共享 | `it.layer(…)`，只给真贵的（数据库、整个服务），说清共享了什么 |
 
 ## 观测
@@ -46,9 +45,10 @@
 - **先问能不能写成代码**（更好的结构、更强的类型），再写检查，最后才写进文字（`AGENTS.md` 的「怎么让 agent 做对」）。
 - **lint 规则**写在 `scripts/oxlint-plugin.ts`，用 `says(错在哪, Fix, See)` 写报错，测试写在 `scripts/oxlint-plugin.test.ts`（`vp run scripts:test`），在根目录 `vite.config.ts` 的 `lint` 里打开；能机械改对的写自动修复。这个仓库不另加 ast-grep：oxlint 已经在 `vp check` 里跑、带类型（[vv-governance](.agents/skills/vv-governance/SKILL.md)）。
 - **存量太多一次改不完的**，先进逃生口的棘轮（`packages/health`），只许减；新写的照规则来。
-- **Effect 自己的诊断**能开就开：在 `tsconfig.base.json` 的 `plugins` 里把它调成 `error`，`vp run effect:check` 会报。
+- **Effect 自己的诊断**能开就开：在 `tsconfig.base.json` 的 `plugins` 里把它调成 `error`，`vp run effect:check` 会报。`@effect/tsgo` 的规则没写进配置的，`scripts/effect-check.ts` 按「规则 × 项目」数命中，记在 `scripts/effect.ratchet.json`：多了失败（报出这次改到的文件里的命中），少了也失败，跑 `vp run effect:write` 降下来；一条规则归零就写成 `error`、退出棘轮。提交前的钩子（`.vite-hooks/pre-commit`）跑它，所以新代码加不进这些问题。不为让检查过而关规则或写 `@effect-diagnostics…:off`：要修。
+- 打包类型声明（`vp pack`）用的 tsgo 带的 Effect 语言服务可能比 `@effect/tsgo` 旧，认不得新规则时会报 unknown-rule 的警告；所以插件写了 `ignoreEffectWarningsInTscExitCode: true`，警告不让构建失败。门禁是 `effect:check`，它自己读每条诊断的级别，不看这个退出码。
 
 ## 外面的工具
 
-- [agent doctor](https://effect.doctor/)（`npx @jgalbsss/agent-doctor`）：给 Effect 代码打分的体检，101 条规则（正确性、v4 迁移、惯用写法、架构、性能、重复的函数）。不在这个仓库的检查里；要用它做一次审计时先问主人（它会下载并运行第三方的包），报出来的照 [cases.md](.agents/skills/vv-effect/references/cases.md) 判断，值得的写成上面的检查。
+- [agent doctor](https://effect.doctor/)（`npx @jgalbsss/agent-doctor`）：给 Effect 代码打分的体检，101 条规则（正确性、v4 迁移、惯用写法、架构、性能、重复的函数）。不在这个仓库的检查里；要用它做一次审计时先问用户（它会下载并运行第三方的包），报出来的照 [cases.md](.agents/skills/vv-effect/references/cases.md) 判断，值得的写成上面的检查。
 - [EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns)：300 多个按主题分的模式（`content/published/patterns/<主题>/`），找某一类问题的标准写法时查；它按 v3 写的多，名字照上面「查 API」核对。

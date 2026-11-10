@@ -202,7 +202,7 @@ const statusOf = (r: RuntimeInfo) => {
   switch (i.status) {
     case "available":
       return r.settings.enabled ? (i.version ?? t("web.runtime.available")) : t("web.runtime.disabled");
-    // The reason, not just unsupported: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
+    // The reason, not just unsupported: for vibevalley it is a missing DeepSeek key, which is the user's to fix.
     case "unsupported":
       return i.reason || t("web.runtime.unsupported");
     case "not_found":

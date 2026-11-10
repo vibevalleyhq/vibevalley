@@ -8,7 +8,9 @@ import * as S from "@vibevalley/protocol/schema";
 import type { Mark } from "#/base/typedMarks.ts";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
+import { attachmentData } from "#/infra/attachment.ts";
 import { orchestratorMood } from "#/infra/frame.ts";
+import { ready, settingsQuery, useQuery } from "#/infra/query.ts";
 import { defineAtom } from "#/state/atom.ts";
 import { defineIntent, type Intent, type Intents } from "#/state/intent.ts";
 import { defineStored, orFallback } from "#/state/stored.ts";
@@ -50,9 +52,7 @@ export function pendingLines(
   return says
     .filter((s) => s.input.id === channel && !arrived(s.key, messages))
     .map((s) =>
-      s.status === "failed"
-        ? { key: s.key, text: s.input.text, state: "failed", ...(s.reason === undefined ? {} : { reason: s.reason }) }
-        : { key: s.key, text: s.input.text, state: "sending" },
+      s.phase === "failed" ? { key: s.key, text: s.input.text, state: "failed", reason: s.fault.reason } : { key: s.key, text: s.input.text, state: "sending" },
     );
 }
 
@@ -78,12 +78,22 @@ export interface ComposerWays {
  * someone. */
 export const chatMarks: readonly Mark[] = ["/", "@"];
 
+/** Where a menu was asked for: a command (/ first in the box) or a name (@), by where it starts. */
+interface Trigger {
+  readonly kind: "command" | "name";
+  readonly start: number;
+}
+
 export function createComposer(core: () => SpaceView | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
   const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
-  const [closed, setClosed] = createSignal(false);
-  let sending = false;
+  /** The menu: open; away while the box has not the focus; or shut by Escape at one trigger (a command or a name, where it
+   * starts), which it stays for while the caret is in that trigger. */
+  const [menu, setMenu] = createSignal<{ readonly _tag: "open" } | { readonly _tag: "away" } | { readonly _tag: "shut"; readonly at: Trigger }>({
+    _tag: "open",
+  });
+  const [sending, setSending] = createSignal(false);
   let disposed = false;
   onSettled(() => () => {
     disposed = true;
@@ -92,6 +102,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   const commanding = createAct((reason) => {
     if (!disposed) ways.failed(reason);
   });
+  const busy = () => sending() || commanding.busy();
   const intent = (): Said => ({ ...ways.target(), text: text().trim() });
   const channelOf = (id: string | undefined): Channel | undefined => {
     const all = core()?.chat?.channels ?? [];
@@ -99,14 +110,36 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   };
 
   const orchestrators = useOrchestrators();
-  /** The orchestrator that looks after the place the next line goes to. */
+  const settings = useQuery(settingsQuery);
+  /** What is set up, for the commands that need it (/imagegen); unknown while the settings are on their way. */
+  const readiness = () => ready(settings, undefined)?.readiness;
+  /** The orchestrator in the place the next line goes to. */
   const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
   // A command (/ first in the box) is offered anywhere; no one else is in a direct channel to be named.
-  const commandTyping = createMemo(() => (closed() ? undefined : typedCommand(text(), caret())));
-  const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
+  const hidden = (kind: Trigger["kind"], found: { readonly start: number } | undefined) => {
+    const m = menu();
+    return m._tag === "away" || (m._tag === "shut" && found !== undefined && m.at.kind === kind && m.at.start === found.start);
+  };
+  const commandTyping = createMemo(() => {
+    const c = typedCommand(text(), caret());
+    return hidden("command", c) ? undefined : c;
+  });
+  const typing = createMemo(() => {
+    if (channelOf(ways.target().id)?.type === "direct") return undefined;
+    const n = typedName(text(), caret());
+    return hidden("name", n) ? undefined : n;
+  });
+  /** Read from what was typed, not the signals just set: a menu shut at a trigger the caret has left is forgotten. */
+  const moved = (value: string, at: number) =>
+    setMenu((m) => {
+      if (m._tag === "open") return m;
+      if (m._tag === "away") return { _tag: "open" };
+      const now = m.at.kind === "command" ? typedCommand(value, at) : typedName(value, at);
+      return now?.start === m.at.start ? m : { _tag: "open" };
+    });
   const offered = createMemo(() => {
     const c = commandTyping();
-    if (c) return offeredFor(commandNameables(), c.query);
+    if (c) return offeredFor(commandNameables(readiness()), c.query);
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
@@ -115,7 +148,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     setText(value);
     setCaret(at);
     setActive(0);
-    setClosed(false);
+    moved(value, at);
     ways.edited?.(value, at);
   };
 
@@ -133,20 +166,20 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
 
   // A line that is a command runs it: the box empties once it went through, and keeps the line when it did not.
   const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
-    sending = true;
+    setSending(true);
     try {
-      const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() }));
+      const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here(), readiness: readiness() }));
       if (disposed || !done) return;
       edit("", 0);
       if ("open" in done) ways.opened?.(done.open);
       else ways.told?.(done.say);
     } finally {
-      sending = false;
+      setSending(false);
     }
   };
 
   const send = async () => {
-    if (disposed || sending) return;
+    if (disposed || busy()) return;
     const asked = commandOf(text());
     if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
@@ -156,10 +189,10 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     edit("", 0);
     ways.sent?.();
     const end = await ways.says.send(said).done;
-    if (!disposed && end?.status === "failed") ways.failed(end.reason ?? "");
+    if (!disposed && end?.phase === "failed") ways.failed(end.fault.reason);
   };
 
-  const onKey = (e: KeyboardEvent) => {
+  const onKey = (e: Pick<KeyboardEvent, "key" | "isComposing" | "shiftKey" | "preventDefault" | "stopPropagation">) => {
     // Enter that picks a word in an input method neither sends nor names.
     if (e.isComposing) return;
     const list = offered();
@@ -179,7 +212,10 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
         // The menu closes, not the window around it.
         e.preventDefault();
         e.stopPropagation();
-        setClosed(true);
+        const c = commandTyping();
+        const n = typing();
+        if (c !== undefined) setMenu({ _tag: "shut", at: { kind: "command", start: c.start } });
+        else if (n !== undefined) setMenu({ _tag: "shut", at: { kind: "name", start: n.start } });
         return;
       }
     }
@@ -191,7 +227,7 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
 
   return {
     text,
-    busy: commanding.busy,
+    busy,
     active,
     setActive,
     offered,
@@ -200,18 +236,22 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
     send,
     onKey,
     /** The caret moves without typing too (arrow keys, a click): the @ menu follows it. */
-    follow: (e: Event) => e.currentTarget instanceof HTMLTextAreaElement && setCaret(e.currentTarget.selectionStart),
+    follow: (e: Event) => {
+      if (!(e.currentTarget instanceof HTMLTextAreaElement)) return;
+      setCaret(e.currentTarget.selectionStart);
+      moved(e.currentTarget.value, e.currentTarget.selectionStart);
+    },
     /** The menu closes when the box loses the focus and comes back with it. */
-    blur: () => setClosed(true),
-    focus: () => setClosed(false),
-    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !commanding.busy(),
+    blur: () => setMenu({ _tag: "away" }),
+    focus: () => setMenu((m) => (m._tag === "away" ? { _tag: "open" } : m)),
+    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     here,
-    /** The place's orchestrator is in a round the owner may stop. */
+    /** The place's orchestrator is in a round the user may stop. */
     stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),
   };
 }
 
-/** What the owner is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. */
+/** What the user is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. */
 const DraftSchema = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   reply: Schema.optionalKey(Schema.Struct({ id: Schema.String, number: Schema.Int })),
@@ -260,7 +300,7 @@ export function useReplying(channel: Accessor<string | undefined>): Accessor<Cha
   };
 }
 
-/** The message the owner is changing in place, one at a time across the page (↑ in an empty box picks the last). */
+/** The message the user is changing in place, one at a time across the page (↑ in an empty box picks the last). */
 const editing = defineAtom<string | undefined>(undefined);
 export const editingId = editing.get;
 export const setEditingId = editing.set;
@@ -284,15 +324,12 @@ const sending =
 
 /** A file uploaded for a message; progress is told in whole percents as it goes up. */
 async function upload(file: File, progress: (percent: number) => void = () => {}): Promise<Attachment> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  // In pieces: one call with every byte as an argument overflows the stack for a big file.
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const data = await attachmentData(file);
   const api = new VibeValleyApi(
     "",
     sending((sent, total) => progress(Math.min(100, Math.round((sent / total) * 100)))),
   );
-  return api.channel.attachment.create({ name: file.name || "file", type: file.type || "application/octet-stream", data: btoa(binary) });
+  return api.attachment.create({ name: file.name || "file", type: file.type || "application/octet-stream", data });
 }
 
 export interface Upload {

@@ -6,7 +6,7 @@ const root = resolve(import.meta.dirname, "..");
 
 const LINK = /\]\(([^)\s]+)\)/gu;
 
-/** A path with a folder and a source file's extension; files in the owner's home (`orchestrator/orchestrator.jsonl`) have none of these. */
+/** A path with a folder and a source file's extension; files in the user's home (`orchestrator/orchestrator.jsonl`) have none of these. */
 const CODE_PATH = /`((?:\.\.?\/)*[\w-][\w.-]*\/[\w./-]+\.(?:go|dart|ts|tsx|astro|sql|json|yaml|sh|py|gz))`/gu;
 
 /** Tracked and new files: a path may be written from the repository root or from inside a package (`internal/core/core.go`). */

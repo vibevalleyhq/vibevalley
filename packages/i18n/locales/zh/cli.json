@@ -39,7 +39,7 @@
     "reviewComment": "验收的话",
     "statusComment": "一起说的话：再来一轮时说要改什么",
     "title": "新的标题",
-    "wantsOwner": "只看在等主人的，等得最久的在前",
+    "wantsUser": "只看在等你的，等得最久的在前",
     "issueWatch": "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr",
     "tier": "PARA 分层",
     "marker": "待办标记",
@@ -77,9 +77,9 @@
       "delete": "删掉一份档案"
     },
     "artifact": {
-      "list": "列出稿子（--issue 只看一张工单的）",
-      "show": "看一篇稿子：标题、版本、归属",
-      "read": "读一篇稿子的正文"
+      "list": "列出 Artifact（--issue 只看一张工单的）",
+      "show": "看一篇 Artifact：标题、版本、归属",
+      "read": "读一篇 Artifact 的正文"
     },
     "channel": {
       "list": "列出频道和私聊",
@@ -125,7 +125,13 @@
       "show": "看一个帮工",
       "stop": "停下帮工这一轮"
     },
-    "chat": "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）"
+    "chat": "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
+    "auth": {
+      "about": "登录到别处的服务端，像 gh auth login：在页面上点同意，这台电脑就拿到自己的钥匙",
+      "login": "登录到一个服务端：显示确认码，等你在已登录的页面上同意，钥匙存在家目录的 auth.json",
+      "status": "现在连哪个服务端、用的是哪台设备的钥匙",
+      "logout": "退出：服务端收回这台电脑的钥匙，本机忘掉它"
+    }
   },
   "next": {
     "help": "看这条命令怎么写",
@@ -144,6 +150,37 @@
     "chatFlag": "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的"
   },
   "op": {
+    "user": {
+      "approval": {
+        "create": "请求登录这台设备：拿到确认码，等你在页面上同意",
+        "collect": "取回同意后的钥匙；还在等时什么都不给",
+        "list": "列出等着你同意的登录请求",
+        "answer": "同意或拒绝一个登录请求"
+      },
+      "get": "看用户叫什么、设没设密码、这个请求是从哪台设备来的",
+      "update": "改用户的名字",
+      "password": {
+        "set": "设密码（只能在跑着 VibeValley 的那台电脑上）"
+      },
+      "login": "用密码登录，给这台设备一把钥匙",
+      "logout": "退出：收回这台设备的钥匙",
+      "device": {
+        "list": "列出用户的设备：配对来的和登录来的",
+        "delete": "收回一台设备的钥匙",
+        "previewDelete": "试收回一台设备：说会怎样，不真收回"
+      }
+    },
+    "attachment": {
+      "create": "上传一个文件，给消息带上或放进素材库"
+    },
+    "library": {
+      "item": {
+        "list": "列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛",
+        "add": "把文件放进素材库：你上传好的附件，或助手、帮工给的网址或工作目录里的文件",
+        "delete": "从素材库拿掉一个文件（发过它的消息仍能打开）",
+        "previewDelete": "试拿掉：说会怎样，不真拿掉"
+      }
+    },
     "agent": {
       "create": "新建一份档案",
       "delete": "删掉一份档案",
@@ -162,45 +199,42 @@
     },
     "artifact": {
       "block": {
-        "create": "在稿子里插一块",
-        "delete": "删掉稿子里的一块和它的子块",
-        "list": "按顺序列出稿子现有的每一块",
+        "create": "在 Artifact 里插一块",
+        "delete": "删掉 Artifact 里的一块和它的子块",
+        "list": "按顺序列出 Artifact 现有的每一块",
         "previewDelete": "试删一块：说会删掉什么，不真删",
         "update": "改一块的字、类型或属性"
       },
       "content": {
-        "get": "读稿子的正文：网页的一版，或块写成的 Markdown"
+        "get": "读 Artifact 的正文：网页的一版，或块写成的 Markdown"
       },
-      "create": "新建稿子：空的一篇来一起写，或交上来一稿",
-      "delete": "删掉一篇稿子",
-      "demo": "开演示：几个帮工一起写一篇稿子，不花模型的钱",
-      "get": "看一篇稿子",
+      "create": "新建 Artifact：空的一篇来一起写，或交上来一稿",
+      "delete": "删掉一篇 Artifact",
+      "demo": "开演示：几个帮工一起写一篇 Artifact，不花模型的钱",
+      "get": "看一篇 Artifact",
       "html": {
-        "edit": "在网页稿子里换掉一段字，成为新的一版"
+        "edit": "在网页 Artifact 里换掉一段字，成为新的一版"
       },
-      "list": "列出某个频道或工单的稿子，不指定就是全部",
+      "list": "列出某个频道或工单的 Artifact，不指定就是全部",
       "markdown": {
-        "get": "把一起写的稿子读成 Markdown"
+        "get": "把一起写的 Artifact 读成 Markdown"
       },
-      "previewDelete": "试删一篇稿子：说会删掉什么，不真删",
-      "submit": "以主人的身份交一批块的操作，按顺序一次做完",
+      "previewDelete": "试删一篇 Artifact：说会删掉什么，不真删",
+      "submit": "以你的身份交一批块的操作，按顺序一次做完",
       "suggestion": {
         "accept": "接受一条改写建议",
-        "create": "对主人写的一块提改写建议",
-        "list": "列出稿子上的改写建议，没答的和答过的",
+        "create": "对你写的一块提改写建议",
+        "list": "列出 Artifact 上的改写建议，没答的和答过的",
         "reject": "拒绝一条改写建议"
       },
-      "update": "给稿子改标题",
+      "update": "给 Artifact 改标题",
       "version": {
-        "create": "给网页稿子交新的一版，旧的留着"
+        "create": "给网页 Artifact 交新的一版，旧的留着"
       }
     },
     "channel": {
       "archive": {
         "set": "归档一个频道或取回来，消息留着"
-      },
-      "attachment": {
-        "create": "上传一个附件，给消息带上"
       },
       "create": "新建一个频道",
       "default": {
@@ -219,10 +253,10 @@
         "previewDelete": "试删一条消息：说会删掉什么，不真删",
         "search": "搜消息",
         "send": "在频道或串里发一条消息",
-        "update": "改主人自己发的一条消息，不再通知谁"
+        "update": "改你自己发的一条消息，不再通知谁"
       },
       "notify": {
-        "set": "设一个频道的提醒：全部、只在 @主人 时、不提醒"
+        "set": "设一个频道的提醒：全部、只在有人 @你 时、不提醒"
       },
       "pin": {
         "list": "列出频道里钉住的消息，新钉的在前",
@@ -302,14 +336,7 @@
       }
     },
     "lan": {
-      "device": {
-        "delete": "移除一台配对过的设备",
-        "previewDelete": "试移除一台设备：说会怎样，不真移除"
-      },
-      "get": "看「连接到本机」开没开、有哪些设备",
-      "me": {
-        "get": "发这个请求的设备是哪台"
-      },
+      "get": "看「连接到本机」开没开、地址和配对码",
       "pair": "用配对码把这台设备配上",
       "pairing": {
         "answer": "放行或拒绝来配对的设备",
@@ -329,14 +356,14 @@
     },
     "orchestrator": {
       "archive": {
-        "get": "读管家压掉的一份对话原文",
-        "list": "列出或搜管家压掉的对话原文"
+        "get": "读助手压掉的一份对话原文",
+        "list": "列出或搜助手压掉的对话原文"
       },
       "eval": {
-        "create": "把管家做错的一轮存成评测样例，写上该怎么做"
+        "create": "把助手做错的一轮存成评测样例，写上该怎么做"
       },
-      "open": "让管家上线，可以说话了",
-      "stop": "停下管家这一轮，派出去的帮工接着干"
+      "open": "让助手上线，可以说话了",
+      "stop": "停下助手这一轮，派出去的帮工接着干"
     },
     "pkm": {
       "block": {
@@ -415,14 +442,15 @@
     },
     "media": {
       "understanding": {
-        "authorize": "登记不可变理解请求，只授权指定频道的管家执行一次",
-        "start": "管家按已授权任务编号执行理解，不接受新的输入或授权声明",
+        "authorize": "登记不可变理解请求，只授权指定频道的助手执行一次",
+        "start": "助手按已授权任务编号执行理解，不接受新的输入或授权声明",
         "create": "确认账号和上传许可后理解选中的本机输入",
         "cleanup": "清理已知远端文件，不重复理解请求",
         "previewCleanup": "预览远端清理和本机保留释放，不改变任何文件"
       },
       "input": {
         "create": "为媒体输入预留有限的本机空间，不上传给供应商",
+        "adopt": "把素材库里的一个文件拿来当媒体输入，照上传一样检查",
         "get": "查看本机的媒体输入",
         "list": "列出本机的媒体输入",
         "delete": "删除没有被任务保留的本机媒体输入",
@@ -473,9 +501,9 @@
     },
     "voice": {
       "call": {
-        "hear": "交上通话里主人说的一句",
-        "say": "交上通话里管家说出的话",
-        "start": "开始和管家通话",
+        "hear": "交上通话里你说的一句",
+        "say": "交上通话里助手说出的话",
+        "start": "开始和助手通话",
         "stop": "挂断通话"
       },
       "dictate": "听写：把一段录音转成字",
@@ -494,7 +522,7 @@
       "about": "档案：派活时指给谁"
     },
     "artifact": {
-      "about": "稿子：一起写的，和交上来的网页"
+      "about": "Artifact：一起写的，和交上来的网页"
     },
     "channel": {
       "about": "频道和私聊，和里面的消息",
@@ -524,7 +552,7 @@
       "about": "档案的记性"
     },
     "orchestrator": {
-      "about": "管家：上线、停下、旧账、评测"
+      "about": "助手：上线、停下、旧账、评测"
     },
     "pkm": {
       "about": "笔记：记一句、搜、雷达、日记和页",
@@ -561,7 +589,7 @@
     "unreachable": "农场 {base} 连不上，后面几项没查",
     "noRuntime": "一个农机也没装：帮工没有能干活的",
     "installRuntime": "装一个编码 agent（Claude Code、Codex……），装好以后让农场再找一遍",
-    "noModelKey": "没有 DeepSeek 的 key：管家和自己的 agent 起不来",
+    "noModelKey": "没有 DeepSeek 的 key：助手和自己的 agent 起不来",
     "setModelKey": "在「设置 › 模型」里填 DeepSeek 的 key",
     "lanSettings": "看「设置 › 设备」",
     "wrong": "这几项不对：{checks}"
@@ -579,7 +607,7 @@
   },
   "arg": {
     "agent": "档案：id 或名字",
-    "artifact": "稿子的 id",
+    "artifact": "Artifact 的 id",
     "channel": "频道：名字（general 或 #general）或 id",
     "cron": "定时任务的 id",
     "cronName": "定时任务的名字",
@@ -591,7 +619,7 @@
     "appPath": "桌面版里的一页，比如 /issues/12；不填是首页",
     "capture": "要记的话；不给就读标准输入",
     "comment": "评论的话",
-    "cronText": "到点时说的话：交给管家或档案去做的事",
+    "cronText": "到点时说的话：交给助手或档案去做的事",
     "memory": "要记的一条",
     "memoryId": "记性的 id，memory list 列出",
     "message": "消息的话",
@@ -601,7 +629,8 @@
     "title": "工单的标题",
     "updateStep": "check 去查有没有新版本，install 装上并重启；不填只说现在的样子",
     "pageTitle": "页的标题",
-    "agentName": "档案的名字"
+    "agentName": "档案的名字",
+    "authServer": "服务端的地址（https://farm.example.com）；不给就用 --server"
   },
   "channel": {
     "sent": "发到了 {channel}"
@@ -616,7 +645,7 @@
       "about": "看有哪些档案能派活"
     },
     "artifactList": {
-      "about": "一张工单的稿子"
+      "about": "一张工单的 Artifact"
     },
     "artifactShow": {
       "about": "看 a1 是哪篇、第几版"
@@ -711,7 +740,7 @@
     },
     "cronCreate": {
       "run": "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00",
-      "about": "每天早上九点让管家看看昨天的改动"
+      "about": "每天早上九点让助手看看昨天的改动"
     },
     "cronDelete": {
       "about": "先试删，看会删掉什么"
@@ -742,8 +771,8 @@
     "issueTimeline": {
       "about": "12 号的时间线和花费"
     },
-    "issueWantsOwner": {
-      "about": "在等主人的工单，等得最久的在前"
+    "issueWantsUser": {
+      "about": "在等你的工单，等得最久的在前"
     },
     "issueWatch": {
       "about": "跟着 12 号，等它交回来或完了再看，最多等十分钟"
@@ -802,6 +831,15 @@
     },
     "issueObserve": {
       "about": "以 JSONL 跟随工单执行"
+    },
+    "authLogin": {
+      "about": "登录到那个服务端，之后的命令都连它"
+    },
+    "authStatus": {
+      "about": "看登录到了哪里"
+    },
+    "authLogout": {
+      "about": "退出，回到这台电脑上的服务端"
     }
   },
   "issue": {
@@ -838,11 +876,22 @@
   "worker": {
     "about": "以当前帮工会话交活、提交 PR 或读取上下文",
     "failed": "帮工接入失败：检查会话凭证、服务连接和操作授权",
-    "report": "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需主人明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
-    "pr": "提交当前会话的 PR，须获主人明确授权。JSON 可选 summary 字符串。",
+    "report": "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需用户明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
+    "pr": "提交当前会话的 PR，须获用户明确授权。JSON 可选 summary 字符串。",
     "context": "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
     "read": "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
     "doctor": "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
     "json": "工具输入的 JSON 对象；参数格式见本命令说明。"
+  },
+  "auth": {
+    "here": "{server} 是这台电脑上的服务端：命令行直接就能用，不用登录",
+    "approve": "在浏览器里打开 {link}\n确认码 {code}：页面上的码一样就点同意。等你同意……",
+    "noBrowser": "没能打开浏览器：自己打开上面的链接",
+    "signedIn": "已登录 {server}，这台电脑在设备列表里叫「{device}」",
+    "notSignedIn": "没有登录：命令连的是 {server}",
+    "revoked": "{server} 收回了这台电脑的钥匙：重新运行 vibevalley auth login",
+    "status": "已登录 {server}，以「{device}」的身份；你叫「{name}」",
+    "signedOut": "已退出 {server}",
+    "logoutUnsaid": "没能让服务端收回钥匙（{why}）：本机已经忘掉它，到设备页上收回它"
   }
 }
