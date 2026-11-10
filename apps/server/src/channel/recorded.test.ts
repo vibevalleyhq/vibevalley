@@ -132,7 +132,7 @@ describe("a search", () => {
       in: "clock-in",
       has: ["image", "link"],
     });
-    expect(parseSearch("from:@主人 来了").from).toBe(userId);
+    expect(parseSearch("from:@用户 来了").from).toBe(userId);
     expect(parseSearch("from:w3").from).toBe("w3");
     const day = parseSearch("before:2026-10-28 after:2026-10-01 has:pdf");
     expect([day.before, day.after, day.words]).toEqual([new Date(2026, 9, 28).getTime(), new Date(2026, 9, 1).getTime(), "has:pdf"]);
@@ -146,7 +146,7 @@ const said = {
   target: "#general",
   from: "user",
   fromKind: "user" as const,
-  name: "主人",
+  name: "用户",
   text: "看这块",
 };
 

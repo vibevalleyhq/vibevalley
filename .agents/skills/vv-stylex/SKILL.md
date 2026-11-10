@@ -1,6 +1,6 @@
 ---
 name: vv-stylex
-description: 在 VibeValley 的 Solid 2 页面、官网和故事查看器里写、改、评审 StyleX 样式；把 Tailwind 或 class 字符串批量迁成 StyleX；排查动态变量丢失、样式合并、伪类、主题、marker、动画和 CSS 层顺序。用在：新增或修改界面样式、组件接收外部样式、StyleX 编译报错、主人说「StyleX 写法」「迁移样式」「批量转换 Tailwind」。沿用宿主令牌，按 Solid 的 class 和对象 style 接线；迁移按语法模式分批，不逐组件重复整套验收。
+description: 在 VibeValley 的 Solid 2 页面、官网和故事查看器里写、改、评审 StyleX 样式；把 Tailwind 或 class 字符串批量迁成 StyleX；排查动态变量丢失、样式合并、伪类、主题、marker、动画和 CSS 层顺序。用在：新增或修改界面样式、组件接收外部样式、StyleX 编译报错、用户说「StyleX 写法」「迁移样式」「批量转换 Tailwind」。沿用宿主令牌，按 Solid 的 class 和对象 style 接线；迁移按语法模式分批，不逐组件重复整套验收。
 ---
 
 # 写 StyleX

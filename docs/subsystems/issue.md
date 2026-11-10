@@ -10,7 +10,7 @@
 
 | 层级 | 字段 | 取值与名称 | 来源 |
 |---|---|---|---|
-| 流程状态 | `status` | `backlog` 备选、`todo` 待办、`in_progress` 处理中、`in_review` 待验收、`done` 已完成、`canceled` 已取消 | 主人设置存库；`in_progress` 与 `in_review` 从在场 `Session` 或 `lastRun` 派生 |
+| 流程状态 | `status` | `backlog` 备选、`todo` 待办、`in_progress` 处理中、`in_review` 待验收、`done` 已完成、`canceled` 已取消 | 用户设置存库；`in_progress` 与 `in_review` 从在场 `Session` 或 `lastRun` 派生 |
 | 展示阶段 | `stage.state` | `refining` 草稿、`queued` 排队、`working` 在做、`asking` 等你回答、`reviewing` 等你验收、`stuck` 卡住了、`done` 已完成、`canceled` 已取消 | `issueStageOf` 实时计算 |
 | 受阻原因 | `stage.stuck` | `conflict` 有冲突、`failed` 没做成、`interrupted` 停在半路、`quiet` 没动静 | `issueStageOf` 实时计算 |
 | 可执行动作 | `stage.acts`、`lead` | `start` 开工、`answer` 回答、`reject` 打回、`complete` 完成、`acknowledge` 知道了、`resolve` 让它解决冲突、`resume` 接着做、`cure` 接着修、`tell` 带话、`stop` 叫停、`close` 取消、`reopen` 重开 | `issueStageOf` 计算，自带点击后发送的请求参数 |
@@ -48,7 +48,7 @@
 
 ## 模型和不变量
 
-- **生命周期统一走 `setStatus` 状态机**：主人只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
+- **生命周期统一走 `setStatus` 状态机**：用户只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
 - **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **责任关系与执行分离**：指派档案写 `issue_assignment`（换人或清空才写 `ended_at`）；实际运行的 `Session` 记在 `issue_assignment_execution`。
 - **写操作收敛为「挪状态」与「说话」**：流转调 `issue.status.update`，评论调 `issue.comment.create`。前端按钮（`stage.acts`）自带请求参数，不重写判断。
@@ -61,16 +61,16 @@
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后经 `mergeInto` 合入父分支。
 - **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单必须先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
-- **已完成只由主人点头**：单轮 `completed` 只进 `in_review`，管家 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
+- **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，管家 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
 
 ## 怎么走
 
 **起草（`issue.refine`）**
 
-1. 主人对 `backlog` 工单发一句话，服务端按当前指派、仓库历史或 `chooseAgent` 选定帮工档案。
-2. 将主人输入写入同一工单串；最近 40 条讨论（最多 24,000 字符）、当前正文、验收标准及问题一起交给 `refining` 会话。有仓库用专属 worktree；没有仓库或档案目录时用隔离的上下文目录，不创建仓库，不进 `issue_assignment_execution`。
+1. 用户对 `backlog` 工单发一句话，服务端按当前指派、仓库历史或 `chooseAgent` 选定帮工档案。
+2. 将用户输入写入同一工单串；最近 40 条讨论（最多 24,000 字符）、当前正文、验收标准及问题一起交给 `refining` 会话。有仓库用专属 worktree；没有仓库或档案目录时用隔离的上下文目录，不创建仓库，不进 `issue_assignment_execution`。
 3. 帮工返回草稿 JSON 块与问题；服务端解析写回工单，并在工单串展示整理后的需求。结束起草会话；有 worktree 时重置回主分支，无仓库的上下文目录只在没有文件时删除。
-4. 主人确认派发时，当前正文和验收标准进入执行说明。执行后不能直接编辑目标、正文或验收条件；补充与退回意见进入同一工单串，不静默替换目标。
+4. 用户确认派发时，当前正文和验收标准进入执行说明。执行后不能直接编辑目标、正文或验收条件；补充与退回意见进入同一工单串，不静默替换目标。
 
 **派活与排队（`issue.status.update` → `todo`）**
 
@@ -80,11 +80,11 @@
 
 ### 完成和交付
 
-主人将工单挪到 `done` 时，服务端按 `deliver` 与分支状态判定交付：
+用户将工单挪到 `done` 时，服务端按 `deliver` 与分支状态判定交付：
 
 1. **无代码改动（`none`）**：管家工单、`deliver: answer` 或分支无新提交时，直接记 `delivered: none` 并关闭会话。
 2. **保留分支（`kept`）**：`deliver: branch` 且有提交时，保留分支并关闭会话，记 `delivered: kept`；工作树里未提交的改动不代提交。
-3. **提交 PR/MR（`pull_request`）**：已有开放或已合入的结构化关联可完成；尚未提交时，仓库应已配置 PR 发布，主人点击完成会先运行检查并提交，发布失败就保持原状态；完成时记 `delivered: submitted`，不合并，保留未合入分支及未提交改动。远端状态变化只更新关联，不代替验收。
+3. **提交 PR/MR（`pull_request`）**：已有开放或已合入的结构化关联可完成；尚未提交时，仓库应已配置 PR 发布，用户点击完成会先运行检查并提交，发布失败就保持原状态；完成时记 `delivered: submitted`，不合并，保留未合入分支及未提交改动。远端状态变化只更新关联，不代替验收。
 4. **要求合入（`change`）**：
    - 在锁外要求工作树干净；有未提交改动就退回帮工，按仓库自己的提交规范提交后再来。干净时用 `git merge-tree` 预检冲突；若冲突则标上 `Issue.conflict` 并留在 `in_review`。
    - 在锁外运行 `.vibevalley/check`；若失败则将末尾 40 行输出交回帮工修复。
@@ -101,7 +101,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 - **帮工（`session`）**：调用 `send`、`deliver`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
 - **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并与 `gh` PR 操作。
-- **信箱与频道（`mailbox`、`channel`）**：排队输入经 `Mailbox` 投递；主人发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
+- **信箱与频道（`mailbox`、`channel`）**：排队输入经 `Mailbox` 投递；用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 - **接入（`ingress`）**：轮询 GitHub PR 的 CI 与 Review 事件，转为 `Trigger` 投入工单信箱。
 
 ## 为什么这样
@@ -109,7 +109,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - **工单是核心实体，帮工挂在工单下**：重开或换人复用同一工单 ID、同一分支与同一工单串，历史不散落。
 - **大活拆成原生父子工单，不设独立 `TaskGraph` 服务**：子工单直接复用普通工单的看板、提问与修复动作，通过检查后合入父分支，省去平行的计划服务、表和面板。
 - **验收子工单只冻结自身改动文件，违规直接退回**：冻结整个测试目录会阻碍后续步骤新增测试，悄悄恢复文件会让帮工莫名编译失败；显式退回并仅在依赖链末端跑全量祖先验收，兼顾防作弊与效率。
-- **状态只存主人意图，展示阶段与按钮由纯函数派生**：`in_progress`、`in_review`、`stage` 和 `acts` 实时算出并由黄金数据锁死，帮工崩溃不会导致库状态卡死。
+- **状态只存用户意图，展示阶段与按钮由纯函数派生**：`in_progress`、`in_review`、`stage` 和 `acts` 实时算出并由黄金数据锁死，帮工崩溃不会导致库状态卡死。
 - **完成结论与交付去向解耦**：将 `done`/`canceled` 与 `delivered` 分为两个正交字段，使调研结论单、留分支单和合并单共用一套状态机。
 
 ## 还没做的

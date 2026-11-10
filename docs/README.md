@@ -21,10 +21,10 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [resource.md](docs/subsystems/resource.md) | Resource：只读、分页、按会话权限裁剪的 `resource_read` |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测、地契 |
-| [artifact.md](docs/subsystems/artifact.md) | 稿子：主人和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
-| [pkm.md](docs/subsystems/pkm.md) | 笔记：主人的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
+| [artifact.md](docs/subsystems/artifact.md) | 稿子：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
+| [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
-| [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到主人 |
+| [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 管家：收什么话、现状、工具、谁能让它合并、巡查、评测 |
 | [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
@@ -49,7 +49,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
-| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、「连接到本机」、管家；`scripts/capabilities.ts` 写出 |
+| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：用户、「连接到本机」、管家；`scripts/capabilities.ts` 写出 |
 | [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、轨迹和精力瓶 |
 | [primitives.md](docs/reference/primitives.md) | 各地基文件夹导出的共用原语和一句话说明；写帮手之前先查；`scripts/primitives.ts` 写出 |
 
@@ -65,7 +65,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ## 用语
 
-叫法分两张表。下面这张是活本身的叫法：工作台、命令行、管家、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列。「不用」一列只管对主人说的话：中文界面不用其中的词，英文界面不用其中的英文词，English 一列里有的照用；代码和讲服务端的文档照「代码里」一列和实际的概念来（[concepts.md](docs/concepts.md)），代码里碰到「不用」里的词，只有指的是这一行的东西才算错。带括号说明的词只在那个意思上不用，「（中文界面）」的只在中文界面不用。界面上的字写在词典里（`packages/i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `packages/i18n/locales/*/shared.json`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。`vpx scripts/i18n.ts check` 照「不用」一列和种地的词查皮（农场、记忆树、像素零件、游戏和素材图鉴）以外的词典，`scripts/glossary.ts` 查「代码里」一列的名字都还在代码里。
+叫法分两张表。下面这张是活本身的叫法：工作台、命令行、管家、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列。「不用」一列只管对用户说的话：中文界面不用其中的词，英文界面不用其中的英文词，English 一列里有的照用；代码和讲服务端的文档照「代码里」一列和实际的概念来（[concepts.md](docs/concepts.md)），代码里碰到「不用」里的词，只有指的是这一行的东西才算错。带括号说明的词只在那个意思上不用，「（中文界面）」的只在中文界面不用。界面上的字写在词典里（`packages/i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `packages/i18n/locales/*/shared.json`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。`vpx scripts/i18n.ts check` 照「不用」一列和种地的词查皮（农场、记忆树、像素零件、游戏和素材图鉴）以外的词典，`scripts/glossary.ts` 查「代码里」一列的名字都还在代码里。
 
 | 叫法 | English | 代码里 | 意思 | 不用 |
 |---|---|---|---|---|
@@ -89,14 +89,14 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | VibeValley | VibeValley | 服务端、整个系统 | 说系统做了什么时的叫法（「VibeValley 会建好」「VibeValley 重启了」）；农场是它的一张皮，不是它的名字 | 农场（指系统时） |
 | 事实 | fact | `Fact` | 改核心状态的一件事 | patch |
 | 改动 | changes | `Changes`（`issue.diff.get`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情、收成清单 |
-| 完成 | complete | 动作 `complete`；工单挪到 `done`（已完成） | 主人点头，工单关成已完成；交付了什么另记（`delivered`）：合进了主分支（`github.pr_repos` 里的仓库是推分支、开 PR，PR 合了才关）、分支留着没合、没有改动要合 | 收获、合并（指完成时：合并只是交付的一种） |
+| 完成 | complete | 动作 `complete`；工单挪到 `done`（已完成） | 用户点头，工单关成已完成；交付了什么另记（`delivered`）：合进了主分支（`github.pr_repos` 里的仓库是推分支、开 PR，PR 合了才关）、分支留着没合、没有改动要合 | 收获、合并（指完成时：合并只是交付的一种） |
 | 取消 | cancel | 动作 `close`；工单挪到 `canceled`（已取消） | 不做了：帮工收工，分支上有提交就留着 | 收工（指取消时：那是帮工离开） |
 | 关上 | closed | `isClosed`：`done` 或 `canceled` | 已完成和已取消的合称：看板的「已关」一列 | |
 | 聊清楚、安排活、完成 | talk it through, get it worked, finish | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一张工单的三段 | |
 | 验收 | review; pass, send back | `Issue.review`（`issue.review`；打回是带话挪回待办，`reject`） | 每张工单都有：判交回来的活过没过；挪到已完成就是通过，管家验过的记在 `Issue.reviewedAt` | 审核 |
 | 验收意见 | review note | finding（`Issue.findings`） | 没过验收的一条意见；下次验收通过才算解决 | 草（农场的皮里用） |
 | 验收标准 | criteria | `Issue.criteria`、`CriterionCheck`、`CheckResult` | 工单写下的完成线，一条一条；帮工交回来时逐条说过没过 | |
-| 问题 | question | questions（`Issue.questions`、`Question`） | 帮工问了主人、还没回答的；有问题时工单「等你回答」 | 缺肥 |
+| 问题 | question | questions（`Issue.questions`、`Question`） | 帮工问了用户、还没回答的；有问题时工单「等你回答」 | 缺肥 |
 | 轨迹 | trajectory | `SessionEvent`（服务端由 `Journal` 记，页面由 `Trajectory`、`WorkLog` 画） | 一个帮工或管家每一轮收到的话、想、说、工具调用和结果 | 干活过程、日志（指轨迹时）、trace |
 | 记性 | memory | memory（`Memory`） | 一份档案记得的事 | 记忆库 |
 | 技能 | skill | skill（`Skill`） | 档案能带的技能；农场里画成技能书 | 插件（指技能时） |
@@ -109,7 +109,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） | 一张工单由哪个档案负责，执行上下文挂在这条关系下 | |
 | 执行器 | executor | `Executor` | 创建、投递、中断和释放 oar 的执行实例 | |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） | 一个帮工读代码，把待规划的工单写成标题、描述和验收标准，写完就走 | |
-| 主人 | owner | owner | 你 | |
+| 用户 | user | user（`User`、`userId`） | 用这个农场的那一个人：对他说话时说「你」，称呼他时用他设的名字，名字能改 | 主人、owner |
 | 田头 | the farm chat | 默认频道（`Channel.default`） | 农场的皮对默认频道的叫法；工作台里写它的名字（`#general`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 你和一个管家两个人说话的地方，帮工不在 | 私信 |
 | 和帮工私聊 | talk | `Channel.direct`、`Session.channel` | 和一个档案直接说话，Session 回到原私聊，闲置时休眠，不创建工单 | |

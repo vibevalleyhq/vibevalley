@@ -249,7 +249,7 @@ catch: (cause) => new SourceFailed({ source: name, cause }),
 // cause: Schema.Defect() keeps the library's error as it was.
 ```
 
-为什么：原样留住原因，日志里能看到库自己的报错和堆栈；给主人看的话由处理它的地方用 `t()` 说。
+为什么：原样留住原因，日志里能看到库自己的报错和堆栈；给用户看的话由处理它的地方用 `t()` 说。
 
 在这里：审；不写 `catch` 的 `tryPromise` 已拦（`vibevalley/try-promise-catch`）。
 
@@ -451,7 +451,7 @@ await Promise.all(ids.map(fetchPage));                         // No limit, no i
 const pages = yield* Effect.forEach(ids, fetchPage, { concurrency: 4 });
 ```
 
-为什么：`Effect.all`、`forEach` 默认一个接一个；要并发就写上限。数量由主人或外面定的（工单数、消息数）不用 `"unbounded"`。循环里一个一个 `yield*` 查库也不要：查一次拿全部。
+为什么：`Effect.all`、`forEach` 默认一个接一个；要并发就写上限。数量由用户或外面定的（工单数、消息数）不用 `"unbounded"`。循环里一个一个 `yield*` 查库也不要：查一次拿全部。
 
 在这里：循环里 `yield*` 已拦（`vibevalley/yield-in-loop`）；并发上限审。
 
@@ -894,7 +894,7 @@ yield* Effect.forEach(files, (file) => Effect.tryPromise({ try: (signal) => uplo
 // The wire's errors are ApiError (Missing, Refused…): words for the owner and next steps, no causes.
 ```
 
-为什么：里面的错误带着原因（堆栈、路径、库的报错），是给日志看的；经接口出去的是协议里的错误，只有给主人看的话和接着能做什么。在边界上转一次，不把里面的东西泄出去。
+为什么：里面的错误带着原因（堆栈、路径、库的报错），是给日志看的；经接口出去的是协议里的错误，只有给用户看的话和接着能做什么。在边界上转一次，不把里面的东西泄出去。
 
 在这里：接口的错误类型是 `ApiError`（类型挡住大部分）；转换在拥有规则的服务或处理里，审。
 

@@ -41,8 +41,8 @@ describe("the orchestrator's rules", () => {
       ["spaces around do not count", "  " + "a".repeat(800) + "\n", "a".repeat(800)],
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });
-    const user = orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#ops", from: "user", fromKind: "user", name: "主人", text: "字".repeat(900) }]);
-    expect(user).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
+    const user = orchestratorEnvelopeLines([{ id: "m4", number: 4, target: "#ops", from: "user", fromKind: "user", name: "用户", text: "字".repeat(900) }]);
+    expect(user).toBe("[target=#ops msg=4 from=用户] " + "字".repeat(900));
   });
 
   it("give every source its head", () => {
@@ -55,6 +55,6 @@ describe("the orchestrator's rules", () => {
         { key: "a", text: "一" },
         { key: "b", text: "二" },
       ]),
-    ).toBe("【巡查】#ops 里有几件事放着没人管：\n- 一\n- 二\n\n看看要不要提醒主人（一两句，说在 #ops）、催帮工或者叫停；都不用管就什么也别说。");
+    ).toBe("【巡查】#ops 里有几件事放着没人管：\n- 一\n- 二\n\n看看要不要提醒用户（一两句，说在 #ops）、催帮工或者叫停；都不用管就什么也别说。");
   });
 });

@@ -2,7 +2,7 @@
   "id": "answer-when-asked-to-check",
   "createdAt": 1792358460000,
   "model": "deepseek-flash",
-  "want": "主人说「查一下打卡为什么慢」，管家记成了一张要改代码的工单。应该用 issue_create 填 deliver: answer：帮工只查、交回带依据的结论，不改代码。",
+  "want": "用户说「查一下打卡为什么慢」，管家记成了一张要改代码的工单。应该用 issue_create 填 deliver: answer：帮工只查、交回带依据的结论，不改代码。",
   "memory": "",
   "tools": [
     "channel_create",
@@ -34,7 +34,7 @@
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：查一下 clock-in 的打卡为什么这么慢",
+    "content": "[来源：用户]\n用户说：查一下 clock-in 的打卡为什么这么慢",
     "display": true,
     "details": {
       "channel": "general"

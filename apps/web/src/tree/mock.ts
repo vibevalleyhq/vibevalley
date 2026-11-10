@@ -75,7 +75,7 @@ const reposZh = ["vibevalley", "字幕面板", "官网", "billing"] as const;
 const notesZh: readonly [string, ...string[]] = [
   "表名用单数：issue、issue_assignment",
   "改完 db/queries 要跑 vp run db:generate",
-  "主人不要兼容层，旧数据直接作废",
+  "用户不要兼容层，旧数据直接作废",
   "页面不折事实，要新数据就加 protocol 字段",
   "提交说明一句话说改完以后的行为",
   "不要开 next dev，先 lint、typecheck 再 build",

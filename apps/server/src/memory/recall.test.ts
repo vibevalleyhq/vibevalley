@@ -52,7 +52,7 @@ test("terms leave out the too common", () => {
 test("notes: this repo's, everyone's, and another's only when it plainly shares the words", () => {
   const memories = [
     memory("here", "迁移文件在 db/migrations，改表先写迁移", { repo: "clock" }),
-    memory("everywhere", "主人要提交信息写中文"),
+    memory("everywhere", "用户要提交信息写中文"),
     memory("other", "博客用 hugo 生成", { repo: "blog" }),
     memory("other-related", "分页接口用 limit 和 offset 参数，默认 20 条", { repo: "blog" }),
   ];
@@ -76,7 +76,7 @@ test("issues: this repo's only, three at most, not its own session's", () => {
 
 test("lines, and what goes first when there are too many", () => {
   expect(lineOf(memory("1", "迁移文件在 db/migrations", { repo: "clock" }), "clock")).toBe("- （这个仓库）迁移文件在 db/migrations");
-  expect(lineOf(memory("2", "主人要提交信息写中文"), "clock")).toBe("- （所有仓库）主人要提交信息写中文");
+  expect(lineOf(memory("2", "用户要提交信息写中文"), "clock")).toBe("- （所有仓库）用户要提交信息写中文");
   const many = Array.from({ length: memoryKeep - 1 }, (_, i) => memory(`n${i}`, `第 ${i} 条`, { at: now - i * dayMs }));
   expect(nextForgotten(many, 1)).toEqual([]);
   const recalled = many.map((m) => (m.id === `n${memoryKeep - 2}` ? { ...m, recalledAt: now } : m));

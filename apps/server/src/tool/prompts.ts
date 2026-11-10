@@ -121,10 +121,10 @@ export function issueDetail(issue: T.Issue, who: string, timeline: T.IssueTimeli
       lines.push(`  ${i + 1}. ${c}（${mark}）`);
     });
   }
-  if (issue.questions.length > 0) lines.push("在等主人回答：" + issue.questions.map((a) => a.question).join("；"));
+  if (issue.questions.length > 0) lines.push("在等用户回答：" + issue.questions.map((a) => a.question).join("；"));
   const open = issue.findings.filter((f) => !f.resolved);
   if (open.length > 0) lines.push("验收没过要修的：" + open.map((f) => f.text).join("；"));
-  if (issue.lastRun?.outcome) lines.push("最后一轮" + t(`shared.outcome.${issue.lastRun.outcome}`) + "，在等主人点头");
+  if (issue.lastRun?.outcome) lines.push("最后一轮" + t(`shared.outcome.${issue.lastRun.outcome}`) + "，在等用户点头");
   if (issue.pullRequest) lines.push(`PR #${issue.pullRequest.number}（${issue.pullRequest.state}）${issue.pullRequest.url}`);
   for (const m of (timeline?.milestones ?? []).slice(0, 8)) lines.push(`  · ${spanWords(now - m.at)}前 ${m.who ? m.who + " " : ""}${head(m.text, 120)}`);
   return lines.join("\n");
@@ -159,8 +159,8 @@ const htmlRules = `页面在沙箱里显示：连不了网、调不了农场的�
 /** The orchestrator's and the session's tool parameter descriptions (tool/schemas.ts). */
 export const params = {
   artifact: {
-    title: "标题：主人在卡片上看到的那一行，最多 80 个字",
-    kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，主人和你都能接着改（artifact_block_create、artifact_block_update）`,
+    title: "标题：用户在卡片上看到的那一行，最多 80 个字",
+    kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）`,
     content: "这一稿的全文；和 file 二选一",
     file: "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
     note: "这一稿改了什么，一句话；第一稿可以写这是什么",
@@ -183,15 +183,15 @@ export const params = {
   },
   issueCreate: {
     agent: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
-    autoSubmitPr: "主人明确允许帮工在检查通过后自行开立或更新 PR 时才填 true；推送分支不等于合并主分支",
+    autoSubmitPr: "用户明确允许帮工在检查通过后自行开立或更新 PR 时才填 true；推送分支不等于合并主分支",
     channel: "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
     deliver:
-      "交付什么：change 是改代码、合进仓库（不填就是它）；branch 是改代码但分支留着不合（主人说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
+      "交付什么：change 是改代码、合进仓库（不填就是它）；branch 是改代码但分支留着不合（用户说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
     description: `给帮工的附言，最多 ${mandateNoteWordLimit} 词（中英文都按词分段）。一手原话自动绑定来源，让帮工用 resource_read 读取；不复述原话，不替帮工编实施方案。`,
-    draft: "要不要让帮工读过代码起草（写成标题、说明、验收标准）；会花钱，主人只是随口记一句时不用",
+    draft: "要不要让帮工读过代码起草（写成标题、说明、验收标准）；会花钱，用户只是随口记一句时不用",
     priority: "紧急、高、普通、低；不填是普通",
     repo: "仓库文件夹名；频道有默认仓库时可以不填；新仓库起一个简短的英文名，开工时会新建",
-    start: "记下就开工（没空位就排队）：只在主人要马上做时填 true；记一下、先别开始、只是指派都不填",
+    start: "记下就开工（没空位就排队）：只在用户要马上做时填 true；记一下、先别开始、只是指派都不填",
     title: "一句话的标题",
   },
   issueStatus: {
@@ -202,7 +202,7 @@ export const params = {
   issueUpdate: {
     deliver: "交付方式：change（合进仓库）、branch（分支留着不合）、answer（只交结论）",
     agent: "谁来做：帮工的名字或 id（派出去以前才能改）",
-    criteria: "验收标准，一条一个主人能照着验的点；给空列表就是清掉（派出去以前才能改）",
+    criteria: "验收标准，一条一个用户能照着验的点；给空列表就是清掉（派出去以前才能改）",
     description: "说明（派出去以前才能改）",
     priority: "紧急、高、普通、低",
     repo: "仓库（派出去以前才能改）",
@@ -214,7 +214,7 @@ export const params = {
     repo: "只看这个仓库的",
     status: "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
     text: "标题或说明里有这些字的（找重复、找某件事时用）",
-    wantsUser: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
+    wantsUser: "只看在等用户的：等回答、等验收、卡住了；按等了多久排，久的在前",
   },
   pkm: {
     text: "要找什么，几个词或一句话",
@@ -224,14 +224,14 @@ export const params = {
     capture: "要记的一句话：写清楚是什么、为什么值得记",
     block: "块的 id：pkm_search、pkm_page_get 的回答里〔〕中的那串",
     suggested: "这一块改成的整段字；原来的 [[链接]] 和 ((引用)) 都要留着，漏了的会补在末尾",
-    rationale: "为什么这样改，一句话，主人接受前会看到",
+    rationale: "为什么这样改，一句话，用户接受前会看到",
   },
   memoryCreate: {
     repo: "只在这个仓库里用：仓库文件夹名",
     text: "要它记住的一句话",
   },
   channelMessageList: {
-    id: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @user",
+    id: "#general、#clock-in，或 #general:<消息号>；管家和用户的私聊是 @user",
   },
   cron: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
@@ -308,12 +308,12 @@ const pkmTierWord: Record<T.PkmTier, string> = {
 export const userAgentWord = "管家";
 
 export const issueReportDescription =
-  "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给主人验收用 prSubmit=false。有问题或未满足的验收项则等主人。问题、验收凭据和记性只认这些字段，不从正文猜。用主人的语言填写。";
+  "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记性只认这些字段，不从正文猜。用用户的语言填写。";
 export const issueReportRecorded = (recorded: boolean) => (recorded ? "报告已记录；现在用简短正文说明结果。" : "当前不是正在处理工单的帮工会话，不能交回。 ");
 export const issueHandbackDescription = "把当前工单收到、但超出这张工单授权范围的一条输入退回网关；envelope 填输入卡片的 ID，reason 说明为什么应重新分流。";
 export const issueHandbackRecorded = "已退回管家重新分流。";
 export const issuePrSubmitDescription =
-  "在当前工单获主人明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。";
+  "在当前工单获用户明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。";
 export const issuePrSubmitted = (result: string) => "PR 已提交：" + result;
 
 /** A blocks artifact's block in one line: its id, revision, type and text (artifact_content_get, artifact_block_update's conflict). */
@@ -325,23 +325,23 @@ export const memoryWhere = (m: T.Memory) => (m.repo ? "仓库 " + m.repo : "所�
 /** The orchestrator's tools' descriptions, shown to the model alongside each name and parameters (tool.ts). */
 const mediaDescriptions = {
   create:
-    "替主人提交一次生图任务。只有主人明确要生成图片时使用；提示词会发给 MOSS，可能计费。id 用新的唯一请求编号，网络中断后重试必须保持同一编号和全部参数；不要为了重试换编号。text 为文生图，layout 为布局 JSON，尺寸须为 256–2048 的 16 倍数且总像素不超过 2097152。不支持参考图编辑。返回排队中的任务，不等生图结束；不要密集轮询。用主人的语言回答。",
-  get: "读取一次媒体任务。图片和语音 ready 才有本机附件；理解结果保留文本和截断信息。unknown 表示厂商可能仍在执行或已计费，不要自动重做。用主人的语言回答。",
-  list: "查看最近 100 次媒体任务，包括授权、来源、结果、状态和可用操作。用主人的语言回答。",
-  cancel: "停止媒体任务的本机等待或撤销未执行授权，不保证厂商停止计算或计费。只有主人要取消时使用。用主人的语言回答。",
-  download: "只重试已经生成的图片或语音结果的下载和本机保存，不重新生成；只有 canRetryDownload 为真才使用。用主人的语言回答。",
+    "替用户提交一次生图任务。只有用户明确要生成图片时使用；提示词会发给 MOSS，可能计费。id 用新的唯一请求编号，网络中断后重试必须保持同一编号和全部参数；不要为了重试换编号。text 为文生图，layout 为布局 JSON，尺寸须为 256–2048 的 16 倍数且总像素不超过 2097152。不支持参考图编辑。返回排队中的任务，不等生图结束；不要密集轮询。用用户的语言回答。",
+  get: "读取一次媒体任务。图片和语音 ready 才有本机附件；理解结果保留文本和截断信息。unknown 表示厂商可能仍在执行或已计费，不要自动重做。用用户的语言回答。",
+  list: "查看最近 100 次媒体任务，包括授权、来源、结果、状态和可用操作。用用户的语言回答。",
+  cancel: "停止媒体任务的本机等待或撤销未执行授权，不保证厂商停止计算或计费。只有用户要取消时使用。用用户的语言回答。",
+  download: "只重试已经生成的图片或语音结果的下载和本机保存，不重新生成；只有 canRetryDownload 为真才使用。用用户的语言回答。",
 };
 
 export const descriptions = {
   "media.image.create": mediaDescriptions.create,
   "media.understanding.start":
-    "按任务 id 执行主人预先登记的图片或视频理解授权。只能在授权频道替主人执行；输入、问题、模型和输出上限已冻结，不能自报上传许可、换参数或提供服务器路径。过期、取消或重启后不能启动。重复同一 id 不重复上传或计费；用 media_job_get 看结果，勿密集轮询。用主人的语言回答。",
+    "按任务 id 执行用户预先登记的图片或视频理解授权。只能在授权频道替用户执行；输入、问题、模型和输出上限已冻结，不能自报上传许可、换参数或提供服务器路径。过期、取消或重启后不能启动。重复同一 id 不重复上传或计费；用 media_job_get 看结果，勿密集轮询。用用户的语言回答。",
   "media.speech.create":
-    "主人明确要求时生成一次 Flash 或 Pro 单人语音。输入文字、账号与 revision、该账号音色和音频格式，可选择 asynchronous 持久异步任务；文字会发给 MOSS，可能计费。id 与全部参数在重试时保持不变，unknown 不自动重做。返回本机任务，ready 后可用附件；非流式结果不会冒充流式播放，PCM 仅下载。用主人的语言回答。",
+    "用户明确要求时生成一次 Flash 或 Pro 单人语音。输入文字、账号与 revision、该账号音色和音频格式，可选择 asynchronous 持久异步任务；文字会发给 MOSS，可能计费。id 与全部参数在重试时保持不变，unknown 不自动重做。返回本机任务，ready 后可用附件；非流式结果不会冒充流式播放，PCM 仅下载。用用户的语言回答。",
   "media.dialogue.create":
-    "主人明确要求时生成多人对话语音。给定唯一说话人 id 与该账号 voice 的映射，以及引用这些 id 的 segments。冻结 id、账号 revision、文字、格式；重复提交只读取同一任务，不重新计费。通过 media_job_get 查询，ready 后取得本机附件。不能替主人确认样本克隆授权。用主人的语言回答。",
+    "用户明确要求时生成多人对话语音。给定唯一说话人 id 与该账号 voice 的映射，以及引用这些 id 的 segments。冻结 id、账号 revision、文字、格式；重复提交只读取同一任务，不重新计费。通过 media_job_get 查询，ready 后取得本机附件。不能替用户确认样本克隆授权。用用户的语言回答。",
   "media.voiceDesign.create":
-    "主人明确要求时，提交文字和音色描述生成预览语音。预览不是可复用 voice_id；保存为音色必须由主人在页面明确授权上传。保持同一请求 id 和参数，结果未知不能重复提交新请求。用 media_job_get 查询本机任务。用主人的语言回答。",
+    "用户明确要求时，提交文字和音色描述生成预览语音。预览不是可复用 voice_id；保存为音色必须由用户在页面明确授权上传。保持同一请求 id 和参数，结果未知不能重复提交新请求。用 media_job_get 查询本机任务。用用户的语言回答。",
   "media.job.get": mediaDescriptions.get,
   "media.job.cancel": mediaDescriptions.cancel,
   "media.job.download": mediaDescriptions.download,
@@ -349,52 +349,52 @@ export const descriptions = {
   "repo.list": "列出工作目录下的仓库（每个文件夹是一个仓库），以及是不是 git 仓库。",
   "channel.list": "列出频道：名字、哪个是默认的、是做什么的、默认仓库。频道是安排活的地方。",
   "session.list": "列出在场的所有帮工：在做什么、上一轮的结果。",
-  "issue.get": "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
-  "issue.diff.get": "看完成一张工单会合进仓库什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
+  "issue.get": "看一张工单的全部：要做的、验收标准做到哪了、在等用户什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
+  "issue.diff.get": "看完成一张工单会合进仓库什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。用户问「改了什么」或者完成前想确认时用。",
   "channel.message.list":
-    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和用户的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   "issue.review":
-    "验收一张交回来的工单：先用 issue_diff_get 看改动，对着它的验收标准逐条看。过了（pass: true）就记下验过，完成仍等主人说；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
+    "验收一张交回来的工单：先用 issue_diff_get 看改动，对着它的验收标准逐条看。过了（pass: true）就记下验过，完成仍等用户说；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
   "issue.comment.create": "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
   "session.stop": "叫停在做一张工单的帮工正在做的这一轮：工单和改动都留着，带句话就接着做。",
   "issue.list":
-    "找工单、看一批工单：主人问「哪些在等我」（wantsUser）、「某个仓库有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、仓库、谁在做、等了多久。",
+    "找工单、看一批工单：用户问「哪些在等我」（wantsUser）、「某个仓库有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、仓库、谁在做、等了多久。",
   "issue.create":
-    "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status_update。记之前先用 issue_list 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
+    "记下一张工单。不填 start 就放进备选、不开工：用户说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。用户要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status_update。记之前先用 issue_list 的 text 查有没有差不多的，有就问用户是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
   "issue.update":
-    "改一张工单：优先级、交付方式随时能改；标题、说明、仓库、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
+    "改一张工单：优先级、交付方式随时能改；标题、说明、仓库、谁来做、验收标准只在派出去以前能改。只在用户叫你改时用：你自己看出来该改的，先在频道里问用户。",
   "issue.status.update":
-    "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+    "挪一张工单的状态，和用户在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（用户要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在用户叫你挪时用；挪不了时照回答里的原因跟用户说。",
   "cron.create":
     "定一件按时间来的事：到点时频道里出现一条「⏰ 定时任务」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。when.kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（expr 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
   "cron.list": "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
   "cron.delete": "删掉一个定时（编号从 cron_list 看）。",
   "channel.create":
-    "开一个新频道：一件长期的事、一个仓库，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，repo 是它的默认仓库（在这里派的活默认在这个仓库里干）。主人要求了才开。",
+    "开一个新频道：一件长期的事、一个仓库，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，repo 是它的默认仓库（在这里派的活默认在这个仓库里干）。用户要求了才开。",
   "channel.update": "改一个频道是做什么的（description），或它的默认仓库（repo，写空字符串就是不要默认仓库）。",
   "pkm.search":
-    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
-  "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
+    "在用户的笔记里找：用户自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。用户提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+  "pkm.page.get": "读用户笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
   "pkm.capture":
-    "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
+    "往用户今天的日记里记一句，标成 LATER #inbox，写上是你记的：用户让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
   "pkm.comment.suggest":
-    "对主人笔记里的一块提一个改写：不直接改，主人在笔记页看到差异、接受了才换。主人让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
+    "对用户笔记里的一块提一个改写：不直接改，用户在笔记页看到差异、接受了才换。用户让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
   "memory.search":
-    "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；repo 只找那个仓库的和所有仓库都用的。派活前想知道某个仓库有什么约定、谁做过类似的活时用。",
+    "在帮工档案的记性里找：它们记下的话、用户替它们记的、做过的活。agent 不填就找所有档案；repo 只找那个仓库的和所有仓库都用的。派活前想知道某个仓库有什么约定、谁做过类似的活时用。",
   "memory.create":
-    "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 repo 就是所有仓库都用。主人对你自己说的偏好用 remember。",
+    "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。用户要某个帮工以后都记得一件事时用；不填 repo 就是所有仓库都用。用户对你自己说的偏好用 remember。",
   "artifact.list": "列出稿子：在一个频道里说过的，或为一张工单做的；都不填列出最近的。每行是 id、标题、种类、第几稿、谁做的、最新这一稿改了什么。",
-  "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
+  "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
   "artifact.content.get":
-    "读一份稿子：网页读某一稿的全文，照主人的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
+    "读一份稿子：网页读某一稿的全文，照用户的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "artifact.create":
-    "写一份稿子：要交给主人看的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，主人在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
-  "artifact.version.create": `给一个网页（html）稿子出新的一稿（旧的留着）：照主人的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的稿子不出新稿，一块一块改它。${htmlRules}。`,
+    "写一份稿子：要交给用户看的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，用户在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
+  "artifact.version.create": `给一个网页（html）稿子出新的一稿（旧的留着）：照用户的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的稿子不出新稿，一块一块改它。${htmlRules}。`,
   "artifact.block.create":
     "在一个一起写的稿子里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，接着改就用回答里的 id 和版本调 artifact_block_update。",
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本。",
-  "artifact.block.delete": "删一块（子块一起删），置成墓碑；主人要删掉哪一段、或你写的某一块不要了时用。",
+  "artifact.block.delete": "删一块（子块一起删），置成墓碑；用户要删掉哪一段、或你写的某一块不要了时用。",
 } satisfies Partial<Record<Op, string>>;
 
 /** A session's tools' descriptions; channel_message_list is the orchestrator's. */
@@ -403,31 +403,31 @@ export const sessionDescriptions = {
   "session.list": "现在谁在场：每个帮工的编号、名字、农机、在哪个仓库、在做什么。",
   "channel.unread.list": "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
   "channel.message.send":
-    "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+    "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@用户 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
   "pkm.search":
-    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
-  "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
+    "在用户的笔记里找：用户自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。用户提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+  "pkm.page.get": "读用户笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
   "pkm.capture":
-    "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
+    "往用户今天的日记里记一句，标成 LATER #inbox，写上是你记的：用户让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
   "pkm.comment.suggest":
-    "对主人笔记里的一块提一个改写：不直接改，主人在笔记页看到差异、接受了才换。主人让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
+    "对用户笔记里的一块提一个改写：不直接改，用户在笔记页看到差异、接受了才换。用户让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
   "memory.search":
-    "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。不填 repo 只找这个仓库的和所有仓库都用的；repo 写空字符串也找别的仓库的。干到一半想知道「这个仓库的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+    "在你的记性里找：你和用户以前替你的档案记下的话、做过的活。不填 repo 只找这个仓库的和所有仓库都用的；repo 写空字符串也找别的仓库的。干到一半想知道「这个仓库的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
   "memory.create":
     "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 repo 记这个仓库的；repo 写空字符串记成所有仓库都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
   "artifact.block.create":
     "在一个一起写的稿子里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
-  "artifact.block.delete": "删一块（子块一起删），置成墓碑；主人要删掉哪一段、或你写的某一块不要了时用。",
+  "artifact.block.delete": "删一块（子块一起删），置成墓碑；用户要删掉哪一段、或你写的某一块不要了时用。",
   "artifact.list":
     "列出稿子：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几稿、谁做的、最新这一稿改了什么。",
-  "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
+  "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
   "artifact.content.get":
-    "读一份稿子：网页读某一稿的全文，照主人的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
+    "读一份稿子：网页读某一稿的全文，照用户的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "artifact.create":
-    "写一份稿子：要交给主人看、代码改动说不清的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，主人在工作台里点开看、回复卡片评论，评论会叫醒你。",
-  "artifact.version.create": `给一个网页（html）稿子出新的一稿（旧的留着）：照主人的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的稿子不出新稿，一块一块改它。${htmlRules}。`,
+    "写一份稿子：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
+  "artifact.version.create": `给一个网页（html）稿子出新的一稿（旧的留着）：照用户的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的稿子不出新稿，一块一块改它。${htmlRules}。`,
   "issue.split": (maxTasks: number) =>
     `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
 };
@@ -438,12 +438,12 @@ export const answers = {
   artifact: {
     made: (a: T.Artifact) =>
       a.body === "html"
-        ? `做好了「${a.title}」第 ${a.version} 稿（id=${a.id}），已经在对话里带着卡片说了，主人在工作台点开看；主人回复那张卡片就是评论`
-        : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；主人回复那张卡片就是评论`,
+        ? `做好了「${a.title}」第 ${a.version} 稿（id=${a.id}），已经在对话里带着卡片说了，用户在工作台点开看；用户回复那张卡片就是评论`
+        : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；用户回复那张卡片就是评论`,
     warned: (ws: readonly HtmlWarning[]) =>
       ws.length === 0
         ? ""
-        : `\n提醒：${ws.map((w) => `第 ${w.line} 行的脚本用了 ${w.call}`).join("；")}。页面连不了网，这部分在主人那里不会动；要用的数据直接写进页面。`,
+        : `\n提醒：${ws.map((w) => `第 ${w.line} 行的脚本用了 ${w.call}`).join("；")}。页面连不了网，这部分在用户那里不会动；要用的数据直接写进页面。`,
     versioned: (a: T.Artifact) => `「${a.title}」出了第 ${a.version} 稿（id=${a.id}），已经在第一稿说过的地方带着卡片说了`,
     none: "还没有稿子",
     line: (a: T.Artifact) => {
@@ -458,7 +458,7 @@ export const answers = {
           : `「${a.title}」（id=${a.id}）一起写的，${a.byName} 起的头；用 artifact_content_get 读它的每一块`,
         ...a.versions.map(
           (v) =>
-            `- 第 ${v.version} 稿 · ${v.byName}${v.note ? " · " + v.note : ""}${v.number !== undefined ? ` · 卡片是 msg=${v.number}，主人的评论是对它的回复` : ""}`,
+            `- 第 ${v.version} 稿 · ${v.byName}${v.note ? " · " + v.note : ""}${v.number !== undefined ? ` · 卡片是 msg=${v.number}，用户的评论是对它的回复` : ""}`,
         ),
       ].join("\n"),
     content: (title: string, version: number, content: string) => `「${title}」第 ${version} 稿的全文：\n\n${content}`,
@@ -470,7 +470,7 @@ export const answers = {
   },
   noIssueNumber: (k: string) => "没有 #" + k + " 这张工单：用 issue_list 找找",
   noIssueOrAgent: (k: string) => "没有叫 " + k + " 的工单或帮工：用 issue_list 找找",
-  nobodyOn: (number: number) => `#${number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status_update 挪到待办`,
+  nobodyOn: (number: number) => `#${number} 现在没有帮工在做：要它接着做，用户说了以后用 issue_status_update 挪到待办`,
   noAgentToDispatch: "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。",
   noAgentOrRuntime: (key: string) => "没有叫 " + key + " 的帮工档案或 runtime",
   rememberOwnNote: "你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive",
@@ -492,10 +492,10 @@ export const answers = {
     failed: (why: string) => "看不了改动：" + why,
   },
   sessionList: {
-    intro: "在场的有主人、管家，和这些帮工：",
+    intro: "在场的有用户、管家，和这些帮工：",
     row: (id: string, name: string, runtime: string, repo: string, phase: string, brief: string) =>
       `- ${id} ${name}（${runtime}，在 ${repo}；${phase}）工单：${brief}`,
-    wake: "要叫醒谁，就在 channel_message_send 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。",
+    wake: "要叫醒谁，就在 channel_message_send 的话里写 @ 加编号（如 @w3）、@管家、@用户；只是提到，不带 @。",
   },
   spoken: {
     held: (target: string, shownCount: number, more: number, inbox: string) =>
@@ -524,7 +524,7 @@ export const answers = {
     nextStep: (target: string) => "下一步：channel_message_list id=" + target + " unread=true",
   },
   accept: {
-    passed: (number: number) => `#${number} 验收过了，等主人点完成`,
+    passed: (number: number) => `#${number} 验收过了，等用户点完成`,
     failed: (number: number, count: number) => `#${number} 没过验收，${count} 处要修，已经交回给帮工`,
   },
   tell: {
@@ -535,7 +535,7 @@ export const answers = {
     stopped: (number: number) => `#${number} 这一轮叫停了`,
   },
   issues: {
-    noneWaiting: "没有在等主人的工单。",
+    noneWaiting: "没有在等用户的工单。",
     none: "没有这样的工单。",
     moreNote: (count: number) => `\n（还有 ${count} 张没列）`,
   },
@@ -571,9 +571,9 @@ export const answers = {
     noChannelShort: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看",
     badTime: (at: string) => "at 不是一个时间：" + (at || "（没填）"),
     pending: (line: string) =>
-      "定好了，等主人同意才生效：\n" +
+      "定好了，等用户同意才生效：\n" +
       line +
-      "\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时任务列表里点「同意」才开始。跟主人说一声它是做什么的。",
+      "\n这一轮不是用户叫你定的，而它会反复来或直接派帮工：用户在定时任务列表里点「同意」才开始。跟用户说一声它是做什么的。",
     confirmed: (line: string) => "定好了：\n" + line,
   },
   listCrons: {
@@ -610,9 +610,9 @@ export const answers = {
       const [first = "", ...rest] = b.body.split("\n");
       return [`${indent}- 〔${b.id}〕${b.marker ? b.marker + " " : ""}${first}`, ...rest.map((line) => `${indent}  ${line}`)].join("\n");
     },
-    captured: (title: string) => `记进了今天的日记《${title}》，标成 LATER #inbox，写着是你记的；主人在笔记里会看到`,
+    captured: (title: string) => `记进了今天的日记《${title}》，标成 LATER #inbox，写着是你记的；用户在笔记里会看到`,
     suggested: (id: string, restored: readonly string[]) =>
-      `提了改写（〔${id}〕），主人在笔记页接受了才会换掉原来的字${restored.length > 0 ? "；你漏掉的 " + restored.join("、") + " 补在了末尾" : ""}`,
+      `提了改写（〔${id}〕），用户在笔记页接受了才会换掉原来的字${restored.length > 0 ? "；你漏掉的 " + restored.join("、") + " 补在了末尾" : ""}`,
   },
   memory: {
     rememberedFor: (id: string, where: string, memId: string) => "替 " + id + " 记下了（" + where + "）〔" + memId + "〕",

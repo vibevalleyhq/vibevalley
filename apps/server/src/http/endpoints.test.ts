@@ -129,7 +129,7 @@ describe("the endpoints the agents' tools stand on", () => {
           id: doc.id,
           block: made.blockId,
           baseRev: live.rev,
-          change: { text: [{ t: "主人点过头的字", marks: {} }] },
+          change: { text: [{ t: "用户点过头的字", marks: {} }] },
         }),
       );
       expect((yield* call(() => api.artifact.suggestion.list({ id: doc.id }))).map((s) => s.id)).toContain(suggestion.id);
@@ -140,7 +140,7 @@ describe("the endpoints the agents' tools stand on", () => {
           .find((b) => b.id === made.blockId)!
           .text.map((x) => x.t)
           .join(""),
-      ).toBe("主人点过头的字");
+      ).toBe("用户点过头的字");
       const many = (yield* call(() => api.channel.message.list({ id: general, limit: 5 }))).find((m) => m.text === "两块一起看")!;
       expect(many.blocks).toMatchObject([
         { blockId: made.blockId, rev: current.rev, text: "又改了" },

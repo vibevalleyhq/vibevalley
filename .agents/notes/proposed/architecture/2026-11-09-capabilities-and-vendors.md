@@ -36,7 +36,7 @@ Status: proposed
 
 ## Alternatives considered
 
-- **用 `Config` 读账号钥匙。** `Config` 是启动时读一次的（环境变量、`vibevalley.yaml`）；账号与绑定是主人运行中改的（`settings.json`），由能力服务每次按当前设置解析。启动配置里的钥匙才用 `Config.redacted`。
+- **用 `Config` 读账号钥匙。** `Config` 是启动时读一次的（环境变量、`vibevalley.yaml`）；账号与绑定是用户运行中改的（`settings.json`），由能力服务每次按当前设置解析。启动配置里的钥匙才用 `Config.redacted`。
 - **一个能力一个 `Context.Service`。** 照 Effect 的写法最直接，但仓库一个模块只导出一个服务；能力挂在 `Provider` 上，供应商的差别都收在 `vendors.ts`，调用方一样不认供应商。
 - **每家供应商一个 `Layer`，启动时选。** 绑定能在运行中换，一个启动时定死的 `Layer` 换不了；按连接与版本解析，必要时缓存。
 

@@ -55,7 +55,7 @@ flowchart LR
 
 | 概念 | 名字 | 收掉的叫法（只在投递这件事上） |
 |---|---|---|
-| 从一个来源记下的一条：主人说的话、定时任务、GitHub、agent 的带话 | 触发 `Trigger` | — |
+| 从一个来源记下的一条：用户说的话、定时任务、GitHub、agent 的带话 | 触发 `Trigger` | — |
 | 交给帮工的一封 | 信 `Envelope` | input（`queuedInputs`、`issueInputs`、`registerInitialInputs`、`returnInput`）、talk（`registerTalk`）、letter、dispatch（`retireDispatches`） |
 | 一封信交给一个帮工的状态 | 投递 `Delivery`（`mailbox_delivery`：`pending` → `handed` → `consumed`） | — |
 | 收信的一方 | 帮工 `Session` | recipient、participant、agent |
@@ -84,7 +84,7 @@ flowchart LR
 
 留在接口上、各说各的事的：退回和撤回意思相反，不并进 `withdraw`：`handBack` 把一封信还回去重新投递，`decline` 是帮工说这封不归它、带着理由退回工单池。`deliveriesOf`（一个帮工的投递）、`waitingOn`（一封信还在等的投递数）、`isRouted`（一个触发路由过没有）是投递的读。
 
-主人定的两件（2026-11-09）：
+用户定的两件（2026-11-09）：
 
 - **开一个帮工**：选哪个档案、开场的话、在哪干，是工单或频道的决定；腾位置、开帮工、登记最初的信、唤醒在 Mailbox 里（`receive` 的 `Hire`）。调用方要和帮工一起写下的自己的东西经 `hiring` 交进来：频道写 `channel_participant`，工单记下帮工开始干。
 - **直说并进 `receive`**：调用方先记下触发（`recordTrigger`），再 `receive` 给那一个帮工；记进 `mailbox_trigger`，过三道刹车，至少投递一次。
@@ -124,7 +124,7 @@ flowchart LR
 
 ## Acceptance criteria
 
-- 用同样的数法重数一遍：投递相关、只在这几个模块之间用的成员清零；剩下的只有读帮工的事实和生命周期、工单用帮工的工作区和交接、工单在自己的串里说话（`say`、`issueThread`、`notice`、`ownerInThread`）和 Inbox 读主人的阅读位置（`ownerReads`），这些是真实的依赖，不归投递。
+- 用同样的数法重数一遍：投递相关、只在这几个模块之间用的成员清零；剩下的只有读帮工的事实和生命周期、工单用帮工的工作区和交接、工单在自己的串里说话（`say`、`issueThread`、`notice`、`ownerInThread`）和 Inbox 读用户的阅读位置（`ownerReads`），这些是真实的依赖，不归投递。
 - 工单和频道不再用帮工跑一轮、开帮工的成员，也不再用 Mailbox 的内部步骤；它们用的投递动词只有「名词和路径」里那张表上的。
 - 频道和工单各至少有一组测试只用假的 Mailbox，不用 `world()`。
 - `vp run server:check` 通过；派活、带话、刹车和私聊的流程测试（`src/flows`）不改断言。

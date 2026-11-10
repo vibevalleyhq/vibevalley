@@ -177,7 +177,7 @@
     "files": "可能涉及："
   },
   "noProfileNamed": "没有叫 {key} 的档案",
-  "prSubmitNotAllowed": "这张工单没有主人明确授予的自行提交 PR 权限",
+  "prSubmitNotAllowed": "这张工单没有用户明确授予的自行提交 PR 权限",
   "prSubmitNotCurrent": "只有当前处理这张工单的帮工能提交 PR",
   "prSubmitUnavailable": "这张工单的仓库没有启用 PR 交付",
   "deliveryNeedsPr": "请先交付一个有效的 PR/MR，再验收完成",

@@ -95,7 +95,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 1. `vp run package:mac` 构建页面与桌面壳，用 `pnpm deploy --prod` 和 `vp pack` 打包服务端，产出 `.dmg`、`.zip` 与 `release.json`。
 2. 打包应用启动时及每 4 小时检查同渠道最新 Release，下载 `.zip` 并校验大小、SHA-512 与 `Info.plist` 版本。
-3. 若新版本 `dbSchema` 与本地一致，退出或点「重启更新」时自动替换 `.app`；若 `dbSchema` 变化，仅在「关于」页由主人确认后替换。
+3. 若新版本 `dbSchema` 与本地一致，退出或点「重启更新」时自动替换 `.app`；若 `dbSchema` 变化，仅在「关于」页由用户确认后替换。
 
 ## 和谁打交道
 
@@ -121,4 +121,4 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 - `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、分层方向与故事覆盖测试。
 - `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
 - `vp run desktop:test`、`apps/desktop/src/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。
-- `vp run migration:verify --baseline <原始工作树> --run`：在四份生产构建图生成后，依次采集静态场景、浏览器行为、隔离真实服务端场景和 Electron/Android 宿主证据；`.test/style-migration/acceptance.json` 只在清单完整、A/A 稳定、A/B 零像素差异且没有失效、失败或跳过的收据时通过。命令要求 Android SDK、JDK 17 和已生成的原生工程；不发布网站，不碰主人的农场或模拟器数据。
+- `vp run migration:verify --baseline <原始工作树> --run`：在四份生产构建图生成后，依次采集静态场景、浏览器行为、隔离真实服务端场景和 Electron/Android 宿主证据；`.test/style-migration/acceptance.json` 只在清单完整、A/A 稳定、A/B 零像素差异且没有失效、失败或跳过的收据时通过。命令要求 Android SDK、JDK 17 和已生成的原生工程；不发布网站，不碰用户的农场或模拟器数据。

@@ -35,7 +35,7 @@
     "beyond": "The suggestion is for rev {rev}, but the block is only at rev {now}",
     "missing": "There is no suggestion {id}",
     "stale": "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
-    "suggested": "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner"
+    "suggested": "A block the user wrote is not changed directly: a suggestion was made〔{id}〕and waits for the user"
   },
   "op": {
     "deleted": "This block was deleted",
@@ -104,6 +104,6 @@
     "many": "\"{words}\" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper",
     "crosses": "\"{words}\" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper",
     "stale": "You are looking at version {version}; the latest is {latest}: change the latest",
-    "note": "The owner changed on the page: \"{old}\" → \"{new}\""
+    "note": "The user changed on the page: \"{old}\" → \"{new}\""
   }
 }

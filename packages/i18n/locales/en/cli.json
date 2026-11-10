@@ -39,7 +39,7 @@
     "reviewComment": "Words with the review",
     "statusComment": "Words with the move: what to change, when it goes for another round",
     "title": "The new title",
-    "wantsUser": "Only those waiting on the owner, the longest waiting first",
+    "wantsUser": "Only those waiting on you, the longest waiting first",
     "issueWatch": "Follow it until in_review, done or canceled, then show it; each status on stderr",
     "tier": "The PARA tier",
     "marker": "The task marker",
@@ -78,7 +78,7 @@
     },
     "artifact": {
       "list": "List drafts (--issue: only one issue's)",
-      "show": "Show a draft: its title, version and owner",
+      "show": "Show a draft: its title, version and where it belongs",
       "read": "Read a draft's words"
     },
     "channel": {
@@ -209,10 +209,10 @@
         "get": "Read a block artifact as Markdown"
       },
       "previewDelete": "Preview deleting an artifact: say what would go, without deleting",
-      "submit": "Submit a batch of block operations as the owner, applied in order at once",
+      "submit": "Submit a batch of block operations as you, applied in order at once",
       "suggestion": {
         "accept": "Accept a suggested change",
-        "create": "Suggest a change to a block the owner wrote",
+        "create": "Suggest a change to a block you wrote",
         "list": "List an artifact's suggestions, open and resolved",
         "reject": "Reject a suggested change"
       },
@@ -245,7 +245,7 @@
         "previewDelete": "Preview deleting a message: say what would go, without deleting",
         "search": "Search messages",
         "send": "Send a message to a channel or thread",
-        "update": "Edit one of the owner's own messages; nobody is told again"
+        "update": "Edit one of your own messages; nobody is told again"
       },
       "notify": {
         "set": "Set a channel's notifications: all, mentions or none"
@@ -492,7 +492,7 @@
     },
     "voice": {
       "call": {
-        "hear": "Hand in a line the owner said on a call",
+        "hear": "Hand in a line you said on a call",
         "say": "Hand in what the manager said on a call",
         "start": "Start a call with the manager",
         "stop": "Hang up a call"
@@ -763,7 +763,7 @@
       "about": "#12's timeline and cost"
     },
     "issueWantsUser": {
-      "about": "The issues waiting on the owner, the longest waiting first"
+      "about": "The issues waiting on you, the longest waiting first"
     },
     "issueWatch": {
       "about": "Follow #12 until it is handed back or over, then show it; ten minutes at most"
@@ -867,8 +867,8 @@
   "worker": {
     "about": "Report, submit a PR or read context as the current helper session",
     "failed": "Helper access failed: check session credentials, connectivity and operation authorization",
-    "report": "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit owner authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
-    "pr": "Submit the current session PR with explicit owner authorization. JSON accepts optional summary string.",
+    "report": "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit user authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
+    "pr": "Submit the current session PR with explicit user authorization. JSON accepts optional summary string.",
     "context": "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
     "read": "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
     "doctor": "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",

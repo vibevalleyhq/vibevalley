@@ -3,7 +3,7 @@
   "image": "Image generation",
   "speech": {
     "title": "Single-speaker speech",
-    "notice": "Send text to the displayed MOSS account to generate one speaker. Charges may apply. Playback never starts automatically; Flash streaming plays only when requested. Canceling stops local waiting, not necessarily provider work or charges. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in owner-only Media storage, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
+    "notice": "Send text to the displayed MOSS account to generate one speaker. Charges may apply. Playback never starts automatically; Flash streaming plays only when requested. Canceling stops local waiting, not necessarily provider work or charges. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in Media storage only you can reach, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
     "configure": "Select a speech connection and Flash or Pro model in AI services first.",
     "binding": "{account} · {connection} · {model} · configuration revision {revision}",
     "refresh": "Refresh connection settings",
@@ -61,7 +61,7 @@
     "cleanup": "Clean remote files",
     "cleanupAsk": "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding."
   },
-  "sourceUser": "Source: owner",
+  "sourceUser": "Source: you",
   "sourceAgent": "Source: orchestrator {agent} · channel {channel}",
   "usage": "Provider reported: {images} image(s) · {width} × {height}",
   "usageUnknown": "No provider usage result yet. This does not mean there was no charge.",

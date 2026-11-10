@@ -9,7 +9,7 @@
 ## 准备
 
 - 先跑定点测试，再跑 `vp run server:check`、`vp run web:check`。
-- 不使用主人的家目录、Key 或媒体。下面的 Playwright 自己起隔离服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下的 `apps/server/src/testing/network.ts` 只替换 MOSS 生图、理解、语音、音色、远端文件请求和结果下载，任务、数据库、文件、状态流、频道和稿子都走真的模块。不要手工拼成功帧。
+- 不使用用户的家目录、Key 或媒体。下面的 Playwright 自己起隔离服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下的 `apps/server/src/testing/network.ts` 只替换 MOSS 生图、理解、语音、音色、远端文件请求和结果下载，任务、数据库、文件、状态流、频道和稿子都走真的模块。不要手工拼成功帧。
 - 区分三类证据：协议离线、隔离程序、真实厂商。这里的成功图片是确定的 PNG，音频是合成音调的 WAV／MP3，不证明账号权限、模型质量或实际费用。
 
 ## 步骤
@@ -30,7 +30,7 @@
 ## 本机大文件输入
 
 1. 在 `apps/server` 跑 `vp test src/media/input.test.ts src/media/inputs.test.ts src/http/media.test.ts src/infra/db.test.ts`。核对 26 MiB 的二进制传输、真实 HTTP 断线、配额竞争、任务保留事务、期限、原内容修复和重启清理；容器头样例不是视频解码或理解验收。
-2. 照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>` 起隔离程序。脚本自行生成 PNG，不读取主人的文件；不配置供应商连接。
+2. 照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>` 起隔离程序。脚本自行生成 PNG，不读取用户的文件；不配置供应商连接。
 3. `POST /api/v1/media/input/create`，JSON 为 `{ "kind": "image", "name": "isolated.png", "mime": "image/png", "size": <PNG字节数> }`；用答复的 ID 向 `/api/v1/media/input/:id/content` 发 PUT，类型为 `application/octet-stream`，正文直接是 PNG。核对返回 `ready`、SHA256 与 `canDelete`，没有私有路径。带外站 Origin 的 PUT 应为 403，非二进制类型为 415。
 4. 重复 PUT 同一就绪 ID 返回原输入；`media.input.get/list` 查询一致；`media.input.previewDelete` 不改变输入；删除后列表没有它。接收一次 `/api/v1/state`，确认没有新增生成任务。这里只上传到本机，没有厂商调用。
 5. 保留 `command.stdout.log` 和 `result.json`；后者应为 `code: 0`、`stopped: true`、空 `cleanupErrors`。回收失败必须继续保留输入记录和配额，不能只看请求失败便认为文件已删除。
@@ -38,11 +38,11 @@
 ## 图片与视频理解
 
 1. 在 `apps/server` 跑 `vp test src/media/understanding.test.ts src/media/remoteFiles.test.ts`；核对上传许可版本、输入保留、共享容量与 ID、实际用量、截断、取消、重启和删除重试。陌生上传状态不开始推理；失败但有文件 ID 的回执仍须真正删除。
-2. 跑 `vp run --filter @vibevalley/web e2e:integration 'test/understanding.spec.ts$'`，再加 `VIBEVALLEY_WEB_DEV=1` 跑同一项。测试选择仓库中的合成 PNG 和可解码 MP4，不用主人的媒体；确认未勾选许可不能提交，选择后文件先落本机，结果进入 Core、显示并存为稿子。重试同一 ID 和刷新不新建任务；截断正文不丢，清理重试不重复理解。
+2. 跑 `vp run --filter @vibevalley/web e2e:integration 'test/understanding.spec.ts$'`，再加 `VIBEVALLEY_WEB_DEV=1` 跑同一项。测试选择仓库中的合成 PNG 和可解码 MP4，不用用户的媒体；确认未勾选许可不能提交，选择后文件先落本机，结果进入 Core、显示并存为稿子。重试同一 ID 和刷新不新建任务；截断正文不丢，清理重试不重复理解。
 3. 跑 `vp run --filter @vibevalley/web e2e:audit 'test/a11y.spec.ts$' --grep 'understanding results'`。读取 `.screens/understanding-{form,ready,incomplete,unknown,canceled}-{light,dark}-{1280,390}.png`，核对许可、截断、费用未知与清理含义；不要只看空状态。
 4. 用 `verify-server.ts --scripted-helper -- <脚本>` 单独核对 JSON 接口与状态流：预留输入、二进制 PUT、带连接及 revision 的 `media.understanding.create`、查询至结果与清理完成、重试同一请求、保存稿子、删除已释放的本机输入后仍能读取结果。`media.understanding.previewCleanup` 不得修改文件或调用供应商。保留脚本输出与 `result.json`；测试 runtime 替换厂商传输，不是实际 MOSS 推理。
-5. 委托路径还需跑 `src/flows/media.test.ts`：主人登记 `media.understanding.authorize` 后应为 `authorized`、输入保留且没有厂商请求；可信管家只传 ID，必须在授权频道承接主人输入。错误频道、自主巡查、HTTP 主人绕过、过期、换 Key、改参数及其他档案重用均拒绝；并发重复开始只上传一次。排队期间换 Key 也必须在上传前拒绝。取消、过期与重启释放尚未执行的输入。
-6. 在真实页面选授权频道，刷新后授权仍在；「发送给管家」只发一条去重的主人消息，撤销后按钮和输入保留按服务端状态改变。用隔离程序核对 `authorize → start 被 HTTP 拒绝 → cancel` 及状态流；脚本模型的可信执行证明与 HTTP 拒绝证明分开保留。
+5. 委托路径还需跑 `src/flows/media.test.ts`：用户登记 `media.understanding.authorize` 后应为 `authorized`、输入保留且没有厂商请求；可信管家只传 ID，必须在授权频道承接用户输入。错误频道、自主巡查、HTTP 用户绕过、过期、换 Key、改参数及其他档案重用均拒绝；并发重复开始只上传一次。排队期间换 Key 也必须在上传前拒绝。取消、过期与重启释放尚未执行的输入。
+6. 在真实页面选授权频道，刷新后授权仍在；「发送给管家」只发一条去重的用户消息，撤销后按钮和输入保留按服务端状态改变。用隔离程序核对 `authorize → start 被 HTTP 拒绝 → cancel` 及状态流；脚本模型的可信执行证明与 HTTP 拒绝证明分开保留。
 
 ## 单人语音
 
@@ -76,7 +76,7 @@
 
 ## 真实厂商
 
-警告：只有主人确认账号、模型、输入、上传范围和费用上限后，才能使用专门测试连接。只用合成图片、音调／合成语音与合成视频，不上传主人文件或录入真实人物声音。调用前按官方价格预估并保留余量；无法确认价格或余额时先停止并说明风险。主人明确授权某次未知单价调用时，记录该授权与限定次数，未知费用不填零，也不宣称累计费用已核实在预算内。克隆 `POST /v1/audio/voices`（包括设计预览的「保存为音色」）的授权不能从目录查询或设计预览推断。
+警告：只有用户确认账号、模型、输入、上传范围和费用上限后，才能使用专门测试连接。只用合成图片、音调／合成语音与合成视频，不上传用户文件或录入真实人物声音。调用前按官方价格预估并保留余量；无法确认价格或余额时先停止并说明风险。用户明确授权某次未知单价调用时，记录该授权与限定次数，未知费用不填零，也不宣称累计费用已核实在预算内。克隆 `POST /v1/audio/voices`（包括设计预览的「保存为音色」）的授权不能从目录查询或设计预览推断。
 
 1. 用入口的隔离沙箱，按[服务端分册](.agents/skills/vv-acceptance/references/server.md)配置授权测试连接；不把 Key 写进命令参数、日志、截图或证据 JSON。不要开启会保存认证头、原始厂商正文或签名 URL 的网络录制。
 2. 每笔生成使用唯一请求 ID，记录完整模型 ID、任务 ID、请求用途与预算台账；重复读取使用原 ID。未知结果立即停止，先查原任务与账单，不因没收到文件而再发 POST。
@@ -100,4 +100,4 @@
 
 ## 收拾
 
-Playwright 停掉它起的进程并清理临时农场；截图不进 git。手动会话关闭媒体轨道、播放上下文、Worker 与 WebSocket，再停止隔离服务。按授权范围清理合成输入、任务保留和已知远端文件，核对清理回执；MOSS 没有官方音色 DELETE，不臆造删除请求，也不把本机释放记成删除厂商音色。不碰主人原有数据。
+Playwright 停掉它起的进程并清理临时农场；截图不进 git。手动会话关闭媒体轨道、播放上下文、Worker 与 WebSocket，再停止隔离服务。按授权范围清理合成输入、任务保留和已知远端文件，核对清理回执；MOSS 没有官方音色 DELETE，不臆造删除请求，也不把本机释放记成删除厂商音色。不碰用户原有数据。

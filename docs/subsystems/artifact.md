@@ -1,6 +1,6 @@
 # 稿子
 
-稿子（`Artifact`）是主人、管家和帮工共创或交付的文档产物，在 `/artifacts` 页和聊天旁栏 `ArtifactCanvas` 中查看与编辑。正文分两种：
+稿子（`Artifact`）是用户、管家和帮工共创或交付的文档产物，在 `/artifacts` 页和聊天旁栏 `ArtifactCanvas` 中查看与编辑。正文分两种：
 - **协作块文档（`blocks`）**：由段落、标题、列表、待办、代码等块组成，按 `BlockOp` 协同修改，服务端为唯一权威。
 - **网页稿子（`html`）**：完整单页 HTML，按版本不可变存储，在严格沙箱 `iframe` 中隔离展示并支持划词改字。
 
@@ -39,7 +39,7 @@
 - **扁平块表 + 分数索引排序**：每块含客户端生成的 UUID `id`、`parentId` 和不以 `0` 结尾的 base62 顺序键 `orderKey`，同级按 `(orderKey, id)` 排序；`split_block.offset` 按 Unicode 码点计算。
 - **单写锁批处理与幂等 `batchId`**：`artifact.submit` 在单锁单事务内按序施加 `BlockOp[]`、递增文档 `seq` 与块 `rev` 并返回 `BlockAck`；相同 `batchId` 重发直接返回首次结果。
 - **按 `baseRev` 与文本比对判冲突**：`update_text` 与 `split_block` 携带 `baseRev`；若 `baseRev` 落后但该块文本未变（仅改过勾选或属性）仍正常施加，文本已变则返回 `conflict` 并将提交文本存为 `conflict` 修订。
-- **主人写过的块受保护（`Suggestion`）**：agent 对 `updatedBy = "owner"` 的块调修改或删除时，服务端不改原块，而是记一条带 `baseRev` 的 `Suggestion`；主人接受时若块当前 `rev` 仍等于 `baseRev` 才应用，否则作废。
+- **用户写过的块受保护（`Suggestion`）**：agent 对 `updatedBy = "owner"` 的块调修改或删除时，服务端不改原块，而是记一条带 `baseRev` 的 `Suggestion`；用户接受时若块当前 `rev` 仍等于 `baseRev` 才应用，否则作废。
 - **实时推送与拼字保护**：块与建议经 `/api/v1/rpc` 的 `artifact.follow` 实时推送；前端 `BlockEditor` 对正聚焦、正处于输入法拼字或有待发改动的块保留本地文本，失焦且在途批次落定后再应用远端更新。
 
 ## 怎么走
@@ -48,11 +48,11 @@
 
 1. 帮工或管家调用 `artifact_create`（传入 `html` 或 `markdown` 正文，或工作目录内相对路径 `file`）。
 2. 服务端校验内容（`html` 过 `check.ts`，`markdown` 转为初始 `BlockInput[]`），在对应工单串或频道发出带 `ArtifactCard` 的消息并落库。
-3. 主人在 `/artifacts` 点「新建」直接创建空的 `blocks` 稿子，不发频道消息。
+3. 用户在 `/artifacts` 点「新建」直接创建空的 `blocks` 稿子，不发频道消息。
 
 **块协同编辑与带话**
 
-1. 主人输入时，本地每 500ms（持续输入最长 2 秒）或回车/失焦时将积压的 `BlockOp` 提交 `artifact.submit`；帮工调 `artifact_block_create|update|delete` 走同一管线。
+1. 用户输入时，本地每 500ms（持续输入最长 2 秒）或回车/失焦时将积压的 `BlockOp` 提交 `artifact.submit`；帮工调 `artifact_block_create|update|delete` 走同一管线。
 2. 在聊天旁栏点块上的「带话」将其加入输入框，发送时服务端记录块 ID、引用版本与当前文本供帮工定位。
 
 ## 和谁打交道
@@ -64,8 +64,8 @@
 ## 为什么这样
 
 - **统一「文档」与「稿子」，Markdown 入库即转块**：只读交付物与协作文档集中管理，Markdown 交上来即可逐段协同修改，无需维护两套工具。
-- **HTML 走独立路由 + CSP 沙箱 + 提交前静态检查**：不用 `srcdoc`，使 `iframe` 与新标签页共享响应头隔离；提交前拦截外链让帮工当场修好，避免主人打开破损页面。
-- **按块操作 + 服务端定序，不上 CRDT**：文档协作以段落分工为主，按块 `baseRev` 判冲突并配合主人块 `Suggestion` 机制，用纯函数即可杜绝静默覆盖。
+- **HTML 走独立路由 + CSP 沙箱 + 提交前静态检查**：不用 `srcdoc`，使 `iframe` 与新标签页共享响应头隔离；提交前拦截外链让帮工当场修好，避免用户打开破损页面。
+- **按块操作 + 服务端定序，不上 CRDT**：文档协作以段落分工为主，按块 `baseRev` 判冲突并配合用户块 `Suggestion` 机制，用纯函数即可杜绝静默覆盖。
 
 ## 还没做的
 

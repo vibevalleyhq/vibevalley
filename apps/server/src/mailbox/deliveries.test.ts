@@ -20,7 +20,7 @@ const row = (message: string, number: number, channel = "c", position = number):
     trigger: {
       id: message,
       source: "channel",
-      actor: { kind: "user", id: "user", name: "主人" },
+      actor: { kind: "user", id: "user", name: "用户" },
       addressed: "direct",
       threads: [`channel:${channel}`],
       card: { summary: "话", totalChars: 1, truncated: false, readUri: `vv://trigger/${message}` },

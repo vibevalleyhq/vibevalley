@@ -39,7 +39,7 @@
     "reviewComment": "验收的话",
     "statusComment": "一起说的话：再来一轮时说要改什么",
     "title": "新的标题",
-    "wantsUser": "只看在等主人的，等得最久的在前",
+    "wantsUser": "只看在等你的，等得最久的在前",
     "issueWatch": "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr",
     "tier": "PARA 分层",
     "marker": "待办标记",
@@ -209,10 +209,10 @@
         "get": "把一起写的稿子读成 Markdown"
       },
       "previewDelete": "试删一篇稿子：说会删掉什么，不真删",
-      "submit": "以主人的身份交一批块的操作，按顺序一次做完",
+      "submit": "以你的身份交一批块的操作，按顺序一次做完",
       "suggestion": {
         "accept": "接受一条改写建议",
-        "create": "对主人写的一块提改写建议",
+        "create": "对你写的一块提改写建议",
         "list": "列出稿子上的改写建议，没答的和答过的",
         "reject": "拒绝一条改写建议"
       },
@@ -245,10 +245,10 @@
         "previewDelete": "试删一条消息：说会删掉什么，不真删",
         "search": "搜消息",
         "send": "在频道或串里发一条消息",
-        "update": "改主人自己发的一条消息，不再通知谁"
+        "update": "改你自己发的一条消息，不再通知谁"
       },
       "notify": {
-        "set": "设一个频道的提醒：全部、只在 @主人 时、不提醒"
+        "set": "设一个频道的提醒：全部、只在有人 @你 时、不提醒"
       },
       "pin": {
         "list": "列出频道里钉住的消息，新钉的在前",
@@ -492,7 +492,7 @@
     },
     "voice": {
       "call": {
-        "hear": "交上通话里主人说的一句",
+        "hear": "交上通话里你说的一句",
         "say": "交上通话里管家说出的话",
         "start": "开始和管家通话",
         "stop": "挂断通话"
@@ -763,7 +763,7 @@
       "about": "12 号的时间线和花费"
     },
     "issueWantsUser": {
-      "about": "在等主人的工单，等得最久的在前"
+      "about": "在等你的工单，等得最久的在前"
     },
     "issueWatch": {
       "about": "跟着 12 号，等它交回来或完了再看，最多等十分钟"
@@ -867,8 +867,8 @@
   "worker": {
     "about": "以当前帮工会话交活、提交 PR 或读取上下文",
     "failed": "帮工接入失败：检查会话凭证、服务连接和操作授权",
-    "report": "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需主人明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
-    "pr": "提交当前会话的 PR，须获主人明确授权。JSON 可选 summary 字符串。",
+    "report": "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需用户明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
+    "pr": "提交当前会话的 PR，须获用户明确授权。JSON 可选 summary 字符串。",
     "context": "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
     "read": "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
     "doctor": "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",

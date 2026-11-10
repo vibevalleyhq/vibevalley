@@ -35,7 +35,7 @@ it.live("an unresolved user mention survives both history windows and restart un
       const written = (yield* chat.post({
         _tag: "Agent",
         from: "orchestrator",
-        text: "@主人 请确认这份变更",
+        text: "@用户 请确认这份变更",
         target: `#general:${parent.number}`,
         anyway: true,
       })).message!;
@@ -67,16 +67,16 @@ it.live("only reading or replying in the mentioned channel completes a user ment
     const chat = yield* Channel;
     const core = yield* Core;
     const channel = yield* chat.openChannel("review", "", "");
-    const first = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@主人 第一份变更", target: "#review", anyway: true })).message!;
+    const first = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第一份变更", target: "#review", anyway: true })).message!;
     yield* chat.post({ _tag: "User", text: "默认频道的另一件事", sendKey: "" });
     expect(mentionIds(core)).toEqual([first.id]);
     yield* chat.post({ _tag: "User", text: "确认了", channel: channel.id, sendKey: "" });
     expect(mentionIds(core)).toEqual([]);
-    const second = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@主人 第二份变更", target: "#review", anyway: true })).message!;
+    const second = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第二份变更", target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([second.id]);
     yield* chat.markRead(channel.id, second.number);
     expect(mentionIds(core)).toEqual([]);
-    const third = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@主人 第三份变更", target: "#review", anyway: true })).message!;
+    const third = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第三份变更", target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([third.id]);
     yield* chat.read("user", { target: "#review" });
     expect(mentionIds(core)).toEqual([]);

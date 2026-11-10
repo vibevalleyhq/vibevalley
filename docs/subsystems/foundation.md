@@ -71,7 +71,7 @@
 - **生成文件不手改**：`db/generated/`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md) 和 [primitives.md](docs/reference/primitives.md) 由脚本生成并由 `docs:verify` 校验。
 - **一种 SQL，两种驱动，单连接**：`infra/db.ts` 在配了 `database.url` 时连那个 Postgres（`@effect/sql-pg`），否则在 `db` 目录里跑 PGlite（`@effect/sql-pglite`，同一种方言，跑在进程里；`memory` 时从每个进程建一次的带表结构的模板拷一份，约 0.1 秒）。两种都只开一条连接：服务按一次一写写成。时间存毫秒 `double precision`，没有 `bigint` 列（Postgres 的驱动把它当字符串交回来），布尔是 `boolean`，枚举存 `text check (列 in (...))`，JSON 存成文本、查询里 `::jsonb` 了再看里面，新建行主键用 `base/ids.ts` 的 UUIDv7（`newId()`）。全文搜索经表结构里的 `term_vector`、`term_query` 两个函数和 GIN 索引：词由 `gse` 切好、只按空格分，词原样保留。
 - **SQL 按表隔离**：`db/queries/<表>.sql` 只写所属表，跨模块只读查询受 `modules.test.ts` 的 `foreignReads` 约束。服务通过 `Db` 服务调用生成函数（`vibevalley/db-door` 检查）。
-- **单一表结构基线，内部不留兼容**：`0001_schema.up.sql` 是唯一迁移文件。PGlite 的库在启动时若 `db.schema` 哈希不匹配，自动将旧库移至 `db.<旧哈希>-<时间>` 并建新库；`database.url` 的库是主人的，不挪不清：空库建表并记下哈希（`vibevalley_baseline`），哈希不同或已有别的表就拒绝启动。
+- **单一表结构基线，内部不留兼容**：`0001_schema.up.sql` 是唯一迁移文件。PGlite 的库在启动时若 `db.schema` 哈希不匹配，自动将旧库移至 `db.<旧哈希>-<时间>` 并建新库；`database.url` 的库是用户的，不挪不清：空库建表并记下哈希（`vibevalley_baseline`），哈希不同或已有别的表就拒绝启动。
 
 ### 边界审计
 
@@ -93,7 +93,7 @@
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |
 | 宿主 | `host.ts` | Electron、移动模拟器 | — | — | `apps/desktop/test`、`apps/mobile` |
-| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 管家 evals，花钱前先问主人 |
+| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 管家 evals，花钱前先问用户 |
 
 - **不靠睡眠等待**：禁止在测试中写死 `setTimeout`、`Effect.sleep` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 检查）；等待状态用 `until`、`waitFor`、`whenState`，时间窗口用 `TestClock` 拨进。
 - **页面测试按 `data-testid` 定位**：禁止用界面中文文案或 CSS 类名做选择器（`vibevalley/no-copy-selector` 检查）；每页在浅色与深色主题下通过 `apps/web/test/a11y.spec.ts` 检查。
@@ -105,7 +105,7 @@
 
 ### 话放在哪
 
-- **对主人的话进词典，对模型的话进 `prompts.ts`**：
+- **对用户的话进词典，对模型的话进 `prompts.ts`**：
   - 界面与通知文案写在 `packages/i18n/locales/{zh,en}/<命名空间>.json`，代码调 `t("key")`（`vibevalley/no-cjk-literal` 拦截硬编码中文）。
   - 模型提示写在各模块 `prompts.ts`（中文编写，要求模型按 `usersLanguage` 回答）。
 - **语言按进程生效**：语言存于 `settings.json` 的 `locale`，服务端启动和保存时调 `setLocale`；页面从 `index.html` 的 `data-locale` 读取并通过 `host.locale` 同步给桌面壳。

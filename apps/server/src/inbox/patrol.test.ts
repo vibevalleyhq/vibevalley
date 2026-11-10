@@ -42,7 +42,7 @@ describe("the patrol", () => {
       fromRole: "worker",
       name: "帮工",
       kind: "chat",
-      text: "请主人决定",
+      text: "请用户决定",
       mentions: [userId],
       spoken: false,
       at,

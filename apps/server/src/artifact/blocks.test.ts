@@ -46,7 +46,7 @@ const make = () =>
             channel_id: null,
             issue: null,
             by_id: "user",
-            by_name: "主人",
+            by_name: "用户",
             version: 0,
             created_at: 0,
           }),
@@ -193,7 +193,7 @@ describe("a blocks artifact", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("演示")).artifact.id;
-        yield* submit(s, id, "mine", { op: "insert_block", block: para("first", "V", "主人先写的") });
+        yield* submit(s, id, "mine", { op: "insert_block", block: para("first", "V", "用户先写的") });
         const all = helpers(["off", false], ["backend", true], ["tester", true], ["frontend", true], ["docs", true]);
         yield* s.demo(id, all);
         const demoFailure = yield* Effect.flip(s.demo(id, all));
@@ -234,7 +234,7 @@ describe("a blocks artifact", () => {
           const snap = yield* s.get(id);
           const b = snap.blocks[1];
           if (snap.blocks.length !== 2 || !b || b.rev < 2) return "";
-          const ack = yield* submit(s, id, "user", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
+          const ack = yield* submit(s, id, "user", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("用户接手了")] });
           return ack.results[0]!.status === "applied" ? b.id : "";
         });
         const taken = yield* waitFor(Effect.andThen(TestClock.adjust(500), tryTaking), (item) => item !== "", "the user taking the block over");
@@ -242,7 +242,7 @@ describe("a blocks artifact", () => {
         yield* finished(s);
         const snap = yield* s.get(id);
         const mine = snap.blocks.find((b) => b.id === taken)!;
-        expect([plain(mine.text), mine.updatedBy]).toEqual(["主人接手了", "user"]);
+        expect([plain(mine.text), mine.updatedBy]).toEqual(["用户接手了", "user"]);
         expect(snap.blocks).toHaveLength(4);
       }),
     ).pipe(Effect.provide(on())),
@@ -322,7 +322,7 @@ describe("a blocks artifact", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("建议")).artifact.id;
-        const a = yield* s.insertBlock(id, "user", { text: "主人写的" });
+        const a = yield* s.insertBlock(id, "user", { text: "用户写的" });
         const made = yield* s.suggest(id, "lab", { block: a.blockId, baseRev: a.rev!, change: { text: [span("帮工改的")] } });
         expect([made.status, made.author, made.baseRev]).toEqual(["open", "lab", a.rev]);
         const accepted = yield* s.acceptSuggestion(id, made.id, "user");
@@ -337,7 +337,7 @@ describe("a blocks artifact", () => {
 
         const b = yield* s.insertBlock(id, "user", { text: "再写一块" });
         const stale = yield* s.suggest(id, "lab", { block: b.blockId, baseRev: b.rev!, change: { text: [span("晚到的")] } });
-        yield* s.updateBlock(id, "user", { block: b.blockId, baseRev: b.rev!, text: "主人先改了" });
+        yield* s.updateBlock(id, "user", { block: b.blockId, baseRev: b.rev!, text: "用户先改了" });
         expect((yield* Effect.flip(s.acceptSuggestion(id, stale.id, "user")))._tag).toBe("Refused");
         expect((yield* s.suggestions(id)).find((x) => x.id === stale.id)!.status).toBe("open");
         expect((yield* s.rejectSuggestion(id, stale.id, "user")).status).toBe("rejected");
@@ -357,7 +357,7 @@ describe("a blocks artifact", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("自动建议")).artifact.id;
-        const a = yield* s.insertBlock(id, "user", { text: "主人的字" });
+        const a = yield* s.insertBlock(id, "user", { text: "用户的字" });
         const made = yield* s.updateBlock(id, "lab", { block: a.blockId, baseRev: a.rev!, text: "帮工想改" });
         expect([made.status, made.suggestion !== undefined]).toEqual(["rejected", true]);
         expect(
@@ -365,7 +365,7 @@ describe("a blocks artifact", () => {
             .find((b) => b.id === a.blockId)!
             .text.map((x) => x.t)
             .join(""),
-        ).toBe("主人的字");
+        ).toBe("用户的字");
         const first = yield* Stream.runCollect(Stream.take(s.suggestionStream(id), 1));
         expect(first.map((e) => (e._tag === "Suggestions" ? e.suggestions.length : -1))).toEqual([1]);
         const deleted = yield* s.deleteBlock(id, "lab", { block: a.blockId });
@@ -379,7 +379,7 @@ describe("a blocks artifact", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("授权矩阵")).artifact.id;
-        const text = yield* s.insertBlock(id, "user", { text: "主人的字" });
+        const text = yield* s.insertBlock(id, "user", { text: "用户的字" });
         const changed = [
           yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, text: "建议改字" }),
           yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, type: "heading", level: 2 }),
@@ -394,7 +394,7 @@ describe("a blocks artifact", () => {
           [false, undefined, true, false],
           [false, undefined, undefined, true],
         ]);
-        expect((yield* s.updateBlock(id, "user", { block: text.blockId, baseRev: text.rev!, text: "主人自己改" })).status).toBe("applied");
+        expect((yield* s.updateBlock(id, "user", { block: text.blockId, baseRev: text.rev!, text: "用户自己改" })).status).toBe("applied");
         const own = yield* s.insertBlock(id, "lab", { text: "帮工自己的" });
         expect((yield* s.updateBlock(id, "lab", { block: own.blockId, baseRev: own.rev!, text: "帮工改自己的" })).status).toBe("applied");
       }),

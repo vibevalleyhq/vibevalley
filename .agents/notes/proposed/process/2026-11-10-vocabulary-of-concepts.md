@@ -39,7 +39,7 @@ Status: proposed
 3. **一个概念一个名字，一个名字一个概念。** 同一个词在两个模块指两样东西，改其中一个的名字，不靠前缀或上下文区分（[命名](docs/style/naming.md)的第三条原则）。
 4. **其余的名字是拼出来的。** 概念以外的导出名由「概念 + 角色词 + 通用技术词」拼成，不用批；拼不出来的就是新名词。
 5. **两张表，一张手写，一张生成。** 手写的是概念表：人批准的，一个概念一行，定义、叫法都在这一行。生成的是清单：脚本从代码读出每个概念在各层的名字。同一件事不在第三处写。
-6. **机器找，模型疑，人定。** AST 认定概念、查名字拼不拼得出；同义和双关要懂意思，由模型标出疑点；批准只由主人做。
+6. **机器找，模型疑，人定。** AST 认定概念、查名字拼不拼得出；同义和双关要懂意思，由模型标出疑点；批准只由用户做。
 
 ### 术：怎么做
 
@@ -68,14 +68,14 @@ Status: proposed
 
 **存量走棘轮。** 检查上线时拼不出来的名字记数，只许减（`scripts/ratchet.ts` 现成的写法）。
 
-**模型审同义和双关。** 照 `scripts/comment-review.ts` 的做法：把清单和证据交给模型，它标出疑似同义（两个概念指向同一批邻居、定义相近）和疑似双关（一个词在两个模块的字段不同）。存量审一次；之后概念表有新增时只审新增的行。结论由主人逐条定，模型不改概念表。
+**模型审同义和双关。** 照 `scripts/comment-review.ts` 的做法：把清单和证据交给模型，它标出疑似同义（两个概念指向同一批邻居、定义相近）和疑似双关（一个词在两个模块的字段不同）。存量审一次；之后概念表有新增时只审新增的行。结论由用户逐条定，模型不改概念表。
 
 **批准的流程。**
 
 1. 跑 `vpx scripts/vocabulary.ts`，读报出的新名词和它的证据。
 2. 新名词是已有概念的另一个叫法时，改名。
 3. 新名词是新概念时，在概念表加一行，PR 正文里点名。
-4. 主人在评审里批这一行。
+4. 用户在评审里批这一行。
 
 ### 器：用什么
 
@@ -85,7 +85,7 @@ Status: proposed
 | `docs/concepts.md` | 概念表（手写）。脚本照 `scripts/glossary.ts` 读用语表的办法读它 |
 | `scripts/vocabulary.ratchet.json` | 拼不出来的名字的存量，按包记数 |
 | `vp run vocabulary:check` | 概念不在概念表、概念表的概念不在代码里、拼不出的名字超过棘轮，三种都失败；失败的话写明哪个名字、`Fix:`、`See`。进提交前的钩子和 CI |
-| `vp run vocabulary` | 重写 `docs/reference/concept-map.md`（清单）；`docs:verify` 查它是不是最新，照 `docs/reference/capabilities.md` 的做法。`vpx scripts/vocabulary.ts --review` 让模型标疑点（要钥匙、花钱，先问主人） |
+| `vp run vocabulary` | 重写 `docs/reference/concept-map.md`（清单）；`docs:verify` 查它是不是最新，照 `docs/reference/capabilities.md` 的做法。`vpx scripts/vocabulary.ts --review` 让模型标疑点（要钥匙、花钱，先问用户） |
 | `scripts/glossary.ts`、`scripts/i18n.ts` | 改成读概念表的「叫法」「English」「不用」三列；「代码里」那条检查由 `vocabulary:check` 接走 |
 | `scripts/stale-names.ts` | 留着：它拦的是退役的名字，概念表管在用的 |
 
@@ -108,15 +108,15 @@ Status: proposed
 
 **人和 agent 的叫法（用户定，2026-11-10）。**
 
-- 不再把人叫「主人」：人有自己的名字（`user_account.name`，能改），界面和提示词里称呼他时用这个名字，泛称写「你」或「用户」。
+- 不再把人叫「用户」：人有自己的名字（`user_account.name`，能改），界面和提示词里称呼他时用这个名字，泛称写「你」或「用户」。
 - 「管家」改叫「助手」：界面、词典、提示词、文档里都换；助手的名字照旧是它档案的名字，能改（`agent.update`）。代码里的 `orchestrator` 跟着概念表的第 4 步再定。
 - 帮工也能改名字：档案的名字今天就能改；一个帮工（`Session.name`）还没有改名的接口，要加。
 
-这一节以前写的「主人」都指用户，跟着叫法的改动一起改。
+这一节以前写的「用户」都指用户，跟着叫法的改动一起改。
 
 **分步。**
 
-1. 主人审下面的初稿，定[精确的概念](#精确的概念)里每一条改不改。
+1. 用户审下面的初稿，定[精确的概念](#精确的概念)里每一条改不改。
 2. 落 `scripts/vocabulary.ts`、概念表和检查，范围是 protocol、表和服务名；拼名规则在 protocol 上拦。同一个改动里删掉上表列的文档，改完链接。
 3. 服务端内部的导出名（2407 个）只出报告，不拦；看过例外的数量再定收不收紧。
 4. 定下要改的名字，每个概念一个改动，`stale-names` 拦旧名字。
@@ -195,7 +195,7 @@ Status: proposed
 |---|---|---|---|---|
 | `Trigger` | 外面来的一件事标准化成的一张：哪个 `Actor`、从哪、对谁、带什么 | `mailbox_trigger.id`；同一来源的同一件事只存一次（`source` 加 `source_key`） | `TriggerSource`、`TriggerAddressing`、`CompactCard` | `TriggerKind` 没搜到用它的地方（第五组） |
 | `Delivery` | 一个 `Trigger` 给一个 Session 的一次投递，和它走到哪 | `session_id` 加 `envelope_id` | `Envelope`（Session 读到的样子）、`urgency`、`held_by`；工单蓄水池（`mailbox_issue`：发往工单的输入先在这里等）、工单订阅（`mailbox_subscription`：哪个串的输入归哪张工单） | 和工单的 `Delivery` 同名（第三组） |
-| `InboxItem` | 要主人处理的一件事，从核心状态现算，不存 | 算出来的 id | `InboxKind` | `PkmTier` 也有一个 `inbox`（第八组） |
+| `InboxItem` | 要用户处理的一件事，从核心状态现算，不存 | 算出来的 id | `InboxKind` | `PkmTier` 也有一个 `inbox`（第八组） |
 
 **频道**
 
@@ -281,7 +281,7 @@ Status: proposed
 
 `docs/concepts.md` 写 Host 是「本机的 VibeValley」：`$VIBEVALLEY_HOME` 下的密钥、农机探测、全局档案模板、日志。[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)以后，这几样分到两边：密钥、模板、日志归服务端，农机探测归机器，机器另有自己的家目录放它的钥匙。「本机」不再是一个地方。
 
-建议：`Host` 不再是概念。`$VIBEVALLEY_HOME` 是家目录，服务端有一个，每台 `Machine` 有一个，约定在 `packages/home`。要主人定：这样做以后，「服务端」是不是一个概念。从代码里面看它只有一个；从 `Device` 和 `Machine` 看，它们连的是「某一个服务端」。
+建议：`Host` 不再是概念。`$VIBEVALLEY_HOME` 是家目录，服务端有一个，每台 `Machine` 有一个，约定在 `packages/home`。要用户定：这样做以后，「服务端」是不是一个概念。从代码里面看它只有一个；从 `Device` 和 `Machine` 看，它们连的是「某一个服务端」。
 
 ### 模块
 
@@ -295,8 +295,8 @@ Status: proposed
 | `Tool`、`Mcp`、`Resource` | 给 agent 的工具、VibeValley 自己的 `/mcp`、只读的 `resource_read` |
 | `Executor` | oar 执行实例的创建、投递、中断和释放 |
 | `Mailbox`、`Ingress` | 谁该听到、什么时候叫醒；外面的来源进来的门 |
-| `Inbox` | 算出要主人处理的事 |
-| `Orchestrator` | 管家：主人直接说话的 agent |
+| `Inbox` | 算出要用户处理的事 |
+| `Orchestrator` | 管家：用户直接说话的 agent |
 | `Pkm`、`Media`、`Voice`、`Lan`、`Game` | 笔记、媒体任务、通话和听写、「连接到本机」、账本折出的金币和成就 |
 
 其余 14 个服务里，11 个和一个概念同名（`Issue`、`Session`、`Channel`……），那一行已经在概念表里；3 个是地基（`ServerConfig`、`Db`、`PublicHttp`）。
@@ -363,7 +363,7 @@ Status: proposed
 
 | 概念 | 是什么 | 怎么算同一个 |
 |---|---|---|
-| `Actor` | 做了一件事的那个：主人、一个 agent、VibeValley 自己，或外面的人和程序 | `kind` 加 `id` |
+| `Actor` | 做了一件事的那个：用户、一个 agent、VibeValley 自己，或外面的人和程序 | `kind` 加 `id` |
 | `Participant` | 一个 Actor 在频道里的身份：能被 @、能被私聊；活得比一次 Session 长 | `channel_participant.id` |
 | `Member` | 一个 Participant 在一个频道里，从哪条消息起、因为什么 | 频道加参与者 |
 
@@ -394,7 +394,7 @@ Status: proposed
 |---|---|---|
 | `status` | 人的决定能改的位置 | `Issue.status`、`Suggestion.status` |
 | `phase` | 一个在跑的东西自己走到哪 | `Session.phase`、媒体任务、连接器、通话、投递、`Todo` |
-| `stage` | 算出来给主人看的，不存 | `IssueStage` |
+| `stage` | 算出来给用户看的，不存 | `IssueStage` |
 
 `state` 只留给「一整份状态」（`SpaceState`、`StateFrame`）。建议：`ConnectorState`、`CallState` 和四张表的 `state` 列改 `phase`；`ToolConnection.status`、`Installation.status` 改 `phase`；`IssueStage.state` 改 `kind`；`ConnectorStatus` 这个形状改名（它是连接器的全部现状，不是一个位置）。
 
@@ -412,7 +412,7 @@ Status: proposed
 
 建议：
 
-1. 工单一侧改名：`delivered: Delivery` 改成 `landed: Landing`（改动落在哪）。`deliver: Deliverable` 留着。信箱的 `Delivery` 留着，它在[信箱](docs/subsystems/mailbox.md)里是状态机的主语。反过来改也成立（信箱的改叫别的），二选一由主人定。
+1. 工单一侧改名：`delivered: Delivery` 改成 `landed: Landing`（改动落在哪）。`deliver: Deliverable` 留着。信箱的 `Delivery` 留着，它在[信箱](docs/subsystems/mailbox.md)里是状态机的主语。反过来改也成立（信箱的改叫别的），二选一由用户定。
 2. 装原因的字段叫 `xWhy`，照 `mailbox_delivery.dropped_why`：`Issue.canceledWhy`、`PhaseClosed.why`。
 3. `SessionClose` 的四个取值里，`merged`、`completed` 说的是工单，不是帮工。帮工走只有三种：活完成了、被请走、丢了。
 
@@ -439,7 +439,7 @@ Status: proposed
 | `TriggerMeta.trigger: RunTrigger` | 一个 `Trigger` 里面装着一个 `RunTrigger` |
 | `TriggerKind` | `ci`、`review`、`comment`；`apps/server/src` 的非测试代码里没搜到用它的地方 |
 
-建议：`RunTrigger` 改叫 `RunCause`（`session_run.cause`），`Trigger` 只指信箱收到的那一张。`TriggerKind` 没人用就删。要主人定的一个模型问题：每一轮是不是都由恰好一个 `Trigger` 引起。是的话 `Run` 直接指 `Trigger` 的 id，`RunCause` 不用存。
+建议：`RunTrigger` 改叫 `RunCause`（`session_run.cause`），`Trigger` 只指信箱收到的那一张。`TriggerKind` 没人用就删。要用户定的一个模型问题：每一轮是不是都由恰好一个 `Trigger` 引起。是的话 `Run` 直接指 `Trigger` 的 id，`RunCause` 不用存。
 
 ### 六、消息和事件（名不副实、同义）
 
@@ -447,7 +447,7 @@ Status: proposed
 |---|---|---|
 | `ChatMessage` | 频道里的一条消息；表 `channel_message`，id `MessageId` | 三个名字 |
 | `ChannelMessage` | 跟随者收到的一条事件：`{ _tag: "Message", message }` | 和上一行只差前缀 |
-| `Chat` | 频道的列表和 @ 主人的消息；注释写「不含说的话」 | 名不副实 |
+| `Chat` | 频道的列表和 @ 用户的消息；注释写「不含说的话」 | 名不副实 |
 | `MessageKind` 的 `chat` | 一条普通的话 | 层次混 |
 | `ServerEventStep`、`ServerEventNotice`、`ServerEventRuntime` | 状态流里不改状态的三种 | 和下一行字段完全相同 |
 | `LiveEventSession`、`LiveEventNotice`、`LiveEventRuntime` | 同上 | 同义；`Step` 和 `Session` 是同一个成员的两个名字 |
@@ -545,7 +545,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 主人逐条定过[精确的概念](#精确的概念)，初稿的每个「待核实」有结论。
+- 用户逐条定过[精确的概念](#精确的概念)，初稿的每个「待核实」有结论。
 - `docs/concepts.md` 有概念、状态和动作、农场的皮、角色词和通用技术词四张表。
 - 「删掉」一列的八处都不在了，没有留「已过时」的标记或只剩一个链接的空节；`vp run docs:verify` 过（链到它们的文档都改了）。
 - `vp run vocabulary:check` 在提交前的钩子和 CI 里跑：在 `packages/protocol/src/issue/shapes.ts` 加一个带 `id` 的 `interface Ticket`，检查失败，说出名字、`Fix:` 和 `See`；删掉概念表的一行，检查失败。
@@ -557,6 +557,6 @@ Status: proposed
 ## Risks
 
 - **拼名规则的例外多。** protocol 上没量过拼不出来的名字有多少；服务端内部更多。回退：规则只在 protocol 上拦，别处只出报告；例外超过三成就把拼名规则降成报告，只留概念的双向检查。
-- **角色词表变成后门。** 往角色词里加一个词就能让任何名字通过。角色词表的改动和概念一样要主人批，PR 正文点名。
+- **角色词表变成后门。** 往角色词里加一个词就能让任何名字通过。角色词表的改动和概念一样要用户批，PR 正文点名。
 - **带 `id` 认不全概念。** `Changes`、`Question`、`Workplace` 没有 `id`，是从用语表补进初稿的。认定规则漏掉的，概念表里手写一行并注明依据；这类行多了说明规则要改。
 - **改名的面。** [精确的概念](#精确的概念)里多数要改存盘的取值和黄金数据。每个概念一个改动，不和检查的落地混在一起。

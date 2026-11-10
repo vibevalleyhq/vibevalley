@@ -30,12 +30,12 @@
   },
   "pair": {
     "title": "Connect to that computer",
-    "intro": "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the channels. Pairing needs the owner's approval on that computer.",
+    "intro": "This device connects to VibeValley on that computer and, as on that computer, sees helpers, sends work and talks in the channels. Pairing needs approval on that computer.",
     "code": "Pairing code",
     "codeHint": "On that computer, press Add a device under Connect to this machine",
     "name": "This device is called",
-    "nameHint": "The name the owner sees in the list of devices",
-    "ask": "Ask the owner to let it in",
-    "waiting": "Waiting for the owner on that computer to approve…"
+    "nameHint": "The name shown in the list of devices",
+    "ask": "Ask to be let in",
+    "waiting": "Waiting for approval on that computer…"
   }
 }

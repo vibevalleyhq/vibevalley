@@ -53,20 +53,20 @@
 
 **发布已有分支（`repo.pr.submit`）**
 
-本机主人显式给出检出根目录、分支、完整 SHA、base、标题和正文。检出可在空间外，不注册仓库。接口仅标注 owner，HTTP 拒绝 Bearer 身份；远程设备、管家和帮工工具不暴露此操作。本机回环监听仍是主人的信任边界。
+本机用户显式给出检出根目录、分支、完整 SHA、base、标题和正文。检出可在空间外，不注册仓库。接口仅标注 owner，HTTP 拒绝 Bearer 身份；远程设备、管家和帮工工具不暴露此操作。本机回环监听仍是用户的信任边界。
 
 发布按仓库共用 Git 目录串行，拒绝脏目录、detached HEAD、分支或 SHA 不符、默认/base 分支、多远端、多个 URL、读写仓库不一致及 URL 重写配置。GitHub.com 用 gh，GitLab.com 用 glab；工具缺失、未登录、返回无法解码均拒绝。未知主机与自建 GitLab 不支持。
 
 正式发布取得目标分支，预检冲突，执行检出的 `.vibevalley/check`，再核对工作树、HEAD、远端配置和 base SHA。检查的 PATH 优先使用目标检出的 `node_modules/.bin`，移除宿主带入的其他检出工具路径。推送使用明确 URL 和 `<SHA>:refs/heads/<branch>`，不强推，不自动提交或切分支。平台查询开放 PR/MR 后复用或创建；只有得到校验过的链接才返回发布成功。
 
-`dryRun` 只读取检出与平台信息，不 fetch、不运行检查、不推送或创建请求。回执的 `check` 区分 `preview`、`passed`、`not-run`；没有脚本不算检查通过。推送后平台失败明确说明 SHA 已推送但链接未确认；重试查询已有请求。失败、取消和成功均保留主人的原检出。网络中断或取消时，远端可能已接收操作，应查询后重试。
+`dryRun` 只读取检出与平台信息，不 fetch、不运行检查、不推送或创建请求。回执的 `check` 区分 `preview`、`passed`、`not-run`；没有脚本不算检查通过。推送后平台失败明确说明 SHA 已推送但链接未确认；重试查询已有请求。失败、取消和成功均保留用户的原检出。网络中断或取消时，远端可能已接收操作，应查询后重试。
 
-工单入口继续验证 `vibevalley/issue-N`，读取 Git 目录内的 `vibevalley-pr.md`，调用同一发布流程。GitLab 支持主人已有分支发布；仓库创建、工单 PR 检测、CI/评审跟随和完成清理仍限 GitHub，不提供 GitLab 自动合并。
+工单入口继续验证 `vibevalley/issue-N`，读取 Git 目录内的 `vibevalley-pr.md`，调用同一发布流程。GitLab 支持用户已有分支发布；仓库创建、工单 PR 检测、CI/评审跟随和完成清理仍限 GitHub，不提供 GitLab 自动合并。
 
 ## 和谁打交道
 
 - **工单与帮工（`issue`、`session`）**：提供 `workplace`、`release`、`reset`、`clear`、`Changes`、`merge`、`mergeInto`、`submitPullRequest` 与 `pullRequestState`。
-- **接入与游戏（`ingress`、`game`）**：向 Ingress 提供 `githubRemote` 与 `githubRequest`；向 Game 提供主人名下的 `contributions` commit 计数。
+- **接入与游戏（`ingress`、`game`）**：向 Ingress 提供 `githubRemote` 与 `githubRequest`；向 Game 提供用户名下的 `contributions` commit 计数。
 
 ## 为什么这样
 

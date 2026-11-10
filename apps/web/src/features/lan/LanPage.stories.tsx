@@ -54,9 +54,9 @@ export default stories({
       ...open,
       pairing: { code: "4821", link: "http://192.168.1.20:8790/pair?c=4821", expiresAt: now + 4 * min },
     }),
-    有人要进来: scene("有台设备扫了码：主人在这台电脑上点头才放进来。", {
+    有人要进来: scene("有台设备扫了码：用户在这台电脑上点头才放进来。", {
       ...open,
-      pairing: { code: "4821", link: "http://192.168.1.20:8790/pair?c=4821", expiresAt: now + 3 * min, asking: "主人的 iPhone" },
+      pairing: { code: "4821", link: "http://192.168.1.20:8790/pair?c=4821", expiresAt: now + 3 * min, asking: "用户的 iPhone" },
     }),
     本机的整页: page("在跑着 VibeValley 的电脑上：改名字、设密码，下面列出配对来的和登录来的设备，都能收回。", { name: "小明", password: true, here: true }),
     登录来的设备: page("从别的设备登录进来：密码只能在那台电脑上设；这台能退出，列表里标着「这台」。", {

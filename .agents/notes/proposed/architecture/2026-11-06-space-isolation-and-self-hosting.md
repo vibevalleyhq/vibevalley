@@ -89,5 +89,5 @@ Status: proposed
 
 ## Risks
 
-- 旧本地开发目录中的 `~/vibevalley-dev/repos/*` 与 `~/.vibevalley/pkm/*` 在升级后不会自动搬移文件；需在设置页与启动日志中给出明确路径提示，由主人手动迁入 `<space>/repos` 与 `<space>/pkm`。
+- 旧本地开发目录中的 `~/vibevalley-dev/repos/*` 与 `~/.vibevalley/pkm/*` 在升级后不会自动搬移文件；需在设置页与启动日志中给出明确路径提示，由用户手动迁入 `<space>/repos` 与 `<space>/pkm`。
 - 每个 `<space>/worktrees/vibevalley.<号>` 在执行 `.vibevalley/setup` 时会安装依赖并构建子包，若多个工单并发启动，耗时与磁盘占用会上升；后续可利用 pnpm 全局虚存硬链加速安装。

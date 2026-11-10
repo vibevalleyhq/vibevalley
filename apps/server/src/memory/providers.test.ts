@@ -136,14 +136,14 @@ describe("memory sources", () => {
 
   it.live("another source's ids carry its name", () => {
     const fake = new Fake("nowledge");
-    fake.lines = [{ id: "m9", line: "主人要中文的提交信息", score: 100 }];
-    fake.listed = [{ id: "m9", agent: "lab", kind: "note", text: "主人要中文的提交信息" } as T.Memory];
+    fake.lines = [{ id: "m9", line: "用户要中文的提交信息", score: 100 }];
+    fake.listed = [{ id: "m9", agent: "lab", kind: "note", text: "用户要中文的提交信息" } as T.Memory];
     return withFake(fake, (m) =>
       Effect.gen(function* () {
         const local = yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
         const got = yield* m.recall({ agent: "lab", repo: "demo", text: "测试 提交", skip: new Set(["nowledge:m1", "other:m2", local.id + "x"]) });
         expect(got.ids).toEqual([local.id, "nowledge:m9"]);
-        expect(got.lines[1]).toBe("主人要中文的提交信息");
+        expect(got.lines[1]).toBe("用户要中文的提交信息");
         expect([...fake.cues[0]!.skip!]).toEqual(["m1"]);
         expect((yield* m.list("lab")).map((x) => x.id)).toEqual([local.id, "nowledge:m9"]);
         yield* m.forget("lab", "nowledge:m9");

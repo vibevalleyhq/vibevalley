@@ -38,6 +38,11 @@ const RULES: readonly Rule[] = [
     says: "a helper is hired: Session.hire (send is for a message; docs/style/naming.md)",
   },
   {
+    name: "主人 for the user",
+    pattern: /主人/u,
+    says: "the person is 你 when spoken to, 用户 when spoken about (to a model, in docs), and called by the name they set; docs/README.md 用语",
+  },
+  {
     name: "产出 for an artifact",
     pattern: /产出/u,
     says: "the user and the prompts call an artifact 稿子, and its versions 第 N 稿 (docs/README.md 用语); 产出 named nothing a person would say",

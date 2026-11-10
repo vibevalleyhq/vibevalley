@@ -2,7 +2,7 @@
 
 游戏模块（`Game`）将农场里的真实工作结果映射为进度与反馈：
 - 只追加账本（`game_ledger` 表）折叠出金币、连胜、成就、称号与各档案战绩。
-- 工作目录里归属主人的 git commit 数折算为农场等级。
+- 工作目录里归属用户的 git commit 数折算为农场等级。
 - 每次状态迁移派生出画面特效 `GameEffect` 与地块视图 `FarmView`。
 
 游戏模块单向订阅核心状态的事实，业务模块不依赖 `game`。
@@ -44,7 +44,7 @@
   - 涵盖新手任务、收成、手艺、精打细算、协作与彩蛋五类。
   - 除新手任务外，已解锁档位均可通过 `game.title.set` 佩戴为称号。
 - **commit 折算等级**：
-  - 从 `Lv.n` 升至 `Lv.n+1` 需 `10 × n` 个归属主人的 commit（`xpToNext`）。
+  - 从 `Lv.n` 升至 `Lv.n+1` 需 `10 × n` 个归属用户的 commit（`xpToNext`）。
   - 首次启动统计基线只定等级、不弹升级横幅；后续新增 commit 跨级时发出 `levelUp` 特效。
 - **成就静态文案与每帧进度分离**：静态描述经 `game.achievement.list` 一次性读取；每帧 `StateFrame` 只带轻量进度数值。
 
@@ -52,7 +52,7 @@
 
 1. **监听事实记账**：订阅 `Core.transitions` 与 `Core.owner` 提取账本条目，写入 `game_ledger` 后施加 `progressChanged` 事实。
 2. **统计 commit**：启动就绪、每 2 分钟及 `sessionReported` 后 15 秒调用 `Repo.contributions`，变化时更新 `progressChanged.commits`。
-3. **指定空地播种**：主人点击空地发消息附带 `station`（0–5），`Game.want` 保留预约 10 秒，期间新派出的帮工自动移至该地块。
+3. **指定空地播种**：用户点击空地发消息附带 `station`（0–5），`Game.want` 保留预约 10 秒，期间新派出的帮工自动移至该地块。
 
 ## 和谁打交道
 

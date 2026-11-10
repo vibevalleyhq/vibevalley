@@ -156,7 +156,7 @@ class FakeEveros {
                         {
                           id: "ep-1",
                           subject: "登录页",
-                          summary: "主人让修登录页，改完了",
+                          summary: "用户让修登录页，改完了",
                           score: 0.7,
                           app_id: body.app_id ?? "default",
                           repo_id: body.repo_id ?? "default",
@@ -270,14 +270,14 @@ describe("Nowledge Mem", () => {
   it.effect("Nowledge reads everything only when told, and writes only when told", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      fake.memories = [{ id: "own-1", title: "主人的偏好", content: "测试要写成可观察的结果", labels: [] }];
+      fake.memories = [{ id: "own-1", title: "用户的偏好", content: "测试要写成可观察的结果", labels: [] }];
       const url = yield* fake.serve();
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memory;
       const q = { agent: "lab", repo: "", text: "测试", kind: "" as const, limit: 0 };
       expect((yield* m.search(q)).found).toEqual([]);
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
-      expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
+      expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["用户的偏好：测试要写成可观察的结果"]);
       yield* m.write({ agent: "lab", text: "不写进去", repo: "", by: user });
       // A write would go out in the background; nothing to wait on shows that none does.
       yield* TestClock.adjust(50);
@@ -422,7 +422,7 @@ describe("EverOS", () => {
       const asked = fake.seen("search")[0]!.body;
       expect([asked.agent_id, asked.query, asked.user_id]).toEqual(["vibevalley-lab", "分页", undefined]);
       const found = (yield* m.search({ agent: "lab", repo: "demo", text: "登录", kind: "issue", limit: 0 })).found;
-      expect(found.some((f) => f.id === `everos:${everosRepo("demo")}:ep-1` && f.text === "登录页：主人让修登录页，改完了")).toBe(true);
+      expect(found.some((f) => f.id === `everos:${everosRepo("demo")}:ep-1` && f.text === "登录页：用户让修登录页，改完了")).toBe(true);
       expect((yield* m.search({ agent: "", repo: "", text: "登录", kind: "", limit: 0 })).found.some((f) => f.source === "everos")).toBe(false);
       const sources = yield* m.sources;
       expect([sources.length, sources[1]!.label, sources[1]!.canList, sources[1]!.canForget, sources[1]!.transcripts]).toEqual([

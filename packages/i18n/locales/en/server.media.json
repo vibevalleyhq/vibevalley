@@ -44,7 +44,7 @@
   "inputChanged": "A saved input cannot be replaced with different bytes. Create a new input instead.",
   "inputTimeout": "The local upload timed out. Its partial file was removed; no provider request was made.",
   "inputDisconnected": "The local upload was interrupted. Its partial file was removed; no provider request was made.",
-  "userRequired": "Generation requires the owner's mandate. Autonomous patrols cannot submit potentially billable requests.",
+  "userRequired": "Generation requires the user's mandate. Autonomous patrols cannot submit potentially billable requests.",
   "invalid": "Invalid image parameters. Check the prompt, layout, dimensions and advanced options.",
   "missing": "This generation task was not found.",
   "corrupt": "The generation record cannot be read. Preserve local data before investigating.",

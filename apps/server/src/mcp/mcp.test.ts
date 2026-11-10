@@ -159,7 +159,7 @@ describe("mcp", () => {
       expect(mailbox.deliveriesOf(id).some((input) => input.envelope_id === extra.id)).toBe(false);
       expect((yield* Effect.promise(() => c.result("issue_pr_submit"))).result?.isError).toBe(true);
       const tool3 = yield* Effect.promise(() => c.tool("issue_pr_submit"));
-      expect(tool3).toContain("没有主人明确授予");
+      expect(tool3).toContain("没有用户明确授予");
       const tool4 = yield* Effect.promise(() =>
         c.tool("issue_report", { session: "another-session", summary: "需要端口", questions: [{ question: "端口用哪个？", options: ["8787", "8788"] }] }),
       );
@@ -400,7 +400,7 @@ describe("mcp", () => {
       // The user changes it in the editor; the helper's next rewrite was made against rev 2.
       yield* artifacts.submit(d.id, "user", {
         batchId: "user",
-        ops: [{ op: "update_text", blockId: blockId(block), baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
+        ops: [{ op: "update_text", blockId: blockId(block), baseRev: 2, text: [{ t: "用户改过的", marks: {} }] }],
       });
       const suggested = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 3, text: "帮工建议的字" });
       expect(suggested).toContain("提了建议");

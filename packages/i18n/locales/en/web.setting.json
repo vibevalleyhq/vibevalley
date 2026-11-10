@@ -22,7 +22,7 @@
     "key": "{label}'s key",
     "keyHint": "key (leave empty if none or to keep)",
     "user": "{label}'s user_id",
-    "userHint": "Your user_id in EverOS (empty means owner)",
+    "userHint": "Your user_id in EverOS (empty uses the default one)",
     "read": "Read",
     "readHint": "Also asked when recalling at the start and when a helper looks things up",
     "write": "Write",

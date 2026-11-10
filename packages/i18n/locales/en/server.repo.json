@@ -77,6 +77,6 @@
   "publish.refused": "Branch publication refused: {detail}",
   "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
   "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
-  "publish.userOnly": "Only the local owner can publish an existing branch",
+  "publish.userOnly": "Only the user on this computer can publish an existing branch",
   "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying."
 }

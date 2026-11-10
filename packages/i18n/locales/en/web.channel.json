@@ -80,7 +80,7 @@
     "typing": "typing…",
     "foldDispatch": "Fold the dispatch",
     "unfoldDispatch": "Unfold the dispatch",
-    "user": "Owner",
+    "user": "You",
     "dispatch": "Sent work",
     "spent": "This round spent {spent}",
     "unread": "{n} new",
@@ -127,7 +127,7 @@
   "members": {
     "open": "Members",
     "title": "Members",
-    "user": "Owner",
+    "user": "You",
     "none": "No helpers here yet",
     "inChannel": "A manager in the channel"
   },
@@ -200,7 +200,7 @@
     "open": "Search everything",
     "title": "Search everything",
     "hint": "Find messages…",
-    "filters": "from:owner  in:#channel  has:file / image / link  before: / after:2026-10-01",
+    "filters": "from:user  in:#channel  has:file / image / link  before: / after:2026-10-01",
     "none": "Nothing found",
     "searching": "Searching…",
     "failed": "The search failed: {why}"

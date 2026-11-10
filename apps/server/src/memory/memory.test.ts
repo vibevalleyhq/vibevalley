@@ -115,8 +115,8 @@ describe("memory", () => {
       yield* port.remember("agent note");
       const written = yield* m.remember({ agent: defaultOrchestrator, text: "user note", repo: "", by: user });
       expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["user", "agent"]);
-      expect((yield* port.read()).prompt).toContain("主人交代：user note");
-      yield* port.rewrite("# notes\n- replacement note\n- 主人交代：user note");
+      expect((yield* port.read()).prompt).toContain("用户交代：user note");
+      yield* port.rewrite("# notes\n- replacement note\n- 用户交代：user note");
       const notes = (yield* m.memoriesOf(defaultOrchestrator)).memories;
       expect(notes.map((note) => note.text)).toEqual(["replacement note", "user note"]);
       expect(notes.find((note) => note.author === "user")?.id).toBe(written.id);
@@ -136,7 +136,7 @@ describe("memory", () => {
       Effect.gen(function* () {
         const folder = path.join(agentHome(config, defaultOrchestrator), "archive");
         yield* fs.makeDirectory(folder, { recursive: true });
-        yield* fs.writeFileString(path.join(folder, "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
+        yield* fs.writeFileString(path.join(folder, "orchestrator-2026-10-12.md"), "用户：给 clock-in 加分页\n管家：派给老周了\n");
       }),
     );
     return Effect.andThen(

@@ -51,5 +51,5 @@
 
 ## 外面的工具
 
-- [agent doctor](https://effect.doctor/)（`npx @jgalbsss/agent-doctor`）：给 Effect 代码打分的体检，101 条规则（正确性、v4 迁移、惯用写法、架构、性能、重复的函数）。不在这个仓库的检查里；要用它做一次审计时先问主人（它会下载并运行第三方的包），报出来的照 [cases.md](.agents/skills/vv-effect/references/cases.md) 判断，值得的写成上面的检查。
+- [agent doctor](https://effect.doctor/)（`npx @jgalbsss/agent-doctor`）：给 Effect 代码打分的体检，101 条规则（正确性、v4 迁移、惯用写法、架构、性能、重复的函数）。不在这个仓库的检查里；要用它做一次审计时先问用户（它会下载并运行第三方的包），报出来的照 [cases.md](.agents/skills/vv-effect/references/cases.md) 判断，值得的写成上面的检查。
 - [EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns)：300 多个按主题分的模式（`content/published/patterns/<主题>/`），找某一类问题的标准写法时查；它按 v3 写的多，名字照上面「查 API」核对。

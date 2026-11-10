@@ -63,12 +63,12 @@ The checkout may be outside the space. A published response includes the confirm
 | 子命令 | JSON 参数 |
 |---|---|
 | `report` | 必填 `summary`；可选 `prSubmit`、`questions`、`checks`、`remember`、`answer`。完整字段和类型见 `report --help` |
-| `pr-submit` | 可选 `summary`；需要主人明确授权 |
+| `pr-submit` | 可选 `summary`；需要用户明确授权 |
 | `context` | 省略参数读当前工单串；可选 `id`、`before`、`limit`、`unread` |
 | `read` | 必填 `uri`，可选 `offset`、`limit` |
 | `doctor` | 无参数，认证调用只读会话列表 |
 
-例如在完整命令后追加 `report '{"summary":"完成","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"tests passed"}]}'`。参数不能选择其他会话。缺失、无效或撤销凭证不会回退主人 HTTP；工具拒绝返回非零退出码，stderr 保留有界且脱敏的原因。
+例如在完整命令后追加 `report '{"summary":"完成","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"tests passed"}]}'`。参数不能选择其他会话。缺失、无效或撤销凭证不会回退用户 HTTP；工具拒绝返回非零退出码，stderr 保留有界且脱敏的原因。
 
 源码入口带绝对 Node 和 Vite+ 加载器路径；桌面包入口为 `Resources/cli/dist/worker.mjs`，仅此次 CLI 调用设置 `ELECTRON_RUN_AS_NODE=1`。生命周期与启动门槛见[会话](docs/subsystems/session.md)。
 

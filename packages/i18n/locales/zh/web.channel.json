@@ -80,7 +80,7 @@
     "typing": "正在输入…",
     "foldDispatch": "收起派活",
     "unfoldDispatch": "展开派活",
-    "user": "主人",
+    "user": "你",
     "dispatch": "派活",
     "spent": "这一轮花了 {spent}",
     "unread": "{n} 条新",
@@ -127,7 +127,7 @@
   "members": {
     "open": "成员",
     "title": "成员",
-    "user": "主人",
+    "user": "你",
     "none": "这里还没有帮工",
     "inChannel": "频道里的管家"
   },
@@ -155,7 +155,7 @@
     "membersHint": "在频道里的管家能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
     "notify": "提醒",
     "notifyAll": "全部",
-    "notifyMentions": "只在 @主人 时",
+    "notifyMentions": "只在有人 @你 时",
     "notifyNone": "不提醒",
     "notifyHint": "不提醒的不算未读、不进 Inbox、不转到微信",
     "archive": "归档",
@@ -200,7 +200,7 @@
     "open": "全部搜索",
     "title": "全部搜索",
     "hint": "找消息…",
-    "filters": "from:主人  in:#频道  has:file / image / link  before: / after:2026-10-01",
+    "filters": "from:用户  in:#频道  has:file / image / link  before: / after:2026-10-01",
     "none": "没有找到",
     "searching": "在找…",
     "failed": "没搜成：{why}"
@@ -237,7 +237,7 @@
     "thread": "串",
     "mention": {
       "orchestrator": "@管家",
-      "user": "@主人",
+      "user": "@用户",
       "everyone": "@所有人"
     },
     "orchestratorNote": "派活、拆计划、问进度",

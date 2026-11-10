@@ -30,9 +30,9 @@
 
 - **所有档案共用 `memory` 表，按档案 ID 归属**：
   - 帮工与管家统一读写 `memory` 表，同档案的多个 `Session` 共享记忆。
-  - 主人在界面添加的条目记 `author: "owner"`，在管家提示中标为「主人交代」，agent 整理时不得覆盖。
+  - 用户在界面添加的条目记 `author: "owner"`，在管家提示中标为「用户交代」，agent 整理时不得覆盖。
 - **两种条目类型（`kind`）与容量上限**：
-  - `note`：来自 `issue_report.remember`、`memory_create` 工具或主人手动添加。
+  - `note`：来自 `issue_report.remember`、`memory_create` 工具或用户手动添加。
   - `issue`：帮工完成工单回合时由服务端自动生成的工单经历（每个 `Session` 更新同一条）。
   - 单条上限 300 字符（UTF-16），每个档案最多保留 300 条，超出时在同一事务内淘汰最久未召回的条目。
 - **高重合度自动去重**：同一仓库范围内若已存在完全相同、或分词重合度（`memoryLikeness`）≥ `0.8` 的条目，则跳过不重复记。
@@ -61,7 +61,7 @@
 
 ## 还没做的
 
-- 主人全局画像（`profile`）、完整对话提炼与记忆树真实数据接入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)、[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)。
+- 用户全局画像（`profile`）、完整对话提炼与记忆树真实数据接入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)、[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)。
 
 ## 怎么验证
 

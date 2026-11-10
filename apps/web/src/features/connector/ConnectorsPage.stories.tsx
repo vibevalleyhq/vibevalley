@@ -31,9 +31,9 @@ const statusOf = (id: ConnectorID, state: ConnectorState, more: Partial<Connecto
     case "pairing":
       return { ...base, pairCode: "4821", ...more };
     case "connected":
-      return { ...base, user: "主人", channel: "general", since: now - 3 * 24 * 60 * min, lastInbound: now - 12 * min, pending: 2, ...more };
+      return { ...base, user: "用户", channel: "general", since: now - 3 * 24 * 60 * min, lastInbound: now - 12 * min, pending: 2, ...more };
     case "paused":
-      return { ...base, user: "主人", channel: "general", since: now - 3 * 24 * 60 * min, lastInbound: now - 90 * min, pausedUntil: now + 45 * min, ...more };
+      return { ...base, user: "用户", channel: "general", since: now - 3 * 24 * 60 * min, lastInbound: now - 90 * min, pausedUntil: now + 45 * min, ...more };
   }
 };
 

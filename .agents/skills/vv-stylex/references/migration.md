@@ -76,7 +76,7 @@ vp run migration:inventory
 
 ### 运行最终验收
 
-准备一份迁移前、已安装依赖的干净工作树作为基准。Android 宿主还需要 [手机分册](.agents/skills/vv-acceptance/references/mobile.md)里的 SDK、JDK 17 和已生成的原生工程；验收自己创建模拟器，不使用主人的设备或家目录。
+准备一份迁移前、已安装依赖的干净工作树作为基准。Android 宿主还需要 [手机分册](.agents/skills/vv-acceptance/references/mobile.md)里的 SDK、JDK 17 和已生成的原生工程；验收自己创建模拟器，不使用用户的设备或家目录。
 
 ```bash
 vp run --no-cache --filter @vibevalley/web build

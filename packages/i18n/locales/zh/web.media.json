@@ -3,7 +3,7 @@
   "image": "生成图片",
   "speech": {
     "title": "单人语音生成",
-    "notice": "将文字发送到下方的 MOSS 账号，生成单人语音，可能产生费用。不会自动播放；Flash 流式播放也需手动开始。取消只停止本机等待，不代表供应商停止处理或计费。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅主人可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
+    "notice": "将文字发送到下方的 MOSS 账号，生成单人语音，可能产生费用。不会自动播放；Flash 流式播放也需手动开始。取消只停止本机等待，不代表供应商停止处理或计费。生成音频每个文件最多 512 MB；超过 25 MiB 的结果保存在仅你可访问的 Media 存储中，与上传输入共用 2 GiB 配额，不能发布到频道。",
     "configure": "请先在 AI 服务中选择语音生成连接和 Flash 或 Pro 模型。",
     "binding": "{account} · {connection} · {model} · 配置版本 {revision}",
     "refresh": "刷新连接配置",
@@ -61,7 +61,7 @@
     "cleanup": "清理远端文件",
     "cleanupAsk": "删除已知远端文件并释放本机输入的保留？供应商可能还在处理结果未知的请求。没有确认 ID 的上传可能仍有文件，需要人工核对；这不会重复理解。"
   },
-  "sourceUser": "来源：主人",
+  "sourceUser": "来源：你",
   "sourceAgent": "来源：管家 {agent} · 频道 {channel}",
   "usage": "厂商报告：{images} 张 · {width} × {height}",
   "usageUnknown": "尚无厂商用量结果；不代表未计费。",

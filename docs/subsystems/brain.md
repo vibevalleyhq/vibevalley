@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | DeepSeek 协议与连接（`@vibevalley/provider`）、agent 历史重放、工具 JSON Schema 生成与消息/参数修补（`@vibevalley/ai`） | 模型名称选择与 API Key 存储（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
-| 单轮模型⇄工具循环（`loop.ts`）：并发跑工具、插话（`steer`）、追问（`followUp`）与中断（`abort`） | 输入何时送入、是否含主人授权、回合如何记入 `session_run`（[管家](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
+| 单轮模型⇄工具循环（`loop.ts`）：并发跑工具、插话（`steer`）、追问（`followUp`）与中断（`abort`） | 输入何时送入、是否含用户授权、回合如何记入 `session_run`（[管家](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
 | 对话 `.jsonl` 持久化、三段式提示与前缀哈希校验、空闲/超限压缩、断点续跑 | 农场业务工具集（`apps/server/src/tool`）与跨档案数据库记忆（[记性](docs/subsystems/memory.md)） |
 | 内置工具：技能按需加载、`MemoryPort`、归档检索、子帮手、自身任务（`Todo`）、提醒与编码工具 | |
 

@@ -2,7 +2,7 @@
 
 服务端的运行参数与凭据来自两类入口：
 - **静态配置（`ServerConfig`）**：开机时从默认值、`vibevalley.yaml` 和环境变量一次性加载，运行期只读。
-- **动态设置（`Setting`）**：主人在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
+- **动态设置（`Setting`）**：用户在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
 
 ## 管什么，不管什么
 
@@ -47,7 +47,7 @@
 | `agora.app_id` / `agora.app_certificate` | 声网 RTC 凭据（`AGORA_APP_ID` / `AGORA_APP_CERTIFICATE`） | 空 |
 | `voice.id` / `voice.line.port` / `voice.line.url` | 默认音色、语音线路端口与固定公网隧道地址 | 默认音色 / `8788` / 空 |
 | `lan.port` | 「连接到本机」局域网监听端口 | `8790` |
-| `git_emails` / `tokei` | 计入主人经验的额外 git 邮箱列表、tokei 命令路径 | 空 / `tokei` |
+| `git_emails` / `tokei` | 计入用户经验的额外 git 邮箱列表、tokei 命令路径 | 空 / `tokei` |
 | `cny_per_usd` | 美元单价折算人民币汇率 | `7.2` |
 | `patrol.heartbeat_minutes` / `cron.tick_ms` | Inbox 巡查间隔（分钟，`0` 关闭）、定时任务检查间隔（毫秒） | `10` / `20000` |
 | `session.stall_seconds` / `session.trajectory_days` | 帮工静默告警秒数、离场后轨迹保留天数（`0` 永久保留） | `240` / `30` |

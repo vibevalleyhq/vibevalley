@@ -421,7 +421,7 @@ describe("the agent", () => {
 
   it.effect("keeps the same system prompt between folds and tells memory news in the input", () => {
     const dir = home();
-    writeFileSync(memoryFile(dir), "- 2026-10-01 主人叫阿周\n- 2026-10-02 用中文\n");
+    writeFileSync(memoryFile(dir), "- 2026-10-01 用户叫阿周\n- 2026-10-02 用中文\n");
     return withAgent(dir, [answer("一"), answer("二")], (r) =>
       Effect.gen(function* () {
         const memoryNews2 = yield* r.agent.memoryNews;
@@ -430,7 +430,7 @@ describe("the agent", () => {
         yield* Effect.promise(() =>
           remember(
             dir,
-            "主人喜欢短句",
+            "用户喜欢短句",
             DateTime.toEpochMillis(
               DateTime.makeZonedUnsafe({ year: 2026, month: 10, day: 18, hour: 9 }, { timeZone: DateTime.zoneMakeLocal(), adjustForTimeZone: true }),
             ),
@@ -439,12 +439,12 @@ describe("the agent", () => {
         const lines = (yield* Effect.promise(() => readMemory(dir))).lines;
         yield* Effect.promise(() => forgetLine(dir, lines.find((l) => l.text === "用中文")!.id));
         const news = yield* r.agent.memoryNews;
-        expect(news).toBe("【记性有更新】\n+ 2026-10-18 主人喜欢短句\n− 2026-10-02 用中文");
+        expect(news).toBe("【记性有更新】\n+ 2026-10-18 用户喜欢短句\n− 2026-10-02 用中文");
         const memoryNews3 = yield* r.agent.memoryNews;
         expect(memoryNews3).toBe("");
         yield* r.ask(news + "\n\nb");
         expect(systemPrompt(r.requests[1]!)).toBe(systemPrompt(r.requests[0]!));
-        expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/u);
+        expect(systemPrompt(r.requests[0]!)).toMatch(/用户叫阿周\n- 2026-10-02 用中文$/u);
         expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/u);
         expect(prefixChanges(r)).toEqual([]);
       }),

@@ -1,6 +1,6 @@
 ---
 name: vv-effect
-description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.1.2）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上主人做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 报了诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」「建议怎么写、不建议怎么写」。
+description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.1.2）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上用户做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 报了诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；用户说「Effect 的最佳实践」「这段 Effect 写得对不对」「建议怎么写、不建议怎么写」。
 ---
 
 # 在这个仓库写 Effect
@@ -47,7 +47,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 | 要做的事 | 用 | 不用 |
 |---|---|---|
-| 主人做的事要先显示结果，等服务端确认 | 一种意图（`state/intent.ts` 的 `defineIntent`）：按请求 key 存，画面经这个 feature 的纯函数覆盖层看（只改主人改的那个字段），帧显示了才结算（`bySeq` 比 `StateFrame.seq`），失败留着可重试（同一个 key），断线时排队 | Atom 自带的 `optimistic`、Solid 2 的 `createOptimistic`：它们答复一回来就撤，而我们的真相在之后的帧里，会先弹回去再跳过去 |
+| 用户做的事要先显示结果，等服务端确认 | 一种意图（`state/intent.ts` 的 `defineIntent`）：按请求 key 存，画面经这个 feature 的纯函数覆盖层看（只改用户改的那个字段），帧显示了才结算（`bySeq` 比 `StateFrame.seq`），失败留着可重试（同一个 key），断线时排队 | Atom 自带的 `optimistic`、Solid 2 的 `createOptimistic`：它们答复一回来就撤，而我们的真相在之后的帧里，会先弹回去再跳过去 |
 | 其余调用接口的动作 | `ui/act.ts` 的 `createAct`：忙的计数一定清，拒绝用出错的语气，断线时拒绝 | 组件里直接 `api.…`（lint `vibevalley/act-door`）；`toast(reasonOf(e))` 不带出错的语气（`vibevalley/failure-tone`） |
 | 要记住的选择（本机的偏好、看板的样子、窗格宽度） | `state/stored.ts` 的 `defineStored(名字, Schema, 默认值)`：经 Schema 解码、按字段退回默认值、跨标签页跟着变 | 直接读写 `localStorage`（`vibevalley/stored-door`） |
 | 值得放进地址的选择（看板的筛选） | Router 的 `useSearchValues`，用 `search` 定义 Codec | 一个刷新就丢的信号 |
@@ -69,8 +69,8 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 检查过了，下面这些检查看不出来，要读代码：
 
 1. **错误有没有被说清楚**：`tryPromise`、`try` 有没有写 `catch`，把真正的原因（`cause`、`message`）带出去；`mapError((e) => String(e))` 拿到的可能是 `UnknownError`。
-2. **错误该不该变成缺陷**：`orDie` 的那个错误主人能不能处理（库写不进去、磁盘满了是要告诉主人的）。要先 die 再 `catchDefect` 接回来的，是错误类型没留住，改成在 `Effect` 的错误通道里传。
-3. **被丢弃的失败有没有人知道**：`Effect.ignore` 丢的如果是主人说的话、要发出去的消息，至少 `{ log: "Warn" }`。
+2. **错误该不该变成缺陷**：`orDie` 的那个错误用户能不能处理（库写不进去、磁盘满了是要告诉用户的）。要先 die 再 `catchDefect` 接回来的，是错误类型没留住，改成在 `Effect` 的错误通道里传。
+3. **被丢弃的失败有没有人知道**：`Effect.ignore` 丢的如果是用户说的话、要发出去的消息，至少 `{ log: "Warn" }`。
 4. **fiber 归谁**：后台的 fiber 在服务的 `Scope` 里（`Effect.forkScoped`、`FiberSet`），服务关了它也停；给外面的回调用的 runtime 用 `FiberSet.makeRuntime*`，不用 `Effect.runForkWith` 了事。
 5. **状态和缓存**：异步读改写用锁或 `SynchronizedRef`；核心快照用 `SubscriptionRef`，探测缓存用 `Cache`；同步局部状态不为了形式换成 Ref。
 6. **资源和边界**：拿到的资源用 `acquireRelease` 配好释放；队列、`Stream` 的缓冲、并发有上限。

@@ -1,6 +1,6 @@
 # 验收管家的评测
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用照脚本回答的模型（`@vibevalley/ai/testing`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用照脚本回答的模型（`@vibevalley/ai/testing`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放用户标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
 
 ## 什么时候用
 
@@ -10,7 +10,7 @@
 
 不用它：只改了管家的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/orchestrator` 就够。
 
-重放连网、花钱（一个样例约等于管家一轮的 token 乘 5），**跑之前先问主人**。没有钥匙或主人没同意时，只做「准备」的第 1 步，并在汇报里写明在线的那半没跑。
+重放连网、花钱（一个样例约等于管家一轮的 token 乘 5），**跑之前先问用户**。没有钥匙或用户没同意时，只做「准备」的第 1 步，并在汇报里写明在线的那半没跑。
 
 ## 准备
 
@@ -20,7 +20,7 @@
    vp check && vp run --filter @vibevalley/server test src/orchestrator/evals.test.ts
    ```
 
-2. 要加新样例时，从家目录拿主人标出的那一轮：
+2. 要加新样例时，从家目录拿用户标出的那一轮：
 
    ```bash
    ls ~/.vibevalley/orchestrator/evals/
@@ -53,7 +53,7 @@
 
 ## 证据
 
-说「验证过了」时，给主人看：
+说「验证过了」时，给用户看：
 
 - 第 1 步和第 3 步的两张表，提交说明里也附上第 3 步的那张。
 - 第 3 步 vitest 的通过行。
@@ -61,9 +61,9 @@
 
 ## 出错时
 
-- **测试被跳过**：环境里没有 `DEEPSEEK_API_KEY`，或没经 `vp run --filter @vibevalley/server evals`（它设 `VIBEVALLEY_EVALS_LIVE=1`）。钥匙问主人要，不要自己去找主人的配置文件。
-- **模型报错**：DeepSeek 返回了错（钥匙不对、余额不够、限流）。照原话告诉主人。
-- **`the turn took too long`**：一轮超过 5 分钟，多半是网络。再跑一次；还这样就告诉主人。
+- **测试被跳过**：环境里没有 `DEEPSEEK_API_KEY`，或没经 `vp run --filter @vibevalley/server evals`（它设 `VIBEVALLEY_EVALS_LIVE=1`）。钥匙问用户要，不要自己去找用户的配置文件。
+- **模型报错**：DeepSeek 返回了错（钥匙不对、余额不够、限流）。照原话告诉用户。
+- **`the turn took too long`**：一轮超过 5 分钟，多半是网络。再跑一次；还这样就告诉用户。
 - **一个样例时过时不过（比如 3/5）**：模型在两种做法之间摇摆。看没过的几次的对话，改提示让规矩更明确；不要为了过而放宽 `expect`。
 - **离线的检查报某条 `expect` 缺字段**：照 `problemOf` 说的补上；工具改了名，样例里的 `tool` 跟着改。
 

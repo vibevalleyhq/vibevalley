@@ -177,7 +177,7 @@
     "files": "May touch:"
   },
   "noProfileNamed": "No profile is named {key}",
-  "prSubmitNotAllowed": "The owner did not explicitly authorize this ticket to submit its own pull request",
+  "prSubmitNotAllowed": "The user did not explicitly authorize this ticket to submit its own pull request",
   "prSubmitNotCurrent": "Only the helper currently handling this ticket can submit its pull request",
   "prSubmitUnavailable": "Pull-request delivery is not enabled for this ticket's repo",
   "deliveryNeedsPr": "Deliver a valid PR/MR before accepting this issue",

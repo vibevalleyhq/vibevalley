@@ -226,7 +226,7 @@ describe("crons", () => {
       yield* Effect.gen(function* () {
         const s = yield* Cron;
         const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), orchestrator(false));
-        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "agent", "等主人同意"]);
+        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "agent", "等你同意"]);
         id = made.id;
         const due = yield* collect;
         yield* TestClock.adjust(10 * 60_000);

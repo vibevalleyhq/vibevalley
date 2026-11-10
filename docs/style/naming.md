@@ -56,8 +56,8 @@
 | 取或算出某样东西的某一项 | `xOf` | `channelOf`、`quotaOf`、`summaryOf` |
 | 是非 | `isX`、`hasX`、`canX` | `isClosed`、`hasFarm` |
 | 从人或模型写的文字里读出结构 | `parseX` | `parseRefinement`、`parseSplit` |
-| 检查一份输入 | `xProblem`：没问题返回 `""`，有问题返回主人读的理由 | `cronProblem`、`channelNameProblem` |
-| 给主人看的一句话 | `xText` | `quotaText`、`dueText` |
+| 检查一份输入 | `xProblem`：没问题返回 `""`，有问题返回用户读的理由 | `cronProblem`、`channelNameProblem` |
+| 给用户看的一句话 | `xText` | `quotaText`、`dueText` |
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |

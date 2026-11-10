@@ -57,7 +57,7 @@ export const self = {
     "记下一条以后的对话也要知道的事：用户的偏好、约定、仓库的关键事实。一句话，不记临时的事。记下的在下一次整理对话后进系统提示；在那之前，这次的结果就在对话里。",
   emptyNote: "note 是空的。",
   remembered: "记下了。",
-  rewriteMemoryDescription: "整理你自己记下的内容：合并重复的、删掉过时或错的。先看系统提示里的「记性」，再给出完整的新内容，不改写主人交代的条目。",
+  rewriteMemoryDescription: "整理你自己记下的内容：合并重复的、删掉过时或错的。先看系统提示里的「记性」，再给出完整的新内容，不改写用户交代的条目。",
   rewritten: (lineCount: number) => `重写好了，现在 ${lineCount} 行。`,
   searchArchiveDescription: "在压缩掉的旧对话原文里搜一个词（不分大小写），返回出现的地方和前后几行。摘要里缺了细节时用。",
   spawnAgentDescription:

@@ -42,7 +42,7 @@ agent 写 Effect 时最常见的错，为什么会写出来，和这个仓库里
 |---|---|---|
 | 用 `Atom.optimistic` 或 Solid 2 的 `createOptimistic` 做乐观更新 | 现成，名字就叫乐观 | 审：它们在答复回来时就撤，我们要等帧，用 `defineIntent` |
 | 答复一回来就算成功，或者过几秒就把「发送中」去掉 | 最短的写法 | 审：结算看帧（`bySeq`、发送 key），超时标成失败，留着可重试 |
-| 覆盖层推算服务端的规则（工单的关注、能不能挪） | 想让画面「更对」 | 审：覆盖层只改主人改的那个字段，规则问服务端（「页面不折事实」） |
+| 覆盖层推算服务端的规则（工单的关注、能不能挪） | 想让画面「更对」 | 审：覆盖层只改用户改的那个字段，规则问服务端（「页面不折事实」） |
 | 每按一次生成一个新的请求 key | 写在点击里最顺手 | 审：key 跟着意图，重试用同一个（`sendOnce`、`createRequestKey`） |
 | feature 里 import `effect/reactivity` | 想直接用 Atom 的部件 | 已拦：`vibevalley/atom-door`；要的帮手加在 `state/` |
 | 模块级的信号当全局 store；直接读写 `localStorage` | 最短的写法 | 已拦：`vibevalley/page-store`、`vibevalley/stored-door` |
@@ -53,7 +53,7 @@ agent 写 Effect 时最常见的错，为什么会写出来，和这个仓库里
 
 **服务和 layer。** 服务是 `Context.Service` 的类，依赖在 layer 里 `yield*`，方法签名里不带依赖；layer 只在入口叠一次（这里是 `services.ts`），v4 的 layer 跨 provide 也会复用，想要新实例写 `Layer.fresh`。
 
-**错误：预期的和缺陷。** 主人能处理、调用方要分开接的（拒绝、找不到、外面的服务失败）是带标签的错误，留在错误通道里，按 `catchTag` 接；没法恢复的（程序的 bug、库坏了）是缺陷，只在边界处理一次（这里是接口的处理和 `Exit` 的折法）。包装外面的错误时把它放进 `cause`，不只留 `String(e)`。
+**错误：预期的和缺陷。** 用户能处理、调用方要分开接的（拒绝、找不到、外面的服务失败）是带标签的错误，留在错误通道里，按 `catchTag` 接；没法恢复的（程序的 bug、库坏了）是缺陷，只在边界处理一次（这里是接口的处理和 `Exit` 的折法）。包装外面的错误时把它放进 `cause`，不只留 `String(e)`。
 
 **资源。** 拿到就配好释放：`Effect.acquireRelease` 放进 `Layer.effect`（v4 里 `Layer.scoped` 并进了 `Layer.effect`）；后台任务用 `Layer.effectDiscard` 加 `Effect.forkScoped`，服务关了它也停。
 

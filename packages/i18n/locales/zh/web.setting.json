@@ -22,13 +22,13 @@
     "key": "{label} 的 key",
     "keyHint": "key（不用或不改就空着）",
     "user": "{label} 的 user_id",
-    "userHint": "你在 EverOS 里的 user_id（空着就是 owner）",
+    "userHint": "你在 EverOS 里的 user_id（空着用默认的那个）",
     "read": "读",
     "readHint": "开工想起、帮工翻记性时也问它",
     "write": "写",
     "writeHint": "记下的也送一份过去",
     "everything": "读全部",
-    "everythingHint": "不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到"
+    "everythingHint": "不只读 VibeValley 替帮工记的，你在里面的记忆每个帮工都读得到"
   },
   "github": {
     "noGh": "没装 gh",

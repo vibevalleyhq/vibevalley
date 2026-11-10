@@ -38,7 +38,7 @@ export default stories({
         <div {...stylex.attrs(viewStyles.memoryStoriesDiv)}>
           <MemoryItem
             memory={memory("这个仓库的测试用 vp test；不要开 next dev。", { fading: a.state === "fading" })}
-            meta={["主人写的", "vibevalley", "想起过 4 次"]}
+            meta={["用户写的", "vibevalley", "想起过 4 次"]}
             faded={a.state === "fading"}
             warning={a.state === "fading" ? "30 天没想起，下周会忘掉" : undefined}
             onForget={a.state === "forgettable" ? () => undefined : undefined}

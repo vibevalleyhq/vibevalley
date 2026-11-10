@@ -405,7 +405,7 @@ describe("the chat", () => {
         const thread = yield* hireAndRun(f, x, "w2", "写 hello", "chat-b");
         const { message: said } = yield* f.chat.post({ _tag: "User", text: "把输出改成中文", channel: thread.id, sendKey: "" });
         yield* until(() => x.runsOf("w2").length >= 2, "a second turn");
-        expect(x.runsOf("w2")[1]).toContain(`[target=#general:${thread.rootNumber} msg=${said.number} from=主人] 把输出改成中文`);
+        expect(x.runsOf("w2")[1]).toContain(`[target=#general:${thread.rootNumber} msg=${said.number} from=用户] 把输出改成中文`);
         yield* until(async () => (await f.deliveryOf("w2", said.id))?.state === "consumed", "consumed");
         yield* until(() => f.messagesOf(thread.id).filter((m) => m.kind === "report").length >= 2, "its reply in the thread");
       }),
@@ -454,7 +454,7 @@ describe("the chat", () => {
             expect(f.messagesOf(direct!.id).at(-1)?.mentions).toEqual([]);
             yield* f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: direct!.id, text: "好，说吧", run: "" });
             yield* until(() => (f.channel(direct!.id)?.unread ?? 0) === 1, "the answer unread");
-            expect((yield* f.chat.read(defaultOrchestrator, { target: "@主人" })).messages.map((m) => m.text)).toEqual([
+            expect((yield* f.chat.read(defaultOrchestrator, { target: "@用户" })).messages.map((m) => m.text)).toEqual([
               "@w3 你先别动，我们单独说",
               "好，说吧",
             ]);
@@ -509,7 +509,7 @@ describe("the chat", () => {
         yield* f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "随便说说", target: "#前端", anyway: true, confirm: true });
         yield* f.chat.setNotify(a, "mentions");
         expect(f.channel(a)?.unread).toBeUndefined();
-        yield* f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "@主人 看一下", target: "#前端", anyway: true, confirm: true });
+        yield* f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "@用户 看一下", target: "#前端", anyway: true, confirm: true });
         expect(f.channel(a)?.unread).toBe(1);
         expect(f.chat.notifyOf(thread)).toBe("mentions");
         yield* f.chat.setNotify(a, "none");
@@ -565,7 +565,7 @@ describe("the chat", () => {
         expect(text3).toEqual(["一个链接 https://example.com/page"]);
         const text4 = yield* Effect.promise(() => text("图 from:管家"));
         expect(text4).toEqual(["我看了图"]);
-        const text5 = yield* Effect.promise(() => text("from:主人 in:#general 图"));
+        const text5 = yield* Effect.promise(() => text("from:用户 in:#general 图"));
         expect(text5).toEqual(["看图"]);
         const text6 = yield* Effect.promise(() => text("图 before:2000-01-01"));
         expect(text6).toEqual([]);
@@ -809,7 +809,7 @@ describe("the chat", () => {
         yield* waitFor(f.mailbox.orchestratorDigest(defaultOrchestrator), (rows) => rows.length === 0, "the digest input consumed");
         yield* f.chat.post({ _tag: "User", text: "大家看一下", channel: f.chat.defaultChannel(), sendKey: "" });
         const unread = yield* f.chat.unread("w12");
-        expect(unread).toEqual([{ channel: "#general", unread: 2, mentionsYou: true, latest: "主人" }]);
+        expect(unread).toEqual([{ channel: "#general", unread: 2, mentionsYou: true, latest: "用户" }]);
         yield* f.chat.read("w12", { target: "#general" });
         const unread2 = yield* f.chat.unread("w12");
         expect(unread2).toEqual([]);
