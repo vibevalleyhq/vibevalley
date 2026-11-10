@@ -3,14 +3,19 @@ import { HttpServerRequest } from "effect/http";
 
 import type { UserHandlers } from "@vibevalley/protocol/api";
 
-import { deviceHeader, outsideHeader } from "#/lan/lan.ts";
+import { deviceHeader, fromHeader, outsideHeader } from "#/lan/lan.ts";
 import { type Caller, User } from "#/user/user.ts";
 
 // Only the gate says a request came from outside, and which device: it drops both headers from what it is handed.
 const caller = Effect.map(Effect.serviceOption(HttpServerRequest.HttpServerRequest), (request): Caller => {
   const headers = Option.getOrUndefined(Option.map(request, (r) => r.headers));
   const device = headers?.[deviceHeader];
-  return { here: headers?.[outsideHeader] === undefined, ...(device !== undefined && device !== "" ? { device } : {}) };
+  const from = headers?.[fromHeader];
+  return {
+    here: headers?.[outsideHeader] === undefined,
+    ...(device !== undefined && device !== "" ? { device } : {}),
+    ...(from !== undefined && from !== "" ? { from } : {}),
+  };
 });
 
 export const userHandlers = Effect.gen(function* () {
@@ -24,7 +29,7 @@ export const userHandlers = Effect.gen(function* () {
     "user.device.list": () => Effect.sync(user.devices),
     "user.device.delete": ({ id }) => user.revoke(id),
     "user.device.previewDelete": ({ id }) => user.previewRevoke(id),
-    "user.approval.create": (body) => user.request(body.name),
+    "user.approval.create": (body) => Effect.flatMap(caller, (c) => user.request(c, body.name)),
     "user.approval.collect": (body) => user.collect(body.claim),
     "user.approval.list": () => Effect.sync(user.requests),
     "user.approval.answer": (body) => user.answerRequest(body.id, body.allow),

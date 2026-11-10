@@ -42,11 +42,15 @@ const loginCommand = Command.make("login", { server: serverArg }, ({ server }) =
     yield* err(t("cli.auth.approve", { code: asked.code, link }));
     yield* openInBrowser(link);
     // Asked until approved; refused (expired, or turned down) ends it with the server's reason.
-    let login = (yield* askAt(base)((api) => api.user.approval.collect({ claim: asked.claim }))).login;
-    while (login === undefined) {
-      yield* Effect.sleep(Duration.seconds(asked.every));
-      login = (yield* askAt(base)((api) => api.user.approval.collect({ claim: asked.claim }))).login;
+    // The server may ask for longer waits (slow_down); from then on it waits that long.
+    let every = asked.every;
+    let collected = yield* askAt(base)((api) => api.user.approval.collect({ claim: asked.claim }));
+    while (collected.login === undefined) {
+      every = collected.every ?? every;
+      yield* Effect.sleep(Duration.seconds(every));
+      collected = yield* askAt(base)((api) => api.user.approval.collect({ claim: asked.claim }));
     }
+    const login = collected.login;
     const home = yield* farmHome;
     keepSignIn({ home, server: base, key: login.key, device: login.device });
     const me = yield* askAt(base)((api) => api.user.get());

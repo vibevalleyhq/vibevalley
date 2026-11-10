@@ -34,7 +34,8 @@ const gateLike = (here: boolean) =>
             return yield* HttpServerResponse.json({ code: "BCDF-GHJK", claim: "t1", expiresAt: 1, every: 0.01 });
           case pathOf("user.approval.collect"):
             collects++;
-            return yield* HttpServerResponse.json(collects < 2 ? {} : { login: { device: "d1", key: "k1" } });
+            // Waiting, then told to slow down (to a wait a test can afford), then the key.
+            return yield* HttpServerResponse.json(collects === 1 ? {} : collects === 2 ? { every: 0.02 } : { login: { device: "d1", key: "k1" } });
           case pathOf("user.logout"):
             return HttpServerResponse.empty({ status: 204 });
           default:

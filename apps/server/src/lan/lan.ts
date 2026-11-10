@@ -3,7 +3,7 @@ import { connect, type Socket } from "node:net";
 import { networkInterfaces } from "node:os";
 
 import { NodeSink, NodeStream } from "@effect/platform-node";
-import { Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Effect, FiberSet, Formatter, Layer, Option, Schema, Semaphore, Stream, String as Str } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -38,6 +38,8 @@ const wrongTries = 5;
 export const deviceHeader = "x-vibevalley-lan-device";
 /** Set on everything the listener hands on, keyed or not: the loopback server's sign that a request came from outside. */
 export const outsideHeader = "x-vibevalley-outside";
+/** The address the gate saw a request come from, for the user to judge a sign-in by; never taken from the device. */
+export const fromHeader = "x-vibevalley-from";
 
 const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
 
@@ -113,8 +115,16 @@ const keyOf = (req: IncomingMessage) => {
   return "";
 };
 
+/** Who is asking: the peer, or the first X-Forwarded-For hop when the peer is a proxy on this computer (TLS in front). */
+const clientOf = (req: IncomingMessage) => {
+  const peer = Str.replace(/^::ffff:/u, "")(req.socket.remoteAddress ?? "");
+  const forwarded = req.headers["x-forwarded-for"];
+  const first = Str.trim(Str.split(typeof forwarded === "string" ? forwarded : "", ",")[0] ?? "");
+  return (peer === "127.0.0.1" || peer === "::1") && first !== "" ? first : peer;
+};
+
 /** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
-const dropped = new Set(["host", "connection", "cookie", "authorization", "origin", "sec-fetch-site", deviceHeader, outsideHeader]);
+const dropped = new Set(["host", "connection", "cookie", "authorization", "origin", "sec-fetch-site", deviceHeader, outsideHeader, fromHeader]);
 
 export const sameOrigin = (headers: Readonly<Record<string, string | string[] | undefined>> & { readonly host?: string | undefined }) =>
   (headers.origin === undefined || headers.origin === `http://${headers.host ?? ""}`) &&
@@ -226,6 +236,7 @@ const make = (options: LanOptions = {}) =>
       const headers: Record<string, string> = {};
       for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers[k] = Array.isArray(v) ? v.join(", ") : v;
       headers[outsideHeader] = "1";
+      headers[fromHeader] = clientOf(req);
       if (device) headers[deviceHeader] = device;
       const body =
         method === "GET" || method === "HEAD"

@@ -258,7 +258,8 @@ describe("lan access", () => {
       for (const op of ["user.approval.list", "user.approval.answer"] as const)
         expect([op, (yield* Effect.promise(() => request("POST", addr + pathOf(op), "", { id: "x", allow: true }))).status]).toEqual([op, 401]);
       const pending = user.requests();
-      expect(pending).toMatchObject([{ code: asked.code, name: "build box" }]);
+      // The gate tells who asked, for the user to judge by.
+      expect(pending).toMatchObject([{ code: asked.code, name: "build box", from: "127.0.0.1" }]);
       // Approved, yet no device until its key is collected.
       yield* user.answerRequest(pending[0]?.id ?? "", true);
       expect(user.devices()).toEqual([]);

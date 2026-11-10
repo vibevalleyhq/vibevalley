@@ -49,6 +49,9 @@
     "wants": "{name} wants to sign in",
     "left": "Expires in {m} min",
     "allow": "Approve",
-    "refuse": "Refuse"
+    "refuse": "Refuse",
+    "from": "Asked from {from}, {at}",
+    "fromHere": "Asked from this computer, {at}",
+    "onlyYours": "Approve only a code you just got from vibevalley auth login in your own terminal: refuse a code someone sent you or an address you do not know; once approved, that device can do anything as you."
   }
 }

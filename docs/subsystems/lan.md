@@ -35,7 +35,8 @@
   - 远端提交配对码后，必须有人在本机点击「让它进来」（`lan.pairing.answer`）才签发钥匙。
 - **密码登录**：`user.login` 凭密码签一把 `login` 来路的钥匙；输错 5 次锁 60 秒。门把钥匙写进 HttpOnly、`SameSite=Strict` 的 Cookie（代理说是 `https` 时加 `Secure`），答复里也带着给命令行用；`user.logout` 收回当前这把并清掉 Cookie。
 - **钥匙只发一次，库里只存 SHA-256**：
-  - 配对或登录成功返回 32 字节 base64url 钥匙（浏览器存入 `vibevalley_device_key` cookie，手机壳存入系统钥匙串）。
+  - 配对或登录成功返回 `vvk_` 开头的 32 字节 base64url 钥匙（前缀让密钥扫描认得出泄露的钥匙；浏览器存入 `vibevalley_device_key` cookie，手机壳存入系统钥匙串）。
+  - 90 天没用过的钥匙自动收回：开机时和之后每天清一遍，用的时候也当场查，过期的拒绝。
   - 数据库仅存钥匙的 SHA-256 哈希并以定长时间比对。
   - 转发前剥离原 `Authorization`、`Cookie` 与伪造的设备头、外来头，注入已验证的 `x-vibevalley-lan-device` 与 `x-vibevalley-outside`。
 - **收回设备或关闭监听当场掐断在途连接**：`User` 收回一台设备（`user.device.delete`、`lan.device.delete`、`user.logout`）时发出 `revoked`，门立即中止该设备名下登记的所有在途 HTTP/SSE 流与 WebSocket；关闭开关时全部中止。
@@ -48,7 +49,7 @@
 
 凭密码登录：在本机设过密码（`user.password.set`）后，远端调 `POST /api/v1/user/login`（密码和这台设备叫什么），门写下 Cookie，之后的请求带着它。
 
-凭确认码登录（命令行的 `vibevalley auth login`，照 `gh auth login`）：远端调 `user.approval.create` 拿到 `XXXX-XXXX` 的确认码和只有它知道的取件凭证（`claim`）；用户在任何已有钥匙的页面（`/approve?code=…`，或设置的「设备」页）对上码点同意（`user.approval.answer`）；远端凭取件凭证轮询 `user.approval.collect`，同意后拿到一把 `login` 来路的钥匙。请求只在内存里，10 分钟过期，同时至多 5 个；设备在取钥匙时才建，同意了没人取的不留下设备。
+凭确认码登录（命令行的 `vibevalley auth login`，照 `gh auth login`）：远端调 `user.approval.create` 拿到 `XXXX-XXXX` 的确认码和只有它知道的取件凭证（`claim`）；用户在任何已有钥匙的页面（`/approve?code=…`，或设置的「设备」页）对上码点同意（`user.approval.answer`）；远端凭取件凭证轮询 `user.approval.collect`，同意后拿到一把 `login` 来路的钥匙。请求只在内存里，10 分钟过期，同时至多 5 个；设备在取钥匙时才建，同意了没人取的不留下设备。同意页显示请求从哪个地址发来（门转发时带 `x-vibevalley-from`：对端地址，对端是本机的反向代理时取 `X-Forwarded-For` 的第一跳）和什么时候发的，并提醒只同意自己刚发起的（RFC 8628 第 5.4 节说的远程钓鱼）；取得比约定的间隔快，就把间隔加 5 秒告诉它（RFC 8628 的 `slow_down`）。
 
 ## 和谁打交道
 

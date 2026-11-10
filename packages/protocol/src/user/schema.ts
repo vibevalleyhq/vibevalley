@@ -42,6 +42,8 @@ export const Approval: Codec<T.Approval> = Schema.Struct({
   id: Schema.String,
   code: Schema.String,
   name: Schema.String,
+  from: Schema.String,
+  askedAt: Schema.Finite,
   expiresAt: Schema.Finite,
 });
 
@@ -64,6 +66,7 @@ export const ApprovalCollectRequest: Codec<T.ApprovalCollectRequest> = Schema.St
 
 export const ApprovalCollected: Codec<T.ApprovalCollected> = Schema.Struct({
   login: Schema.optionalKey(UserLogin),
+  every: Schema.optionalKey(Schema.Finite),
 });
 
 export const ApprovalAnswerRequest: Codec<T.ApprovalAnswerRequest> = Schema.Struct({

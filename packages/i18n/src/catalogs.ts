@@ -4323,6 +4323,10 @@ export const catalogs = {
         left: "还有 {m} 分钟过期",
         allow: "同意",
         refuse: "拒绝",
+        from: "从 {from} 发来，{at}",
+        fromHere: "从这台电脑发来，{at}",
+        onlyYours:
+          "只同意你自己刚在终端里运行 vibevalley auth login 出的码：别人发给你的码、你不认得的地址，都点拒绝——同意了，那台设备就能以你的身份做任何事。",
       },
     },
     "web.voice": {
@@ -9144,6 +9148,10 @@ export const catalogs = {
         left: "Expires in {m} min",
         allow: "Approve",
         refuse: "Refuse",
+        from: "Asked from {from}, {at}",
+        fromHere: "Asked from this computer, {at}",
+        onlyYours:
+          "Approve only a code you just got from vibevalley auth login in your own terminal: refuse a code someone sent you or an address you do not know; once approved, that device can do anything as you.",
       },
     },
     "web.voice": {
@@ -13681,9 +13689,12 @@ export interface Messages {
   "web.user.account.thisDevice": { readonly name: string | number };
   "web.user.account.title": undefined;
   "web.user.approvals.allow": undefined;
+  "web.user.approvals.from": { readonly at: string | number; readonly from: string | number };
+  "web.user.approvals.fromHere": { readonly at: string | number };
   "web.user.approvals.hint": undefined;
   "web.user.approvals.left": { readonly m: string | number };
   "web.user.approvals.none": undefined;
+  "web.user.approvals.onlyYours": undefined;
   "web.user.approvals.page": undefined;
   "web.user.approvals.refuse": undefined;
   "web.user.approvals.title": undefined;

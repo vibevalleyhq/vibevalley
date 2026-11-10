@@ -49,6 +49,9 @@ export interface Approval {
   /** What the asking device shows, for the user to match on the page. */
   code: string;
   name: string;
+  /** The address it asked from, for the user to tell their own terminal from someone else's; "" for this computer. */
+  from: string;
+  askedAt: number;
   expiresAt: number;
 }
 
@@ -73,6 +76,8 @@ export interface ApprovalCollectRequest {
 export interface ApprovalCollected {
   /** Absent while it waits; the device's key once the user approved it, given once. */
   login?: UserLogin;
+  /** It asked again too soon (RFC 8628's slow_down): the seconds to wait from now on. */
+  every?: number;
 }
 
 export interface ApprovalAnswerRequest {

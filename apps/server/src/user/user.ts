@@ -1,6 +1,6 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
-import { Array as Arr, Cause, Clock, Context, Effect, FiberSet, Layer, Option, Order, PubSub, Semaphore, Stream, String as Str } from "effect";
+import { Array as Arr, Cause, Clock, Context, Effect, FiberSet, Layer, Option, Order, PubSub, Schedule, Semaphore, Stream, String as Str } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -21,6 +21,13 @@ const passwordMin = 8;
 const requestForMs = 10 * 60_000;
 const requestsAtOnce = 5;
 const collectEverySeconds = 2;
+/** RFC 8628's slow_down: a collect this much sooner than asked waits five seconds more from then on. */
+const slowDownSeconds = 5;
+const collectSlack = 0.8;
+/** A key nobody has used for this long is taken back: a lost laptop's key does not stay good for ever. */
+const idleForMs = 90 * 24 * 3600_000;
+/** Every device key starts so: secret scanners (and people) can tell one in a leaked file or log. */
+const keyPrefix = "vvk_";
 // No vowels and no look-alikes (0/O, 1/I): a code read off a terminal is typed or matched without slips or words.
 const codeLetters = "BCDFGHJKLMNPQRSTVWXZ";
 
@@ -38,6 +45,8 @@ interface Device extends T.UserDevice {
 interface Request extends T.Approval {
   readonly claimHash: string;
   approved: boolean;
+  every: number;
+  lastCollect: number;
 }
 
 /** XXXX-XXXX from codeLetters; randomBytes' bias over 20 letters is far too small to matter for a ten-minute code. */
@@ -50,6 +59,8 @@ const requestCode = () => {
 export interface Caller {
   readonly here: boolean;
   readonly device?: string;
+  /** The address the gate saw it come from; absent on this machine. */
+  readonly from?: string;
 }
 
 export class User extends Context.Service<
@@ -70,7 +81,7 @@ export class User extends Context.Service<
     /** What revoke would do, refused as it would be; nothing changes. */
     readonly previewRevoke: (id: string) => Effect.Effect<T.Preview, ApiError>;
     /** A device asking to be signed in; refused while too many already wait. */
-    readonly request: (name: string) => Effect.Effect<T.ApprovalCreated, ApiError>;
+    readonly request: (caller: Caller, name: string) => Effect.Effect<T.ApprovalCreated, ApiError>;
     /** The asking device's key once approved, given once; nothing while it waits. */
     readonly collect: (claim: string) => Effect.Effect<T.ApprovalCollected, ApiError>;
     readonly requests: () => T.Approval[];
@@ -155,7 +166,7 @@ const make = Effect.gen(function* () {
   const waiting = new Map<string, Request>();
   const live = () => {
     for (const [id, r] of waiting) if (r.expiresAt <= now()) waiting.delete(id);
-    return Arr.map(Array.from(waiting.values()), ({ claimHash: _, approved: __, ...r }): T.Approval => r);
+    return Arr.map(Array.from(waiting.values()), ({ claimHash: _, approved: __, every: ___, lastCollect: ____, ...r }): T.Approval => r);
   };
 
   const shown = ({ keyHash: _, written: __, ...d }: Device): T.UserDevice => d;
@@ -173,7 +184,7 @@ const make = Effect.gen(function* () {
   };
 
   const addDevice = Effect.fn("User.addDevice")(function* (given: string, came: T.DeviceCame) {
-    const key = randomBytes(32).toString("base64url");
+    const key = keyPrefix + randomBytes(32).toString("base64url");
     const tidy = tidyName(given);
     const d: Device = { id: newId(), name: Str.isEmpty(tidy) ? t("server.user.aDevice") : tidy, came, addedAt: now(), keyHash: keyHash(key), written: 0 };
     yield* db.run(q.addUserDevice({ id: d.id, name: d.name, came, key_hash: d.keyHash, added_at: d.addedAt }));
@@ -189,6 +200,20 @@ const make = Effect.gen(function* () {
     yield* PubSub.publish(revokes, id);
     return listed();
   });
+
+  const idle = (d: Device) => now() - (d.lastSeen ?? d.addedAt) >= idleForMs;
+  const takeBackIdle = Effect.fn("User.takeBackIdle")(function* () {
+    yield* Effect.forEach(
+      Arr.filter(Array.from(devices.values()), idle),
+      (d) => {
+        logs.info(`vibevalley: user: "${d.name}" unused for 90 days, its key taken back`);
+        return revoke(d.id);
+      },
+      { discard: true },
+    );
+  });
+  // At start, then daily; the gate also refuses an idle key the moment it is used (byKey).
+  yield* Effect.forkScoped(Effect.repeat(takeBackIdle(), Schedule.spaced("1 day")));
 
   return User.of({
     status,
@@ -238,6 +263,10 @@ const make = Effect.gen(function* () {
       const hit = Arr.findFirst(Array.from(devices.values()), (d) => matches(d.keyHash));
       if (Option.isNone(hit)) return undefined;
       const found = hit.value;
+      if (idle(found)) {
+        forkHere(revoke(found.id).pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: user: ${Cause.pretty(c)}`))));
+        return undefined;
+      }
       const at = now();
       found.lastSeen = at;
       if (at - found.written >= seenEveryMs) {
@@ -249,7 +278,7 @@ const make = Effect.gen(function* () {
       return shown(found);
     },
     revoke,
-    request: Effect.fn("User.request")(function* (given) {
+    request: Effect.fn("User.request")(function* (caller, given) {
       if (live().length >= requestsAtOnce) return yield* Effect.fail(refuse(t("server.user.requestsBusy")));
       const tidy = tidyName(given);
       const claim = randomBytes(32).toString("base64url");
@@ -257,9 +286,13 @@ const make = Effect.gen(function* () {
         id: newId(),
         code: requestCode(),
         name: Str.isEmpty(tidy) ? t("server.user.aDevice") : tidy,
+        from: caller.here ? "" : (caller.from ?? ""),
+        askedAt: now(),
         expiresAt: now() + requestForMs,
         claimHash: keyHash(claim),
         approved: false,
+        every: collectEverySeconds,
+        lastCollect: Number.NEGATIVE_INFINITY,
       };
       waiting.set(r.id, r);
       logs.info(`vibevalley: user: "${r.name}" asks to sign in (${r.code})`);
@@ -270,10 +303,17 @@ const make = Effect.gen(function* () {
       const matches = sameSecret(keyHash(claim));
       const hit = Arr.findFirst(Array.from(waiting.values()), (r) => matches(r.claimHash));
       if (Option.isNone(hit)) return yield* Effect.fail(refuse(t("server.user.requestGone")));
-      if (!hit.value.approved) return {};
+      const r = hit.value;
+      if (!r.approved) {
+        const tooSoon = now() - r.lastCollect < r.every * 1000 * collectSlack;
+        r.lastCollect = now();
+        if (!tooSoon) return {};
+        r.every += slowDownSeconds;
+        return { every: r.every };
+      }
       // The device is made when its key is collected: an approval nobody collects leaves no device behind.
-      waiting.delete(hit.value.id);
-      return { login: yield* addDevice(hit.value.name, "login") };
+      waiting.delete(r.id);
+      return { login: yield* addDevice(r.name, "login") };
     }),
     requests: live,
     answerRequest: Effect.fn("User.answerRequest")(function* (id, allow) {
