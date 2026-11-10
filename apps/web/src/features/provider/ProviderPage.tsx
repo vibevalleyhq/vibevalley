@@ -340,7 +340,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                             {name}
                             <Show when={"hint" in item ? item.hint : undefined}>{(hint) => <Hint text={t(`web.provider.${hint()}`)} />}</Show>
                             <Show when={use === "speech"}>
-                              <Link href="/media?mode=speech" data-testid="provider-speech-open" {...stylex.attrs(viewStyles.link)}>
+                              <Link href="/library?make=speech" data-testid="provider-speech-open" {...stylex.attrs(viewStyles.link)}>
                                 {t("web.provider.openSpeechShort")}
                               </Link>
                             </Show>

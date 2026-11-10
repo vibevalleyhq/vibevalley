@@ -71,7 +71,7 @@ async function submittedJob(page: Page) {
 for (const mode of ["success", "truncated", "hold"] as const) {
   test(`streamed transcription exposes persisted partial text and segments before ${mode}`, async ({ page, api }) => {
     await bindAudio(api, "audio-a", false, mode);
-    await page.goto("/media?mode=audio");
+    await page.goto("/library?make=audio");
     await page.getByTestId("audio-mode-transcription").click();
     await choose(page, page.getByTestId("audio-execution"), "streaming");
     await page.getByTestId("audio-file").setInputFiles(audioFile());
@@ -120,7 +120,7 @@ for (const mode of ["success", "truncated", "hold"] as const) {
 
 test("ordinary transcription stays asynchronous and cannot enable streaming", async ({ page, api }) => {
   await bindAudio(api, "audio-a", false, undefined, "moss-transcribe-1.0");
-  await page.goto("/media?mode=audio");
+  await page.goto("/library?make=audio");
   await page.getByTestId("audio-mode-transcription").click();
   await expect(page.getByTestId("audio-execution")).toBeDisabled();
   await expect(page.getByTestId("audio-diarize")).toBeDisabled();
@@ -139,7 +139,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`structured speakers produce playable saved audio in ${theme}`, async ({ page, api }) => {
     const configuration = await bindAudio(api);
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
-    await page.goto("/media?mode=audio");
+    await page.goto("/library?make=audio");
     await page.getByTestId("audio-speaker-name").fill("host");
     await choose(page, page.getByTestId("audio-speaker-voice"), "voice-one");
     await page.getByTestId("audio-turn-text").fill("[audio:success] Hello from the host.");
@@ -204,7 +204,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     const handle = await player.evaluateHandle((element: HTMLAudioElement) => element);
     await player.evaluate((element: HTMLAudioElement) => element.play());
-    await page.getByTestId("media-mode-image").click();
+    await page.getByTestId("library-make-form").locator('[data-key="image"]').click();
     expect(await handle.evaluate((element) => ({ paused: element.paused, src: element.getAttribute("src") }))).toEqual({ paused: true, src: null });
     await handle.dispose();
   });
@@ -216,7 +216,7 @@ test("regression: large speaker audio survives reload until the user explicitly 
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/channel/message/send")) publications.push(request.postData() ?? "");
   });
-  await page.goto("/media?mode=audio");
+  await page.goto("/library?make=audio");
   await page.getByTestId("audio-speaker-name").fill("host");
   await choose(page, page.getByTestId("audio-speaker-voice"), "voice-one");
   await choose(page, page.getByTestId("audio-format"), "mp3");
@@ -287,7 +287,7 @@ for (const theme of ["light", "dark"] as const)
     await bindAudio(api);
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
     const before = new Set((await api.media.job.list()).map((job) => job.id));
-    await page.goto("/media?mode=audio");
+    await page.goto("/library?make=audio");
     await page.getByTestId("audio-mode-voiceDesign").click();
     await page.getByTestId("audio-instructions").fill("[audio:success] A warm calm narrator.");
     await page.getByTestId("audio-preview-text").fill("[audio:success] This is a voice preview.");
@@ -317,7 +317,7 @@ for (const theme of ["light", "dark"] as const)
   test(`regression: cloning requires file and account revision consent and lists only the selected account in ${theme}`, async ({ page, api }) => {
     await bindAudio(api);
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
-    await page.goto("/media?mode=audio");
+    await page.goto("/library?make=audio");
     await page.getByTestId("audio-mode-clone").click();
     await choose(page, page.getByTestId("audio-account"), "audio-a");
     await page.getByTestId("audio-file").setInputFiles(audioFile());
@@ -352,7 +352,7 @@ for (const theme of ["light", "dark"] as const)
   test(`long transcription keeps timestamps, seeks local input and saves results without resubmitting on reload in ${theme}`, async ({ page, api }) => {
     await bindAudio(api);
     await page.addInitScript((value) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: value })), theme);
-    await page.goto("/media?mode=audio");
+    await page.goto("/library?make=audio");
     await page.getByTestId("audio-mode-transcription").click();
     await page.getByTestId("audio-file").setInputFiles(audioFile());
     await expect(page.getByTestId("audio-submit")).toBeDisabled();
@@ -408,7 +408,7 @@ test("regression: lost submission preserves the original account and ID; unknown
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/media/voiceDesign/create")) bodies.push(request.postData() ?? "");
   });
-  await page.goto("/media?mode=audio");
+  await page.goto("/library?make=audio");
   await page.getByTestId("audio-mode-voiceDesign").click();
   await page.getByTestId("audio-instructions").fill("A calm narrator");
   await page.getByTestId("audio-preview-text").fill("[audio:unknown]");

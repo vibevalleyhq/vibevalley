@@ -42,7 +42,7 @@ async function prepare(page: Page, text: string) {
       }
     };
   });
-  await page.goto("/media?mode=speech");
+  await page.goto("/library?make=speech");
   await expect(page.getByTestId("speech-voice")).toBeEnabled();
   await page.getByTestId("speech-voice").click();
   await page.locator('[role="option"][data-key="voice-one"]').click();
@@ -142,7 +142,7 @@ for (const action of ["stop", "leave", "device"] as const) {
         await page.getByTestId("flash-stop").click();
         break;
       case "leave":
-        await page.getByTestId("media-mode-image").click();
+        await page.getByTestId("library-make-form").locator('[data-key="image"]').click();
         break;
       case "device":
         await page.evaluate(() => navigator.mediaDevices.dispatchEvent(new Event("devicechange")));

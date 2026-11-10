@@ -8,6 +8,7 @@ export const mediaHandlers = Effect.gen(function* () {
   const media = yield* Media;
   return {
     "media.input.create": media.inputs.create,
+    "media.input.adopt": ({ attachment }) => media.inputs.adopt(attachment),
     "media.input.get": ({ id }) => media.inputs.get(id),
     "media.input.list": media.inputs.list,
     "media.input.delete": ({ id }) => media.inputs.delete(id),

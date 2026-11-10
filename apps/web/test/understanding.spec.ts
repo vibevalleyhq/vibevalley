@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { expect, test } from "./fixtures";
-import { bindUnderstanding, localUnderstandingInput, understandingFile } from "./understanding-fixture";
+import { bindUnderstanding, libraryUnderstandingFile, localUnderstandingInput, understandingFile } from "./understanding-fixture";
 
 test.use({ farm: "understanding" });
 
@@ -10,9 +10,10 @@ for (const kind of ["image", "video"] as const) {
   test(`${kind} uploads with explicit consent, produces saved text and survives refresh without resubmission`, async ({ page, api }) => {
     await bindUnderstanding(api);
     const before = new Set((await api.media.job.list()).map((job) => job.id));
-    await page.goto("/media");
-    await page.getByTestId("media-mode-understanding").click();
-    await page.getByTestId("understanding-files").setInputFiles(understandingFile(kind).path);
+    const file = await libraryUnderstandingFile({ api, kind });
+    await page.goto("/library");
+    await page.locator(`[data-testid="library-item"][data-key="${file.id}"]`).getByTestId("library-understand").click();
+    await expect(page.getByTestId("understanding-file")).toHaveText(file.name);
     await page.getByTestId("understanding-prompt").fill(`Describe the synthetic ${kind}.`);
     await expect(page.getByTestId("understanding-submit")).toBeDisabled();
     await page.getByTestId("understanding-consent").click();
@@ -49,17 +50,17 @@ for (const kind of ["image", "video"] as const) {
     await retry;
     expect((await api.media.job.list()).filter((item) => !before.has(item.id))).toHaveLength(1);
     await page.reload();
-    await page.getByTestId("media-mode-understanding").click();
     await expect(card.getByTestId("understanding-result")).toHaveText(ready.result.text);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(`[data-testid="library-item"][data-key="${file.id}"]`).getByTestId("library-understood")).toHaveText(ready.result.text);
   });
 }
 
 test("regression: stale upload approval is refused before an understanding task is created", async ({ page, api }) => {
   const initial = await bindUnderstanding(api);
   const before = (await api.media.job.list()).map((job) => job.id);
-  await page.goto("/media");
-  await page.getByTestId("media-mode-understanding").click();
-  await page.getByTestId("understanding-files").setInputFiles(understandingFile("image").path);
+  const file = await libraryUnderstandingFile({ api, kind: "image" });
+  await page.goto(`/library?understand=${file.id}`);
   await page.getByTestId("understanding-prompt").fill("Describe the synthetic image.");
   await page.getByTestId("understanding-consent").click();
   await api.provider.update({
@@ -94,8 +95,7 @@ test("truncated text is retained and cleanup retry does not repeat inference", a
     allowUpload: true,
     maxOutputTokens: 8,
   });
-  await page.goto("/media");
-  await page.getByTestId("media-mode-understanding").click();
+  await page.goto(`/library?understand=${input.hash}`);
   const card = page.locator(`[data-testid="understanding-job"][data-id="${job.id}"]`);
   await expect(card).toHaveAttribute("data-phase", "incomplete");
   await expect(card).toHaveAttribute("data-cleanup", "blocked");
@@ -123,8 +123,7 @@ test("unknown and canceled understanding retain honest states and explicit clean
   } as const;
   const unknown = await api.media.understanding.create({ ...request, inputs: [...request.inputs], id: crypto.randomUUID() });
   const canceled = await api.media.understanding.create({ ...request, inputs: [...request.inputs], id: crypto.randomUUID(), prompt: "[understanding:hold]" });
-  await page.goto("/media");
-  await page.getByTestId("media-mode-understanding").click();
+  await page.goto(`/library?understand=${input.hash}`);
   const unknownCard = page.locator(`[data-testid="understanding-job"][data-id="${unknown.id}"]`);
   const canceledCard = page.locator(`[data-testid="understanding-job"][data-id="${canceled.id}"]`);
   await expect(unknownCard).toHaveAttribute("data-phase", "unknown");
@@ -143,9 +142,8 @@ test("unknown and canceled understanding retain honest states and explicit clean
 test("user can authorize immutable input for a channel and revoke it before any vendor upload", async ({ page, api }) => {
   await bindUnderstanding(api);
   const channel = await api.channel.create({ name: "understanding-approval" });
-  await page.goto("/media");
-  await page.getByTestId("media-mode-understanding").click();
-  await page.getByTestId("understanding-files").setInputFiles(understandingFile("video").path);
+  const file = await libraryUnderstandingFile({ api, kind: "video" });
+  await page.goto(`/library?understand=${file.id}`);
   await page.getByTestId("understanding-prompt").fill("Explain this synthetic video after my approval.");
   await page.getByTestId("understanding-channel").click();
   await page.locator(`[role="option"][data-key="${channel}"]`).click();
@@ -163,7 +161,6 @@ test("user can authorize immutable input for a channel and revoke it before any 
   expect(granted.authorization?.channel).toBe(channel);
   expect(granted.inputs[0]?.kind).toBe("video");
   await page.reload();
-  await page.getByTestId("media-mode-understanding").click();
   await expect(card).toHaveAttribute("data-phase", "authorized");
   await card.getByTestId("understanding-cancel").click();
   await card.getByTestId("understanding-cancel-sure").click();

@@ -44,8 +44,8 @@ test("regression: submission retries preserve the request ID and editing require
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/media/image/create")) bodies.push(request.postData() ?? "");
   });
-  await page.goto("/media");
-  await expect(page.getByTestId("media-page")).toBeVisible();
+  await page.goto("/library?make=image");
+  await expect(page.getByTestId("image-panel")).toBeVisible();
   await page.getByTestId("media-prompt").fill("A quiet farm");
   const refused = page.waitForResponse((response) => response.url().endsWith("/api/v1/media/image/create") && response.status() === 409);
   await page.getByTestId("media-generate").click();
@@ -66,7 +66,7 @@ test("regression: submission retries preserve the request ID and editing require
 test("regression: an image is generated, saved, published once and referenced by an artifact through the real server", async ({ page, api }) => {
   await bindImage(api);
   const channel = await api.channel.create({ name: "generated-images" });
-  await page.goto("/media");
+  await page.goto("/library?make=image");
   await page.getByTestId("media-prompt").fill("[media:success] A quiet farm");
   await page.getByTestId("media-width").fill("256");
   await page.getByTestId("media-height").fill("256");
@@ -110,7 +110,7 @@ test("regression: an image is generated, saved, published once and referenced by
 
 test("layout input generates through the same task and attachment pipeline", async ({ page, api }) => {
   await bindImage(api);
-  await page.goto("/media");
+  await page.goto("/library?make=image");
   await page.getByTestId("media-format").click();
   await page.locator('[role="option"][data-key="layout"]').click();
   await page.getByTestId("media-prompt").fill(
@@ -134,7 +134,7 @@ test("download retry, unknown outcomes and cancellation use the task state witho
   const retry = await api.media.image.create({ ...imageRequest, id: "retry-download", prompt: "[media:download-failure]" });
   const unknown = await api.media.image.create({ ...imageRequest, id: "unknown-result", prompt: "[media:unknown]" });
   const cancel = await api.media.image.create({ ...imageRequest, id: "cancel-wait", prompt: "[media:hold]" });
-  await page.goto("/media");
+  await page.goto("/library?make=image");
   const retryCard = page.locator(`[data-testid="media-job"][data-id="${retry.id}"]`);
   await expect(retryCard).toHaveAttribute("data-phase", "download_failed");
   const unknownCard = page.locator(`[data-testid="media-job"][data-id="${unknown.id}"]`);
@@ -153,7 +153,7 @@ test("download retry, unknown outcomes and cancellation use the task state witho
 test("invalid image dimensions are rejected before an external request and leave no task", async ({ page, api }) => {
   await bindImage(api);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/media");
+  await page.goto("/library?make=image");
   await page.getByTestId("media-prompt").fill("Invalid size, no generation");
   await page.getByTestId("media-width").fill("257");
   await page.getByTestId("media-generate").click();

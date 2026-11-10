@@ -1,4 +1,4 @@
-import { Clock, Effect, Exit, FileSystem, Path, Schema, Semaphore, type Scope, Stream } from "effect";
+import { Array as Arr, Clock, Context, Effect, Exit, FileSystem, Option, Path, Schema, Semaphore, type Scope, Stream, String as Str } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -30,6 +30,8 @@ export const makeInputs = Effect.gen(function* () {
   // attachments' one, so a staged file is renamed into place.
   const staging = join(kept.staging, "media");
   const contentOf = (hash: string) => kept.pathOf(hash);
+  // What staging an upload needs, the same for an upload over HTTP and an adopted attachment.
+  const stagingNeeds = Context.make(FileSystem.FileSystem, fs).pipe(Context.add(Path.Path, path));
   const lock = yield* Semaphore.make(1);
   const uploading = new Set<string>();
   const resultReservations = new Map<string, number>();
@@ -91,7 +93,7 @@ export const makeInputs = Effect.gen(function* () {
     Effect.uninterruptible,
   );
 
-  return {
+  const service = {
     get,
     list,
     sweep,
@@ -222,7 +224,7 @@ export const makeInputs = Effect.gen(function* () {
           yield* resume(
             Effect.gen(function* () {
               const declared = yield* metadata(row);
-              const staged = yield* stageMediaInput(join(staging, id), declared, source).pipe(Effect.provideService(FileSystem.FileSystem, fs));
+              const staged = yield* stageMediaInput(join(staging, id), declared, source).pipe(Effect.provideContext(stagingNeeds));
               return yield* lock.withPermits(1)(
                 Effect.gen(function* () {
                   if (row.hash !== null && staged.hash !== row.hash) return yield* Effect.fail(refused(t("server.media.inputChanged")));
@@ -396,4 +398,14 @@ export const makeInputs = Effect.gen(function* () {
       Effect.uninterruptible,
     ),
   };
+  /** A kept attachment taken as an input: its bytes go through the same checks an upload does, and land on the same id. */
+  const adopt = Effect.fn("Media.inputAdopt")(function* (attachment: string) {
+    const [file] = yield* kept.of([attachment]);
+    if (file === undefined) return yield* Effect.fail(refused(t("server.media.inputInvalid")));
+    const kind = Arr.findFirst(["image", "video", "audio"] as const, (k) => Str.startsWith(`${k}/`)(file.type));
+    if (Option.isNone(kind)) return yield* Effect.fail(refused(t("server.media.inputInvalid")));
+    const input = yield* service.create({ kind: kind.value, name: file.name, mime: file.type, size: file.size });
+    return yield* service.upload(input.id, fs.stream(kept.pathOf(file.id)).pipe(Stream.mapError(storageError)));
+  });
+  return { ...service, adopt };
 });

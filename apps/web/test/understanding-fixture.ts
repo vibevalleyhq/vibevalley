@@ -38,3 +38,11 @@ export async function localUnderstandingInput(api: VibeValleyApi, kind: "image" 
   if (!response.ok) throw new Error(`Synthetic input upload failed: ${response.status}`);
   return api.media.input.get({ id: input.id });
 }
+
+/** The file kept and put in the library, as the page's upload does: understanding starts from it. */
+export const libraryUnderstandingFile = (given: { readonly api: VibeValleyApi; readonly kind: "image" | "video" }) => {
+  const file = understandingFile(given.kind);
+  return given.api.attachment
+    .create({ name: file.name, type: file.mime, data: readFileSync(file.path).toString("base64") })
+    .then((kept) => given.api.library.item.add({ attachment: kept.id }).then(() => kept));
+};

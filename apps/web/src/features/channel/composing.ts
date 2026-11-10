@@ -8,6 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 import type { Mark } from "#/base/typedMarks.ts";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
+import { attachmentData } from "#/infra/attachment.ts";
 import { orchestratorMood } from "#/infra/frame.ts";
 import { ready, settingsQuery, useQuery } from "#/infra/query.ts";
 import { defineAtom } from "#/state/atom.ts";
@@ -323,15 +324,12 @@ const sending =
 
 /** A file uploaded for a message; progress is told in whole percents as it goes up. */
 async function upload(file: File, progress: (percent: number) => void = () => {}): Promise<Attachment> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  // In pieces: one call with every byte as an argument overflows the stack for a big file.
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const data = await attachmentData(file);
   const api = new VibeValleyApi(
     "",
     sending((sent, total) => progress(Math.min(100, Math.round((sent / total) * 100)))),
   );
-  return api.attachment.create({ name: file.name || "file", type: file.type || "application/octet-stream", data: btoa(binary) });
+  return api.attachment.create({ name: file.name || "file", type: file.type || "application/octet-stream", data });
 }
 
 export interface Upload {

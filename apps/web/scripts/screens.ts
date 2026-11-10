@@ -5,7 +5,9 @@ import { chromium } from "@playwright/test";
 
 const server = process.env.VIBEVALLEY_SERVER;
 if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
-const pages = (process.env.VIBEVALLEY_PAGES ?? "/,/issues,/chat,/docs,/agents,/manager,/runtimes,/repos,/catalog,/settings").split(",").filter(Boolean);
+const pages = (process.env.VIBEVALLEY_PAGES ?? "/,/issues,/chat,/library,/artifacts,/agents,/orchestrator,/runtimes,/repos,/catalog,/settings")
+  .split(",")
+  .filter(Boolean);
 const [width = 1440, height = 900] = (process.env.VIBEVALLEY_SCREEN ?? "1440x900").split("x").map(Number);
 const out = join(import.meta.dirname, "..", ".screens");
 mkdirSync(out, { recursive: true });

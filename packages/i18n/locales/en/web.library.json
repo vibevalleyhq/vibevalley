@@ -1,0 +1,41 @@
+{
+  "title": "Library",
+  "hint": "Files that were generated, that you uploaded, and that helpers brought back.",
+  "upload": "Upload",
+  "uploading": "Uploading…",
+  "make": "Generate",
+  "makeTitle": "Generate",
+  "configure": "Set up AI connections",
+  "empty": "Nothing here yet. Generate an image or speech, upload a file, or ask a helper in the chat to put what it found here.",
+  "nothingShown": "Nothing matches these filters.",
+  "originLabel": "From",
+  "kindLabel": "Kind",
+  "origin": { "all": "All", "generated": "Generated", "uploaded": "Uploaded", "fetched": "Brought back" },
+  "kind": { "all": "All", "image": "Images", "audio": "Audio", "video": "Video", "other": "Other" },
+  "job": {
+    "image": "image",
+    "speech": "speech",
+    "speakers": "dialogue",
+    "voiceDesign": "voice design",
+    "clone": "voice clone",
+    "transcription": "transcription",
+    "understanding": "understanding"
+  },
+  "from": {
+    "generated": "Generated · {job}",
+    "uploadedHere": "You uploaded it here",
+    "uploadedIn": "You sent it in {channel}",
+    "fetchedUrl": "{agent} brought it back from {url}",
+    "fetchedPath": "{agent} brought it back from {path} in its working directory"
+  },
+  "download": "Download",
+  "sendTo": "Send to a channel",
+  "send": "Send",
+  "sent": "Sent",
+  "remove": "Remove from library",
+  "removeAsk": "Remove “{name}” from the library? Messages that have it still open it.",
+  "understand": "Understand",
+  "understandTitle": "Understand “{name}”",
+  "understood": "What it shows",
+  "makeTabs": { "image": "Image", "speech": "Speech", "audio": "Audio workbench" }
+}

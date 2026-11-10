@@ -2,7 +2,7 @@ import type { Effect } from "effect";
 import { Schema } from "effect";
 
 import { Preview } from "../common/schema";
-import type { ApiError, Endpoint } from "../endpoint";
+import { type ApiError, type Endpoint, input } from "../endpoint";
 import type * as T from "../shapes";
 import * as A from "./audio-schema";
 import * as S from "./schema";
@@ -16,6 +16,8 @@ export interface MediaHandlers<R = never> {
   readonly "media.audio.previewCleanup": (a: T.MediaJobRequest) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "media.audio.cleanup": (a: T.MediaJobRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
   readonly "media.input.create": (a: T.MediaInputRequest) => Effect.Effect<T.MediaInput, ApiError, R>;
+  /** A kept attachment (a library item) taken as an input, checked as an upload is. */
+  readonly "media.input.adopt": (a: { readonly attachment: string }) => Effect.Effect<T.MediaInput, ApiError, R>;
   readonly "media.input.get": (a: T.MediaJobRequest) => Effect.Effect<T.MediaInput, ApiError, R>;
   readonly "media.input.list": () => Effect.Effect<T.MediaInput[], ApiError, R>;
   readonly "media.input.previewDelete": (a: T.MediaJobRequest) => Effect.Effect<T.Preview, ApiError, R>;
@@ -45,6 +47,7 @@ export const mediaEndpoints: readonly Endpoint[] = [
   { op: "media.audio.previewCleanup", about: ["id"], input: S.MediaJobRequest, result: Preview, can: ["user"] },
   { op: "media.audio.cleanup", about: ["id"], input: S.MediaJobRequest, result: A.MediaAudioJob, can: ["user"], dryRun: "media.audio.previewCleanup" },
   { op: "media.input.create", about: [], input: S.MediaInputRequest, result: S.MediaInput, can: ["user"] },
+  { op: "media.input.adopt", about: [], input: input({ attachment: Schema.String }), result: S.MediaInput, can: ["user"] },
   { op: "media.input.get", about: ["id"], input: S.MediaJobRequest, result: S.MediaInput, can: ["user"] },
   { op: "media.input.list", about: [], input: undefined, result: Schema.Array(S.MediaInput), can: ["user"] },
   { op: "media.input.delete", about: ["id"], input: S.MediaJobRequest, result: undefined, can: ["user"], dryRun: "media.input.previewDelete" },

@@ -1,5 +1,4 @@
 {
-  "title": "Media",
   "image": "Image generation",
   "speech": {
     "title": "Single-speaker speech",
@@ -32,7 +31,6 @@
     "title": "Understand images and video",
     "notice": "Select 1–5 images (up to 30 MB each), or one video (up to 200 MB); do not mix them. Files are first stored on this computer, then sent to the displayed MOSS connection after your approval. Charges may apply. Canceling does not guarantee that the provider stopped.",
     "configure": "Select an understanding connection in AI services first.",
-    "files": "Local images or video",
     "prompt": "What should the model explain?",
     "tokens": "Maximum output tokens",
     "executor": "Execution / authorized channel",
@@ -44,8 +42,6 @@
     "delegated": "Sent to the assistant",
     "delegation": "Execute my authorized media understanding task {id}, then report the result.",
     "consent": "I approve sending these files and this prompt to the displayed MOSS connection.",
-    "stored": "Stored locally",
-    "selected": "Selected; not uploaded yet",
     "uploading": "Storing selected files on this computer…",
     "stopUpload": "Stop local upload",
     "uploadFailed": "Local upload failed. This submission has not started understanding; retry or select the files again.",
@@ -65,8 +61,6 @@
   "sourceAgent": "Source: assistant {agent} · channel {channel}",
   "usage": "Provider reported: {images} image(s) · {width} × {height}",
   "usageUnknown": "No provider usage result yet. This does not mean there was no charge.",
-  "hint": "Generate images or single-speaker speech, or understand selected images and video with the connections bound in AI services. Keep results locally.",
-  "configure": "Configure AI connections",
   "prompt": "Prompt / layout JSON",
   "format": "Input format",
   "text": "Text to image",

@@ -44,7 +44,7 @@ const saved = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInp
   return yield* inputs.upload(input.id, Stream.make(bytes));
 });
 
-it.effect("input reservations are immutable, kept as one attachment, and never return private paths", () =>
+it.effect("input reservations are immutable, kept as one attachment, taken from a kept file, and never return private paths", () =>
   Effect.gen(function* () {
     const inputs = yield* makeInputs;
     const fs = yield* FileSystem.FileSystem;
@@ -70,6 +70,13 @@ it.effect("input reservations are immutable, kept as one attachment, and never r
     // Media stops holding it; the attachment stays for whatever else keeps it.
     const stays = yield* fs.exists(keptAt(config.home, second.hash ?? ""));
     expect(stays).toBe(true);
+    // A kept file is taken as an input on its own bytes; one that is no image, video or audio is refused.
+    const kept = yield* Attachment;
+    const file = yield* kept.attach({ name: "kept.png", type: "image/png", data: Buffer.from(bytes).toString("base64") });
+    const input = yield* inputs.adopt(file.id);
+    expect(input).toMatchObject({ phase: "ready", hash: file.id, kind: "image", mime: "image/png", size: bytes.length });
+    const text = yield* kept.attach({ name: "notes.txt", type: "text/plain", data: Buffer.from("plain words").toString("base64") });
+    expect((yield* Effect.flip(inputs.adopt(text.id)))._tag).toBe("Refused");
   }).pipe(Effect.provide(layer())),
 );
 

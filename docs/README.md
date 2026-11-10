@@ -36,6 +36,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
+| [library.md](docs/subsystems/library.md) | 素材库：生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
 | [media.md](docs/subsystems/media.md) | 生图：持久化任务、独立下载、安全校验、本机附件与状态投影 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、三条流、接口和能力表、重启 |
@@ -118,6 +119,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 频道 | channel | channel（`Channel`） | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群（指频道时）、群聊 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
 | 附件 | attachment | `Attachment`（`attachment` 表） | 农场留下的一份文件：一条消息带的文件和图，也是媒体的结果、素材库里的一条 | |
+| 素材库 | library | `Library`（`library_item` 表） | 生成的、你上传的、帮工拿回来的文件都在一处；一份文件一张卡，记着来路 | 媒体（指这一页时） |
 | 工作目录 | working folder | `Workplace`（`workdir`） | 帮工干活的目录：仓库目录或工单的 worktree；VibeValley 自己的是 `VIBEVALLEY_WORK_ROOT` | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 一张工单的一种触发：到点开它的一轮，派给帮工或助手 | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 要你处理的事，从核心状态现算 | 通知（指 Inbox 时）、来电（农场的皮里用） |

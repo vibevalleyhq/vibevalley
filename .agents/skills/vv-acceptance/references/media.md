@@ -4,7 +4,7 @@
 
 ## 什么时候用
 
-用于 `media`、音频协议、下载与附件、理解授权、助手媒体工具、`/media` 页，以及 MOSS Live／Vision 的实时视觉、播放与资源生命周期。模型列表能查、用途能绑定，不等于生成能用。
+用于 `media`、音频协议、下载与附件、理解授权、助手媒体工具、素材库 `/library` 页（生成对话框 `?make=`、理解对话框 `?understand=<附件 id>`），以及 MOSS Live／Vision 的实时视觉、播放与资源生命周期。模型列表能查、用途能绑定，不等于生成能用。
 
 ## 准备
 
@@ -49,7 +49,7 @@
 1. 在 `apps/server` 跑 `vp test src/media/speech.test.ts src/media/audio.test.ts src/media/audioResult.test.ts src/media/release.test.ts src/flows/media.test.ts`。核对 Flash／Pro、格式闭集与实际格式、用量、凭据快照、共享 ID 和容量、可信来源、下载独立重试、磁盘失败、取消竞争和重启；未知结果不重合成。
 2. 跑 `vp run --filter @vibevalley/web e2e:integration 'test/speech.spec.ts$'`，再加 `VIBEVALLEY_WEB_DEV=1` 跑同一项。确认从 AI 服务页进入语音、账号音色分页、明确提交后保存；两种格式都要检查浏览器时长与解码状态、播放推进、下载字节及频道去重。离开面板后旧播放器停止并清空来源。
 3. 模拟丢失提交答复，再改变 Provider 配置：重试必须仍提交原请求 ID、文字、账号版本、音色和格式；开始新请求才采用新配置。下载失败只重试下载；未知和取消如实显示，不能据按钮恢复猜测未计费。
-4. 查看 `apps/web/.screens/speech-ready-{light,dark}-{1280,390}.png`，再在实际 `/media?mode=speech` 页面做 axe 检查。播放器、保存链接与长任务 ID 不横向溢出，截图应包含结果和动作，不只看表单。
+4. 查看 `apps/web/.screens/speech-ready-{light,dark}-{1280,390}.png`，再在实际 `/library?make=speech` 页面做 axe 检查。播放器、保存链接与长任务 ID 不横向溢出，截图应包含结果和动作，不只看表单。
 5. `verify-server.ts --scripted-helper -- <脚本>` 中绑定假凭据，创建语音至 `ready`，GET 本机附件并校验音频，重复请求不新建任务，状态流不含 Key 或签名 URL。保存 `command.stdout.log` 与 `result.json`，确认 code 0、stopped true、无清理错误。整段音频通过不代表 Flash 流式或异步轮询通过。
 
 ## 流式、异步与长转写
@@ -83,7 +83,7 @@
 3. 对照请求格式与实际回执，记录实际 MIME、文件格式、可取得的时长／采样率／声道、厂商用量与附件哈希。请求 FLAC 返回 WAV 时应如实记录 WAV；未知用量不记零。
 4. 在真实应用播放已下载音频，记录时长、解码状态与播放位置推进；Flash 另记录完成前的实际播放，Live 另记录实际播放完成／打断回执。原始协议探针成功不能替代这些应用证据。
 5. 检查结果域名的 DNS。若 `img.mosi.cn` 被解析到 `198.18.0.0/15`，保留拒绝证据，按[下载边界](docs/subsystems/media.md)在隔离环境修复 DNS 后只重试下载；不改生产 SSRF 校验，不重生成。
-6. 验收真实克隆时，在 `/media?mode=audio` 选择授权账号和合成样本，勾选许可后仅提交一次。核对任务 `ready` 与返回的音色 ID，再通过同账号 `provider.voice.list` 和单人语音选择器确认可用；用该 ID 合成一句短文本，实际播放、下载、刷新后再播放。保留两个请求 ID、原样本哈希、WAV 元数据与下载哈希，核对任务没有因刷新增加。只创建成功而没有取得可播放结果，不算完整验收。
+6. 验收真实克隆时，在 `/library?make=audio` 选择授权账号和合成样本，勾选许可后仅提交一次。核对任务 `ready` 与返回的音色 ID，再通过同账号 `provider.voice.list` 和单人语音选择器确认可用；用该 ID 合成一句短文本，实际播放、下载、刷新后再播放。保留两个请求 ID、原样本哈希、WAV 元数据与下载哈希，核对任务没有因刷新增加。只创建成功而没有取得可播放结果，不算完整验收。
 
 真实克隆、真实 Live 播放或真实宿主步骤未走通时，应逐项写「未验收」及阻碍，不用离线、替身或裸协议结果填补。
 

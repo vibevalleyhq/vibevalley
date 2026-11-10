@@ -249,6 +249,7 @@
 | `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
 | `createRequestKey` | `api.ts` | The request key of one thing the user may send again (a form's create, a button's). a new one after. |
+| `attachmentData` | `attachment.ts` | A file's bytes as attachment.create takes them: base64. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
 | `formIssues` | `form/issues.ts` |  |

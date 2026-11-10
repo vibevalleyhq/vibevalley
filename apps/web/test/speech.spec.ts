@@ -45,7 +45,7 @@ for (const scenario of [
     await page.addInitScript((theme) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme })), scenario.theme);
     await page.goto("/settings/providers");
     await page.getByTestId("provider-speech-open").click();
-    await expect(page.getByTestId("media-mode-speech")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("library-make-form").locator('[data-key="speech"]')).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("speech-connection")).toHaveAttribute("data-model", scenario.model);
     await expect(page.getByTestId("speech-connection")).toHaveAttribute("data-revision", String(status.revision));
     const next = page.waitForResponse((response) => response.url().endsWith("/api/v1/provider/voice/list") && response.status() === 200);
@@ -126,7 +126,7 @@ for (const scenario of [
     }
     const player = await audio.evaluateHandle((element: HTMLAudioElement) => element);
     await audio.evaluate((element: HTMLAudioElement) => element.play());
-    await page.getByTestId("media-mode-image").click();
+    await page.getByTestId("library-make-form").locator('[data-key="image"]').click();
     await expect(page.getByTestId("speech-audio")).toHaveCount(0);
     expect(await player.evaluate((element) => ({ paused: element.paused, source: element.getAttribute("src") }))).toEqual({ paused: true, source: null });
     await player.dispose();
@@ -139,7 +139,7 @@ test("regression: large speech survives reload until the user explicitly release
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/channel/message/send")) publications.push(request.postData() ?? "");
   });
-  await page.goto("/media?mode=speech");
+  await page.goto("/library?make=speech");
   await chooseVoice(page, "voice-one");
   await page.getByTestId("speech-text").fill("[speech:large]");
   await page.getByTestId("speech-generate").click();
@@ -199,7 +199,7 @@ test("regression: a lost speech response preserves the immutable request across 
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/media/speech/create")) bodies.push(request.postData() ?? "");
   });
-  await page.goto("/media?mode=speech");
+  await page.goto("/library?make=speech");
   await chooseVoice(page, "voice-one");
   await page.getByTestId("speech-text").fill("[speech:success] Retain the original request");
   await page.route(
@@ -248,7 +248,7 @@ test("speech download retry, unknown result and cancellation retain server job s
   page.on("request", (sent) => {
     if (sent.url().endsWith("/api/v1/media/speech/create")) generated.push(sent.postData() ?? "");
   });
-  await page.goto("/media?mode=speech");
+  await page.goto("/library?make=speech");
   const retryCard = page.locator(`[data-testid="speech-job"][data-id="${retry.id}"]`);
   const unknownCard = page.locator(`[data-testid="speech-job"][data-id="${unknown.id}"]`);
   const cancelCard = page.locator(`[data-testid="speech-job"][data-id="${cancel.id}"]`);

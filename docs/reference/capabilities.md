@@ -66,6 +66,7 @@
 | `media.audio.previewCleanup` | 预览清理已知远端音频文件，不实际改动 | `/api/v1/media/audio/previewCleanup` | ✓ |   |   |   |
 | `media.audio.cleanup` | 清理已知远端音频文件，不重复转写或合成 | `/api/v1/media/audio/cleanup` | ✓ |   |   |   |
 | `media.input.create` | 为媒体输入预留有限的本机空间，不上传给供应商 | `/api/v1/media/input/create` | ✓ |   |   |   |
+| `media.input.adopt` | 把素材库里的一个文件拿来当媒体输入，照上传一样检查 | `/api/v1/media/input/adopt` | ✓ |   |   |   |
 | `media.input.get` | 查看本机的媒体输入 | `/api/v1/media/input/get` | ✓ |   |   |   |
 | `media.input.list` | 列出本机的媒体输入 | `/api/v1/media/input/list` | ✓ |   |   |   |
 | `media.input.delete` | 删除没有被任务保留的本机媒体输入 | `/api/v1/media/input/delete` | ✓ |   |   |   |

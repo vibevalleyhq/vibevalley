@@ -443,6 +443,7 @@
     "media": {
       "input": {
         "create": "Reserve bounded local storage for a media input without uploading to a provider",
+        "adopt": "Take a library file as a media input, checked as an upload is",
         "get": "Read a local media input",
         "list": "List local media inputs",
         "delete": "Delete a local media input not retained by a task",

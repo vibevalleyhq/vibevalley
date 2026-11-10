@@ -24,7 +24,7 @@
   "Attachment.get": ["library", "media"],
   "Attachment.keep": ["artifact"],
   "Attachment.keepStaged": ["media"],
-  "Attachment.of": ["channel"],
+  "Attachment.of": ["channel", "media"],
   "Attachment.pathOf": ["artifact", "channel", "media"],
   "Attachment.staging": ["media"],
   "Channel.addressOf": ["orchestrator", "tool"],

@@ -1,6 +1,6 @@
 # 媒体任务与输入
 
-「媒体」页由 `Media` 服务管理生图、图片／视频理解、单人语音、多人对白、音色设计与克隆、长音频转写。用户在[AI 服务](docs/subsystems/provider.md)分别绑定连接与模型；任务先落库，页面通过同一状态流观察进度。结果保留实际格式、元数据与厂商用量；实时 Live 与独立 Vision 的设备和会话归[语音](docs/subsystems/voice.md)。
+`Media` 服务管理生图、图片／视频理解、单人语音、多人对白、音色设计与克隆、长音频转写。用户在[AI 服务](docs/subsystems/provider.md)分别绑定连接与模型；任务先落库，页面通过同一状态流观察进度；表单收在[素材库](docs/subsystems/library.md)的「生成」对话框里，完成的结果进素材库。结果保留实际格式、元数据与厂商用量；实时 Live 与独立 Vision 的设备和会话归[语音](docs/subsystems/voice.md)。
 
 ## 管什么，不管什么
 
@@ -28,7 +28,7 @@
 | `apps/server/db/queries/media_input.sql`、`media_input_pin.sql` | 输入、删除标记与任务保留记录 |
 | `apps/server/src/http/media.ts` | 本机专用的二进制上传入口 |
 | `apps/server/src/tool/media.ts` | 助手调用同一 Media 服务 |
-| `apps/web/src/features/media/` | `/media` 表单、任务、预览、保存与频道发布 |
+| `apps/web/src/features/media/` | 素材库「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
 
 Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)。生图、语音及任务读取对 owner 与 orchestrator 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 owner 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
 
@@ -52,7 +52,7 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 
 ## 本机输入
 
-`media.input.create` 校验名称、MIME、用途与声明大小，返回服务端生成的输入 ID；它只预留本机空间，不读取服务器上的任意路径、不联系厂商。用户随后 `PUT /api/v1/media/input/:id/content`，请求类型为 `application/octet-stream`，正文直接流式落盘，不经频道的 Base64 JSON。`media.input.get/list/delete` 查询、列出和删除输入；`media.input.previewDelete` 只预览，供 CLI 的 `--dry-run` 使用。五个 JSON 接口与二进制上传都只给本机用户，LAN 和 agent 工具不开放上传。
+`media.input.create` 校验名称、MIME、用途与声明大小，返回服务端生成的输入 ID；它只预留本机空间，不读取服务器上的任意路径、不联系厂商。用户随后 `PUT /api/v1/media/input/:id/content`，请求类型为 `application/octet-stream`，正文直接流式落盘，不经频道的 Base64 JSON。`media.input.adopt` 把一个已有的附件（素材库的一条）当作输入，字节照上传一样核对，落在同一个输入上。`media.input.get/list/delete` 查询、列出和删除输入；`media.input.previewDelete` 只预览，供 CLI 的 `--dry-run` 使用。这些 JSON 接口与二进制上传都只给本机用户，LAN 和 agent 工具不开放上传。
 
 图片上限为 30,000,000 字节，视频为 200,000,000 字节。支持 PNG、JPEG、WebP、GIF、BMP、TIFF，以及 MP4、M4V、MOV、AVI、WebM、MKV 的容器签名；音频接受 WAV、MP3、M4A、FLAC、Ogg 和 WebM，按用途核对格式与时长。容器签名不代表完整解码成功。上传核对声明与实际字节数，计算 SHA256；流式暂存限时 300 秒，最多同时八路。输入以 `0600` 权限写入附件存储下的暂存目录（`attachments/staging/media/`），完整写完后才经 `Attachment.keepStaged` 改名成为附件（[附件](docs/subsystems/attachment.md)），不把私有路径返回给页面；输入的 `hash` 就是附件的 id。相同内容共用一个附件，不共用输入 ID；再次上传已经就绪的 ID 返回原结果，不改内容。
 

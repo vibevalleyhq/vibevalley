@@ -1,0 +1,41 @@
+{
+  "title": "素材库",
+  "hint": "生成的、你上传的、帮工拿回来的文件都在这里。",
+  "upload": "上传",
+  "uploading": "正在上传…",
+  "make": "生成",
+  "makeTitle": "生成",
+  "configure": "配置 AI 连接",
+  "empty": "还没有素材。生成一张图或一段语音、上传一个文件，或者在聊天里让帮工把找到的东西放进来，都会出现在这里。",
+  "nothingShown": "没有符合筛选的素材。",
+  "originLabel": "来路",
+  "kindLabel": "种类",
+  "origin": { "all": "全部", "generated": "生成的", "uploaded": "你上传的", "fetched": "帮工拿回来的" },
+  "kind": { "all": "全部", "image": "图", "audio": "音频", "video": "视频", "other": "其它" },
+  "job": {
+    "image": "生图",
+    "speech": "单人语音",
+    "speakers": "多人对白",
+    "voiceDesign": "音色设计",
+    "clone": "音色克隆",
+    "transcription": "转写",
+    "understanding": "理解"
+  },
+  "from": {
+    "generated": "生成的 · {job}",
+    "uploadedHere": "你在素材库上传的",
+    "uploadedIn": "你在 {channel} 发的",
+    "fetchedUrl": "{agent} 从 {url} 拿回来的",
+    "fetchedPath": "{agent} 从工作目录的 {path} 拿回来的"
+  },
+  "download": "下载",
+  "sendTo": "发到频道",
+  "send": "发送",
+  "sent": "已发送",
+  "remove": "从库里拿掉",
+  "removeAsk": "从素材库拿掉「{name}」？聊天里发过的照样能打开。",
+  "understand": "理解",
+  "understandTitle": "理解「{name}」",
+  "understood": "理解的结果",
+  "makeTabs": { "image": "生图", "speech": "单人语音", "audio": "音频工作台" }
+}

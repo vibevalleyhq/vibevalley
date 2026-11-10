@@ -2,12 +2,11 @@ import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Feature, attachmentPath, type MediaImageRequest, type MediaImageJob } from "@vibevalley/protocol";
+import { attachmentPath, type MediaImageRequest, type MediaImageJob } from "@vibevalley/protocol";
 
 import { Readiness } from "#/features/setting/index.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { Link, useSearchParams } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
@@ -15,10 +14,7 @@ import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 
-import { AudioPanel } from "./AudioPanel.tsx";
 import { publicationKey } from "./publication.ts";
-import { SpeechPanel } from "./SpeechPanel.tsx";
-import { UnderstandingPanel } from "./UnderstandingPanel.tsx";
 
 const viewStyles = stylex.create({
   page: {
@@ -50,21 +46,9 @@ const viewStyles = stylex.create({
   image: { maxHeight: "calc(var(--spacing) * 96)", maxWidth: "100%", borderRadius: "var(--radius-md)", objectFit: "contain" },
 });
 
-/** What each mode of the page uses, for its readiness line. */
-const featuresOf = {
-  image: ["image"],
-  understanding: ["understanding"],
-  speech: ["speech"],
-  audio: ["speakers", "voiceDesign", "transcription"],
-} satisfies Record<string, readonly Feature[]>;
-
-export function MediaPage() {
+/** The image form and its recent jobs: one of the forms the library's 生成 dialog holds. */
+export function ImagePanel() {
   const state = useCore();
-  const [search, setSearch] = useSearchParams();
-  const mode = () => {
-    const selected = search().get("mode");
-    return selected === "speech" || selected === "understanding" || selected === "audio" ? selected : "image";
-  };
   const images = () => state()?.media?.filter((job) => job.kind === "image") ?? [];
   const [prompt, setPrompt] = createSignal("");
   const [format, setFormat] = createSignal<"text" | "layout">("text");
@@ -97,173 +81,120 @@ export function MediaPage() {
     return act.run(() => api.media.image.create(input));
   };
   return (
-    <div {...stylex.attrs(viewStyles.page)} data-testid="media-page">
-      <div {...stylex.attrs(viewStyles.header)}>
-        <h1 {...stylex.attrs(viewStyles.title)}>{t("web.media.title")}</h1>
-        <Link href="/settings/providers" {...stylex.attrs(viewStyles.link)}>
-          {t("web.media.configure")}
-        </Link>
-      </div>
-      <div {...stylex.attrs(viewStyles.actions)}>
-        <Button
-          data-testid="media-mode-image"
-          aria-pressed={mode() === "image" ? "true" : "false"}
-          tone={mode() === "image" ? "primary" : "plain"}
-          onClick={() => setSearch({ mode: "image" })}
-        >
-          {t("web.media.image")}
-        </Button>
-        <Button
-          data-testid="media-mode-understanding"
-          aria-pressed={mode() === "understanding" ? "true" : "false"}
-          tone={mode() === "understanding" ? "primary" : "plain"}
-          onClick={() => setSearch({ mode: "understanding" })}
-        >
-          {t("web.media.understanding.title")}
-        </Button>
-        <Button
-          data-testid="media-mode-speech"
-          aria-pressed={mode() === "speech" ? "true" : "false"}
-          tone={mode() === "speech" ? "primary" : "plain"}
-          onClick={() => setSearch({ mode: "speech" })}
-        >
-          {t("web.media.speech.title")}
-        </Button>
-        <Button
-          data-testid="media-mode-audio"
-          aria-pressed={mode() === "audio" ? "true" : "false"}
-          tone={mode() === "audio" ? "primary" : "plain"}
-          onClick={() => setSearch({ mode: "audio" })}
-        >
-          {t("web.audio.title")}
-        </Button>
-      </div>
-      <div {...stylex.attrs(viewStyles.content)}>
-        <Readiness features={featuresOf[mode()]} />
-        <Show when={mode() === "audio"}>
-          <AudioPanel />
-        </Show>
-        <Show when={mode() === "speech"}>
-          <SpeechPanel />
-        </Show>
-        <Show when={mode() === "understanding"}>
-          <UnderstandingPanel />
-        </Show>
-        <Show when={mode() === "image"}>
-          <Card title={t("web.media.generate")}>
-            <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.notice")}</p>
-            <fieldset disabled={act.busy() || submitted() !== undefined} {...stylex.attrs(viewStyles.form)} aria-label={t("web.media.prompt")}>
-              <Field label={t("web.media.format")}>
-                <Select
-                  label={t("web.media.format")}
-                  testid="media-format"
-                  value={format()}
-                  onChange={setFormat}
-                  options={[
-                    { value: "text", label: t("web.media.text") },
-                    { value: "layout", label: t("web.media.layout") },
-                  ]}
+    <section {...stylex.attrs(viewStyles.content)} data-testid="image-panel" aria-label={t("web.media.image")}>
+      <Readiness features={["image"]} />
+      <Card title={t("web.media.generate")}>
+        <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.notice")}</p>
+        <fieldset disabled={act.busy() || submitted() !== undefined} {...stylex.attrs(viewStyles.form)} aria-label={t("web.media.prompt")}>
+          <Field label={t("web.media.format")}>
+            <Select
+              label={t("web.media.format")}
+              testid="media-format"
+              value={format()}
+              onChange={setFormat}
+              options={[
+                { value: "text", label: t("web.media.text") },
+                { value: "layout", label: t("web.media.layout") },
+              ]}
+            />
+          </Field>
+          <Field label={t("web.media.prompt")}>
+            <TextArea
+              data-testid="media-prompt"
+              aria-label={t("web.media.prompt")}
+              rows={5}
+              value={prompt()}
+              onInput={(event) => setPrompt(event.currentTarget.value)}
+            />
+          </Field>
+          <div {...stylex.attrs(viewStyles.dimensions)}>
+            <Field label={t("web.media.width")}>
+              <TextInput
+                data-testid="media-width"
+                aria-label={t("web.media.width")}
+                type="number"
+                value={width()}
+                onInput={(e) => setWidth(Number(e.currentTarget.value))}
+              />
+            </Field>
+            <Field label={t("web.media.height")}>
+              <TextInput
+                data-testid="media-height"
+                aria-label={t("web.media.height")}
+                type="number"
+                value={height()}
+                onInput={(e) => setHeight(Number(e.currentTarget.value))}
+              />
+            </Field>
+          </div>
+          <details>
+            <summary {...stylex.attrs(viewStyles.summary)}>{t("web.media.advanced")}</summary>
+            <div {...stylex.attrs(viewStyles.advanced)}>
+              <Field label={t("web.media.seed")}>
+                <TextInput aria-label={t("web.media.seed")} type="number" value={seed()} onInput={(e) => setSeed(e.currentTarget.value)} />
+              </Field>
+              <Field label={t("web.media.steps")}>
+                <TextInput aria-label={t("web.media.steps")} type="number" value={steps()} onInput={(e) => setSteps(e.currentTarget.value)} />
+              </Field>
+              <Field label={t("web.media.guidance")}>
+                <TextInput
+                  aria-label={t("web.media.guidance")}
+                  type="number"
+                  step="any"
+                  value={guidance()}
+                  onInput={(e) => setGuidance(e.currentTarget.value)}
                 />
               </Field>
-              <Field label={t("web.media.prompt")}>
-                <TextArea
-                  data-testid="media-prompt"
-                  aria-label={t("web.media.prompt")}
-                  rows={5}
-                  value={prompt()}
-                  onInput={(event) => setPrompt(event.currentTarget.value)}
-                />
+              <Field label={t("web.media.negative")}>
+                <TextArea aria-label={t("web.media.negative")} value={negative()} onInput={(e) => setNegative(e.currentTarget.value)} />
               </Field>
-              <div {...stylex.attrs(viewStyles.dimensions)}>
-                <Field label={t("web.media.width")}>
-                  <TextInput
-                    data-testid="media-width"
-                    aria-label={t("web.media.width")}
-                    type="number"
-                    value={width()}
-                    onInput={(e) => setWidth(Number(e.currentTarget.value))}
-                  />
-                </Field>
-                <Field label={t("web.media.height")}>
-                  <TextInput
-                    data-testid="media-height"
-                    aria-label={t("web.media.height")}
-                    type="number"
-                    value={height()}
-                    onInput={(e) => setHeight(Number(e.currentTarget.value))}
-                  />
-                </Field>
-              </div>
-              <details>
-                <summary {...stylex.attrs(viewStyles.summary)}>{t("web.media.advanced")}</summary>
-                <div {...stylex.attrs(viewStyles.advanced)}>
-                  <Field label={t("web.media.seed")}>
-                    <TextInput aria-label={t("web.media.seed")} type="number" value={seed()} onInput={(e) => setSeed(e.currentTarget.value)} />
-                  </Field>
-                  <Field label={t("web.media.steps")}>
-                    <TextInput aria-label={t("web.media.steps")} type="number" value={steps()} onInput={(e) => setSteps(e.currentTarget.value)} />
-                  </Field>
-                  <Field label={t("web.media.guidance")}>
-                    <TextInput
-                      aria-label={t("web.media.guidance")}
-                      type="number"
-                      step="any"
-                      value={guidance()}
-                      onInput={(e) => setGuidance(e.currentTarget.value)}
-                    />
-                  </Field>
-                  <Field label={t("web.media.negative")}>
-                    <TextArea aria-label={t("web.media.negative")} value={negative()} onInput={(e) => setNegative(e.currentTarget.value)} />
-                  </Field>
-                  <label {...stylex.attrs(viewStyles.label)}>
-                    <Checkbox label={t("web.media.enhance")} checked={enhance()} onChange={setEnhance} />
-                    {t("web.media.enhance")}
-                  </label>
-                  <label {...stylex.attrs(viewStyles.label)}>
-                    <Checkbox label={t("web.media.watermark")} checked={watermark()} onChange={setWatermark} />
-                    {t("web.media.watermark")}
-                  </label>
-                </div>
-              </details>
-            </fieldset>
-            <Show when={submitted()}>
-              <p {...stylex.attrs(viewStyles.detail)}>{t("web.media.pending")}</p>
-            </Show>
-            <div {...stylex.attrs(viewStyles.actions)}>
-              <Button data-testid="media-generate" tone="primary" disabled={act.busy() || !prompt().trim()} onClick={() => void submit()}>
-                {submitted() ? t("web.media.resubmit") : t("web.media.generate")}
-              </Button>
-              <Show when={submitted()}>
-                <ConfirmButton
-                  testid="media-new"
-                  tone="primary"
-                  label={t("web.media.new")}
-                  question={t("web.media.newAsk")}
-                  disabled={act.busy()}
-                  onConfirm={() => {
-                    setSubmitted(undefined);
-                    setError(undefined);
-                  }}
-                />
-              </Show>
+              <label {...stylex.attrs(viewStyles.label)}>
+                <Checkbox label={t("web.media.enhance")} checked={enhance()} onChange={setEnhance} />
+                {t("web.media.enhance")}
+              </label>
+              <label {...stylex.attrs(viewStyles.label)}>
+                <Checkbox label={t("web.media.watermark")} checked={watermark()} onChange={setWatermark} />
+                {t("web.media.watermark")}
+              </label>
             </div>
-            <Show when={error()}>
-              {(why) => (
-                <p role="alert" data-testid="media-error" {...stylex.attrs(viewStyles.error)}>
-                  {why()}
-                </p>
-              )}
-            </Show>
-          </Card>
-          <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.media.history")}</h2>
-          <Show when={images().length > 0} fallback={<Quiet>{t("web.media.empty")}</Quiet>}>
-            <For each={images()} keyed={(job) => job.id}>
-              {(job) => <JobCard job={job()} />}
-            </For>
-          </Show>
+          </details>
+        </fieldset>
+        <Show when={submitted()}>
+          <p {...stylex.attrs(viewStyles.detail)}>{t("web.media.pending")}</p>
         </Show>
-      </div>
-    </div>
+        <div {...stylex.attrs(viewStyles.actions)}>
+          <Button data-testid="media-generate" tone="primary" disabled={act.busy() || !prompt().trim()} onClick={() => void submit()}>
+            {submitted() ? t("web.media.resubmit") : t("web.media.generate")}
+          </Button>
+          <Show when={submitted()}>
+            <ConfirmButton
+              testid="media-new"
+              tone="primary"
+              label={t("web.media.new")}
+              question={t("web.media.newAsk")}
+              disabled={act.busy()}
+              onConfirm={() => {
+                setSubmitted(undefined);
+                setError(undefined);
+              }}
+            />
+          </Show>
+        </div>
+        <Show when={error()}>
+          {(why) => (
+            <p role="alert" data-testid="media-error" {...stylex.attrs(viewStyles.error)}>
+              {why()}
+            </p>
+          )}
+        </Show>
+      </Card>
+      <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.media.history")}</h2>
+      <Show when={images().length > 0} fallback={<Quiet>{t("web.media.empty")}</Quiet>}>
+        <For each={images()} keyed={(job) => job.id}>
+          {(job) => <JobCard job={job()} />}
+        </For>
+      </Show>
+    </section>
   );
 }
 

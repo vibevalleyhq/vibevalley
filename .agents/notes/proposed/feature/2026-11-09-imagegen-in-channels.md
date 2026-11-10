@@ -6,7 +6,7 @@ Status: proposed
 
 用户想在频道里直接要图：打 `/imagegen 一只在麦田里打盹的橘猫`，过一会儿图就出现在这个频道里。现在做不到：
 
-- 生图（`Media.createImage`，MOSS）只有两个入口：用户在 `/media` 页填表，或者助手调 `media.image.create` 工具（只在承接用户那一轮）。生成好的图存成本机附件，要用户回媒体页手动发到频道。
+- 生图（`Media.createImage`，MOSS）只有两个入口：用户在素材库（`/library`）的「生成」对话框里填表，或者助手调 `media.image.create` 工具（只在承接用户那一轮）。生成好的图存成本机附件，要用户回媒体页手动发到频道。
 - 助手的大脑建时写着 `noSkills: true`（`session/host.ts`），它一个 skill 都看不到；VibeValley 也没有自带给助手的 skill。
 - 输入框的斜杠命令只有 `/issue`、`/remember`、`/stop`、`/dm`。
 
@@ -30,7 +30,7 @@ Status: proposed
 ## Acceptance criteria
 
 - 在一个频道里发 `/imagegen <描述>`：这里的助手收到这一句（频道没成员也一样），读 `imagegen` skill，调一次 `media.image.create`，任务来源是这个助手和这个频道。
-- 任务 `ready` 后，来源频道里出现一条助手发的带图消息；同一任务重试下载或重启后不多发。用户在 `/media` 页发起的任务不自动发。
+- 任务 `ready` 后，来源频道里出现一条助手发的带图消息；同一任务重试下载或重启后不多发。用户在素材库「生成」对话框里发起的任务不自动发。
 - 服务端测试：skill 随服务端带着、写的工具名就是助手的工具名（`orchestrator/skills.test.ts`），助手的系统提示列出它（`orchestrator.test.ts`）；带 `to` 的用户发言只投递给那个助手、`to` 指向帮工被拒（`channel.test.ts`）；助手发起的生图完成后发回来源频道、重启后仍只一条，用户自己的不发（`media.test.ts`）。页面：`commandOf` 认得 `/imagegen`（`commands.test.ts`）。
 - 文档：`docs/subsystems/media.md`、`channel.md` 写上这条路。
 

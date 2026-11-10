@@ -35,7 +35,7 @@ export type MediaCaller =
 export class Media extends Context.Service<
   Media,
   {
-    readonly inputs: Pick<Effect.Success<typeof makeInputs>, "create" | "upload" | "get" | "list" | "delete" | "previewDelete" | "content">;
+    readonly inputs: Pick<Effect.Success<typeof makeInputs>, "create" | "adopt" | "upload" | "get" | "list" | "delete" | "previewDelete" | "content">;
     readonly createImage: (input: T.MediaImageRequest, caller: MediaCaller) => Effect.Effect<T.MediaImageJob, ApiError>;
     readonly createUnderstanding: (input: T.MediaUnderstandingRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
     readonly authorizeUnderstanding: (input: T.MediaUnderstandingAuthorizationRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
@@ -168,7 +168,7 @@ const make = Effect.gen(function* () {
   );
 
   /** A made image goes back to the channel an orchestrator was asked for it in, under its name, once: the send key is the
-   * job's, so a retried download or a restart says nothing again. The user's own jobs (the media page) stay where they are. */
+   * job's, so a retried download or a restart says nothing again. The user's own jobs (the library's Generate dialog) stay where they are. */
   const postBack = Effect.fnUntraced(function* (id: string) {
     const row = yield* found(id);
     if (row.phase !== "ready" || row.attachment === null) return;

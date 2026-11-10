@@ -150,6 +150,9 @@ export class VibeValleyApi {
     input: {
       create: (a: T.MediaInputRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
         this.call<T.MediaInput>("/api/v1/media/input/create", a, options),
+      /** A kept attachment (a library item) taken as an input, checked as an upload is. */
+      adopt: (a: { attachment: string }, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
+        this.call<T.MediaInput>("/api/v1/media/input/adopt", a, options),
       get: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> => this.call<T.MediaInput>("/api/v1/media/input/get", a, options),
       list: (options?: { signal?: AbortSignal }): Promise<T.MediaInput[]> => this.call<T.MediaInput[]>("/api/v1/media/input/list", undefined, options),
       delete: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/media/input/delete", a, options),

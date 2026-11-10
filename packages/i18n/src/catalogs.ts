@@ -310,6 +310,7 @@ export const catalogs = {
           },
           input: {
             create: "为媒体输入预留有限的本机空间，不上传给供应商",
+            adopt: "把素材库里的一个文件拿来当媒体输入，照上传一样检查",
             get: "查看本机的媒体输入",
             list: "列出本机的媒体输入",
             delete: "删除没有被任务保留的本机媒体输入",
@@ -3477,8 +3478,48 @@ export const catalogs = {
         waiting: "等那台电脑上点头……",
       },
     },
+    "web.library": {
+      title: "素材库",
+      hint: "生成的、你上传的、帮工拿回来的文件都在这里。",
+      upload: "上传",
+      uploading: "正在上传…",
+      make: "生成",
+      makeTitle: "生成",
+      configure: "配置 AI 连接",
+      empty: "还没有素材。生成一张图或一段语音、上传一个文件，或者在聊天里让帮工把找到的东西放进来，都会出现在这里。",
+      nothingShown: "没有符合筛选的素材。",
+      originLabel: "来路",
+      kindLabel: "种类",
+      origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
+      kind: { all: "全部", image: "图", audio: "音频", video: "视频", other: "其它" },
+      job: {
+        image: "生图",
+        speech: "单人语音",
+        speakers: "多人对白",
+        voiceDesign: "音色设计",
+        clone: "音色克隆",
+        transcription: "转写",
+        understanding: "理解",
+      },
+      from: {
+        generated: "生成的 · {job}",
+        uploadedHere: "你在素材库上传的",
+        uploadedIn: "你在 {channel} 发的",
+        fetchedUrl: "{agent} 从 {url} 拿回来的",
+        fetchedPath: "{agent} 从工作目录的 {path} 拿回来的",
+      },
+      download: "下载",
+      sendTo: "发到频道",
+      send: "发送",
+      sent: "已发送",
+      remove: "从库里拿掉",
+      removeAsk: "从素材库拿掉「{name}」？聊天里发过的照样能打开。",
+      understand: "理解",
+      understandTitle: "理解「{name}」",
+      understood: "理解的结果",
+      makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
+    },
     "web.media": {
-      title: "媒体",
       image: "生成图片",
       speech: {
         title: "单人语音生成",
@@ -3514,7 +3555,6 @@ export const catalogs = {
         notice:
           "选 1–5 张图片（每张不超过 30 MB）或一个视频（不超过 200 MB），不要混传。文件先存到这台电脑，经你确认后才发给下方的 MOSS 连接，可能产生费用。停止等待不代表供应商停止处理。",
         configure: "请先在 AI 服务中选择图片与视频理解的连接。",
-        files: "本机图片或视频",
         prompt: "想让模型说明什么？",
         tokens: "最多输出多少 token",
         executor: "执行方式／授权频道",
@@ -3526,8 +3566,6 @@ export const catalogs = {
         delegated: "已发送给助手",
         delegation: "请执行我已授权的媒体理解任务 {id}，完成后告诉我结果。",
         consent: "我同意将这些文件和问题发送到上方的 MOSS 连接。",
-        stored: "已存到本机",
-        selected: "已选择，还未上传",
         uploading: "正在将选中的文件保存到本机…",
         stopUpload: "停止本机上传",
         uploadFailed: "本机上传失败，这次提交尚未开始理解；请重试或重新选择文件。",
@@ -3547,8 +3585,6 @@ export const catalogs = {
       sourceAgent: "来源：助手 {agent} · 频道 {channel}",
       usage: "厂商报告：{images} 张 · {width} × {height}",
       usageUnknown: "尚无厂商用量结果；不代表未计费。",
-      hint: "用 AI 服务中绑定的连接生成图片、单人语音或理解选中的图片、视频，结果保存在本机。",
-      configure: "配置 AI 连接",
       prompt: "提示词 / 布局 JSON",
       format: "输入方式",
       text: "文生图",
@@ -3725,11 +3761,12 @@ export const catalogs = {
       tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.provider": {
-      speechNotice: "可独立选择 Flash 或 Pro，再到媒体页生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
+      speechNotice:
+        "可独立选择 Flash 或 Pro，再到素材库的「生成」里生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
       title: "用途",
       intro: "每个功能用哪个账号和模型。账号和钥匙在「账号与钥匙」里填。",
       words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 理解 语音 音频 AI",
-      understandingNotice: "配置独立的连接和模型。在媒体页选择文件并明确确认上传；保存配置不会上传文件或发起推理。",
+      understandingNotice: "配置独立的连接和模型。在素材库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
       imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
       add: "添加 MOSS 连接",
       reload: "重新加载",
@@ -4905,6 +4942,7 @@ export const catalogs = {
         media: {
           input: {
             create: "Reserve bounded local storage for a media input without uploading to a provider",
+            adopt: "Take a library file as a media input, checked as an upload is",
             get: "Read a local media input",
             list: "List local media inputs",
             delete: "Delete a local media input not retained by a task",
@@ -8274,8 +8312,48 @@ export const catalogs = {
         waiting: "Waiting for approval on that computer…",
       },
     },
+    "web.library": {
+      title: "Library",
+      hint: "Files that were generated, that you uploaded, and that helpers brought back.",
+      upload: "Upload",
+      uploading: "Uploading…",
+      make: "Generate",
+      makeTitle: "Generate",
+      configure: "Set up AI connections",
+      empty: "Nothing here yet. Generate an image or speech, upload a file, or ask a helper in the chat to put what it found here.",
+      nothingShown: "Nothing matches these filters.",
+      originLabel: "From",
+      kindLabel: "Kind",
+      origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
+      kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
+      job: {
+        image: "image",
+        speech: "speech",
+        speakers: "dialogue",
+        voiceDesign: "voice design",
+        clone: "voice clone",
+        transcription: "transcription",
+        understanding: "understanding",
+      },
+      from: {
+        generated: "Generated · {job}",
+        uploadedHere: "You uploaded it here",
+        uploadedIn: "You sent it in {channel}",
+        fetchedUrl: "{agent} brought it back from {url}",
+        fetchedPath: "{agent} brought it back from {path} in its working directory",
+      },
+      download: "Download",
+      sendTo: "Send to a channel",
+      send: "Send",
+      sent: "Sent",
+      remove: "Remove from library",
+      removeAsk: "Remove “{name}” from the library? Messages that have it still open it.",
+      understand: "Understand",
+      understandTitle: "Understand “{name}”",
+      understood: "What it shows",
+      makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
+    },
     "web.media": {
-      title: "Media",
       image: "Image generation",
       speech: {
         title: "Single-speaker speech",
@@ -8311,7 +8389,6 @@ export const catalogs = {
         notice:
           "Select 1–5 images (up to 30 MB each), or one video (up to 200 MB); do not mix them. Files are first stored on this computer, then sent to the displayed MOSS connection after your approval. Charges may apply. Canceling does not guarantee that the provider stopped.",
         configure: "Select an understanding connection in AI services first.",
-        files: "Local images or video",
         prompt: "What should the model explain?",
         tokens: "Maximum output tokens",
         executor: "Execution / authorized channel",
@@ -8324,8 +8401,6 @@ export const catalogs = {
         delegated: "Sent to the assistant",
         delegation: "Execute my authorized media understanding task {id}, then report the result.",
         consent: "I approve sending these files and this prompt to the displayed MOSS connection.",
-        stored: "Stored locally",
-        selected: "Selected; not uploaded yet",
         uploading: "Storing selected files on this computer…",
         stopUpload: "Stop local upload",
         uploadFailed: "Local upload failed. This submission has not started understanding; retry or select the files again.",
@@ -8348,8 +8423,6 @@ export const catalogs = {
       sourceAgent: "Source: assistant {agent} · channel {channel}",
       usage: "Provider reported: {images} image(s) · {width} × {height}",
       usageUnknown: "No provider usage result yet. This does not mean there was no charge.",
-      hint: "Generate images or single-speaker speech, or understand selected images and video with the connections bound in AI services. Keep results locally.",
-      configure: "Configure AI connections",
       prompt: "Prompt / layout JSON",
       format: "Input format",
       text: "Text to image",
@@ -8563,12 +8636,12 @@ export const catalogs = {
     },
     "web.provider": {
       speechNotice:
-        "Choose a separate Flash or Pro binding, then generate one speaker on the Media page. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
+        "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
       title: "Uses",
       intro: "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
       words: "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
       understandingNotice:
-        "Configure the independent connection and model. Select files and explicitly approve uploads on the Media page. Saving this configuration does not upload or run inference.",
+        "Configure the independent connection and model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
       imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
       add: "Add MOSS connection",
       reload: "Reload",
@@ -9814,6 +9887,7 @@ export interface Messages {
   "cli.op.media.clone.create": undefined;
   "cli.op.media.dialogue.create": undefined;
   "cli.op.media.image.create": undefined;
+  "cli.op.media.input.adopt": undefined;
   "cli.op.media.input.create": undefined;
   "cli.op.media.input.delete": undefined;
   "cli.op.media.input.get": undefined;
@@ -12882,19 +12956,61 @@ export interface Messages {
   "web.lan.pair.nameHint": undefined;
   "web.lan.pair.title": undefined;
   "web.lan.pair.waiting": undefined;
+  "web.library.configure": undefined;
+  "web.library.download": undefined;
+  "web.library.empty": undefined;
+  "web.library.from.fetchedPath": { readonly agent: string | number; readonly path: string | number };
+  "web.library.from.fetchedUrl": { readonly agent: string | number; readonly url: string | number };
+  "web.library.from.generated": { readonly job: string | number };
+  "web.library.from.uploadedHere": undefined;
+  "web.library.from.uploadedIn": { readonly channel: string | number };
+  "web.library.hint": undefined;
+  "web.library.job.clone": undefined;
+  "web.library.job.image": undefined;
+  "web.library.job.speakers": undefined;
+  "web.library.job.speech": undefined;
+  "web.library.job.transcription": undefined;
+  "web.library.job.understanding": undefined;
+  "web.library.job.voiceDesign": undefined;
+  "web.library.kind.all": undefined;
+  "web.library.kind.audio": undefined;
+  "web.library.kind.image": undefined;
+  "web.library.kind.other": undefined;
+  "web.library.kind.video": undefined;
+  "web.library.kindLabel": undefined;
+  "web.library.make": undefined;
+  "web.library.makeTabs.audio": undefined;
+  "web.library.makeTabs.image": undefined;
+  "web.library.makeTabs.speech": undefined;
+  "web.library.makeTitle": undefined;
+  "web.library.nothingShown": undefined;
+  "web.library.origin.all": undefined;
+  "web.library.origin.fetched": undefined;
+  "web.library.origin.generated": undefined;
+  "web.library.origin.uploaded": undefined;
+  "web.library.originLabel": undefined;
+  "web.library.remove": undefined;
+  "web.library.removeAsk": { readonly name: string | number };
+  "web.library.send": undefined;
+  "web.library.sendTo": undefined;
+  "web.library.sent": undefined;
+  "web.library.title": undefined;
+  "web.library.understand": undefined;
+  "web.library.understandTitle": { readonly name: string | number };
+  "web.library.understood": undefined;
+  "web.library.upload": undefined;
+  "web.library.uploading": undefined;
   "web.media.advanced": undefined;
   "web.media.cancel": undefined;
   "web.media.cancelAsk": undefined;
   "web.media.channel": undefined;
   "web.media.chooseChannel": undefined;
-  "web.media.configure": undefined;
   "web.media.empty": undefined;
   "web.media.enhance": undefined;
   "web.media.format": undefined;
   "web.media.generate": undefined;
   "web.media.guidance": undefined;
   "web.media.height": undefined;
-  "web.media.hint": undefined;
   "web.media.history": undefined;
   "web.media.image": undefined;
   "web.media.layout": undefined;
@@ -12947,7 +13063,6 @@ export interface Messages {
   "web.media.speech.voiceHint": undefined;
   "web.media.steps": undefined;
   "web.media.text": undefined;
-  "web.media.title": undefined;
   "web.media.understanding.authorization": { readonly channel: string | number };
   "web.media.understanding.authorizationNotice": undefined;
   "web.media.understanding.authorize": undefined;
@@ -12960,7 +13075,6 @@ export interface Messages {
   "web.media.understanding.delegation": { readonly id: string | number };
   "web.media.understanding.direct": undefined;
   "web.media.understanding.executor": undefined;
-  "web.media.understanding.files": undefined;
   "web.media.understanding.history": undefined;
   "web.media.understanding.new": undefined;
   "web.media.understanding.newAsk": undefined;
@@ -12969,9 +13083,7 @@ export interface Messages {
   "web.media.understanding.pending": undefined;
   "web.media.understanding.prompt": undefined;
   "web.media.understanding.save": undefined;
-  "web.media.understanding.selected": undefined;
   "web.media.understanding.stopUpload": undefined;
-  "web.media.understanding.stored": undefined;
   "web.media.understanding.submit": undefined;
   "web.media.understanding.title": undefined;
   "web.media.understanding.tokens": undefined;
