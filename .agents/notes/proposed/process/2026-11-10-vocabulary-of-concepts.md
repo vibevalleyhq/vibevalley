@@ -143,7 +143,7 @@ Status: proposed
 |---|---|---|---|---|
 | `Space` | 一套独立的工作：若干仓库、工单、频道和一份笔记 | 目录 `$VIBEVALLEY_WORK_ROOT` | `SpaceState`（它的核心状态）、`StateFrame`（推给页面的一帧）、`call`（现在有没有在通话） | `scope` 四个意思都不是它（第九组） |
 | `Machine` | 一台登记过的电脑；Session 在其中一台上干活 | `machine.id` | `here`、`online`、家目录 | 用语表里农机的英文是 machine；`Host` 并进来（见下） |
-| `Device` | 一台配对过、能连进来的设备，一台一把钥匙 | `lan_device.id` | | 现在叫 `LanDevice`；[主人的登录](.agents/notes/proposed/feature/2026-11-10-user-login.md)的设备是不是它 |
+| `Device` | 用户的一台设备，一台一把钥匙；配对来的或登录来的 | `user_device.id` | `came` | 代码里叫 `UserDevice`（[用户和设备](docs/subsystems/user.md)） |
 | `User` | 这个服务端唯一的那个人 | 固定的 `user` | | 用语表「代码里」一列还写 owner |
 | `Actor` | 做了一件事的那个：`User`、一个 `Agent`、VibeValley 自己，或外面的人和程序 | `kind` 加 `id` | `ActorKind` | 现在叫 `TriggerActor`，另有两套分类、八个字段名（第一组） |
 

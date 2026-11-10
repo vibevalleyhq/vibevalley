@@ -6,7 +6,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 apps/server/               服务端（Effect v4，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （Context.Service）：core、setting、agent、repo、memory、artifact、runtime、executor、session、mailbox、channel、pkm、cron、issue、
+                           （Context.Service）：core、setting、user、agent、repo、memory、artifact、runtime、executor、session、mailbox、channel、pkm、cron、issue、
                            inbox、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
                            oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
@@ -133,7 +133,7 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。
 - **服务端的服务**：每个模块导出一个服务，名字是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`，lint 的 `singular-service` 查），照 Effect 的默认写法（`node_modules/effect/AGENTS.md`）：类，接口写在类型参数里（频道的大接口放同模块 `contracts.ts`），layer 是它的静态成员（`class Issue extends Context.Service<Issue, { … }>()("@vibevalley/server/issue/issue") { static readonly layer = … }`，标签是包名加文件的路径，effect:check 的 `deterministicKeys` 查），别处要它的类型写 `Issue["Service"]`；一个 `make`（`Effect.gen` 里 `yield*` 它用到的服务，不拿整个农场，用 `Issue.of({ … })` 拼出服务）；`services.ts` 按次序把 `X.layer` 叠起来，模块只用排在它前面的，往上走流（`Stream`，新闻、变化）；开机就要做的放 `start`、`ready` 这类 layer，叠在最后；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
 - **处理函数要薄**：接口的处理（`http/handlers/<概念>.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。
-- **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，是从外面进来的唯一一道门：只放在本机点过头配对的设备（`remote` 那部分）和凭密码登录的设备（除了设密码），每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)）。
+- **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，是从外面进来的唯一一道门：只放在本机点过头配对的设备（`remote` 那部分）和凭密码或确认码登录的设备（除了设密码），每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 - **图标分两套**：工作台的按钮和标记用 reicon 的线条图标，一个意思一个图，写在 `apps/web/src/ui/icons.ts`，`<Icon name>` 只收表里的名字；像素皮（农场、记忆树、`ui/pixel`）用 `design/pixel` 生成的贴图（`SpriteIcon`；形状照 Hugeicons）；头像、农机的 logo 和插画在哪都是像素图；都不用 ▶、■、✓ 这类字符代替（[客户端](docs/subsystems/app.md)）。
 - **界面照田间工作台**：工作台的颜色、圆角、字号、阴影、动效和层都用 `apps/web/src/style.css` 的令牌，lint 的 `no-hex-color`、`design-tokens` 拦散值；挑哪一档、原子组件的样子和交之前的自查照 [界面怎么做](docs/style/design.md)，StyleX 的写法和批量迁移照 [vv-stylex](.agents/skills/vv-stylex/SKILL.md)。
 - **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。

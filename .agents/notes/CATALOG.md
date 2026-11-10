@@ -2,11 +2,10 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（33 篇）
+## proposed（32 篇）
 
 ### feature
 
-- 2026-11-10 [用户登录，设备各拿一把钥匙](.agents/notes/proposed/feature/2026-11-10-user-login.md)
 - 2026-11-09 [设置按功能分，钥匙放一处，没准备好就指路](.agents/notes/proposed/feature/2026-11-09-settings-by-feature.md)
 - 2026-11-09 [频道里用 /imagegen 生图](.agents/notes/proposed/feature/2026-11-09-imagegen-in-channels.md)
 - 2026-11-04 [网页稿子的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)

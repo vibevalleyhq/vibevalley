@@ -30,7 +30,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
-| [lan.md](docs/subsystems/lan.md) | 「连接到本机」：局域网里配对过的设备用同一个农场 |
+| [lan.md](docs/subsystems/lan.md) | 「连接到本机」：从外面进农场的唯一一道门，按钥匙的来路放行 |
+| [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
 | [media.md](docs/subsystems/media.md) | 生图：持久化任务、独立下载、安全校验、本机附件与状态投影 |

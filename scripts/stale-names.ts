@@ -21,7 +21,7 @@ const RULES: readonly Rule[] = [
     name: "the farm's person under the owner name",
     pattern:
       /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
-    says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (.agents/notes/proposed/feature/2026-11-10-user-login.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
+    says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
     // oar's acquired-session key, and the EverOS sender id that memories already stored outside are filed under.
     except: /^apps\/server\/src\/(executor\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
   },
