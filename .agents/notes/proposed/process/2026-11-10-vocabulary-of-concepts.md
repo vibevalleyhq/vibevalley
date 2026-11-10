@@ -224,7 +224,7 @@ Status: proposed
 | `MemorySource` | 外面的一个记性来源，写在设置里 | `kind`（`nowledge`、`everos`），一种一个 | | `source` 六个意思（第九组）；另有一个 `MemorySourceInfo` |
 | `Cron` | 一张工单的一种触发：到点开它的一轮 | `cron.id` | `CronWhen` | 取值 `cron` 和概念同名（第八组） |
 | `MediaInput` | 传给媒体任务的一份输入文件 | `media_input.id` | `MediaInputPhase` | |
-| `MediaJob` | 一个生图、理解或语音合成的任务 | 任务的 id | `MediaPhase`、`MediaCleanup` | 形状叫 job，四张表按产物叫（`media_generation`……） |
+| `MediaJob` | 一个生图、理解或语音合成的任务 | 任务的 id | `MediaPhase`、`MediaCleanup` | 形状叫 job，表也叫 job（`media_job`，按 `kind` 分） |
 
 **游戏**
 

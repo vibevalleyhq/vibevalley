@@ -13,8 +13,9 @@ import { PublicHttp } from "#/infra/publicHttp.ts";
 import { Provider } from "#/provider/provider.ts";
 import { testConfig, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
-import * as q from "#db/media_generation.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
+import { newJob } from "./job.ts";
 import { Media, type MediaCaller } from "./media.ts";
 import { png } from "./testdata/png.ts";
 
@@ -94,7 +95,7 @@ it.effect("image tasks persist a result, keep bytes as an attachment, project sa
     const imageCreatedFailure = yield* media.createImage({ ...input, prompt: "different" }, { kind: "user" }).pipe(Effect.flip);
     expect(imageCreatedFailure).toMatchObject({ _tag: "Refused" });
     expect(calls).toBe(1);
-    const row = yield* (yield* Db).one(q.generation({ id: input.id }));
+    const row = yield* (yield* Db).one(q.mediaJob({ id: input.id }));
     expect(row?.result_url).toBeNull();
     yield* notIn(row, "test-private-key");
     const state = (yield* Core).state();
@@ -327,7 +328,7 @@ it.effect("generation source and reported usage survive restart without acceptin
       const ready = yield* waitFor(media.get(input.id), (row) => row.phase === "ready", "attributed image saved");
       if (ready.kind !== "image") return yield* Effect.die("Expected image task");
       expect(ready.source).toEqual(source);
-      const row = yield* (yield* Db).one(q.generation({ id: input.id }));
+      const row = yield* (yield* Db).one(q.mediaJob({ id: input.id }));
       const sourceJson = yield* json(source);
       expect(row?.source).toBe(sourceJson);
       const usage = yield* parsed(row?.usage ?? "null");
@@ -373,18 +374,22 @@ it.effect("restart marks unsent and ambiguous tasks separately and resumes only 
     const db = yield* Db;
     for (const phase of ["queued", "generating", "downloading"] as const) {
       yield* db.run(
-        q.insertGeneration({
-          id: phase,
-          request: yield* json({ ...input, id: phase }),
-          source: yield* json({ kind: "user" }),
-          connection: "moss",
-          revision: 1,
-          model: "moss-image-sft-1.0",
-          now: 1,
-        }),
+        q.insertMediaJob(
+          newJob({
+            kind: "image",
+            phase: "queued",
+            id: phase,
+            request: yield* json({ ...input, id: phase }),
+            source: yield* json({ kind: "user" }),
+            connection: "moss",
+            revision: 1,
+            model: "moss-image-sft-1.0",
+            now: 1,
+          }),
+        ),
       );
       yield* db.run(
-        q.changeGeneration({
+        q.changeImageJob({
           id: phase,
           phase,
           attachment: null,

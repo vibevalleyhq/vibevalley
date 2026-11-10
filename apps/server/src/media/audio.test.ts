@@ -13,10 +13,11 @@ import { PublicHttp } from "#/infra/publicHttp.ts";
 import { Provider } from "#/provider/provider.ts";
 import { waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
-import * as q from "#db/media_audio.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
 import { makeAudio } from "./audio.ts";
 import { makeInputs } from "./inputs.ts";
+import { newJob } from "./job.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
 import { wav } from "./testdata/audio.ts";
 
@@ -81,7 +82,10 @@ const harness = Effect.gen(function* () {
     lock: yield* Semaphore.make(1),
     slots: yield* Semaphore.make(1),
     publish: () => Effect.void,
-    capacity: () => db.run(q.pendingAudio()).pipe(Effect.flatMap((rows) => (rows.length >= 8 ? Effect.fail(refused("capacity")) : Effect.void))),
+    capacity: () =>
+      db
+        .run(q.pendingMediaJobs({ kinds: ["speakers", "voiceDesign", "clone", "transcription"] }))
+        .pipe(Effect.flatMap((rows) => (rows.length >= 8 ? Effect.fail(refused("capacity")) : Effect.void))),
     otherExists: (id: string) => Effect.succeed(id === "image-id"),
   };
   return { audio: yield* makeAudio(ports), inputs, ports };
@@ -96,7 +100,7 @@ const layer = (http: HttpClient.HttpClient, downloads = download) =>
 it.effect("regression: async speakers persist task ID before polling, retain actual format, and never repeat billing", () => {
   let submitted = 0;
   let polled = 0;
-  let savedRow: Effect.Effect<q.AudioResult | undefined> = Effect.die("Task lookup was not initialized");
+  let savedRow: Effect.Effect<q.MediaJobResult | undefined> = Effect.die("Task lookup was not initialized");
   const http = HttpClient.make((request) =>
     Effect.gen(function* () {
       if (request.method === "POST") {
@@ -105,13 +109,13 @@ it.effect("regression: async speakers persist task ID before polling, retain act
       }
       polled++;
       const savedRow2 = yield* savedRow;
-      expect(savedRow2).toMatchObject({ remote_task_id: "task-one", phase: "generating" });
+      expect(savedRow2).toMatchObject({ remote_task: "task-one", phase: "generating" });
       return HttpClientResponse.fromWeb(request, Response.json(success));
     }),
   );
   return Effect.gen(function* () {
     yield* configured();
-    savedRow = (yield* Db).one(q.audio({ id: speakers.id }));
+    savedRow = (yield* Db).one(q.mediaJob({ id: speakers.id }));
     const { audio } = yield* harness;
     const submittedRequest = { ...speakers, format: "mp3" as const };
     yield* audio.createSpeakers(submittedRequest, { kind: "user" });
@@ -138,7 +142,7 @@ it.effect("regression: async speakers persist task ID before polling, retain act
     expect(polled).toBe(1);
     yield* notIn(ready, "signed");
     yield* notIn(ready, "task-one");
-    const found = yield* (yield* Db).one(q.audio({ id: speakers.id }));
+    const found = yield* (yield* Db).one(q.mediaJob({ id: speakers.id }));
     yield* notIn(found, "audio-private-key");
   }).pipe(Effect.scoped, Effect.provide(layer(http)));
 });
@@ -261,23 +265,26 @@ it.effect("regression: restored known tasks poll the original account while queu
     const db = yield* Db;
     for (const id of ["known", "uncertain", "queued"]) {
       yield* db.run(
-        q.insertAudio({
-          id,
-          kind: "speakers",
-          request: yield* json({ ...speakers, id, kind: "speakers" }),
-          source: yield* json({ kind: "user" }),
-          input: null,
-          connection: "moss",
-          revision: 1,
-          model: "moss-ttsd-1.0",
-          fingerprint: createHash("sha256").update("audio-private-key").digest("hex"),
-          now: yield* Clock.currentTimeMillis,
-        }),
+        q.insertMediaJob(
+          newJob({
+            phase: "queued",
+            id,
+            kind: "speakers",
+            request: yield* json({ ...speakers, id, kind: "speakers" }),
+            source: yield* json({ kind: "user" }),
+            input: null,
+            connection: "moss",
+            revision: 1,
+            model: "moss-ttsd-1.0",
+            fingerprint: createHash("sha256").update("audio-private-key").digest("hex"),
+            now: yield* Clock.currentTimeMillis,
+          }),
+        ),
       );
       if (id !== "queued") {
-        const row = yield* db.one(q.audio({ id }));
+        const row = yield* db.one(q.mediaJob({ id }));
         if (!row) return yield* Effect.die("Missing seeded task");
-        yield* db.run(q.changeAudio({ ...row, phase: "generating", remote_task_id: id === "known" ? "task-one" : null, now: yield* Clock.currentTimeMillis }));
+        yield* db.run(q.changeAudioJob({ ...row, phase: "generating", remote_task: id === "known" ? "task-one" : null, now: yield* Clock.currentTimeMillis }));
       }
     }
     const { audio } = yield* harness;
@@ -782,9 +789,9 @@ it.effect.each(["done", "eof", "cancel"] as const)("streamed diarization checkpo
       const transcriptionCreated = yield* audio.createTranscription(request, { kind: "user" });
       expect(transcriptionCreated).toEqual(final);
       expect(submissions).toBe(1);
-      const row = yield* (yield* Db).one(q.audio({ id: request.id }));
+      const row = yield* (yield* Db).one(q.mediaJob({ id: request.id }));
       if (!row) return yield* Effect.die("Expected streamed task");
-      yield* (yield* Db).run(q.changeAudio({ ...row, phase: "generating", now: yield* Clock.currentTimeMillis }));
+      yield* (yield* Db).run(q.changeAudioJob({ ...row, phase: "generating", now: yield* Clock.currentTimeMillis }));
       yield* audio.restore();
       const audio2 = yield* audio.get(request.id);
       expect(audio2).toMatchObject({ phase: "unknown", canResume: false, result: final.result });

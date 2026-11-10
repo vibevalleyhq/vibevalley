@@ -126,96 +126,45 @@ CREATE TABLE media_remote_file (
 );
 CREATE INDEX media_remote_file_phase ON media_remote_file(phase);
 
-CREATE TABLE media_understanding (
+CREATE TABLE media_job (
+  -- The caller's id, one job whatever its kind: the same id again is that job, or refused when it differs.
   id TEXT PRIMARY KEY NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('image','understanding','speech','speakers','voiceDesign','clone','transcription')),
+  -- The request as the caller gave it (JSON, by kind): what makes the same id the same job.
   request TEXT NOT NULL,
-  inputs TEXT NOT NULL,
   source TEXT NOT NULL,
-  "authorization" TEXT,
   connection TEXT NOT NULL,
   revision INTEGER NOT NULL,
   model TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('authorized','queued','uploading','generating','ready','incomplete','failed','unknown','canceled')),
-  result TEXT,
-  cleanup TEXT NOT NULL CHECK (cleanup IN ('pending','running','done','blocked','unknown')),
+  phase TEXT NOT NULL CHECK (phase IN ('authorized','queued','uploading','generating','downloading','ready','incomplete','failed','unknown','canceled','download_failed')),
   problem TEXT NOT NULL DEFAULT '',
-  created_at double precision NOT NULL,
-  updated_at double precision NOT NULL
-);
-CREATE INDEX media_understanding_recent ON media_understanding(created_at DESC, id);
-CREATE INDEX media_understanding_phase ON media_understanding(phase, cleanup);
-
-CREATE TABLE media_generation (
-  id TEXT PRIMARY KEY NOT NULL,
-  request TEXT NOT NULL,
-  source TEXT NOT NULL,
   usage TEXT,
-  connection TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
+  -- What the vendor made: its signed address, the kept attachment, and (understanding, audio) its answer as JSON.
   result_url TEXT,
   attachment TEXT,
-  problem TEXT NOT NULL DEFAULT '',
-  created_at double precision NOT NULL,
-  updated_at double precision NOT NULL
-);
-CREATE INDEX media_generation_recent ON media_generation(created_at DESC, id);
-CREATE INDEX media_generation_phase ON media_generation(phase);
-
-CREATE TABLE media_speech (
-  id TEXT PRIMARY KEY NOT NULL,
-  request TEXT NOT NULL,
-  source TEXT NOT NULL,
-  connection TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  credential_hash TEXT NOT NULL,
+  result TEXT,
+  -- The vendor's task while it runs elsewhere (speech, audio).
   remote_task TEXT,
   result_format TEXT CHECK (result_format IN ('mp3','wav','pcm','flac','aac','opus')),
   content_type TEXT,
   metadata TEXT,
-  usage TEXT,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
-  result_url TEXT,
-  attachment TEXT,
-  result_input TEXT,
-  assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
-  problem TEXT NOT NULL DEFAULT '',
-  created_at double precision NOT NULL,
-  updated_at double precision NOT NULL
-);
-CREATE INDEX media_speech_recent ON media_speech(created_at DESC, id);
-CREATE INDEX media_speech_phase ON media_speech(phase);
-
-CREATE TABLE media_audio (
-  id TEXT PRIMARY KEY NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('speakers','voiceDesign','clone','transcription')),
-  request TEXT NOT NULL,
-  source TEXT NOT NULL,
+  -- Media inputs it holds: the one it reads (audio), the ones it reads (understanding, JSON), and what it made as inputs.
   input TEXT,
-  connection TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  fingerprint TEXT NOT NULL,
-  phase TEXT NOT NULL CHECK (phase IN ('queued','generating','downloading','ready','failed','unknown','canceled','download_failed')),
-  remote_task_id TEXT,
-  result_url TEXT,
-  result_format TEXT CHECK (result_format IN ('mp3','wav','pcm','flac','aac','opus')),
-  content_type TEXT,
-  metadata TEXT,
-  usage TEXT,
-  result TEXT,
-  attachment TEXT,
+  inputs TEXT NOT NULL DEFAULT '[]',
   result_input TEXT,
   preview_input TEXT,
   assets_released INTEGER NOT NULL DEFAULT 0 CHECK (assets_released IN (0,1)),
-  problem TEXT NOT NULL DEFAULT '',
+  -- Which key it was asked with (speech), what its inputs were (audio), who allowed it (understanding).
+  credential_hash TEXT NOT NULL DEFAULT '',
+  fingerprint TEXT NOT NULL DEFAULT '',
+  "authorization" TEXT,
+  -- The vendor-side cleanup of what it uploaded (understanding); done for every other kind.
+  cleanup TEXT NOT NULL DEFAULT 'done' CHECK (cleanup IN ('pending','running','done','blocked','unknown')),
   created_at double precision NOT NULL,
   updated_at double precision NOT NULL
 );
-CREATE INDEX media_audio_phase ON media_audio(phase);
-CREATE INDEX media_audio_created ON media_audio(created_at DESC, id);
+CREATE INDEX media_job_recent ON media_job(kind, created_at DESC, id);
+CREATE INDEX media_job_phase ON media_job(phase, cleanup);
 
 CREATE TABLE attachment (
   -- The sha256 of its bytes, kept under the home directory's attachments/: the same file is kept once.

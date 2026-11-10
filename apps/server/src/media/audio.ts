@@ -2,6 +2,7 @@ import { Clock, Effect, Fiber, FiberMap, FileSystem, Option, Schedule, Schema, S
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { MediaPhaseValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -12,10 +13,11 @@ import { fileBlob } from "#/infra/files.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { type Account, Provider } from "#/provider/provider.ts";
-import * as q from "#db/media_audio.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
 import { inspectAudio } from "./audioMetadata.ts";
 import { type MediaInputs, releaseAudioResult, saveAudioResult } from "./audioResult.ts";
+import { type JobRow, jobsOf, newJob } from "./job.ts";
 import type { MediaCaller } from "./media.ts";
 import { receiveTranscriptionStream, type TranscriptionCheckpoint } from "./transcriptionStream.ts";
 
@@ -40,6 +42,11 @@ interface AudioPorts {
   capacity: () => Effect.Effect<void, ApiError>;
   otherExists: (id: string) => Effect.Effect<boolean>;
 }
+/** The audio kinds this file runs, in media_job. */
+const audioKinds: readonly string[] = ["speakers", "voiceDesign", "clone", "transcription"];
+/** This file's media jobs, as it reads media_job. */
+const jobs = jobsOf({ kinds: audioKinds, phases: MediaPhaseValues });
+
 export interface AudioWorkflow {
   createSpeakers: (input: T.MediaSpeakersRequest, caller: MediaCaller) => Effect.Effect<T.MediaAudioJob, ApiError>;
   createVoiceDesign: (input: T.MediaVoiceDesignRequest, caller: MediaCaller) => Effect.Effect<T.MediaAudioJob, ApiError>;
@@ -77,13 +84,14 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
   const active = (phase: T.MediaPhase) => phase === "queued" || phase === "generating" || phase === "downloading";
   const invalid = () => refused(t("server.media.audioInvalid"));
   const corrupt = () => refused(t("server.media.corrupt"));
-  const request = (row: q.AudioResult) => Schema.decodeEffect(Schema.fromJsonString(S.MediaAudioRequest))(row.request).pipe(Effect.mapError(corrupt));
+  const request = (row: JobRow<T.MediaPhase>) => Schema.decodeEffect(Schema.fromJsonString(S.MediaAudioRequest))(row.request).pipe(Effect.mapError(corrupt));
+  const own = (id: string) => Effect.map(db.one(q.mediaJob({ id })), jobs.one);
   const found = Effect.fnUntraced(function* (id: string) {
-    const row = yield* db.one(q.audio({ id }));
+    const row = yield* own(id);
     if (!row) return yield* Effect.fail(refused(t("server.media.missing")));
     return row;
   });
-  const view = Effect.fnUntraced(function* (row: q.AudioResult): Effect.fn.Return<T.MediaAudioJob, ApiError> {
+  const view = Effect.fnUntraced(function* (row: JobRow<T.MediaPhase>): Effect.fn.Return<T.MediaAudioJob, ApiError> {
     const input = yield* request(row);
     const attachment =
       row.attachment === null ? undefined : yield* Schema.decodeEffect(Schema.fromJsonString(S.Attachment))(row.attachment).pipe(Effect.mapError(corrupt));
@@ -116,7 +124,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       canResume:
         row.assets_released === 0 &&
         !(input.kind === "transcription" && input.streaming === true) &&
-        row.remote_task_id !== null &&
+        row.remote_task !== null &&
         row.result_url === null &&
         row.result === null &&
         (row.phase === "unknown" || row.phase === "canceled"),
@@ -146,9 +154,9 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       before: readonly T.MediaPhase[],
       patch: Partial<
         Pick<
-          q.AudioResult,
+          JobRow<T.MediaPhase>,
           | "phase"
-          | "remote_task_id"
+          | "remote_task"
           | "result_url"
           | "result_format"
           | "content_type"
@@ -164,21 +172,21 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     ) {
       const row = yield* found(id);
       if (!before.includes(row.phase)) return false;
-      yield* db.run(q.changeAudio({ ...row, ...patch, now: yield* Clock.currentTimeMillis }));
+      yield* db.run(q.changeAudioJob({ ...row, ...patch, now: yield* Clock.currentTimeMillis }));
       yield* ports.publish();
       return true;
     },
     ports.lock.withPermits(1),
     Effect.uninterruptible,
   );
-  const originalAccount = Effect.fnUntraced(function* (row: q.AudioResult): Effect.fn.Return<Account, ApiError> {
+  const originalAccount = Effect.fnUntraced(function* (row: JobRow<T.MediaPhase>): Effect.fn.Return<Account, ApiError> {
     const account = yield* provider.account({ connection: row.connection, model: row.model });
     if (account.fingerprint !== row.fingerprint) return yield* Effect.fail(refused(t("server.media.audioAccountChanged")));
     return { ...account, revision: row.revision };
   });
   const clean = Effect.fnUntraced(function* (id: string) {
     const row = yield* found(id);
-    if (row.phase !== "ready" && row.phase !== "failed" && !(row.phase === "canceled" && row.remote_task_id === null)) return;
+    if (row.phase !== "ready" && row.phase !== "failed" && !(row.phase === "canceled" && row.remote_task === null)) return;
     const remote = yield* ports.remote.list(id);
     if (row.phase === "canceled" && remote.length > 0) return;
     if (remote.some((file) => file.remote_id === null && (file.phase === "unknown" || file.phase === "uploading"))) return;
@@ -258,7 +266,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
               }
               yield* db
                 .attempt(
-                  q.changeAudio({
+                  q.changeAudioJob({
                     ...current,
                     phase: "ready",
                     attachment: saved.attachment ? yield* attachmentJson(saved.attachment).pipe(Effect.mapError(corrupt)) : null,
@@ -290,8 +298,8 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
   const poll = Effect.fnUntraced(function* (id: string) {
     const once = Effect.gen(function* () {
       const row = yield* found(id);
-      if (row.phase !== "generating" || row.remote_task_id === null) return true;
-      const remoteId = row.remote_task_id;
+      if (row.phase !== "generating" || row.remote_task === null) return true;
+      const remoteId = row.remote_task;
       const task = yield* Effect.gen(function* () {
         const account = yield* originalAccount(row);
         return yield* account.tasks.get(remoteId);
@@ -402,7 +410,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
             ...(input.keyterms === undefined ? {} : { keyterms: input.keyterms }),
           }),
           {
-            task: (taskId) => change(id, ["generating", "canceled"], { remote_task_id: taskId }).pipe(Effect.asVoid),
+            task: (taskId) => change(id, ["generating", "canceled"], { remote_task: taskId }).pipe(Effect.asVoid),
             save: Effect.fnUntraced(function* (checkpoint: TranscriptionCheckpoint) {
               const patch = {
                 result: yield* resultJson(checkpoint.result).pipe(Effect.mapError(corrupt)),
@@ -431,7 +439,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       attempted = true;
       // Only the HTTP wait is interruptible: a returned task ID must reach durable storage before polling or cancellation can intervene.
       yield* Effect.uninterruptibleMask((resume) =>
-        resume(synthesis).pipe(Effect.flatMap((taskId) => change(id, ["generating", "canceled", "unknown"], { remote_task_id: taskId }))),
+        resume(synthesis).pipe(Effect.flatMap((taskId) => change(id, ["generating", "canceled", "unknown"], { remote_task: taskId }))),
       );
       yield* poll(id);
     }).pipe(
@@ -460,7 +468,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     const input = yield* Schema.decodeEffect(S.MediaAudioRequest)(given, { onExcessProperty: "error" }).pipe(Effect.mapError(invalid));
     return yield* ports.lock.withPermits(1)(
       Effect.gen(function* () {
-        const existing = yield* db.one(q.audio({ id: input.id }));
+        const existing = yield* own(input.id);
         if (existing) {
           const storedRequest = yield* request(existing);
           if (!same(storedRequest, input) || !same((yield* view(existing)).source, source)) return yield* Effect.fail(refused(t("server.media.reusedId")));
@@ -506,18 +514,21 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
             })
             .pipe(Effect.mapError(invalid));
         const insert = db.run(
-          q.insertAudio({
-            id: input.id,
-            kind: input.kind,
-            request: yield* requestJson(input).pipe(Effect.mapError(invalid)),
-            source: yield* sourceJson(source).pipe(Effect.mapError(invalid)),
-            input: reference === null ? null : yield* referenceJson(reference).pipe(Effect.mapError(invalid)),
-            connection: account.connection,
-            revision: account.revision,
-            model: account.model,
-            fingerprint: account.fingerprint,
-            now: yield* Clock.currentTimeMillis,
-          }),
+          q.insertMediaJob(
+            newJob({
+              id: input.id,
+              kind: input.kind,
+              phase: "queued",
+              request: yield* requestJson(input).pipe(Effect.mapError(invalid)),
+              source: yield* sourceJson(source).pipe(Effect.mapError(invalid)),
+              input: reference === null ? null : yield* referenceJson(reference).pipe(Effect.mapError(invalid)),
+              connection: account.connection,
+              revision: account.revision,
+              model: account.model,
+              fingerprint: account.fingerprint,
+              now: yield* Clock.currentTimeMillis,
+            }),
+          ),
         );
         if (reference) yield* ports.inputs.pin([reference.id], input.id, insert);
         else yield* insert;
@@ -534,11 +545,11 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
     createTranscription: Effect.fn("Media.createTranscription")((input, caller) => create({ ...input, kind: "transcription" }, caller)),
     get,
     list: Effect.fn("Media.audioList")(function* () {
-      const recentAudio2 = yield* db.run(q.recentAudio());
+      const recentAudio2 = yield* Effect.map(db.run(q.recentMediaJobs({ kinds: audioKinds })), jobs.many);
       return yield* Effect.forEach(recentAudio2, view);
     }),
-    has: (id) => db.one(q.audio({ id })).pipe(Effect.map((row) => row !== undefined)),
-    pending: () => db.run(q.pendingAudio()).pipe(Effect.map((rows) => rows.length)),
+    has: (id) => own(id).pipe(Effect.map((row) => row !== undefined)),
+    pending: () => Effect.map(db.run(q.pendingMediaJobs({ kinds: audioKinds })), jobs.many).pipe(Effect.map((rows) => rows.length)),
     previewCleanup: Effect.fn("Media.audioPreviewCleanup")(function* (id): Effect.fn.Return<T.Preview, ApiError> {
       const row = yield* found(id);
       if (row.phase !== "ready" && row.phase !== "failed") return yield* Effect.fail(refused(t("server.media.busy")));
@@ -557,7 +568,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         Effect.gen(function* () {
           const row = yield* found(id);
           if (!active(row.phase)) return Option.none();
-          yield* db.run(q.changeAudio({ ...row, phase: "canceled", problem: t("server.media.canceled"), now: yield* Clock.currentTimeMillis }));
+          yield* db.run(q.changeAudioJob({ ...row, phase: "canceled", problem: t("server.media.canceled"), now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();
           return FiberMap.getUnsafe(fibers, id);
         }),
@@ -573,7 +584,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           if (row.phase === "ready" || row.phase === "downloading") return yield* view(row);
           if (!(yield* view(row)).canRetryDownload) return yield* Effect.fail(refused(t("server.media.noDownload")));
           yield* ports.capacity();
-          yield* db.run(q.changeAudio({ ...row, phase: "downloading", problem: "", now: yield* Clock.currentTimeMillis }));
+          yield* db.run(q.changeAudioJob({ ...row, phase: "downloading", problem: "", now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();
           yield* run(id, download(id));
           return yield* get(id);
@@ -588,7 +599,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           if (!(yield* view(row)).canResume) return yield* Effect.fail(refused(t("server.media.audioPollingPaused")));
           yield* originalAccount(row);
           yield* ports.capacity();
-          yield* db.run(q.changeAudio({ ...row, phase: "generating", problem: "", now: yield* Clock.currentTimeMillis }));
+          yield* db.run(q.changeAudioJob({ ...row, phase: "generating", problem: "", now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();
           yield* run(id, poll(id));
           return yield* get(id);
@@ -596,15 +607,15 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
       );
     }),
     restore: Effect.fn("Media.audioRestore")(function* () {
-      yield* db.run(q.interruptAudio({ now: yield* Clock.currentTimeMillis, problem: t("server.media.restarted") }));
+      yield* db.run(q.interruptRemoteJobs({ kinds: audioKinds, now: yield* Clock.currentTimeMillis, problem: t("server.media.restarted") }));
       yield* ports.publish();
-      const pendingAudio2 = yield* db.run(q.pendingAudio());
+      const pendingAudio2 = yield* Effect.map(db.run(q.pendingMediaJobs({ kinds: audioKinds })), jobs.many);
       yield* Effect.forEach(
         pendingAudio2,
         (row) =>
           Effect.gen(function* () {
             if (row.phase === "downloading") yield* run(row.id, download(row.id));
-            else if (row.remote_task_id !== null)
+            else if (row.remote_task !== null)
               yield* originalAccount(row).pipe(
                 Effect.andThen(run(row.id, poll(row.id))),
                 Effect.catch(() => change(row.id, ["generating"], { phase: "unknown", problem: t("server.media.audioAccountChanged") })),
@@ -612,7 +623,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
           }),
         { discard: true },
       );
-      const audioCleanup2 = yield* db.run(q.audioCleanup());
+      const audioCleanup2 = yield* Effect.map(db.run(q.audioCleanup()), jobs.many);
       yield* Effect.forEach(audioCleanup2, (row) => cleanSafely(row.id), { discard: true });
     }),
   };

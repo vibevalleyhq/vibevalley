@@ -20,10 +20,10 @@
 | `packages/protocol/src/media/` | 任务、请求、事实、Schema 与接口权限 |
 | `apps/server/src/media/` | Media 服务、任务、下载与文件校验 |
 | `apps/server/src/infra/publicHttp.ts` | 只拨号已校验公网 IPv4 的独立 HTTP 客户端 |
-| `apps/server/db/queries/media_generation.sql` | 生图持久化与恢复查询 |
-| `apps/server/src/media/understanding.ts`、`apps/server/db/queries/media_understanding.sql` | 理解的授权核对、输入保留、持久化、恢复与清理 |
+| `apps/server/db/queries/media_job.sql`、`apps/server/src/media/job.ts` | 每种任务一张表 `media_job`（按 `kind` 分）：按 id 取、最近的、在跑的、新建、放掉资产共用一份查询；各种任务改行、重启时怎么收尾各写各的 |
+| `apps/server/src/media/understanding.ts` | 理解的授权核对、输入保留、持久化、恢复与清理 |
 | `apps/server/src/media/speech.ts`、`speechStream.ts`、`audioResult.ts` | 单人语音、Flash 流式、音频下载与落盘 |
-| `apps/server/src/media/audio.ts`、`transcriptionStream.ts`、`apps/server/db/queries/media_audio.sql` | 多人对白、音色设计／克隆、长转写与异步恢复 |
+| `apps/server/src/media/audio.ts`、`transcriptionStream.ts` | 多人对白、音色设计／克隆、长转写与异步恢复 |
 | `apps/server/src/media/input.ts`、`inputs.ts` | 流式输入、配额、任务保留与本机回收 |
 | `apps/server/db/queries/media_input.sql`、`media_input_pin.sql` | 输入、删除标记与任务保留记录 |
 | `apps/server/src/http/media.ts` | 本机专用的二进制上传入口 |
@@ -35,6 +35,7 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 ## 不变量
 
 - **同一请求不重新生成**：调用者给出 1–80 位字母、数字、下划线或连字符的 ID。同一 ID、参数与调用来源返回原任务，参数或来源不同则拒绝。浏览器重试保持 ID 与参数；修改输入或再次生成须明确新建。
+- **一个 id 是一个任务**：各种任务在同一张表 `media_job`，按 `kind` 分；同一个 id 已是别种任务就拒绝。各种代码读行时只认自己的种类和自己有的阶段，别的当不是自己的。
 - **先落库再发出**：任务保存连接 ID、配置 revision、完整模型 ID、参数和阶段；Key 只留在排队任务的内存快照。直接发起的任务不因改连接而换账号；委托理解在执行及排队后上传前再次核对授权。任务登记与本机工作纤程注册在同一临界区内，不因浏览器断开留下未启动的排队任务。
 - **来源由服务端确认**：HTTP 入口记为用户；助手工具从执行上下文取档案、频道与用户委托，不接受模型自报身份。来源随任务落库并进入公共投影，重启保留；任务的来源频道不等于图片后来发布的目标频道。
 - **只记录厂商报告的用量**：成功响应的图片数和输出尺寸随签名 URL 一起落库，下载失败、重试和重启保留。未收到用量时省略该字段，页面明确未知不代表未计费，不猜价格或填零。

@@ -11,9 +11,10 @@ import { Db } from "#/infra/db.ts";
 import { Provider } from "#/provider/provider.ts";
 import { waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
-import * as q from "#db/media_understanding.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
 import { makeInputs } from "./inputs.ts";
+import { newJob } from "./job.ts";
 import { Media } from "./media.ts";
 import { png } from "./testdata/png.ts";
 
@@ -134,7 +135,7 @@ it.effect.each(["completed", "incomplete"])("understanding persists %s text and 
     expect(cleanupUnderstanding2).toEqual(job);
     expect(calls).toEqual(["POST https://api.mosi.cn/v1/files", "POST https://api.mosi.cn/v1/responses", "DELETE https://api.mosi.cn/v1/files/file-one"]);
     yield* notIn(job, "test-only-understanding-key");
-    const found = yield* (yield* Db).one(q.understanding({ id: request.id }));
+    const found = yield* (yield* Db).one(q.mediaJob({ id: request.id }));
     yield* notIn(found, "test-only-understanding-key");
     const understandingCreatedFailure = yield* media.createUnderstanding({ ...request, prompt: "Different question" }).pipe(Effect.flip);
     expect(understandingCreatedFailure).toMatchObject({ _tag: "Refused" });
@@ -398,21 +399,24 @@ it.effect("regression: restart cancels unsent work, preserves uncertain work and
             id,
             Effect.gen(function* () {
               yield* db.run(
-                q.insertUnderstanding({
-                  id,
-                  request: asked,
-                  inputs: pinned,
-                  source: owned,
-                  authorization: null,
-                  phase: "queued",
-                  connection: "moss",
-                  revision: request.revision,
-                  model: "moss-vl-1.0",
-                  now: 1,
-                }),
+                q.insertMediaJob(
+                  newJob({
+                    kind: "understanding",
+                    id,
+                    request: asked,
+                    inputs: pinned,
+                    source: owned,
+                    authorization: null,
+                    phase: "queued",
+                    connection: "moss",
+                    revision: request.revision,
+                    model: "moss-vl-1.0",
+                    now: 1,
+                  }),
+                ),
               );
               yield* db.run(
-                q.changeUnderstanding({
+                q.changeUnderstandingJob({
                   id,
                   phase,
                   source: owned,

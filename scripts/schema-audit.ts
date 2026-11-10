@@ -79,12 +79,18 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "artifact_block.type", protocol: "BlockTypeValues", values: T.BlockTypeValues },
   { column: "artifact_suggestion.status", protocol: "SuggestionStatusValues", values: T.SuggestionStatusValues },
   { column: "pkm_comment.status", protocol: "PkmCommentStatusValues", values: T.PkmCommentStatusValues },
-  { column: "media_speech.phase", protocol: "MediaPhaseValues", values: T.MediaPhaseValues },
-  { column: "media_speech.result_format", protocol: "MediaAudioFormatValues", values: T.MediaAudioFormatValues },
-  { column: "media_audio.phase", protocol: "MediaPhaseValues", values: T.MediaPhaseValues },
-  { column: "media_audio.kind", protocol: "MediaAudioKindValues", values: T.MediaAudioKindValues },
-  { column: "media_audio.result_format", protocol: "MediaAudioFormatValues", values: T.MediaAudioFormatValues },
-  { column: "media_understanding.phase", protocol: "MediaUnderstandingPhaseValues", values: T.MediaUnderstandingPhaseValues },
+  // One table for every kind of media job: its phases are every kind's.
+  {
+    column: "media_job.phase",
+    protocol: "MediaPhaseValues and MediaUnderstandingPhaseValues",
+    values: [...new Set([...T.MediaUnderstandingPhaseValues, ...T.MediaPhaseValues])],
+  },
+  {
+    column: "media_job.kind",
+    protocol: "image, understanding, speech and MediaAudioKindValues",
+    values: ["image", "understanding", "speech", ...T.MediaAudioKindValues],
+  },
+  { column: "media_job.result_format", protocol: "MediaAudioFormatValues", values: T.MediaAudioFormatValues },
 ];
 
 // Preserve quoted words and line numbers; a CHECK in a comment is not a constraint.

@@ -73,38 +73,26 @@ export type Words_mailbox_delivery_urgency = typeof Words_mailbox_delivery_urgen
 export const Words_mailbox_issue_state = Schema.Literals(["held","forwarded","returned"])
 export type Words_mailbox_issue_state = typeof Words_mailbox_issue_state.Type
 
-export const Words_media_audio_kind = Schema.Literals(["speakers","voiceDesign","clone","transcription"])
-export type Words_media_audio_kind = typeof Words_media_audio_kind.Type
-
-export const Words_media_audio_phase = Schema.Literals(["queued","generating","downloading","ready","failed","unknown","canceled","download_failed"])
-export type Words_media_audio_phase = typeof Words_media_audio_phase.Type
-
-export const Words_media_audio_result_format = Schema.Literals(["mp3","wav","pcm","flac","aac","opus"])
-export type Words_media_audio_result_format = typeof Words_media_audio_result_format.Type
-
-export const Words_media_generation_phase = Schema.Literals(["queued","generating","downloading","ready","failed","unknown","canceled","download_failed"])
-export type Words_media_generation_phase = typeof Words_media_generation_phase.Type
-
 export const Words_media_input_phase = Schema.Literals(["reserved","uploading","ready","failed","deleting"])
 export type Words_media_input_phase = typeof Words_media_input_phase.Type
+
+export const Words_media_job_cleanup = Schema.Literals(["pending","running","done","blocked","unknown"])
+export type Words_media_job_cleanup = typeof Words_media_job_cleanup.Type
+
+export const Words_media_job_kind = Schema.Literals(["image","understanding","speech","speakers","voiceDesign","clone","transcription"])
+export type Words_media_job_kind = typeof Words_media_job_kind.Type
+
+export const Words_media_job_phase = Schema.Literals(["authorized","queued","uploading","generating","downloading","ready","incomplete","failed","unknown","canceled","download_failed"])
+export type Words_media_job_phase = typeof Words_media_job_phase.Type
+
+export const Words_media_job_result_format = Schema.Literals(["mp3","wav","pcm","flac","aac","opus"])
+export type Words_media_job_result_format = typeof Words_media_job_result_format.Type
 
 export const Words_media_remote_file_phase = Schema.Literals(["uploading","ready","rejected","unknown","deleting","deleted"])
 export type Words_media_remote_file_phase = typeof Words_media_remote_file_phase.Type
 
 export const Words_media_remote_file_purpose = Schema.Literals(["image","video","audio"])
 export type Words_media_remote_file_purpose = typeof Words_media_remote_file_purpose.Type
-
-export const Words_media_speech_phase = Schema.Literals(["queued","generating","downloading","ready","failed","unknown","canceled","download_failed"])
-export type Words_media_speech_phase = typeof Words_media_speech_phase.Type
-
-export const Words_media_speech_result_format = Schema.Literals(["mp3","wav","pcm","flac","aac","opus"])
-export type Words_media_speech_result_format = typeof Words_media_speech_result_format.Type
-
-export const Words_media_understanding_cleanup = Schema.Literals(["pending","running","done","blocked","unknown"])
-export type Words_media_understanding_cleanup = typeof Words_media_understanding_cleanup.Type
-
-export const Words_media_understanding_phase = Schema.Literals(["authorized","queued","uploading","generating","ready","incomplete","failed","unknown","canceled"])
-export type Words_media_understanding_phase = typeof Words_media_understanding_phase.Type
 
 export const Words_memory_author = Schema.Literals(["user","agent","system"])
 export type Words_memory_author = typeof Words_memory_author.Type

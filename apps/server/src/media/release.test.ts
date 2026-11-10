@@ -15,11 +15,11 @@ import { Provider } from "#/provider/provider.ts";
 import { waitFor } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 import { world } from "#/testing/world.ts";
-import * as audio from "#db/media_audio.sql.ts";
 import * as input from "#db/media_input.sql.ts";
-import * as speech from "#db/media_speech.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
 import { makeInputs } from "./inputs.ts";
+import { newJob } from "./job.ts";
 import { Media } from "./media.ts";
 import { wav } from "./testdata/audio.ts";
 
@@ -115,7 +115,7 @@ it.effect(
       yield* media.restore();
       expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
       const before = yield* media.get(first.id);
-      const row = yield* db.one(audio.audio({ id: first.id }));
+      const row = yield* db.one(q.mediaJob({ id: first.id }));
       expect((yield* media.previewRelease(first.id)).does).toHaveLength(3);
       const media2 = yield* media.get(first.id);
       expect(media2).toEqual(before);
@@ -134,8 +134,8 @@ it.effect(
       expect((yield* media.inputs.content(local.id)).size).toBe(bytes.length);
       const inputCapacity2 = yield* db.run(input.inputCapacity());
       expect(inputCapacity2).toEqual({ bytes: bytes.length, count: 1 });
-      const after = yield* db.one(audio.audio({ id: first.id }));
-      expect(after).toMatchObject({ request: row?.request, remote_task_id: row?.remote_task_id, result: row?.result });
+      const after = yield* db.one(q.mediaJob({ id: first.id }));
+      expect(after).toMatchObject({ request: row?.request, remote_task: row?.remote_task, result: row?.result });
       yield* media.release(second.id);
       const inputCapacity3 = yield* db.run(input.inputCapacity());
       expect(inputCapacity3).toEqual({ bytes: 0, count: 0 });
@@ -230,22 +230,25 @@ it.effect.each(["queued", "generating", "downloading"] as const)("regression: %s
     const now = yield* Clock.currentTimeMillis;
     const request: T.MediaVoiceDesignRequest = { id: "not-terminal", connection: "moss", revision: 1, text: "Hello.", instruction: "Warm.", format: "wav" };
     yield* db.run(
-      audio.insertAudio({
-        id: request.id,
-        kind: "voiceDesign",
-        request: yield* json({ ...request, kind: "voiceDesign" }),
-        source: yield* json({ kind: "user" }),
-        input: null,
-        connection: "moss",
-        revision: 1,
-        model: "moss-voice-generator-1.0",
-        fingerprint: "test",
-        now,
-      }),
+      q.insertMediaJob(
+        newJob({
+          phase: "queued",
+          id: request.id,
+          kind: "voiceDesign",
+          request: yield* json({ ...request, kind: "voiceDesign" }),
+          source: yield* json({ kind: "user" }),
+          input: null,
+          connection: "moss",
+          revision: 1,
+          model: "moss-voice-generator-1.0",
+          fingerprint: "test",
+          now,
+        }),
+      ),
     );
-    const row = yield* db.one(audio.audio({ id: request.id }));
+    const row = yield* db.one(q.mediaJob({ id: request.id }));
     if (!row) return yield* Effect.die("Missing seeded job");
-    yield* db.run(audio.changeAudio({ ...row, phase, now }));
+    yield* db.run(q.changeAudioJob({ ...row, phase, now }));
     const previewReleaseFailure = yield* media.previewRelease(request.id).pipe(Effect.flip);
     expect(previewReleaseFailure).toMatchObject({ _tag: "Refused" });
     const releasedFailure = yield* media.release(request.id).pipe(Effect.flip);
@@ -285,7 +288,7 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
         const patch = {
           phase,
           now,
-          remote_task_id: "paid-task",
+          remote_task: "paid-task",
           result_url: phase === "download_failed" ? "https://audio.example.com/result.pcm" : null,
           result_input: yield* json(asset),
           result_format: "pcm" as const,
@@ -293,38 +296,45 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
         };
         if ("instruction" in request) {
           yield* db.run(
-            audio.insertAudio({
-              id: request.id,
-              kind: "voiceDesign",
-              request: yield* json({ ...request, kind: "voiceDesign" }),
-              source: yield* json({ kind: "user" }),
-              input: null,
-              connection: "moss",
-              revision: 1,
-              model: "moss-voice-generator-1.0",
-              fingerprint: "test",
-              now,
-            }),
+            q.insertMediaJob(
+              newJob({
+                phase: "queued",
+                id: request.id,
+                kind: "voiceDesign",
+                request: yield* json({ ...request, kind: "voiceDesign" }),
+                source: yield* json({ kind: "user" }),
+                input: null,
+                connection: "moss",
+                revision: 1,
+                model: "moss-voice-generator-1.0",
+                fingerprint: "test",
+                now,
+              }),
+            ),
           );
-          const row = yield* db.one(audio.audio({ id: request.id }));
+          const row = yield* db.one(q.mediaJob({ id: request.id }));
           if (!row) return yield* Effect.die("Missing design job");
-          yield* db.run(audio.changeAudio({ ...row, ...patch }));
+          yield* db.run(q.changeAudioJob({ ...row, ...patch }));
         } else {
           yield* db.run(
-            speech.insertSpeech({
-              id: request.id,
-              request: yield* json(request),
-              source: yield* json({ kind: "user" }),
-              connection: "moss",
-              revision: 1,
-              model: "moss-tts-1.5-flash",
-              credential_hash: "test",
-              now,
-            }),
+            q.insertMediaJob(
+              newJob({
+                kind: "speech",
+                phase: "queued",
+                id: request.id,
+                request: yield* json(request),
+                source: yield* json({ kind: "user" }),
+                connection: "moss",
+                revision: 1,
+                model: "moss-tts-1.5-flash",
+                credential_hash: "test",
+                now,
+              }),
+            ),
           );
-          const row = yield* db.one(speech.speech({ id: request.id }));
+          const row = yield* db.one(q.mediaJob({ id: request.id }));
           if (!row) return yield* Effect.die("Missing speech job");
-          yield* db.run(speech.changeSpeech({ ...row, ...patch, remote_task: "paid-task" }));
+          yield* db.run(q.changeSpeechJob({ ...row, ...patch, remote_task: "paid-task" }));
         }
         const media2 = yield* media.get(request.id);
         expect(media2).toMatchObject({
@@ -343,9 +353,9 @@ it.effect.each(["unknown", "canceled", "download_failed"] as const)(
       expect(audioResumeFailure).toMatchObject({ _tag: "Refused" });
       const speechResumeFailure = yield* media.speechResume(spoken.id).pipe(Effect.flip);
       expect(speechResumeFailure).toMatchObject({ _tag: "Refused" });
-      const audio2 = yield* db.one(audio.audio({ id: design.id }));
-      expect(audio2).toMatchObject({ remote_task_id: "paid-task", assets_released: 1 });
-      const speech2 = yield* db.one(speech.speech({ id: spoken.id }));
+      const audio2 = yield* db.one(q.mediaJob({ id: design.id }));
+      expect(audio2).toMatchObject({ remote_task: "paid-task", assets_released: 1 });
+      const speech2 = yield* db.one(q.mediaJob({ id: spoken.id }));
       expect(speech2).toMatchObject({ remote_task: "paid-task", assets_released: 1 });
       for (const id of assets) {
         const inputFailure = yield* inputs.get(id).pipe(Effect.flip);

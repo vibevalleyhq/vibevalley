@@ -11,8 +11,9 @@ import { PublicHttp } from "#/infra/publicHttp.ts";
 import { Provider } from "#/provider/provider.ts";
 import { testConfig, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
-import * as q from "#db/media_speech.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
+import { newJob } from "./job.ts";
 import { Media, type MediaCaller } from "./media.ts";
 import { mp3, wav } from "./testdata/audio.ts";
 
@@ -106,7 +107,7 @@ it.effect.each([
       expect(changedFailure).toMatchObject({ _tag: "Refused" });
     }
     expect(calls).toBe(1);
-    const row = yield* (yield* Db).one(q.speech({ id: input.id }));
+    const row = yield* (yield* Db).one(q.mediaJob({ id: input.id }));
     expect(row?.result_url).toBeNull();
     yield* notIn(row, "test-private-key");
     const jobs = (yield* Core).state().media;
@@ -183,7 +184,7 @@ it.effect("regression: speech download starts only after the private URL is stor
       const media = yield* Media;
       yield* media.createSpeech(input, { kind: "user" });
       yield* Deferred.await(started);
-      const found = yield* (yield* Db).one(q.speech({ id: input.id }));
+      const found = yield* (yield* Db).one(q.mediaJob({ id: input.id }));
       expect(found).toMatchObject({ phase: "downloading", result_url: response.url });
       const shown = (yield* Core).state().media;
       yield* notIn(shown, "token=private");
@@ -430,7 +431,7 @@ it.effect("speech source and completed attachment survive restart without accept
       const ready = yield* waitFor(media.get(input.id), (job) => job.phase === "ready", "attributed speech saved");
       expect(ready.source).toEqual(source);
       const sourceJson = yield* json(source);
-      expect((yield* (yield* Db).one(q.speech({ id: input.id })))?.source).toBe(sourceJson);
+      expect((yield* (yield* Db).one(q.mediaJob({ id: input.id })))?.source).toBe(sourceJson);
       return ready;
     }).pipe(Effect.provide(layer(generated, downloaded, config)));
     yield* Effect.gen(function* () {
@@ -462,19 +463,23 @@ it.effect("restart cancels unsent speech, marks uncertainty and resumes only per
     const db = yield* Db;
     for (const phase of ["queued", "generating", "downloading", "download_failed", "canceled"] as const) {
       yield* db.run(
-        q.insertSpeech({
-          id: phase,
-          request: yield* json({ ...input, id: phase }),
-          source: yield* json({ kind: "user" }),
-          connection: input.connection,
-          revision: input.revision,
-          model: "moss-tts-1.5-flash",
-          credential_hash: "",
-          now: 1,
-        }),
+        q.insertMediaJob(
+          newJob({
+            kind: "speech",
+            phase: "queued",
+            id: phase,
+            request: yield* json({ ...input, id: phase }),
+            source: yield* json({ kind: "user" }),
+            connection: input.connection,
+            revision: input.revision,
+            model: "moss-tts-1.5-flash",
+            credential_hash: "",
+            now: 1,
+          }),
+        ),
       );
       yield* db.run(
-        q.changeSpeech({
+        q.changeSpeechJob({
           id: phase,
           phase,
           attachment: null,
@@ -573,7 +578,7 @@ it.effect("regression: asynchronous speech persists its task before polling and 
       const media = yield* Media;
       yield* media.createSpeech({ ...input, asynchronous: true }, { kind: "user" });
       yield* Deferred.await(polling);
-      const found = yield* (yield* Db).one(q.speech({ id: input.id }));
+      const found = yield* (yield* Db).one(q.mediaJob({ id: input.id }));
       expect(found).toMatchObject({ phase: "generating", remote_task: "remote-speech" });
       const canceled = yield* media.cancel(input.id);
       expect(canceled).toMatchObject({ phase: "canceled", canResume: true });
@@ -593,27 +598,31 @@ it.effect("regression: restart never queries a known asynchronous task with repl
     yield* configured();
     const db = yield* Db;
     yield* db.run(
-      q.insertSpeech({
-        id: input.id,
-        request: yield* json({ ...input, asynchronous: true }),
-        source: yield* json({ kind: "user" }),
-        connection: input.connection,
-        revision: input.revision,
-        model: "moss-tts-1.5-flash",
-        credential_hash: "different-original-key-fingerprint",
-        now: 1,
-      }),
+      q.insertMediaJob(
+        newJob({
+          kind: "speech",
+          phase: "queued",
+          id: input.id,
+          request: yield* json({ ...input, asynchronous: true }),
+          source: yield* json({ kind: "user" }),
+          connection: input.connection,
+          revision: input.revision,
+          model: "moss-tts-1.5-flash",
+          credential_hash: "different-original-key-fingerprint",
+          now: 1,
+        }),
+      ),
     );
-    const row = yield* db.one(q.speech({ id: input.id }));
+    const row = yield* db.one(q.mediaJob({ id: input.id }));
     if (!row) return yield* Effect.die("Missing seeded speech");
-    yield* db.run(q.changeSpeech({ ...row, phase: "generating", remote_task: "known-before-restart", now: 2 }));
+    yield* db.run(q.changeSpeechJob({ ...row, phase: "generating", remote_task: "known-before-restart", now: 2 }));
     const media = yield* Media;
     yield* media.restore();
     const paused = yield* waitFor(media.get(input.id), (job) => job.phase === "unknown", "credential mismatch pauses polling");
     expect(paused).toMatchObject({ canResume: true });
     const speechResumeFailure = yield* media.speechResume(input.id).pipe(Effect.flip);
     expect(speechResumeFailure).toMatchObject({ _tag: "Refused" });
-    expect((yield* db.one(q.speech({ id: input.id })))?.remote_task).toBe("known-before-restart");
+    expect((yield* db.one(q.mediaJob({ id: input.id })))?.remote_task).toBe("known-before-restart");
   }).pipe(Effect.provide(layer(HttpClient.make(() => Effect.die("Changed credentials must not reach MOSS"))))),
 );
 
@@ -662,7 +671,7 @@ it.effect("regression: Flash delivers PCM before completion and saves actual met
       );
       yield* Deferred.await(first);
       expect((yield* media.get(input.id)).phase).toBe("generating");
-      expect((yield* (yield* Db).one(q.speech({ id: input.id })))?.remote_task).toBe("stream-private-id");
+      expect((yield* (yield* Db).one(q.mediaJob({ id: input.id })))?.remote_task).toBe("stream-private-id");
       const speechEventsFailure = yield* media.speechEvents(input.id).pipe(Effect.flip);
       expect(speechEventsFailure).toMatchObject({ _tag: "Refused" });
       yield* Deferred.succeed(finish, undefined);

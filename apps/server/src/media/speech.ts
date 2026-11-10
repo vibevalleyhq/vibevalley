@@ -2,7 +2,7 @@ import { type Cause, Clock, Effect, Fiber, FiberMap, FileSystem, Option, Queue, 
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { MediaAudioFormatValues } from "@vibevalley/protocol";
+import { MediaAudioFormatValues, MediaPhaseValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -13,9 +13,10 @@ import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { type Account, Provider } from "#/provider/provider.ts";
 import type { SpeechRequest } from "#/provider/vendors.ts";
-import * as q from "#db/media_speech.sql.ts";
+import * as q from "#db/media_job.sql.ts";
 
 import { saveAudioResult, releaseAudioResult, type MediaInputs } from "./audioResult.ts";
+import { type JobRow, jobsOf, newJob } from "./job.ts";
 import type { MediaCaller } from "./media.ts";
 import { receiveSpeechStream, type SpeechStreamSaved } from "./speechStream.ts";
 
@@ -38,6 +39,9 @@ const usageJson = encodeJson(S.MediaAudioUsage);
 const requestJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSpeechRequest));
 const sourceJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSource));
 
+/** This file's media jobs, as it reads media_job. */
+const jobs = jobsOf({ kinds: ["speech"], phases: MediaPhaseValues });
+
 export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
   const kept = yield* Attachment;
@@ -50,12 +54,13 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
   const active = (phase: T.MediaPhase) => phase === "queued" || phase === "generating" || phase === "downloading";
   const decodeRequest = (text: string) =>
     Schema.decodeEffect(Schema.fromJsonString(S.MediaSpeechRequest))(text).pipe(Effect.mapError(() => refused(t("server.media.corrupt"))));
+  const own = (id: string) => Effect.map(db.one(q.mediaJob({ id })), jobs.one);
   const found = Effect.fnUntraced(function* (id: string) {
-    const row = yield* db.one(q.speech({ id }));
+    const row = yield* own(id);
     if (!row) return yield* Effect.fail(refused(t("server.media.missing")));
     return row;
   });
-  const view = Effect.fnUntraced(function* (row: q.SpeechResult): Effect.fn.Return<T.MediaSpeechJob, ApiError> {
+  const view = Effect.fnUntraced(function* (row: JobRow<T.MediaPhase>): Effect.fn.Return<T.MediaSpeechJob, ApiError> {
     const input = yield* decodeRequest(row.request);
     const source = yield* Schema.decodeEffect(Schema.fromJsonString(S.MediaSource))(row.source).pipe(Effect.mapError(() => refused(t("server.media.corrupt"))));
     const attachment =
@@ -123,14 +128,14 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
       before: readonly T.MediaPhase[],
       patch: Partial<
         Pick<
-          q.SpeechResult,
+          JobRow<T.MediaPhase>,
           "phase" | "result_url" | "attachment" | "problem" | "remote_task" | "result_format" | "content_type" | "metadata" | "usage" | "result_input"
         >
       >,
     ) {
       const row = yield* found(id);
       if (!before.includes(row.phase) || (row.assets_released !== 0 && patch.result_input !== undefined)) return false;
-      yield* db.run(q.changeSpeech({ ...row, ...patch, now: yield* Clock.currentTimeMillis }));
+      yield* db.run(q.changeSpeechJob({ ...row, ...patch, now: yield* Clock.currentTimeMillis }));
       yield* ports.publish();
       return true;
     },
@@ -244,7 +249,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           result_input: saved.resultInput === null ? null : yield* referenceJson(saved.resultInput),
           metadata: yield* metadataJson(saved.metadata),
           usage: saved.usage === undefined ? null : yield* usageJson(saved.usage),
-        } satisfies Partial<q.SpeechResult>;
+        } satisfies Partial<JobRow<T.MediaPhase>>;
         if (
           !(yield* change(id, ["generating"], {
             ...patch,
@@ -306,10 +311,10 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
         ),
       );
     }),
-    has: (id: string) => db.one(q.speech({ id })).pipe(Effect.map((row) => row !== undefined)),
-    pending: () => db.run(q.pendingSpeech()).pipe(Effect.map((rows) => rows.length)),
+    has: (id: string) => own(id).pipe(Effect.map((row) => row !== undefined)),
+    pending: () => Effect.map(db.run(q.pendingMediaJobs({ kinds: ["speech"] })), jobs.many).pipe(Effect.map((rows) => rows.length)),
     list: Effect.fn("Media.speechList")(function* () {
-      const recentSpeech2 = yield* db.run(q.recentSpeech());
+      const recentSpeech2 = yield* Effect.map(db.run(q.recentMediaJobs({ kinds: ["speech"] })), jobs.many);
       return yield* Effect.forEach(recentSpeech2, view);
     }),
     create: Effect.fn("Media.createSpeech")(function* (given: T.MediaSpeechRequest, caller: MediaCaller) {
@@ -320,7 +325,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
         return yield* Effect.fail(refused(t("server.media.speechInvalid")));
       return yield* ports.lock.withPermits(1)(
         Effect.gen(function* () {
-          const existing = yield* db.one(q.speech({ id: input.id }));
+          const existing = yield* own(input.id);
           if (existing) {
             const storedRequest = yield* decodeRequest(existing.request);
             if (!same(storedRequest, input) || !same((yield* view(existing)).source, source)) return yield* Effect.fail(refused(t("server.media.reusedId")));
@@ -337,16 +342,20 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
             .pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
           if (input.streaming === true && streams.size >= 8) return yield* Effect.fail(refused(t("server.media.speechInvalid")));
           yield* db.run(
-            q.insertSpeech({
-              id: input.id,
-              request: yield* requestJson(input).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
-              source: yield* sourceJson(source).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
-              connection: account.connection,
-              revision: account.revision,
-              model: account.model,
-              credential_hash: account.fingerprint,
-              now: yield* Clock.currentTimeMillis,
-            }),
+            q.insertMediaJob(
+              newJob({
+                id: input.id,
+                kind: "speech",
+                phase: "queued",
+                request: yield* requestJson(input).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
+                source: yield* sourceJson(source).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
+                connection: account.connection,
+                revision: account.revision,
+                model: account.model,
+                credential_hash: account.fingerprint,
+                now: yield* Clock.currentTimeMillis,
+              }),
+            ),
           );
           if (input.streaming === true) streams.set(input.id, { queue: yield* Queue.bounded<T.MediaSpeechEvent, Cause.Done>(16), claimed: false });
           yield* ports.publish();
@@ -406,7 +415,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
         Effect.gen(function* () {
           const row = yield* found(id);
           if (!active(row.phase)) return Option.none();
-          yield* db.run(q.changeSpeech({ ...row, phase: "canceled", problem: t("server.media.canceled"), now: yield* Clock.currentTimeMillis }));
+          yield* db.run(q.changeSpeechJob({ ...row, phase: "canceled", problem: t("server.media.canceled"), now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();
           return FiberMap.getUnsafe(fibers, id);
         }),
@@ -427,7 +436,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           if (row.result_url === null || (row.phase !== "download_failed" && row.phase !== "canceled"))
             return yield* Effect.fail(refused(t("server.media.noDownload")));
           yield* ports.capacity();
-          yield* db.run(q.changeSpeech({ ...row, phase: "downloading", problem: "", now: yield* Clock.currentTimeMillis }));
+          yield* db.run(q.changeSpeechJob({ ...row, phase: "downloading", problem: "", now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();
           yield* run(id, download(id));
           return yield* get(id);
@@ -443,7 +452,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           const account = yield* provider.account({ connection: row.connection, model: row.model });
           if (account.fingerprint !== row.credential_hash) return yield* Effect.fail(refused(t("server.media.remoteAccountChanged")));
           yield* ports.capacity();
-          yield* db.run(q.changeSpeech({ ...row, phase: "generating", problem: "", now: yield* Clock.currentTimeMillis }));
+          yield* db.run(q.changeSpeechJob({ ...row, phase: "generating", problem: "", now: yield* Clock.currentTimeMillis }));
           yield* ports.publish();
           yield* run(id, poll(id));
           return yield* get(id);
@@ -451,9 +460,9 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
       );
     }),
     restore: Effect.fn("Media.speechRestore")(function* () {
-      yield* db.run(q.interruptSpeech({ problem: t("server.media.restarted"), now: yield* Clock.currentTimeMillis }));
+      yield* db.run(q.interruptRemoteJobs({ kinds: ["speech"], problem: t("server.media.restarted"), now: yield* Clock.currentTimeMillis }));
       yield* ports.publish();
-      const pendingSpeech2 = yield* db.run(q.pendingSpeech());
+      const pendingSpeech2 = yield* Effect.map(db.run(q.pendingMediaJobs({ kinds: ["speech"] })), jobs.many);
       yield* Effect.forEach(pendingSpeech2, (row) => run(row.id, row.phase === "generating" ? poll(row.id) : download(row.id)), {
         discard: true,
       });
