@@ -34,6 +34,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 - **提交前静态白名单检查（`check.ts`）**：仅放行 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`，且媒体必须内联為 `data:` 或 `blob:`；含表外外链、表单提交或嵌套页面的直接拒绝并报错行号。
 - **怎么看（`display`）**：网页 Artifact 带 `display`：`page`（整页，没有约定）、`slides`、`motion`，建的时候定（不填是 `page`），`artifact.update` 能改，一稿不变只换看法；一起写的没有这一项。
 - **外壳和消息约定（`@vibevalley/artifact/shell`）**：工作台看一稿时请求 `?shell=1&display=…&theme=…`，服务端在页面后面接上主题变量（`--vv-page`、`--vv-ink`…，和 `style.css` 的取值一致）、划词脚本和 `vv` 运行时；样式用 `:where()`，页面自己写的总是赢。运行时只对父窗口说话、只听父窗口：页面报 `ready`（种类、页数和每页的标题、备注，或时长）和 `at`（第几页、第几秒），外壳发 `goto`、`seek`、`play`、`pause`。两头都按 `HtmlShellMessage`、`HtmlShellCommand` 的 Schema 认，不认的丢掉；页面的话只改外壳显示的东西，不能让工作台做框外的事。显示和主题写在地址里，因为一稿的响应永久缓存。
+- **幻灯片（`display: "slides"`）**：一页一个顶层 `<section>`，备注写在 `<aside class="notes">`，版式 class 有 `title`、`two-col`、`image`、`quote`。运行时按 1280×720 排一页、缩放到框里，`?at=` 打开在某一页，`?still=1` 是缩略图（不收键盘和点击），自己处理 ←/→、空格、Home/End 和点击翻页，报每页的标题和备注。外壳（`SlidesControls`）给上一页、下一页、缩略图条、全屏放映、演讲者视图（`/present`，当前页、下一页、备注、计时）和存成 PDF；工作台的标签页和演讲者视图经 `BroadcastChannel` 互相跟着翻。存成 PDF 是新开一个 `?print=1` 的页面：只有它的 CSP 多一个 `allow-modals`，好让页面自己调打印，打印时每页一张纸。写法给模型的在工具描述（`display`）和助手的 `slides` skill（`apps/server/src/orchestrator/skills/slides/SKILL.md`，带模板）。
 - **划词源码替换（`artifact.html.edit`）**：预览挂载 `?shell=1` 外壳，划词生成选中文本及前后各 32 字的 `HtmlAnchor`；服务端在最新版源码中唯一匹配并替换该处转义字节存为新版，跨标签或有歧义则拒绝。
 
 ### 协作块文档（`blocks`）
@@ -80,3 +81,4 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 - `apps/server/src/artifact/policy.test.ts`、`check.test.ts`、`edit.test.ts`、`http/artifact.test.ts`：CSP 响应头、白名单拦截、划词源码替换与 `?shell=1` 注入测试。
 - `apps/server/src/artifact/blocks.rules.test.ts`、`blocks.test.ts`、`artifact.test.ts`：顺序键、Markdown 往返、`batchId` 幂等、`baseRev` 冲突、`Suggestion` 与 `artifact.follow` 测试。
 - `apps/web/test/artifact.spec.ts`、`artifact-blocks.spec.ts`：浏览器沙箱隔离、划词改字、块编辑与建议接受端到端测试。
+- `packages/artifact/src/artifact.test.ts`：外壳消息只认约定里的形状、主题变量和运行时接在页面后面；`apps/web/test/slides.spec.ts`：幻灯片按控件、缩略图和键盘翻页，演讲者视图互相跟着翻、显示备注，打印时一页一张。

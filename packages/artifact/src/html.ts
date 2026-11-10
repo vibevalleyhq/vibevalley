@@ -32,8 +32,7 @@ export const htmlSources = {
 } as const;
 
 /** An HTML artifact is someone else's page: it must never run as one of the farm's. */
-export const htmlPolicy = [
-  `sandbox ${htmlSandbox}`,
+const htmlLimits = [
   "default-src 'none'",
   ["script-src 'unsafe-inline'", ...htmlSources.script].join(" "),
   ["style-src 'unsafe-inline'", ...htmlSources.style].join(" "),
@@ -44,6 +43,10 @@ export const htmlPolicy = [
   "form-action 'none'",
   "base-uri 'none'",
 ].join("; ");
+export const htmlPolicy = `sandbox ${htmlSandbox}; ${htmlLimits}`;
+
+/** The same page opened on its own to be printed (a deck saved as a PDF): it may open the print dialog, nothing more. */
+const htmlPrintPolicy = `sandbox ${htmlSandbox} allow-modals; ${htmlLimits}`;
 
 /** An html artifact's version never changes once made: cached for good. A blocks one is not served as a file. */
 export const artifactHeaders: Record<string, string> = {
@@ -53,6 +56,8 @@ export const artifactHeaders: Record<string, string> = {
   "content-type": "text/html; charset=utf-8",
   "content-security-policy": htmlPolicy,
 };
+
+export const artifactPrintHeaders: Record<string, string> = { ...artifactHeaders, "content-security-policy": htmlPrintPolicy };
 
 export const demoPieces = 6;
 export const demoJitter = 0.3;

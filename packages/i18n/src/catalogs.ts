@@ -2020,6 +2020,28 @@ export const catalogs = {
         save: "存成新的一稿",
         saved: "存成了第 {version} 稿",
       },
+      slides: {
+        previous: "上一页",
+        next: "下一页",
+        at: "{at} / {pages}",
+        present: "全屏放映",
+        presenter: "演讲者视图",
+        pdf: "存成 PDF",
+        thumbnails: "每一页",
+        slide: "第 {at} 页 {title}",
+      },
+      presenter: {
+        title: "演讲者视图：{title}",
+        missing: "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
+        current: "这一页",
+        next: "下一页",
+        end: "这是最后一页",
+        notes: "备注",
+        noNotes: "这一页没有备注",
+        clock: "讲了多久",
+        restart: "重新计时",
+        aside: "下一页和备注",
+      },
     },
     "web.audio": {
       title: "音频工作台",
@@ -6786,6 +6808,28 @@ export const catalogs = {
         save: "Save as a new version",
         saved: "Saved as version {version}",
       },
+      slides: {
+        previous: "Previous slide",
+        next: "Next slide",
+        at: "{at} / {pages}",
+        present: "Present full screen",
+        presenter: "Presenter view",
+        pdf: "Save as PDF",
+        thumbnails: "Slides",
+        slide: "Slide {at} {title}",
+      },
+      presenter: {
+        title: "Presenter view: {title}",
+        missing: "No deck named: open the presenter view from an artifact's controls.",
+        current: "This slide",
+        next: "Next slide",
+        end: "This is the last slide",
+        notes: "Notes",
+        noNotes: "No notes on this slide",
+        clock: "Time so far",
+        restart: "Restart timer",
+        aside: "Next slide and notes",
+      },
     },
     "web.audio": {
       title: "Audio studio",
@@ -11448,6 +11492,24 @@ export interface Messages {
   "web.artifact.page.versions": undefined;
   "web.artifact.place.hint": undefined;
   "web.artifact.place.label": undefined;
+  "web.artifact.presenter.aside": undefined;
+  "web.artifact.presenter.clock": undefined;
+  "web.artifact.presenter.current": undefined;
+  "web.artifact.presenter.end": undefined;
+  "web.artifact.presenter.missing": undefined;
+  "web.artifact.presenter.next": undefined;
+  "web.artifact.presenter.noNotes": undefined;
+  "web.artifact.presenter.notes": undefined;
+  "web.artifact.presenter.restart": undefined;
+  "web.artifact.presenter.title": { readonly title: string | number };
+  "web.artifact.slides.at": { readonly at: string | number; readonly pages: string | number };
+  "web.artifact.slides.next": undefined;
+  "web.artifact.slides.pdf": undefined;
+  "web.artifact.slides.present": undefined;
+  "web.artifact.slides.presenter": undefined;
+  "web.artifact.slides.previous": undefined;
+  "web.artifact.slides.slide": { readonly at: string | number; readonly title: string | number };
+  "web.artifact.slides.thumbnails": undefined;
   "web.artifact.suggestions.accept": undefined;
   "web.artifact.suggestions.attrChecked": undefined;
   "web.artifact.suggestions.attrLanguage": undefined;

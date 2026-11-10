@@ -44,6 +44,11 @@ describe("the tools", () => {
     expect(spentText({ tokens: 12_500 })).toBe("1.3 万 token");
   });
 
+  it("let the orchestrator and a helper say how an html artifact is shown", () => {
+    for (const table of [parameters, sessionParameters]) expect(table["artifact.create"].fields).toHaveProperty("display");
+    expect(params.artifact.display).toMatch(/slides/u);
+  });
+
   it("read in the trajectory by label and what they name", () => {
     expect(toolStart("issue_create", { title: "加个 README", repo: "demo", start: true })).toEqual({
       text: "记一张工单：demo",

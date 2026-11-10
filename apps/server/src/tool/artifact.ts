@@ -128,6 +128,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
                 {
                   title: p.title,
                   kind: p.kind,
+                  ...(p.display !== undefined ? { display: p.display } : {}),
                   content,
                   ...(p.note ? { note: p.note } : {}),
                   channel: p.channel ?? c.here,
@@ -150,7 +151,14 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
               const content = yield* artifactWords(c, p.content, p.file);
               const made = yield* artifacts.create(
                 { from: c.session, by: c.agent },
-                { title: p.title, kind: p.kind, content, ...(p.note ? { note: p.note } : {}), ...sessionArtifactScope(c.session) },
+                {
+                  title: p.title,
+                  kind: p.kind,
+                  ...(p.display !== undefined ? { display: p.display } : {}),
+                  content,
+                  ...(p.note ? { note: p.note } : {}),
+                  ...sessionArtifactScope(c.session),
+                },
               );
               return answers.artifact.made(made) + warnings(made, content);
             }),

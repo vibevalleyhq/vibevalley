@@ -3,7 +3,15 @@ import { Effect, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, LibraryFileKindValues, LibraryOriginKindValues, PkmTierValues } from "@vibevalley/protocol";
+import {
+  ArtifactDisplayValues,
+  ArtifactKindValues,
+  CronWhenKindValues,
+  DeliverableValues,
+  LibraryFileKindValues,
+  LibraryOriginKindValues,
+  PkmTierValues,
+} from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -48,6 +56,7 @@ const artifactText = {
   note: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.note })),
 };
 const artifactKind = Schema.Literals(ArtifactKindValues).annotate({ description: params.artifact.kind });
+const artifactDisplay = Schema.optionalKey(Schema.Literals(ArtifactDisplayValues).annotate({ description: params.artifact.display }));
 const artifactId = Schema.String.annotate({ description: params.artifact.id }).pipe(
   Schema.decodeTo(S.ArtifactId, {
     decode: SchemaGetter.transform((s: string) => S.artifactId(s.trim())),
@@ -156,6 +165,7 @@ export const parameters = {
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.channel })),
     issue: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.issue })),
     kind: artifactKind,
+    display: artifactDisplay,
     title: Schema.String.annotate({ description: params.artifact.title }),
   }).annotate({ requiredOrder: ["title", "kind"] }),
   "artifact.get": Schema.Struct({ id: artifactId }),
@@ -282,6 +292,7 @@ export const sessionParameters = {
     ...artifactText,
     file: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.file })),
     kind: artifactKind,
+    display: artifactDisplay,
     title: Schema.String.annotate({ description: params.artifact.title }),
   }).annotate({ requiredOrder: ["title", "kind"] }),
   "artifact.get": Schema.Struct({ id: artifactId }),

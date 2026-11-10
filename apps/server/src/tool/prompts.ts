@@ -161,6 +161,8 @@ export const params = {
   artifact: {
     title: "标题：用户在卡片上看到的那一行，最多 80 个字",
     kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）`,
+    display:
+      '网页（html）怎么看，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class="notes">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）不填',
     content: "这一稿的全文；和 file 二选一",
     file: "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
     note: "这一稿改了什么，一句话；第一稿可以写这是什么",

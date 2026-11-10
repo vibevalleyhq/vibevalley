@@ -117,5 +117,27 @@
     "to": "Change to",
     "save": "Save as a new version",
     "saved": "Saved as version {version}"
+  },
+  "slides": {
+    "previous": "Previous slide",
+    "next": "Next slide",
+    "at": "{at} / {pages}",
+    "present": "Present full screen",
+    "presenter": "Presenter view",
+    "pdf": "Save as PDF",
+    "thumbnails": "Slides",
+    "slide": "Slide {at} {title}"
+  },
+  "presenter": {
+    "title": "Presenter view: {title}",
+    "missing": "No deck named: open the presenter view from an artifact's controls.",
+    "current": "This slide",
+    "next": "Next slide",
+    "end": "This is the last slide",
+    "notes": "Notes",
+    "noNotes": "No notes on this slide",
+    "clock": "Time so far",
+    "restart": "Restart timer",
+    "aside": "Next slide and notes"
   }
 }

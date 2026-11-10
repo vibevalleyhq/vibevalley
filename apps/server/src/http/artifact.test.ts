@@ -41,6 +41,12 @@ describe("an artifact's content", () => {
       expect(text3).toBe("<p>第二版</p>");
       const shown = yield* get(`${artifactPath(html.id, 1)}?shell=1`);
       expect(shown.headers.get("content-security-policy")).toBe(htmlPolicy);
+      // Only the page opened on its own to be printed may open the print dialog.
+      const printed = yield* get(`${artifactPath(html.id, 1)}?shell=1&print=1`);
+      expect(printed.headers.get("content-security-policy")).toMatch(
+        /^sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals; default-src 'none'; /u,
+      );
+      expect(htmlPolicy).not.toMatch(/allow-modals/u);
       const shownText = yield* Effect.promise(() => shown.text());
       expect(shownText).toMatch(/^<p>第一版<\/p>\n<style>[^]*vibevalley: "selection"[^]*\(\{ display: "page" \}\)/u);
       expect((yield* artifacts.content(html.id, 1)).content).toBe("<p>第一版</p>");

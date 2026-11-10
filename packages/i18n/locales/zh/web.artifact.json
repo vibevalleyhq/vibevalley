@@ -117,5 +117,27 @@
     "to": "改成",
     "save": "存成新的一稿",
     "saved": "存成了第 {version} 稿"
+  },
+  "slides": {
+    "previous": "上一页",
+    "next": "下一页",
+    "at": "{at} / {pages}",
+    "present": "全屏放映",
+    "presenter": "演讲者视图",
+    "pdf": "存成 PDF",
+    "thumbnails": "每一页",
+    "slide": "第 {at} 页 {title}"
+  },
+  "presenter": {
+    "title": "演讲者视图：{title}",
+    "missing": "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
+    "current": "这一页",
+    "next": "下一页",
+    "end": "这是最后一页",
+    "notes": "备注",
+    "noNotes": "这一页没有备注",
+    "clock": "讲了多久",
+    "restart": "重新计时",
+    "aside": "下一页和备注"
   }
 }

@@ -254,7 +254,11 @@ const variantStyles = stylex.create({
       "@media (width>=80rem)": "0",
     },
     minWidth: "0",
-    flex: "1",
+    // Narrow, the view scrolls: the section is as tall as what it holds (a deck's controls too), not squeezed under the rail.
+    flex: {
+      default: "0 0 auto",
+      "@media (width>=80rem)": "1",
+    },
     flexDirection: "column",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 4)",
@@ -440,6 +444,17 @@ const viewStyles = stylex.create({
     fontSize: "var(--text-sm)",
     lineHeight: "var(--text-sm--line-height)",
     color: "var(--color-berry)",
+  },
+  // Narrow, the page scrolls: the frame keeps its own height and the deck's controls stay under it.
+  artifactFramed: {
+    minHeight: {
+      default: "auto",
+      "@media (width>=80rem)": "0",
+    },
+    flexShrink: {
+      default: "0",
+      "@media (width>=80rem)": "1",
+    },
   },
   artifactFrame: {
     minHeight: {
@@ -731,11 +746,12 @@ function Title(props: { artifact: Artifact }) {
       setText(props.artifact.title);
       return;
     }
-    const done = await act.run(async () => {
-      await api.artifact.update({ id, title });
-      void queries.invalidate({ prefix: ["artifacts"] });
-      return true;
-    });
+    const done = await act.run(() =>
+      api.artifact.update({ id, title }).then(() => {
+        void queries.invalidate({ prefix: ["artifacts"] });
+        return true;
+      }),
+    );
     if (done !== true) setText(props.artifact.title);
   };
   return (
@@ -902,6 +918,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                   title={t("web.artifact.page.frame", { title: props.artifact.title, version: v().version })}
                   testId="artifact-frame"
                   frameStyle={viewStyles.artifactFrame}
+                  rootStyle={viewStyles.artifactFramed}
                   onFrame={setFrame}
                 />
                 {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}

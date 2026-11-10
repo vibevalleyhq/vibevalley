@@ -7,7 +7,7 @@ import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf 
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "#/artifact/artifact.ts";
-import { artifactHeaders } from "#/artifact/policy.ts";
+import { artifactHeaders, artifactPrintHeaders } from "#/artifact/policy.ts";
 import { shellThemeOf, withShell } from "#/artifact/shell.ts";
 import { Attachment } from "#/attachment/attachment.ts";
 import { messageOf, reasonOf, refused } from "#/base/errors.ts";
@@ -127,9 +127,11 @@ export const artifactContent = HttpRouter.add(
     // The workbench's view: the page with the runtime after it, for how it is shown and in the workbench's theme (artifact/shell.ts).
     const page = yield* artifacts.content(artifactId(id), Number(version));
     const shown = yield* artifacts.get(artifactId(id));
+    // ?print=1 is that page opened on its own to be printed: only it may open the print dialog.
+    const headers = asked.get("print") === "1" ? artifactPrintHeaders : artifactHeaders;
     return HttpServerResponse.text(withShell({ page: page.content, display: shown.display ?? "page", theme: shellThemeOf(asked.get("theme")) }), {
       contentType,
-      headers: artifactHeaders,
+      headers,
     });
   }).pipe(Effect.orElseSucceed(notFound)),
 );

@@ -10,7 +10,7 @@ import { FarmPage } from "#/farm/FarmPage.tsx";
 import { repoMap } from "#/farm/map/RepoMap.tsx";
 import { lastFarmRepo } from "#/farm/store.ts";
 import { AgentsRoute } from "#/features/agent/index.ts";
-import { ArtifactsPage } from "#/features/artifact/index.ts";
+import { ArtifactsPage, PresenterPage } from "#/features/artifact/index.ts";
 import { CatalogPage } from "#/features/catalog/index.ts";
 import { ChatPage, chatSay } from "#/features/channel/index.ts";
 import { Follow } from "#/features/inbox/index.ts";
@@ -139,6 +139,8 @@ const routes: readonly RouteDefinition[] = [
   },
   { path: "/tree", component: TreePage },
   { path: "/pair", component: PairPage },
+  // A deck's speaker's window: a page of its own, opened from the slides' controls.
+  { path: "/present", component: PresenterPage },
   { path: "/login", component: LoginPage },
 ];
 

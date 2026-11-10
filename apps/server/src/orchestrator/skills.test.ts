@@ -16,4 +16,14 @@ layer(NodeFileSystem.layer)("the orchestrator's own skills", (it) => {
       expect(text).toContain(toolName("media.image.create"));
     }),
   );
+
+  it.effect("the slides skill ships with the server, names the artifact tool and the display its runtime lays out", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const text = yield* fs.readFileString(`${orchestratorSkills}/slides/SKILL.md`);
+      expect(text).toMatch(/^---\nname: slides\ndescription: \S/u);
+      expect(text).toContain(toolName("artifact.create"));
+      expect(text).toMatch(/display` 填 `slides`/u);
+    }),
+  );
 });

@@ -85,6 +85,9 @@ import {
   SlashSquare,
   X,
   XCircle,
+  Fullscreen,
+  DocumentDownload,
+  Notes,
   type IconFunction,
 } from "reicon";
 
@@ -141,6 +144,10 @@ export const icons = {
   previous: AngleLeft,
   next: AngleRight,
   enlarge: Maximize,
+  // A deck of slides: shown on the whole screen, with the speaker's own window, and saved as a PDF.
+  present: Fullscreen,
+  presenter: Notes,
+  pdf: DocumentDownload,
   collapse: Minimize,
   thread: ChatRoundDots,
   pin: PinTack,
