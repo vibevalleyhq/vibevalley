@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作区、依赖 catalog、构建与类型检查 | 各包的对外约定（各包 `README.md`） |
-| 服务端 13 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
+| 服务端 11 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
 | `packages/protocol` 的概念目录、Schema 与客户端生成 | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
 | Postgres 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
 | 测试金字塔、虚拟时钟与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
@@ -21,7 +21,7 @@
 | `tsconfig.base.json`、`scripts/oxlint-plugin.ts` | TypeScript 严格选项、`@effect/tsgo` 插件与仓库自定义 lint 规则 |
 | `apps/server/src/base/` | 纯工具函数与基础定义（`ids.ts`、`json.ts`、`redact.ts`、`actor.ts`、`clip.ts`、`order.ts`、`errors.ts`、`assets.ts`、`prompts.ts`） |
 | `apps/server/src/infra/` | 系统适配（`config.ts`、`db.ts`、`baseline.ts`、`time.ts`、`log.ts`、`lease.ts`、`files.ts`） |
-| `apps/server/src/modules.ts`、`services.ts` | 13 个模块的归属表与两阶段服务组装 |
+| `apps/server/src/modules.ts`、`services.ts` | 11 个模块的归属表与两阶段服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
@@ -47,12 +47,12 @@
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
 
-- **13 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
+- **11 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
-- **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
+- **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/service-paths.ts` 扇入检查守住）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
 - **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，助手工具为 `agent` 带 `role: "orchestrator"` 与 `forUser`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
-- **模块之间的路径记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员，存在 `scripts/service-paths.json`；`vp run paths:check` 在提交前的钩子里跑，多一条路就失败：要么走已有的门，要么 `vp run paths:write` 写下来并在 PR 里说明；少了的路由 `paths:write` 去掉，不能悄悄回来。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
+- **模块之间的路径与服务扇入记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### Effect 与错误处理
@@ -137,7 +137,7 @@
 
 ## 为什么这样
 
-- **按限界上下文切成 13 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
+- **按限界上下文切成 11 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
 - **契约按概念分目录，不拆多包**：消除单大文件合并冲突，同时避免拆成十几个子包的构建开销。
 - **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。

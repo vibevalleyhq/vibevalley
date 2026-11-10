@@ -10,7 +10,7 @@ import { maxRunning } from "@vibevalley/protocol";
 import { Agent } from "#/agent/agent.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { Executor } from "#/executor/executor.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Repo } from "#/repo/repo.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
@@ -35,7 +35,8 @@ describe("an agent's channel context", () => {
     });
     return Effect.gen(function* () {
       const sessions = yield* Session;
-      const executor = yield* Executor;
+      const machines = yield* Machine;
+      const executor = machines.executions(machines.here());
       const core = yield* Core;
       const repos = yield* Repo;
       const channel = (yield* Channel).defaultChannel();
@@ -93,7 +94,8 @@ describe("an agent's channel context", () => {
     const runtime = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("结论：回答了") });
     return Effect.gen(function* () {
       const sessions = yield* Session;
-      const executor = yield* Executor;
+      const machines = yield* Machine;
+      const executor = machines.executions(machines.here());
       const core = yield* Core;
       const chat = yield* Channel;
       const agent = profile();
@@ -199,7 +201,8 @@ describe("an agent's channel context", () => {
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const sessions = yield* Session;
-        const executor = yield* Executor;
+        const machines = yield* Machine;
+        const executor = machines.executions(machines.here());
         const core = yield* Core;
         const agent = profile();
         yield* (yield* Agent).save(agent);

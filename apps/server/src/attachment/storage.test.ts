@@ -5,18 +5,18 @@ import { Array as Arr, Deferred, Effect, Fiber, FileSystem, Layer, Path, Stream 
 import { ServerConfig } from "#/infra/config.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { Storage } from "./storage.ts";
+import { makeStorage } from "./storage.ts";
 
 const bytes = new TextEncoder().encode("a kept file");
-// Storage takes the key it is given; the caller (Attachment) hashes the bytes.
+// makeStorage takes the key it is given; the caller (Attachment) hashes the bytes.
 const key = "d686580a17015eb1824fae75642d75248f1b50ee5147941530f117716243330d";
 
-layer(Storage.layer.pipe(Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig()))), { excludeTestServices: true })(
+layer(NodeServices.layer.pipe(Layer.provideMerge(Layer.succeed(ServerConfig, testConfig()))), { excludeTestServices: true })(
   "storage on the local disk",
   (it) => {
     it.effect("keeps a key once, reads it back, and deletes it", () =>
       Effect.gen(function* () {
-        const storage = yield* Storage;
+        const storage = yield* makeStorage;
         yield* storage.put(key, bytes);
         yield* storage.put(key, bytes);
         const fs = yield* FileSystem.FileSystem;
@@ -36,7 +36,7 @@ layer(Storage.layer.pipe(Layer.provideMerge(NodeServices.layer), Layer.provideMe
 
     it.effect("a streamed put is published whole, and a cancelled one leaves nothing at its key", () =>
       Effect.gen(function* () {
-        const storage = yield* Storage;
+        const storage = yield* makeStorage;
         const other = "0000000000000000000000000000000000000000000000000000000000000000";
         const started = yield* Deferred.make<void>();
         const endless = Stream.concat(Stream.make(bytes), Stream.fromEffect(Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never))));

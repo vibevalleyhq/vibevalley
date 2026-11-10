@@ -3,8 +3,8 @@ import { expect, it } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 
 import { Agent } from "#/agent/agent.ts";
-import { Executor } from "#/executor/executor.ts";
 import { Issue } from "#/issue/issue.ts";
+import { Machine } from "#/machine/machine.ts";
 import { Session } from "#/session/session.ts";
 import type { SessionNews } from "#/session/signals.ts";
 import { testIssues } from "#/testing/world.ts";
@@ -41,7 +41,8 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
       });
       return Effect.gen(function* () {
         const sessions = yield* Session;
-        const executor = yield* Executor;
+        const machines = yield* Machine;
+        const executor = machines.executions(machines.here());
         const issue2 = yield* Issue;
         const issues = testIssues(issue2);
         const events: SessionNews[] = [];

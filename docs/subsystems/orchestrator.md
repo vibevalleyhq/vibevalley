@@ -20,6 +20,7 @@
 | `apps/server/src/orchestrator/response.ts`、`openai.ts` | 电话与 `POST /v1/chat/completions` 的进程内流式响应端口（`Caller`） |
 | `apps/server/src/orchestrator/prompts.ts` | 助手系统提示词 |
 | `apps/server/src/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 助手和帮工 `/mcp` 的工具；参数与接口权限对应，媒体流程由脚本模型验证 |
+| `apps/server/src/tool/resource.ts` | `resource_read`（`Tool.readResource`）：解析 `vv://` URI，执行会话级只读权限裁剪与 UTF-16 快照分页（`TextCache`） |
 | `$VIBEVALLEY_HOME/agent/<档案 id>/` | 对话文件 `<档案 id>.jsonl`、压缩归档 `archive/` 与错轮评测 `evals/` |
 | `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台助手页（记性、轨迹、旧账、声音） |
 
@@ -36,6 +37,7 @@
 - **输入带来源头，非用户长话截断**：首行标明 `[来源：用户|群聊|工单|定时任务|巡查]`。非用户群聊消息超 800 字时截断并附地址，用户发言从不截断。
 - **工具名与参数对齐协议接口**：工具名由接口 `op` 将 `.` 换为 `_` 得出，参数复用接口 Schema（模型专用字段放 `agentOnly`），由 `tool/tool.test.ts` 校验。
 - **工具枚举在入口归一，非法值拒绝**：状态和优先级接受标准值与别名；未传才是缺省，非法值不转成缺省。解码失败时不执行工具的业务函数，`tool/schemas.test.ts` 验证这条。
+- **`resource_read` 按会话权限只读裁剪并固定分页快照**：投递卡片只带摘要与 `vv://` 指针（Trigger、工单、频道、GitHub 评审线程、Artifact、记忆、仓库）。`Tool.readResource` 不改业务表、不推进消费回执；助手可读全局资源，帮工仅可读自身工单、父工单、显式 `blockedBy` 工单及所在频道，首次读取（`offset = 0`）写入会话级 LRU `TextCache` 以保证后续分页一致。
 - **改工单与定周期任务须有当轮用户授权（`actsForUser`）**：仅当本轮最新输入含用户原话时 `Actor.forUser` 为真；否则调 `issue_update`、`issue_status_update` 直接拒绝，调周期/派工 `cron_create` 存为 `pending` 待批。
 - **挑档案顺序（`chooseAgent`）**：依次匹配：点名的档案名/ID → 指定农机首个可用档案 → 用户界面选定档案 → 工单文字命中 `Agent.tags` 最多的可用档案。
 - **整条消息落库，流式字只走响应端口**：思考与书写阶段更新助手 `Session.phase`（`thinking` / `speaking_text`）与 `channel`；完整回复生成后一次性写入频道，若带 `responsePort` 则同步流式推送。
@@ -77,5 +79,5 @@
 ## 怎么验证
 
 - `apps/server/src/orchestrator/orchestrator.test.ts`、`situation.test.ts`、`apps/server/src/session/host.test.ts`：多助手路由、现状增量、长文截断與 `forUser` 授权测试。
-- `apps/server/src/tool/tool.test.ts`：工具名、权限与参数 Schema 一致性测试。
+- `apps/server/src/tool/tool.test.ts`、`resource.test.ts`、`textCache.test.ts`：工具名、权限与参数 Schema 一致性，`vv://` 跨工单越权拦截与 LRU 快照分页测试。
 - `apps/server/src/orchestrator/evals.test.ts`、`evals.live.test.ts`：评测断言与真模型回放测试。

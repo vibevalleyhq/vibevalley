@@ -19,7 +19,6 @@ import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
 import { agentHome, reposDir, ServerConfig } from "#/infra/config.ts";
 import { localeMinute } from "#/infra/time.ts";
-import { Ingress } from "#/ingress/ingress.ts";
 import type { Handed, Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
@@ -88,8 +87,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const mailbox = yield* Mailbox;
     const cron = yield* Cron;
     const tool = yield* Tool;
-    const ingress = yield* Ingress;
-    const responses = makeResponses(ingress, chat);
+    const responses = makeResponses(mailbox, chat);
 
     const service = yield* Llm;
     const forkHere = yield* FiberSet.makeRuntime();

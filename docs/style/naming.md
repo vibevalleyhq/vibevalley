@@ -61,7 +61,7 @@
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
-| 服务开机时做的事 | `boot`（layer 和服务的成员同名）；`start` 只指开始干一件事 | `Mailbox.boot`；`issues.start`、`executor.start` |
+| 服务开机时做的事 | `boot`（layer 和服务的成员同名）；`start` 只指开始干一件事 | `Mailbox.boot`；`issues.start`、`executions.start` |
 | 一个服务往外说发生了什么 | 一条流，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `Session.news`、`Mailbox.news`（`DeliveryNews`） |
 
 两条容易犯的：
@@ -112,7 +112,7 @@
 | rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
 | changes | 代码的改动（用语表的「改动」：`Issue.changes`、`Repo.changes`、`T.Changes`） | 投递的变化流（`Mailbox.changes`）：改叫 `news` |
 | open | 形容词，还没了结（`openQuestions`、`openFindings`；`Lan.setOpen` 的开着） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个帮工的投递（`openDeliveries`）：改叫 `deliveriesOf` |
-| start | 开始干一件事（`issue.start`、`Executor.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
+| start | 开始干一件事（`issue.start`、`Executions.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
 | input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
 | present | — | 这个进程正拿着它、能交信（`Session.present`）：改叫 `isReachable`；核心状态里的帮工（`Session.presentSessions`）：改叫 `hired` |
 | orchestrator | 职务：助手能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和串都有成员（`members`，记在 `channel_member`），这里的助手问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |

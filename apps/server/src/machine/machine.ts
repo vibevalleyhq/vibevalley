@@ -4,12 +4,12 @@ import type * as T from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { Executor } from "#/executor/executor.ts";
 import { hostName } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { addHereMachine, hereMachine } from "#db/machine.sql.ts";
 
-import { type Executions, linked } from "./link.ts";
+import { type Executions, makeExecutor } from "./executor.ts";
+import { linked } from "./link.ts";
 
 /** The computers helpers work on. Today only the server's own, kept from its first start; machines that join from
  * the command line come in with the machine link (.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md). */
@@ -26,7 +26,7 @@ export class Machine extends Context.Service<
     Machine,
     Effect.gen(function* () {
       const db = yield* Db;
-      const executor = yield* Executor;
+      const executor = yield* makeExecutor;
       const core = yield* Core;
       const kept = yield* db.one(hereMachine());
       const at = yield* Clock.currentTimeMillis;

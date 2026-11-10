@@ -11,7 +11,7 @@ import { Session } from "#/session/session.ts";
 import { starter, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
-import { Executor } from "./executor.ts";
+import { Machine } from "./machine.ts";
 
 it.live("regression: worker environments merge proxy bypasses without changing their source", () => {
   const env = { NO_PROXY: "example.com,localhost,example.com", no_proxy: "internal,::1", HTTPS_PROXY: "http://proxy.invalid:8080" };
@@ -76,6 +76,7 @@ it.live("regression: early tool connection failures reach the journal and core w
   return Effect.gen(function* () {
     const sessions = yield* Session;
     const core = yield* Core;
+    const machines = yield* Machine;
     const sent = yield* sessions.hire({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
       hiring: () =>
         Effect.sync(() => {
@@ -94,7 +95,7 @@ it.live("regression: early tool connection failures reach the journal and core w
       ]),
     );
     yield* until(() => core.session(id)?.phase._tag === "done", "the successful run despite optional MCP failure");
-    yield* (yield* Executor).close(id);
+    yield* machines.executions(machines.here()).close(id);
     expect(subscribed).toBeGreaterThan(0);
     expect(released).toBe(subscribed);
   }).pipe(

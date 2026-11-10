@@ -9,7 +9,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | `Session` 的创建、恢复、带话、叫停、交接与离场 | 工单状态机、排队、验收与合并决策（[工单](docs/subsystems/issue.md)） |
-| `Executor`：oar 实例生命周期、静默检测（`stalls`）与关闭确认 | 农机安装探测、模型列表与档案校验（[档案和农机](docs/subsystems/agent.md)） |
+| `Executions`（`machine/executor.ts`）：oar 实例生命周期、静默检测与关闭确认 | 农机安装探测、模型列表与档案校验（[档案和农机](docs/subsystems/agent.md)） |
 | `Run` 记录（`session_run`）：触发来源、消费输入、结局与花费 | 谁该被唤醒、刹车与投递状态机（[Mailbox](docs/subsystems/mailbox.md)） |
 | oar 事件转核心状态事实（`reactionTo`）与轨迹日志（`events/<id>.json`） | git worktree、分支与合并实现（[仓库](docs/subsystems/repo.md)） |
 | 并发槽位上限（`noRoom`）、腾位置（`makeRoom`）与每日花费记账 | 记忆的存储与检索算法（[记性](docs/subsystems/memory.md)） |
@@ -19,7 +19,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/executor/executor.ts`、`stalls.ts` | 管理 oar `Subagents` 实例启停、投递、中断与静默间隔检测 |
+| `apps/server/src/machine/machine.ts`、`executor.ts`、`link.ts` | 机器登记、经链路暴露的 `Executions`（管理 oar `Subagents` 启停、投递、中断与静默检测） |
 | `apps/server/src/session/session.ts`、`registry.ts`、`recording.ts` | 对外 `Session` 服务、在场会话与运行登记表（`Hands`）、数据库持久化与 `/mcp` 令牌 |
 | `apps/server/src/session/launch.ts`、`watch.ts` | 并发准入、唤醒/休眠、事件跟踪与 `settling` 后台收尾 |
 | `apps/server/src/session/reaction.ts`、`report.ts`、`hiring.ts`、`briefing.ts` | 事件映射、汇报解析、容量检查与任务说明拼装纯函数 |
@@ -43,8 +43,8 @@
 
 - **助手与帮工统一在 `sessions` 中**：以 `Session.role`（`orchestrator` 或 `worker`）区分，共用 `phase` 与 `session_run`；仅 `worker` 参与并发槽位、地块分配与目录恢复。
 - **助手的会话由帮工模块自己登记**：开机时登记每个助手档案，之后经 `Agent.whenKept` 在档案存下（新建、改、装模板、按模板更新）的那次写返回之前登记或改名；登记失败那次写就失败。工单、频道、Mailbox 用到助手的会话时它已经在了，不再自己补。
-- **执行器在机器上，帮工隔着链路找它**：`Session` 经 `Machine.executions(machine)` 拿到一台机器的执行器（`machine/link.ts`），不直接依赖 `Executor`；过界的每个值都复制一份，为执行器搬到别的进程、别的机器做准备。
-- **执行器拥有底层资源，`Session` 拥有领域状态**：`Executor` 持有 oar 实例直至确认底层进程关闭才释放占位；关闭失败时继续占槽并拒绝清理该目录。
+- **执行器内聚在机器模块，帮工隔着链路找它**：`Session` 经 `Machine.executions(machine)` 拿到一台机器的 `Executions`（`machine/link.ts` 包装 `machine/executor.ts`），过界的每个值都复制一份，为执行器搬到别的进程、别的机器做准备。
+- **执行器拥有底层资源，`Session` 拥有领域状态**：`machine/executor.ts` 持有 oar 实例直至确认底层进程关闭才释放占位；关闭失败时继续占槽并拒绝清理该目录。
 
 ### 在场阶段与回合结算
 
@@ -79,7 +79,7 @@
 **派出帮工（`Session.hire`）**
 
 1. 在准入锁内检查容量上限，分配 `w<n>` 编号，调用 `Repo.workplace` 准备目录，调用 `Runtime.resolve` 确定农机与模型。
-2. 召回档案记忆，拼装规矩、人设、技能与任务说明，通过 `Executor` 启动 oar 会话。
+2. 召回档案记忆，拼装规矩、人设、技能与任务说明，通过 `Machine.executions` 启动 oar 会话。
 3. 释放准入锁，调用 `hiring` 回调登记工单 `Assignment` 执行关联或私聊投递；若失败则关闭执行器并释放现场。
 4. 写 `session` 表并施加 `sessionChanged` 事实，启动事件监听与静默计时器（默认 240 秒无事件报 `quiet`）。
 
@@ -91,7 +91,7 @@
 
 **交接与离场（`handOver` / `dismiss`）**
 
-1. 先确认 `Executor` 关闭底层 oar 会话；若关闭失败则拒绝合并或重置，保持现场占位。
+1. 先确认 `Machine.executions` 关闭底层 oar 会话；若关闭失败则拒绝合并或重置，保持现场占位。
 2. `handOver` 在会话锁内运行调用方传入的检查与合并函数；失败则保留 `Session` 与分支并返回 `NotTakenIn`。
 3. 合并成功或调用 `dismiss` 后，更新 `session` 表为 `closed`、作废 `/mcp` 令牌、通知 `Memory.endSession` 并施加 `sessionLeft`。
 
@@ -109,7 +109,7 @@
 
 ## 为什么这样
 
-- **用 `Executor` 隔离进程资源，用纯函数表达领域规则**：防止启动中断或关闭失败时泄漏子进程或重用脏目录；事件映射与汇报解析保持纯函数以便快速单测。
+- **用 `Machine.executions` 隔离进程资源，用纯函数表达领域规则**：防止启动中断或关闭失败时泄漏子进程或重用脏目录；事件映射与汇报解析保持纯函数以便快速单测。
 - **区分 `Session`、`Run`、进程连接 `launch` 与 oar 会话**：`Session` 代表跨轮次工作现场，`Run` 记单轮触发与花费，内存 `launch`（`${id}#n`）标识一次底层连接以便重连时退回未确认投递，底层 oar 会话可随时替换而不丢工单归属。
 - **一条 `Session.news` 广播全部会话动静**：招人、汇报、离场、消费/退回回执与启动阶段变化统一走单条带 `_tag` 的流，取代多条平行事件流。
 - **不做命令级权限确认，靠工作目录与回环监听划边界**：放弃将权限请求做成地里杂草逐条批准（会让帮工停在命令上等人，与无人值守冲突）。
@@ -123,12 +123,12 @@
 ## 怎么验证
 
 - `apps/server/src/session/report.test.ts`、`journal.test.ts`、`inProcessRun.test.ts`：汇报解析、轨迹版本追加与进程内 `Run` 测试。
-- `apps/server/src/session/session.test.ts`、`apps/server/src/flows/work.test.ts`：派工、带话、静默告警、容量上限、合并交接与重启恢复测试。
+- `apps/server/src/machine/executor.test.ts`、`access.test.ts`、`apps/server/src/session/session.test.ts`、`apps/server/src/flows/work.test.ts`：执行器生命周期、派工、带话、静默告警、容量上限、合并交接与重启恢复测试。
 - `apps/server/src/runtime/runtime.test.ts`、`presets.test.ts`：农机探测缓存、额度计算与每日花费测试。
 
 ### Worker access observations
 
-`Executor` merges the effective `NO_PROXY` and `no_proxy` entries with `127.0.0.1,localhost,::1` for each child session. Both variables receive the same trimmed, deduplicated list. Inherited and profile values are combined. Null and empty profile values add no entries; they cannot remove inherited bypasses or loopback hosts. Runtimes that declare `refusedSessionOptions.env` receive no added environment values. oar Subagents already refuses these runtimes because it needs a depth variable; this change does not alter that refusal. Other proxy variables and the host environment stay unchanged.
+`machine/executor.ts` merges the effective `NO_PROXY` and `no_proxy` entries with `127.0.0.1,localhost,::1` for each child session. Both variables receive the same trimmed, deduplicated list. Inherited and profile values are combined. Null and empty profile values add no entries; they cannot remove inherited bypasses or loopback hosts. Runtimes that declare `refusedSessionOptions.env` receive no added environment values. oar Subagents already refuses these runtimes because it needs a depth variable; this change does not alter that refusal. Other proxy variables and the host environment stay unchanged.
 
 `Session.toolConnections` contains observations for the configured MCP servers. A missing entry or `unknown` means no connection evidence. `starting`, `ready`, `failed`, and `cancelled` are runtime reports, not HTTP health results. These optional MCP observations do not gate a run or establish readiness of the separate required worker CLI. The required CLI gate is described in [worker access](docs/subsystems/session.md#帮工-cli-接入).
 

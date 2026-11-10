@@ -29,6 +29,8 @@ const root = "apps/server/src/";
 const outerCallers = new Set(["http"]);
 const ground = new Set(["infra", "base"]);
 const skipped = /\.(test|spec)\.ts$|\/testing\/|\/testdata\/|\.d\.ts$/u;
+/** Leaf gateway/gamification services reached only by HTTP, Core's late-bound Projection, and Machine (staged for apps/machine). */
+export const singleCallerServices = new Set(["Connector", "Game", "Lan", "Machine", "Mcp", "Projection", "Voice"]);
 
 /** A file's module: the folder under apps/server/src it sits in; undefined for the files at the top (services.ts). */
 export const moduleOf = (path: string): string | undefined => {
@@ -38,15 +40,16 @@ export const moduleOf = (path: string): string | undefined => {
 };
 
 export type Edges = Readonly<Record<string, readonly string[]>>;
+export type FanIn = Readonly<Record<string, readonly string[]>>;
 
-/** Service.member → the modules other than the service's own that use it, both sorted. */
-export function edgesOf(files: ReadonlyArray<{ readonly path: string; readonly text: string }>): Edges {
+function parsedFiles(files: ReadonlyArray<{ readonly path: string; readonly text: string }>) {
   const programs = files.flatMap(({ path, text }) => {
     const program: unknown = parseSync(path, text, { lang: "ts" }).program;
     return isNode(program) ? [{ path, program }] : [];
   });
   const user = new Map<string, string>();
-  for (const { path, program } of programs)
+  for (const { path, program } of programs) {
+    if (skipped.test(path)) continue;
     walk(program, (n) => {
       if (n.type !== "ClassDeclaration") return;
       const name = identName(n["id"]);
@@ -54,6 +57,13 @@ export function edgesOf(files: ReadonlyArray<{ readonly path: string; readonly t
       const base = n["superClass"];
       if (name !== undefined && module !== undefined && isNode(base) && JSON.stringify(base).includes('"Service"')) user.set(name, module);
     });
+  }
+  return { programs, user };
+}
+
+/** Service.member → the modules other than the service's own that use it, both sorted. */
+export function edgesOf(files: ReadonlyArray<{ readonly path: string; readonly text: string }>): Edges {
+  const { programs, user } = parsedFiles(files);
   const edges = new Map<string, Set<string>>();
   for (const { path, program } of programs) {
     const module = moduleOf(path);
@@ -78,6 +88,49 @@ export function edgesOf(files: ReadonlyArray<{ readonly path: string; readonly t
     });
   }
   return Object.fromEntries([...edges.keys()].toSorted().map((k) => [k, [...(edges.get(k) ?? [])].toSorted()]));
+}
+
+/** Service → every non-test module outside its own (HTTP included) that yields it, both sorted. */
+export function fanInOf(files: ReadonlyArray<{ readonly path: string; readonly text: string }>): FanIn {
+  const { programs, user } = parsedFiles(files);
+  const callers = new Map<string, Set<string>>();
+  for (const [service, home] of user) if (!ground.has(home)) callers.set(service, new Set());
+  for (const { path, program } of programs) {
+    const module = moduleOf(path);
+    if (module === undefined || skipped.test(path)) continue;
+    walk(program, (n) => {
+      if (n.type !== "YieldExpression" || n["delegate"] !== true) return;
+      const service = identName(n["argument"]);
+      const home = service === undefined ? undefined : user.get(service);
+      if (service === undefined || home === undefined || home === module || !callers.has(service)) return;
+      callers.get(service)?.add(module);
+    });
+  }
+  return Object.fromEntries([...callers.keys()].toSorted().map((k) => [k, [...(callers.get(k) ?? [])].toSorted()]));
+}
+
+/** Single-caller top-level Context.Services outside `singleCallerServices`, or stale allowlist entries. */
+export function fanInProblems(fanIn: FanIn, allowed: ReadonlySet<string> = singleCallerServices): string[] {
+  const problems: string[] = [];
+  for (const [service, callers] of Object.entries(fanIn)) {
+    if (callers.length <= 1 && !allowed.has(service))
+      problems.push(
+        `${service} has ${callers.length === 0 ? "no" : `only one (${callers[0]})`} caller module outside its own. ` +
+          `Fix: keep single-caller helpers inside the caller's module instead of registering a top-level Context.Service, ` +
+          `or list a leaf gateway service in singleCallerServices with its reason. See docs/subsystems/foundation.md`,
+      );
+    if (callers.length > 1 && allowed.has(service))
+      problems.push(
+        `${service} now has ${callers.length} caller modules (${callers.join(", ")}). ` +
+          `Fix: drop ${service} from singleCallerServices in scripts/service-paths.ts.`,
+      );
+  }
+  for (const service of [...allowed].toSorted())
+    if (!(service in fanIn))
+      problems.push(
+        `${service} is in singleCallerServices but no longer exists. ` + `Fix: drop ${service} from singleCallerServices in scripts/service-paths.ts.`,
+      );
+  return problems;
 }
 
 /** What is wrong with today's edges against the kept ones (empty when nothing). */
@@ -106,7 +159,9 @@ if (import.meta.main) {
   const paths = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", root], { encoding: "utf8" })
     .split("\n")
     .filter((p) => p.endsWith(".ts"));
-  const now = edgesOf(paths.map((path) => ({ path, text: readFileSync(path, "utf8") })));
+  const sources = paths.map((path) => ({ path, text: readFileSync(path, "utf8") }));
+  const now = edgesOf(sources);
+  const fanIn = fanInOf(sources);
   // One line a member, as the formatter keeps it.
   if (values.write === true)
     writeFileSync(
@@ -117,9 +172,9 @@ if (import.meta.main) {
     );
   if (values.check === true || values.write === true) {
     const kept: Edges = JSON.parse(readFileSync(tablePath, "utf8"));
-    const problems = pathProblems(kept, now);
+    const problems = [...pathProblems(kept, now), ...fanInProblems(fanIn)];
     for (const p of problems) console.error(`paths: ${p}`);
     if (problems.length > 0) process.exit(1);
-    console.log(`paths: ${Object.keys(now).length} service members used across modules, no new path`);
+    console.log(`paths: ${Object.keys(now).length} service members used across modules, no new path or single-caller service`);
   } else for (const [key, modules] of Object.entries(now)) console.log(`${key.padEnd(40)} ${modules.join(", ")}`);
 }

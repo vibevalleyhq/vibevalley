@@ -19,6 +19,7 @@
 | `apps/server/src/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
 | `apps/server/src/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
 | `apps/server/src/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
+| `apps/server/src/repo/pullSnapshot.ts` | GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照（`Repo.githubSnapshot`）及失败 Actions 日志提取 |
 | `apps/server/src/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
 | `apps/web/src/features/repo/ReposPage.tsx` | 工作台仓库页（新建、概况、语言占比、提交日历） |
 | `apps/web/src/farm/map/RepoMap.tsx`、`islands.ts` | 像素农场群岛地图与岛屿空位计算 |
@@ -34,7 +35,7 @@
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
 - **合并和提 PR 前工作树必须干净**：`checkMerge` 先看 `git status --porcelain`；有未提交改动就以 `MergeFailure` 退回，让帮工按仓库自己的提交规范提交，不再代它生成不合规的提交说明。
-- **PR 能力只读检测缓存**：开机与调 `github.refresh` 时检测 `gh` 登录及各仓库 `origin` 写权限并缓存；判断 `usesPullRequests` 只读该缓存与 `github.pr_repos` 配置。
+- **PR 能力只读检测缓存与完整快照**：开机与调 `github.refresh` 时检测 `gh` 登录及各仓库 `origin` 写权限并缓存；判断 `usesPullRequests` 只读该缓存与 `github.pr_repos` 配置。`githubSnapshot` 拉取 PR 的检查、评审、评论与评审线程时，任一分页请求失败即放弃整次快照，不把残缺结果当成空列表；失败的 Actions 检查若带 job 链接，自动用 `gh run view --job <id> --log-failed` 取回末尾 40 行。
 
 ## 怎么走
 
@@ -65,8 +66,8 @@
 
 ## 和谁打交道
 
-- **工单与帮工（`issue`、`session`）**：提供 `workplace`、`release`、`reset`、`clear`、`Changes`、`merge`、`mergeInto`、`submitPullRequest` 与 `pullRequestState`。
-- **接入与游戏（`ingress`、`game`）**：向 Ingress 提供 `githubRemote` 与 `githubRequest`；向 Game 提供用户名下的 `contributions` commit 计数。
+- **工单与帮工（`issue`、`session`）**：提供 `workplace`、`release`、`reset`、`clear`、`Changes`、`merge`、`mergeInto`、`submitPullRequest`、`pullRequestState` 与 `githubSnapshot`。
+- **工具与游戏（`tool`、`game`）**：向 `tool/resource.ts` 提供 `vv://github/...` 评审线程快照读取；向 Game 提供用户名下的 `contributions` commit 计数。
 
 ## 为什么这样
 

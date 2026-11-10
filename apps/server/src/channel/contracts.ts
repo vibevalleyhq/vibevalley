@@ -91,6 +91,16 @@ interface SpeakOptions {
 
 export type Made = { readonly card: T.ArtifactCard } | { readonly attachments: readonly string[] };
 
+export interface UserInput {
+  readonly source: "connector" | "voice";
+  readonly channel?: string;
+  readonly envelope: string;
+  readonly text: string;
+  readonly picked?: Picked;
+  readonly responsePort?: string;
+  readonly voiceMode?: "dictated" | "conversation" | "api";
+}
+
 export interface SayMore {
   readonly source?: "connector" | "voice";
   readonly responsePort?: string;
@@ -98,8 +108,6 @@ export interface SayMore {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
-  /** Snapshotted at write time before storing the message. */
-  readonly blockRefs?: readonly T.BlockRef[];
   readonly blocks?: readonly T.QuotedBlock[];
   /** Delivers only to this orchestrator instead of channel members. */
   readonly to?: string;
@@ -199,6 +207,8 @@ export interface ChannelService {
   readonly userReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
+  readonly user: (input: UserInput) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
+  readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
   readonly post: PostDoor;
   /** Edits do not wake participants. */
   readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Effect.Effect<T.ChatMessage, ApiError>;

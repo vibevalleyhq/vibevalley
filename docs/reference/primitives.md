@@ -186,7 +186,7 @@
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. |
-| `worldBelowIngress` | `world.ts` | Services below Ingress for module tests. |
+| `moduleWorld` | `world.ts` | Core domain services below Inbox/Tool/Mcp for module tests. |
 | `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
 | `testIssues` | `world.ts` | Issues a test adds are ones the user sent, so their mandate is explicit. |
 | `Said` | `world.ts` |  |

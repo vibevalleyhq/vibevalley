@@ -9,7 +9,6 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator, worker } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
-import { Ingress } from "#/ingress/ingress.ts";
 import { Media } from "#/media/media.ts";
 import { png } from "#/media/testdata/png.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
@@ -55,16 +54,16 @@ it.effect("the orchestrator creates an attributed image and reads its local atta
   ]);
   return Effect.gen(function* () {
     yield* configured;
-    const ingress = yield* Ingress;
-    yield* ingress.say("Generate one image", {}, undefined, "");
+    const chat = yield* Channel;
+    yield* chat.say("Generate one image", {}, undefined, "");
     const jobs = yield* waitFor((yield* Media).list(), (jobs) => jobs.some((job) => job.id === id && job.phase === "ready"), "the orchestrator's local image");
     const job = jobs.find((job) => job.id === id);
     if (job?.kind !== "image") return yield* Effect.die("Expected image task");
-    expect(job?.source).toEqual({ kind: "orchestrator", agent: defaultOrchestrator, channel: (yield* Channel).defaultChannel() });
+    expect(job?.source).toEqual({ kind: "orchestrator", agent: defaultOrchestrator, channel: chat.defaultChannel() });
     expect(job?.usage).toEqual({ images: 1, width: 256, height: 256 });
     expect(job?.attachment?.id).toMatch(/^[a-f0-9]{64}$/u);
     yield* until(() => requests.length >= 2, "submission acknowledged");
-    yield* ingress.say("Read the saved image", {}, undefined, "");
+    yield* chat.say("Read the saved image", {}, undefined, "");
     yield* until(() => requests.length >= 4, "image tools answered");
     const results = requests.flatMap((request) => request.messages.filter((message) => message.role === "toolResult").map(messageText)).join("\n");
     expect(results).toContain(job?.attachment?.id);
@@ -83,12 +82,12 @@ it.effect("unknown outcomes reach the model without usage guesses, while autonom
   ]);
   return Effect.gen(function* () {
     yield* configured;
-    const ingress = yield* Ingress;
+    const chat = yield* Channel;
     const media = yield* Media;
-    yield* ingress.say("Generate one image", {}, undefined, "");
+    yield* chat.say("Generate one image", {}, undefined, "");
     yield* waitFor(media.list(), (jobs) => jobs.some((job) => job.id === "unknown" && job.phase === "unknown"), "ambiguous submission");
     yield* until(() => requests.length >= 2, "submission acknowledged");
-    yield* ingress.say("Check without submitting again", {}, undefined, "");
+    yield* chat.say("Check without submitting again", {}, undefined, "");
     yield* until(() => requests.length >= 4, "unknown outcome reported");
     const results = requests
       .at(-1)
@@ -125,18 +124,18 @@ it.effect("the orchestrator retries only a download and cancels a separate pendi
   ]);
   return Effect.gen(function* () {
     yield* configured;
-    const ingress = yield* Ingress;
+    const chat = yield* Channel;
     const media = yield* Media;
-    yield* ingress.say("Generate one image", {}, undefined, "");
+    yield* chat.say("Generate one image", {}, undefined, "");
     yield* waitFor(media.list(), (jobs) => jobs.some((job) => job.id === "retry" && job.phase === "download_failed"), "download failed");
     yield* until(() => requests.length >= 2, "submission acknowledged");
-    yield* ingress.say("Retry only its download", {}, undefined, "");
+    yield* chat.say("Retry only its download", {}, undefined, "");
     yield* waitFor(media.get("retry"), (job) => job.phase === "ready", "tool retried download");
     yield* until(() => requests.length >= 4, "retry acknowledged");
-    yield* ingress.say("Generate another image", {}, undefined, "");
+    yield* chat.say("Generate another image", {}, undefined, "");
     yield* waitFor(media.list(), (jobs) => jobs.some((job) => job.id === "cancel" && job.phase === "generating"), "generation started");
     yield* until(() => requests.length >= 6, "second submission acknowledged");
-    yield* ingress.say("Cancel waiting for that image", {}, undefined, "");
+    yield* chat.say("Cancel waiting for that image", {}, undefined, "");
     yield* waitFor(media.get("cancel"), (job) => job.phase === "canceled", "tool canceled waiting");
     const medias = yield* media.list();
     expect(medias).toHaveLength(2);
@@ -175,8 +174,8 @@ it.effect("the orchestrator executes a frozen user approval through its trusted 
       channel,
     });
     expect((yield* media.get(id)).phase).toBe("authorized");
-    const ingress = yield* Ingress;
-    yield* ingress.say("Execute the authorized understanding task", {}, channel, "");
+    const chat = yield* Channel;
+    yield* chat.say("Execute the authorized understanding task", {}, channel, "");
     const job = yield* waitFor(media.get(id), (job) => job.kind === "understanding" && job.cleanup === "done", "delegated task result");
     expect(job).toMatchObject({
       phase: "ready",
@@ -184,7 +183,7 @@ it.effect("the orchestrator executes a frozen user approval through its trusted 
       result: { text: "Offline understanding of image input." },
     });
     yield* until(() => requests.length >= 2, "delegated submission acknowledged");
-    yield* ingress.say("Read the understanding result", {}, channel, "");
+    yield* chat.say("Read the understanding result", {}, channel, "");
     yield* until(() => requests.length >= 4, "understanding result read by orchestrator");
     const returned = requests
       .at(-1)
@@ -220,18 +219,18 @@ it.effect("the orchestrator synthesizes speech with trusted provenance and reads
       connections: [{ id: "images", name: "Images", adapter: "moss", enabled: true }],
       speech: { connection: "images", model: "moss-tts-1.5-flash" },
     });
-    const ingress = yield* Ingress;
-    yield* ingress.say("Generate the requested speech", {}, undefined, "");
+    const chat = yield* Channel;
+    yield* chat.say("Generate the requested speech", {}, undefined, "");
     const jobs = yield* waitFor((yield* Media).list(), (jobs) => jobs.some((job) => job.id === id && job.phase === "ready"), "speech tool saved audio");
     const job = jobs.find((job) => job.id === id);
     expect(job).toMatchObject({
       kind: "speech",
-      source: { kind: "orchestrator", agent: defaultOrchestrator, channel: (yield* Channel).defaultChannel() },
+      source: { kind: "orchestrator", agent: defaultOrchestrator, channel: chat.defaultChannel() },
       attachment: { type: "audio/wav" },
     });
     if (job?.kind !== "speech" || !job.attachment) return yield* Effect.die("Expected saved speech");
     yield* until(() => requests.length >= 2, "speech submission acknowledged");
-    yield* ingress.say("Read the saved speech", {}, undefined, "");
+    yield* chat.say("Read the saved speech", {}, undefined, "");
     yield* until(() => requests.length >= 4, "speech result read by orchestrator");
     const returned = requests
       .at(-1)

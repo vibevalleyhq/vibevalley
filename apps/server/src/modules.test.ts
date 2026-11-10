@@ -124,8 +124,8 @@ describe("the modules", () => {
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
     expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
     expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
-    const ingress = join(src, "ingress/ingress.ts");
-    expect(foreignQueries(ingress, inspect(ingress, 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";').edges)).toEqual([
+    const github = join(src, "issue/github.ts");
+    expect(foreignQueries(github, inspect(github, 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";').edges)).toEqual([
       "mailbox_trigger.sql.ts:recordTrigger",
     ]);
   });

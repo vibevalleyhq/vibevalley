@@ -63,6 +63,7 @@ export default defineConfig({
         "vpx scripts/stale-names.ts",
         "vpx scripts/glossary.ts",
         "vpx scripts/protocol-surface.ts --check",
+        "vpx scripts/service-paths.ts --check",
         "vpx scripts/i18n.ts check",
         "vpx scripts/capabilities.ts --check",
         "vpx scripts/api-client.ts --check",

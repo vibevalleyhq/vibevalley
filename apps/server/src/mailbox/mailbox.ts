@@ -30,7 +30,16 @@ import * as qr from "#db/mailbox_trigger.sql.ts";
 
 import { Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import { inputOf, orchestratorSource, deliveryScope, type InputContext, type TriggerInput, type TriggerResource, type KnownGitHubEvent } from "./payload.ts";
+import {
+  inputOf,
+  orchestratorSource,
+  deliveryScope,
+  type InputContext,
+  type SourceEvent,
+  type TriggerInput,
+  type TriggerResource,
+  type KnownGitHubEvent,
+} from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
 import { channelRecipients, waitsForHuman } from "./routing.ts";
@@ -38,6 +47,8 @@ import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 import { triggerJournal } from "./triggers.ts";
 import { makeWorkMailbox } from "./work.ts";
+
+export type { SourceEvent };
 
 export interface InsertDelivery {
   readonly session: string;
@@ -96,6 +107,8 @@ export type DeliveryNews =
 export class Mailbox extends Context.Service<
   Mailbox,
   {
+    readonly record: (event: SourceEvent) => Effect.Effect<Trigger | undefined, ApiError>;
+    readonly accept: (event: SourceEvent) => Effect.Effect<Trigger | undefined, ApiError>;
     readonly recordTrigger: (input: TriggerInput) => Effect.Effect<Trigger, ApiError>;
     readonly readTrigger: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
     readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
@@ -295,8 +308,19 @@ export class Mailbox extends Context.Service<
           reach.left(session);
           breaker.reset(session);
         });
+      const record = Effect.fn("Mailbox.record")(function* (event: SourceEvent) {
+        if (event.selfEcho === true) return undefined;
+        return yield* journal.recordTrigger(event);
+      });
+      const accept = Effect.fn("Mailbox.accept")(function* (event: SourceEvent) {
+        const trigger = yield* record(event);
+        if (trigger) yield* api.receive({ _tag: "Trigger", trigger });
+        return trigger;
+      });
       const api = Mailbox.of({
         ...journal,
+        record,
+        accept,
         unreadSummary,
         isRouted: work.isRouted,
         triggersOf: work.issueInputs,

@@ -14,7 +14,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { Core } from "#/core/core.ts";
-import { watchStalls } from "#/executor/executor.ts";
+import { watchStalls } from "#/machine/executor.ts";
 import { Repo } from "#/repo/repo.ts";
 import { MergeFailure } from "#/repo/workplace.ts";
 import { gitIn } from "#/testing/git.ts";

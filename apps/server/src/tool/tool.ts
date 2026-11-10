@@ -5,6 +5,8 @@ import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { head } from "#/base/clip.ts";
+import type { ApiError } from "#/base/errors.ts";
+import type { RepoError } from "#/repo/workplace.ts";
 import type { ToolStart } from "#/session/reaction.ts";
 
 import { artifactTools } from "./artifact.ts";
@@ -17,7 +19,7 @@ import { memoryTools } from "./memory.ts";
 import { pkmTools } from "./pkm.ts";
 import { sessionLine } from "./prompts.ts";
 import { repoTools } from "./repo.ts";
-import { resourceTools } from "./resource.ts";
+import { makeResourceReader, type ReadResource, type ResourceError, type ResourcePage, resourceTools } from "./resource.ts";
 import type { Who } from "./schemas.ts";
 
 export class Tool extends Context.Service<
@@ -27,6 +29,8 @@ export class Tool extends Context.Service<
     readonly orchestrator: (who: Who) => LoopTool[];
     /** A session's tools, served on /mcp. */
     readonly session: (who: Who) => LoopTool[];
+    /** Authorized, paged reads over stable per-session snapshots (`vv://...`). */
+    readonly readResource: (session: string, input: ReadResource) => Effect.Effect<ResourcePage, ResourceError | ApiError | RepoError>;
     /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
     readonly start: (name: string, args: unknown) => ToolStart;
     readonly sessionLine: (session: T.Session) => string;
@@ -101,7 +105,8 @@ const make = Effect.gen(function* () {
   const media = yield* mediaTools;
   const library = yield* libraryTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
-  const resourceRead = yield* resourceTools;
+  const readResource = yield* makeResourceReader;
+  const resourceRead = resourceTools(readResource);
   const repoList = yield* repoTools;
 
   return Tool.of({
@@ -162,6 +167,7 @@ const make = Effect.gen(function* () {
       artifactVersion("session")(who),
       ...library.session(who),
     ],
+    readResource,
     start: toolStart,
     sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),
   });

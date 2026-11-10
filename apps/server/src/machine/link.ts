@@ -1,11 +1,11 @@
 import { Array as Arr, Effect } from "effect";
 
-import type { Executor } from "#/executor/executor.ts";
+import type { Executions } from "./executor.ts";
 
 // Clone every payload in-process so non-serializable values or shared-reference mutations surface in tests.
 const across = <A>(value: A): A => structuredClone(value);
 
-export type Executions = Executor["Service"];
+export type { Executions };
 
 export const linked = (executor: Executions): Executions => ({
   start: (input) => Effect.map(executor.start(across(input)), across),

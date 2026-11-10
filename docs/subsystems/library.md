@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 表 `library_item`：每个附件至多一条，记第一次的来路、加入和最近一次的时间 | 文件的字节、名字和类型（[附件](docs/subsystems/attachment.md)、[存储](docs/subsystems/storage.md)） |
+| 表 `library_item`：每个附件至多一条，记第一次的来路、加入和最近一次的时间 | 文件的字节、名字和类型（[附件](docs/subsystems/attachment.md)） |
 | 记下三种来路：任务做完的结果、用户在聊天里发的和在这页上传的、帮工和助手经 `library.item.add` 交来的 | 生成、理解任务本身（[媒体](docs/subsystems/media.md)） |
 | 帮工给的网址经公网下载、给的路径只认它工作目录里的文件 | 读帮工工作目录的检查（`Session.workFile`，[帮工](docs/subsystems/session.md)） |
 | 页面：筛选栏、缩略图、详情栏、按名字搜和排序、拖进来和粘贴上传、键盘、下载、发到频道、拿掉、生成对话框、理解对话框 | 发到频道的消息（[频道](docs/subsystems/channel.md)） |

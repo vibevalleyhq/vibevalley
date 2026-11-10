@@ -15,24 +15,21 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 内容 |
 |---|---|
-| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、收获 |
-| [ingress.md](docs/subsystems/ingress.md) | Ingress：把七种来源标准化成一张 Trigger，去重、存载荷、交给信箱 |
-| [mailbox.md](docs/subsystems/mailbox.md) | 信箱：谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
-| [resource.md](docs/subsystems/resource.md) | Resource：只读、分页、按会话权限裁剪的 `resource_read` |
-| [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
-| [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测、地契 |
+| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进 |
+| [mailbox.md](docs/subsystems/mailbox.md) | 信箱：来源触发去重、谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
+| [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、机器执行器、规矩和汇报、事件日志、额度和上限 |
+| [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
 | [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
-| [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具、谁能让它合并、巡查、评测 |
+| [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
 | [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音助手 |
 | [lan.md](docs/subsystems/lan.md) | 「连接到本机」：从外面进农场的唯一一道门，按钥匙的来路放行 |
-| [storage.md](docs/subsystems/storage.md) | 存储：字节放在哪，按 SHA-256 存一次；现在是本机磁盘，换成对象存储只换它 |
-| [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按内容存一次；消息、媒体结果和素材库都引用它 |
+| [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按 SHA-256 内容寻址落盘存一次；消息、媒体结果和素材库都引用它 |
 | [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
@@ -110,7 +107,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | 一个帮工负责的原生工单，前置完成后派发 | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） | 一张工单由哪个档案负责，执行上下文挂在这条关系下 | |
-| 执行器 | executor | `Executor` | 创建、投递、中断和释放 oar 的执行实例 | |
+| 执行器 | executor | `Executions`（`Machine.executions`） | 创建、投递、中断和释放 oar 的执行实例 | |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） | 一个帮工读代码，把待规划的工单写成标题、描述和验收标准，写完就走 | |
 | 用户 | user | user（`User`、`userId`） | 用这个农场的那一个人：对他说话时说「你」，称呼他时用他设的名字，名字能改 | 主人、owner |
 | 田头 | the farm chat | 默认频道（`Channel.default`） | 农场的皮对默认频道的叫法；工作台里写它的名字（`#general`） | 群（指默认频道时） |

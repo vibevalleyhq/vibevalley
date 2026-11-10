@@ -259,16 +259,6 @@
     "swallowed": 0,
     "resultBranch": 0
   },
-  "server: Ingress": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
-  },
   "server: Issues": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -305,16 +295,6 @@
     "cast": 4,
     "lintOff": 5,
     "orDie": 2,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
-  },
-  "server: Resource": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
     "resultBranch": 0

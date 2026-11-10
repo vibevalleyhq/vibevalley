@@ -11,7 +11,7 @@ import { Agent } from "#/agent/agent.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { type Started } from "#/executor/executor.ts";
+import { type Started } from "#/machine/executor.ts";
 import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Repo } from "#/repo/repo.ts";

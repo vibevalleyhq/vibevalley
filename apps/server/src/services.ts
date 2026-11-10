@@ -10,12 +10,10 @@ import { Channel, start as channelStart } from "./channel/channel.ts";
 import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Cron, start as cronStart } from "./cron/cron.ts";
-import { Executor } from "./executor/executor.ts";
 import { Game, start as gameStart } from "./game/game.ts";
 import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
 import { ServerConfig } from "./infra/config.ts";
 import { Database, Db } from "./infra/db.ts";
-import { Ingress, start as ingressStart } from "./ingress/ingress.ts";
 import { Issue, start as issueStart } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Library } from "./library/library.ts";
@@ -29,11 +27,9 @@ import { Pkm } from "./pkm/pkm.ts";
 import { layer as projection } from "./projection/frame.ts";
 import { Provider } from "./provider/provider.ts";
 import { Repo, type RepoHooks, start as repoStart } from "./repo/repo.ts";
-import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
 import { Session, ready as sessionReady } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
-import { Storage } from "./storage/storage.ts";
 import { Tool } from "./tool/tool.ts";
 import { User } from "./user/user.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
@@ -65,7 +61,6 @@ export const platform = (config: ServerConfig["Service"]) =>
     on(Core.layer),
     on(Setting.layer),
     on(User.layer),
-    on(Storage.layer),
     on(Attachment.layer),
     on(Provider.layer),
     on(Llm.layer),
@@ -84,22 +79,16 @@ export const sourceControl =
     below.pipe(on(Repo.layer(o.repo)));
 
 /** Agent Sessions: an agent at work on an issue in a workplace. */
-export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Machine.layer), on(Session.layer));
+export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Machine.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents, the user's notes; the sessions register as its helpers. */
 export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) =>
   below.pipe(on(Channel.layer), on(Media.layer), on(Library.layer), on(Artifact.layer), on(Pkm.layer));
 
-/** Mailbox: delivery priority, durable per-Session input and the execution pump. */
+/** Mailbox: immutable source triggers, delivery priority, durable per-Session input and the execution pump. */
 export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));
 
 export const issues = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Issue.layer), on(Cron.layer));
-
-/** Ingress: immutable source events and their compact cards. */
-export const ingress = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Ingress.layer));
-
-/** Resource: authorized, paged reads over stable per-session snapshots. */
-export const resources = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Resource.layer));
 
 /** Inbox: what in it is news to the user, and the patrol. */
 const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.layer));
@@ -142,8 +131,6 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     mailbox,
     collaboration,
     issues,
-    ingress,
-    resources,
     inbox,
     orchestrator(options),
     gamification,
@@ -152,7 +139,6 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     agentSessionsStart,
     mailboxReady,
     collaborationStart,
-    on(ingressStart),
     issuesStart,
     inboxStart,
     gamificationStart,

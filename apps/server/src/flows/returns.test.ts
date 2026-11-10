@@ -8,9 +8,8 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
-import { Ingress, type SourceEvent } from "#/ingress/ingress.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Mailbox, type SourceEvent } from "#/mailbox/mailbox.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
@@ -31,12 +30,11 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     const issue2 = yield* Issue;
     const issues = testIssues(issue2);
     const mailbox = yield* Mailbox;
-    const ingress = yield* Ingress;
     const sql = yield* SqlClient.SqlClient;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "work", repo: "handback-trigger", agent: "lab" });
     const started = yield* issues.start(issue.id, "");
-    const trigger = (yield* ingress.accept(event(issue.id, "beyond-original-scope")))!;
+    const trigger = (yield* mailbox.accept(event(issue.id, "beyond-original-scope")))!;
     const receipt = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
     yield* await_(
       () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`,
@@ -50,7 +48,7 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     expect(returned[0]!.envelope_id).not.toBe(trigger.id);
     expect(returned[0]!.payload.note).toContain("another work item");
     expect(returned[0]!.payload.trigger.meta.issue).toBeUndefined();
-    expect((yield* ingress.read(trigger.id))?.trigger).toEqual(trigger);
+    expect((yield* mailbox.readTrigger(trigger.id))?.trigger).toEqual(trigger);
     expect(
       (yield* sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]?.state,
     ).toBe("consumed");
@@ -70,19 +68,18 @@ it.live("regression: closing an unassigned issue returns its held user input wit
     const service = yield* Issue;
     const issues = testIssues(service);
     const mailbox = yield* Mailbox;
-    const ingress = yield* Ingress;
     const chat = yield* Channel;
     const sql = yield* SqlClient.SqlClient;
     const issue = yield* issues.add({ title: "waiting", repo: "unassigned-return" });
     const source = event(issue.id, "unread-user-followup");
-    const trigger = (yield* ingress.accept(source))!;
+    const trigger = (yield* mailbox.accept(source))!;
     yield* service.setStatus(issue.id, "canceled", "", "", user);
     yield* await_(
       () => Effect.succeed(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
       (rows) => rows.length === 1,
       "held input returned on cancel",
     );
-    yield* ingress.accept(source);
+    yield* mailbox.accept(source);
     expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
     expect((yield* chat.history(chat.defaultChannel())).some((message) => message.text.includes(source.text))).toBe(false);

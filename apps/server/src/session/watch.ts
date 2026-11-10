@@ -7,9 +7,9 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { worker as sessionActor } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
-import { type Execution, type StartFailure } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort } from "#/infra/log.ts";
+import { type Execution, type StartFailure } from "#/machine/executor.ts";
 import { Machine } from "#/machine/machine.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Runtime } from "#/runtime/runtime.ts";

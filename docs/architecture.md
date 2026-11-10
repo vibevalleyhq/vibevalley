@@ -60,20 +60,18 @@ flowchart LR
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
-- **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 13 个有序模块（见 `apps/server/src/modules.ts`）：
-  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`storage`、`attachment`、`provider`）
+- **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 11 个有序模块（见 `apps/server/src/modules.ts`）：
+  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`attachment`、`provider`）
   2. `Agents`（`agent`、`runtime`、`memory`；模型和循环在 `packages/ai`、`packages/agent`）
   3. `Source Control`（`repo`）
-  4. `Agent Sessions`（`executor`、`session`）
+  4. `Agent Sessions`（`machine`、`session`）
   5. `Mailbox`（`mailbox`）
-  6. `Collaboration`（`channel`、`media`、`artifact`、`pkm`）
+  6. `Collaboration`（`channel`、`media`、`library`、`artifact`、`pkm`）
   7. `Issues`（`issue`、`cron`）
-  8. `Ingress`（`ingress`）
-  9. `Resource`（`resource`）
-  10. `Inbox`（`inbox`）
-  11. `Orchestrator`（`orchestrator`、`tool`）
-  12. `Gamification`（`game`）
-  13. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`）
+  8. `Inbox`（`inbox`）
+  9. `Orchestrator`（`orchestrator`、`tool`）
+  10. `Gamification`（`game`）
+  11. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`、`chat`、`projection`）
   模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走 `Stream` 或窄端口。`apps/server/src/services.ts` 分两阶段组装：先构建所有服务并注册订阅，再按模块顺序执行启动任务。
 - **网关（`apps/server/src/http`、`mcp`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts` 提供三条 SSE 流；`src/mcp/` 为帮工提供 `/mcp`（[核心状态](docs/subsystems/core.md)）。
 - **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
@@ -119,7 +117,7 @@ Host：
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
+| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、工单 GitHub 观察游标（`issue_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
 | `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
 | `agent/<档案 id>/` | 助手对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |

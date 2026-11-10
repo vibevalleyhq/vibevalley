@@ -1,6 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
 
-import { Cause, Clock, Deferred, Duration, Effect, Fiber, Option, Predicate, Queue, Schedule, Schema, Semaphore } from "effect";
+import { Cause, Clock, type Context, Deferred, Duration, Effect, Fiber, Option, Predicate, Queue, Schedule, Schema, Semaphore } from "effect";
 import type { SqlClient, SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -15,7 +15,6 @@ import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
 import type { Inbox } from "#/inbox/inbox.ts";
 import { causeMessage } from "#/infra/db.ts";
-import type { Ingress } from "#/ingress/ingress.ts";
 import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
@@ -59,7 +58,6 @@ export type SqlFailure = SqlError.SqlError | Schema.SchemaError | Cause.NoSuchEl
 export interface BridgeEnv {
   readonly now: () => number;
   readonly chat: Context.Service.Shape<typeof Channel>;
-  readonly ingress: Context.Service.Shape<typeof Ingress>;
   readonly core: Context.Service.Shape<typeof Core>;
   readonly inbox: Context.Service.Shape<typeof Inbox>;
   readonly retryFirst: number;
@@ -70,16 +68,15 @@ export interface BridgeEnv {
   readonly isClosing: () => boolean;
 }
 
-import type { Context } from "effect";
 
 export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly outbox: Queue.Queue<void>; readonly inbox: Queue.Queue<void> }) => {
-  const { now, chat, ingress, core, inbox, retryFirst, retryMost, forkHere, tried, inTx, isClosing } = env;
+  const { now, chat, core, inbox, retryFirst, retryMost, forkHere, tried, inTx, isClosing } = env;
   const id = adapter.id;
   const outboxBackoff = Schedule.exponential(Duration.millis(retryFirst)).pipe(
     Schedule.modifyDelay(({ duration }) => Effect.succeed(Duration.min(duration, Duration.millis(retryMost)))),
   );
   const say = (text: string, channel: string | undefined, sendKey: string) =>
-    ingress.user({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
+    chat.user({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
 
   let account: Account | undefined;
   /** A login going on: how far it is, and the code the user typed for it. None when no login is. */

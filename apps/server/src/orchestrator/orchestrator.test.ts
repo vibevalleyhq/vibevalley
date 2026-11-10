@@ -18,14 +18,13 @@ import { Core } from "#/core/core.ts";
 import { Cron } from "#/cron/cron.ts";
 import { Inbox } from "#/inbox/inbox.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import { Ingress } from "#/ingress/ingress.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
-import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
 import { starter, testConfig, aTurn, gate, nextTurn, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
 import { Said, world } from "#/testing/world.ts";
+import { Tool } from "#/tool/tool.ts";
 
 import { Orchestrator } from "./orchestrator.ts";
 
@@ -104,9 +103,9 @@ const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig()
 /** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. */
 const marked = (f: { readonly requests: readonly Request[] }) =>
   Effect.gen(function* () {
-    const ingress = yield* Ingress;
+    const chat = yield* Channel;
     const before = f.requests.length;
-    yield* ingress.say("（标记）", {}, undefined, "");
+    yield* chat.say("（标记）", {}, undefined, "");
     yield* until(() => f.requests.slice(before).some((c) => lastLine(c).includes("（标记）")), "the marker taken");
   });
 
@@ -134,7 +133,7 @@ describe("the orchestrator", () => {
         : answer([toolCall("issue_create", { title: "oversized note", description: "word ".repeat(31), repo: "demo" })]),
     );
     return Effect.gen(function* () {
-      yield* (yield* Ingress).say("record the work", {}, undefined, "");
+      yield* (yield* Channel).say("record the work", {}, undefined, "");
       yield* until(() => f.requests.some((request) => answeredWith(request)?.includes("30") === true), "the rejected note");
       const found = yield* (yield* Issue).list();
       expect(found).toHaveLength(0);
@@ -150,14 +149,13 @@ describe("the orchestrator", () => {
   it.live("writes an issue down and starts it, and hears the user's voice in the default channel", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
       const sessions = yield* Session;
       const issues = yield* Issue;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       yield* enableLab;
       const words = yield* said;
-      yield* ingress.say("帮我在 demo 里加个 README", {}, undefined, "");
+      yield* chat.say("帮我在 demo 里加个 README", {}, undefined, "");
       const reached = yield* until(() => words().length >= 1 && words(), "its words");
       expect(reached).toEqual(["好，记下了"]);
       const origin = saidIn(chat.defaultChannel()).find((message) => message.from === "user" && message.text.includes("加个 README"))!;
@@ -181,11 +179,11 @@ describe("the orchestrator", () => {
       expect(answer!.text).toBe("好，记下了");
       expect(sessions.hired().map((session) => session.repo)).toEqual(["demo"]);
       const worker = sessions.hired()[0]!;
-      expect((yield* (yield* Resource).read(worker.id, { uri: `vv://trigger/${origin.id}` })).text).toContain(origin.text);
+      expect((yield* (yield* Tool).readResource(worker.id, { uri: `vv://trigger/${origin.id}` })).text).toContain(origin.text);
       yield* until(() => sessions.hired()[0]?.lastRun, "its report");
 
       const before = f.requests.length;
-      yield* ingress.user({ source: "voice", voiceMode: "dictated", text: "随便说一句", envelope: "" });
+      yield* chat.user({ source: "voice", voiceMode: "dictated", text: "随便说一句", envelope: "" });
       yield* until(() => f.requests.length > before, "the orchestrator asked");
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
       const answered = f.requests.length;
@@ -199,10 +197,10 @@ describe("the orchestrator", () => {
   it.live("is shown the user's note repos, and the notes the user's words call up", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const pkm = yield* Pkm;
       yield* pkm.save({ title: "Beehives", tier: "project", markdown: "- TODO check the queens every week\n" });
-      yield* ingress.say("蜂箱的 queens 怎么样了", {}, undefined, "");
+      yield* chat.say("蜂箱的 queens 怎么样了", {}, undefined, "");
       yield* until(() => f.requests.length > 0, "the orchestrator asked");
       const input = lastInput(f.requests.at(-1)!);
       expect(input).toMatch(/用户笔记里在做的项目[\s\S]*- 《Beehives》（1 件没做完）/u);
@@ -214,11 +212,10 @@ describe("the orchestrator", () => {
   it.live("answers the user in their direct channel", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       const direct = (yield* Core).state().chat!.channels.find((c) => c.type === "direct" && c.peer === defaultOrchestrator)!;
-      yield* ingress.say("单独问你一句：地里怎么样", {}, direct.id, "");
+      yield* chat.say("单独问你一句：地里怎么样", {}, direct.id, "");
       const answered = () => saidIn(direct.id).filter((m) => m.from === defaultOrchestrator);
       expect((yield* until(() => answered().length >= 1 && answered(), "its answer there")).map((m) => m.text)).toEqual(["收到"]);
       expect(saidIn(chat.defaultChannel()).some((m) => m.from === defaultOrchestrator)).toBe(false);
@@ -233,7 +230,6 @@ describe("the orchestrator", () => {
     const f = farm(respond, config);
     return Effect.gen(function* () {
       const agents = yield* Agent;
-      const ingress = yield* Ingress;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       const lead = yield* agents.create({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
@@ -242,7 +238,7 @@ describe("the orchestrator", () => {
 
       const direct = yield* chat.direct(lead.name);
       expect(direct).not.toBe(chat.defaultChannel());
-      yield* ingress.say("私下问你", {}, direct, "");
+      yield* chat.say("私下问你", {}, direct, "");
       expect((yield* until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");
       expect(asked("私下问你")[0]!.system).toContain("你是助手「阿青」");
       const fs = yield* FileSystem.FileSystem;
@@ -258,11 +254,11 @@ describe("the orchestrator", () => {
       yield* chat.updateChannel(notes, { members: [lead.id] });
       expect(membersOfNotes()).toEqual(Option.some([lead.id]));
       expect(chat.orchestratorIn(notes)).toBe(lead.id);
-      yield* ingress.say("这边怎么样", {}, notes, "");
+      yield* chat.say("这边怎么样", {}, notes, "");
       yield* until(() => from(notes, lead.id)[0], "the answer from the one in the channel");
-      yield* ingress.say(`@${lead.id} 你也看看`, {}, undefined, "");
+      yield* chat.say(`@${lead.id} 你也看看`, {}, undefined, "");
       yield* until(() => from(chat.defaultChannel(), lead.id)[0], "the answer from the one named");
-      yield* ingress.say("默认频道里随便说", {}, undefined, "");
+      yield* chat.say("默认频道里随便说", {}, undefined, "");
       yield* until(() => from(chat.defaultChannel(), defaultOrchestrator)[0], "the default one's answer");
       expect(asked("默认频道里随便说")[0]!.system).not.toContain("你是助手");
       // Its own skills are listed for it to load: /imagegen is one.
@@ -276,10 +272,10 @@ describe("the orchestrator", () => {
     const config = testConfig();
     const f = farm(respond, config);
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const words = yield* said;
       expect((yield* Core).state().call).not.toBe("live");
-      yield* ingress.say("地里怎么样", {}, undefined, "");
+      yield* chat.say("地里怎么样", {}, undefined, "");
       // The user speaking, from any door, opens the farm.
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
@@ -385,9 +381,9 @@ describe("the orchestrator", () => {
   it.effect("a new interactive response ends the previous port that is still open", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
+      const mailbox = yield* Mailbox;
       const channel = yield* Channel;
-      const responses = makeResponses(ingress, channel);
+      const responses = makeResponses(mailbox, channel);
       const first = responses.open(true);
       const second = responses.open(true);
       const collectOutcome = yield* Stream.runCollect(first.caller.words);
@@ -410,7 +406,7 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const words = yield* said;
-      yield* (yield* Ingress).user({ source: "voice", voiceMode: "api", responsePort: "gone-after-restart", text: "重启后继续", envelope: "gone-1" });
+      yield* (yield* Channel).user({ source: "voice", voiceMode: "api", responsePort: "gone-after-restart", text: "重启后继续", envelope: "gone-1" });
       const reached = yield* until(() => words().at(-1), "the answer without its response port");
       expect(reached).toBe("收到");
       expect(lastLine(f.requests.at(-1)!)).toContain("重启后继续");
@@ -475,9 +471,9 @@ describe("the orchestrator", () => {
   it.live("hears a send key once", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
-      for (let i = 0; i < 2; i++) yield* ingress.say("地里怎么样", {}, undefined, "k1");
-      for (let i = 0; i < 2; i++) yield* ingress.user({ source: "voice", voiceMode: "dictated", text: "电话里问一句", envelope: "k2" });
+      const chat = yield* Channel;
+      for (let i = 0; i < 2; i++) yield* chat.say("地里怎么样", {}, undefined, "k1");
+      for (let i = 0; i < 2; i++) yield* chat.user({ source: "voice", voiceMode: "dictated", text: "电话里问一句", envelope: "k2" });
       yield* until(
         () =>
           f.requests.some((request) =>
@@ -493,7 +489,7 @@ describe("the orchestrator", () => {
         for (const k of Object.keys(heard) as (keyof typeof heard)[]) if (text.includes(k)) heard[k]++;
       }
       expect(heard).toEqual({ 地里怎么样: 1, 电话里问一句: 1 });
-      const saidFailure = yield* Effect.flip(ingress.say("早", {}, undefined, "k".repeat(65)));
+      const saidFailure = yield* Effect.flip(chat.say("早", {}, undefined, "k".repeat(65)));
       expect(saidFailure).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -501,10 +497,10 @@ describe("the orchestrator", () => {
   it.live("is told the sowing form's pick", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const lab = yield* enableLab;
       const words = yield* said;
-      yield* ingress.say("修一个 bug：登录闪退", { agent: lab.id, repo: " notes " }, undefined, "");
+      yield* chat.say("修一个 bug：登录闪退", { agent: lab.id, repo: " notes " }, undefined, "");
       yield* until(() => words().length >= 1, "its words");
       expect(lastLine(f.requests[0]!)).toMatch(
         new RegExp(`（用户在对话框里选定了帮工：${lab.name}）\n（用户选定了仓库：notes，派活就派在这个仓库里）\n用户说：修一个 bug：登录闪退$`, "u"),
@@ -548,7 +544,6 @@ describe("the orchestrator", () => {
       const sessions = yield* Session;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
-      const ingress = yield* Ingress;
       const lab = yield* enableLab;
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
       helper = hired.session!.id;
@@ -559,7 +554,7 @@ describe("the orchestrator", () => {
       const refused = yield* until(() => saidIn(thread).find((m) => m.from === defaultOrchestrator && m.text.startsWith("合并：")), "the completion refused");
       expect(refused.text).toBe("合并：没挪：改工单、挪状态要用户说一声。这一轮不是用户叫你的：在频道里问用户要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
-      yield* ingress.say("收下", {}, undefined, "");
+      yield* chat.say("收下", {}, undefined, "");
       const merged = yield* waitFor(issues.get(hired.session!.issue!), (t) => t.closedAt !== undefined, "merged");
       // The helper said its words and committed nothing: done, with nothing to merge, and said so.
       expect(merged.delivered).toBe("none");
@@ -586,19 +581,19 @@ describe("the orchestrator", () => {
     });
     return Effect.gen(function* () {
       const issues = yield* Issue;
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const words = yield* said;
       yield* enableLab;
-      yield* ingress.say("记一下：首页偶尔白屏", {}, undefined, "");
+      yield* chat.say("记一下：首页偶尔白屏", {}, undefined, "");
       const noted = yield* until(() => words().find((w) => w.startsWith("工单：记下了")), "noted");
       const issue = (yield* issues.list()).find((t) => t.title === "首页偶尔白屏")!;
       number = issue.number;
       expect(noted).toBe(`工单：记下了：#${number}「首页偶尔白屏」，在备选里，没开工`);
       expect([issue.status, executionsOf(issue)]).toEqual(["backlog", []]);
-      yield* ingress.say(`#${number} 开工`, {}, undefined, "");
+      yield* chat.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
       yield* waitFor(issues.get(issue.id), (i) => i.status === "in_review", "handed back");
-      yield* ingress.say("哪些在等我？", {}, undefined, "");
+      yield* chat.say("哪些在等我？", {}, undefined, "");
       const waiting = yield* until(() => words().find((w) => w.startsWith("工单：- #")), "listed");
       expect(waiting).toContain(`#${number}「首页偶尔白屏」等你验收`);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -615,7 +610,7 @@ describe("the orchestrator", () => {
     }, testConfig());
     return Effect.gen(function* () {
       const crons = yield* Cron;
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const words = yield* said;
       // Woken by a cron, not the user: what it sets to come back daily waits.
       yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, user);
@@ -625,7 +620,7 @@ describe("the orchestrator", () => {
       yield* until(() => words().some((w) => w.startsWith("定时任务：定好了，等用户同意才生效")), "the orchestrator told it waits");
       const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
       expect(mine(false)).toMatchObject([{ pending: true, by: "agent" }]);
-      yield* ingress.say("每天九点跑一遍测试", {}, undefined, "");
+      yield* chat.say("每天九点跑一遍测试", {}, undefined, "");
       const on = yield* until(() => mine(true).length === 1 && mine(true), "the user's cron on");
       expect(on[0]).toMatchObject({ by: "agent" });
       expect(on[0]!.pending).toBe(false);
@@ -658,11 +653,11 @@ describe("the orchestrator", () => {
   it.effect("hears the patrol once with the next user input", () => {
     const f = farm(respond, testConfig());
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const inbox = yield* Inbox;
       const sessions = yield* Session;
       yield* enableLab;
-      yield* ingress.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
+      yield* chat.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(
         () => sessions.hired().some((session) => session.brief.split("\n")[0] === "加个 CHANGELOG" && session.phase._tag === "done"),
         "the work handed back",
@@ -689,10 +684,10 @@ describe("the orchestrator", () => {
     const config = testConfig();
     const f = farm(respond, config);
     return Effect.gen(function* () {
-      const ingress = yield* Ingress;
+      const chat = yield* Channel;
       const sessions = yield* Session;
       const words = yield* said;
-      yield* ingress.say("地里怎么样", {}, undefined, "");
+      yield* chat.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");
       const asked = (yield* waitFor(
         Effect.map(sessions.events(defaultOrchestrator), (all) => (all ?? []).find((e) => e.type === "user/message")),

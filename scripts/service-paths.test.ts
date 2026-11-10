@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { edgesOf, pathProblems } from "./service-paths.ts";
+import { edgesOf, fanInOf, fanInProblems, pathProblems } from "./service-paths.ts";
 
 const files = [
   { path: "apps/server/src/session/session.ts", text: "export class Session extends Context.Service<Session, {}>()('x') {}" },
@@ -26,5 +26,17 @@ describe("the service path table", () => {
 
   test("a path gone fails until the table is written down", () => {
     expect(pathProblems({ "Session.hire": ["mailbox"] }, {})).toEqual([expect.stringMatching(/mailbox no longer uses Session\.hire.*paths:write/u)]);
+  });
+
+  test("counts service fan-in across modules including http and rejects new single-caller services", () => {
+    expect(fanInOf(files)).toEqual({ Session: ["http", "mailbox"] });
+    expect(fanInProblems({ Session: ["http", "mailbox"], Storage: ["attachment"] }, new Set())).toEqual([
+      expect.stringMatching(/^Storage has only one \(attachment\) caller module/u),
+    ]);
+    expect(fanInProblems({ Machine: ["session"] }, new Set(["Machine"]))).toEqual([]);
+    expect(fanInProblems({ Machine: ["repo", "session"] }, new Set(["Machine", "Storage"]))).toEqual([
+      expect.stringMatching(/^Machine now has 2 caller modules/u),
+      expect.stringMatching(/^Storage is in singleCallerServices but no longer exists/u),
+    ]);
   });
 });

@@ -16,7 +16,6 @@ import { Core } from "#/core/core.ts";
 import { Inbox } from "#/inbox/inbox.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, callbackLog } from "#/infra/log.ts";
-import { Ingress } from "#/ingress/ingress.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 import { type Account, Provider } from "#/provider/provider.ts";
 import type { RealtimeEvents, RealtimeLink, RealtimeTransport } from "#/provider/vendors.ts";
@@ -180,7 +179,6 @@ const make = (options: VoiceOptions = {}) =>
     const settings = yield* Setting;
     const provider = yield* Provider;
     const chat = yield* Channel;
-    const ingress = yield* Ingress;
     const response = yield* Orchestrator;
     const clock = yield* Clock.Clock;
     const httpClient = yield* HttpClient.HttpClient;
@@ -312,7 +310,7 @@ const make = (options: VoiceOptions = {}) =>
     const heard = Effect.fn("Voice.heard")(function* (agentId: string, text: string, picked: string, sendKey: string) {
       const call = yield* callOf(agentId);
       if (!call.quick) return;
-      yield* ingress.user({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
+      yield* chat.user({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
     });
 
     return Voice.of({

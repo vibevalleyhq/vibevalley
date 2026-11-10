@@ -5,8 +5,8 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
-import { worldBelowIngress } from "#/testing/world.ts";
-import * as cursor from "#db/ingress_github.sql.ts";
+import { moduleWorld } from "#/testing/world.ts";
+import * as cursor from "#db/issue_github.sql.ts";
 import { allOpenDeliveries } from "#db/mailbox_delivery.sql.ts";
 
 import { Mailbox } from "./mailbox.ts";
@@ -51,7 +51,7 @@ it.effect("regression: the source cursor and Mailbox trigger share commit and ro
     expect(allOpenDeliveries2).toEqual([]);
     expect(mailbox.deliveriesOf(defaultOrchestrator)).toEqual([]);
     expect(core.state()).toBe(state);
-  }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
+  }).pipe(Effect.scoped, Effect.provide(moduleWorld())),
 );
 
 it.effect("regression: duplicate source and channel records keep the first trigger and payload", () =>
@@ -85,7 +85,7 @@ it.effect("regression: duplicate source and channel records keep the first trigg
       text: "first",
       data: { kind: "channel_message", message: channel.id, channel: "room" },
     });
-  }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
+  }).pipe(Effect.scoped, Effect.provide(moduleWorld())),
 );
 
 it.effect("regression: cron replay supplies decoded source payloads without routing them", () =>
@@ -103,5 +103,5 @@ it.effect("regression: cron replay supplies decoded source payloads without rout
     expect(registered2).toBe(false);
     const registered3 = yield* mailbox.isRouted(second.id);
     expect(registered3).toBe(false);
-  }).pipe(Effect.scoped, Effect.provide(worldBelowIngress())),
+  }).pipe(Effect.scoped, Effect.provide(moduleWorld())),
 );

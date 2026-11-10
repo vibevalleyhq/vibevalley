@@ -9,8 +9,9 @@ import type { ApiError } from "@vibevalley/protocol/api";
 
 import { missing, refused } from "#/base/errors.ts";
 import { Db } from "#/infra/db.ts";
-import { Storage } from "#/storage/storage.ts";
 import * as q from "#db/attachment.sql.ts";
+
+import { makeStorage } from "./storage.ts";
 
 export interface KeptFile {
   readonly path: string;
@@ -44,7 +45,7 @@ export class Attachment extends Context.Service<
 
 const make = Effect.gen(function* () {
   const db = yield* Db;
-  const storage = yield* Storage;
+  const storage = yield* makeStorage;
   const unkept = (e: { readonly message: string }) => refused(e.message);
 
   const sha256Of = (key: string) =>

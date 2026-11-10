@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Config, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Schema } from "effect";
+import { Clock, Config, Deferred, Effect, Exit, FiberMap, FiberSet, Metric, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -52,6 +52,18 @@ export type DeliveredInput =
 
 export type StartFailure = { readonly execution?: never; readonly refused: string; readonly retained: boolean };
 export type Started = { readonly execution: Execution; readonly refused?: never; readonly retained?: never } | StartFailure;
+
+export interface Executions {
+  readonly start: (input: StartExecution) => Effect.Effect<Started>;
+  readonly deliver: (id: string, text: string, inputId: string) => Effect.Effect<DeliveredInput>;
+  readonly interrupt: (id: string) => Effect.Effect<ControlOutcome | { readonly kind: "failed"; readonly reason: string }>;
+  readonly close: (id: string) => Effect.Effect<void, ApiError>;
+  readonly failed: (id: string, why: string) => Effect.Effect<StartFailure>;
+  readonly observe: (id: string, observer: ExecutionObserver) => void;
+  readonly detach: (id: string) => void;
+  readonly find: (id: string) => Execution | undefined;
+  readonly all: () => readonly Execution[];
+}
 
 class NotClosed extends Schema.TaggedError<NotClosed, { readonly brand: unique symbol }>()("NotClosed", {
   message: Schema.String,
@@ -137,27 +149,7 @@ const view = (allocation: Allocation): Execution => {
   };
 };
 
-export class Executor extends Context.Service<
-  Executor,
-  {
-    readonly start: (input: StartExecution) => Effect.Effect<Started>;
-    readonly deliver: (id: string, text: string, inputId: string) => Effect.Effect<DeliveredInput>;
-    readonly interrupt: (id: string) => Effect.Effect<ControlOutcome | { readonly kind: "failed"; readonly reason: string }>;
-    readonly close: (id: string) => Effect.Effect<void, ApiError>;
-    readonly failed: (id: string, why: string) => Effect.Effect<StartFailure>;
-    readonly observe: (id: string, observer: ExecutionObserver) => void;
-    readonly detach: (id: string) => void;
-    readonly find: (id: string) => Execution | undefined;
-    readonly all: () => readonly Execution[];
-  }
->()("@vibevalley/server/executor/executor") {
-  static readonly layer = Layer.effect(
-    Executor,
-    Effect.suspend(() => make),
-  );
-}
-
-const make = Effect.gen(function* () {
+export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions, never, ServerConfig | Runtime | Clock.Clock | import("effect").Scope.Scope> {
   const config = yield* ServerConfig;
   const inherited = {
     NO_PROXY: yield* Config.String("NO_PROXY").pipe(Config.withDefault("")),
@@ -224,7 +216,7 @@ const make = Effect.gen(function* () {
     yield* Metric.update(running, allocations.size);
   });
 
-  const close = Effect.fn("Executor.close")(function* (id: string) {
+  const close = Effect.fn("Executions.close")(function* (id: string) {
     const allocation = allocations.get(id);
     if (allocation) yield* closeOwned(allocation);
   });
@@ -242,7 +234,7 @@ const make = Effect.gen(function* () {
     );
   });
 
-  const failed = Effect.fn("Executor.failed")(function* (id: string, why: string): Effect.fn.Return<StartFailure> {
+  const failed = Effect.fn("Executions.failed")(function* (id: string, why: string): Effect.fn.Return<StartFailure> {
     const allocation = allocations.get(id);
     return allocation ? yield* failedAllocation(allocation, why) : { refused: why, retained: false };
   });
@@ -269,8 +261,8 @@ const make = Effect.gen(function* () {
     ),
   );
 
-  return Executor.of({
-    start: Effect.fn("Executor.start")(function* ({ agent, owner, cwd, input, resume, options }): Effect.fn.Return<Started> {
+  return {
+    start: Effect.fn("Executions.start")(function* ({ agent, owner, cwd, input, resume, options }): Effect.fn.Return<Started> {
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: failureOf(prior.phase) ?? t("server.session.life.notReturned"), retained: true };
@@ -353,7 +345,7 @@ const make = Effect.gen(function* () {
       });
       return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation), { log: "Warn" }) : Effect.void)));
     }),
-    deliver: Effect.fn("Executor.deliver")(function* (id, text, inputId) {
+    deliver: Effect.fn("Executions.deliver")(function* (id, text, inputId) {
       const allocation = allocations.get(id);
       const agent = allocation ? agentOf(allocation.phase) : undefined;
       if (!agent) return { kind: "rejected", code: "closed", reason: t("server.session.life.noHelper", { id }) };
@@ -378,7 +370,7 @@ const make = Effect.gen(function* () {
         ? ({ kind: "rejected", code: delivered.code, reason: delivered.reason } as const)
         : ({ kind: "accepted", landed: delivered.landed, inputId: delivered.inputId } as const);
     }),
-    interrupt: Effect.fn("Executor.interrupt")(function* (id) {
+    interrupt: Effect.fn("Executions.interrupt")(function* (id) {
       const allocation = allocations.get(id);
       const agent = allocation ? agentOf(allocation.phase) : undefined;
       if (!agent) return { kind: "failed", reason: t("server.session.life.noHelper", { id }) };
@@ -467,5 +459,5 @@ const make = Effect.gen(function* () {
       return allocation ? view(allocation) : undefined;
     },
     all: () => [...allocations.values()].map(view),
-  });
+  };
 });

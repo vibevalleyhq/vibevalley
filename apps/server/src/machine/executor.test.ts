@@ -10,7 +10,7 @@ import { Session } from "#/session/session.ts";
 import { starter, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
-import { Executor } from "./executor.ts";
+import { Machine } from "./machine.ts";
 
 it.live("regression: cancelling a close caller leaves disposal owned by the executor", () => {
   const { promise: disposing, resolve: entered } = Promise.withResolvers<void>();
@@ -41,7 +41,8 @@ it.live("regression: cancelling a close caller leaves disposal owned by the exec
       })),
   };
   return Effect.gen(function* () {
-    const executor = yield* Executor;
+    const machines = yield* Machine;
+    const executor = machines.executions(machines.here());
     const sessions = yield* Session;
     const agent = { ...starter("lab"), effort: "" };
     yield* (yield* Agent).save(agent);

@@ -9,11 +9,11 @@ import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { ServerConfig } from "#/infra/config.ts";
-import { actionsJobOf, githubSnapshot } from "#/ingress/github.ts";
 import { gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { GitError, run } from "./git.ts";
+import { actionsJobOf } from "./pullSnapshot.ts";
 import { Repo, githubOrigin, type GitHubRun, probeGitHub, type RepoHooks } from "./repo.ts";
 import { repository } from "./repository.ts";
 
@@ -80,7 +80,7 @@ describe("GitHub", () => {
       root,
       Effect.gen(function* () {
         const repo = yield* Repo;
-        const snapshot = yield* githubSnapshot(repo)("sample", 7);
+        const snapshot = yield* repo.githubSnapshot("sample", 7);
         expect(snapshot.viewer).toBe("gardener");
         expect(snapshot.checks).toEqual([
           { name: "test", status: "COMPLETED", conclusion: "FAILURE", url: "https://checks/1" },
@@ -97,7 +97,7 @@ describe("GitHub", () => {
         });
         expect(snapshot.comments.find((comment) => comment.id === "SECOND")).toMatchObject({ threadId: "PRRT_second", resolved: true });
         failReviews = true;
-        expect((yield* Effect.flip(githubSnapshot(repo)("sample", 7)))._tag).toBe("RepoError");
+        expect((yield* Effect.flip(repo.githubSnapshot("sample", 7)))._tag).toBe("RepoError");
         yield* repo.resolveReviewThread("sample", "PRRT_9");
         expect(resolved).toEqual(["PRRT_9"]);
       }),
@@ -115,7 +115,7 @@ describe("GitHub", () => {
           expect(args).toContain("--slurp");
           const query = args.find((arg) => arg.startsWith("query="))?.slice(6) ?? "";
           expect(query).not.toContain("databaseId");
-          if (query.startsWith("query IngressChecks("))
+          if (query.startsWith("query PullChecks("))
             return {
               out: Formatter.formatJson([
                 {
@@ -144,7 +144,7 @@ describe("GitHub", () => {
                 },
               ]),
             };
-          if (query.startsWith("query IngressReviews("))
+          if (query.startsWith("query PullReviews("))
             return failReviews
               ? { out: "not available", ok: false }
               : {
@@ -162,7 +162,7 @@ describe("GitHub", () => {
                     ),
                   ),
                 };
-          if (query.startsWith("query IngressComments("))
+          if (query.startsWith("query PullComments("))
             return {
               out: Formatter.formatJson(
                 [1, 2].map((i) =>
@@ -178,7 +178,7 @@ describe("GitHub", () => {
                 ),
               ),
             };
-          if (query.startsWith("query IngressThreads("))
+          if (query.startsWith("query PullThreads("))
             return {
               out: Formatter.formatJson([
                 pull("reviewThreads", [
@@ -193,7 +193,7 @@ describe("GitHub", () => {
                 ]),
               ]),
             };
-          expect(query.startsWith("query IngressThreadComments(")).toBe(true);
+          expect(query.startsWith("query PullThreadComments(")).toBe(true);
           expect(args).toContain("id=PRRT_9");
           expect(args).toContain("endCursor=edge99");
           return { out: Formatter.formatJson([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };

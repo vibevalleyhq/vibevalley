@@ -13,6 +13,7 @@ import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.
 import { cloneTimeoutMs, githubOrigin, type GitHubRun, makeRepoGitHub, probeGitHub, runGitHub } from "./github.ts";
 import { runGitLab } from "./hosting.ts";
 import { publisher, type PublishNetwork } from "./publish.ts";
+import { type GitHubPullSnapshot, makeGithubSnapshot } from "./pullSnapshot.ts";
 import { asFarm, repository } from "./repository.ts";
 import { activityOf, contributionsOf, countsOf, lexists, secondsOf, tokeiArgs, yearDays } from "./stats.ts";
 import {
@@ -101,6 +102,7 @@ export class Repo extends Context.Service<
     readonly submitBranch: (req: T.SubmitBranch) => Effect.Effect<T.BranchPublication, MergeFailure | RepoError>;
     readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string) => Effect.Effect<T.PullRequest, MergeFailure | RepoError>;
     readonly pullRequestState: (name: string, n: number) => Effect.Effect<T.PullRequestState, RepoError>;
+    readonly githubSnapshot: (name: string, n: number) => Effect.Effect<GitHubPullSnapshot, RepoError>;
     readonly githubRequest: GitHubRun;
     readonly githubRemote: (name: string) => Effect.Effect<string, RepoError>;
     readonly resolveReviewThread: (name: string, thread: string) => Effect.Effect<void, RepoError>;
@@ -347,8 +349,10 @@ const make = (hooks: RepoHooks = {}) =>
       syncMain,
     });
     const { capability: _capability, ...githubMethods } = github;
+    const githubSnapshot = makeGithubSnapshot(gh, github.githubRemote);
 
     const shape = Repo.of({
+      githubSnapshot,
       root,
       submitBranch,
       limit: perRepo,

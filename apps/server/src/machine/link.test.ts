@@ -4,10 +4,10 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import type { Execution, ExecutionObserver } from "#/executor/executor.ts";
 import { lab } from "#/flows/farm.ts";
 
-import { type Executions, linked } from "./link.ts";
+import type { Execution, ExecutionObserver, Executions } from "./executor.ts";
+import { linked } from "./link.ts";
 
 const execution: Execution = {
   owner: { id: sessionId("w1"), agent: "lab", runtime: "pi" },

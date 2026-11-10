@@ -2,7 +2,7 @@ import { expect, it } from "vite-plus/test";
 
 import { staleNamesIn } from "./stale-names.ts";
 
-const source = "apps/server/src/executor/executor.ts";
+const source = "apps/server/src/machine/executor.ts";
 
 it("regression: browser worker feature detection is not a stale domain name", () => {
   const browser = "apps/web/src/features/voice/moss-worker.ts";
@@ -45,4 +45,6 @@ it("regression: stale service names are rejected while Effect Config APIs remain
   expect(staleNamesIn(source, "const config = yield* ServerConfig;")).toEqual([]);
   expect(staleNamesIn(source, "const config = yield* Settings.get;")).toHaveLength(1);
   expect(staleNamesIn(source, "agents.saveAgent(input)")).toHaveLength(1);
+  for (const line of ['import { Storage } from "#/storage/storage.ts";', "const ingress = yield* Ingress;", "worldBelowIngress()"])
+    expect(staleNamesIn(source, line)).toHaveLength(1);
 });

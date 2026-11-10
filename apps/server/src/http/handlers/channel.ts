@@ -1,30 +1,48 @@
 import { Effect } from "effect";
 
+import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import type { ChannelHandlers } from "@vibevalley/protocol/api";
 
+import { Artifact } from "#/artifact/artifact.ts";
 import { missing, lookIn, reasonOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Game } from "#/game/game.ts";
 import { requestKeys } from "#/http/api.ts";
-import { Ingress } from "#/ingress/ingress.ts";
+
+/** Snapshots the blocks quoted by the user so later edits or deletions remain visible on the message. */
+const quoteBlocks = (artifacts: Artifact["Service"], refs: readonly T.BlockRef[] | undefined): Effect.Effect<T.QuotedBlock[]> =>
+  Effect.forEach(refs ?? [], (ref) =>
+    Effect.gen(function* () {
+      const snapshot = yield* artifacts.blocks(ref.artifactId);
+      const block = snapshot.blocks.find((b) => b.id === ref.blockId);
+      return {
+        artifactId: ref.artifactId,
+        blockId: ref.blockId,
+        rev: ref.rev,
+        title: snapshot.artifact.title,
+        ...(block ? { type: block.type, text: block.text.map((s) => s.t).join(""), nowRev: block.rev } : { deleted: true }),
+      } satisfies T.QuotedBlock;
+    }).pipe(Effect.catch((e) => Effect.as(Effect.logWarning("quoting a block failed", e), undefined))),
+  ).pipe(Effect.map((all) => all.flatMap((b) => (b === undefined ? [] : [b]))));
 
 export const channelHandlers = Effect.gen(function* () {
+  const artifacts = yield* Artifact;
   const channels = yield* Channel;
-  const ingress = yield* Ingress;
   const game = yield* Game;
   const threadOnce = requestKeys<string>();
   const done: ChannelHandlers = {
     "channel.message.send": (body) =>
-      Effect.andThen(
-        Effect.sync(() => body.station !== undefined && game.want(body.station)),
-        ingress.say(body.text, { ...(body.agent ? { agent: body.agent } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
+      Effect.gen(function* () {
+        if (body.station !== undefined) game.want(body.station);
+        const blocks = yield* quoteBlocks(artifacts, body.blocks);
+        yield* channels.say(body.text, { ...(body.agent ? { agent: body.agent } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
           ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
           ...(body.attachments ? { attachments: body.attachments } : {}),
-          ...(body.blocks ? { blockRefs: body.blocks } : {}),
+          ...(blocks.length > 0 ? { blocks } : {}),
           ...(body.to !== undefined ? { to: body.to } : {}),
-        }),
-      ),
+        });
+      }),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.repo ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),
     "channel.archive.set": ({ id, on }) => channels.archive(id, on),

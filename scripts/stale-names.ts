@@ -23,7 +23,7 @@ const RULES: readonly Rule[] = [
       /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
     says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
     // oar's acquired-session key, and the EverOS sender id that memories already stored outside are filed under.
-    except: /^apps\/server\/src\/(executor\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
+    except: /^apps\/server\/src\/(machine\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
   },
   {
     name: "a delivery name the one-door plan retired",
@@ -405,7 +405,14 @@ const RULES: readonly Rule[] = [
     name: "a service under a plural name",
     pattern:
       /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Repo, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
+    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Machine, Mailbox, Memory, Repo, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
+    dirs: ["apps/server/src"],
+  },
+  {
+    name: "a retired single-caller or pass-through server service",
+    pattern:
+      /["'`](?:\.\.?\/|#\/)(?:storage|executor|resource|ingress)\/|\b(Storage|Executor|Resource|Ingress|worldBelowIngress|ingress_github)\b/u,
+    says: "Attachment owns attachment/storage.ts, Machine owns machine/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Mailbox.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
     dirs: ["apps/server/src"],
   },
   {

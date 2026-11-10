@@ -12,13 +12,25 @@ import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { heldShown, type Envelope, retryWindowMs } from "#/mailbox/envelope.ts";
+import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
-import { type Post, type PostOf, type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, envelopeMore, type ChannelService } from "./contracts.ts";
+import {
+  type Post,
+  type PostOf,
+  type SayMore,
+  type Spoken,
+  type Meta,
+  type UserInput,
+  metaOf,
+  metaText,
+  toMessage,
+  envelopeMore,
+  type ChannelService,
+} from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
 import { channelHub, lastMax, lineOf } from "./hub.ts";
 import { mentionOf, parseChatTarget } from "./mentions.ts";
@@ -39,7 +51,7 @@ const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
 const afterAll = "\uffff";
 
-export type { Info, Spoken, SayMore, Delivered } from "./contracts.ts";
+export type { Info, Spoken, SayMore, UserInput, Delivered } from "./contracts.ts";
 
 export class Channel extends Context.Service<Channel, ChannelService>()("@vibevalley/server/channel/channel") {
   static readonly layer = Layer.effect(
@@ -367,6 +379,32 @@ const make = Effect.gen(function* () {
   }
 
   const shape = Channel.of({
+    user: Effect.fn("Channel.user")(function* (input) {
+      yield* core.open();
+      return yield* post({
+        _tag: "User",
+        text: input.text,
+        channel: input.channel,
+        sendKey: input.envelope,
+        source: input.source,
+        ...(input.picked ? { picked: input.picked } : {}),
+        ...(input.responsePort ? { responsePort: input.responsePort } : {}),
+        ...(input.voiceMode ? { voiceMode: input.voiceMode } : {}),
+      });
+    }),
+    say: Effect.fn("Channel.say")(function* (text, pick, channel, sendKey, more) {
+      const a = pick.agent ? agents.agent(pick.agent) : undefined;
+      const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
+      yield* core.open();
+      yield* post({
+        _tag: "User",
+        text,
+        channel,
+        sendKey,
+        ...more,
+        ...(picked.agent || picked.repo ? { picked } : {}),
+      });
+    }),
     post,
     userReads: Effect.map(PubSub.subscribe(userReadHub), Stream.fromSubscription),
     now: () => core.state().chat,

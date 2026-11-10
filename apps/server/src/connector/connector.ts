@@ -10,7 +10,6 @@ import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Inbox } from "#/inbox/inbox.ts";
 import { Db } from "#/infra/db.ts";
-import { Ingress } from "#/ingress/ingress.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
 
@@ -51,7 +50,6 @@ const make = (options: ConnectorOptions = {}) =>
     const now = () => clock.currentTimeMillisUnsafe();
     const db = yield* Db;
     const chat = yield* Channel;
-    const ingress = yield* Ingress;
     const core = yield* Core;
     const inbox = yield* Inbox;
     const retryFirst = options.retryFirstMs ?? 30_000;
@@ -62,7 +60,7 @@ const make = (options: ConnectorOptions = {}) =>
     const tried = <A>(e: Effect.Effect<A, SqlFailure, SqlClient.SqlClient>) => Effect.mapError(db.attempt(e), bridgeError);
     const inTx = <A>(work: Effect.Effect<A, SqlFailure, SqlClient.SqlClient>) => Effect.mapError(db.attemptTx(work), bridgeError);
     let closing = false;
-    const env = { now, chat, ingress, core, inbox, retryFirst, retryMost, forkHere, tried, inTx, isClosing: () => closing };
+    const env = { now, chat, core, inbox, retryFirst, retryMost, forkHere, tried, inTx, isClosing: () => closing };
 
     const http = yield* HttpClient.HttpClient;
     const adapters = [

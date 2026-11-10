@@ -45,6 +45,10 @@ export interface TriggerInput {
   readonly data?: unknown;
 }
 
+export interface SourceEvent extends TriggerInput {
+  readonly selfEcho?: boolean;
+}
+
 export const triggerOf = (input: TriggerInput): Trigger => {
   const id =
     input.id ??

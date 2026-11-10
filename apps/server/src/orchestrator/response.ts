@@ -4,14 +4,14 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
 import { type Channel } from "#/channel/channel.ts";
-import { type Ingress } from "#/ingress/ingress.ts";
+import { type Mailbox } from "#/mailbox/mailbox.ts";
 import { Caller, type NotAnswered } from "#/session/host.ts";
 
 import type { Answer } from "./openai.ts";
 import { orchestratorModel } from "./situation.ts";
 
 /** The live API/phone responses, from opening a port to dropping it once its words are read. */
-export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Service"]) => {
+export const makeResponses = (mailbox: Mailbox["Service"], channel: Channel["Service"]) => {
   const responses = new Map<string, Caller>();
   let latestResponse = "";
 
@@ -50,7 +50,7 @@ export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Ser
       drop(id);
     });
 
-  /** A live API/phone response whose durable input goes through Ingress before the orchestrator sees it. */
+  /** A live API/phone response whose durable input goes through Channel before the orchestrator sees it. */
   const answerer =
     (on: "api" | "phone") =>
     (model: string): Answer<NotAnswered> | undefined => {
@@ -59,7 +59,7 @@ export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Ser
         Stream.unwrap(
           Effect.gen(function* () {
             const response = open(true);
-            yield* ingress
+            yield* channel
               .user({
                 source: "voice",
                 text,
@@ -77,7 +77,7 @@ export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Ser
   const brief = (line: string): Effect.Effect<string, NotAnswered> =>
     Effect.gen(function* () {
       const response = open(false);
-      yield* ingress
+      yield* mailbox
         .accept({
           source: "workbench",
           key: newId(),

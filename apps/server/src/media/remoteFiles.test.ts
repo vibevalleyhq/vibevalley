@@ -9,7 +9,6 @@ import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { Provider } from "#/provider/provider.ts";
 import { Setting } from "#/setting/setting.ts";
-import { Storage } from "#/storage/storage.ts";
 import { testConfig } from "#/testing/layers.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 
@@ -26,7 +25,7 @@ const notIn = (value: unknown, secret: string) =>
 /** The library, and a Provider whose accounts' calls go to the given vendor. */
 const layer = (http: HttpClient.HttpClient) =>
   Layer.mergeAll(
-    Attachment.layer.pipe(Layer.provideMerge(Storage.layer), Layer.provideMerge(Db.layer), Layer.provideMerge(Database)),
+    Attachment.layer.pipe(Layer.provideMerge(Db.layer), Layer.provideMerge(Database)),
     Provider.layer.pipe(Layer.provide(Setting.layer), Layer.provide(Layer.succeed(HttpClient.HttpClient, http))),
   ).pipe(Layer.provideMerge(NodeServices.layer), Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())));
 const key = "isolated-test-key";

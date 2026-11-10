@@ -22,6 +22,7 @@ import { type Hired, type HireOptions, type SessionNews, Session } from "#/sessi
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { filledKinds, sentTitles } from "./creation.ts";
 import { type Dispatched, issueDispatch } from "./dispatch.ts";
+import { makeGitHubPoller } from "./github.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
@@ -58,6 +59,7 @@ export class Issue extends Context.Service<
     readonly timeline: (id: string) => Effect.Effect<T.IssueTimeline, ApiError>;
     readonly templates: (repo: string) => Effect.Effect<T.RepoTemplates, ApiError>;
     readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Effect.Effect<Hired>;
+    readonly pollGitHub: Effect.Effect<void>;
     readonly refreshPullRequests: Effect.Effect<void>;
     readonly refreshQueue: Effect.Effect<void>;
     readonly submitPullRequest: (session: string, summary?: string) => Effect.Effect<string, ApiError>;
@@ -136,6 +138,7 @@ const make = Effect.gen(function* () {
     savePullRequest,
     finishPullRequest,
   });
+  const pollGitHub = yield* makeGitHubPoller(() => core.state().issues);
 
   const submitPullRequest = Effect.fn("Issue.submitPullRequest")(function* (session: string, summary?: string) {
     const issue = worked.issueOf(session);
@@ -484,6 +487,7 @@ const make = Effect.gen(function* () {
       return { repo: name, stack, recent: sentTitles(all, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     }),
     hire,
+    pollGitHub,
     refreshPullRequests: refreshPullRequests(),
     refreshQueue: refreshQueue(),
   });
@@ -498,7 +502,10 @@ export const start = Layer.effectDiscard(
     yield* Effect.forkScoped(issue.refreshQueue.pipe(Effect.repeat(Schedule.spaced(config.chat.retryWakeMs)), Effect.delay(config.chat.retryWakeMs)));
     const pollEvery = config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000;
     yield* Effect.forkScoped(
-      issue.refreshPullRequests.pipe(bestEffort("vibevalley: refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)),
+      Effect.all([issue.refreshPullRequests.pipe(bestEffort("vibevalley: refresh pull requests")), issue.pollGitHub], { discard: true }).pipe(
+        Effect.repeat(Schedule.spaced(pollEvery)),
+        Effect.delay(pollEvery),
+      ),
     );
   }),
 );
