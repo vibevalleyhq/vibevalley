@@ -11,7 +11,7 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Card } from "#/ui/layout.tsx";
 
-import { devicesQuery, userQuery } from "./queries";
+import { devicesQuery, userQuery } from "./signIns";
 
 const viewStyles = stylex.create({
   row: {

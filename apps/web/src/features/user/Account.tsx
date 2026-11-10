@@ -12,7 +12,7 @@ import { Field, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-import { userQuery } from "./queries";
+import { userQuery } from "./signIns";
 
 const viewStyles = stylex.create({
   row: {

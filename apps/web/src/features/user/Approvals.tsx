@@ -15,7 +15,7 @@ import { Button } from "#/ui/Button.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { SettingsPage as Page } from "#/ui/settings.tsx";
 
-import { approvalsQuery } from "./queries";
+import { approvalsQuery } from "./signIns";
 
 const viewStyles = stylex.create({
   row: {

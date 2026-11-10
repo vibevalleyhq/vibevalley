@@ -11,7 +11,7 @@ import { Field, TextInput } from "#/ui/Field.tsx";
 import { deviceGuess } from "./device";
 import { afterSignIn } from "./entry";
 import { signIn as signInWith } from "./login";
-import { userQuery } from "./queries";
+import { userQuery } from "./signIns";
 
 const viewStyles = stylex.create({
   main: {

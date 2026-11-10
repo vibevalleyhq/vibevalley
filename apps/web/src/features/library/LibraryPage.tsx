@@ -26,7 +26,7 @@ import { toast } from "#/ui/toasts.ts";
 
 import { Inspector } from "./Inspector.tsx";
 import { between, countsOf, justify, type KindFilter, kindOf, making, type Names, neighbor, shown, understoodText, type Where } from "./items.ts";
-import { libraryQuery } from "./queries.ts";
+import { libraryQuery } from "./listing.ts";
 import { Rail } from "./Rail.tsx";
 import { knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles, useWidth } from "./Tiles.tsx";
 
