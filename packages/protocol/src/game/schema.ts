@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
+import { Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
 import * as T from "../shapes";
 
@@ -47,11 +48,6 @@ const playFields = {
 export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayAction)) });
 
 export const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayActionView)) });
-
-export const Repo: Codec<T.Repo> = Schema.Struct({
-  path: Schema.String,
-  commits: Schema.Finite,
-});
 
 export const CommitCount: Codec<T.CommitCount> = Schema.Struct({
   total: Schema.Finite,

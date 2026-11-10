@@ -1,30 +1,6 @@
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
-import type { Commit, UncommittedItem } from "../repo/shapes";
+import type { Conflict } from "../repo/shapes";
 import type { IssueAnswer, PhaseResting, Run, Session, SessionEvent } from "../session/shapes";
-
-export interface Conflict {
-  base: string;
-  files: string[];
-}
-
-export interface Changes {
-  repo: string;
-  base: string;
-  branch?: string;
-  commits: Commit[];
-  files: ChangedFile[];
-  uncommitted: UncommittedItem[];
-  conflicts: string[];
-  behind: number;
-}
-
-export interface ChangedFile {
-  path: string;
-  status: string;
-  added: number;
-  removed: number;
-  patch?: string;
-}
 
 /** Responsibility for an issue, retained across execution contexts and ended only by reassignment or unassignment. */
 export interface Assignment {

@@ -2,15 +2,11 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
-import { Commit, UncommittedItem } from "../repo/schema";
+import { Conflict } from "../repo/schema";
 import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
 import * as T from "../shapes";
 import { IssueReportMemoryScopeValues } from "./shapes";
 
-export const Conflict: Codec<T.Conflict> = Schema.Struct({
-  base: Schema.String,
-  files: Schema.mutable(Schema.Array(Schema.String)),
-});
 export const Delivery: Codec<T.Delivery> = Schema.Literals(T.DeliveryValues);
 export const IssueCanceled: Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanceledValues);
 
@@ -184,25 +180,6 @@ export const IssueUpdate: Codec<T.IssueUpdate> = Schema.Struct({
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   deliver: Schema.optionalKey(Deliverable),
   before: Schema.optionalKey(Schema.String),
-});
-
-export const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
-  path: Schema.String,
-  status: Schema.String,
-  added: Schema.Finite,
-  removed: Schema.Finite,
-  patch: Schema.optionalKey(Schema.String),
-});
-
-export const Changes: Codec<T.Changes> = Schema.Struct({
-  repo: Schema.String,
-  base: Schema.String,
-  branch: Schema.optionalKey(Schema.String),
-  commits: Schema.mutable(Schema.Array(Commit)),
-  files: Schema.mutable(Schema.Array(ChangedFile)),
-  uncommitted: Schema.mutable(Schema.Array(UncommittedItem)),
-  conflicts: Schema.mutable(Schema.Array(Schema.String)),
-  behind: Schema.Finite,
 });
 
 export const IssueHistory: Codec<T.IssueHistory> = Schema.Struct({

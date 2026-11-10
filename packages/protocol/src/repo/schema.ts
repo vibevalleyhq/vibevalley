@@ -134,3 +134,28 @@ export const BranchPublication: Codec<T.BranchPublication> = Schema.Struct({
   reused: Schema.optionalKey(Schema.Boolean),
   state: Schema.optionalKey(Schema.Literals(["open"])),
 });
+export const Repo: Codec<T.Repo> = Schema.Struct({
+  path: Schema.String,
+  commits: Schema.Finite,
+});
+export const Conflict: Codec<T.Conflict> = Schema.Struct({
+  base: Schema.String,
+  files: Schema.mutable(Schema.Array(Schema.String)),
+});
+export const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
+  path: Schema.String,
+  status: Schema.String,
+  added: Schema.Finite,
+  removed: Schema.Finite,
+  patch: Schema.optionalKey(Schema.String),
+});
+export const Changes: Codec<T.Changes> = Schema.Struct({
+  repo: Schema.String,
+  base: Schema.String,
+  branch: Schema.optionalKey(Schema.String),
+  commits: Schema.mutable(Schema.Array(Commit)),
+  files: Schema.mutable(Schema.Array(ChangedFile)),
+  uncommitted: Schema.mutable(Schema.Array(UncommittedItem)),
+  conflicts: Schema.mutable(Schema.Array(Schema.String)),
+  behind: Schema.Finite,
+});

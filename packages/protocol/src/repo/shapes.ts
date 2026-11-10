@@ -137,3 +137,33 @@ export interface BranchPublication {
   readonly reused?: boolean;
   readonly state?: "open";
 }
+
+/** A repo the farm works in, and how many commits helpers made in it. */
+export interface Repo {
+  path: string;
+  commits: number;
+}
+
+export interface Conflict {
+  base: string;
+  files: string[];
+}
+
+export interface ChangedFile {
+  path: string;
+  status: string;
+  added: number;
+  removed: number;
+  patch?: string;
+}
+
+export interface Changes {
+  repo: string;
+  base: string;
+  branch?: string;
+  commits: Commit[];
+  files: ChangedFile[];
+  uncommitted: UncommittedItem[];
+  conflicts: string[];
+  behind: number;
+}
