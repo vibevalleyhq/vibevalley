@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { LibraryItem, MediaJob } from "@vibevalley/protocol";
 
-import { kindOf, making, originLine, shown, understoodText } from "./items.ts";
+import { between, countsOf, durationText, extOf, justify, kindOf, making, neighbor, originLine, shown, understoodText, whereKey } from "./items.ts";
 
 const item = (id: string, type: string, origin: LibraryItem["origin"]): LibraryItem => ({
   attachment: { id, name: `${id}.bin`, type, size: 1 },
@@ -14,18 +14,91 @@ const item = (id: string, type: string, origin: LibraryItem["origin"]): LibraryI
 const picture = item("a", "image/png", { kind: "generated", job: "j1", jobKind: "image" });
 const song = item("b", "audio/mpeg", { kind: "uploaded" });
 const page = item("c", "text/html", { kind: "fetched", agent: "lab", from: { url: "https://example.com/a.html" } });
+const said = item("d", "image/jpeg", { kind: "uploaded", channel: "c1", message: "m1" });
 const names = { agent: (id: string) => (id === "lab" ? "实验员" : id), channel: (id: string) => (id === "c1" ? "#general" : id) };
 
 test("a file's kind is read off its media type", () => {
   expect(Arr.map(["image/webp", "audio/wav", "video/mp4", "application/pdf"], kindOf)).toEqual(["image", "audio", "video", "other"]);
 });
 
-test("the filters let through what both name", () => {
+test("the rail lets through what both its groups name", () => {
   const all = [picture, song, page];
-  expect(shown({ items: all, origin: "all", kind: "all" })).toEqual(all);
-  expect(shown({ items: all, origin: "uploaded", kind: "all" })).toEqual([song]);
-  expect(shown({ items: all, origin: "all", kind: "other" })).toEqual([page]);
-  expect(shown({ items: all, origin: "generated", kind: "audio" })).toEqual([]);
+  expect(shown({ items: all, where: { by: "all" }, kind: "all" })).toEqual(all);
+  expect(shown({ items: all, where: { by: "origin", origin: "uploaded" }, kind: "all" })).toEqual([song]);
+  expect(shown({ items: all, where: { by: "all" }, kind: "other" })).toEqual([page]);
+  expect(shown({ items: all, where: { by: "origin", origin: "generated" }, kind: "audio" })).toEqual([]);
+  expect(shown({ items: all, where: { by: "agent", agent: "lab" }, kind: "all" })).toEqual([page]);
+  expect(shown({ items: [...all, said], where: { by: "channel", channel: "c1" }, kind: "all" })).toEqual([said]);
+  expect(whereKey({ by: "channel", channel: "c1" })).toBe("channel:c1");
+});
+
+test("each group of the rail is counted with the other group's choice applied", () => {
+  const counts = countsOf({ items: [picture, song, page, said], where: { by: "origin", origin: "uploaded" }, kind: "image" });
+  // Over the images: one generated, one said in c1.
+  expect(counts.where).toEqual(
+    new Map([
+      ["all", 2],
+      ["generated", 1],
+      ["channel:c1", 1],
+      ["uploaded", 1],
+    ]),
+  );
+  // Over the uploads: a sound and a picture.
+  expect(counts.kind).toEqual(
+    new Map([
+      ["all", 2],
+      ["audio", 1],
+      ["image", 1],
+    ]),
+  );
+  expect([counts.channels, counts.agents]).toEqual([["c1"], ["lab"]]);
+});
+
+test("rows are justified to the width, the last one left at its height", () => {
+  const rows = justify({ ratios: [1, 2, 1, 1, 0.1], width: 400, height: 100, gap: 0 });
+  // 1+2+1 = 4 at 100 high is exactly 400 wide; the rest is the last row, a sliver kept to half as wide as high.
+  expect(Arr.map(rows, (r) => Arr.map(r, (p) => [p.index, p.width, p.height]))).toEqual([
+    [
+      [0, 100, 100],
+      [1, 200, 100],
+      [2, 100, 100],
+    ],
+    [
+      [3, 100, 100],
+      [4, 50, 100],
+    ],
+  ]);
+  const scaled = justify({ ratios: [1, 1, 1], width: 250, height: 100, gap: 10 });
+  // Three would be 320 wide: the row shrinks to (250 - 20) / 3 high and fills the width with its gaps.
+  expect(Arr.map(scaled[0] ?? [], (p) => Math.round(p.height))).toEqual([77, 77, 77]);
+  expect(Math.round((scaled[0]?.at(-1)?.x ?? 0) + (scaled[0]?.at(-1)?.width ?? 0))).toBe(250);
+  expect(justify({ ratios: [1], width: 0, height: 100, gap: 0 })).toEqual([]);
+});
+
+test("arrows step through the order, and up and down go to the nearest tile in the next row", () => {
+  const rows = justify({ ratios: [1, 2, 1, 1, 1], width: 400, height: 100, gap: 0 });
+  expect([neighbor({ rows, index: 0, key: "left" }), neighbor({ rows, index: 0, key: "right" }), neighbor({ rows, index: 4, key: "right" })]).toEqual([
+    undefined,
+    1,
+    undefined,
+  ]);
+  // Index 1 spans 100..300, its middle 200: below, tile 3 (0..100, middle 50) and 4 (100..200, middle 150): 4 is nearer.
+  expect([neighbor({ rows, index: 1, key: "down" }), neighbor({ rows, index: 3, key: "up" }), neighbor({ rows, index: 0, key: "up" })]).toEqual([
+    4,
+    0,
+    undefined,
+  ]);
+});
+
+test("a shift-click takes everything between, either way round", () => {
+  expect(between({ ids: ["a", "b", "c", "d"], from: "b", to: "d" })).toEqual(["b", "c", "d"]);
+  expect(between({ ids: ["a", "b", "c", "d"], from: "c", to: "a" })).toEqual(["a", "b", "c"]);
+  expect(between({ ids: ["a", "b"], from: "gone", to: "b" })).toEqual(["b"]);
+});
+
+test("a file without a picture shows its extension and a sound its length", () => {
+  expect([extOf("notes.txt"), extOf("archive.tar.gz"), extOf("README"), extOf(".env")]).toEqual(["TXT", "GZ", "", ""]);
+  expect([durationText(0), durationText(65.4), durationText(3725)]).toEqual(["0:00", "1:05", "1:02:05"]);
 });
 
 test("the origin line says who and from where", () => {
@@ -43,7 +116,7 @@ test("jobs still making a file come first; understanding makes none", () => {
   expect(making(jobs)).toEqual([jobs[0]]);
 });
 
-test("a card shows the newest understanding of its file", () => {
+test("the inspector shows the newest understanding of its file", () => {
   const understood = (text: string, hash: string, updatedAt: number) =>
     job({ kind: "understanding", phase: "ready", updatedAt, inputs: [{ hash }], result: { text } } as unknown as Partial<MediaJob> &
       Pick<MediaJob, "kind" | "phase">);

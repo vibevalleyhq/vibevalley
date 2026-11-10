@@ -175,6 +175,7 @@ export const params = {
     name: "放进去叫什么名字；不填用文件自己的名字",
     origin: "只列哪一种来路：generated 生成的、uploaded 用户上传的、fetched 帮工和助手拿回来的；不填列全部",
     type: "只列哪一类文件：image、audio、video、other；不填列全部",
+    text: "只列名字里带这几个字的，不分大小写；不填不筛",
   },
   issueOrAgent,
   issueNumber,

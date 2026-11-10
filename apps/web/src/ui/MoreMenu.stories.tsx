@@ -49,5 +49,20 @@ export default stories({
         </div>
       ),
     }),
+    "One choice of a kind, under its own icon": story({
+      note: "发到哪个频道：触发的图标说是哪一类选择，不是 ⋯。",
+      render: () => (
+        <div {...stylex.attrs(viewStyles.moreMenuStoriesDiv)}>
+          <MoreMenu
+            label="发到频道"
+            icon="send"
+            items={[
+              { key: "general", label: "#general", icon: "chat", onSelect: noop },
+              { key: "design", label: "#设计", icon: "chat", onSelect: noop },
+            ]}
+          />
+        </div>
+      ),
+    }),
   },
 });

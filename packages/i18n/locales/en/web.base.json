@@ -188,6 +188,7 @@
       "lists": "Menus and lists",
       "issues": "Issues",
       "pictures": "Pictures",
+      "library": "Library",
       "farm": "Farm",
       "desktop": "Desktop app (system-wide)"
     },
@@ -209,7 +210,10 @@
       "debug": "Debug console",
       "voice": "Talk to the assistant (changeable in settings)",
       "command": "Commands: a ticket, remember, stop, a direct message",
-      "newIssue": "New issue"
+      "newIssue": "New issue",
+      "libraryMove": "Move between files",
+      "libraryLook": "See the picture full screen",
+      "libraryRemove": "Remove the selected from the library"
     }
   },
   "rich": {

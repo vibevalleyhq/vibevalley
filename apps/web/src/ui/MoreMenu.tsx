@@ -81,6 +81,8 @@ export interface MoreItem {
 /** ⋯: the actions a place has that are not its main one, in base-ui's Menu, drawn like every workbench menu. */
 export function MoreMenu(props: {
   label: string;
+  /** The trigger's picture: ⋯ unless the menu is one choice of a kind (send to which channel). */
+  icon?: IconName;
   items: readonly MoreItem[];
   testid?: string;
   /** The trigger's data-key, where its testid names a kind of button (a message's tools). */
@@ -100,7 +102,7 @@ export function MoreMenu(props: {
         title={props.label}
         class={stylex.attrs(styles.trigger).class}
       >
-        <Icon name="more" size={16} />
+        <Icon name={props.icon ?? "more"} size={16} />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner {...positionerAttrs()} side={props.side ?? "bottom"} align="end">

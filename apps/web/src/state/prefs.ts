@@ -26,11 +26,22 @@ const PrefsSchema = Schema.Struct({
   start: orFallback(Schema.Literals(StartValues), "workbench"),
   /** A pane's width the user dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
   widths: orFallback(Schema.Record(Schema.String, Schema.Finite), {}),
+  /** The library's thumbnail row height, in px (features/library). */
+  libraryTile: orFallback(Schema.Finite, 160),
 });
 
 type Prefs = typeof PrefsSchema.Type;
 
-const prefs = defineStored("prefs", PrefsSchema, { pick: "auto", repo: "", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} });
+const prefs = defineStored("prefs", PrefsSchema, {
+  pick: "auto",
+  repo: "",
+  pet: "dog",
+  theme: "system",
+  scale: 100,
+  start: "workbench",
+  widths: {},
+  libraryTile: 160,
+});
 
 /** The choices now; read in a computation or a component, it follows them. */
 export const prefsNow = prefs.get;
@@ -44,6 +55,7 @@ export const setPet = (pet: string) => set({ pet });
 export const setTheme = (theme: ThemeChoice) => set({ theme });
 export const setScale = (scale: Scale) => set({ scale });
 export const setStart = (start: Start) => set({ start });
+export const setLibraryTile = (libraryTile: number) => set({ libraryTile });
 /** A pane's width; none puts it back to its default. */
 export const setWidth = (pane: string, width: number | undefined) =>
   prefs.update((p) => {

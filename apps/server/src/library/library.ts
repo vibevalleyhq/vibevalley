@@ -196,7 +196,9 @@ const make = Effect.gen(function* () {
 
   return Library.of({
     list: Effect.fn("Library.list")(function* (req) {
-      const rows = yield* db.run(q.libraryItems({ kind: req.origin ?? "", top: req.type ?? "", n: listMax }));
+      const rows = yield* db.run(
+        q.libraryItems({ kind: req.origin ?? "", top: req.type ?? "", text: Str.trim(req.text ?? ""), sort: req.sort ?? "recent", n: listMax }),
+      );
       return Arr.map(rows, itemOf);
     }),
     add,

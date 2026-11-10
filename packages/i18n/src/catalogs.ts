@@ -2220,7 +2220,16 @@ export const catalogs = {
       lightbox: { label: "看图", prev: "上一张", next: "下一张", original: "打开原图", close: "关上" },
       shortcuts: {
         title: "快捷键",
-        place: { everywhere: "到处", composer: "输入框", lists: "菜单和名单", issues: "工单", pictures: "看图", farm: "农场", desktop: "桌面版（系统全局）" },
+        place: {
+          everywhere: "到处",
+          composer: "输入框",
+          lists: "菜单和名单",
+          issues: "工单",
+          pictures: "看图",
+          library: "素材库",
+          farm: "农场",
+          desktop: "桌面版（系统全局）",
+        },
         say: {
           switcher: "跳到频道、串、私聊",
           sheet: "打开这张表",
@@ -2240,6 +2249,9 @@ export const catalogs = {
           voice: "跟助手说话（在设置里能换）",
           command: "命令：记工单、让助手记住、叫停、私聊",
           newIssue: "新工单",
+          libraryMove: "在素材之间挪",
+          libraryLook: "全屏看选中的图",
+          libraryRemove: "从库里拿掉选中的",
         },
       },
       rich: {
@@ -3485,13 +3497,18 @@ export const catalogs = {
       uploading: "正在上传…",
       make: "生成",
       makeTitle: "生成",
-      configure: "配置 AI 连接",
-      empty: "还没有素材。生成一张图或一段语音、上传一个文件，或者在聊天里让帮工把找到的东西放进来，都会出现在这里。",
+      empty: "还没有素材",
+      emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在聊天里让帮工把找到的东西放进来。",
       nothingShown: "没有符合筛选的素材。",
-      originLabel: "来路",
-      kindLabel: "种类",
+      drop: "松开，放进素材库",
+      rail: { label: "筛选", where: "来路", kind: "种类", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
       origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
-      kind: { all: "全部", image: "图", audio: "音频", video: "视频", other: "其它" },
+      kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
+      search: "搜索名字",
+      sortLabel: "排序",
+      sort: { recent: "最近", name: "名字", size: "大小" },
+      tileSize: "缩略图大小",
+      grid: "素材",
       job: {
         image: "生图",
         speech: "单人语音",
@@ -3508,12 +3525,27 @@ export const catalogs = {
         fetchedUrl: "{agent} 从 {url} 拿回来的",
         fetchedPath: "{agent} 从工作目录的 {path} 拿回来的",
       },
+      inspector: {
+        label: "详情",
+        kind: "种类",
+        pixels: "尺寸",
+        bytes: "大小",
+        length: "时长",
+        from: "来路",
+        added: "加入",
+        openChannel: "去 {channel} 看",
+        selected: "已选 {n} 个",
+        clear: "不选了",
+        more: "更多",
+      },
       download: "下载",
       sendTo: "发到频道",
-      send: "发送",
-      sent: "已发送",
+      sentTo: "发到了 {channel}",
       remove: "从库里拿掉",
       removeAsk: "从素材库拿掉「{name}」？聊天里发过的照样能打开。",
+      removeSome: "从素材库拿掉这 {n} 个？聊天里发过的照样能打开。",
+      removeSure: "拿掉",
+      keep: "算了",
       understand: "理解",
       understandTitle: "理解「{name}」",
       understood: "理解的结果",
@@ -6975,6 +7007,7 @@ export const catalogs = {
           lists: "Menus and lists",
           issues: "Issues",
           pictures: "Pictures",
+          library: "Library",
           farm: "Farm",
           desktop: "Desktop app (system-wide)",
         },
@@ -6997,6 +7030,9 @@ export const catalogs = {
           voice: "Talk to the assistant (changeable in settings)",
           command: "Commands: a ticket, remember, stop, a direct message",
           newIssue: "New issue",
+          libraryMove: "Move between files",
+          libraryLook: "See the picture full screen",
+          libraryRemove: "Remove the selected from the library",
         },
       },
       rich: {
@@ -8319,13 +8355,18 @@ export const catalogs = {
       uploading: "Uploading…",
       make: "Generate",
       makeTitle: "Generate",
-      configure: "Set up AI connections",
-      empty: "Nothing here yet. Generate an image or speech, upload a file, or ask a helper in the chat to put what it found here.",
+      empty: "Nothing here yet",
+      emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
       nothingShown: "Nothing matches these filters.",
-      originLabel: "From",
-      kindLabel: "Kind",
+      drop: "Let go to put it in the library",
+      rail: { label: "Filters", where: "From", kind: "Kind", channels: "From channels", agents: "From helpers", anyWhere: "Any origin", anyKind: "Any kind" },
       origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
+      search: "Search names",
+      sortLabel: "Sort",
+      sort: { recent: "Recent", name: "Name", size: "Size" },
+      tileSize: "Thumbnail size",
+      grid: "Files",
       job: {
         image: "image",
         speech: "speech",
@@ -8342,12 +8383,27 @@ export const catalogs = {
         fetchedUrl: "{agent} brought it back from {url}",
         fetchedPath: "{agent} brought it back from {path} in its working directory",
       },
+      inspector: {
+        label: "Details",
+        kind: "Kind",
+        pixels: "Size",
+        bytes: "File size",
+        length: "Length",
+        from: "From",
+        added: "Added",
+        openChannel: "See it in {channel}",
+        selected: "{n} selected",
+        clear: "Clear selection",
+        more: "More",
+      },
       download: "Download",
       sendTo: "Send to a channel",
-      send: "Send",
-      sent: "Sent",
+      sentTo: "Sent to {channel}",
       remove: "Remove from library",
       removeAsk: "Remove “{name}” from the library? Messages that have it still open it.",
+      removeSome: "Remove these {n} from the library? Messages that have them still open them.",
+      removeSure: "Remove",
+      keep: "Keep",
       understand: "Understand",
       understandTitle: "Understand “{name}”",
       understood: "What it shows",
@@ -11625,6 +11681,7 @@ export interface Messages {
   "web.base.shortcuts.place.everywhere": undefined;
   "web.base.shortcuts.place.farm": undefined;
   "web.base.shortcuts.place.issues": undefined;
+  "web.base.shortcuts.place.library": undefined;
   "web.base.shortcuts.place.lists": undefined;
   "web.base.shortcuts.place.pictures": undefined;
   "web.base.shortcuts.say.close": undefined;
@@ -11634,6 +11691,9 @@ export interface Messages {
   "web.base.shortcuts.say.editLast": undefined;
   "web.base.shortcuts.say.farmMenu": undefined;
   "web.base.shortcuts.say.flip": undefined;
+  "web.base.shortcuts.say.libraryLook": undefined;
+  "web.base.shortcuts.say.libraryMove": undefined;
+  "web.base.shortcuts.say.libraryRemove": undefined;
   "web.base.shortcuts.say.mention": undefined;
   "web.base.shortcuts.say.move": undefined;
   "web.base.shortcuts.say.names": undefined;
@@ -12956,15 +13016,28 @@ export interface Messages {
   "web.lan.pair.nameHint": undefined;
   "web.lan.pair.title": undefined;
   "web.lan.pair.waiting": undefined;
-  "web.library.configure": undefined;
   "web.library.download": undefined;
+  "web.library.drop": undefined;
   "web.library.empty": undefined;
+  "web.library.emptyHow": undefined;
   "web.library.from.fetchedPath": { readonly agent: string | number; readonly path: string | number };
   "web.library.from.fetchedUrl": { readonly agent: string | number; readonly url: string | number };
   "web.library.from.generated": { readonly job: string | number };
   "web.library.from.uploadedHere": undefined;
   "web.library.from.uploadedIn": { readonly channel: string | number };
+  "web.library.grid": undefined;
   "web.library.hint": undefined;
+  "web.library.inspector.added": undefined;
+  "web.library.inspector.bytes": undefined;
+  "web.library.inspector.clear": undefined;
+  "web.library.inspector.from": undefined;
+  "web.library.inspector.kind": undefined;
+  "web.library.inspector.label": undefined;
+  "web.library.inspector.length": undefined;
+  "web.library.inspector.more": undefined;
+  "web.library.inspector.openChannel": { readonly channel: string | number };
+  "web.library.inspector.pixels": undefined;
+  "web.library.inspector.selected": { readonly n: string | number };
   "web.library.job.clone": undefined;
   "web.library.job.image": undefined;
   "web.library.job.speakers": undefined;
@@ -12972,12 +13045,12 @@ export interface Messages {
   "web.library.job.transcription": undefined;
   "web.library.job.understanding": undefined;
   "web.library.job.voiceDesign": undefined;
+  "web.library.keep": undefined;
   "web.library.kind.all": undefined;
   "web.library.kind.audio": undefined;
   "web.library.kind.image": undefined;
   "web.library.kind.other": undefined;
   "web.library.kind.video": undefined;
-  "web.library.kindLabel": undefined;
   "web.library.make": undefined;
   "web.library.makeTabs.audio": undefined;
   "web.library.makeTabs.image": undefined;
@@ -12988,12 +13061,25 @@ export interface Messages {
   "web.library.origin.fetched": undefined;
   "web.library.origin.generated": undefined;
   "web.library.origin.uploaded": undefined;
-  "web.library.originLabel": undefined;
+  "web.library.rail.agents": undefined;
+  "web.library.rail.anyKind": undefined;
+  "web.library.rail.anyWhere": undefined;
+  "web.library.rail.channels": undefined;
+  "web.library.rail.kind": undefined;
+  "web.library.rail.label": undefined;
+  "web.library.rail.where": undefined;
   "web.library.remove": undefined;
   "web.library.removeAsk": { readonly name: string | number };
-  "web.library.send": undefined;
+  "web.library.removeSome": { readonly n: string | number };
+  "web.library.removeSure": undefined;
+  "web.library.search": undefined;
   "web.library.sendTo": undefined;
-  "web.library.sent": undefined;
+  "web.library.sentTo": { readonly channel: string | number };
+  "web.library.sort.name": undefined;
+  "web.library.sort.recent": undefined;
+  "web.library.sort.size": undefined;
+  "web.library.sortLabel": undefined;
+  "web.library.tileSize": undefined;
   "web.library.title": undefined;
   "web.library.understand": undefined;
   "web.library.understandTitle": { readonly name: string | number };

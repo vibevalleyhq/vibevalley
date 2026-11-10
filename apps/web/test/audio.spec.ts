@@ -153,7 +153,8 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByTestId("audio-add-turn").click();
     const turn = page.getByTestId("audio-turn").nth(1);
     await turn.getByTestId("audio-turn-speaker").click();
-    await page.getByRole("option").nth(1).click();
+    // By its name: the library behind the dialog lists its files as options too.
+    await page.getByRole("option", { name: "guest", exact: true }).click();
     await turn.getByTestId("audio-turn-text").fill("Hello from the guest.");
     const created = page.waitForResponse((response) => response.url().endsWith("/api/v1/media/dialogue/create") && response.status() === 200);
     await page.getByTestId("audio-submit").click();

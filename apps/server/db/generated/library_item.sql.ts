@@ -9,6 +9,8 @@ import { Words_library_item_kind } from "./types.js"
 export const LibraryItemsParams = Schema.Struct({
   ["kind"]: Schema.String,
   ["top"]: Schema.String,
+  ["text"]: Schema.String,
+  ["sort"]: Schema.String,
   ["n"]: Schema.Int,
 })
 export type LibraryItemsParams = typeof LibraryItemsParams.Type
@@ -26,14 +28,14 @@ export const LibraryItemsResult = Schema.Struct({
 export type LibraryItemsResult = typeof LibraryItemsResult.Type
 
 
-export const LibraryItemsSql = "-- name: LibraryItems :many\n-- bound: at most n, the most recently arrived first; kind and top ('' for any) filter by origin and by media type.\nselect i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size\nfrom library_item i join attachment a on a.id = i.attachment_id\nwhere ($1::text = '' or i.kind::text = $1::text)\n  and ($2::text = ''\n    or ($2::text = 'other' and split_part(a.type, '/', 1) not in ('image', 'audio', 'video'))\n    or split_part(a.type, '/', 1) = $2::text)\norder by i.last_at desc, i.attachment_id\nlimit $3::int;"
+export const LibraryItemsSql = "-- name: LibraryItems :many\n-- bound: at most n; kind and top ('' for any) filter by origin and by media type, text by words in the name;\n-- sort is recent (the latest arrival first), name or size (the biggest first), then the latest arrival.\nselect i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size\nfrom library_item i join attachment a on a.id = i.attachment_id\nwhere ($1::text = '' or i.kind::text = $1::text)\n  and ($2::text = ''\n    or ($2::text = 'other' and split_part(a.type, '/', 1) not in ('image', 'audio', 'video'))\n    or split_part(a.type, '/', 1) = $2::text)\n  and ($3::text = '' or strpos(lower(a.name), lower($3::text)) > 0)\norder by\n  case when $4::text = 'name' then lower(a.name) end,\n  case when $4::text = 'size' then a.size end desc,\n  i.last_at desc, i.attachment_id\nlimit $5::int;"
 
 export const libraryItems = Effect.fn("LibraryItems")(function* (params: LibraryItemsParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
     Request: LibraryItemsParams,
     Result: LibraryItemsResult,
-    execute: (p) => sql.unsafe(LibraryItemsSql, [p["kind"], p["top"], p["n"]]),
+    execute: (p) => sql.unsafe(LibraryItemsSql, [p["kind"], p["top"], p["text"], p["sort"], p["n"]]),
   })(params)
 })
 

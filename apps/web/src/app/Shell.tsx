@@ -428,7 +428,8 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <main {...stylex.attrs(variantStyles.shellMain)}>
-        <Show when={!inFarm() && here()?.id !== "chat"}>
+        {/* The chat and the library draw their own one bar at the top: the place's name would be a second. */}
+        <Show when={!inFarm() && here()?.id !== "chat" && here()?.id !== "library"}>
           <Desk place={here()} />
         </Show>
         <div {...stylex.attrs(viewStyles.shellDiv)}>{props.children}</div>

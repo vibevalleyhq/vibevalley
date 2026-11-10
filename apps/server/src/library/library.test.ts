@@ -60,6 +60,13 @@ layer(world(), { buildPerTest: true, excludeTestServices: true })("the library",
       const images = yield* library.list({ type: "image" });
       const others = yield* library.list({ type: "other" });
       expect([images.length, others.length]).toEqual([1, 1]);
+      // Words in the name, any case; by name and by size the other way round from the arrivals.
+      const named = yield* library.list({ text: "CAT" });
+      const byName = yield* library.list({ sort: "name" });
+      const bySize = yield* library.list({ sort: "size" });
+      expect(Arr.map(named, (i) => i.attachment.id)).toEqual([made.id]);
+      expect(Arr.map(byName, (i) => i.attachment.name)).toEqual(["cat.png", "note.txt"]);
+      expect(Arr.map(bySize, (i) => i.attachment.id)).toEqual(made.size >= said.size ? [made.id, said.id] : [said.id, made.id]);
     }),
   );
 

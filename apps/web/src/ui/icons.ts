@@ -5,6 +5,14 @@ import {
   Calendar,
   Link,
   Download,
+  Download2,
+  EyeScan,
+  Image,
+  MagicStar,
+  MusicNote,
+  Sort,
+  Upload,
+  Video,
   AngleDown,
   Check,
   Minus,
@@ -109,6 +117,12 @@ export const icons = {
   stop: Stop,
   send: Send,
   attach: Paperclip,
+  download: Download2,
+  upload: Upload,
+  sort: Sort,
+  // Making a file with a model, and having a model look at one.
+  generate: MagicStar,
+  understand: EyeScan,
   // Starting a name or a command in the box.
   mention: AtSign,
   command: SlashSquare,
@@ -136,6 +150,10 @@ export const icons = {
   // Things and states.
   folder: Folder,
   file: File,
+  // A file by what it holds.
+  image: Image,
+  audio: MusicNote,
+  video: Video,
   clock: ClockCircle,
   calendar: Calendar,
   inbox: Inbox,

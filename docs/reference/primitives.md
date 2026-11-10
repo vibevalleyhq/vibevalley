@@ -369,6 +369,7 @@
 | `setTheme` | `prefs.ts` |  |
 | `setScale` | `prefs.ts` |  |
 | `setStart` | `prefs.ts` |  |
+| `setLibraryTile` | `prefs.ts` |  |
 | `setWidth` | `prefs.ts` | A pane's width; none puts it back to its default. |
 | `rememberPick` | `prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
 | `usePrefs` | `prefs.ts` | One of the choices, following it. |

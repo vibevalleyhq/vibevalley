@@ -23,9 +23,16 @@ export interface LibraryItem {
   lastAt: number;
 }
 
+export const LibrarySortValues = ["recent", "name", "size"] as const;
+/** recent: the most recently arrived first; name: by name; size: the biggest first. */
+export type LibrarySort = (typeof LibrarySortValues)[number];
+
 export interface LibraryListRequest {
   origin?: LibraryOriginKind;
   type?: LibraryFileKind;
+  /** Words the file's name holds, any case. */
+  text?: string;
+  sort?: LibrarySort;
 }
 
 /** Exactly one of: an attachment already kept (the user's upload), a public https address, or a file in the caller's working directory. */

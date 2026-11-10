@@ -39,6 +39,7 @@ export const agentOnly: Partial<Record<Op, readonly string[]>> = {
 const libraryList = Schema.Struct({
   origin: Schema.optionalKey(Schema.Literals(LibraryOriginKindValues).annotate({ description: params.library.origin })),
   type: Schema.optionalKey(Schema.Literals(LibraryFileKindValues).annotate({ description: params.library.type })),
+  text: Schema.optionalKey(Schema.String.annotate({ description: params.library.text })),
 });
 const libraryName = Schema.optionalKey(Schema.String.annotate({ description: params.library.name }));
 

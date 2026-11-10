@@ -1,7 +1,7 @@
 /** Where a shortcut works, as the sheet groups them. */
-type ShortcutPlace = "everywhere" | "composer" | "lists" | "issues" | "pictures" | "farm" | "desktop";
+type ShortcutPlace = "everywhere" | "composer" | "lists" | "issues" | "pictures" | "library" | "farm" | "desktop";
 
-export const shortcutPlaces: readonly ShortcutPlace[] = ["everywhere", "composer", "lists", "issues", "pictures", "farm", "desktop"];
+export const shortcutPlaces: readonly ShortcutPlace[] = ["everywhere", "composer", "lists", "issues", "pictures", "library", "farm", "desktop"];
 
 /** A key as the sheet shows it: mod is ⌘ on a Mac and Ctrl elsewhere. */
 export type Key = "mod" | "shift" | "alt" | "enter" | "esc" | "up" | "down" | "left" | "right" | "space" | "tab" | (string & {});
@@ -27,6 +27,9 @@ export const shortcuts = [
   { id: "pick", place: "lists", keys: ["enter"] },
   { id: "newIssue", place: "issues", keys: ["C"] },
   { id: "flip", place: "pictures", keys: ["left", "right"] },
+  { id: "libraryMove", place: "library", keys: ["left", "right", "up", "down"] },
+  { id: "libraryLook", place: "library", keys: ["space"] },
+  { id: "libraryRemove", place: "library", keys: ["Delete"] },
   { id: "tool", place: "farm", keys: ["1…6"] },
   { id: "names", place: "farm", keys: ["alt"] },
   { id: "farmMenu", place: "farm", keys: ["esc"] },

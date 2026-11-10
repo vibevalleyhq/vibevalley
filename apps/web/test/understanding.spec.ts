@@ -12,7 +12,9 @@ for (const kind of ["image", "video"] as const) {
     const before = new Set((await api.media.job.list()).map((job) => job.id));
     const file = await libraryUnderstandingFile({ api, kind });
     await page.goto("/library");
-    await page.locator(`[data-testid="library-item"][data-key="${file.id}"]`).getByTestId("library-understand").click();
+    // Picked, the file shows in the inspector, which starts its understanding.
+    await page.locator(`[data-testid="library-item"][data-key="${file.id}"]`).click();
+    await page.getByTestId("library-inspector").getByTestId("library-understand").click();
     await expect(page.getByTestId("understanding-file")).toHaveText(file.name);
     await page.getByTestId("understanding-prompt").fill(`Describe the synthetic ${kind}.`);
     await expect(page.getByTestId("understanding-submit")).toBeDisabled();
@@ -52,7 +54,8 @@ for (const kind of ["image", "video"] as const) {
     await page.reload();
     await expect(card.getByTestId("understanding-result")).toHaveText(ready.result.text);
     await page.keyboard.press("Escape");
-    await expect(page.locator(`[data-testid="library-item"][data-key="${file.id}"]`).getByTestId("library-understood")).toHaveText(ready.result.text);
+    await page.locator(`[data-testid="library-item"][data-key="${file.id}"]`).click();
+    await expect(page.getByTestId("library-inspector").getByTestId("library-understood")).toHaveText(ready.result.text);
   });
 }
 

@@ -29,6 +29,8 @@ export const LibraryItems = Schema.mutable(Schema.Array(LibraryItem));
 export const LibraryListRequest: Codec<T.LibraryListRequest> = Schema.Struct({
   origin: Schema.optionalKey(Schema.Literals(T.LibraryOriginKindValues)),
   type: Schema.optionalKey(Schema.Literals(T.LibraryFileKindValues)),
+  text: Schema.optionalKey(Schema.String),
+  sort: Schema.optionalKey(Schema.Literals(T.LibrarySortValues)),
 });
 
 export const LibraryAddRequest: Codec<T.LibraryAddRequest> = Schema.Struct({
