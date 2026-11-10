@@ -42,6 +42,7 @@ const make = () =>
           qa.addArtifact({
             id,
             title: title.trim() || t("server.artifact.untitled"),
+            display: null,
             body: "blocks",
             channel_id: null,
             issue: null,

@@ -142,7 +142,7 @@
     "apps/desktop": 4
   },
   "preferEffectString": {
-    "apps/server": 1097,
+    "apps/server": 1095,
     "apps/cli": 48,
     "packages/agent": 112,
     "packages/ai": 27,
@@ -179,7 +179,7 @@
     "packages/ai": 63,
     "packages/provider": 26,
     "packages/pkm": 59,
-    "packages/artifact": 60,
+    "packages/artifact": 59,
     "packages/protocol": 44,
     "packages/bridge": 2,
     "packages/testkit": 11,

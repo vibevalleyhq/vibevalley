@@ -10,6 +10,7 @@ export const AddArtifactParams = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
   ["body"]: Words_artifact_body,
+  ["display"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
@@ -20,13 +21,13 @@ export const AddArtifactParams = Schema.Struct({
 export type AddArtifactParams = typeof AddArtifactParams.Type
 
 
-export const AddArtifactSql = "-- name: AddArtifact :exec\ninsert into artifact (id, title, body, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, 0,\n        $9, $9);"
+export const AddArtifactSql = "-- name: AddArtifact :exec\ninsert into artifact (id, title, body, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0,\n        $10, $10);"
 
 export const addArtifact = Effect.fn("AddArtifact")(function* (params: AddArtifactParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddArtifactParams,
-    execute: (p) => sql.unsafe(AddArtifactSql, [p["id"], p["title"], p["body"], p["channel_id"], p["issue"], p["by_id"], p["by_name"], p["version"], p["created_at"]]),
+    execute: (p) => sql.unsafe(AddArtifactSql, [p["id"], p["title"], p["body"], p["display"], p["channel_id"], p["issue"], p["by_id"], p["by_name"], p["version"], p["created_at"]]),
   })(params)
 })
 
@@ -40,6 +41,7 @@ export const ArtifactResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
   ["body"]: Words_artifact_body,
+  ["display"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -76,6 +78,7 @@ export const ArtifactsInChannelResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
   ["body"]: Words_artifact_body,
+  ["display"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -112,6 +115,7 @@ export const ArtifactsForIssueResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
   ["body"]: Words_artifact_body,
+  ["display"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -148,6 +152,7 @@ export const ArtifactsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
   ["body"]: Words_artifact_body,
+  ["display"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -242,6 +247,24 @@ export const artifactRenamed = Effect.fn("ArtifactRenamed")(function* (params: A
   return yield* SqlSchema.void({
     Request: ArtifactRenamedParams,
     execute: (p) => sql.unsafe(ArtifactRenamedSql, [p["title"], p["updated_at"], p["id"]]),
+  })(params)
+})
+
+export const ArtifactShownParams = Schema.Struct({
+  ["display"]: Schema.NullOr(Schema.String),
+  ["updated_at"]: Schema.Number,
+  ["id"]: Schema.String,
+})
+export type ArtifactShownParams = typeof ArtifactShownParams.Type
+
+
+export const ArtifactShownSql = "-- name: ArtifactShown :exec\nupdate artifact set display = $1, updated_at = $2 where id = $3 and body = 'html';"
+
+export const artifactShown = Effect.fn("ArtifactShown")(function* (params: ArtifactShownParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ArtifactShownParams,
+    execute: (p) => sql.unsafe(ArtifactShownSql, [p["display"], p["updated_at"], p["id"]]),
   })(params)
 })
 

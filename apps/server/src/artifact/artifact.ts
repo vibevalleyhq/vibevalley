@@ -2,7 +2,8 @@ import { Clock, Context, Effect, Layer, Semaphore, type Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { userId } from "@vibevalley/protocol";
+import { ArtifactDisplayValues, userId } from "@vibevalley/protocol";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Attachment } from "#/attachment/attachment.ts";
@@ -40,7 +41,8 @@ export class Artifact extends Context.Service<
     readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError>;
     /** The user's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
     readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError>;
-    readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
+    /** Its title, or how an html one is shown. */
+    readonly update: (req: T.ArtifactUpdateRequest) => Effect.Effect<T.Artifact, ApiError>;
     readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
     /** It and its versions or blocks go; the versions' attachments stay. */
     readonly remove: (id: T.ArtifactId) => Effect.Effect<void, ApiError>;
@@ -90,6 +92,7 @@ const make = () =>
         id: S.artifactId(row.id),
         title: row.title,
         body: row.body,
+        ...(row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {}),
         ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
         ...(row.said_channel !== null && row.said_number !== null ? { said: { channel: row.said_channel, number: row.said_number } } : {}),
         ...(row.issue !== null ? { issue: S.issueId(row.issue) } : {}),
@@ -133,7 +136,20 @@ const make = () =>
       const id = S.artifactId(newId());
       const now = yield* Clock.currentTimeMillis;
       const name = maker.by === userId ? t("server.channel.name.user") : maker.by;
-      yield* db.run(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
+      yield* db.run(
+        qa.addArtifact({
+          id,
+          title,
+          body: "blocks",
+          display: null,
+          channel_id: null,
+          issue: null,
+          by_id: maker.by,
+          by_name: name,
+          version: 0,
+          created_at: now,
+        }),
+      );
       const found2 = yield* found(id);
       return yield* assemble(found2);
     });
@@ -150,6 +166,8 @@ const make = () =>
       const problem = artifactProblem({ title: req.title, kind, size: bytes.length }) || (kind === "html" ? htmlProblem(htmlCheck(req.content)) : "");
       if (problem) return yield* Effect.fail(refused(problem));
       const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
+      if (body === "blocks" && req.display !== undefined) return yield* Effect.fail(refused(t("server.artifact.displayHtmlOnly")));
+      const display = body === "html" ? (req.display ?? "page") : null;
       const channel = yield* chat.placeOf(maker.from, req.channel ?? "");
       const file = body === "html" ? yield* keep(bytes, title) : "";
       const id = S.artifactId(newId());
@@ -166,7 +184,18 @@ const make = () =>
       });
       const now = yield* Clock.currentTimeMillis;
       yield* db.run(
-        qa.addArtifact({ id, title, body, channel_id: said.channel, issue: req.issue ?? null, by_id: maker.by, by_name: said.name, version, created_at: now }),
+        qa.addArtifact({
+          id,
+          title,
+          body,
+          display,
+          channel_id: said.channel,
+          issue: req.issue ?? null,
+          by_id: maker.by,
+          by_name: said.name,
+          version,
+          created_at: now,
+        }),
       );
       yield* db.run(qa.artifactSaid({ id, message_id: said.id }));
       if (body === "html") {
@@ -300,12 +329,17 @@ const make = () =>
         const note = t("server.artifact.edit.note", { old: head(req.anchor.exact.trim(), 40), new: head(req.text.trim(), 40) });
         return yield* version(maker, { id: req.id, content: edited.source, note });
       }, lock.withPermits(1)),
-      rename: Effect.fn("Artifact.rename")(function* (id, title) {
-        yield* found(id);
-        const problem = artifactProblem({ title });
-        if (problem) return yield* Effect.fail(refused(problem));
-        yield* db.run(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
-        const found2 = yield* found(id);
+      update: Effect.fn("Artifact.update")(function* (req) {
+        const row = yield* found(req.id);
+        if (req.title !== undefined) {
+          const problem = artifactProblem({ title: req.title });
+          if (problem) return yield* Effect.fail(refused(problem));
+        }
+        if (req.display !== undefined && row.body !== "html") return yield* Effect.fail(refused(t("server.artifact.displayHtmlOnly")));
+        const now = yield* Clock.currentTimeMillis;
+        if (req.title !== undefined) yield* db.run(qa.artifactRenamed({ id: req.id, title: req.title.trim(), updated_at: now }));
+        if (req.display !== undefined) yield* db.run(qa.artifactShown({ id: req.id, display: req.display, updated_at: now }));
+        const found2 = yield* found(req.id);
         return yield* assemble(found2);
       }, lock.withPermits(1)),
       previewRemove: Effect.fn("Artifact.previewRemove")(function* (id) {

@@ -22,7 +22,7 @@ export const artifactHandlers = Effect.gen(function* () {
       ),
     "artifact.version.create": (req) => artifacts.version({ from: userId, by: userId }, req),
     "artifact.html.edit": (req) => artifacts.htmlEdit({ from: userId, by: userId }, req),
-    "artifact.update": ({ id, title }) => artifacts.rename(id, title),
+    "artifact.update": (req) => artifacts.update(req),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
     "artifact.block.list": ({ id }) => artifacts.blocks(id),

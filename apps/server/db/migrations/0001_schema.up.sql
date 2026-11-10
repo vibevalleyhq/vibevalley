@@ -529,6 +529,8 @@ CREATE TABLE artifact (
   title       text not null,
   -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version).
   body        text not null check (body in ('blocks', 'html')),
+  -- html: how the workbench shows it (page, slides, motion); blocks: none.
+  display     text check ((body = 'html') = (display is not null) and (display is null or display in ('page', 'slides', 'motion'))),
   -- The channel or thread it was announced in, none for one the user started on the page; the issue it was made for, if any.
   channel_id  text references channel (id),
   -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).

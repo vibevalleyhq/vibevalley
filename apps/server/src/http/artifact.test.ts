@@ -42,7 +42,7 @@ describe("an artifact's content", () => {
       const shown = yield* get(`${artifactPath(html.id, 1)}?shell=1`);
       expect(shown.headers.get("content-security-policy")).toBe(htmlPolicy);
       const shownText = yield* Effect.promise(() => shown.text());
-      expect([shownText.startsWith("<p>第一版</p>\n<script>"), shownText.includes('vibevalley: "selection"')]).toEqual([true, true]);
+      expect(shownText).toMatch(/^<p>第一版<\/p>\n<style>[^]*vibevalley: "selection"[^]*\(\{ display: "page" \}\)/u);
       expect((yield* artifacts.content(html.id, 1)).content).toBe("<p>第一版</p>");
       const md = yield* artifacts.create(user, { title: "说明", kind: "markdown", content: "# 题\n\n<script>no</script>" });
       for (const path of [

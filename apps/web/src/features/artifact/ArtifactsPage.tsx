@@ -4,7 +4,6 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Artifact, type ArtifactVersion, artifactPath, userId, type SayRequest } from "@vibevalley/protocol";
-import { htmlSandbox } from "@vibevalley/protocol/rules";
 
 import { Keyed, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
@@ -28,8 +27,8 @@ import { toast } from "#/ui/toasts.ts";
 import { artifactHref, bodyIcon, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
+import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
-import { shellPath } from "./shell";
 
 const recipeStyles3 = stylex.create({
   artifactsPageA: {
@@ -897,14 +896,13 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
           >
             {(v) => (
               <>
-                <iframe
-                  ref={setFrame}
-                  data-testid="artifact-frame"
+                <HtmlFrame
+                  artifact={props.artifact}
+                  version={v().version}
                   title={t("web.artifact.page.frame", { title: props.artifact.title, version: v().version })}
-                  src={shellPath(props.artifact.id, v().version)}
-                  sandbox={htmlSandbox}
-                  referrerpolicy="no-referrer"
-                  {...stylex.attrs(viewStyles.artifactFrame)}
+                  testId="artifact-frame"
+                  frameStyle={viewStyles.artifactFrame}
+                  onFrame={setFrame}
                 />
                 {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}
                 <Show when={rail.get() && v().version === props.artifact.version}>

@@ -8,7 +8,7 @@ import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "#/artifact/artifact.ts";
 import { artifactHeaders } from "#/artifact/policy.ts";
-import { withShell } from "#/artifact/shell.ts";
+import { shellThemeOf, withShell } from "#/artifact/shell.ts";
 import { Attachment } from "#/attachment/attachment.ts";
 import { messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { wireOf } from "#/base/json.ts";
@@ -122,11 +122,15 @@ export const artifactContent = HttpRouter.add(
     const path = yield* artifacts.file(artifactId(id), Number(version));
     if (!path) return notFound();
     const contentType = artifactHeaders["content-type"] ?? "text/html; charset=utf-8";
-    if (new URL(request.url, "http://farm").searchParams.get("shell") !== "1")
-      return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
-    // The workbench's view: the page with the shell after it (artifact/shell.ts).
+    const asked = new URL(request.url, "http://farm").searchParams;
+    if (asked.get("shell") !== "1") return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
+    // The workbench's view: the page with the runtime after it, for how it is shown and in the workbench's theme (artifact/shell.ts).
     const page = yield* artifacts.content(artifactId(id), Number(version));
-    return HttpServerResponse.text(withShell(page.content), { contentType, headers: artifactHeaders });
+    const shown = yield* artifacts.get(artifactId(id));
+    return HttpServerResponse.text(withShell({ page: page.content, display: shown.display ?? "page", theme: shellThemeOf(asked.get("theme")) }), {
+      contentType,
+      headers: artifactHeaders,
+    });
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 

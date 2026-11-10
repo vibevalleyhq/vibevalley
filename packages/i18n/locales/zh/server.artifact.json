@@ -2,6 +2,7 @@
   "noTitle": "Artifact 要有个标题",
   "longTitle": "标题太长了，最多 {max} 个字",
   "badKind": "认不得 {kind} 这种 Artifact，只认 {kinds}",
+  "displayHtmlOnly": "只有网页 Artifact 能选怎么看（page、slides、motion）；一起写的没有这一项",
   "empty": "Artifact 是空的",
   "tooBig": "一稿最多 {mb} MB",
   "missing": "没有 {id} 这份 Artifact",

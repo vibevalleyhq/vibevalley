@@ -668,6 +668,7 @@ export const catalogs = {
       noTitle: "Artifact 要有个标题",
       longTitle: "标题太长了，最多 {max} 个字",
       badKind: "认不得 {kind} 这种 Artifact，只认 {kinds}",
+      displayHtmlOnly: "只有网页 Artifact 能选怎么看（page、slides、motion）；一起写的没有这一项",
       empty: "Artifact 是空的",
       tooBig: "一稿最多 {mb} MB",
       missing: "没有 {id} 这份 Artifact",
@@ -5377,6 +5378,7 @@ export const catalogs = {
       noTitle: "An artifact needs a title",
       longTitle: "The title is too long: at most {max} characters",
       badKind: "No artifact of kind {kind}: only {kinds}",
+      displayHtmlOnly: "Only an html artifact is shown as a page, slides or motion; one written together has no display",
       empty: "The artifact is empty",
       tooBig: "A version is at most {mb} MB",
       missing: "There is no artifact {id}",
@@ -10191,6 +10193,7 @@ export interface Messages {
   "server.artifact.demo.2.paragraphs.2": undefined;
   "server.artifact.demoNotInserted": { readonly status: string | number };
   "server.artifact.demoRunning": undefined;
+  "server.artifact.displayHtmlOnly": undefined;
   "server.artifact.edit.crosses": { readonly words: string | number };
   "server.artifact.edit.empty": undefined;
   "server.artifact.edit.many": { readonly n: string | number; readonly words: string | number };

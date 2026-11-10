@@ -8,6 +8,8 @@ export const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBod
 
 export const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
 
+export const ArtifactDisplay: Codec<T.ArtifactDisplay> = Schema.Literals(T.ArtifactDisplayValues);
+
 export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
   id: ArtifactId,
   title: Schema.String,
@@ -31,6 +33,7 @@ export const Artifact: Codec<T.Artifact> = Schema.Struct({
   id: ArtifactId,
   title: Schema.String,
   body: ArtifactBody,
+  display: Schema.optionalKey(ArtifactDisplay),
   channel: Schema.optionalKey(Schema.String),
   said: Schema.optionalKey(Schema.Struct({ channel: Schema.String, number: Schema.Finite })),
   issue: Schema.optionalKey(IssueId),
@@ -46,6 +49,7 @@ export const Artifact: Codec<T.Artifact> = Schema.Struct({
 export const ArtifactRequest: Codec<T.ArtifactRequest> = Schema.Struct({
   title: Schema.String,
   kind: ArtifactKind,
+  display: Schema.optionalKey(ArtifactDisplay),
   content: Schema.optionalKey(Schema.String),
   note: Schema.optionalKey(Schema.String),
   channel: Schema.optionalKey(Schema.String),
@@ -72,10 +76,35 @@ export const ArtifactHtmlEdit: Codec<T.ArtifactHtmlEdit> = Schema.Struct({
   text: Schema.String,
 });
 
-export const HtmlShellMessage: Codec<T.HtmlShellMessage> = Schema.Struct({
-  vibevalley: Schema.Literal("selection"),
-  anchor: HtmlAnchor,
+export const ArtifactUpdateRequest: Codec<T.ArtifactUpdateRequest> = Schema.Struct({
+  id: ArtifactId,
+  title: Schema.optionalKey(Schema.String),
+  display: Schema.optionalKey(ArtifactDisplay),
 });
+
+const shellCount = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 10_000 }));
+const shellTime = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 86_400 }));
+const shellWords = Schema.mutable(Schema.Array(Schema.String.check(Schema.isMaxLength(10_000))).check(Schema.isMaxLength(10_000)));
+
+export const HtmlShellMessage: Codec<T.HtmlShellMessage> = Schema.Union([
+  Schema.Struct({ vibevalley: Schema.Literal("selection"), anchor: HtmlAnchor }),
+  Schema.Struct({
+    vibevalley: Schema.Literal("ready"),
+    display: ArtifactDisplay,
+    pages: Schema.optionalKey(shellCount),
+    titles: Schema.optionalKey(shellWords),
+    notes: Schema.optionalKey(shellWords),
+    duration: Schema.optionalKey(shellTime),
+  }),
+  Schema.Struct({ vibevalley: Schema.Literal("at"), page: Schema.optionalKey(shellCount), time: Schema.optionalKey(shellTime) }),
+]);
+
+export const HtmlShellCommand: Codec<T.HtmlShellCommand> = Schema.Union([
+  Schema.Struct({ vibevalley: Schema.Literal("goto"), page: shellCount }),
+  Schema.Struct({ vibevalley: Schema.Literal("seek"), time: shellTime }),
+  Schema.Struct({ vibevalley: Schema.Literal("play") }),
+  Schema.Struct({ vibevalley: Schema.Literal("pause") }),
+]);
 
 export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
   channel: Schema.optionalKey(Schema.String),

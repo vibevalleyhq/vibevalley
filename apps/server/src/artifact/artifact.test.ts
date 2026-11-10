@@ -71,7 +71,7 @@ describe("an artifact", () => {
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
-  it.effect("started on the page with a title is empty, announced nowhere, and an html one has no blocks", () =>
+  it.effect("started on the page with a title is empty and announced nowhere; an html one has no blocks and is shown as a page unless asked", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;
@@ -83,9 +83,18 @@ describe("an artifact", () => {
       const html = yield* artifacts.create(user, { title: "页", kind: "html", content: page("页") });
       const blocksFailure = yield* Effect.flip(artifacts.blocks(html.id));
       expect(blocksFailure).toMatchObject({ _tag: "Refused" });
-      expect((yield* artifacts.rename(blank.id, "  第 43 周  ")).title).toBe("第 43 周");
-      const renamedFailure = yield* Effect.flip(artifacts.rename(blank.id, " "));
+      expect((yield* artifacts.update({ id: blank.id, title: "  第 43 周  " })).title).toBe("第 43 周");
+      const renamedFailure = yield* Effect.flip(artifacts.update({ id: blank.id, title: " " }));
       expect(renamedFailure).toMatchObject({ _tag: "Refused" });
+      const deck = yield* artifacts.create(user, { title: "周报", kind: "html", display: "slides", content: page("幻灯片") });
+      expect([html.display, deck.display]).toEqual(["page", "slides"]);
+      expect((yield* artifacts.update({ id: html.id, display: "slides" })).display).toBe("slides");
+      expect((yield* artifacts.get(html.id)).version).toBe(1);
+      expect(blank.display).toBeUndefined();
+      const shownFailure = yield* Effect.flip(artifacts.update({ id: blank.id, display: "slides" }));
+      expect(shownFailure).toMatchObject({ _tag: "Refused" });
+      const madeFailure = yield* Effect.flip(artifacts.create(user, { title: "笔记", kind: "markdown", display: "slides", content: "# 笔记" }));
+      expect(madeFailure).toMatchObject({ _tag: "Refused" });
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 

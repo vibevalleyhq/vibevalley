@@ -1,8 +1,8 @@
 -- Artifacts (artifact/artifact.ts).
 
 -- name: AddArtifact :exec
-insert into artifact (id, title, body, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
-values (sqlc.arg(id), sqlc.arg(title), sqlc.arg(body), sqlc.narg(channel_id), sqlc.narg(issue), sqlc.arg(by_id), sqlc.arg(by_name), sqlc.arg(version), 0,
+insert into artifact (id, title, body, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
+values (sqlc.arg(id), sqlc.arg(title), sqlc.arg(body), sqlc.narg(display), sqlc.narg(channel_id), sqlc.narg(issue), sqlc.arg(by_id), sqlc.arg(by_name), sqlc.arg(version), 0,
         sqlc.arg(created_at), sqlc.arg(created_at));
 
 -- name: Artifact :one
@@ -39,6 +39,9 @@ update artifact set message_id = sqlc.arg(message_id) where id = sqlc.arg(id);
 
 -- name: ArtifactRenamed :exec
 update artifact set title = sqlc.arg(title), updated_at = sqlc.arg(updated_at) where id = sqlc.arg(id);
+
+-- name: ArtifactShown :exec
+update artifact set display = sqlc.arg(display), updated_at = sqlc.arg(updated_at) where id = sqlc.arg(id) and body = 'html';
 
 -- name: DeleteArtifact :exec
 delete from artifact where id = sqlc.arg(id);

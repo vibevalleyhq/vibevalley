@@ -32,6 +32,8 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 - **每一稿是一个附件，版本不可变**：单版上限 5MB，字节经 `Attachment.keep` 存一次，`artifact_version.attachment_id` 指向它；提交新版追加 `artifact_version` 记录，不覆盖旧版；删掉 Artifact 不删附件。
 - **双层沙箱隔离**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`。
 - **提交前静态白名单检查（`check.ts`）**：仅放行 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`，且媒体必须内联為 `data:` 或 `blob:`；含表外外链、表单提交或嵌套页面的直接拒绝并报错行号。
+- **怎么看（`display`）**：网页 Artifact 带 `display`：`page`（整页，没有约定）、`slides`、`motion`，建的时候定（不填是 `page`），`artifact.update` 能改，一稿不变只换看法；一起写的没有这一项。
+- **外壳和消息约定（`@vibevalley/artifact/shell`）**：工作台看一稿时请求 `?shell=1&display=…&theme=…`，服务端在页面后面接上主题变量（`--vv-page`、`--vv-ink`…，和 `style.css` 的取值一致）、划词脚本和 `vv` 运行时；样式用 `:where()`，页面自己写的总是赢。运行时只对父窗口说话、只听父窗口：页面报 `ready`（种类、页数和每页的标题、备注，或时长）和 `at`（第几页、第几秒），外壳发 `goto`、`seek`、`play`、`pause`。两头都按 `HtmlShellMessage`、`HtmlShellCommand` 的 Schema 认，不认的丢掉；页面的话只改外壳显示的东西，不能让工作台做框外的事。显示和主题写在地址里，因为一稿的响应永久缓存。
 - **划词源码替换（`artifact.html.edit`）**：预览挂载 `?shell=1` 外壳，划词生成选中文本及前后各 32 字的 `HtmlAnchor`；服务端在最新版源码中唯一匹配并替换该处转义字节存为新版，跨标签或有歧义则拒绝。
 
 ### 协作块文档（`blocks`）

@@ -2,6 +2,7 @@
   "noTitle": "An artifact needs a title",
   "longTitle": "The title is too long: at most {max} characters",
   "badKind": "No artifact of kind {kind}: only {kinds}",
+  "displayHtmlOnly": "Only an html artifact is shown as a page, slides or motion; one written together has no display",
   "empty": "The artifact is empty",
   "tooBig": "A version is at most {mb} MB",
   "missing": "There is no artifact {id}",

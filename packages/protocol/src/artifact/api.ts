@@ -22,7 +22,7 @@ export interface ArtifactHandlers<R = never> {
   /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
   readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError, R>;
   /** Its title, as the user renames it. */
-  readonly "artifact.update": (a: { readonly id: T.ArtifactId; readonly title: string }) => Effect.Effect<T.Artifact, ApiError, R>;
+  readonly "artifact.update": (a: T.ArtifactUpdateRequest) => Effect.Effect<T.Artifact, ApiError, R>;
   readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<void, ApiError, R>;
   readonly "artifact.previewDelete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Preview, ApiError, R>;
   /** A blocks artifact and every live block (no tombstones), in order. */
@@ -96,7 +96,7 @@ export const artifactEndpoints: readonly Endpoint[] = [
   {
     op: "artifact.update",
     about: ["id"],
-    input: input({ id: S.ArtifactId, title: Schema.String }),
+    input: S.ArtifactUpdateRequest,
     result: S.Artifact,
     can: ["user", "remote"],
   },

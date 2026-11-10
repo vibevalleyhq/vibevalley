@@ -370,7 +370,7 @@ export class VibeValleyApi {
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a, options),
     /** Its title, as the user renames it. */
-    update: (a: { id: T.ArtifactId; title: string }, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+    update: (a: T.ArtifactUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("/api/v1/artifact/update", a, options),
     delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a, options),
     previewDelete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>

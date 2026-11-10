@@ -17,6 +17,7 @@ import {
   selectionOf,
   splitAt,
 } from "./index.ts";
+import { shellMessageOf, shellPath, withShell } from "./shell.ts";
 
 describe("@vibevalley/artifact domain engine", () => {
   it("applies block operations, splits spans at code points, and round-trips Markdown", () => {
@@ -82,5 +83,25 @@ describe("@vibevalley/artifact domain engine", () => {
     expect(codePointOffset("😀abc", 2)).toBe(1);
     expect(markdownShortcut("### Title")).toEqual({ type: "heading", attrs: { level: 3 }, strip: 4 });
     expect(editSpans([{ t: "hello", marks: { bold: true } }], "hello!")).toEqual([{ t: "hello!", marks: { bold: true } }]);
+  });
+
+  it("hears only the shell protocol's messages from a page, and serves the page with its runtime", () => {
+    expect(shellMessageOf({ vibevalley: "ready", display: "slides", pages: 5, titles: ["a"], notes: [""] })).toMatchObject({ pages: 5 });
+    expect(shellMessageOf({ vibevalley: "at", page: 2 })).toEqual({ vibevalley: "at", page: 2 });
+    expect(shellMessageOf({ vibevalley: "ready", display: "motion", duration: 12.5 })).toMatchObject({ duration: 12.5 });
+    for (const other of [
+      null,
+      { vibevalley: "ready", display: "poster" },
+      { vibevalley: "ready", display: "slides", pages: -1 },
+      { vibevalley: "ready", display: "slides", pages: 1.5 },
+      { vibevalley: "at", time: Number.POSITIVE_INFINITY },
+      { vibevalley: "goto", page: 1 },
+      { vibevalley: "navigate", href: "/settings" },
+    ])
+      expect(shellMessageOf(other)).toBeUndefined();
+    expect(withShell({ page: "<p>hi</p>", display: "page", theme: "dark" })).toMatch(
+      /^<p>hi<\/p>\n<style>:root\{[^}]*--vv-page:#151413[^]*\(\{ display: "page" \}\)/u,
+    );
+    expect(shellPath("a", 3, "slides", "dark")).toBe("/api/v1/artifact/a/3?shell=1&display=slides&theme=dark");
   });
 });

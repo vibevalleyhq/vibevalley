@@ -77,11 +77,17 @@ export const usePrefs =
 
 const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
-// The theme goes on <html> as data-theme ("system" worked out from the system's own) and is told to the host so its own parts follow.
+/** The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. */
+export const shownTheme = (): "light" | "dark" => {
+  const { theme } = prefs.get();
+  return theme === "system" ? (dark().matches ? "dark" : "light") : theme;
+};
+
+// The theme goes on <html> as data-theme and is told to the host so its own parts follow.
 function apply() {
   const { theme, scale } = prefsNow();
   const root = document.documentElement;
-  root.dataset.theme = theme === "system" ? (dark().matches ? "dark" : "light") : theme;
+  root.dataset.theme = shownTheme();
   root.style.setProperty("--workbench-zoom", String(scale / 100));
   currentHost().theme?.(theme);
 }
