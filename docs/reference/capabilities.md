@@ -6,7 +6,7 @@
 |---|---|---|
 | 用户 | 用户在农场那台电脑上 | 页面、命令行 |
 | 连进来的设备 | 用户配对过的手机、另一台电脑 | 经「连接到本机」只放这一列打了 ✓ 的 |
-| 管家 | 管家 | 它的工具：打了 ✓ 的每个接口是它的一个工具（`channel.message.list` 是 `channel_message_list`），`apps/server/src/tool` 照这一列给 |
+| 助手 | 助手 | 它的工具：打了 ✓ 的每个接口是它的一个工具（`channel.message.list` 是 `channel_message_list`），`apps/server/src/tool` 照这一列给 |
 | 帮工 | 在干活的帮工 | 经 `/mcp` 拿的工具，同上 |
 
 `GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `endpoints` 里：用户和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给页面要的三种 side event，`/events` 留给调试。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
@@ -15,27 +15,27 @@
 
 服务端本身
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `server.health.get` | 服务端在不在、是哪个版本 | `/api/v1/server/health/get` | ✓ | ✓ |   |   |
 
 ## orchestrator
 
-管家：上线、停下、旧账、评测
+助手：上线、停下、旧账、评测
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
-| `orchestrator.open` | 让管家上线，可以说话了 | `/api/v1/orchestrator/open` | ✓ | ✓ |   |   |
-| `orchestrator.stop` | 停下管家这一轮，派出去的帮工接着干 | `/api/v1/orchestrator/stop` | ✓ | ✓ |   |   |
-| `orchestrator.archive.list` | 列出或搜管家压掉的对话原文 | `/api/v1/orchestrator/archive/list` | ✓ | ✓ |   |   |
-| `orchestrator.archive.get` | 读管家压掉的一份对话原文 | `/api/v1/orchestrator/archive/get` | ✓ | ✓ |   |   |
-| `orchestrator.eval.create` | 把管家做错的一轮存成评测样例，写上该怎么做 | `/api/v1/orchestrator/eval/create` | ✓ | ✓ |   |   |
+| `orchestrator.open` | 让助手上线，可以说话了 | `/api/v1/orchestrator/open` | ✓ | ✓ |   |   |
+| `orchestrator.stop` | 停下助手这一轮，派出去的帮工接着干 | `/api/v1/orchestrator/stop` | ✓ | ✓ |   |   |
+| `orchestrator.archive.list` | 列出或搜助手压掉的对话原文 | `/api/v1/orchestrator/archive/list` | ✓ | ✓ |   |   |
+| `orchestrator.archive.get` | 读助手压掉的一份对话原文 | `/api/v1/orchestrator/archive/get` | ✓ | ✓ |   |   |
+| `orchestrator.eval.create` | 把助手做错的一轮存成评测样例，写上该怎么做 | `/api/v1/orchestrator/eval/create` | ✓ | ✓ |   |   |
 
 ## setting
 
 设置：模型、钥匙、目录和别的
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `setting.get` | 看设置 | `/api/v1/setting/get` | ✓ | ✓ |   |   |
 | `setting.validate` | 这些设置会被拒的第一处，不存 | `/api/v1/setting/validate` | ✓ | ✓ |   |   |
@@ -45,7 +45,7 @@
 
 
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `provider.get` | 读取供应商连接和默认用途，密钥只显示提示 | `/api/v1/provider/get` | ✓ |   |   |   |
 | `provider.update` | 按版本保存供应商连接和默认用途 | `/api/v1/provider/update` | ✓ |   |   |   |
@@ -56,7 +56,7 @@
 
 
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `media.dialogue.create` | 使用指定账号的音色生成多人对话 | `/api/v1/media/dialogue/create` | ✓ |   | ✓ |   |
 | `media.voiceDesign.create` | 设计合成音色试听，不保存可复用音色 | `/api/v1/media/voiceDesign/create` | ✓ |   | ✓ |   |
@@ -72,8 +72,8 @@
 | `media.input.previewDelete` | 预览删除本机媒体输入，不实际改动 | `/api/v1/media/input/previewDelete` | ✓ |   |   |   |
 | `media.image.create` | 创建生图任务，同一编号不重复生成 | `/api/v1/media/image/create` | ✓ |   | ✓ |   |
 | `media.understanding.create` | 确认账号和上传许可后理解选中的本机输入 | `/api/v1/media/understanding/create` | ✓ |   |   |   |
-| `media.understanding.authorize` | 登记不可变理解请求，只授权指定频道的管家执行一次 | `/api/v1/media/understanding/authorize` | ✓ |   |   |   |
-| `media.understanding.start` | 管家按已授权任务编号执行理解，不接受新的输入或授权声明 | `/api/v1/media/understanding/start` |   |   | ✓ |   |
+| `media.understanding.authorize` | 登记不可变理解请求，只授权指定频道的助手执行一次 | `/api/v1/media/understanding/authorize` | ✓ |   |   |   |
+| `media.understanding.start` | 助手按已授权任务编号执行理解，不接受新的输入或授权声明 | `/api/v1/media/understanding/start` |   |   | ✓ |   |
 | `media.speech.create` | 创建单人语音任务，生成后下载到本机，不重复提交同一编号 | `/api/v1/media/speech/create` | ✓ |   | ✓ |   |
 | `media.speech.resume` | 继续查询已知语音任务，不重新提交 | `/api/v1/media/speech/resume` | ✓ |   |   |   |
 | `media.understanding.previewCleanup` | 预览远端清理和本机保留释放，不改变任何文件 | `/api/v1/media/understanding/previewCleanup` | ✓ |   |   |   |
@@ -89,7 +89,7 @@
 
 频道和私聊，和里面的消息
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `channel.message.send` | 在频道或串里发一条消息 | `/api/v1/channel/message/send` | ✓ | ✓ |   | ✓ |
 | `channel.create` | 新建一个频道 | `/api/v1/channel/create` | ✓ | ✓ | ✓ |   |
@@ -119,7 +119,7 @@
 
 定时任务
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `cron.create` | 新建一个定时任务 | `/api/v1/cron/create` | ✓ | ✓ | ✓ |   |
 | `cron.list` | 列出全部定时任务 | `/api/v1/cron/list` | ✓ | ✓ | ✓ |   |
@@ -131,23 +131,23 @@
 
 通话和听写
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `voice.hear` | 交上正在通的那通电话里听到的一句 | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
 | `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ |   |   |   |
 | `voice.grant.create` | 拿通话用的声网令牌 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
 | `voice.grant.renew` | 给通话换新的声网令牌 | `/api/v1/voice/grant/renew` | ✓ | ✓ |   |   |
-| `voice.call.start` | 开始和管家通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |
+| `voice.call.start` | 开始和助手通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |
 | `voice.call.stop` | 挂断通话 | `/api/v1/voice/call/stop` | ✓ | ✓ |   |   |
 | `voice.call.hear` | 交上通话里你说的一句 | `/api/v1/voice/call/hear` | ✓ | ✓ |   |   |
-| `voice.call.say` | 交上通话里管家说出的话 | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
+| `voice.call.say` | 交上通话里助手说出的话 | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
 | `voice.dictate` | 听写：把一段录音转成字 | `/api/v1/voice/dictate` | ✓ | ✓ |   |   |
 
 ## issue
 
 工单：写、改、挪状态、评论、验收
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `issue.conversation.get` | 工单讨论串的位置 | `/api/v1/issue/conversation/get` | ✓ | ✓ |   |   |
 | `issue.comment.create` | 给工单带一句话，交给它最新的帮工 | `/api/v1/issue/comment/create` | ✓ | ✓ | ✓ |   |
@@ -171,7 +171,7 @@
 
 帮工
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `session.stop` | 停下帮工这一轮，帮工还在 | `/api/v1/session/stop` | ✓ | ✓ | ✓ |   |
 | `session.list` | 列出帮工，可以只看一份档案的 | `/api/v1/session/list` | ✓ | ✓ | ✓ | ✓ |
@@ -182,7 +182,7 @@
 
 稿子：一起写的，和交上来的网页
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `artifact.list` | 列出某个频道或工单的稿子，不指定就是全部 | `/api/v1/artifact/list` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.get` | 看一篇稿子 | `/api/v1/artifact/get` | ✓ | ✓ | ✓ | ✓ |
@@ -210,7 +210,7 @@
 
 里程碑和称号
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `game.achievement.list` | 列出全部里程碑 | `/api/v1/game/achievement/list` | ✓ | ✓ |   |   |
 | `game.title.set` | 挑一个挂在农场卡上的称号 | `/api/v1/game/title/set` | ✓ | ✓ |   |   |
@@ -219,7 +219,7 @@
 
 农机：机器上的编码 agent
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `runtime.list` | 列出全部农机 | `/api/v1/runtime/list` | ✓ | ✓ |   |   |
 | `runtime.refresh` | 重新探测一台农机 | `/api/v1/runtime/refresh` | ✓ | ✓ |   |   |
@@ -229,7 +229,7 @@
 
 仓库：工作目录下的 git 仓库
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `repo.pr.submit` | 发布已有本地分支 | `/api/v1/repo/pr/submit` | ✓ |   |   |   |
 | `repo.list` | 列出全部仓库 | `/api/v1/repo/list` | ✓ | ✓ | ✓ |   |
@@ -243,7 +243,7 @@
 
 GitHub 的检测：gh 装没装、登没登录
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `github.get` | 看 gh 装没装、登没登录 | `/api/v1/github/get` | ✓ | ✓ |   |   |
 | `github.refresh` | 重新检测 GitHub，顺带刷新开着的 PR | `/api/v1/github/refresh` | ✓ | ✓ |   |   |
@@ -252,7 +252,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 档案：派活时指给谁
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `agent.list` | 列出全部档案 | `/api/v1/agent/list` | ✓ | ✓ |   |   |
 | `agent.validate` | 看每份档案现在派活哪里不对，没存的草稿也看 | `/api/v1/agent/validate` | ✓ | ✓ |   |   |
@@ -271,7 +271,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 技能
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `skill.list` | 列出全部技能 | `/api/v1/skill/list` | ✓ | ✓ |   |   |
 | `skill.create` | 新建一个技能 | `/api/v1/skill/create` | ✓ |   |   |   |
@@ -283,7 +283,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 笔记：记一句、搜、雷达、日记和页
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `pkm.page.list` | 列出笔记库里的每一页，新的在前 | `/api/v1/pkm/page/list` | ✓ | ✓ |   |   |
 | `pkm.page.get` | 看一页：引用读出来，带反链和没答的批注 | `/api/v1/pkm/page/get` | ✓ | ✓ | ✓ | ✓ |
@@ -310,7 +310,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 档案的记性
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `memory.list` | 列出一份档案的记性：库里的和配置的来源 | `/api/v1/memory/list` | ✓ | ✓ |   |   |
 | `memory.recall` | 看档案对这个仓库和这句话会想起什么 | `/api/v1/memory/recall` | ✓ | ✓ |   |   |
@@ -323,7 +323,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 连接器：把微信、飞书、QQ 接到频道
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `connector.list` | 列出微信、飞书、QQ 连接器和它们的状况 | `/api/v1/connector/list` | ✓ | ✓ |   |   |
 | `connector.login` | 登录一个连接器 | `/api/v1/connector/login` | ✓ |   |   |   |
@@ -335,7 +335,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 连接到本机：开关、配对、设备
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `lan.get` | 看「连接到本机」开没开、地址和配对码 | `/api/v1/lan/get` | ✓ |   |   |   |
 | `lan.update` | 打开或关上「连接到本机」 | `/api/v1/lan/update` | ✓ |   |   |   |
@@ -349,7 +349,7 @@ GitHub 的检测：gh 装没装、登没登录
 
 
 
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 管家 | 帮工 |
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `user.get` | 看用户叫什么、设没设密码、这个请求是从哪台设备来的 | `/api/v1/user/get` | ✓ | ✓ |   |   |
 | `user.update` | 改用户的名字 | `/api/v1/user/update` | ✓ |   |   |   |

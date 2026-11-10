@@ -7,7 +7,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 档案、技能库（`Skill`）与农机设置的持久化（`config.json`）及原子更新事务 | 管家如何使用档案（[管家](docs/subsystems/orchestrator.md)）、`vibevalley` 农机内部实现（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
+| 档案、技能库（`Skill`）与农机设置的持久化（`config.json`）及原子更新事务 | 助手如何使用档案（[助手](docs/subsystems/orchestrator.md)）、`vibevalley` 农机内部实现（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案模板的读取、安装、按模板更新与本地模板导入（`agent-templates/<id>/`） | 会话如何启动、并发上限与每日花费表持久化（[帮工](docs/subsystems/session.md)） |
 | 农机注册表、后台探测、模型与能力缓存、派活前配置解析（`Runtime.resolve`） | 档案记忆的存储与召回（[记性](docs/subsystems/memory.md)） |
 | 档案可派性预检（`agentProblems`：农机缺失、选项不兼容、额度/预算耗尽） | 像素角色贴图渲染（[农场的皮](docs/subsystems/farm.md)） |
@@ -21,7 +21,7 @@
 | `apps/server/src/runtime/runtime.ts` | 农机注册表、探测缓存、额度轮询、`assess` 与 `resolve` |
 | `apps/server/src/runtime/presets.ts`、`presets.json` | 农机预设、支持项 `supportOf`、可派性校验 `agentProblems` 与挑人算法 `chooseAgent` |
 | `apps/server/src/runtime/quota.ts`、`price.ts`、`dsh.ts`、`pi.ts` | 额度文案、模型单价表、DeepSeek Harness 与 pi 配置读取 |
-| `apps/web/src/features/agent/`、`features/runtime/` | 档案列表、模板目录、捏帮工页、管家档案页、农具页与技能书页 |
+| `apps/web/src/features/agent/`、`features/runtime/` | 档案列表、模板目录、捏帮工页、助手档案页、农具页与技能书页 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`agent.*`、`skill.*`、`runtime.*`）。
 
@@ -29,8 +29,8 @@
 
 - **单一配置文件与副本事务**：档案、技能库和农机设置存于 `config.json`，经 `Agent.change` 在深拷贝副本上修改并写盘成功后才替换内存引用（删除技能时同事务清理档案引用）。
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
-- **角色固定为 `orchestrator` 与 `worker`**：默认管家 `orchestrator` 不可删除或改为帮工；所有管家档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
-- **角色只管职责，别的各问一处**：档案是农场里的一个人，`role` 只决定他能做什么（工具、权限、能不能派去改代码）。他怎么上班、在哪干活、话算谁说的，各由一处回答：当值（会话 id 就是档案 id、开机就在）问 `isOnDuty`，按活雇来的问 `isHired`（`session/roster.ts`）；在服务端进程里干活、由 `Session.host` 收消息的问 `Agent.isHosted`；交给当值的人的工单问 `assignedOnDuty`。今天这几处都由角色推出来，以后有不当值的管家或在进程里干活的帮工，只改这几处。话是谁说的（`ActorKind`）只有 `owner`、`agent`、`system`，agent 另带 `role`（消息的 `fromRole`、触发的 `actor.role`、服务端的 `Actor`）；库里存的说话的人和定时任务、记忆的作者都只记这三种。
+- **角色固定为 `orchestrator` 与 `worker`**：默认助手 `orchestrator` 不可删除或改为帮工；所有助手档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
+- **角色只管职责，别的各问一处**：档案是农场里的一个人，`role` 只决定他能做什么（工具、权限、能不能派去改代码）。他怎么上班、在哪干活、话算谁说的，各由一处回答：当值（会话 id 就是档案 id、开机就在）问 `isOnDuty`，按活雇来的问 `isHired`（`session/roster.ts`）；在服务端进程里干活、由 `Session.host` 收消息的问 `Agent.isHosted`；交给当值的人的工单问 `assignedOnDuty`。今天这几处都由角色推出来，以后有不当值的助手或在进程里干活的帮工，只改这几处。话是谁说的（`ActorKind`）只有 `owner`、`agent`、`system`，agent 另带 `role`（消息的 `fromRole`、触发的 `actor.role`、服务端的 `Actor`）；库里存的说话的人和定时任务、记忆的作者都只记这三种。
 - **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组，`chooseAgent` 按工单文字命中的关键词数挑选帮工档案。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型。
 - **外观确定性补齐（`withCast`）**：缺省外观按档案 `id` 哈希取模补齐，前后端 `castOf` 算法一致。
@@ -40,7 +40,7 @@
 
 ## 内置的模板
 
-内置模板位于 `apps/server/src/agent/templates/`（顺序见 `templates/index.json`），除默认管家 `orchestrator` 外含 9 个帮工模板：
+内置模板位于 `apps/server/src/agent/templates/`（顺序见 `templates/index.json`），除默认助手 `orchestrator` 外含 9 个帮工模板：
 
 | 档案名称 | 默认农机 | 动物外观 | 职责（`duty`） |
 |---|---|---|---|
@@ -71,7 +71,7 @@
 ## 和谁打交道
 
 - **帮工与工单（`session`、`issue`）**：派活前调 `check` 与 `resolve`；`Session` 读取档案与勾选的 `Skill` 拼入提示，运行后调 `spend` 与 `usageSoon`。
-- **管家（`orchestrator`）**：调用 `Runtime.candidates` 与 `Runtime.choose` 获取可派档案、额度与花费。
+- **助手（`orchestrator`）**：调用 `Runtime.candidates` 与 `Runtime.choose` 获取可派档案、额度与花费。
 - **核心状态（`core`）**：经 `Core.runtime` 推农机窄事件，经 `Core.notice` 发模型回退提醒。
 
 ## 为什么这样

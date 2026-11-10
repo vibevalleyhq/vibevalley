@@ -1,10 +1,10 @@
 {
   "name": {
     "user": "You",
-    "orchestrator": "Manager"
+    "orchestrator": "Assistant"
   },
   "mention": {
-    "orchestrator": "@manager",
+    "orchestrator": "@assistant",
     "user": "@user",
     "everyone": "@everyone"
   },
@@ -26,7 +26,7 @@
   "channelGone": "The channel cannot be found",
   "noHelper": "There is no helper {id}",
   "noChannel": "There is no channel {id}",
-  "notOrchestrator": "{id} is not a manager's profile: only a manager can look after a channel",
+  "notOrchestrator": "{id} is not an assistant's profile: only an assistant can look after a channel",
   "noMessageId": "There is no message {id}",
   "threadOnlyTitle": "A thread can only get a title",
   "defaultStays": "The default channel cannot be archived or deleted: make another one the default first",

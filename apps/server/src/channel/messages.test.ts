@@ -35,9 +35,9 @@ test("an @ right after Chinese names someone, and one inside a Latin word or an 
   expect(mentionsIn("mail a@w3.dev, x@@w3")).toEqual([]);
 });
 
-test("with several orchestrators: the place's hears the user, 管家 is the place's, and each is named by its id", () => {
+test("with several orchestrators: the place's hears the user, 助手 is the place's, and each is named by its id", () => {
   const names = { here: "lead", orchestrators: ["orchestrator", "lead", "agent-1", "agent-12"] };
-  expect(mentionsIn("@管家 看看，@agent-12 也看看，@agent-1", names)).toEqual(["lead", "agent-12", "agent-1"]);
+  expect(mentionsIn("@助手 看看，@agent-12 也看看，@agent-1", names)).toEqual(["lead", "agent-12", "agent-1"]);
   expect(mentionsIn("@orchestrator 你呢 `@lead`", names)).toEqual(["orchestrator"]);
   expect(mentionsIn("@lead 在吗")).toEqual([]);
   const base: ChannelAudience & BrakeInput = {
@@ -96,7 +96,7 @@ describe("channel follows", () => {
 
 describe("a search", () => {
   it("reads its filters out of its words, and leaves one it cannot read among them", () => {
-    expect(parseSearch("苹果 from:管家 in:#clock-in has:image has:link")).toEqual({
+    expect(parseSearch("苹果 from:助手 in:#clock-in has:image has:link")).toEqual({
       words: "苹果",
       from: defaultOrchestrator,
       in: "clock-in",

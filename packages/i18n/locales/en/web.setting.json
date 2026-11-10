@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "Language",
-    "line": "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
+    "line": "The page's words, what the assistant and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
     "zh": "中文",
     "en": "English",
     "label": "Page language"
@@ -80,7 +80,7 @@
     "device": "This device only"
   },
   "general": {
-    "languageHint": "The page, the manager and the helpers all speak it",
+    "languageHint": "The page, the assistant and the helpers all speak it",
     "start": "Open on start",
     "startHint": "Where the app, or the home page, opens",
     "starts": {
@@ -101,7 +101,7 @@
     "scaleHint": "Scales the whole workbench; the farm keeps its whole-number scaling"
   },
   "models": {
-    "deepseekHint": "The manager and VibeValley's own helpers use it"
+    "deepseekHint": "The assistant and VibeValley's own helpers use it"
   },
   "memory": {
     "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."
@@ -161,7 +161,7 @@
     "dictationUrl": "No dictation address yet"
   },
   "feature": {
-    "orchestrator": "The manager",
+    "orchestrator": "The assistant",
     "image": "Image generation",
     "understanding": "Media understanding",
     "speech": "Speech",

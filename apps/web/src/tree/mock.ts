@@ -101,7 +101,7 @@ const casesZh: readonly [MemoryCase, ...MemoryCase[]] = [
   { intent: "官网首页换成像素风", approach: "复用 public/pixel 的图", insight: "图片放大用整数倍，不然像素会糊" },
   { intent: "billing 补退款", approach: "先补黄金数据，再改规则", insight: "退款金额要从原单的分算，不能反推" },
   { intent: "修 SSE 断线不重连", approach: "加心跳和指数退避", insight: "代理会吞掉空闲超过 60 秒的连接" },
-  { intent: "管家派活时带上仓库", approach: "在工具描述里写明默认仓库", insight: "改了工具描述要跑 evals" },
+  { intent: "助手派活时带上仓库", approach: "在工具描述里写明默认仓库", insight: "改了工具描述要跑 evals" },
   { intent: "农场的时钟和真实时间对齐", approach: "日钟的速度可调，默认 600 秒一天", insight: "测试里把速度设成 0" },
   { intent: "手机壳扫码配对", approach: "一台设备一把钥匙", insight: "配对页不能放 /mcp" },
 ];

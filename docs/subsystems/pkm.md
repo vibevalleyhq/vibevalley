@@ -6,9 +6,9 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和管家交付的文档与网页（[稿子](docs/subsystems/artifact.md)） |
+| 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和助手交付的文档与网页（[稿子](docs/subsystems/artifact.md)） |
 | 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与 FTS5 检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
-| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 管家与帮工的 `pkm_*` 工具封装（`apps/server/src/tool/pkm.ts`） |
+| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`apps/server/src/tool/pkm.ts`） |
 | 行内批注与改写建议（`pkm_comment`）的创建、接受与拒绝 | |
 
 ## 在哪
@@ -38,7 +38,7 @@
   - 所有笔记读写经过同一把信号量锁，采用临时文件原子替换。
   - 每次修改在 `pkm_change` 记录修改前后的全文（保留最近 200 条），`pkm.undo` 每次恢复最新一条变更。
 - **Agent 只提改写建议，且强制保留链接**：
-  - 帮工和管家通过 `pkm_search`、`pkm_page_get`、`pkm_capture` 和 `pkm_comment_suggest` 访问笔记，不直接覆盖已有块。
+  - 帮工和助手通过 `pkm_search`、`pkm_page_get`、`pkm_capture` 和 `pkm_comment_suggest` 访问笔记，不直接覆盖已有块。
   - 改写建议若丢失了原块中的 `[[链接]]` 或 `((引用))`，服务端自动将其补回建议末尾。
   - 用户在界面点击接受后，才替换原块并清除批注标记。
 - **前后端共用 `applyBlockOps`**：
@@ -54,7 +54,7 @@
 ## 和谁打交道
 
 - **记性（`memory`）**：调用 `termsList` 对中英文块文本分词。
-- **管家与工具（`orchestrator`、`tool`）**：管家现状含 `01_Projects` 活跃项目；当轮纯用户发言自动附入最多 3 个相关笔记块。
+- **助手与工具（`orchestrator`、`tool`）**：助手现状含 `01_Projects` 活跃项目；当轮纯用户发言自动附入最多 3 个相关笔记块。
 
 ## 为什么这样
 

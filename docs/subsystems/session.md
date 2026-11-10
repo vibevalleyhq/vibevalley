@@ -1,7 +1,7 @@
 # 帮工
 
 `Session` 是档案（`Agent`）持续工作的执行上下文：
-- 处理工单时画成地里的小动物，处理私聊或管家编排时关联频道；外部代理经 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，进程内管家经 `AgentHost` 驱动。
+- 处理工单时画成地里的小动物，处理私聊或助手编排时关联频道；外部代理经 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，进程内助手经 `AgentHost` 驱动。
 - 一次触发到一次汇报是一轮 `Run`；一个 `Session` 可跨越多次 `Run` 与重启。
 
 ## 管什么，不管什么
@@ -13,7 +13,7 @@
 | `Run` 记录（`session_run`）：触发来源、消费输入、结局与花费 | 谁该被唤醒、刹车与投递状态机（[Mailbox](docs/subsystems/mailbox.md)） |
 | oar 事件转核心状态事实（`reactionTo`）与轨迹日志（`events/<id>.json`） | git worktree、分支与合并实现（[仓库](docs/subsystems/repo.md)） |
 | 并发槽位上限（`noRoom`）、腾位置（`makeRoom`）与每日花费记账 | 记忆的存储与检索算法（[记性](docs/subsystems/memory.md)） |
-| 进程内 `AgentHost` 与 `InProcessRun`（供管家运行、记录轨迹与评测） | 管家的编排提示词与工具集（[管家](docs/subsystems/orchestrator.md)） |
+| 进程内 `AgentHost` 与 `InProcessRun`（供助手运行、记录轨迹与评测） | 助手的编排提示词与工具集（[助手](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
 
@@ -39,10 +39,10 @@
 | `Session` | `T.Session`、`session` 表 | 档案的持续工作上下文（工单现场或私聊上下文），编号 `w<n>` 单调递增 |
 | `Run` | `T.Run`、`session_run` 表 | 一次触发到一次结束汇报（从 `sessionPhaseChanged(working)` 到 `sessionReported`） |
 | oar 会话 | `oarSessionId`、`Subagent` | 底层编码代理的记录流；重启或失联时可在同一 `Session` 下更换 |
-| 机器 | `T.Machine`、`machine` 表、`machine/machine.ts` | 帮工干活的那台电脑；今天只有服务端自己这台（开机时没有就记下，主机名为名），雇来的帮工记着它（`Session.machine`），服务端进程里的管家没有。别的机器经命令行加入在后面几步（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)） |
+| 机器 | `T.Machine`、`machine` 表、`machine/machine.ts` | 帮工干活的那台电脑；今天只有服务端自己这台（开机时没有就记下，主机名为名），雇来的帮工记着它（`Session.machine`），服务端进程里的助手没有。别的机器经命令行加入在后面几步（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)） |
 
-- **管家与帮工统一在 `sessions` 中**：以 `Session.role`（`orchestrator` 或 `worker`）区分，共用 `phase` 与 `session_run`；仅 `worker` 参与并发槽位、地块分配与目录恢复。
-- **管家的会话由帮工模块自己登记**：开机时登记每个管家档案，之后经 `Agent.whenKept` 在档案存下（新建、改、装模板、按模板更新）的那次写返回之前登记或改名；登记失败那次写就失败。工单、频道、Mailbox 用到管家的会话时它已经在了，不再自己补。
+- **助手与帮工统一在 `sessions` 中**：以 `Session.role`（`orchestrator` 或 `worker`）区分，共用 `phase` 与 `session_run`；仅 `worker` 参与并发槽位、地块分配与目录恢复。
+- **助手的会话由帮工模块自己登记**：开机时登记每个助手档案，之后经 `Agent.whenKept` 在档案存下（新建、改、装模板、按模板更新）的那次写返回之前登记或改名；登记失败那次写就失败。工单、频道、Mailbox 用到助手的会话时它已经在了，不再自己补。
 - **执行器在机器上，帮工隔着链路找它**：`Session` 经 `Machine.executions(machine)` 拿到一台机器的执行器（`machine/link.ts`），不直接依赖 `Executor`；过界的每个值都复制一份，为执行器搬到别的进程、别的机器做准备。
 - **执行器拥有底层资源，`Session` 拥有领域状态**：`Executor` 持有 oar 实例直至确认底层进程关闭才释放占位；关闭失败时继续占槽并拒绝清理该目录。
 
@@ -69,7 +69,7 @@
   - 全农场最多 6 个在忙帮工 `maxRunning`，单台农机按 `maxWorking` 限制，单仓库默认最多 3 个 `repo.max_sessions`。
   - 槽位满 6 个又来新活时，`makeRoom` 让最久闲置的工单会话收工或让私聊会话休眠。
 - **无沙箱与无逐条权限确认**：帮工在 `$VIBEVALLEY_WORK_ROOT` 下直接执行命令，不弹权限确认；安全边界是服务端只听 `127.0.0.1`。
-- **只追加的轨迹日志**：`events/<id>.json` 按序记录每一步事件，流式草稿按 `revision` 递增推送，落盘后不改。帮工留最近 240 条、管家留 1000 条，离场默认 30 天后清理文件。
+- **只追加的轨迹日志**：`events/<id>.json` 按序记录每一步事件，流式草稿按 `revision` 递增推送，落盘后不改。帮工留最近 240 条、助手留 1000 条，离场默认 30 天后清理文件。
 - **额度与每日花费**：
   - 开机、每 5 分钟及每轮后 20 秒读额度，低于 15%（`quotaLow`）标「快用完了」。
   - 按日花费记入 `runtime_spend` 表；额度或预算耗尽时（`moneyStop`）阻止派新活，在跑回合继续跑完。
@@ -105,7 +105,7 @@
 - **工单（`issue`）**：开帮工经 `Mailbox.receive`（`Hire`），调用 `withWorkplace`、`clearWorkplace`、`discardWork`、`dismiss`；订阅 `Session.news`（`Reported`、`Left`、`IssueStarted`、`RunFinished`）。
 - **信箱与频道（`mailbox`、`channel`）**：Mailbox 调 `deliver` 并订阅 `news` 的回执和启动动静；Channel 订阅 `news` 的 `Hired`、`Left`、`Reported` 管理工单串与汇报。帮工做的每件事都只在这一条 `news` 上说，各订阅方按 `_tag` 取自己要的。
 - **仓库、农机与记性（`repo`、`runtime`、`memory`）**：提供工作目录、农机探测/计费和每轮前后的记忆召回与写入。
-- **管家（`orchestrator`）**：通过 `Session.host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run` 表。
+- **助手（`orchestrator`）**：通过 `Session.host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run` 表。
 
 ## 为什么这样
 

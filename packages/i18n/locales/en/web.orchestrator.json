@@ -21,7 +21,7 @@
       "blurb": "A flower in a wide straw hat, shears in the apron pocket."
     },
     "robot": {
-      "name": "Robot manager",
+      "name": "Robot assistant",
       "blurb": "A round farm robot whose face screen smiles."
     }
   },
@@ -38,14 +38,14 @@
       "voice": "Voice"
     },
     "all": "← All profiles",
-    "title": "Manager",
-    "intro": "The manager is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
+    "title": "Assistant",
+    "intro": "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
     "look": "It looks like {name}.",
     "profile": "Edit its profile",
-    "tabs": "The manager's",
+    "tabs": "The assistant's",
     "heard": "Heard",
-    "quiet": "The manager has not spoken yet.",
-    "trajectory": "Each of the manager's rounds",
+    "quiet": "The assistant has not spoken yet.",
+    "trajectory": "Each of the assistant's rounds",
     "about": "What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click \"This round went wrong\" on what it heard, write what it should have done, and it is kept as an eval."
   }
 }

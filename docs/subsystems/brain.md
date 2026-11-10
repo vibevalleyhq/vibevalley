@@ -1,13 +1,13 @@
 # VibeValley 自己的 agent
 
-`Brain` 是仓库自研的进程内 agent，由 `packages/provider`（厂商接入）、`packages/ai`（模型调用与消息桥）和 `packages/agent` 组成，支撑管家、`vibevalley` 农机帮工、CLI 对话与子帮手四种宿主。
+`Brain` 是仓库自研的进程内 agent，由 `packages/provider`（厂商接入）、`packages/ai`（模型调用与消息桥）和 `packages/agent` 组成，支撑助手、`vibevalley` 农机帮工、CLI 对话与子帮手四种宿主。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | DeepSeek 协议与连接（`@vibevalley/provider`）、agent 历史重放、工具 JSON Schema 生成与消息/参数修补（`@vibevalley/ai`） | 模型名称选择与 API Key 存储（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
-| 单轮模型⇄工具循环（`loop.ts`）：并发跑工具、插话（`steer`）、追问（`followUp`）与中断（`abort`） | 输入何时送入、是否含用户授权、回合如何记入 `session_run`（[管家](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
+| 单轮模型⇄工具循环（`loop.ts`）：并发跑工具、插话（`steer`）、追问（`followUp`）与中断（`abort`） | 输入何时送入、是否含用户授权、回合如何记入 `session_run`（[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
 | 对话 `.jsonl` 持久化、三段式提示与前缀哈希校验、空闲/超限压缩、断点续跑 | 农场业务工具集（`apps/server/src/tool`）与跨档案数据库记忆（[记性](docs/subsystems/memory.md)） |
 | 内置工具：技能按需加载、`MemoryPort`、归档检索、子帮手、自身任务（`Todo`）、提醒与编码工具 | |
 
@@ -23,7 +23,7 @@
 | `packages/agent/src/brain.ts`、`session.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口、`.jsonl` 读写、上下文压缩与前缀分段 SHA-256 校验 |
 | `packages/agent/src/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 自身内置工具、技能目录扫描、记忆接口、MCP 客户端与定时提醒 |
 | `packages/agent/src/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
-| `apps/server/src/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 管家宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
+| `apps/server/src/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
 
 ## 模型和不变量
 
@@ -36,9 +36,9 @@
 
 ### 四种宿主配置（`BrainOptions`）
 
-| 能力项 | 管家 | 帮工（`vibevalley` 农机） | CLI 对话 | 子帮手（`spawn_agent`） |
+| 能力项 | 助手 | 帮工（`vibevalley` 农机） | CLI 对话 | 子帮手（`spawn_agent`） |
 |---|---|---|---|---|
-| 农场业务工具 | `Tool` 管家工具表 | 经 `/mcp` 挂载帮工工具表 | 无 | 继承父 agent |
+| 农场业务工具 | `Tool` 助手工具表 | 经 `/mcp` 挂载帮工工具表 | 无 | 继承父 agent |
 | 本地编码工具（`coding.ts`） | 无 | 有 | 有 | 继承父 agent |
 | 目录技能扫描（`SKILL.md`） | 无（`noSkills`） | 有 | 有 | 继承父 agent |
 | 记忆（`MemoryPort`） | 数据库 `memory` 表 | 无（由 `Session` 管） | 本地 `MEMORY.md` | 无 |
@@ -84,8 +84,8 @@
 
 ## 和谁打交道
 
-- **四个宿主**：管家 `session/host.ts`、帮工农机 `runtime/vibevalley.ts`、终端对话 `chat/main.ts` 与内部 `spawn_agent`。
-- **资源服务（`resource`）**：管家与帮工的 `resource_read` 工具经 `apps/server/src/resource/` 按会话权限分页读取 `vv://` 资源。
+- **四个宿主**：助手 `session/host.ts`、帮工农机 `runtime/vibevalley.ts`、终端对话 `chat/main.ts` 与内部 `spawn_agent`。
+- **资源服务（`resource`）**：助手与帮工的 `resource_read` 工具经 `apps/server/src/resource/` 按会话权限分页读取 `vv://` 资源。
 
 ## 为什么这样
 
@@ -95,7 +95,7 @@
 
 ## 还没做的
 
-- 按档案 `toolsets` 分配工具、统一技能发现模块并支持管家加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- 按档案 `toolsets` 分配工具、统一技能发现模块并支持助手加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 
 ## 怎么验证
 

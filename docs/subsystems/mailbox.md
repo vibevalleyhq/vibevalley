@@ -20,7 +20,7 @@
 | `apps/server/src/mailbox/work.ts` | 工单蓄水池（Tier 1）、退回转交（`handback`）与投递写入（`forward`） |
 | `apps/server/src/mailbox/triggers.ts` | 服务内部的触发器记录、读取、来源查询与 cron 重放 |
 | `apps/server/src/mailbox/payload.ts`、`envelope.ts` | 共享形状、编码与纯转换，不读写数据库 |
-| `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与管家流推送 |
+| `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与助手流推送 |
 
 ## 模型和不变量
 
@@ -46,8 +46,8 @@
 
 1. `Channel`、`Ingress`、`Issue` 或 `Cron` 经 Mailbox 服务持久化 `Trigger`，提交后调用 `Mailbox.receive`。
 2. `Mailbox` 在信箱写锁内计算受众、检查工单蓄水门禁与三道刹车，原子写入 `mailbox_delivery` 与路由回执。
-3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或把一段对话交给管家：`Mailbox.news` 的 `Handed`（管家由管家模块来答，帮工经 `Session.deliver` 唤醒）。
-4. 会话换人或关单时，未消费的用户追问以确定性返回编号转交新负责人或管家。
+3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或把一段对话交给助手：`Mailbox.news` 的 `Handed`（助手由助手模块来答，帮工经 `Session.deliver` 唤醒）。
+4. 会话换人或关单时，未消费的用户追问以确定性返回编号转交新负责人或助手。
 
 ## 和谁打交道
 

@@ -115,7 +115,7 @@
 | start | 开始干一件事（`issue.start`、`Executor.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
 | input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
 | present | — | 这个进程正拿着它、能交信（`Session.present`）：改叫 `isReachable`；核心状态里的帮工（`Session.presentSessions`）：改叫 `hired` |
-| orchestrator | 职务：管家能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和串都有成员（`members`，记在 `channel_member`），这里的管家问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |
+| orchestrator | 职务：助手能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和串都有成员（`members`，记在 `channel_member`），这里的助手问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |
 
 已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`repo.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、仓库的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 

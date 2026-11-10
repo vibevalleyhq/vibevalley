@@ -2,7 +2,7 @@
   "reading": "Reading…",
   "unread": "Cannot be read.",
   "notNow": "Not yet",
-  "orchestrator": "Manager",
+  "orchestrator": "Assistant",
   "plotOf": "{name}'s plot",
   "plot": {
     "unread": "This plot's ticket has not been read yet.",
@@ -129,8 +129,8 @@
     "jobHint": "What to do, and what counts as done",
     "job": "Ticket",
     "who": "Who plants it",
-    "orchestratorPicks": "Manager picks",
-    "how": "Start: the manager hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
+    "orchestratorPicks": "Assistant picks",
+    "how": "Start: the assistant hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
     "draft": "Draft",
     "start": "Start"
   },
@@ -170,12 +170,12 @@
     "warehouse": "Warehouse",
     "graphs": "Tasks and achievements",
     "log": "Farm log",
-    "orchestrator": "Manager and pets",
+    "orchestrator": "Assistant and pets",
     "harvest": "Harvest {name}'s plot",
     "sow": "Sow · plot {plot}",
     "water": "Water {name}",
     "menu": "Menu",
-    "pickLook": "Pick a manager you like; the farm and the chat change at once.",
+    "pickLook": "Pick an assistant you like; the farm and the chat change at once.",
     "drawing": "Still being drawn…",
     "pets": "Pets",
     "shopItems": {
@@ -193,7 +193,7 @@
       },
       "doghouse": {
         "name": "Doghouse",
-        "note": "For the manager's dog"
+        "note": "For the assistant's dog"
       }
     },
     "shopClosed": "The shop is being done up and opens in the next version. You have {coins} coins: save them for now."
@@ -214,7 +214,7 @@
     "yard": "What you can click in the yard"
   },
   "log": {
-    "empty": "Nothing yet. Once you open, what you and the manager say and who finished what are kept here.",
+    "empty": "Nothing yet. Once you open, what you and the assistant say and who finished what are kept here.",
     "you": "You",
     "said": "said",
     "answered": "answered",
@@ -244,13 +244,13 @@
       "2": "How is it going?",
       "3": "Everyone, call it a day"
     },
-    "greeting": "This is the farm chat, where you, the manager and the helpers talk. Tell me something to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.",
+    "greeting": "This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.",
     "phase": {
       "off": "Type or press the mic to open",
-      "connecting": "Reaching the manager…",
-      "listening": "The manager is listening",
-      "thinking": "The manager is thinking…",
-      "speaking": "The manager is speaking",
+      "connecting": "Reaching the assistant…",
+      "listening": "The assistant is listening",
+      "thinking": "The assistant is thinking…",
+      "speaking": "The assistant is speaking",
       "error": "Not connected: try again"
     },
     "newIn": "new words in {n} places",
@@ -283,7 +283,7 @@
     "pageAndSchedules": "Channel page and scheduled tasks",
     "settingsLink": "Settings",
     "back2": "Back",
-    "newChannelLine": "A long-running matter or a repo gets a place of its own to talk and send work. Call the manager here and the work is sent here.",
+    "newChannelLine": "A long-running matter or a repo gets a place of its own to talk and send work. Call the assistant here and the work is sent here.",
     "nameHint": "Name, such as clock-in",
     "name": "Channel name",
     "descriptionHint": "What it is for (optional)",
@@ -299,11 +299,11 @@
     "anyone": "Any helper",
     "inThread": "Say it in the thread; {name} sees it…",
     "inThreadAnyone": "Say it in the thread…",
-    "toOrchestrator": "Tell the manager; @ calls a helper…",
-    "toOrchestratorAlone": "Just between you and the manager…",
+    "toOrchestrator": "Tell the assistant; @ calls a helper…",
+    "toOrchestratorAlone": "Just between you and the assistant…",
     "who": "Who",
-    "stop": "Stop the manager",
-    "stopHint": "Stops the manager's round; helpers already sent keep working",
+    "stop": "Stop the assistant",
+    "stopHint": "Stops the assistant's round; helpers already sent keep working",
     "send": "Send",
     "less": "Less",
     "more": "Read more",
@@ -375,7 +375,7 @@
   },
   "hud": {
     "label": "The farm's HUD",
-    "look": "Change the manager's look",
+    "look": "Change the assistant's look",
     "workbenchHint": "Tickets, chat… the pages for managing work",
     "workbench": "Workbench",
     "treeHint": "Memory tree: what the farm has learned",
@@ -472,7 +472,7 @@
       "hint": "Which machine each helper uses, its persona and skills, how it looks"
     },
     "manager": {
-      "hint": "Talk to the manager"
+      "hint": "Talk to the assistant"
     },
     "runtimes": {
       "label": "Workshop · machines",

@@ -1,6 +1,6 @@
 # 稿子
 
-稿子（`Artifact`）是用户、管家和帮工共创或交付的文档产物，在 `/artifacts` 页和聊天旁栏 `ArtifactCanvas` 中查看与编辑。正文分两种：
+稿子（`Artifact`）是用户、助手和帮工共创或交付的文档产物，在 `/artifacts` 页和聊天旁栏 `ArtifactCanvas` 中查看与编辑。正文分两种：
 - **协作块文档（`blocks`）**：由段落、标题、列表、待办、代码等块组成，按 `BlockOp` 协同修改，服务端为唯一权威。
 - **网页稿子（`html`）**：完整单页 HTML，按版本不可变存储，在严格沙箱 `iframe` 中隔离展示并支持划词改字。
 
@@ -46,7 +46,7 @@
 
 **创建与交付稿子**
 
-1. 帮工或管家调用 `artifact_create`（传入 `html` 或 `markdown` 正文，或工作目录内相对路径 `file`）。
+1. 帮工或助手调用 `artifact_create`（传入 `html` 或 `markdown` 正文，或工作目录内相对路径 `file`）。
 2. 服务端校验内容（`html` 过 `check.ts`，`markdown` 转为初始 `BlockInput[]`），在对应工单串或频道发出带 `ArtifactCard` 的消息并落库。
 3. 用户在 `/artifacts` 点「新建」直接创建空的 `blocks` 稿子，不发频道消息。
 
@@ -58,7 +58,7 @@
 ## 和谁打交道
 
 - **频道（`channel`）**：调用 `Channel.announce` 发稿子卡片；在消息中记录被引用的块快照。
-- **工具（`tool`、`mcp`）**：向管家和帮工暴露 `artifact_*` 工具，自动绑定会话工单与档案身份。
+- **工具（`tool`、`mcp`）**：向助手和帮工暴露 `artifact_*` 工具，自动绑定会话工单与档案身份。
 - **「连接到本机」（`lan`）**：放行配对设备访问 `GET /api/v1/artifact/<id>/<version>`。
 
 ## 为什么这样

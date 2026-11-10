@@ -2,7 +2,7 @@
   "id": "orchestrator",
   "version": 1,
   "role": "orchestrator",
-  "name": "管家",
+  "name": "助手",
   "duty": "替用户派活、转告结果",
   "tags": [],
   "look": {

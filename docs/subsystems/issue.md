@@ -27,7 +27,7 @@
 |---|---|
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
 | 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
-| 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[管家](docs/subsystems/orchestrator.md#模型和不变量)） |
+| 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[助手](docs/subsystems/orchestrator.md#模型和不变量)） |
 | 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
 | 完成与交付：冲突预检、跑 `.vibevalley/check`、合入父分支或主分支、提 PR 与轮询 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
 
@@ -54,14 +54,14 @@
 - **写操作收敛为「挪状态」与「说话」**：流转调 `issue.status.update`，评论调 `issue.comment.create`。前端按钮（`stage.acts`）自带请求参数，不重写判断。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID（`Issue.idOf`）。
 - **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`；启动失败且工作区干净时撤回新单，已有改动则保留现场。
-- **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，管家建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
+- **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
 - **PR 在途自动跟进**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；仅 `prSubmit=false` 显式交接才进 `in_review`。
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后经 `mergeInto` 合入父分支。
 - **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单必须先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
-- **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，管家 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
+- **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，助手 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
 
 ## 怎么走
 
@@ -82,7 +82,7 @@
 
 用户将工单挪到 `done` 时，服务端按 `deliver` 与分支状态判定交付：
 
-1. **无代码改动（`none`）**：管家工单、`deliver: answer` 或分支无新提交时，直接记 `delivered: none` 并关闭会话。
+1. **无代码改动（`none`）**：助手工单、`deliver: answer` 或分支无新提交时，直接记 `delivered: none` 并关闭会话。
 2. **保留分支（`kept`）**：`deliver: branch` 且有提交时，保留分支并关闭会话，记 `delivered: kept`；工作树里未提交的改动不代提交。
 3. **提交 PR/MR（`pull_request`）**：已有开放或已合入的结构化关联可完成；尚未提交时，仓库应已配置 PR 发布，用户点击完成会先运行检查并提交，发布失败就保持原状态；完成时记 `delivered: submitted`，不合并，保留未合入分支及未提交改动。远端状态变化只更新关联，不代替验收。
 4. **要求合入（`change`）**：

@@ -4,7 +4,7 @@
 
 ## 跑起来
 
-需要 Vite+（`vp`）：按 `.node-version` 安装 Node（24），按 `packageManager` 使用 pnpm。帮工使用本机已安装并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和管家只需 DeepSeek 密钥。
+需要 Vite+（`vp`）：按 `.node-version` 安装 Node（24），按 `packageManager` 使用 pnpm。帮工使用本机已安装并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和助手只需 DeepSeek 密钥。
 
 ```bash
 vp install                                   # 根目录：安装全部 workspace 依赖
@@ -44,7 +44,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run desktop:test`：Playwright 启动完整 Electron 应用。
 - `vp run docs:verify`：校验 Note、skill、文档链接与旧名字。
 
-测试不连接真实模型：服务端使用脚本化模型（`@vibevalley/ai/testing`），帮工使用 oar 测试 runtime。管家真模型评测（`vp run --filter @vibevalley/server evals`）消耗 DeepSeek 额度，运行前须经用户同意。
+测试不连接真实模型：服务端使用脚本化模型（`@vibevalley/ai/testing`），帮工使用 oar 测试 runtime。助手真模型评测（`vp run --filter @vibevalley/server evals`）消耗 DeepSeek 额度，运行前须经用户同意。
 
 ## 分支、提交和 PR
 
@@ -66,7 +66,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 ## 调试台
 
-农场页按 `` ` `` 打开调试台（`apps/web/src/farm/debug/`），可控制通话、管家与时间，查看帮工、音效、状态帧与事件。URL 加 `?tod=0.9` 可固定首页与农场的昼夜时间。
+农场页按 `` ` `` 打开调试台（`apps/web/src/farm/debug/`），可控制通话、助手与时间，查看帮工、音效、状态帧与事件。URL 加 `?tod=0.9` 可固定首页与农场的昼夜时间。
 
 ## 只用命令行派一个活
 

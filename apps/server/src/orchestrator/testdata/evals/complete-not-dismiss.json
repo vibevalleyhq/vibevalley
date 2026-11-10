@@ -2,7 +2,7 @@
   "id": "complete-not-dismiss",
   "createdAt": 1792271400000,
   "model": "deepseek-flash",
-  "want": "用户说收下 #41，管家却把工单挪到已取消让帮工收工，改动没进主分支。收下是完成：用 issue_status_update 挪到已完成，照工单交付。",
+  "want": "用户说收下 #41，助手却把工单挪到已取消让帮工收工，改动没进主分支。收下是完成：用 issue_status_update 挪到已完成，照工单交付。",
   "memory": "",
   "tools": [
     "channel_create",

@@ -130,7 +130,7 @@ const channelLayer = (x: FakeSessions) =>
           id: defaultOrchestrator,
           role: "orchestrator",
           agent: defaultOrchestrator,
-          name: "管家",
+          name: "助手",
           runtime: "vibevalley",
           brief: "",
           repo: null,
@@ -440,7 +440,7 @@ describe("the chat", () => {
           Effect.gen(function* () {
             yield* hireAndRun(f, x, "w3", "写 hello", "chat-d");
             const [direct, ...more] = directs(f);
-            expect([direct?.peer, direct?.title, more.length]).toEqual([defaultOrchestrator, "管家", 0]);
+            expect([direct?.peer, direct?.title, more.length]).toEqual([defaultOrchestrator, "助手", 0]);
             const heard = yield* news(f);
             const before = x.runsOf("w3").length;
             const { message: said } = yield* f.chat.post({ _tag: "User", text: "@w3 你先别动，我们单独说", channel: direct!.id, sendKey: "" });
@@ -563,7 +563,7 @@ describe("the chat", () => {
         expect(text2).toEqual(["看图"]);
         const text3 = yield* Effect.promise(() => text("has:link"));
         expect(text3).toEqual(["一个链接 https://example.com/page"]);
-        const text4 = yield* Effect.promise(() => text("图 from:管家"));
+        const text4 = yield* Effect.promise(() => text("图 from:助手"));
         expect(text4).toEqual(["我看了图"]);
         const text5 = yield* Effect.promise(() => text("from:用户 in:#general 图"));
         expect(text5).toEqual(["看图"]);
@@ -668,7 +668,7 @@ describe("the chat", () => {
         const session: T.Session = {
           id: sessionId("o2"),
           role: "orchestrator",
-          name: "另一个管家",
+          name: "另一个助手",
           agent: "lab",
           runtime: "pi",
           brief: "",
@@ -697,7 +697,7 @@ describe("the chat", () => {
       Effect.gen(function* () {
         const thread = yield* hireAndRun(f, x, "w7", "写 hello", "chat-e");
         // The orchestrator is never cooled down, so only the hop limit holds.
-        for (let i = 1; i <= 5; i++) expect((yield* f.chat.post({ _tag: "Agent", from: "w7", text: `@管家 第 ${i} 次问`, anyway: true })).kind).toBe("sent");
+        for (let i = 1; i <= 5; i++) expect((yield* f.chat.post({ _tag: "Agent", from: "w7", text: `@助手 第 ${i} 次问`, anyway: true })).kind).toBe("sent");
         const held = (yield* Effect.promise(() => f.deliveries(defaultOrchestrator))).filter((d) => d.reason === "mention").map((d) => d.held_by);
         expect(held).toEqual(["", "", "", "", "hop_limit"]);
         const notices = f.messagesOf(thread.id).filter((m) => m.kind === "notice");

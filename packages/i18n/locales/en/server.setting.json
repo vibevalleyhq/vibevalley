@@ -24,7 +24,7 @@
     "url": "The model's address is a full address starting with http(s), such as https://api.openai.com/v1/chat/completions",
     "voiceId": "The voice cannot be empty: pick one or fill in a MiniMax voice id",
     "microsoft": "Microsoft speech needs a region and a voice name",
-    "persona": "The manager's persona cannot be empty"
+    "persona": "The assistant's persona cannot be empty"
   },
   "defaults": {
     "failureMessage": "I got stuck for a moment. Could you say that again?"

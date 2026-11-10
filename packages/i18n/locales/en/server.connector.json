@@ -20,7 +20,7 @@
   "noConnector": "There is no connection {id}",
   "noChannel": "There is no channel called {name}",
   "line": {
-    "orchestrator": "Manager",
+    "orchestrator": "Assistant",
     "dispatch": "sent",
     "thread": "in a ticket's thread",
     "head": "[{who}]",

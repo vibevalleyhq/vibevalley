@@ -36,7 +36,7 @@ const turns: MossLineState["turns"] = [
 ];
 
 const events: MossLineState["events"] = [
-  { up: true, text: '{"type":"session.update","persona":"农场的管家"}' },
+  { up: true, text: '{"type":"session.update","persona":"农场的助手"}' },
   { up: false, text: '{"type":"session.created"}' },
   { up: false, text: '{"type":"input.speech.started"}' },
   { up: false, text: '{"type":"input.speech.stopped"}' },

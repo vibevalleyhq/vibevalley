@@ -43,6 +43,11 @@ const RULES: readonly Rule[] = [
     says: "the person is 你 when spoken to, 用户 when spoken about (to a model, in docs), and called by the name they set; docs/README.md 用语",
   },
   {
+    name: "管家 for the assistant",
+    pattern: /管家/u,
+    says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); the code name stays orchestrator (docs/README.md 用语)",
+  },
+  {
     name: "产出 for an artifact",
     pattern: /产出/u,
     says: "the user and the prompts call an artifact 稿子, and its versions 第 N 稿 (docs/README.md 用语); 产出 named nothing a person would say",
@@ -303,7 +308,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a profile called a helper's where the user reads it",
     pattern: /帮工档案/u,
-    says: "档案 (a profile): its role is 管家 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
+    says: "档案 (a profile): its role is 助手 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
     dirs: ["apps/web/src", "apps/server/src"],
     // On the server only the word tables are the user's; prompts.ts is a model's.
     except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
@@ -384,7 +389,7 @@ const RULES: readonly Rule[] = [
     name: "the orchestrator in a local called manager",
     // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face").
     pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
-    says: "orchestrator (or the profile's id): manager is only the English page's word for 管家",
+    says: "orchestrator (or the profile's id): manager is only the English page's word for 助手",
   },
   {
     name: "a service not in Effect's default class form",

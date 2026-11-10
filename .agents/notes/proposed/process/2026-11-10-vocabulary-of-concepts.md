@@ -249,7 +249,7 @@ Status: proposed
 |---|---|---|---|
 | `Fact` | `Core.apply` | 不存：折进核心状态，折完是一个 `seq` | 不改 |
 | `LiveEvent` | `Core` | 不存：只推给在听的页面 | 不改，过了就没了 |
-| `SessionEvent` | `Journal` | `events/<id>.json` | 流式的一步按 `revision` 更新，落盘后不改；帮工留最近 240 条、管家 1000 条，离场 30 天后清文件 |
+| `SessionEvent` | `Journal` | `events/<id>.json` | 流式的一步按 `revision` 更新，落盘后不改；帮工留最近 240 条、助手 1000 条，离场 30 天后清文件 |
 | `Trigger` | `Mailbox.recordTrigger` | `mailbox_trigger` | 内容不改，同一来源的同一件事留第一次的；路由回执（`routed_at`）另写；库里没有删它的查询 |
 | `LedgerEntry` | `Game` | `game_ledger` | 只加，库里没有改和删它的查询 |
 | `Commit` | git | 仓库里 | 不改；它是 git 的，VibeValley 只读 |
@@ -264,7 +264,7 @@ Status: proposed
 |---|---|---|---|
 | `Issue` | 写下时；即时派活先写表拿号再开 Session，启动失败且工作目录干净就撤回 | 库里有删它的查询，谁调没查；关上（`done`、`canceled`）不是没，能重开；核心状态只留没关的和最近关的 50 张 | 换人、重开，id 不变 |
 | `Assignment` | 指派一个档案 | 换人或清空指派（写 `ended_at`） | 同一个档案继续负责时，换 Session 不换它 |
-| `Session` | 派活（`hire`）；和一个档案私聊；管家的在档案存下时登记 | 阶段到 `closed`：从核心状态拿掉，`session` 表里留着 | 多轮、休眠、重启；底下的 oar 会话可以换 |
+| `Session` | 派活（`hire`）；和一个档案私聊；助手的在档案存下时登记 | 阶段到 `closed`：从核心状态拿掉，`session` 表里留着 | 多轮、休眠、重启；底下的 oar 会话可以换 |
 | `Run` | 一次触发；带着 `brief` 的 `sessionPhaseChanged` | 一次汇报（`sessionReported`），写下 `outcome` | 中途插进来的话记进这一轮的 `heard`，不另开 |
 | `Delivery` | `Mailbox.receive` 算出谁该听到，一个 Session 一行 | 到 `consumed`（模型真的读到）或 `dropped` | `handed` 以后没收到回执，退回 `pending` 再投 |
 | `Machine` | 服务端开机时没有就记下自己这台 | 没查 | |
@@ -296,7 +296,7 @@ Status: proposed
 | `Executor` | oar 执行实例的创建、投递、中断和释放 |
 | `Mailbox`、`Ingress` | 谁该听到、什么时候叫醒；外面的来源进来的门 |
 | `Inbox` | 算出要用户处理的事 |
-| `Orchestrator` | 管家：用户直接说话的 agent |
+| `Orchestrator` | 助手：用户直接说话的 agent |
 | `Pkm`、`Media`、`Voice`、`Lan`、`Game` | 笔记、媒体任务、通话和听写、「连接到本机」、账本折出的金币和成就 |
 
 其余 14 个服务里，11 个和一个概念同名（`Issue`、`Session`、`Channel`……），那一行已经在概念表里；3 个是地基（`ServerConfig`、`Db`、`PublicHttp`）。
@@ -428,7 +428,7 @@ Status: proposed
 
 `executor` 一个词三样东西。建议：表改 `issue_assignment_session`，列改 `session`，`Assignment.executions` 改 `sessions`；`runtime_todo.executor` 改 `by`。`Executor` 和 `Execution` 只留给 oar 那一层。
 
-另一处同义：用语表写「帮工 = Session」，又写档案的角色是「管家或帮工（`worker`）」。管家也有 Session（`Session.role` 是 `orchestrator`）。精确的说法：Session 是执行上下文；帮工是角色为 `worker` 的 Session。`worker` 这个取值和 `Assignment.executions[].kind` 的 `worker` 是同一个词，留一处。
+另一处同义：用语表写「帮工 = Session」，又写档案的角色是「助手或帮工（`worker`）」。助手也有 Session（`Session.role` 是 `orchestrator`）。精确的说法：Session 是执行上下文；帮工是角色为 `worker` 的 Session。`worker` 这个取值和 `Assignment.executions[].kind` 的 `worker` 是同一个词，留一处。
 
 ### 五、触发（双关）
 

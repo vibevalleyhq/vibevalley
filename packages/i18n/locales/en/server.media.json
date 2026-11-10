@@ -19,7 +19,7 @@
   "understandingRejected": "MOSS rejected the understanding request. It was not repeated.",
   "remoteUnresolved": "Some uploads have no confirmed file ID. Known files were cleaned, but inspect these names in the provider console: {files}",
   "understandingPhase": {
-    "authorized": "Awaiting orchestrator",
+    "authorized": "Awaiting the assistant",
     "queued": "Queued",
     "uploading": "Uploading to MOSS",
     "generating": "Understanding",

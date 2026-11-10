@@ -23,7 +23,7 @@ Status: proposed
 三步，一步一个提交，行为不变：
 
 1. 绑定规则合成一个（`setting/provider.ts` 的 `bindingOf`）；供应商目录（`provider/vendors.ts`），MOSS 生图走通；`Provider.image(request)` 交出不认供应商的绑定；Media 不再 import MOSS。
-2. 其余 MOSS 能力（理解、语音、多人语音、音色设计、转写、听写、Live、实时视觉）照做，DeepSeek（管家的对话模型）、声网（通话线路）进目录；`Provider` 除了连接的增删改与目录查询，只剩不认供应商的能力方法。
+2. 其余 MOSS 能力（理解、语音、多人语音、音色设计、转写、听写、Live、实时视觉）照做，DeepSeek（助手的对话模型）、声网（通话线路）进目录；`Provider` 除了连接的增删改与目录查询，只剩不认供应商的能力方法。
 3. 钥匙改 `Redacted` 与 `Config.redacted`。
 
 ## 进度

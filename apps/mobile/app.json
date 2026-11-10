@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "infoPlist": {
         "UIBackgroundModes": ["audio"],
-        "NSMicrophoneUsageDescription": "和管家打电话要用麦克风",
+        "NSMicrophoneUsageDescription": "和助手打电话要用麦克风",
         "NSLocalNetworkUsageDescription": "连进同一个网络里那台电脑上的农场",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true

@@ -3,7 +3,7 @@ import { everyone, defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { mentionLead } from "@vibevalley/protocol/rules";
 // The chat's names for who is not a helper; defaultOrchestrator is filled in where the place is known.
 export const chatNamed: Readonly<Record<string, string>> = {
-  管家: defaultOrchestrator,
+  助手: defaultOrchestrator,
   用户: userId,
   所有人: everyone,
   // @manager is what the English page says for the orchestrator (server.channel.mention.orchestrator); @orchestrator already names the
@@ -21,7 +21,7 @@ const chatTick = /`[^`\n]*`/gu;
 
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-/** Who a place's words can name besides the sessions: its own orchestrator (@管家) and every orchestrator by its profile id. */
+/** Who a place's words can name besides the sessions: its own orchestrator (@助手) and every orchestrator by its profile id. */
 export interface Nameable {
   readonly here: string;
   readonly orchestrators: readonly string[];

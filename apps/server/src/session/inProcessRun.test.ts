@@ -43,7 +43,7 @@ const records = Effect.gen(function* () {
       id: "orchestrator",
       role: "orchestrator",
       agent: "orchestrator",
-      name: "管家",
+      name: "助手",
       runtime: "vibevalley",
       brief: "",
       repo: null,

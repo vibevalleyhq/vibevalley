@@ -12,7 +12,7 @@ Status: proposed
 - `apps/server/src/issue/brief.ts` 用 `shortTitle` 提取标题，`apps/server/src/issue/lifecycle.ts` 将结果存为正式标题。长标题可在冒号处被截成 `test(issue)`，完整内容退入说明。
 - `apps/server/src/issue/prompts.ts` 给只读和起草模式追加「不用提交」的例外，抵消通用执行规则。文字豁免不等于工具或文件权限收窄。
 
-[管家](docs/subsystems/orchestrator.md)、[工单](docs/subsystems/issue.md)和[信箱](docs/subsystems/mailbox.md)已经有来源记录、授权、指派、投递与结构化汇报。本提案不再创建一套同名概念，而是检查它们是否共同保证完整工作流程。
+[助手](docs/subsystems/orchestrator.md)、[工单](docs/subsystems/issue.md)和[信箱](docs/subsystems/mailbox.md)已经有来源记录、授权、指派、投递与结构化汇报。本提案不再创建一套同名概念，而是检查它们是否共同保证完整工作流程。
 
 参考基线为 [dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype/tree/8c32a9dc5d72c033816c6a8110b37f40cf94fba4)，固定提交 `8c32a9dc5d72c033816c6a8110b37f40cf94fba4`。本提案依据源码和文档比较，未运行上游或进行模型效果对比。上游声明它是研究原型；规则写在提示词中，不表示该规则都由程序保证。
 
@@ -34,12 +34,12 @@ Status: proposed
 
 | 机制 | 上游配合方式 | 单独删改会破坏什么 | VibeValley 的承接点 |
 |---|---|---|---|
-| 原始要求与授权 | Trigger 保留原文，Mandate 记录授权依据，管家只补路由事实 | 标题或管家转述成为唯一依据，建议变成要求 | 工单来源、`IssueMandate`、`Actor` 和范围约束应贯穿创建、评论、改派、恢复；已确认变更与建议应可区分。 |
-| 一条补充的承接责任 | 相关帮工先决定是否在范围内；仍有工单承接时，管家不再另建工作；交回后才重新路由 | 同一条补充被执行两次，或所有人都以为别人会执行 | 工单负责人、评论投递和转交应共享身份与回执；信息订阅不改变负责人。 |
+| 原始要求与授权 | Trigger 保留原文，Mandate 记录授权依据，助手只补路由事实 | 标题或助手转述成为唯一依据，建议变成要求 | 工单来源、`IssueMandate`、`Actor` 和范围约束应贯穿创建、评论、改派、恢复；已确认变更与建议应可区分。 |
+| 一条补充的承接责任 | 相关帮工先决定是否在范围内；仍有工单承接时，助手不再另建工作；交回后才重新路由 | 同一条补充被执行两次，或所有人都以为别人会执行 | 工单负责人、评论投递和转交应共享身份与回执；信息订阅不改变负责人。 |
 | 范围内自主完成 | 帮工负责调查、实现和验证；普通测试失败不触发交回；实质阻碍才问人 | 递归拆单被禁止后，改成频繁报阻碍，用户仍承担调度 | 内部计划不自动变成业务工单；拆分提案、授权和派发应分开，原负责人应承担集成交付责任。 |
 | 持续对话与恢复 | Ticket 与 Assignment、Session 分离；投递、读取和承接分开记；恢复前重验授权 | 一轮结束即丢责任，或恢复时误启用户已停止的工作 | 工单、指派与执行记录应区分运行结束、交付就绪、业务完成、暂停和授权撤回。 |
 | 交付与注意力 | Report 保存证据，Attention 保存问题，Reply 按用途校验并返回来源 | 少说话变成隐藏问题；完整报告又被多个角色重复播报 | 结构化汇报、问题、频道和收件箱应指向同一结果；排队不等于送达，提交不等于可验收。 |
-| 事件与资源 | 管家不阻塞等待；后台任务有完成事件、槽位和生命周期；待执行动作先持久保存 | 管家结束后无人跟进，或子进程留在后台却显示空闲 | 复用 Mailbox、Session 和 Executor；重启、测试仍运行、交接和投递失败都应有明确归属。 |
+| 事件与资源 | 助手不阻塞等待；后台任务有完成事件、槽位和生命周期；待执行动作先持久保存 | 助手结束后无人跟进，或子进程留在后台却显示空闲 | 复用 Mailbox、Session 和 Executor；重启、测试仍运行、交接和投递失败都应有明确归属。 |
 | 策略与追溯 | Policy 版本约束在途判断，提示词按部件装配并记录版本 | 文本热改后无法解释依据，或者记录了版本却不知何时生效 | 复用提示前缀指纹和运行轨迹，分别验证自有 Brain 与外部农机的注入时机。 |
 
 上游允许多个 Ticket 订阅同一 Thread。VibeValley 不必复制这张关系表，但应保留「有明确承接者时不重复派发」的职责。上下文可流向多人，执行权限不随上下文传播。
@@ -64,12 +64,12 @@ Status: proposed
 
 | 编号 | 上游规则与职责 | 拟议决策及替代 | 验收组 |
 |---|---|---|---|
-| R01 | shared、dispatch：原始请求不由路由者改写 | 保留原文与来源；管家不应扩大范围。 | A01 |
-| R02 | dispatch：管家不添加实现方案或验收条件 | 区分普通路由与获授权起草；起草建议经确认后才成为执行要求。 | A01、A02 |
+| R01 | shared、dispatch：原始请求不由路由者改写 | 保留原文与来源；助手不应扩大范围。 | A01 |
+| R02 | dispatch：助手不添加实现方案或验收条件 | 区分普通路由与获授权起草；起草建议经确认后才成为执行要求。 | A01、A02 |
 | R03 | scope：文件多、测试失败不构成交回理由 | 保留范围内持续执行；已有批准方案不因跨文件再次停工。 | A03 |
 | R04 | work：代码默认交付 PR，除非任务另有要求 | 按 `deliver` 适配答案、分支、变更和 PR；保留执行者完成交付的责任。 | A03 |
 | R05 | handoff：问题用结构化 Attention 表达 | 复用工单问题与来源关联；一项一个决定，解决后明确清除。 | A04 |
-| R06 | replies：排队不证明投递成功 | 保留用途、来源与投递回执；同一结果不由帮工、管家和系统重复发送。 | A04 |
+| R06 | replies：排队不证明投递成功 | 保留用途、来源与投递回执；同一结果不由帮工、助手和系统重复发送。 | A04 |
 | R07 | replies：IM 一律不超过 100 词 | 不采用全场景数字限制；保留简短通知、完整证据和按需查阅的分工。 | A04 |
 | R08 | subscriptions：订阅消息是上下文，不增加权限 | 保留来源身份与授权边界；机器人、引用和外部文档不应授予新权限。 | A01、A05 |
 | R09 | subscriptions：人的补充可恢复 ended Ticket | 先按上一节映射结束原因与授权，再确定续跑入口；不直接删除连续协作能力，也不自动重开用户已完成的工单。 | A05、A06 |
@@ -101,7 +101,7 @@ R19–R21 是不采用上游团队的默认授权，不是取消合并、署名�
 
 | 部件组 | 上游名称 | 本地归属 |
 |---|---|---|
-| 共同边界与角色 | `runtime/shared`、`runtime/orchestrator`、`runtime/worker` | 管家与会话的角色规则，配合实际工具权限 |
+| 共同边界与角色 | `runtime/shared`、`runtime/orchestrator`、`runtime/worker` | 助手与会话的角色规则，配合实际工具权限 |
 | 团队策略 | Communication、Ticket scope、Delivery requirements | 已有仓库约定与用户明确策略，不重复塞进每张工单 |
 | 工作指引 | `runtime/subscriptions`、`runtime/replies`、`runtime/dispatch`、`runtime/work` | 频道、信箱、工单与会话边界 |
 | 主动承接 | `runtime/admission` | 暂缓产品能力，保留授权原则 |
@@ -117,11 +117,11 @@ R19–R21 是不采用上游团队的默认授权，不是取消合并、署名�
 | Issue 与协议 | 标题、授权范围、负责人、业务拆分、暂停和交付判断 | 第二份工单生命周期或授权真相 |
 | Channel、Ingress、Mailbox | 原始消息、来源、承接目标与持久投递 | 复制的需求库、聊天库或手工消息游标 |
 | Session、Executor、runtime | 实际执行、工具能力、后台资源、恢复与注入记录 | 用提示词冒充进程隔离，或让执行 phase 独占业务结论 |
-| Orchestrator 与 Tool | 路由、派发边界、结构化提问和结果投递 | 管家反复翻译原始要求，或只隐藏工具却不校验调用 |
+| Orchestrator 与 Tool | 路由、派发边界、结构化提问和结果投递 | 助手反复翻译原始要求，或只隐藏工具却不校验调用 |
 | 通用 Brain | 通用提示装配、skills、记忆和轨迹能力 | 在 `packages/agent` 中加入工单、农场或发布规则 |
 | 页面与宿主 | 展示真实状态、证据、待决定问题和当前动作 | 为顶部、托盘或灵动岛分别推导一套业务状态 |
 
-现有实现位置见[架构](docs/architecture.md)及[管家](docs/subsystems/orchestrator.md)、[会话](docs/subsystems/session.md)、[大脑](docs/subsystems/brain.md)、[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[信箱](docs/subsystems/mailbox.md)、[仓库](docs/subsystems/repo.md)。实施应复用这些所有者，不以逐项采用上游为由创建同名服务。
+现有实现位置见[架构](docs/architecture.md)及[助手](docs/subsystems/orchestrator.md)、[会话](docs/subsystems/session.md)、[大脑](docs/subsystems/brain.md)、[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[信箱](docs/subsystems/mailbox.md)、[仓库](docs/subsystems/repo.md)。实施应复用这些所有者，不以逐项采用上游为由创建同名服务。
 
 ### 工单文字与标题
 
@@ -133,7 +133,7 @@ R19–R21 是不采用上游团队的默认授权，不是取消合并、署名�
 
 ### 与已有计划的边界
 
-- [管家的授权](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)拥有动作分档和跨轮同意的细节。本提案要求这些动作共同服务完整工作流程，不另复制一张权限表。
+- [助手的授权](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)拥有动作分档和跨轮同意的细节。本提案要求这些动作共同服务完整工作流程，不另复制一张权限表。
 - [工具集与技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)拥有档案能力与按需加载的细节。给档案增加工具不应自动扩大某张工单的授权。
 - [同工单协作](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)仍是独立提案。其中点名直接启动帮手、自动暂存或提交的建议，不因本提案而获准；实施前应按负责人、写入权限和保留现场的约束重新审查。
 

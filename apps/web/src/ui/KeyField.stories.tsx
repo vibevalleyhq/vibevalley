@@ -40,7 +40,7 @@ export default stories({
             removing={a.removing}
             onRemove={(removing) => set({ removing })}
             link={{ href: "https://platform.deepseek.com", label: "拿钥匙" }}
-            tip="管家和记性用它"
+            tip="助手和记性用它"
             small={a.small}
           >
             <SecretInput placeholder="sk-…" />

@@ -51,7 +51,7 @@
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
-- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `agent` 带 `role: "orchestrator"` 与 `forUser`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
+- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，助手工具为 `agent` 带 `role: "orchestrator"` 与 `forUser`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
 - **模块之间的路径记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员，存在 `scripts/service-paths.json`；`vp run paths:check` 在提交前的钩子里跑，多一条路就失败：要么走已有的门，要么 `vp run paths:write` 写下来并在 PR 里说明；少了的路由 `paths:write` 去掉，不能悄悄回来。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
@@ -93,7 +93,7 @@
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |
 | 宿主 | `host.ts` | Electron、移动模拟器 | — | — | `apps/desktop/test`、`apps/mobile` |
-| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 管家 evals，花钱前先问用户 |
+| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 助手 evals，花钱前先问用户 |
 
 - **不靠睡眠等待**：禁止在测试中写死 `setTimeout`、`Effect.sleep` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 检查）；等待状态用 `until`、`waitFor`、`whenState`，时间窗口用 `TestClock` 拨进。
 - **页面测试按 `data-testid` 定位**：禁止用界面中文文案或 CSS 类名做选择器（`vibevalley/no-copy-selector` 检查）；每页在浅色与深色主题下通过 `apps/web/test/a11y.spec.ts` 检查。

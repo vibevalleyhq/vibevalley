@@ -188,7 +188,7 @@ describe("profiles", () => {
       testConfig(),
       Effect.gen(function* () {
         const s = yield* Agent;
-        expect((yield* Effect.flip(s.create(draft({ name: "外头的管家", role: "orchestrator", runtime: "claude" }))))._tag).toBe("Refused");
+        expect((yield* Effect.flip(s.create(draft({ name: "外头的助手", role: "orchestrator", runtime: "claude" }))))._tag).toBe("Refused");
         const lead = yield* s.create(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
         expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
         expect([s.isOrchestrator(lead.id), s.isOrchestrator("backend")]).toEqual([true, false]);

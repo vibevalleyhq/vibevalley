@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "语言",
-    "line": "界面上的字、管家和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
+    "line": "界面上的字、助手和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
     "zh": "中文",
     "en": "English",
     "label": "界面语言"
@@ -80,7 +80,7 @@
     "device": "只对这台设备"
   },
   "general": {
-    "languageHint": "界面、管家和帮工说的话都用它",
+    "languageHint": "界面、助手和帮工说的话都用它",
     "start": "启动时打开",
     "startHint": "打开应用、或者打开首页时先进哪里",
     "starts": {
@@ -101,7 +101,7 @@
     "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变"
   },
   "models": {
-    "deepseekHint": "管家和 VibeValley 自己的帮工用它"
+    "deepseekHint": "助手和 VibeValley 自己的帮工用它"
   },
   "memory": {
     "intro": "帮工还能去外面的记性里查、往里记。"
@@ -161,7 +161,7 @@
     "dictationUrl": "还没填听写的地址"
   },
   "feature": {
-    "orchestrator": "管家",
+    "orchestrator": "助手",
     "image": "生图",
     "understanding": "媒体理解",
     "speech": "单人语音",

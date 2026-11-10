@@ -136,7 +136,7 @@ describe("memory", () => {
       Effect.gen(function* () {
         const folder = path.join(agentHome(config, defaultOrchestrator), "archive");
         yield* fs.makeDirectory(folder, { recursive: true });
-        yield* fs.writeFileString(path.join(folder, "orchestrator-2026-10-12.md"), "用户：给 clock-in 加分页\n管家：派给老周了\n");
+        yield* fs.writeFileString(path.join(folder, "orchestrator-2026-10-12.md"), "用户：给 clock-in 加分页\n助手：派给老周了\n");
       }),
     );
     return Effect.andThen(

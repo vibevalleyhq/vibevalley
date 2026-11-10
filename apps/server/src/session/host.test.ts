@@ -110,7 +110,7 @@ describe("AgentHost", () => {
         ),
       );
       const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", runtime: "vibevalley", brief: "" },
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
         inputType: "testInput",
         home: config.home,
         cwd: config.workRoot,
@@ -130,7 +130,7 @@ describe("AgentHost", () => {
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
       });
       const kept = yield* (yield* Db).one(qs.sessionByID({ id: "orchestrator" }));
-      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", ended_at: null });
+      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", ended_at: null });
       const caller = new Caller();
       const heard: string[] = [];
       const reading = yield* Effect.forkChild(Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))));
@@ -164,7 +164,7 @@ describe("AgentHost", () => {
       const sessions = yield* Session;
       const { llm } = scriptedLLM();
       const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", runtime: "vibevalley", brief: "" },
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
         inputType: "testInput",
         home: config.home,
         cwd: config.workRoot,
@@ -211,7 +211,7 @@ describe("AgentHost", () => {
       const sessions = yield* Session;
       const { llm } = scriptedLLM();
       const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "管家", runtime: "vibevalley", brief: "" },
+        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
         inputType: "testInput",
         home: config.home,
         cwd: config.workRoot,

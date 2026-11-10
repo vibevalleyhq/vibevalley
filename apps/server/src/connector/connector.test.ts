@@ -227,7 +227,7 @@ describe("the chat apps", () => {
       expect(nth2).toEqual({
         app: "weixin",
         to: user,
-        text: "【管家】\n收到：帮我看看打卡页",
+        text: "【助手】\n收到：帮我看看打卡页",
         reply: "ctx-a",
       });
       const saidIn2 = yield* saidIn(chat.defaultChannel());
@@ -263,7 +263,7 @@ describe("the chat apps", () => {
       script.weixinIn.push(wx(user, "后面的正常消息", "ctx-good"));
       const nth2 = yield* nth(script, "weixin", 0, "the valid message after a bad row");
       expect(nth2).toMatchObject({
-        text: "【管家】\n收到：后面的正常消息",
+        text: "【助手】\n收到：后面的正常消息",
       });
       const saidIn2 = yield* saidIn(chat.defaultChannel());
       expect(saidIn2).toEqual(["后面的正常消息"]);
@@ -338,7 +338,7 @@ describe("the chat apps", () => {
       expect(nth2).toEqual({
         app: "weixin",
         to: user,
-        text: "【管家】\n收到：打卡页怎么样了",
+        text: "【助手】\n收到：打卡页怎么样了",
         reply: "ctx-c",
       });
       const saidIn2 = yield* saidIn(channel.id);
@@ -381,7 +381,7 @@ describe("the chat apps", () => {
       script.opened = "ctx-fresh";
       script.weixinIn.push(wx(user, "五", "ctx-fresh"));
       const fresh = yield* nth(script, "weixin", 0, "the fresh answer");
-      expect(fresh).toMatchObject({ text: "【管家】\n收到：五", reply: "ctx-fresh" });
+      expect(fresh).toMatchObject({ text: "【助手】\n收到：五", reply: "ctx-fresh" });
       expect(script.by("weixin")).toHaveLength(1);
       yield* status((s) => s.pending === 0, "nothing pending");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
@@ -399,7 +399,7 @@ describe("the chat apps", () => {
       yield* TestClock.adjust(30_000);
       const nth2 = yield* nth(script, "weixin", 0, "the held answer");
       expect(nth2).toMatchObject({
-        text: "【管家】\n收到：一",
+        text: "【助手】\n收到：一",
         reply: "ctx-1",
       });
       yield* status((s) => s.pending === 0, "nothing pending");
@@ -444,7 +444,7 @@ describe("the chat apps", () => {
       expect(nth2).toEqual({
         app: "qq",
         to: "user-openid",
-        text: "【管家】\n收到：跑一下测试",
+        text: "【助手】\n收到：跑一下测试",
         reply: last.id,
       });
       const saidIn2 = yield* saidIn(chat.defaultChannel());
@@ -503,7 +503,7 @@ describe("the chat apps", () => {
       script.opened = next.id;
       script.qqIn.push(next);
       const fresh = yield* nth(script, "qq", 1, "the fresh answer");
-      expect([fresh.text, fresh.reply, script.by("qq").length]).toEqual(["【管家】\n收到：二", next.id, 2]);
+      expect([fresh.text, fresh.reply, script.by("qq").length]).toEqual(["【助手】\n收到：二", next.id, 2]);
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
@@ -521,11 +521,11 @@ describe("the chat apps", () => {
       yield* reaches("feishu", "connected");
       const later = [yield* feishuMsg("ou_other", "帮我删库"), yield* feishuMsg("ou_user", "群里的话", "group"), yield* feishuMsg("ou_user", "看看昨天的提交")];
       for (const m of later) script.feishuIn.push(m);
-      const answer = yield* until(async () => script.by("feishu").find((m) => m.text.startsWith("【管家】")), "the answer in Feishu");
+      const answer = yield* until(async () => script.by("feishu").find((m) => m.text.startsWith("【助手】")), "the answer in Feishu");
       expect(answer).toEqual({
         app: "feishu",
         to: "ou_user",
-        text: "【管家】\n收到：看看昨天的提交",
+        text: "【助手】\n收到：看看昨天的提交",
         reply: "",
       });
       const saidIn2 = yield* saidIn(chat.defaultChannel());
@@ -540,7 +540,7 @@ describe("the chat apps", () => {
       yield* qqPaired(script);
       script.weixinIn.push(wx(user, "大家好"));
       yield* nth(script, "weixin", 0, "WeChat answered");
-      expect((yield* nth(script, "qq", 1, "QQ answered")).text).toBe("【管家】\n收到：大家好");
+      expect((yield* nth(script, "qq", 1, "QQ answered")).text).toBe("【助手】\n收到：大家好");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
@@ -668,7 +668,7 @@ describe("the chat apps", () => {
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
         yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: thread, text: "在旧串里继续答复", run: "" });
-        expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
+        expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【助手 · 在工单串里】\n在旧串里继续答复");
         expect(second.by("weixin")).toHaveLength(1);
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);
       }).pipe(Effect.scoped, Effect.provide(farm(second, config)));

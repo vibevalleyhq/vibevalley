@@ -231,7 +231,7 @@ export const params = {
     text: "要它记住的一句话",
   },
   channelMessageList: {
-    id: "#general、#clock-in，或 #general:<消息号>；管家和用户的私聊是 @user",
+    id: "#general、#clock-in，或 #general:<消息号>；助手和用户的私聊是 @user",
   },
   cron: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
@@ -305,13 +305,13 @@ const pkmTierWord: Record<T.PkmTier, string> = {
 };
 
 /** Who the orchestrator is, as a tool answer names it. */
-export const userAgentWord = "管家";
+export const userAgentWord = "助手";
 
 export const issueReportDescription =
   "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记性只认这些字段，不从正文猜。用用户的语言填写。";
 export const issueReportRecorded = (recorded: boolean) => (recorded ? "报告已记录；现在用简短正文说明结果。" : "当前不是正在处理工单的帮工会话，不能交回。 ");
 export const issueHandbackDescription = "把当前工单收到、但超出这张工单授权范围的一条输入退回网关；envelope 填输入卡片的 ID，reason 说明为什么应重新分流。";
-export const issueHandbackRecorded = "已退回管家重新分流。";
+export const issueHandbackRecorded = "已退回助手重新分流。";
 export const issuePrSubmitDescription =
   "在当前工单获用户明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。";
 export const issuePrSubmitted = (result: string) => "PR 已提交：" + result;
@@ -352,7 +352,7 @@ export const descriptions = {
   "issue.get": "看一张工单的全部：要做的、验收标准做到哪了、在等用户什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
   "issue.diff.get": "看完成一张工单会合进仓库什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。用户问「改了什么」或者完成前想确认时用。",
   "channel.message.list":
-    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和用户的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），助手读和用户的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   "issue.review":
     "验收一张交回来的工单：先用 issue_diff_get 看改动，对着它的验收标准逐条看。过了（pass: true）就记下验过，完成仍等用户说；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
   "issue.comment.create": "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
@@ -403,7 +403,7 @@ export const sessionDescriptions = {
   "session.list": "现在谁在场：每个帮工的编号、名字、农机、在哪个仓库、在做什么。",
   "channel.unread.list": "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
   "channel.message.send":
-    "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@用户 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+    "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@助手、@用户 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
   "pkm.search":
     "在用户的笔记里找：用户自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。用户提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
   "pkm.page.get": "读用户笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
@@ -492,10 +492,10 @@ export const answers = {
     failed: (why: string) => "看不了改动：" + why,
   },
   sessionList: {
-    intro: "在场的有用户、管家，和这些帮工：",
+    intro: "在场的有用户、助手，和这些帮工：",
     row: (id: string, name: string, runtime: string, repo: string, phase: string, brief: string) =>
       `- ${id} ${name}（${runtime}，在 ${repo}；${phase}）工单：${brief}`,
-    wake: "要叫醒谁，就在 channel_message_send 的话里写 @ 加编号（如 @w3）、@管家、@用户；只是提到，不带 @。",
+    wake: "要叫醒谁，就在 channel_message_send 的话里写 @ 加编号（如 @w3）、@助手、@用户；只是提到，不带 @。",
   },
   spoken: {
     held: (target: string, shownCount: number, more: number, inbox: string) =>

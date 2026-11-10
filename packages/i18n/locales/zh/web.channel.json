@@ -6,13 +6,13 @@
   },
   "defaultRepo": "默认仓库 {repo}",
   "channels": "频道列表",
-  "defaultHint": "默认的频道：你、管家和帮工都在这儿",
+  "defaultHint": "默认的频道：你、助手和帮工都在这儿",
   "findHint": "在这个频道里找…",
   "find": "在这个频道里找",
   "findMessages": "找消息",
   "settings": "频道设置",
   "inChannel": "频道里的",
-  "empty": "{label} 还没人说话：跟管家说一件要做的事。",
+  "empty": "{label} 还没人说话：跟助手说一件要做的事。",
   "sendTo": "发送消息至 {label}",
   "side": "频道和帮工",
   "channelsTitle": "频道",
@@ -26,7 +26,7 @@
     "thinking": "在想",
     "speaking": "在说"
   },
-  "orchestrator": "管家",
+  "orchestrator": "助手",
   "nobodyOnIt": "现在没有帮工在干，串还留着",
   "replies": "{n} 条回复",
   "thread": "串",
@@ -44,19 +44,19 @@
     "descriptionHint": "这个频道是做什么的？",
     "repo": "默认仓库（可不填）",
     "repoHint": "在这个频道里派活、没说仓库时，就在这个仓库里干",
-    "repoNone": "空着就没有：派活时管家要问在哪个仓库",
+    "repoNone": "空着就没有：派活时助手要问在哪个仓库",
     "settingsOf": "# {name} 的设置",
     "save": "保存"
   },
   "issues": {
-    "empty": "这个频道里还没有工单。在聊天里跟管家说一件要做的事，它会派帮工，工单就列在这里。",
+    "empty": "这个频道里还没有工单。在聊天里跟助手说一件要做的事，它会派帮工，工单就列在这里。",
     "thread": "工单串"
   },
   "crons": {
-    "empty": "还没有定时任务：跟管家说「每天九点跑一遍测试」。",
+    "empty": "还没有定时任务：跟助手说「每天九点跑一遍测试」。",
     "next": "下次 {next}",
     "direct": "直接派 {agent}",
-    "byOrchestrator": "管家定的",
+    "byOrchestrator": "助手定的",
     "label": "定时任务「{name}」",
     "on": "开着",
     "off": "关着",
@@ -129,14 +129,14 @@
     "title": "成员",
     "user": "你",
     "none": "这里还没有帮工",
-    "inChannel": "频道里的管家"
+    "inChannel": "频道里的助手"
   },
   "composer": {
     "notSent": "没发出去：{why}",
     "who": "叫谁",
     "mention": "叫人",
-    "stop": "叫停管家",
-    "stopHint": "叫管家停下这一轮，派出去的帮工照常干活",
+    "stop": "叫停助手",
+    "stopHint": "叫助手停下这一轮，派出去的帮工照常干活",
     "send": "发送",
     "sendHint": "回车发送 · Shift+回车换行",
     "replying": "回复 {name}",
@@ -151,8 +151,8 @@
     "name": "名称",
     "category": "分组（可不填）",
     "categoryHint": "侧栏里按分组列频道",
-    "members": "频道里的管家",
-    "membersHint": "在频道里的管家能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
+    "members": "频道里的助手",
+    "membersHint": "在频道里的助手能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
     "notify": "提醒",
     "notifyAll": "全部",
     "notifyMentions": "只在有人 @你 时",
@@ -236,7 +236,7 @@
     "talkThread": "{who}的串",
     "thread": "串",
     "mention": {
-      "orchestrator": "@管家",
+      "orchestrator": "@助手",
       "user": "@用户",
       "everyone": "@所有人"
     },
@@ -253,15 +253,15 @@
       "needs": "/issue 后面写工单的标题"
     },
     "remember": {
-      "name": "让管家记住",
+      "name": "让助手记住",
       "args": "一句话",
-      "note": "记进这里管家的记性",
+      "note": "记进这里助手的记性",
       "needs": "/remember 后面写要它记住的话"
     },
     "stop": {
-      "name": "叫停管家",
+      "name": "叫停助手",
       "args": "",
-      "note": "这里的管家停下这一轮，派出去的帮工照常干活",
+      "note": "这里的助手停下这一轮，派出去的帮工照常干活",
       "needs": ""
     },
     "dm": {
@@ -273,7 +273,7 @@
     "imagegen": {
       "name": "生图",
       "args": "描述",
-      "note": "交给这里的管家用 MOSS 画一张，画好发回这里",
+      "note": "交给这里的助手用 MOSS 画一张，画好发回这里",
       "needs": "/imagegen 后面写想要的画面",
       "nowhere": "先打开一个频道再生图",
       "notReady": "生图还没设置好：{why}，回车去设置"
@@ -282,7 +282,7 @@
       "issue": "记下了 #{n}",
       "remember": "记下了",
       "stop": "叫停了",
-      "imagegen": "交给管家了，画好会发到这里"
+      "imagegen": "交给助手了，画好会发到这里"
     }
   }
 }

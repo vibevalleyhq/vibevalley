@@ -6,13 +6,13 @@
   },
   "defaultRepo": "default repo {repo}",
   "channels": "Channels",
-  "defaultHint": "The default channel: you, the manager and the helpers are all here",
+  "defaultHint": "The default channel: you, the assistant and the helpers are all here",
   "findHint": "Find in this channel…",
   "find": "Find in this channel",
   "findMessages": "Find messages",
   "settings": "Channel settings",
   "inChannel": "In the channel",
-  "empty": "Nobody has spoken in {label}: tell the manager something to do.",
+  "empty": "Nobody has spoken in {label}: tell the assistant something to do.",
   "sendTo": "Message {label}",
   "side": "Channels and helpers",
   "channelsTitle": "Channels",
@@ -26,7 +26,7 @@
     "thinking": "thinking",
     "speaking": "speaking"
   },
-  "orchestrator": "Manager",
+  "orchestrator": "Assistant",
   "nobodyOnIt": "No helper is on it now; the thread stays",
   "replies": "{n, plural, one {# reply} other {# replies}}",
   "thread": "Thread",
@@ -44,19 +44,19 @@
     "descriptionHint": "What is this channel for?",
     "repo": "Default repo (optional)",
     "repoHint": "Work sent in this channel without a repo goes to this one",
-    "repoNone": "Empty means none: the manager asks which repo when sending work",
+    "repoNone": "Empty means none: the assistant asks which repo when sending work",
     "settingsOf": "Settings of # {name}",
     "save": "Save"
   },
   "issues": {
-    "empty": "No tickets in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the ticket is listed here.",
+    "empty": "No tickets in this channel yet. Tell the assistant something to do in the chat; it sends a helper, and the ticket is listed here.",
     "thread": "Ticket thread"
   },
   "crons": {
-    "empty": "No scheduled tasks: tell the manager \"run the tests every day at nine\".",
+    "empty": "No scheduled tasks: tell the assistant \"run the tests every day at nine\".",
     "next": "next {next}",
     "direct": "straight to {agent}",
-    "byOrchestrator": "set by the manager",
+    "byOrchestrator": "set by the assistant",
     "label": "Scheduled task \"{name}\"",
     "on": "On",
     "off": "Off",
@@ -129,14 +129,14 @@
     "title": "Members",
     "user": "You",
     "none": "No helpers here yet",
-    "inChannel": "A manager in the channel"
+    "inChannel": "An assistant in the channel"
   },
   "composer": {
     "notSent": "Not sent: {why}",
     "who": "Who",
     "mention": "Mention someone",
-    "stop": "Stop the manager",
-    "stopHint": "Stops the manager's round; helpers already sent keep working",
+    "stop": "Stop the assistant",
+    "stopHint": "Stops the assistant's round; helpers already sent keep working",
     "send": "Send",
     "sendHint": "Enter sends · Shift+Enter for a new line",
     "replying": "Replying to {name}",
@@ -151,8 +151,8 @@
     "name": "Name",
     "category": "Group (optional)",
     "categoryHint": "The sidebar lists channels by group",
-    "members": "Managers in the channel",
-    "membersHint": "The managers in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
+    "members": "Assistants in the channel",
+    "membersHint": "The assistants in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
     "notify": "Notify",
     "notifyAll": "All",
     "notifyMentions": "Only @user",
@@ -236,7 +236,7 @@
     "talkThread": "{who}'s thread",
     "thread": "Thread",
     "mention": {
-      "orchestrator": "@manager",
+      "orchestrator": "@assistant",
       "user": "@user",
       "everyone": "@everyone"
     },
@@ -253,15 +253,15 @@
       "needs": "Write the ticket's title after /issue"
     },
     "remember": {
-      "name": "Have the manager remember",
+      "name": "Have the assistant remember",
       "args": "a line",
-      "note": "Kept in the memory of the manager here",
+      "note": "Kept in the memory of the assistant here",
       "needs": "Write what it should remember after /remember"
     },
     "stop": {
-      "name": "Stop the manager",
+      "name": "Stop the assistant",
       "args": "",
-      "note": "The manager here stops this turn; helpers it sent keep working",
+      "note": "The assistant here stops this turn; helpers it sent keep working",
       "needs": ""
     },
     "dm": {
@@ -273,7 +273,7 @@
     "imagegen": {
       "name": "Make an image",
       "args": "description",
-      "note": "The manager here draws it with MOSS and posts it here",
+      "note": "The assistant here draws it with MOSS and posts it here",
       "needs": "Write what to draw after /imagegen",
       "nowhere": "Open a channel first to make an image",
       "notReady": "Images aren't set up: {why}. Press Enter to set it up"
@@ -282,7 +282,7 @@
       "issue": "Written down as #{n}",
       "remember": "Remembered",
       "stop": "Stopped",
-      "imagegen": "Handed to the manager; the image will be posted here"
+      "imagegen": "Handed to the assistant; the image will be posted here"
     }
   }
 }

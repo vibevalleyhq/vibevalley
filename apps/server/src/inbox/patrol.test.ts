@@ -66,7 +66,7 @@ describe("what reaches the user off the farm", () => {
     from: "orchestrator",
     fromKind: "agent",
     fromRole: "orchestrator",
-    name: "管家",
+    name: "助手",
     kind: "chat",
     text: "好",
     at: 0,

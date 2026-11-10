@@ -36,7 +36,7 @@ export default stories({
   title: "组件/频道/定时任务",
   stories: {
     States: story({
-      note: "开着、关着、管家提的等你批准。",
+      note: "开着、关着、助手提的等你批准。",
       args: { state: "enabled" },
       grid: { rows: ["state", ["enabled", "disabled", "pending"]] },
       render: (a) => (

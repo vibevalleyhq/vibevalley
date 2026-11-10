@@ -6,7 +6,7 @@
   "reading": "Reading…",
   "never": "Never mind",
   "later": "Leave it for now",
-  "orchestrator": "Manager",
+  "orchestrator": "Assistant",
   "noHelper": "No helper yet",
   "board": {
     "earlier": "{n} earlier",
@@ -177,10 +177,10 @@
       "run/error": "Error",
       "run/end": "Round over"
     },
-    "orchestratorStuck": "The manager did not finish answering this round: see what it said in its channel",
+    "orchestratorStuck": "The assistant did not finish answering this round: see what it said in its channel",
     "job": "To do",
     "from": "From",
-    "fromCron": "A scheduled task: each time it is due it goes to the manager, and its answer waits for you",
+    "fromCron": "A scheduled task: each time it is due it goes to the assistant, and its answer waits for you",
     "answered": "In its channel",
     "evidence": "Evidence",
     "unsure": "Not sure about",
@@ -281,7 +281,7 @@
     "heard": "{n, plural, one {heard # word on the way} other {heard # words on the way}}"
   },
   "card": {
-    "orchestrator": "Manager",
+    "orchestrator": "Assistant",
     "refining": "{name} is drafting",
     "draft": "Draft",
     "queued": "Queued",
@@ -297,7 +297,7 @@
     "used": "took {took}",
     "run": "round {n}",
     "runs": "{n, plural, one {# round} other {# rounds}}",
-    "orchestratorWorking": "the manager is on it",
+    "orchestratorWorking": "the assistant is on it",
     "missingFlag": "Record missing",
     "missing": "The run's record is missing: {what}"
   },

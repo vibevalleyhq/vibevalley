@@ -38,8 +38,8 @@ export const zh = {
     // The job's branch as the story goes (a helper's branch is vibevalley/<helper>-<time>).
     git: { branch: "vibevalley/w3-mgr2k", worktree: "自己的 worktree", commits: "个提交", tests: "测试", merged: "收进 main" },
     steps: [
-      { icon: "act-speaking_text", title: "说一句", text: "对管家说：「在 clock-in 里加一个查询打卡记录的接口，写测试。」打字也行，按住说话也行。" },
-      { icon: "icon-seeds", title: "派活", text: "管家挑一个合适的帮工，在项目里给它开独立的分支和 worktree，像在空地上播下种子。" },
+      { icon: "act-speaking_text", title: "说一句", text: "对助手说：「在 clock-in 里加一个查询打卡记录的接口，写测试。」打字也行，按住说话也行。" },
+      { icon: "icon-seeds", title: "派活", text: "助手挑一个合适的帮工，在项目里给它开独立的分支和 worktree，像在空地上播下种子。" },
       {
         icon: "act-run_command",
         title: "干活",
@@ -63,14 +63,14 @@ export const zh = {
       {
         icon: "icon-board",
         title: "田头群聊",
-        text: "你、管家和帮工在同一个群里说话。每件活下面挂一个工单串，帮工在里面确认、提问、汇报，你随时插话；还能按项目开频道。",
+        text: "你、助手和帮工在同一个群里说话。每件活下面挂一个工单串，帮工在里面确认、提问、汇报，你随时插话；还能按项目开频道。",
       },
       {
         icon: "icon-task-board",
         title: "种植计划",
         text: "长任务先拆成一张有先后的步骤图，你看过草稿再开工。修 bug 时第一步先写一个会失败的验收测试，后面的步骤谁也改不动它。",
       },
-      { icon: "button-mic", title: "张嘴就派活", text: "按住说话，语音管家听你说完，交给同一个管家去派活。" },
+      { icon: "button-mic", title: "张嘴就派活", text: "按住说话，语音助手听你说完，交给同一个助手去派活。" },
       {
         icon: "icon-tasks",
         title: "工单看板和地图",
@@ -97,7 +97,7 @@ export const zh = {
   screens: {
     title: "看看农场",
     items: [
-      { image: "farm", caption: "农场：田地、管家和右下角的田头" },
+      { image: "farm", caption: "农场：田地、助手和右下角的田头" },
       { image: "title", caption: "首页：昼夜跟着你的时间走" },
       { image: "chat", caption: "聊天页：频道、帮工和右边打开的工单串" },
     ],
@@ -115,7 +115,7 @@ export const zh = {
     list: [
       "macOS（Apple 芯片）",
       "至少一个装好并登录的编码 agent：pi、Claude Code 或 Codex",
-      "一把 DeepSeek 的 API 钥匙，管家要用",
+      "一把 DeepSeek 的 API 钥匙，助手要用",
       "自己构建要 Bun 1.4 和 Node 24",
     ],
     build: "打一个 macOS 应用",

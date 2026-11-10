@@ -4,7 +4,7 @@
 
 ## 什么时候用
 
-用于 `media`、音频协议、下载与附件、理解授权、管家媒体工具、`/media` 页，以及 MOSS Live／Vision 的实时视觉、播放与资源生命周期。模型列表能查、用途能绑定，不等于生成能用。
+用于 `media`、音频协议、下载与附件、理解授权、助手媒体工具、`/media` 页，以及 MOSS Live／Vision 的实时视觉、播放与资源生命周期。模型列表能查、用途能绑定，不等于生成能用。
 
 ## 准备
 
@@ -41,8 +41,8 @@
 2. 跑 `vp run --filter @vibevalley/web e2e:integration 'test/understanding.spec.ts$'`，再加 `VIBEVALLEY_WEB_DEV=1` 跑同一项。测试选择仓库中的合成 PNG 和可解码 MP4，不用用户的媒体；确认未勾选许可不能提交，选择后文件先落本机，结果进入 Core、显示并存为稿子。重试同一 ID 和刷新不新建任务；截断正文不丢，清理重试不重复理解。
 3. 跑 `vp run --filter @vibevalley/web e2e:audit 'test/a11y.spec.ts$' --grep 'understanding results'`。读取 `.screens/understanding-{form,ready,incomplete,unknown,canceled}-{light,dark}-{1280,390}.png`，核对许可、截断、费用未知与清理含义；不要只看空状态。
 4. 用 `verify-server.ts --scripted-helper -- <脚本>` 单独核对 JSON 接口与状态流：预留输入、二进制 PUT、带连接及 revision 的 `media.understanding.create`、查询至结果与清理完成、重试同一请求、保存稿子、删除已释放的本机输入后仍能读取结果。`media.understanding.previewCleanup` 不得修改文件或调用供应商。保留脚本输出与 `result.json`；测试 runtime 替换厂商传输，不是实际 MOSS 推理。
-5. 委托路径还需跑 `src/flows/media.test.ts`：用户登记 `media.understanding.authorize` 后应为 `authorized`、输入保留且没有厂商请求；可信管家只传 ID，必须在授权频道承接用户输入。错误频道、自主巡查、HTTP 用户绕过、过期、换 Key、改参数及其他档案重用均拒绝；并发重复开始只上传一次。排队期间换 Key 也必须在上传前拒绝。取消、过期与重启释放尚未执行的输入。
-6. 在真实页面选授权频道，刷新后授权仍在；「发送给管家」只发一条去重的用户消息，撤销后按钮和输入保留按服务端状态改变。用隔离程序核对 `authorize → start 被 HTTP 拒绝 → cancel` 及状态流；脚本模型的可信执行证明与 HTTP 拒绝证明分开保留。
+5. 委托路径还需跑 `src/flows/media.test.ts`：用户登记 `media.understanding.authorize` 后应为 `authorized`、输入保留且没有厂商请求；可信助手只传 ID，必须在授权频道承接用户输入。错误频道、自主巡查、HTTP 用户绕过、过期、换 Key、改参数及其他档案重用均拒绝；并发重复开始只上传一次。排队期间换 Key 也必须在上传前拒绝。取消、过期与重启释放尚未执行的输入。
+6. 在真实页面选授权频道，刷新后授权仍在；「发送给助手」只发一条去重的用户消息，撤销后按钮和输入保留按服务端状态改变。用隔离程序核对 `authorize → start 被 HTTP 拒绝 → cancel` 及状态流；脚本模型的可信执行证明与 HTTP 拒绝证明分开保留。
 
 ## 单人语音
 

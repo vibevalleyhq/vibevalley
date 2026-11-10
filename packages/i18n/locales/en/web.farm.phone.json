@@ -2,7 +2,7 @@
   "ringing": "Incoming…",
   "decline": "Decline",
   "answer": "Answer",
-  "callOrchestrator": "Call the manager",
+  "callOrchestrator": "Call the assistant",
   "missed": "Missed {n}",
   "log": "Log",
   "noCalls": "No calls yet.",
@@ -11,13 +11,13 @@
   "noMissed": "No missed calls. All is well in the field.",
   "phase": {
     "connecting": "Connecting…",
-    "live": "On the call: go ahead, the manager is listening",
-    "coming": "On the call: the manager is on the way",
+    "live": "On the call: go ahead, the assistant is listening",
+    "coming": "On the call: the assistant is on the way",
     "ending": "Hanging up…",
     "failed": "Not connected: {why}",
-    "idle": "Just say it. When a ticket comes back or gets stuck, the manager calls you too."
+    "idle": "Just say it. When a ticket comes back or gets stuck, the assistant calls you too."
   },
-  "manager": "Manager",
+  "manager": "Assistant",
   "hangUp": "Hang up",
   "app": {
     "missed": "Missed",

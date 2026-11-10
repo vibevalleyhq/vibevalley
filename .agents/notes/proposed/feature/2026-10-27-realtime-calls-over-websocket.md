@@ -23,10 +23,10 @@ Status: proposed
 
 ### 2. 实时模型当嘴，农场事务调 `ask_orchestrator`
 
-- **接听配置**：`VoiceAnswer` 新增 `{ vendor: "realtime"; url: string; model: string; voice: string }`，密钥存于 `settings.json` 的 `realtimeKey`（默认仍为声网管家模式）。
-- **工具问管家**：日常寒暄由实时模型直接秒回；涉及工单、帮工、派活或记忆时，实时模型调用进程内工具 `ask_orchestrator` 将用户原话交 `Orchestrator`，再将管家回复口语化念出。
-- **频道落库不重不漏**：用户输入转写定稿与模型自答经 `Channel.spoken` 记入默认频道（不重复唤醒）；`ask_orchestrator` 由管家写回频道，转述轮不再重复入库。
-- **通话内主动播报与插话**：`Inbox.news` 事项经管家 `brief` 生成摘要后，在当前话音结束后发 `response.create` 播报；收到 `input_audio_buffer.speech_started` 时立即通知前端停播并按实际播放毫秒数发 `conversation.item.truncate`。
+- **接听配置**：`VoiceAnswer` 新增 `{ vendor: "realtime"; url: string; model: string; voice: string }`，密钥存于 `settings.json` 的 `realtimeKey`（默认仍为声网助手模式）。
+- **工具问助手**：日常寒暄由实时模型直接秒回；涉及工单、帮工、派活或记忆时，实时模型调用进程内工具 `ask_orchestrator` 将用户原话交 `Orchestrator`，再将助手回复口语化念出。
+- **频道落库不重不漏**：用户输入转写定稿与模型自答经 `Channel.spoken` 记入默认频道（不重复唤醒）；`ask_orchestrator` 由助手写回频道，转述轮不再重复入库。
+- **通话内主动播报与插话**：`Inbox.news` 事项经助手 `brief` 生成摘要后，在当前话音结束后发 `response.create` 播报；收到 `input_audio_buffer.speech_started` 时立即通知前端停播并按实际播放毫秒数发 `conversation.item.truncate`。
 
 ### 3. 本机 WebSocket 接口与安全边界
 
@@ -35,14 +35,14 @@ Status: proposed
 
 ## Alternatives considered
 
-- **禁用实时模型自答，每句都等管家文字再交模型朗读**：首字需串联转写、管家推理与语音合成三段延迟，且实时模型朗读长文易改词。
+- **禁用实时模型自答，每句都等助手文字再交模型朗读**：首字需串联转写、助手推理与语音合成三段延迟，且实时模型朗读长文易改词。
 - **浏览器直连外部厂商 WebRTC**：仅 OpenAI 支持，且工具调用与转写落库需绕经前端页面中转。
 - **走声网 MLLM 模式**：仍需 Agora 凭据与公网回调入口，无法省去隧道。
 
 ## Acceptance criteria
 
 - 仅配置实时模型地址、模型名与 `realtimeKey`（不填 Agora 凭据、不开 `8788` 线路与隧道）即可在桌面端拨通、对话并挂断。
-- 询问农场状态或派工单时，实时模型调用 `ask_orchestrator` 执行并在默认频道留下唯一一份用户提问与管家回复。
+- 询问农场状态或派工单时，实时模型调用 `ask_orchestrator` 执行并在默认频道留下唯一一份用户提问与助手回复。
 - 插话时前端立即停播并按已播放毫秒数截断服务端上下文，外放通话 3 分钟不因回声自问自答；跨源连接 `/api/v1/voice/realtime` 返回 `403`。
 
 ## Risks

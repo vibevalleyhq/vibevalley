@@ -62,7 +62,7 @@ export default stories({
       args: { checked: true, disabled: false },
       render: (a, set) => (
         <div {...stylex.attrs(viewStyles.choiceStoriesDiv2)}>
-          <PxSwitchField label="自动派活" hint="管家看到空闲的帮工就派" checked={a.checked} disabled={a.disabled} onChange={(checked) => set({ checked })} />
+          <PxSwitchField label="自动派活" hint="助手看到空闲的帮工就派" checked={a.checked} disabled={a.disabled} onChange={(checked) => set({ checked })} />
         </div>
       ),
     }),

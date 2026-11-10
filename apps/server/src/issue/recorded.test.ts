@@ -243,7 +243,7 @@ describe("templates", () => {
       issue("没派过", "app", 8, { sent: false }),
       issue("计划里的一步", "app", 8, { parent: issueId("g") }),
       issue("定时任务", "app", 8, { cron: "s1" }),
-      issue("给管家", "app", 8, { agent: defaultOrchestrator }),
+      issue("给助手", "app", 8, { agent: defaultOrchestrator }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),
       issue("二", "app", 2),

@@ -62,7 +62,7 @@ export default stories({
     }),
     Trajectory: story({
       fill: true,
-      note: "轨迹：每一轮的瀑布图（问、模型、工具三条道），点开一步看输入输出；能把一步标成「做错了」，留给管家的评测。",
+      note: "轨迹：每一轮的瀑布图（问、模型、工具三条道），点开一步看输入输出；能把一步标成「做错了」，留给助手的评测。",
       args: { marking: "ok" },
       controls: { marking: { kind: "choice", options: ["ok", "refused"] } },
       render: (a) => (

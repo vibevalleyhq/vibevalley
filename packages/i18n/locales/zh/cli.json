@@ -348,14 +348,14 @@
     },
     "orchestrator": {
       "archive": {
-        "get": "读管家压掉的一份对话原文",
-        "list": "列出或搜管家压掉的对话原文"
+        "get": "读助手压掉的一份对话原文",
+        "list": "列出或搜助手压掉的对话原文"
       },
       "eval": {
-        "create": "把管家做错的一轮存成评测样例，写上该怎么做"
+        "create": "把助手做错的一轮存成评测样例，写上该怎么做"
       },
-      "open": "让管家上线，可以说话了",
-      "stop": "停下管家这一轮，派出去的帮工接着干"
+      "open": "让助手上线，可以说话了",
+      "stop": "停下助手这一轮，派出去的帮工接着干"
     },
     "pkm": {
       "block": {
@@ -434,8 +434,8 @@
     },
     "media": {
       "understanding": {
-        "authorize": "登记不可变理解请求，只授权指定频道的管家执行一次",
-        "start": "管家按已授权任务编号执行理解，不接受新的输入或授权声明",
+        "authorize": "登记不可变理解请求，只授权指定频道的助手执行一次",
+        "start": "助手按已授权任务编号执行理解，不接受新的输入或授权声明",
         "create": "确认账号和上传许可后理解选中的本机输入",
         "cleanup": "清理已知远端文件，不重复理解请求",
         "previewCleanup": "预览远端清理和本机保留释放，不改变任何文件"
@@ -493,8 +493,8 @@
     "voice": {
       "call": {
         "hear": "交上通话里你说的一句",
-        "say": "交上通话里管家说出的话",
-        "start": "开始和管家通话",
+        "say": "交上通话里助手说出的话",
+        "start": "开始和助手通话",
         "stop": "挂断通话"
       },
       "dictate": "听写：把一段录音转成字",
@@ -543,7 +543,7 @@
       "about": "档案的记性"
     },
     "orchestrator": {
-      "about": "管家：上线、停下、旧账、评测"
+      "about": "助手：上线、停下、旧账、评测"
     },
     "pkm": {
       "about": "笔记：记一句、搜、雷达、日记和页",
@@ -580,7 +580,7 @@
     "unreachable": "农场 {base} 连不上，后面几项没查",
     "noRuntime": "一个农机也没装：帮工没有能干活的",
     "installRuntime": "装一个编码 agent（Claude Code、Codex……），装好以后让农场再找一遍",
-    "noModelKey": "没有 DeepSeek 的 key：管家和自己的 agent 起不来",
+    "noModelKey": "没有 DeepSeek 的 key：助手和自己的 agent 起不来",
     "setModelKey": "在「设置 › 模型」里填 DeepSeek 的 key",
     "lanSettings": "看「设置 › 设备」",
     "wrong": "这几项不对：{checks}"
@@ -610,7 +610,7 @@
     "appPath": "桌面版里的一页，比如 /issues/12；不填是首页",
     "capture": "要记的话；不给就读标准输入",
     "comment": "评论的话",
-    "cronText": "到点时说的话：交给管家或档案去做的事",
+    "cronText": "到点时说的话：交给助手或档案去做的事",
     "memory": "要记的一条",
     "memoryId": "记性的 id，memory list 列出",
     "message": "消息的话",
@@ -731,7 +731,7 @@
     },
     "cronCreate": {
       "run": "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00",
-      "about": "每天早上九点让管家看看昨天的改动"
+      "about": "每天早上九点让助手看看昨天的改动"
     },
     "cronDelete": {
       "about": "先试删，看会删掉什么"

@@ -2,7 +2,7 @@
   "reading": "在读……",
   "unread": "读不到。",
   "notNow": "先不收",
-  "orchestrator": "管家",
+  "orchestrator": "助手",
   "plotOf": "{name}的地",
   "plot": {
     "unread": "这块地的工单还没读到。",
@@ -129,8 +129,8 @@
     "jobHint": "要做什么，做到什么程度算完",
     "job": "工单",
     "who": "谁来种",
-    "orchestratorPicks": "管家挑",
-    "how": "开始：管家把这句话交给帮工，在 {repo} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
+    "orchestratorPicks": "助手挑",
+    "how": "开始：助手把这句话交给帮工，在 {repo} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
     "draft": "草稿",
     "start": "开始"
   },
@@ -170,12 +170,12 @@
     "warehouse": "仓库",
     "graphs": "任务与成就",
     "log": "农场日志",
-    "orchestrator": "管家和宠物",
+    "orchestrator": "助手和宠物",
     "harvest": "收获{name}的地",
     "sow": "播种 · 第 {plot} 块地",
     "water": "给{name}浇水",
     "menu": "菜单",
-    "pickLook": "挑一个你喜欢的管家，农场和对话里马上换上。",
+    "pickLook": "挑一个你喜欢的助手，农场和对话里马上换上。",
     "drawing": "还在画……",
     "pets": "宠物",
     "shopItems": {
@@ -193,7 +193,7 @@
       },
       "doghouse": {
         "name": "狗窝",
-        "note": "给管家的狗"
+        "note": "给助手的狗"
       }
     },
     "shopClosed": "商店还在装修，下一版开张。现在有 {coins} 金币，先攒着。"
@@ -214,7 +214,7 @@
     "yard": "院子里能点的"
   },
   "log": {
-    "empty": "还没有事。开工以后，你和管家说的话、谁做完了什么，都记在这里。",
+    "empty": "还没有事。开工以后，你和助手说的话、谁做完了什么，都记在这里。",
     "you": "你",
     "said": "说",
     "answered": "答",
@@ -244,13 +244,13 @@
       "2": "进度怎么样？",
       "3": "大家收工"
     },
-    "greeting": "这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
+    "greeting": "这里是田头，你、助手和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
     "phase": {
       "off": "打字或者按麦克风，就开工",
-      "connecting": "正在接通管家…",
-      "listening": "管家在听",
-      "thinking": "管家在想…",
-      "speaking": "管家在说",
+      "connecting": "正在接通助手…",
+      "listening": "助手在听",
+      "thinking": "助手在想…",
+      "speaking": "助手在说",
       "error": "没接通，再试一次"
     },
     "newIn": "{n} 处有新话",
@@ -283,7 +283,7 @@
     "pageAndSchedules": "频道页和定时任务",
     "settingsLink": "设置",
     "back2": "返回",
-    "newChannelLine": "一件长期的事、一个仓库，单独一个地方说话、派活。在这里叫管家，活就派在这里。",
+    "newChannelLine": "一件长期的事、一个仓库，单独一个地方说话、派活。在这里叫助手，活就派在这里。",
     "nameHint": "名字，比如 clock-in",
     "name": "频道名",
     "descriptionHint": "做什么的（可以不填）",
@@ -299,11 +299,11 @@
     "anyone": "不指定帮工",
     "inThread": "在串里说，{name}会看到…",
     "inThreadAnyone": "在串里说…",
-    "toOrchestrator": "对管家说，@ 叫帮工…",
-    "toOrchestratorAlone": "只对管家说…",
+    "toOrchestrator": "对助手说，@ 叫帮工…",
+    "toOrchestratorAlone": "只对助手说…",
     "who": "叫谁",
-    "stop": "叫管家停下",
-    "stopHint": "叫管家停下这一轮，派出去的帮工照常干活",
+    "stop": "叫助手停下",
+    "stopHint": "叫助手停下这一轮，派出去的帮工照常干活",
     "send": "发送",
     "less": "收起",
     "more": "展开阅读",
@@ -375,7 +375,7 @@
   },
   "hud": {
     "label": "农场的 HUD",
-    "look": "换管家的样子",
+    "look": "换助手的样子",
     "workbenchHint": "工单、聊天……管活的页面",
     "workbench": "工作台",
     "treeHint": "记忆树：农场学会了什么",
@@ -472,7 +472,7 @@
       "hint": "每个帮工用哪台农机、带什么人设和技能、长什么样"
     },
     "manager": {
-      "hint": "跟管家说话"
+      "hint": "跟助手说话"
     },
     "runtimes": {
       "label": "工坊 · 农具",

@@ -128,7 +128,7 @@ describe("a call's agent", () => {
   it("says which key is missing", () => {
     // The quick model, so the rest needs no line; the default (the orchestrator) needs the line and nothing else.
     expect(vendorsFor(defaultVoice(), { asrKey: "", llmKey: "", ttsKey: "" }, "")).toMatchObject({
-      reason: "管家的语音线路没接通",
+      reason: "助手的语音线路没接通",
     });
     const d: VoiceSettings = {
       ...defaultVoice(),

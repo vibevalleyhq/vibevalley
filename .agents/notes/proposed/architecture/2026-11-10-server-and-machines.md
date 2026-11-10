@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-今天一个 VibeValley 进程就是一台机器的全部：工单、频道、管家、核心状态，和这台机器上的农机（编码 agent）、仓库、worktree 都在同一个进程里，存在同一个 SQLite 文件里。用户要在好几台机器上干活（家里的、公司的、一台跑长任务的服务器），只能每台各开一座农场，工单和频道互不相通。
+今天一个 VibeValley 进程就是一台机器的全部：工单、频道、助手、核心状态，和这台机器上的农机（编码 agent）、仓库、worktree 都在同一个进程里，存在同一个 SQLite 文件里。用户要在好几台机器上干活（家里的、公司的、一台跑长任务的服务器），只能每台各开一座农场，工单和频道互不相通。
 
 按 2026-11-10 的代码数，碰本机的只有几块：`runtime`（探测本机装了哪些农机）、`repo`（git 仓库和 worktree）、`executor` 与 `session` 的启动部分（经 oar 起本机的编码 agent、收它的事件）、轨迹文件。其余的（`core`、`issue`、`channel`、`mailbox`、`orchestrator`、`cron`、`inbox`、`connector`、`setting`、`provider`、`agent` 档案、`memory`、`pkm`、`artifact`、`media`）不碰本机的进程和工作目录，本来就可以放在别处。
 
@@ -14,7 +14,7 @@ Status: proposed
 
 | 概念 | 名字 | 管什么 |
 |---|---|---|
-| 服务端 | server（`apps/server`） | 核心状态只有一份，在这里：工单、频道、信箱、管家（它只调模型接口，不需要本机的农机）、定时、收件箱、连接器、设置、稿子、笔记、媒体。库是 Postgres |
+| 服务端 | server（`apps/server`） | 核心状态只有一份，在这里：工单、频道、信箱、助手（它只调模型接口，不需要本机的农机）、定时、收件箱、连接器、设置、稿子、笔记、媒体。库是 Postgres |
 | 机器 | machine（新的 `apps/machine`，命令 `vibevalley machine …`） | 一台登记过的电脑：探测它的农机、管它的仓库和 worktree、经 oar 起帮工、把帮工的事件和轨迹交回服务端 |
 
 帮工（会话）仍是服务端核心状态里的一个人，只是多了「在哪台机器上」（`Session.machine`）。派活时服务端按档案的农机和仓库挑一台有这个农机、有这个仓库的机器；页面上能看到每台机器在不在、装了什么、在干什么。
@@ -38,7 +38,7 @@ Status: proposed
 3. **机器的链路。** 服务端与机器之间的消息（派活、交回事件、轨迹、探测结果）写成 Schema；`runtime`、`repo`、`executor` 与 `session` 的启动部分搬到 `apps/machine`，经链路和服务端说话。同一个进程里仍跑一份，靠链路的内存实现；测试照旧一个整农场。
    按 2026-11-10 的代码量，这一步拆成四小步，各一个提交：
    - **3a 执行器隔着链路。** 帮工模块对执行器的 9 个调用（起、投递、中断、关闭、失败、观察、放手、查一个、查全部）都换成经链路找机器的执行器；链路的消息写成 `packages/protocol/src/machine` 的 Schema，内存实现把每条消息编码、解码一遍再交给本机的执行器，混进不能序列化的东西就在测试里失败。启动参数（oar 的 `SessionOptions`）是普通数据；oar 的事件仍在服务端读成事实（`reaction.ts` 要读核心状态），所以原样过链路，按 oar 的记录格式认。`find`、`all` 读服务端按机器上报维持的一份执行情况。
-   - **3b 仓库隔着链路。** 工单（改动、冲突、合并、叠放）、帮工（工作目录、放回、清理）、`ingress`（GitHub）、游戏（提交统计）、管家和工具（列仓库）对 `Repo` 的调用经链路找有这个仓库的机器。
+   - **3b 仓库隔着链路。** 工单（改动、冲突、合并、叠放）、帮工（工作目录、放回、清理）、`ingress`（GitHub）、游戏（提交统计）、助手和工具（列仓库）对 `Repo` 的调用经链路找有这个仓库的机器。
    - **3c 探测隔着链路。** 机器上报装了哪些农机、额度和设置是否可用，进 `Machine` 的状态；派活按机器挑。
    - **3d 搬家。** 执行器、仓库、探测和它们的驱动搬到 `apps/machine`，服务端只留链路的一头；同一个进程里仍可两头都跑（内存链路），测试照旧一个整农场。
    用户定了（2026-11-10）先做登录再接着拆：3a 之后先做用户登录（已做完，见[用户和设备](docs/subsystems/user.md)），再做 3b–3d。
@@ -50,7 +50,7 @@ Status: proposed
 | 步 | 状态 | 提交 | 做了什么 |
 |---|---|---|---|
 | 1 Postgres | 完成，CI 上的真 Postgres 未做 | `f94e225de` | 表结构与查询改成 Postgres 方言：时间 `double precision`（不用 `bigint`，Postgres 的驱动把它当字符串交回）、触发器改 plpgsql、全文搜索换成 `term_vector`/`term_query` 加 GIN 索引、JSON 文本列在查询里 `::jsonb`、`authorization` 加引号（保留字）、`channel.root_id` 的外键建完表再加。`scripts/pg-generate.ts` 让 PGlite 对每条查询做 Parse 和 Describe，参数与结果列的类型是 Postgres 说的，结果列来自哪张表哪一列也是它说的（`tableID`、`columnID`），只剩「算出来的列会不会为空」和取值集合靠查询里的记号。驱动二选一：`database.url`（`@effect/sql-pg`，按密钥读，空库才建表、记下哈希，别的一律拒绝启动），否则 PGlite 在 `db` 目录；内存库从每个进程建一次的模板拷一份（新起一个约 0.7 秒，拷一份约 0.1 秒）。服务端测试只开一半的核：PGlite 吃 CPU，开满时最重的几个媒体测试会等过超时。测试里手写的 SQLite 触发器都换成共用的 `refuse`/`allow`（plpgsql）；几个测试原来靠 SQLite 下碰巧的先后（外发消息的顺序、消费后才挂的 👀），改成等那件事本身。手动在一个真的 Postgres（本机临时起的集群）上验过：空库建表并记下哈希，重启认得出，已有别的表的库拒绝启动。还没做：CI 在真 Postgres 上跑服务端测试，要给每座测试农场建一个自己的空库 |
-| 2 机器这个概念 | 完成 | 本步的提交 | 协议加 `Machine`（id、名字、`here`、`online`、加入时间）与事实 `machineChanged`，核心状态加 `machines`（归帮工那一组模块）；表 `machine`（`here` 至多一行）。新模块 `machine/machine.ts`（服务 `Machine`，在帮工那一组里、排在执行器和帮工前面）：开机时没有服务端自己这台就记下（名字是主机名，从 `infra/config.ts` 的 `hostName` 取，`lan` 也改从那里取），告诉核心。雇来的帮工记着它（`Session.machine`、`session.machine` 列），服务端进程里的管家没有。今天只有一台，帮工就在它上面；「按机器挑」等第 3 步有了别的机器再写，免得先立一个只有一个答案的选择。探测到的农机和仓库先不进机器的状态：今天它们走别的推送，第 3 步由机器自己报。黄金数据只多了 `machines: []`（逐行比过）。最重的三个媒体测试单独放宽到 60 秒 |
+| 2 机器这个概念 | 完成 | 本步的提交 | 协议加 `Machine`（id、名字、`here`、`online`、加入时间）与事实 `machineChanged`，核心状态加 `machines`（归帮工那一组模块）；表 `machine`（`here` 至多一行）。新模块 `machine/machine.ts`（服务 `Machine`，在帮工那一组里、排在执行器和帮工前面）：开机时没有服务端自己这台就记下（名字是主机名，从 `infra/config.ts` 的 `hostName` 取，`lan` 也改从那里取），告诉核心。雇来的帮工记着它（`Session.machine`、`session.machine` 列），服务端进程里的助手没有。今天只有一台，帮工就在它上面；「按机器挑」等第 3 步有了别的机器再写，免得先立一个只有一个答案的选择。探测到的农机和仓库先不进机器的状态：今天它们走别的推送，第 3 步由机器自己报。黄金数据只多了 `machines: []`（逐行比过）。最重的三个媒体测试单独放宽到 60 秒 |
 | 3a 执行器隔着链路 | 完成 | 本步的提交 | 帮工模块不再直接拿 `Executor`：`Machine.executions(machine)` 交出那台机器的执行器，今天是本进程的一台，经 `machine/link.ts` 的 `linked`：起、投递、中断、失败的参数和答复，查一个、查全部的结果，观察到的事件、汇报、工具连接，每个值过界都 `structuredClone` 一份（函数会被拒绝，两边不共享对象）。整套测试照旧全过，说明这条路上没有不能上线的东西。链路的消息还没写成 Schema、没有真的网络：那是 3d 搬家时的事，那时 oar 的事件按它的记录格式认 |
 
 ## Alternatives considered

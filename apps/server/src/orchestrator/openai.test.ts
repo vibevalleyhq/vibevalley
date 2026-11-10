@@ -33,7 +33,7 @@ describe("chat/completions", () => {
       [
         {
           messages: [
-            { role: "system", content: "你是管家" },
+            { role: "system", content: "你是助手" },
             { role: "user", content: "旧的" },
             { role: "assistant", content: "好" },
             { role: "user", content: " 让老周跑测试 " },

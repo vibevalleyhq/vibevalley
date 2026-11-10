@@ -1,6 +1,6 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/update.ts、scripts/package.ts）、用真模型重放管家的评测（管家的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下管家的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/update.ts、scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收
@@ -15,16 +15,16 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 |---|---|---|
 | `apps/server/src/**`、`apps/server/db`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
 | `apps/web/src/**`、`apps/web/public` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
-| `media`、生图协议、结果下载、管家媒体工具或 `/media` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与稿子引用真的接通；费用和未知结果边界不变 |
+| `media`、生图协议、结果下载、助手媒体工具或 `/media` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与稿子引用真的接通；费用和未知结果边界不变 |
 | `apps/mobile/**`、`packages/protocol/src/host.ts`、`apps/server/src/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
 | `apps/desktop/src/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
-| 管家的提示、`apps/server/src/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了管家的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
+| 助手的提示、`apps/server/src/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了助手的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
 
 一次改动碰了几块，就读几份，在同一个沙箱子命令里一起做（造数据、调接口、截图）。
 
 不用它：只改了纯函数、单元测试已经覆盖的；只改了注释和文档。
 
-**管家的评测连网、花钱：跑之前先问用户。** 没问、没钥匙时只做那份分册里离线的部分，汇报里写明在线的那半没跑。默认不派真的帮工（要本机登录的农机或钥匙）；用户明确授权验证真实帮工 CLI 时，按服务端分册的「真实帮工的 CLI 与连接观测」执行。普通派活使用沙箱的 `--scripted-helper`（[server.md](.agents/skills/vv-acceptance/references/server.md)）。
+**助手的评测连网、花钱：跑之前先问用户。** 没问、没钥匙时只做那份分册里离线的部分，汇报里写明在线的那半没跑。默认不派真的帮工（要本机登录的农机或钥匙）；用户明确授权验证真实帮工 CLI 时，按服务端分册的「真实帮工的 CLI 与连接观测」执行。普通派活使用沙箱的 `--scripted-helper`（[server.md](.agents/skills/vv-acceptance/references/server.md)）。
 
 ## 准备
 
@@ -34,7 +34,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 ## 步骤
 
 1. 照上表选出分册，读它。
-2. 除了管家的评测，都用同一个沙箱，在仓库根目录跑：
+2. 除了助手的评测，都用同一个沙箱，在仓库根目录跑：
 
    ```bash
    vpx scripts/verify-server.ts [--scripted-helper] -- <这一轮的子命令>

@@ -41,7 +41,7 @@ const msg = (fromKind: ChatMessage["fromKind"], from: string, name: string, text
 });
 
 const user = (text: string, more: Partial<ChatMessage> = {}) => msg("user", "user", "用户", text, more);
-const orchestrator = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "orchestrator", "管家", text, { fromRole: "orchestrator", ...more });
+const orchestrator = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "orchestrator", "助手", text, { fromRole: "orchestrator", ...more });
 const helper = (text: string, more: Partial<ChatMessage> = {}) => msg("agent", "w1", "老周", text, { fromRole: "worker", agent: "老周", ...more });
 
 /** Rows as the channel draws them: one after another, a row from the same sender soon after folds under the one before. */
@@ -58,7 +58,7 @@ const list = (note: string, rows: { m: ChatMessage; continues?: boolean }[]): St
 export default stories({
   title: "界面/频道/消息",
   stories: {
-    Talk: list("用户、管家、帮工在频道里说话；同一个人接着说，头像和名字只出现一次。", [
+    Talk: list("用户、助手、帮工在频道里说话；同一个人接着说，头像和名字只出现一次。", [
       { m: user("登录过期的问题谁来修？") },
       { m: orchestrator("派给老周了，在工单 #18 里。") },
       { m: orchestrator("他说半小时左右。"), continues: true },

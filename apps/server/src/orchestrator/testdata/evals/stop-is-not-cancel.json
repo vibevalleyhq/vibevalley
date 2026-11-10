@@ -2,7 +2,7 @@
   "id": "stop-is-not-cancel",
   "createdAt": 1792271100000,
   "model": "deepseek-flash",
-  "want": "用户说先停一下 #41，管家把工单挪到已取消，帮工回家、改动不收了。应该用 session_stop 叫停这一轮，工单和改动都留着。",
+  "want": "用户说先停一下 #41，助手把工单挪到已取消，帮工回家、改动不收了。应该用 session_stop 叫停这一轮，工单和改动都留着。",
   "memory": "",
   "tools": [
     "channel_create",

@@ -2,7 +2,7 @@
   "id": "answer-when-asked-to-check",
   "createdAt": 1792358460000,
   "model": "deepseek-flash",
-  "want": "用户说「查一下打卡为什么慢」，管家记成了一张要改代码的工单。应该用 issue_create 填 deliver: answer：帮工只查、交回带依据的结论，不改代码。",
+  "want": "用户说「查一下打卡为什么慢」，助手记成了一张要改代码的工单。应该用 issue_create 填 deliver: answer：帮工只查、交回带依据的结论，不改代码。",
   "memory": "",
   "tools": [
     "channel_create",

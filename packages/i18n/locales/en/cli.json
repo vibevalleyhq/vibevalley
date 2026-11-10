@@ -348,14 +348,14 @@
     },
     "orchestrator": {
       "archive": {
-        "get": "Read one of the manager's archived conversations",
-        "list": "List or search the manager's archived conversations"
+        "get": "Read one of the assistant's archived conversations",
+        "list": "List or search the assistant's archived conversations"
       },
       "eval": {
-        "create": "Save a manager turn that went wrong as an eval case, with what it should have done"
+        "create": "Save an assistant turn that went wrong as an eval case, with what it should have done"
       },
-      "open": "Bring the manager online",
-      "stop": "Stop the manager's current round; the helpers it sent keep working"
+      "open": "Bring the assistant online",
+      "stop": "Stop the assistant's current round; the helpers it sent keep working"
     },
     "pkm": {
       "block": {
@@ -441,7 +441,7 @@
         "previewDelete": "Preview deleting a local media input without changing it"
       },
       "understanding": {
-        "authorize": "Freeze an understanding request for one execution by the selected channel's orchestrator",
+        "authorize": "Freeze an understanding request for one execution by the selected channel's assistant",
         "start": "Execute an authorized understanding task by ID without accepting new input or self-declared consent",
         "create": "Understand selected local inputs with explicit account and upload approval",
         "cleanup": "Clean known remote files without repeating understanding",
@@ -493,8 +493,8 @@
     "voice": {
       "call": {
         "hear": "Hand in a line you said on a call",
-        "say": "Hand in what the manager said on a call",
-        "start": "Start a call with the manager",
+        "say": "Hand in what the assistant said on a call",
+        "start": "Start a call with the assistant",
         "stop": "Hang up a call"
       },
       "dictate": "Dictate: turn a recording into text",
@@ -543,7 +543,7 @@
       "about": "A profile's memories"
     },
     "orchestrator": {
-      "about": "The manager: online, stop, archive, evals"
+      "about": "The assistant: online, stop, archive, evals"
     },
     "pkm": {
       "about": "Notes: note a line, search, the radar, journals and pages",
@@ -580,7 +580,7 @@
     "unreachable": "The farm at {base} does not answer; the rest was not checked",
     "noRuntime": "No runtime is installed: helpers have nothing to work with",
     "installRuntime": "Install a coding agent (Claude Code, Codex…), then have the farm look again",
-    "noModelKey": "No DeepSeek key: the orchestrator and your own agent cannot start",
+    "noModelKey": "No DeepSeek key: the assistant and your own agent cannot start",
     "setModelKey": "Fill in the DeepSeek key under Settings › Models",
     "lanSettings": "See Settings › Devices",
     "wrong": "These are not right: {checks}"
@@ -610,7 +610,7 @@
     "appPath": "A page of the desktop app, such as /issues/12; the start page if none",
     "capture": "What to note; stdin if none",
     "comment": "The comment",
-    "cronText": "What is said when it comes due: the work for the orchestrator or a profile",
+    "cronText": "What is said when it comes due: the work for the assistant or a profile",
     "memory": "The memory to keep",
     "memoryId": "The memory's id, as memory list shows it",
     "message": "The message",
@@ -731,7 +731,7 @@
     },
     "cronCreate": {
       "run": "vibevalley cron create morning 'look at yesterday\\'s changes' --daily 09:00",
-      "about": "Have the orchestrator look at yesterday's changes every morning at nine"
+      "about": "Have the assistant look at yesterday's changes every morning at nine"
     },
     "cronDelete": {
       "about": "Try it first: what it would delete"

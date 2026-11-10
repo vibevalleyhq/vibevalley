@@ -13,12 +13,12 @@
 | Host | — | — | `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | |
 | 空间 | 大地图 | `/repos` 的「全部」（`farm/map/RepoMap.tsx`，农场的皮，`app/` 交给仓库页） | `SpaceState`；目录是服务端 `ServerConfig` 的 `workRoot`（不进协议） | |
 | 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`；岛的地和空位是 `farm/map/RepoMap.tsx` 的 `IslandDetail`） | `RepoSummary`、`RepoActivity`、`RepoLanguages`；帮工在哪个仓库、目录、分支是服务端的 `Workplace` | `/api/v1/repo/…` |
-| 档案 | 一种小动物（管家是田头的人） | `/agents`（`features/agent`） | `Agent`（`role` 是管家或帮工） | `/api/v1/agent/…` |
+| 档案 | 一种小动物（助手是田头的人） | `/agents`（`features/agent`） | `Agent`（`role` 是助手或帮工） | `/api/v1/agent/…` |
 | 档案模板 | — | `/agents/templates`（`features/agent/TemplatesPage.tsx`） | `AgentTemplate`、档案上的 `from` | `/api/v1/agent/template/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
 | 技能 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skill/…` |
-| 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是管家的档案时是那个管家的） |
-| 管家 | 管家 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"` 的会话）、`Channel.orchestrator`（这里的管家：私聊的对面或频道成员里的管家）、`Channel.members`（频道里的成员） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
+| 记性 | 记性 | 档案页和助手页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是助手的档案时是那个助手的） |
+| 助手 | 助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"` 的会话）、`Channel.orchestrator`（这里的助手：私聊的对面或频道成员里的助手）、`Channel.members`（频道里的成员） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.assignments`（责任与执行历史） | `/api/v1/issue/…` |
 | 父子工单 | 图纸桌打开工单 | 工作台 `features/issue/FamilyDetail.tsx` | `Issue.parent`、`blockedBy`，父单与子单都是普通工单 | `/api/v1/issue/…` |
 | 稿子 | — | `/artifacts`（`features/artifact`） | `Artifact`、`ArtifactBlock` | `/api/v1/artifact/…` |
@@ -52,8 +52,8 @@
 | 档案、技能、档案模板 | `Agent`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
 | 农机 | `Runtime` | `config.json` 里每台农机的设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
 | 记性 | `Memory` | `memory` 表 | |
-| 管家 | `Orchestrator`（每个管家一个宿主） | `session` 表、`agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
-| 工单 | `Issue`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_assignment`（责任关系）、`issue_assignment_execution`（执行上下文） | |
+| 助手 | `Orchestrator`（每个助手一个宿主） | `session` 表、`agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
+| 工单 | `Issue`（`issue/issue.ts`；派给助手的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_assignment`（责任关系）、`issue_assignment_execution`（执行上下文） | |
 | 父子依赖 | `Issue`（`issue/dependencies.ts`） | `issue.parent`、`blocked_by`、`constraints` | 通用 DAG 算法在 `packages/agent/src/dag.ts` |
 | 稿子 | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_revision`、`artifact_block`、`artifact_op` 表，`artifacts/<sha256>` | |
 | 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_undo` 表 | |

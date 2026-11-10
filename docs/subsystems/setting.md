@@ -74,7 +74,7 @@
 ## 和谁打交道
 
 - **全部服务端模块**：注入 `ServerConfig` 读取静态参数。
-- **管家、农机、语音与记性（`orchestrator`、`runtime`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
+- **助手、农机、语音与记性（`orchestrator`、`runtime`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
 
 ### 供应商配置
 

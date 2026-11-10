@@ -10,7 +10,7 @@
 | MOSS 账号模型目录查询、用途模型校验和解析 | 录音设备、通话、中继与字幕（[语音](docs/subsystems/voice.md)） |
 | 脱敏的公共状态、配置版本冲突与迟到查询结果 | 外部编码农机的登录、模型和凭据（[档案和农机](docs/subsystems/agent.md)） |
 
-当前适配器为 MOSS；供应商目录（`apps/server/src/provider/vendors.ts`）还列出 DeepSeek（管家的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 HttpClient 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
+当前适配器为 MOSS；供应商目录（`apps/server/src/provider/vendors.ts`）还列出 DeepSeek（助手的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 HttpClient 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
 
 ## 在哪
 

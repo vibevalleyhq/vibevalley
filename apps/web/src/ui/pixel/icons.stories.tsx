@@ -100,7 +100,7 @@ export default stories({
     Marked: story({
       render: () => (
         <div {...stylex.attrs(viewStyles.iconsStoriesDiv3)}>
-          <Marked mark="icon-bell">管家说：两块地熟了，可以去看改动了。</Marked>
+          <Marked mark="icon-bell">助手说：两块地熟了，可以去看改动了。</Marked>
         </div>
       ),
     }),

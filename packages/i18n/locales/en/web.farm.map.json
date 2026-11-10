@@ -18,7 +18,7 @@
   "homeless": "Not in any repo: ",
   "sea": "No repos in the work folder yet: the map is all sea.",
   "notDrafted": "Not drafted: {why}",
-  "sowIntro": "Planting in {repo}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
+  "sowIntro": "Planting in {repo}: write a line on what to do, and the assistant sends a helper; or write it as a to-do first and start it after a look.",
   "job": "What to do",
   "jobExample": "Such as: add Remember me to the sign-in page",
   "todo": "Write it as a to-do",

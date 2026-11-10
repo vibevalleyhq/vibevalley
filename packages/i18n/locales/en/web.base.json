@@ -15,7 +15,7 @@
     },
     "agents": {
       "label": "Profiles",
-      "hint": "Profiles: managers and helpers"
+      "hint": "Profiles: assistants and helpers"
     },
     "runtimes": {
       "label": "Machines",
@@ -58,7 +58,7 @@
   "toasts": "Notices",
   "runtime": "Runs on: {name}",
   "user": "Me",
-  "orchestrator": "Manager",
+  "orchestrator": "Assistant",
   "unreachable": "The server cannot be reached for now: try again when it is back.",
   "query": { "invalidResponse": "The response does not match the expected data format. The last valid result has been kept." },
   "table": {
@@ -207,7 +207,7 @@
       "names": "Hold to name everything in the yard",
       "farmMenu": "Put the tool down, or open the menu",
       "debug": "Debug console",
-      "voice": "Talk to the manager (changeable in settings)",
+      "voice": "Talk to the assistant (changeable in settings)",
       "command": "Commands: a ticket, remember, stop, a direct message",
       "newIssue": "New issue"
     }

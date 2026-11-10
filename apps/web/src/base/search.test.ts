@@ -14,12 +14,12 @@ test("an empty query matches everything", () => {
 
 test("a Chinese name is found by its pinyin, whole, by initials or both, once the dictionary has loaded", async () => {
   await pinyinLoaded;
-  expect(spelled("管家", "gj")).toBe(true);
-  expect(spelled("管家", "guanjia")).toBe(true);
-  expect(spelled("管家", "guanj")).toBe(true);
+  expect(spelled("助手", "zs")).toBe(true);
+  expect(spelled("助手", "zhushou")).toBe(true);
+  expect(spelled("助手", "zhus")).toBe(true);
   expect(spelled("读书笔记", "bj")).toBe(true);
   expect(spelled("重庆", "cq") && spelled("重庆", "zq")).toBe(true);
-  expect(spelled("管家", "gz")).toBe(false);
+  expect(spelled("助手", "sz")).toBe(false);
   // Initials of characters that are not next to each other are not a match.
   expect(spelled("读书笔记", "dj")).toBe(false);
   expect(matches("waiguan", ["外观", "主题"])).toBe(true);

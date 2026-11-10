@@ -1,6 +1,6 @@
 # 记性
 
-每个档案（含管家与帮工）拥有一份持久记忆（`Memory`），跨会话、跨仓库、跨重启共享：
+每个档案（含助手与帮工）拥有一份持久记忆（`Memory`），跨会话、跨仓库、跨重启共享：
 - 新回合开始前按当前任务召回相关记忆；回合结束时记下本轮经验与工单摘要。
 - 记忆默认存在本地的库里，可双向同步 Nowledge Mem 与 EverOS。
 
@@ -11,7 +11,7 @@
 | 档案记忆的增删查、去重、300 条容量淘汰与中英文分词（`gse` + FTS5） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
 | 开工前相关性召回（`pick`）及页面「下回想起什么」预览（`memory.recall`） | 单个 `Session` 已召回记忆 ID 的记录（`session.recalled` 列，[帮工](docs/subsystems/session.md)） |
 | 本地的库与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在 `settings.json` 中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
-| 管家与帮工共用的 `MemoryPort` 及管家压缩归档（`archive/`）读取 | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
+| 助手与帮工共用的 `MemoryPort` 及助手压缩归档（`archive/`）读取 | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
@@ -29,8 +29,8 @@
 ## 模型和不变量
 
 - **所有档案共用 `memory` 表，按档案 ID 归属**：
-  - 帮工与管家统一读写 `memory` 表，同档案的多个 `Session` 共享记忆。
-  - 用户在界面添加的条目记 `author: "owner"`，在管家提示中标为「用户交代」，agent 整理时不得覆盖。
+  - 帮工与助手统一读写 `memory` 表，同档案的多个 `Session` 共享记忆。
+  - 用户在界面添加的条目记 `author: "owner"`，在助手提示中标为「用户交代」，agent 整理时不得覆盖。
 - **两种条目类型（`kind`）与容量上限**：
   - `note`：来自 `issue_report.remember`、`memory_create` 工具或用户手动添加。
   - `issue`：帮工完成工单回合时由服务端自动生成的工单经历（每个 `Session` 更新同一条）。
@@ -51,7 +51,7 @@
 
 ## 和谁打交道
 
-- **帮工与管家（`session`、`orchestrator`）**：`Session` 在回合前后调用 `recall`、`write`、`keep`、`endSession`，并为管家注入 `MemoryPort`。
+- **帮工与助手（`session`、`orchestrator`）**：`Session` 在回合前后调用 `recall`、`write`、`keep`、`endSession`，并为助手注入 `MemoryPort`。
 - **笔记与设置（`pkm`、`setting`）**：向 `Pkm` 提供 `termsList` 分词；从 `Setting` 读取 `memorySources` 配置。
 
 ## 为什么这样

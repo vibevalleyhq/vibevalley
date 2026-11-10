@@ -2,7 +2,7 @@
   "ringing": "来电…",
   "decline": "挂断",
   "answer": "接听",
-  "callOrchestrator": "打给管家",
+  "callOrchestrator": "打给助手",
   "missed": "未接 {n}",
   "log": "记录",
   "noCalls": "还没有通话。",
@@ -11,13 +11,13 @@
   "noMissed": "没有未接来电。地里都好好的。",
   "phase": {
     "connecting": "正在接通……",
-    "live": "通话中：说吧，管家在听",
-    "coming": "通话中：管家在路上",
+    "live": "通话中：说吧，助手在听",
+    "coming": "通话中：助手在路上",
     "ending": "挂断中……",
     "failed": "没接通：{why}",
-    "idle": "有事直接说，工单交回来、卡住了，管家也会打过来。"
+    "idle": "有事直接说，工单交回来、卡住了，助手也会打过来。"
   },
-  "manager": "管家",
+  "manager": "助手",
   "hangUp": "挂断",
   "app": {
     "missed": "未接",

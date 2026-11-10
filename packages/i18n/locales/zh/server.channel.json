@@ -1,10 +1,10 @@
 {
   "name": {
     "user": "用户",
-    "orchestrator": "管家"
+    "orchestrator": "助手"
   },
   "mention": {
-    "orchestrator": "@管家",
+    "orchestrator": "@助手",
     "user": "@用户",
     "everyone": "@所有人"
   },
@@ -26,7 +26,7 @@
   "channelGone": "找不到这个频道",
   "noHelper": "没有 {id} 这个帮工",
   "noChannel": "没有 {id} 这个频道",
-  "notOrchestrator": "{id} 不是管家的档案：频道只能交给管家照看",
+  "notOrchestrator": "{id} 不是助手的档案：频道只能交给助手照看",
   "noMessageId": "没有 {id} 这条消息",
   "threadOnlyTitle": "串只能改标题",
   "defaultStays": "默认频道不能归档、不能删：先把别的频道设成默认",
