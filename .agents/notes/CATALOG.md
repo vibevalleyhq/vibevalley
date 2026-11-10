@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（30 篇）
+## proposed（31 篇）
 
 ### feature
 
@@ -21,6 +21,7 @@
 
 ### architecture
 
+- 2026-11-10 [一个服务端管多台机器，库换成 Postgres](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-09 [工单和频道经 Mailbox 一道门找到帮工](.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md)
 - 2026-11-09 [能力不认供应商，供应商是适配器](.agents/notes/proposed/architecture/2026-11-09-capabilities-and-vendors.md)
 - 2026-11-08 [显式状态机分层体系、Effect v4 原语与全链路错误契约](.agents/notes/proposed/architecture/2026-11-08-explicit-state-machines-and-error-contracts.md)
