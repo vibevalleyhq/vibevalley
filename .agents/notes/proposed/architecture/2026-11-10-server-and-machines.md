@@ -25,7 +25,7 @@ Status: proposed
 
 **帮工照旧只跟自己那台机器说话。** 帮工的命令行和 `/mcp` 今天连 `127.0.0.1` 的服务端；拆开后连本机的 machine 进程，machine 带着这次会话的令牌转给服务端。帮工拿不到机器的钥匙，也看不到别的机器。
 
-**服务端要能对外，所以要登录。** 今天的安全底线是「服务端只听 127.0.0.1」（AGENTS.md）。纯服务端放到一台服务器上，就得听外面的连接，这条规矩要改成：服务端可以对外，但每个请求都要带钥匙。主人的设备凭密码登录或经「连接到本机」配对拿钥匙（[主人登录](.agents/notes/proposed/feature/2026-11-10-owner-login.md)），机器用机器钥匙，帮工用会话令牌，三种钥匙能做的事分开；`/mcp` 只经机器进来。只在本机用的人，照旧只听 `127.0.0.1`。
+**服务端要能对外，所以要登录。** 今天的安全底线是「服务端只听 127.0.0.1」（AGENTS.md）。纯服务端放到一台服务器上，就得听外面的连接，这条规矩要改成：服务端可以对外，但每个请求都要带钥匙。主人的设备凭密码登录或经「连接到本机」配对拿钥匙（[用户登录](.agents/notes/proposed/feature/2026-11-10-user-login.md)），机器用机器钥匙，帮工用会话令牌，三种钥匙能做的事分开；`/mcp` 只经机器进来。只在本机用的人，照旧只听 `127.0.0.1`。
 
 **库换成 Postgres，服务端只有一种 SQL。** `db/queries/*.sql` 和 `0001_schema.up.sql` 改写成 Postgres 的方言，`scripts/sqlite-generate.ts` 改成对着 Postgres 推类型（`pg-generate.ts`）。全文搜索从 FTS5 的 `bm25` 换成 `tsvector` 和 `ts_rank`（分词仍由 `gse.ts` 做好，Postgres 用 `simple` 配置）。驱动按配置选：`vibevalley.yaml` 写了 `database.url` 就连那个 Postgres（`@effect/sql-pg`）；没写就在家目录里跑 PGlite（`@effect/sql-pglite`，同一种方言跑在进程里），桌面版一个人一台机器时开箱即用，和今天一样。测试用内存里的 PGlite；CI 另跑一遍真的 Postgres。
 
@@ -41,8 +41,8 @@ Status: proposed
    - **3b 仓库隔着链路。** 工单（改动、冲突、合并、叠放）、帮工（工作目录、放回、清理）、`ingress`（GitHub）、游戏（提交统计）、管家和工具（列仓库）对 `Repo` 的调用经链路找有这个仓库的机器。
    - **3c 探测隔着链路。** 机器上报装了哪些农机、额度和设置是否可用，进 `Machine` 的状态；派活按机器挑。
    - **3d 搬家。** 执行器、仓库、探测和它们的驱动搬到 `apps/machine`，服务端只留链路的一头；同一个进程里仍可两头都跑（内存链路），测试照旧一个整农场。
-   主人定了（2026-11-10）先做登录再接着拆：3a 之后先做 [主人登录](.agents/notes/proposed/feature/2026-11-10-owner-login.md)，再做 3b–3d。
-4. **注册与钥匙。** 建在主人登录的设备钥匙上：机器的钥匙是另一种来路。 `vibevalley machine join`、页面上的批准与收回、三种钥匙、服务端对外时的鉴权；帮工的命令行和 `/mcp` 改连本机的 machine。
+   主人定了（2026-11-10）先做登录再接着拆：3a 之后先做 [用户登录](.agents/notes/proposed/feature/2026-11-10-user-login.md)，再做 3b–3d。
+4. **注册与钥匙。** 建在用户登录的设备钥匙上：机器的钥匙是另一种来路。 `vibevalley machine join`、页面上的批准与收回、三种钥匙、服务端对外时的鉴权；帮工的命令行和 `/mcp` 改连本机的 machine。
 5. **分开跑。** `vibevalley server`（纯服务端，读 `database.url`）和 `vibevalley machine`（一台机器）各自能起；桌面版默认两者都起，也能只当一台机器；文档、官网的说法跟着改。
 
 ## 进度

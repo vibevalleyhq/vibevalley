@@ -6,7 +6,7 @@
 
 ### feature
 
-- 2026-11-10 [主人登录，设备各拿一把钥匙](.agents/notes/proposed/feature/2026-11-10-owner-login.md)
+- 2026-11-10 [用户登录，设备各拿一把钥匙](.agents/notes/proposed/feature/2026-11-10-user-login.md)
 - 2026-11-09 [设置按功能分，钥匙放一处，没准备好就指路](.agents/notes/proposed/feature/2026-11-09-settings-by-feature.md)
 - 2026-11-09 [频道里用 /imagegen 生图](.agents/notes/proposed/feature/2026-11-09-imagegen-in-channels.md)
 - 2026-11-04 [网页稿子的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
