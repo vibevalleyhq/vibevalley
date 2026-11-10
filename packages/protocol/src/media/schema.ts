@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { Attachment } from "../channel/schema";
+import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { MediaAudioJob } from "./audio-schema";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";

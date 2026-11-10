@@ -204,7 +204,7 @@ Status: proposed
 | `Channel` | 说话的地方：频道、私聊、挂在一条消息下的串，三种是同一样东西 | `channel.id` | `ChannelType`、`Member`（谁在里面、从哪条起）、`ReadCursor`、`Notify` | 取值 `channel` 和概念同名（第八组） |
 | `Participant` | 一个 `Actor` 在频道里的身份：能被 @、能被私聊，活得比一次 Session 长 | `channel_participant.id` | | `kind` 把角色和层混在一起（第一组） |
 | `Message` | 频道里的一条消息 | `channel_message.id`；`number` 是它在频道里的号 | `MessageKind`、`Mention`、`Reaction`、`Embed` | 现在叫 `ChatMessage`，另有 `ChannelMessage`、`Chat`（第六组） |
-| `Attachment` | 一条消息带的一个文件 | `channel_attachment.id` | | `CardAttachment`、媒体任务的 `attachment` 列 |
+| `Attachment` | 一条消息带的一个文件 | `attachment.id` | | `CardAttachment`、媒体任务的 `attachment` 列 |
 | `Connector` | 一个聊天软件接到一个频道上的那条线 | 它的 id（`weixin`、`feishu`、`qq`） | `ConnectorState`、`ConnectorAccount` | 形状叫 `ConnectorStatus`（第二组） |
 
 **Artifact 和笔记**
@@ -488,7 +488,7 @@ Status: proposed
 |---|---|---|
 | `machine` 双关 | 表 `machine` 是一台电脑；用语表里农机的英文是 machine | 改用语表的英文 |
 | `source` 六个意思 | `TriggerSource`、`AgentTemplateSource`、`KeySource`、`MemorySource`、`PkmSource`、媒体任务的 `source` | 逐个换成它说的事 |
-| `kind` 和 `type` | `Channel.type`、`BlockType`、`SessionEventType`；`channel_attachment.type` 是 MIME | 分类统一成 `kind`，`type` 只留给 MIME |
+| `kind` 和 `type` | `Channel.type`、`BlockType`、`SessionEventType`；`attachment.type` 是 MIME | 分类统一成 `kind`，`type` 只留给 MIME |
 | `scope` 四个意思 | `memory.scope`、`mailbox_delivery.scope`、`IssueConstraints.scope`、`IssueReportMemoryScope` | 逐个换 |
 | `check` 三个意思 | `CriterionCheck`、`BranchCheck`、`IssueConstraints.check`（一条命令）、`ingress_github` 的 CI check | 逐个换 |
 | `template` 两个意思 | `AgentTemplate`；`IssueTemplate`、`TemplateKind`（归 `repo`） | `TemplateKind` 带上 `Issue` |

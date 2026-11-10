@@ -1,4 +1,4 @@
-import type { Attachment } from "../channel/shapes";
+import type { Attachment } from "../attachment/shapes";
 import type { MediaJob } from "../media/shapes";
 
 export const LibraryOriginKindValues = ["generated", "uploaded", "fetched"] as const;

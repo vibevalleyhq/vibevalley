@@ -136,6 +136,7 @@ export const catalogs = {
           logout: "退出：收回这台设备的钥匙",
           device: { list: "列出用户的设备：配对来的和登录来的", delete: "收回一台设备的钥匙", previewDelete: "试收回一台设备：说会怎样，不真收回" },
         },
+        attachment: { create: "上传一个文件，给消息带上或放进素材库" },
         library: {
           item: {
             list: "列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛",
@@ -189,7 +190,6 @@ export const catalogs = {
         },
         channel: {
           archive: { set: "归档一个频道或取回来，消息留着" },
-          attachment: { create: "上传一个附件，给消息带上" },
           create: "新建一个频道",
           default: { set: "设成默认频道：没指名的话都到这里" },
           delete: "删掉一个频道，连同它的串和消息",
@@ -772,6 +772,7 @@ export const catalogs = {
         note: "用户在页面上改了：「{old}」→「{new}」",
       },
     },
+    "server.attachment": { noAttachment: "没有 {id} 这个附件：先上传，再带着它说话", emptyFile: "这个文件是空的", fileTooBig: "文件太大了：至多 {mb} MB" },
     "server.base": {
       noFile: "{path}: 没有这个文件",
       notPort: "{path}: {name} 不是端口：{port}",
@@ -812,19 +813,16 @@ export const catalogs = {
       connectorsThere: "接着连接器",
       queuedThere: "还有 {n} 张工单排着队要在这里开工",
       issuesThere: "这里派过 {n} 张工单的活",
-      noAttachment: "没有 {id} 这个附件：先上传，再带着它说话",
       messageGone: "这条消息已经删了",
       notYours: "只能改你自己说的话",
       badEmoji: "回应是一个表情或一个短词，不带空格",
       threadOnlyInChannel: "串只开在频道里的消息下面",
-      emptyFile: "这个文件是空的",
       deletes: "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
       deletesDeliveries: "还没交出去的 {n} 份不再送",
       defaultIsChannel: "默认频道只能是一个频道，不能是私聊或串",
       noDirect: "{target}：你和对方之间没有私聊",
       noChannelNamed: "没有叫 #{name} 的频道。有：{tags}",
       absent: "{who} 不在场，没送到",
-      fileTooBig: "文件太大了：至多 {mb} MB",
       noProfileNamed: "没有叫 {key} 的档案",
       talkFailed: "没有接上这个会话：{why}",
       profileDisabled: "{name}已停用",
@@ -4718,6 +4716,7 @@ export const catalogs = {
             previewDelete: "Preview taking back a device's key: say what would happen, without doing it",
           },
         },
+        attachment: { create: "Upload a file, to say with a message or keep in the library" },
         library: {
           item: {
             list: "List the library: generated files, your uploads, and what helpers fetched; filter by origin and type",
@@ -4771,7 +4770,6 @@ export const catalogs = {
         },
         channel: {
           archive: { set: "Archive a channel or bring it back; its messages stay" },
-          attachment: { create: "Upload an attachment for a message" },
           create: "Create a channel",
           default: { set: "Make a channel the default: where anything unaddressed goes" },
           delete: "Delete a channel with its threads and messages",
@@ -5416,6 +5414,11 @@ export const catalogs = {
         note: 'The user changed on the page: "{old}" → "{new}"',
       },
     },
+    "server.attachment": {
+      noAttachment: "There is no attachment {id}: upload it first, then say it",
+      emptyFile: "The file is empty",
+      fileTooBig: "The file is too big: {mb} MB at most",
+    },
     "server.base": {
       noFile: "{path}: no such file",
       notPort: "{path}: {name} is not a port: {port}",
@@ -5456,19 +5459,16 @@ export const catalogs = {
       connectorsThere: "a connector is bound to it",
       queuedThere: "{n} tickets wait in the queue to start here",
       issuesThere: "{n} tickets were worked here",
-      noAttachment: "There is no attachment {id}: upload it first, then say it",
       messageGone: "This message is deleted already",
       notYours: "Only your own words can be changed",
       badEmoji: "A reaction is one emoji or a short word, without spaces",
       threadOnlyInChannel: "A thread opens only under a message in a channel",
-      emptyFile: "The file is empty",
       deletes: "Delete message {number} in {target} ({name}: {text}); its number stays",
       deletesDeliveries: "{n} not yet handed are no longer sent",
       defaultIsChannel: "Only a channel can be the default, not a direct channel or a thread",
       noDirect: "{target}: there is no direct channel between you",
       noChannelNamed: "There is no channel #{name}. There are: {tags}",
       absent: "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
-      fileTooBig: "The file is too big: {mb} MB at most",
       noProfileNamed: "No profile is named {key}",
       talkFailed: "Could not start this conversation: {why}",
       profileDisabled: "{name} is disabled",
@@ -9747,8 +9747,8 @@ export interface Messages {
   "cli.op.artifact.suggestion.reject": undefined;
   "cli.op.artifact.update": undefined;
   "cli.op.artifact.version.create": undefined;
+  "cli.op.attachment.create": undefined;
   "cli.op.channel.archive.set": undefined;
-  "cli.op.channel.attachment.create": undefined;
   "cli.op.channel.create": undefined;
   "cli.op.channel.default.set": undefined;
   "cli.op.channel.delete": undefined;
@@ -10119,6 +10119,9 @@ export interface Messages {
   "server.artifact.untitled": undefined;
   "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
   "server.artifact.withNote": { readonly note: string | number; readonly said: string | number };
+  "server.attachment.emptyFile": undefined;
+  "server.attachment.fileTooBig": { readonly mb: string | number };
+  "server.attachment.noAttachment": { readonly id: string | number };
   "server.base.homeTaken": { readonly home: string | number };
   "server.base.homeUnlocked": { readonly home: string | number };
   "server.base.noFile": { readonly path: string | number };
@@ -10155,8 +10158,6 @@ export interface Messages {
     readonly what: string | number;
   };
   "server.channel.empty": undefined;
-  "server.channel.emptyFile": undefined;
-  "server.channel.fileTooBig": { readonly mb: string | number };
   "server.channel.helpersThere": undefined;
   "server.channel.hopLimit": { readonly limit: string | number };
   "server.channel.inUse": { readonly why: string | number };
@@ -10167,7 +10168,6 @@ export interface Messages {
   "server.channel.messageGone": undefined;
   "server.channel.name.orchestrator": undefined;
   "server.channel.name.user": undefined;
-  "server.channel.noAttachment": { readonly id: string | number };
   "server.channel.noChannel": { readonly id: string | number };
   "server.channel.noChannelNamed": { readonly name: string | number; readonly tags: string | number };
   "server.channel.noDirect": { readonly target: string | number };

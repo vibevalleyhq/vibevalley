@@ -5,6 +5,7 @@ import { SqlClient } from "effect/sql";
 
 import { defaultOrchestrator, type MediaImageRequest } from "@vibevalley/protocol";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
@@ -86,7 +87,7 @@ it.effect("image tasks persist a result, keep bytes as an attachment, project sa
     expect(ready.attachment?.type).toBe("image/png");
     expect(ready.usage).toEqual({ images: 1, width: 256, height: 256 });
     expect(ready.canCancel).toBe(false);
-    const attachment2 = yield* (yield* Channel).attachment(ready.attachment?.id ?? "");
+    const attachment2 = yield* (yield* Attachment).get(ready.attachment?.id ?? "");
     expect(attachment2).toBeDefined();
     const { watermark, ...rest } = input;
     expect((yield* media.createImage({ watermark, ...rest }, { kind: "user" })).id).toBe(input.id);

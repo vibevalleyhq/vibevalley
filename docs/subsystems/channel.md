@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 频道、私聊、串的增删改查，消息号与地址 `#<频道>:<消息号>` | 工单生命周期与派活决策（[工单](docs/subsystems/issue.md)） |
-| 消息写入、编辑、删除、回应、置顶、附件、搜索与链接预览 | 收件优先级、三道刹车、投递状态与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
+| 消息写入、编辑、删除、回应、置顶、带附件、搜索与链接预览 | 收件优先级、三道刹车、投递状态与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
 | 阅读游标（`channel_read_cursor`）与未处理 `@用户`（`userMentions`） | 会话如何跑一轮、私聊执行器休眠实现（[帮工](docs/subsystems/session.md)） |
 | 页面按频道的 RPC WebSocket 实时订阅与按修订号（`revision`）补齐 | 哪些未读事项提醒用户或外推连接器（[Inbox](docs/subsystems/inbox.md)） |
 | 外部连接器（微信、飞书、QQ）：配对、收件去重、发件退避与摘要 | 助手如何生成回复（[助手](docs/subsystems/orchestrator.md)） |
@@ -23,11 +23,11 @@
 | `apps/server/src/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
 | `packages/protocol/src/rpc.ts`、`apps/server/src/http/rpc.ts` | `/api/v1/rpc` 频道与 Artifact 实时订阅契约与服务端挂载 |
 | `apps/server/src/connector/` | `connector.ts` 桥接协调器、`digest.ts`、`weixin.ts`、`feishu.ts`、`qq.ts` |
-| 表 `channel`、`channel_participant`、`channel_message`、`channel_attachment`、`channel_mention`、`channel_member`、`channel_read_cursor` | 频道与消息存储表 |
+| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor` | 频道与消息存储表 |
 | 表 `connector_account`、`connector_inbound`、`connector_outbox` | 外部聊天软件账号、入站去重与出站队列 |
 | `apps/web/src/features/channel/`、`apps/web/src/farm/chat/` | 工作台聊天页、输入框 `composing.ts`、订阅 `follow.ts` 与农场田头窗 |
 
-接口见 [capabilities.md](docs/reference/capabilities.md)（`channel.*`、`connector.*` 及 `GET /api/v1/attachment/<id>`）。
+接口见 [capabilities.md](docs/reference/capabilities.md)（`channel.*`、`connector.*`；附件见[附件](docs/subsystems/attachment.md)）。
 
 ## 模型和不变量
 
@@ -62,7 +62,7 @@
 | 帮工回合结束汇报 | 失败时唤醒所在频道的成员 | 完成时作为摘要捎带给成员 |
 
 - **帮工说话前新鲜度拦截**：帮工刚读串却要发往顶层频道时先要求 `confirm`；目标通道有未读新消息时先拦截并返回最旧 3 条未读，帮工可改后再发或带 `anyway: true` 照发。
-- **附件与公网链接预览**：附件按 SHA-256 去重并经 `GET /api/v1/attachment/<id>` 带沙箱返回（上限 25MB）；消息中的公网 `http(s)` 链接在后台抓取标题与摘要（拦截内网与云元数据地址，限 3 次跳转、3 秒、512KB）。
+- **附件与公网链接预览**：消息只带附件的 id，存和读归[附件](docs/subsystems/attachment.md)；消息中的公网 `http(s)` 链接在后台抓取标题与摘要（拦截内网与云元数据地址，限 3 次跳转、3 秒、512KB）。
 
 ### 外部连接器（微信、飞书、QQ）
 

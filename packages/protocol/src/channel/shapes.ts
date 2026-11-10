@@ -1,5 +1,6 @@
 import type { AgentRole } from "../agent/shapes";
 import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes";
+import type { Attachment } from "../attachment/shapes";
 import type { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
@@ -63,18 +64,6 @@ export interface Reaction {
   /** Participants, in the order they reacted. */
   by: string[];
 }
-
-/** id is the sha256 of its bytes, served at attachmentPath. */
-export interface Attachment {
-  id: string;
-  name: string;
-  /** A media type: image/png, application/pdf… */
-  type: string;
-  size: number;
-}
-
-/** The one read that is not a POST, since an <img src> can only GET. */
-export const attachmentPath = (id: string) => `/api/v1/attachment/${id}`;
 
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
@@ -175,7 +164,7 @@ export interface SayRequest {
   blocks?: BlockRef[];
   /** The number of the message there it answers. */
   replyTo?: number;
-  /** Ids from channel.attachment.create. */
+  /** Ids from attachment.create. */
   attachments?: string[];
   station?: number;
   agent?: string;
@@ -232,15 +221,6 @@ export interface OnSet {
   id: string;
   on: boolean;
 }
-
-/** At most attachmentMax bytes, as base64. */
-export interface AttachmentUpload {
-  name: string;
-  type: string;
-  data: string;
-}
-
-export const attachmentMax = 25 * 1024 * 1024;
 
 export interface MessageSearch {
   text: string;

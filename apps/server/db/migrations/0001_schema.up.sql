@@ -216,7 +216,7 @@ CREATE TABLE media_audio (
 CREATE INDEX media_audio_phase ON media_audio(phase);
 CREATE INDEX media_audio_created ON media_audio(created_at DESC, id);
 
-CREATE TABLE channel_attachment (
+CREATE TABLE attachment (
   -- The sha256 of its bytes, kept under the home directory's attachments/: the same file is kept once.
   id          text primary key,
   name        text not null,
@@ -226,7 +226,7 @@ CREATE TABLE channel_attachment (
 );
 CREATE TABLE library_item (
   -- A file in the library is a kept attachment: one item per file, however often it comes back.
-  attachment_id text primary key references channel_attachment (id),
+  attachment_id text primary key references attachment (id),
   kind          text not null check (kind in ('generated', 'uploaded', 'fetched')),
   -- Where it first came from (LibraryOrigin as JSON); a later arrival only moves last_at.
   origin        text not null,

@@ -35,7 +35,6 @@ export interface ChannelHandlers<R = never> {
   readonly "channel.pin.list": (a: { readonly id: string }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
   /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
   readonly "channel.thread.create": (a: { readonly id: T.MessageId; readonly requestKey?: string }) => Effect.Effect<string, ApiError, R>;
-  readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
   /** Out of the sidebar and the thread lists (on), or back. its messages and address stay. */
   readonly "channel.archive.set": (a: T.OnSet) => Effect.Effect<void, ApiError, R>;
   /** A channel nothing points at any more, with its threads and messages. */
@@ -209,12 +208,5 @@ export const channelEndpoints: readonly Endpoint[] = [
     input: undefined,
     result: Schema.mutable(Schema.Array(S.ChannelUnread)),
     can: ["user", "remote", "session"],
-  },
-  {
-    op: "channel.attachment.create",
-    about: [],
-    input: S.AttachmentUpload,
-    result: S.Attachment,
-    can: ["user", "remote"],
   },
 ];

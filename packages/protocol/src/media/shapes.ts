@@ -1,4 +1,4 @@
-import type { Attachment } from "../channel/shapes";
+import type { Attachment } from "../attachment/shapes";
 import type { MediaAudioJob } from "./audio-shapes";
 
 export const mediaInputContentPath = (id: string) => `/api/v1/media/input/${encodeURIComponent(id)}/content`;

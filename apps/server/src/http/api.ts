@@ -9,9 +9,9 @@ import { artifactId } from "@vibevalley/protocol/schema";
 import { Artifact } from "#/artifact/artifact.ts";
 import { artifactHeaders } from "#/artifact/policy.ts";
 import { withShell } from "#/artifact/shell.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { wireOf } from "#/base/json.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Voice } from "#/voice/voice.ts";
 
 import { fromTheFarm } from "./rpc.ts";
@@ -25,7 +25,7 @@ const notFound = () => HttpServerResponse.text("404 page not found\n", { status:
 /** The most a body may be, read before it is decoded: an attachment comes as base64 in JSON, everything else is small. */
 const bodyMax = 2 * 1024 * 1024;
 const attachmentBodyMax = Math.ceil(attachmentMax / 3) * 4 + 64 * 1024;
-const bodyMaxOf = (endpoint: Endpoint) => (endpoint.op === "channel.attachment.create" ? attachmentBodyMax : bodyMax);
+const bodyMaxOf = (endpoint: Endpoint) => (endpoint.op === "attachment.create" ? attachmentBodyMax : bodyMax);
 
 /** Each call of an endpoint, by its op and the status it answered. */
 const requests = Metric.counter("vibevalley.http.requests", { description: "Calls of an endpoint, by op and status", incremental: true });
@@ -90,11 +90,11 @@ export const attachments = HttpRouter.add(
   "GET",
   "/api/v1/attachment/:id",
   Effect.gen(function* () {
-    const chat = yield* Channel;
+    const files = yield* Attachment;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const id = new URL(request.url, "http://farm").pathname.slice(attachmentPrefix.length);
     if (!/^[0-9a-f]{64}$/u.test(id)) return notFound();
-    const found = yield* chat.attachment(id);
+    const found = yield* files.get(id);
     if (!found) return notFound();
     const pdf = found.type === "application/pdf";
     return yield* HttpServerResponse.file(found.path, {

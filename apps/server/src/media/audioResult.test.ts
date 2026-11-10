@@ -5,7 +5,7 @@ import { TestClock } from "effect/testing";
 
 import { attachmentMax, type MediaAudioFormat } from "@vibevalley/protocol";
 
-import { Channel } from "#/channel/channel.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { world } from "#/testing/world.ts";
 
@@ -24,7 +24,7 @@ const downloadSpeech = Effect.fnUntraced(function* (url: string, format: MediaAu
     const result = yield* saveAudioResult("download-test", url, format, inputs).pipe(Effect.provideService(PublicHttp, http));
     expect(result.resultInput).toBeNull();
     if (!result.attachment) return yield* Effect.die("Expected a small attachment");
-    const attachment = yield* (yield* Channel).attachment(result.attachment.id);
+    const attachment = yield* (yield* Attachment).get(result.attachment.id);
     if (!attachment) return yield* Effect.die("Missing saved attachment");
     const file = yield* (yield* FileSystem.FileSystem).readFile(attachment.path);
     return Buffer.from(file);

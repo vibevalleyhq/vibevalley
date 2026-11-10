@@ -3,6 +3,7 @@ import { Array as Arr, Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { waitFor } from "#/testing/layers.ts";
@@ -37,12 +38,12 @@ layer(world(), { buildPerTest: true, excludeTestServices: true })("the library",
       const library = yield* Library;
       const chat = yield* Channel;
       const core = yield* Core;
-      const said = yield* chat.attach(file("note.txt", "打卡规则"));
+      const said = yield* (yield* Attachment).attach(file("note.txt", "打卡规则"));
       const { message } = yield* chat.post({ _tag: "User", text: "看这个", sendKey: "k1", attachments: [said.id] });
       const uploaded = yield* waitFor(library.list({ origin: "uploaded" }), (items) => items.length === 1, "the uploaded file");
       expect(uploaded[0]).toMatchObject({ attachment: said, origin: { kind: "uploaded", channel: message.channel, message: message.id } });
 
-      const made = yield* chat.attach(file("cat.png", "not really a png", "image/png"));
+      const made = yield* (yield* Attachment).attach(file("cat.png", "not really a png", "image/png"));
       yield* core.apply({ type: "mediaChanged", jobs: [image("job-1", made, "generating")] });
       yield* core.apply({ type: "mediaChanged", jobs: [image("job-1", made, "ready")] });
       yield* core.apply({ type: "mediaChanged", jobs: [image("job-1", made, "ready")] });
@@ -65,15 +66,15 @@ layer(world(), { buildPerTest: true, excludeTestServices: true })("the library",
   it.effect("takes an item out but keeps the file a message has", () =>
     Effect.gen(function* () {
       const library = yield* Library;
-      const chat = yield* Channel;
-      const kept = yield* chat.attach(file("a.txt", "a"));
+      const files = yield* Attachment;
+      const kept = yield* files.attach(file("a.txt", "a"));
       const item = yield* library.add({ attachment: kept.id }, { kind: "user" });
       expect(item.origin).toEqual({ kind: "uploaded" });
       const preview = yield* library.previewRemove(kept.id);
       expect(preview.does).toHaveLength(1);
       yield* library.remove(kept.id);
       const left = yield* library.list({});
-      const stillThere = yield* chat.attachment(kept.id);
+      const stillThere = yield* files.get(kept.id);
       const again = yield* Effect.flip(library.remove(kept.id));
       expect([left, stillThere === undefined, again._tag]).toEqual([[], false, "Missing"]);
     }),

@@ -113,7 +113,6 @@
 | `channel.markUnread` | 标成未读，从这一条起 | `/api/v1/channel/markUnread` | ✓ | ✓ |   |   |
 | `channel.list` | 列出全部频道和私聊，默认的在前 | `/api/v1/channel/list` | ✓ | ✓ | ✓ |   |
 | `channel.unread.list` | 列出还没读完的频道和串，新的在前 | `/api/v1/channel/unread/list` | ✓ | ✓ |   | ✓ |
-| `channel.attachment.create` | 上传一个附件，给消息带上 | `/api/v1/channel/attachment/create` | ✓ | ✓ |   |   |
 
 ## cron
 
@@ -374,3 +373,11 @@ GitHub 的检测：gh 装没装、登没登录
 | `library.item.add` | 把文件放进素材库：你上传好的附件，或助手、帮工给的网址或工作目录里的文件 | `/api/v1/library/item/add` | ✓ | ✓ | ✓ | ✓ |
 | `library.item.delete` | 从素材库拿掉一个文件（发过它的消息仍能打开） | `/api/v1/library/item/delete` | ✓ | ✓ |   |   |
 | `library.item.previewDelete` | 试拿掉：说会怎样，不真拿掉 | `/api/v1/library/item/previewDelete` | ✓ | ✓ |   |   |
+
+## attachment
+
+
+
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
+|---|---|---|---|---|---|---|
+| `attachment.create` | 上传一个文件，给消息带上或放进素材库 | `/api/v1/attachment/create` | ✓ | ✓ |   |   |

@@ -5,8 +5,8 @@ import type * as T from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Db } from "#/infra/db.ts";
 import { fileBlob } from "#/infra/files.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -69,7 +69,7 @@ const sourceJson = encodeJson(S.MediaSource);
 export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
   const db = yield* Db;
   const provider = yield* Provider;
-  const channel = yield* Channel;
+  const kept = yield* Attachment;
   const downloads = yield* PublicHttp;
   const fs = yield* FileSystem.FileSystem;
   const fibers = yield* FiberMap.make<string, void, ApiError>();
@@ -218,7 +218,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
         const saved = yield* resume(
           saveAudioResult(id, resultUrl, format, ports.inputs).pipe(
             Effect.provideService(PublicHttp, downloads),
-            Effect.provideService(Channel, channel),
+            Effect.provideService(Attachment, kept),
             Effect.provideService(FileSystem.FileSystem, fs),
           ),
         );
@@ -233,7 +233,7 @@ export const makeAudio = Effect.fnUntraced(function* (ports: AudioPorts) {
             saved.metadata?.duration !== undefined &&
             saved.metadata.duration <= 30
           ) {
-            const file = yield* channel.attachment(saved.attachment.id);
+            const file = yield* kept.get(saved.attachment.id);
             if (!file) return yield* Effect.fail(corrupt());
             preview = yield* ports.inputs.storeResult(
               {

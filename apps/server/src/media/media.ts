@@ -5,6 +5,7 @@ import type * as T from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { head } from "#/base/clip.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -75,6 +76,7 @@ const make = Effect.gen(function* () {
   const cleanup = yield* FiberHandle.make<void>();
   const core = yield* Core;
   const channel = yield* Channel;
+  const kept = yield* Attachment;
   const provider = yield* Provider;
   const downloads = yield* PublicHttp;
   const lock = yield* Semaphore.make(1);
@@ -179,7 +181,7 @@ const make = Effect.gen(function* () {
     const request = yield* decodeRequest(row.request);
     yield* Effect.gen(function* () {
       const bytes = yield* downloadImage(row.result_url ?? "", request.width, request.height).pipe(Effect.provideService(PublicHttp, downloads));
-      const attachment = yield* channel.attach({ name: `moss-${id}.png`, type: "image/png", data: bytes.toString("base64") });
+      const attachment = yield* kept.attach({ name: `moss-${id}.png`, type: "image/png", data: bytes.toString("base64") });
       yield* change(id, ["downloading"], { phase: "ready", attachment: yield* attachmentJson(attachment), result_url: null, problem: "" });
     }).pipe(
       Effect.catch(() => change(id, ["downloading"], { phase: "download_failed", problem: t("server.media.downloadFailed") })),

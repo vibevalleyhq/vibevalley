@@ -4,7 +4,7 @@ import { HttpClient, HttpClientResponse } from "effect/http";
 
 import type * as T from "@vibevalley/protocol";
 
-import { Channel } from "#/channel/channel.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
@@ -94,7 +94,7 @@ it.effect.each([
     if (ready.kind !== "speech") return yield* Effect.die("Expected speech task");
     expect(ready).toMatchObject({ model, voice: input.voice, format, connection: "moss", revision: 1, source: { kind: "user" }, canCancel: false });
     expect(ready.attachment?.type).toBe(type);
-    const file = yield* (yield* Channel).attachment(ready.attachment?.id ?? "");
+    const file = yield* (yield* Attachment).get(ready.attachment?.id ?? "");
     if (!file) return yield* Effect.die("Expected local speech attachment");
     const file2 = yield* (yield* FileSystem.FileSystem).readFile(file.path);
     expect(Buffer.from(file2)).toEqual(bytes);

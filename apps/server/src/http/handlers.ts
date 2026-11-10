@@ -4,6 +4,7 @@ import type { Handlers } from "@vibevalley/protocol/api";
 
 import { agentHandlers } from "./handlers/agent.ts";
 import { artifactHandlers } from "./handlers/artifact.ts";
+import { attachmentHandlers } from "./handlers/attachment.ts";
 import { channelHandlers } from "./handlers/channel.ts";
 import { connectorHandlers } from "./handlers/connector.ts";
 import { coreHandlers } from "./handlers/core.ts";
@@ -45,6 +46,7 @@ export const handlers = Effect.gen(function* () {
     ...(yield* sessionHandlers),
     ...(yield* artifactHandlers),
     ...(yield* libraryHandlers),
+    ...(yield* attachmentHandlers),
     ...(yield* pkmHandlers),
     ...(yield* cronHandlers),
     ...(yield* issueHandlers),

@@ -170,6 +170,9 @@
         "previewDelete": "试收回一台设备：说会怎样，不真收回"
       }
     },
+    "attachment": {
+      "create": "上传一个文件，给消息带上或放进素材库"
+    },
     "library": {
       "item": {
         "list": "列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛",
@@ -232,9 +235,6 @@
     "channel": {
       "archive": {
         "set": "归档一个频道或取回来，消息留着"
-      },
-      "attachment": {
-        "create": "上传一个附件，给消息带上"
       },
       "create": "新建一个频道",
       "default": {

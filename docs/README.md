@@ -31,6 +31,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音助手 |
 | [lan.md](docs/subsystems/lan.md) | 「连接到本机」：从外面进农场的唯一一道门，按钥匙的来路放行 |
+| [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按内容存一次；消息、媒体结果和素材库都引用它 |
 | [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
@@ -115,7 +116,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 和帮工私聊 | talk | `Channel.direct`、`Session.channel` | 和一个档案直接说话，Session 回到原私聊，闲置时休眠，不创建工单 | |
 | 频道 | channel | channel（`Channel`） | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群（指频道时）、群聊 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
-| 附件 | attachment | `Attachment`（`channel_attachment` 表） | 一条消息带的文件和图 | |
+| 附件 | attachment | `Attachment`（`attachment` 表） | 农场留下的一份文件：一条消息带的文件和图，也是媒体的结果、素材库里的一条 | |
 | 工作目录 | working folder | `Workplace`（`workdir`） | 帮工干活的目录：仓库目录或工单的 worktree；VibeValley 自己的是 `VIBEVALLEY_WORK_ROOT` | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 一张工单的一种触发：到点开它的一轮，派给帮工或助手 | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 要你处理的事，从核心状态现算 | 通知（指 Inbox 时）、来电（农场的皮里用） |

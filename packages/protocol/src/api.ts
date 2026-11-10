@@ -1,5 +1,6 @@
 import { type AgentHandlers, agentEndpoints } from "./agent/api";
 import { type ArtifactHandlers, artifactEndpoints } from "./artifact/api";
+import { type AttachmentHandlers, attachmentEndpoints } from "./attachment/api";
 import { type ChannelHandlers, channelEndpoints } from "./channel/api";
 import { type ConnectorHandlers, connectorEndpoints } from "./connector/api";
 import { type CoreHandlers, coreEndpoints } from "./core/api";
@@ -32,6 +33,7 @@ export type { CronHandlers } from "./cron/api";
 export type { GameHandlers } from "./game/api";
 export type { IssueHandlers } from "./issue/api";
 export type { LanHandlers } from "./lan/api";
+export type { AttachmentHandlers } from "./attachment/api";
 export type { LibraryHandlers } from "./library/api";
 export type { UserHandlers } from "./user/api";
 export type { MemoryHandlers } from "./memory/api";
@@ -68,7 +70,8 @@ export interface Handlers<R = never>
     ConnectorHandlers<R>,
     LanHandlers<R>,
     UserHandlers<R>,
-    LibraryHandlers<R> {}
+    LibraryHandlers<R>,
+    AttachmentHandlers<R> {}
 
 export const endpoints: readonly Endpoint[] = [
   ...coreEndpoints,
@@ -92,4 +95,5 @@ export const endpoints: readonly Endpoint[] = [
   ...lanEndpoints,
   ...userEndpoints,
   ...libraryEndpoints,
+  ...attachmentEndpoints,
 ];

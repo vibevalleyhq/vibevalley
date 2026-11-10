@@ -26,7 +26,7 @@ export const LibraryItemsResult = Schema.Struct({
 export type LibraryItemsResult = typeof LibraryItemsResult.Type
 
 
-export const LibraryItemsSql = "-- name: LibraryItems :many\n-- bound: at most n, the most recently arrived first; kind and top ('' for any) filter by origin and by media type.\nselect i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size\nfrom library_item i join channel_attachment a on a.id = i.attachment_id\nwhere ($1::text = '' or i.kind::text = $1::text)\n  and ($2::text = ''\n    or ($2::text = 'other' and split_part(a.type, '/', 1) not in ('image', 'audio', 'video'))\n    or split_part(a.type, '/', 1) = $2::text)\norder by i.last_at desc, i.attachment_id\nlimit $3::int;"
+export const LibraryItemsSql = "-- name: LibraryItems :many\n-- bound: at most n, the most recently arrived first; kind and top ('' for any) filter by origin and by media type.\nselect i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size\nfrom library_item i join attachment a on a.id = i.attachment_id\nwhere ($1::text = '' or i.kind::text = $1::text)\n  and ($2::text = ''\n    or ($2::text = 'other' and split_part(a.type, '/', 1) not in ('image', 'audio', 'video'))\n    or split_part(a.type, '/', 1) = $2::text)\norder by i.last_at desc, i.attachment_id\nlimit $3::int;"
 
 export const libraryItems = Effect.fn("LibraryItems")(function* (params: LibraryItemsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -55,7 +55,7 @@ export const LibraryItemResult = Schema.Struct({
 export type LibraryItemResult = typeof LibraryItemResult.Type
 
 
-export const LibraryItemSql = "-- name: LibraryItem :one\nselect i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size\nfrom library_item i join channel_attachment a on a.id = i.attachment_id\nwhere i.attachment_id = $1;"
+export const LibraryItemSql = "-- name: LibraryItem :one\nselect i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size\nfrom library_item i join attachment a on a.id = i.attachment_id\nwhere i.attachment_id = $1;"
 
 export const libraryItem = Effect.fn("LibraryItem")(function* (params: LibraryItemParams) {
   const sql = yield* SqlClient.SqlClient

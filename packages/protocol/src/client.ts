@@ -259,10 +259,6 @@ export class VibeValleyApi {
       /** The places the caller has not read all of, the newest first. */
       list: (options?: { signal?: AbortSignal }): Promise<T.ChannelUnread[]> => this.call<T.ChannelUnread[]>("/api/v1/channel/unread/list", undefined, options),
     },
-    attachment: {
-      create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
-        this.call<T.Attachment>("/api/v1/channel/attachment/create", a, options),
-    },
   };
 
   readonly cron = {
@@ -669,6 +665,12 @@ export class VibeValleyApi {
       previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
         this.call<T.Preview>("/api/v1/library/item/previewDelete", a, options),
     },
+  };
+
+  readonly attachment = {
+    /** Kept once by its bytes: the same file again is the same attachment. */
+    create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
+      this.call<T.Attachment>("/api/v1/attachment/create", a, options),
   };
 
   /** R is the answer api.ts gives the path; each method above names it. */

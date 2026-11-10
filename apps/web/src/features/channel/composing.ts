@@ -331,7 +331,7 @@ async function upload(file: File, progress: (percent: number) => void = () => {}
     "",
     sending((sent, total) => progress(Math.min(100, Math.round((sent / total) * 100)))),
   );
-  return api.channel.attachment.create({ name: file.name || "file", type: file.type || "application/octet-stream", data: btoa(binary) });
+  return api.attachment.create({ name: file.name || "file", type: file.type || "application/octet-stream", data: btoa(binary) });
 }
 
 export interface Upload {

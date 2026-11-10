@@ -18,6 +18,7 @@ export * from "./game/schema";
 export * from "./lan/schema";
 export * from "./user/schema";
 export * from "./library/schema";
+export * from "./attachment/schema";
 export * from "./connector/schema";
 export * from "./machine/schema";
 export * from "./voice/schema";

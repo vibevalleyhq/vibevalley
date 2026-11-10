@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";
+import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/schema";
 import * as T from "../shapes";
@@ -18,8 +19,6 @@ export const Embed: Codec<T.Embed> = Schema.Struct({
 });
 
 export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
-
-export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Finite });
 
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: MessageId,
@@ -140,8 +139,6 @@ export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.
 export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: MessageId, emoji: Schema.String, on: Schema.Boolean });
 
 export const OnSet: Codec<T.OnSet> = Schema.Struct({ id: Schema.String, on: Schema.Boolean });
-
-export const AttachmentUpload: Codec<T.AttachmentUpload> = Schema.Struct({ name: Schema.String, type: Schema.String, data: Schema.String });
 
 export const MessageSearch: Codec<T.MessageSearch> = Schema.Struct({ text: Schema.String, channel: Schema.optionalKey(Schema.String) });
 

@@ -5,6 +5,7 @@ import { Llm } from "@vibevalley/ai/llm";
 
 import { Agent } from "./agent/agent.ts";
 import { Artifact } from "./artifact/artifact.ts";
+import { Attachment } from "./attachment/attachment.ts";
 import { Channel, start as channelStart } from "./channel/channel.ts";
 import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
@@ -63,6 +64,7 @@ export const platform = (config: ServerConfig["Service"]) =>
     on(Core.layer),
     on(Setting.layer),
     on(User.layer),
+    on(Attachment.layer),
     on(Provider.layer),
     on(Llm.layer),
   );

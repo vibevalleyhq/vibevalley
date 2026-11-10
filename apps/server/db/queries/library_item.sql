@@ -3,7 +3,7 @@
 -- name: LibraryItems :many
 -- bound: at most n, the most recently arrived first; kind and top ('' for any) filter by origin and by media type.
 select i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size
-from library_item i join channel_attachment a on a.id = i.attachment_id
+from library_item i join attachment a on a.id = i.attachment_id
 where (sqlc.arg(kind)::text = '' or i.kind::text = sqlc.arg(kind)::text)
   and (sqlc.arg(top)::text = ''
     or (sqlc.arg(top)::text = 'other' and split_part(a.type, '/', 1) not in ('image', 'audio', 'video'))
@@ -13,7 +13,7 @@ limit sqlc.arg(n)::int;
 
 -- name: LibraryItem :one
 select i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size
-from library_item i join channel_attachment a on a.id = i.attachment_id
+from library_item i join attachment a on a.id = i.attachment_id
 where i.attachment_id = sqlc.arg(id);
 
 -- name: AddLibraryItem :exec

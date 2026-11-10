@@ -230,8 +230,6 @@ export interface ChannelService {
   readonly issueThreadId: (issue: string) => Effect.Effect<string | null>;
   readonly issueMessages: (issue: string) => Effect.Effect<Envelope[]>;
   readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
-  readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
-  readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
   /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
    * session's own thread, else the default channel. */
   readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;

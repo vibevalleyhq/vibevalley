@@ -7,6 +7,7 @@ import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { Attachment } from "#/attachment/attachment.ts";
 import { head } from "#/base/clip.ts";
 import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
@@ -34,7 +35,7 @@ import {
   type ChannelEnvelopeRow,
 } from "./contracts.ts";
 import { keepChannels, targetOf } from "./messages.ts";
-import { channelAttachments, messageMutations } from "./mutations.ts";
+import { messageMutations } from "./mutations.ts";
 import { ChatModel, type ChannelRow } from "./rooms.ts";
 
 /** The channel a new farm opens with. */
@@ -372,7 +373,9 @@ export const channelHub = Effect.gen(function* () {
     reactions: null,
   });
 
-  const { filesAt, attachmentsOf, attach, attachment } = yield* channelAttachments;
+  const files = yield* Attachment;
+  const filesAt = files.pathOf;
+  const attachmentsOf = files.of;
   const deliveryTarget = (r: ChannelEnvelopeRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
   const asEnvelope = (r: ChannelEnvelopeRow): Envelope => ({
     id: r.envelope_id,
@@ -453,8 +456,6 @@ export const channelHub = Effect.gen(function* () {
     messageRow,
     attachmentsOf,
     filesAt,
-    attach,
-    attachment,
     asEnvelope,
     inboxRows,
     envelopeOf,

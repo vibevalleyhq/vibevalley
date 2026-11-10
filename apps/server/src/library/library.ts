@@ -6,9 +6,9 @@ import type * as T from "@vibevalley/protocol";
 import type { ApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { lookIn, missing, refused } from "#/base/errors.ts";
 import { jsonOf } from "#/base/json.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { PublicHttp, publicHttps } from "#/infra/publicHttp.ts";
@@ -85,7 +85,7 @@ export class Library extends Context.Service<
 const make = Effect.gen(function* () {
   const db = yield* Db;
   const core = yield* Core;
-  const chat = yield* Channel;
+  const files = yield* Attachment;
   const sessions = yield* Session;
   const http = yield* PublicHttp;
 
@@ -171,7 +171,7 @@ const make = Effect.gen(function* () {
     );
 
   const stored = (bytes: Uint8Array, name: string, type: string) =>
-    chat.attach({ name, type: type === "" ? typeOfName(name) : type, data: Buffer.from(bytes).toString("base64") });
+    files.attach({ name, type: type === "" ? typeOfName(name) : type, data: Buffer.from(bytes).toString("base64") });
 
   const add = Effect.fn("Library.add")(function* (req: T.LibraryAddRequest, by: AddedBy) {
     if (Arr.filter([req.attachment, req.url, req.path], given).length !== 1) return yield* Effect.fail(refused(t("server.library.oneSource")));
@@ -179,8 +179,8 @@ const make = Effect.gen(function* () {
     const name = given(req.name) ? Str.trim(req.name) : "";
     if (given(req.attachment)) {
       if (by.kind !== "user") return yield* Effect.fail(refused(t("server.library.agentAttachment")));
-      const kept = yield* chat.attachment(req.attachment);
-      if (kept === undefined) return yield* Effect.fail(missing(t("server.channel.noAttachment", { id: req.attachment }), [lookIn.channel]));
+      const kept = yield* files.get(req.attachment);
+      if (kept === undefined) return yield* Effect.fail(missing(t("server.attachment.noAttachment", { id: req.attachment }), []));
       yield* keep(req.attachment, { kind: "uploaded" }, at);
       return yield* found(req.attachment);
     }

@@ -7,6 +7,7 @@ import { TestClock } from "effect/testing";
 import type * as T from "@vibevalley/protocol";
 import { endpoints } from "@vibevalley/protocol/api";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Db } from "#/infra/db.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
@@ -201,7 +202,7 @@ it.effect("regression: releasing a design preview keeps its channel attachment a
     const released = yield* media.release(design.id);
     expect(released).toMatchObject({ previewInput: null, canRelease: false, attachment: design.attachment });
     expect((yield* media.inputs.get(design.previewInput)).canDelete).toBe(false);
-    const file = yield* (yield* Channel).attachment(design.attachment.id);
+    const file = yield* (yield* Attachment).get(design.attachment.id);
     if (!file) return yield* Effect.die("Release deleted an independently owned channel attachment");
     const file2 = yield* (yield* FileSystem.FileSystem).readFile(file.path);
     expect(Buffer.from(file2)).toEqual(wav());

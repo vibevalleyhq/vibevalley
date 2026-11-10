@@ -170,6 +170,9 @@
         "previewDelete": "Preview taking back a device's key: say what would happen, without doing it"
       }
     },
+    "attachment": {
+      "create": "Upload a file, to say with a message or keep in the library"
+    },
     "library": {
       "item": {
         "list": "List the library: generated files, your uploads, and what helpers fetched; filter by origin and type",
@@ -232,9 +235,6 @@
     "channel": {
       "archive": {
         "set": "Archive a channel or bring it back; its messages stay"
-      },
-      "attachment": {
-        "create": "Upload an attachment for a message"
       },
       "create": "Create a channel",
       "default": {

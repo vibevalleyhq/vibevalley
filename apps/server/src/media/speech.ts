@@ -6,8 +6,8 @@ import { MediaAudioFormatValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
@@ -40,7 +40,7 @@ const sourceJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSource));
 
 export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
   const db = yield* Db;
-  const channel = yield* Channel;
+  const kept = yield* Attachment;
   const provider = yield* Provider;
   const downloads = yield* PublicHttp;
   const fs = yield* FileSystem.FileSystem;
@@ -147,7 +147,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
         const saved = yield* resume(
           saveAudioResult(id, address, job.format, ports.inputs).pipe(
             Effect.provideService(PublicHttp, downloads),
-            Effect.provideService(Channel, channel),
+            Effect.provideService(Attachment, kept),
             Effect.provideService(FileSystem.FileSystem, fs),
           ),
         );
@@ -256,7 +256,7 @@ export const makeSpeech = Effect.fnUntraced(function* (ports: Ports) {
           yield* releaseAudioResult(id, saved, ports.inputs);
       }),
     }).pipe(
-      Effect.provideService(Channel, channel),
+      Effect.provideService(Attachment, kept),
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.catch(() =>
         Effect.gen(function* () {

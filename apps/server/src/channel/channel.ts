@@ -81,8 +81,6 @@ const make = Effect.gen(function* () {
     reacting,
     attachmentsOf,
     filesAt,
-    attach,
-    attachment,
     inboxRows,
     envelopeOf,
   } = r;
@@ -500,8 +498,6 @@ const make = Effect.gen(function* () {
         address: targetOfRow(r.channel_type, r.root_number, null, r.top_id, r.channel_name),
       }));
     }),
-    attach,
-    attachment,
     placeOf: Effect.fn("Channel.placeOf")(function* (from, channel) {
       if (model.channel(channel)) return channel;
       return yield* resolveTarget(from, channel);

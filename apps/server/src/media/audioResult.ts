@@ -4,8 +4,8 @@ import { t } from "@vibevalley/i18n";
 import { attachmentMax } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 
+import { Attachment } from "#/attachment/attachment.ts";
 import { type ApiError, refused } from "#/base/errors.ts";
-import { Channel } from "#/channel/channel.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { PublicHttp, publicHttps } from "#/infra/publicHttp.ts";
 
@@ -52,7 +52,7 @@ export const saveAudioStream = Effect.fn("Media.saveAudioStream")(function* (
   source: Stream.Stream<Uint8Array, ApiError>,
   inputs: MediaInputs,
   name: string = `moss-${id}.${format}`,
-): Effect.fn.Return<AudioSavedResult, ApiError, Channel | FileSystem.FileSystem> {
+): Effect.fn.Return<AudioSavedResult, ApiError, Attachment | FileSystem.FileSystem> {
   let retained: AudioSavedResult | undefined;
   return yield* Effect.scoped(
     Effect.uninterruptibleMask((resume) =>
@@ -68,8 +68,8 @@ export const saveAudioStream = Effect.fn("Media.saveAudioStream")(function* (
         const bytes = yield* fs.readFile(staged.path).pipe(Effect.mapError(failed));
         const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         if (!validateSpeechBytes(buffer, format)) return yield* Effect.fail(failed());
-        const channel = yield* Channel;
-        const attachment = yield* channel.attach({ name: staged.name, type: staged.mime, data: buffer.toString("base64") });
+        const files = yield* Attachment;
+        const attachment = yield* files.attach({ name: staged.name, type: staged.mime, data: buffer.toString("base64") });
         return { attachment, resultInput: null, ...metadata };
       }),
     ),
@@ -82,7 +82,7 @@ export const saveAudioResult = Effect.fn("Media.saveAudioResult")(
     address: string,
     format: T.MediaAudioFormat,
     inputs: MediaInputs,
-  ): Effect.fn.Return<AudioSavedResult, ApiError, Channel | FileSystem.FileSystem | PublicHttp> {
+  ): Effect.fn.Return<AudioSavedResult, ApiError, Attachment | FileSystem.FileSystem | PublicHttp> {
     const url = yield* Schema.decodeEffect(Schema.URLFromString)(address).pipe(Effect.mapError(failed));
     if (!publicHttps(url)) return yield* Effect.fail(failed());
     const http = yield* PublicHttp;

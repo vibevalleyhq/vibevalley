@@ -46,7 +46,6 @@ export const channelHandlers = Effect.gen(function* () {
     "channel.pin.set": ({ id, on }) => channels.pin(id, on),
     "channel.pin.list": ({ id }) => channels.pins(id),
     "channel.thread.create": ({ id, requestKey }) => threadOnce(requestKey, channels.threadUnder(id)),
-    "channel.attachment.create": (upload) => channels.attach(upload),
   };
   return done;
 });

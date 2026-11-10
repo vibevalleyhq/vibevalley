@@ -17,6 +17,7 @@ export * from "./game/shapes";
 export * from "./lan/shapes";
 export * from "./user/shapes";
 export * from "./library/shapes";
+export * from "./attachment/shapes";
 export * from "./connector/shapes";
 export * from "./machine/shapes";
 export * from "./voice/shapes";

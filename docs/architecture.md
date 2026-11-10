@@ -61,7 +61,7 @@ flowchart LR
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
 - **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 13 个有序模块（见 `apps/server/src/modules.ts`）：
-  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`provider`）
+  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`attachment`、`provider`）
   2. `Agents`（`agent`、`runtime`、`memory`；模型和循环在 `packages/ai`、`packages/agent`）
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`executor`、`session`）
@@ -102,7 +102,7 @@ flowchart LR
 `packages/protocol/src/api.ts` 汇总各概念的 `endpoints`。每个接口定义 `op`（如 `issue.status.update`，对应 `POST /api/v1/issue/status/update`）、`about`、输入与输出的 Schema，以及权限集合 `can`（`user`、`remote`、`orchestrator`、`session`）。
 
 - 所有命令接口均使用 `POST /api/v1/<路径>`，参数统一放在 JSON 请求体中。
-- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（聊天附件）、`GET /api/v1/artifact/<id>/<version>`（网页 Artifact）、`GET /api/v1/rpc`（频道与 Artifact 订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音助手入口）。
+- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（附件）、`GET /api/v1/artifact/<id>/<version>`（网页 Artifact）、`GET /api/v1/rpc`（频道与 Artifact 订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音助手入口）。
 - 从外面来的只经「连接到本机」那道门：配对来的设备只放 `can` 含 `remote` 的接口与流，登录来的设备是用户本人（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 
 ## 存了什么

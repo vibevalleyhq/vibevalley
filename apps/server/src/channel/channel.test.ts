@@ -13,6 +13,7 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import builtIn from "#/agent/templates/orchestrator/agent.json" with { type: "json" };
+import { Attachment } from "#/attachment/attachment.ts";
 import { head } from "#/base/clip.ts";
 import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
@@ -153,7 +154,11 @@ const channelLayer = (x: FakeSessions) =>
         onIssue: (issue: string) => sessionOnIssue(x.core.state(), issue)?.id,
         news: Effect.map(PubSub.subscribe(x.news), Stream.fromSubscription),
       };
-      return Channel.layer.pipe(Layer.provideMerge(Mailbox.layer), Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])));
+      return Channel.layer.pipe(
+        Layer.provideMerge(Mailbox.layer),
+        Layer.provideMerge(Attachment.layer),
+        Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])),
+      );
     }),
   );
 
@@ -286,7 +291,7 @@ const news = (f: Farm) =>
   });
 
 const run = <A, E>(
-  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channel | Mailbox | SqlClient.SqlClient | Scope.Scope>,
+  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channel | Attachment | Mailbox | SqlClient.SqlClient | Scope.Scope>,
   config?: ServerConfig["Service"],
   /** What the farm logs to besides (heard). */
   logs: Layer.Layer<never> = Layer.empty,
@@ -555,7 +560,7 @@ describe("the chat", () => {
         const context2 = yield* Effect.context();
         const runPromise = Effect.runPromiseWith(context2);
         const general = f.chat.defaultChannel();
-        const file = yield* f.chat.attach({ name: "图.png", type: "image/png", data: Buffer.from("x").toString("base64") });
+        const file = yield* (yield* Attachment).attach({ name: "图.png", type: "image/png", data: Buffer.from("x").toString("base64") });
         const pictured = (yield* f.chat.post({ _tag: "User", text: "看图", sendKey: "", attachments: [file.id] })).message;
         yield* f.chat.post({ _tag: "User", text: "一个链接 https://example.com/page", sendKey: "" });
         yield* f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "我看了图", anyway: true, confirm: true });
@@ -1055,12 +1060,14 @@ describe("the chat", () => {
           const threadUnder2 = yield* f.chat.threadUnder(reply.id);
           expect(threadUnder2).toBe(thread);
 
-          const file = yield* f.chat.attach({ name: "截图.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") });
+          const file = yield* (yield* Attachment).attach({ name: "截图.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") });
           expect(file).toMatchObject({ name: "截图.png", type: "image/png", size: 9 });
-          expect((yield* f.chat.attach({ name: "again.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") })).id).toBe(file.id);
+          expect((yield* (yield* Attachment).attach({ name: "again.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") })).id).toBe(
+            file.id,
+          );
           const shown = (yield* f.chat.post({ _tag: "User", text: "", sendKey: "", attachments: [file.id] })).message;
           expect(shown.attachments).toEqual([file]);
-          const kept = yield* f.chat.attachment(file.id);
+          const kept = yield* (yield* Attachment).get(file.id);
           expect(readFileSync(kept!.path, "utf8")).toBe("png bytes");
           expect((yield* f.chat.read(defaultOrchestrator, { target: "#general", limit: 1 })).messages[0]!.attachments).toEqual([
             { name: "截图.png", path: kept!.path },
@@ -1077,9 +1084,9 @@ describe("the chat", () => {
     // A file where the attachments folder should be: making the folder fails, already existing.
     writeFileSync(join(config.home, "attachments"), "");
     return run(
-      (f) =>
+      () =>
         Effect.gen(function* () {
-          const refusal = yield* Effect.flip(f.chat.attach({ name: "a.txt", type: "", data: Buffer.from("x").toString("base64") }));
+          const refusal = yield* Effect.flip((yield* Attachment).attach({ name: "a.txt", type: "", data: Buffer.from("x").toString("base64") }));
           expect(refusal).toMatchObject({ _tag: "Refused", reason: expect.stringContaining("AlreadyExists") });
         }),
       config,
