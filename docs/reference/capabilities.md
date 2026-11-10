@@ -180,31 +180,31 @@
 
 ## artifact
 
-稿子：一起写的，和交上来的网页
+Artifact：一起写的，和交上来的网页
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
-| `artifact.list` | 列出某个频道或工单的稿子，不指定就是全部 | `/api/v1/artifact/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.get` | 看一篇稿子 | `/api/v1/artifact/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.content.get` | 读稿子的正文：网页的一版，或块写成的 Markdown | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.create` | 新建稿子：空的一篇来一起写，或交上来一稿 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.version.create` | 给网页稿子交新的一版，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.html.edit` | 在网页稿子里换掉一段字，成为新的一版 | `/api/v1/artifact/html/edit` | ✓ | ✓ |   |   |
-| `artifact.update` | 给稿子改标题 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
-| `artifact.delete` | 删掉一篇稿子 | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
-| `artifact.previewDelete` | 试删一篇稿子：说会删掉什么，不真删 | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
-| `artifact.block.list` | 按顺序列出稿子现有的每一块 | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
+| `artifact.list` | 列出某个频道或工单的 Artifact，不指定就是全部 | `/api/v1/artifact/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.get` | 看一篇 Artifact | `/api/v1/artifact/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.content.get` | 读 Artifact 的正文：网页的一版，或块写成的 Markdown | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.create` | 新建 Artifact：空的一篇来一起写，或交上来一稿 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.version.create` | 给网页 Artifact 交新的一版，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.html.edit` | 在网页 Artifact 里换掉一段字，成为新的一版 | `/api/v1/artifact/html/edit` | ✓ | ✓ |   |   |
+| `artifact.update` | 给 Artifact 改标题 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
+| `artifact.delete` | 删掉一篇 Artifact | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
+| `artifact.previewDelete` | 试删一篇 Artifact：说会删掉什么，不真删 | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
+| `artifact.block.list` | 按顺序列出 Artifact 现有的每一块 | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
 | `artifact.submit` | 以你的身份交一批块的操作，按顺序一次做完 | `/api/v1/artifact/submit` | ✓ | ✓ |   |   |
-| `artifact.block.create` | 在稿子里插一块 | `/api/v1/artifact/block/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.block.create` | 在 Artifact 里插一块 | `/api/v1/artifact/block/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.block.update` | 改一块的字、类型或属性 | `/api/v1/artifact/block/update` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.delete` | 删掉稿子里的一块和它的子块 | `/api/v1/artifact/block/delete` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.block.delete` | 删掉 Artifact 里的一块和它的子块 | `/api/v1/artifact/block/delete` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.block.previewDelete` | 试删一块：说会删掉什么，不真删 | `/api/v1/artifact/block/previewDelete` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.suggestion.list` | 列出稿子上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ |   |   |
+| `artifact.suggestion.list` | 列出 Artifact 上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ |   |   |
 | `artifact.suggestion.create` | 对你写的一块提改写建议 | `/api/v1/artifact/suggestion/create` | ✓ | ✓ |   |   |
 | `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
 | `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
-| `artifact.markdown.get` | 把一起写的稿子读成 Markdown | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
-| `artifact.demo` | 开演示：几个帮工一起写一篇稿子，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
+| `artifact.markdown.get` | 把一起写的 Artifact 读成 Markdown | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
+| `artifact.demo` | 开演示：几个帮工一起写一篇 Artifact，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
 
 ## game
 

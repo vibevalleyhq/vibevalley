@@ -15,7 +15,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 |---|---|---|
 | `apps/server/src/**`、`apps/server/db`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
 | `apps/web/src/**`、`apps/web/public` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
-| `media`、生图协议、结果下载、助手媒体工具或 `/media` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与稿子引用真的接通；费用和未知结果边界不变 |
+| `media`、生图协议、结果下载、助手媒体工具或 `/media` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
 | `apps/mobile/**`、`packages/protocol/src/host.ts`、`apps/server/src/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
 | `apps/desktop/src/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
 | 助手的提示、`apps/server/src/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了助手的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |

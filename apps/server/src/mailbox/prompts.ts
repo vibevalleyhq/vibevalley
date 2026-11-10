@@ -14,11 +14,11 @@ export function messageLine(m: Envelope): string {
       : `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
   if (m.deleted === true) return head + " （这条已删除）";
   const files = (m.attachments ?? []).map((a) => `\n  │ [附件 ${a.name}：${a.path}]`).join("");
-  const made = m.artifact ? `\n  │ [稿子「${m.artifact.title}」第 ${m.artifact.version} 稿：id=${m.artifact.id}，原文用 artifact_content_get 读]` : "";
+  const made = m.artifact ? `\n  │ [Artifact「${m.artifact.title}」第 ${m.artifact.version} 稿：id=${m.artifact.id}，原文用 artifact_content_get 读]` : "";
   const quoted = (m.blocks ?? [])
     .map((b) => {
       const now = b.deleted === true ? "已删除" : b.nowRev !== undefined && b.nowRev !== b.rev ? `现在第 ${b.nowRev} 版` : "没变";
-      return `\n  │ [指着稿子「${b.title}」的块：artifact=${b.artifactId} block=${b.blockId} 引用时第 ${b.rev} 版，${now}]${b.text ? "\n  │ " + b.text.replaceAll("\n", "\n  │ ") : ""}`;
+      return `\n  │ [指着 Artifact「${b.title}」的块：artifact=${b.artifactId} block=${b.blockId} 引用时第 ${b.rev} 版，${now}]${b.text ? "\n  │ " + b.text.replaceAll("\n", "\n  │ ") : ""}`;
     })
     .join("");
   return `${head}${m.edited === true ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}${made}${quoted}`;

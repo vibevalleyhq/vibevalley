@@ -77,9 +77,9 @@
       "delete": "删掉一份档案"
     },
     "artifact": {
-      "list": "列出稿子（--issue 只看一张工单的）",
-      "show": "看一篇稿子：标题、版本、归属",
-      "read": "读一篇稿子的正文"
+      "list": "列出 Artifact（--issue 只看一张工单的）",
+      "show": "看一篇 Artifact：标题、版本、归属",
+      "read": "读一篇 Artifact 的正文"
     },
     "channel": {
       "list": "列出频道和私聊",
@@ -188,37 +188,37 @@
     },
     "artifact": {
       "block": {
-        "create": "在稿子里插一块",
-        "delete": "删掉稿子里的一块和它的子块",
-        "list": "按顺序列出稿子现有的每一块",
+        "create": "在 Artifact 里插一块",
+        "delete": "删掉 Artifact 里的一块和它的子块",
+        "list": "按顺序列出 Artifact 现有的每一块",
         "previewDelete": "试删一块：说会删掉什么，不真删",
         "update": "改一块的字、类型或属性"
       },
       "content": {
-        "get": "读稿子的正文：网页的一版，或块写成的 Markdown"
+        "get": "读 Artifact 的正文：网页的一版，或块写成的 Markdown"
       },
-      "create": "新建稿子：空的一篇来一起写，或交上来一稿",
-      "delete": "删掉一篇稿子",
-      "demo": "开演示：几个帮工一起写一篇稿子，不花模型的钱",
-      "get": "看一篇稿子",
+      "create": "新建 Artifact：空的一篇来一起写，或交上来一稿",
+      "delete": "删掉一篇 Artifact",
+      "demo": "开演示：几个帮工一起写一篇 Artifact，不花模型的钱",
+      "get": "看一篇 Artifact",
       "html": {
-        "edit": "在网页稿子里换掉一段字，成为新的一版"
+        "edit": "在网页 Artifact 里换掉一段字，成为新的一版"
       },
-      "list": "列出某个频道或工单的稿子，不指定就是全部",
+      "list": "列出某个频道或工单的 Artifact，不指定就是全部",
       "markdown": {
-        "get": "把一起写的稿子读成 Markdown"
+        "get": "把一起写的 Artifact 读成 Markdown"
       },
-      "previewDelete": "试删一篇稿子：说会删掉什么，不真删",
+      "previewDelete": "试删一篇 Artifact：说会删掉什么，不真删",
       "submit": "以你的身份交一批块的操作，按顺序一次做完",
       "suggestion": {
         "accept": "接受一条改写建议",
         "create": "对你写的一块提改写建议",
-        "list": "列出稿子上的改写建议，没答的和答过的",
+        "list": "列出 Artifact 上的改写建议，没答的和答过的",
         "reject": "拒绝一条改写建议"
       },
-      "update": "给稿子改标题",
+      "update": "给 Artifact 改标题",
       "version": {
-        "create": "给网页稿子交新的一版，旧的留着"
+        "create": "给网页 Artifact 交新的一版，旧的留着"
       }
     },
     "channel": {
@@ -513,7 +513,7 @@
       "about": "档案：派活时指给谁"
     },
     "artifact": {
-      "about": "稿子：一起写的，和交上来的网页"
+      "about": "Artifact：一起写的，和交上来的网页"
     },
     "channel": {
       "about": "频道和私聊，和里面的消息",
@@ -598,7 +598,7 @@
   },
   "arg": {
     "agent": "档案：id 或名字",
-    "artifact": "稿子的 id",
+    "artifact": "Artifact 的 id",
     "channel": "频道：名字（general 或 #general）或 id",
     "cron": "定时任务的 id",
     "cronName": "定时任务的名字",
@@ -636,7 +636,7 @@
       "about": "看有哪些档案能派活"
     },
     "artifactList": {
-      "about": "一张工单的稿子"
+      "about": "一张工单的 Artifact"
     },
     "artifactShow": {
       "about": "看 a1 是哪篇、第几版"

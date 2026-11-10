@@ -2,13 +2,14 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（32 篇）
+## proposed（33 篇）
 
 ### feature
 
+- 2026-11-10 [素材库：生成的、你上传的、帮工拿回来的文件都在一处](.agents/notes/proposed/feature/2026-11-10-the-library.md)
 - 2026-11-09 [设置按功能分，钥匙放一处，没准备好就指路](.agents/notes/proposed/feature/2026-11-09-settings-by-feature.md)
 - 2026-11-09 [频道里用 /imagegen 生图](.agents/notes/proposed/feature/2026-11-09-imagegen-in-channels.md)
-- 2026-11-04 [网页稿子的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
+- 2026-11-04 [网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
 - 2026-10-27 [自己的实时模型经本机 WebSocket 接电话，其余照旧走声网](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
 - 2026-10-22 [记忆树：接真数据与手艺播种](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [助手给用户报告：早报、仓库健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)

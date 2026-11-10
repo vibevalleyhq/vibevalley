@@ -1,10 +1,10 @@
-# Agent Note: 网页稿子的元素锚点、锚点评论与高度回报
+# Agent Note: 网页 Artifact 的元素锚点、锚点评论与高度回报
 
 Status: proposed
 
 ## Problem
 
-用户在查看网页稿子（[稿子](docs/subsystems/artifact.md)）时，虽然已支持划词替换文字（`artifact.html.edit`），但还缺三项视觉审阅交互：
+用户在查看网页 Artifact（[Artifact](docs/subsystems/artifact.md)）时，虽然已支持划词替换文字（`artifact.html.edit`），但还缺三项视觉审阅交互：
 - 指着图表、按钮或容器让帮工改样式时，无法在画面上直接点选 DOM 元素并将评论钉在该元素上。
 - 聊天旁栏（`ArtifactCanvas.tsx`）尚未挂载 `?shell=1` 外壳脚本。
 - 聊天流中的网页卡片尚不能按实际内容高度自适应展开。
@@ -21,7 +21,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 在网页稿子中点选一个 DOM 元素并发表评论，页面对应位置显示编号角标，点击评论可滚动定位到该元素。
+- 在网页 Artifact 中点选一个 DOM 元素并发表评论，页面对应位置显示编号角标，点击评论可滚动定位到该元素。
 - 聊天旁栏 `ArtifactCanvas` 支持与 `/artifacts` 页一致的划词改字与元素锚点点选。
 
 ## Risks

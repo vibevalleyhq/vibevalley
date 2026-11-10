@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-频道消息与块稿子已走 `/api/v1/rpc` WebSocket 按修订号增量订阅（[频道](docs/subsystems/channel.md)、[稿子](docs/subsystems/artifact.md)），但全局状态同步还缺两块：
+频道消息与块 Artifact 已走 `/api/v1/rpc` WebSocket 按修订号增量订阅（[频道](docs/subsystems/channel.md)、[Artifact](docs/subsystems/artifact.md)），但全局状态同步还缺两块：
 - **服务端不知道用户是否正在看屏幕**：只要消息在工作台尚未标为已读，外部连接器（微信/飞书/QQ）就会立即外推；用户坐在电脑前看页面时手机也会同时响。
 - **工单与帮工每次仍推整份 `StateFrame`**：工单与会话变多后，任何一条事实都会把全量 `issues` 和 `sessions` 重新序列化推一遍；页面断线重连也只能重拉整帧快照。
 

@@ -25,7 +25,7 @@
   - 主监听永远只绑 `127.0.0.1`；门开启时绑 `0.0.0.0:<lan.port>`。
   - 非 `/api/v1/` 下的静态页面 `GET`/`HEAD` 直接转发；`/mcp` 与 `/v1/chat/completions` 一律返回 `404`。
   - 不带钥匙只放 `lan.pair`、`user.login`、`user.get`、`user.approval.create`、`user.approval.collect`。
-  - 配对来的设备在 `/api/v1/` 下仅放行 `can` 含 `remote` 的接口、三条 SSE 流、附件与网页稿子 `GET` 以及 `/api/v1/rpc` WebSocket；管理「连接到本机」自身及修改本机设置、档案、技能、农机、连接器的接口均不含 `remote`，远端调用返回 `403`。
+  - 配对来的设备在 `/api/v1/` 下仅放行 `can` 含 `remote` 的接口、三条 SSE 流、附件与网页 Artifact `GET` 以及 `/api/v1/rpc` WebSocket；管理「连接到本机」自身及修改本机设置、档案、技能、农机、连接器的接口均不含 `remote`，远端调用返回 `403`。
   - 登录来的设备放行 `/api/v1/` 下的一切，只有 `user.password.set` 返回 `403`。
 - **一次性配对码 + 本机点头**：
   - 配对码为 10 位随机码，有效期 2 分钟，输错 5 次即作废，同时只允许一台设备挂起等待。

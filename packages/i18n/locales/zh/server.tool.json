@@ -33,9 +33,9 @@
     "search_archive": "翻旧账",
     "memory_search": "翻记性",
     "memory_create": "替帮工记",
-    "artifact_block_create": "往稿子里加一块",
-    "artifact_block_update": "改稿子的一块",
-    "artifact_block_delete": "删稿子的一块"
+    "artifact_block_create": "往 Artifact 里加一块",
+    "artifact_block_update": "改 Artifact 的一块",
+    "artifact_block_delete": "删 Artifact 的一块"
   },
   "about": "{label}：{about}"
 }

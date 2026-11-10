@@ -26,7 +26,7 @@ Host（本机宿主 ~/.vibevalley：全局设置、模型密钥、农机探测�
     ├── Issue（空间工单：可无 Repo，或关联一个 Repo 切出 Worktree，可拆分子工单）
     │   ├── Assignment（责任指派 → Agent 档案）
     │   └── IssueThread（工单评论串 → Channel）
-    ├── Pkm & Artifact（空间知识与产出：<space>/pkm/* 笔记库、共创稿子）
+    ├── Pkm & Artifact（空间知识与产出：<space>/pkm/* 笔记库、共创 Artifact）
     └── Space DB（空间状态库 <space>/.vibevalley/space.db：工单、会话、频道、记忆、索引）
 ```
 
@@ -47,7 +47,7 @@ Host（本机宿主 ~/.vibevalley：全局设置、模型密钥、农机探测�
 | **工作树（Worktree）** | `Worktree` / `Workplace` | `Workplace` | `<repo>#<issueNumber>` | `<space>/worktrees/<owner>/<repo>.<issueNumber>` | 1. 由 `Issue` 在指定 `Repo` 上开工时从基线分支切出，对应分支 `vibevalley/issue-<issueNumber>`；<br>2. 首次切出自动运行 `.vibevalley/setup`；<br>3. 同工单重开或换帮工复用同一 `Worktree`；合并或 PR 合入后自动清理 |
 | **工单（Issue）** | `Issue` | `Issue` | 内部 UUID + 空间内递增编号 `#<number>` | `<space>/.vibevalley/space.db`（`issue` 表） | 1. `Issue` 归属 `Space`，通过可选字段 `repo?: RepoId` 关联目标仓库；<br>2. 状态机固定为 `backlog`（待规划）→ `todo`（待办）→ `in_progress`（处理中）→ `in_review`（待验收）→ `done` / `canceled`；<br>3. 父工单可经 `issue.split` 拆分为带 `blockedBy` 依赖的子工单，子工单通过门禁后先合入父分支 |
 | **笔记（Pkm）** | `Pkm` (`PkmPage` / `PkmBlock`) | `Pkm` | 页面相对路径（如 `notes/architecture.md`） | `<space>/pkm/{daily,notes,sources}` | 1. Markdown 文件是唯一真相，SQLite 仅存反链、术语与评论索引；<br>2. 归属当前 `Space`，供助手立项与帮工查阅空间背景知识 |
-| **稿子（Artifact）** | `Artifact` | `Artifact` | `ArtifactId` | `<space>/.vibevalley/artifacts/` + `space.db` | 挂在频道或工单上的可交付块文档（`blocks`）或交互式网页（`html`），按版本或块操作（`op`）留痕 |
+| **Artifact（Artifact）** | `Artifact` | `Artifact` | `ArtifactId` | `<space>/.vibevalley/artifacts/` + `space.db` | 挂在频道或工单上的可交付块文档（`blocks`）或交互式网页（`html`），按版本或块操作（`op`）留痕 |
 
 #### 2.3 执行与协同实体（谁在 `Space` 里干活）
 

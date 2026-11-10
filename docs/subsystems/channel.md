@@ -21,7 +21,7 @@
 | `apps/server/src/channel/writing.ts`、`route.ts` | 消息落库、生成 `Trigger`、计算候选受众并交 `Mailbox` |
 | `apps/server/src/channel/threads.ts`、`talk.ts` | 工单串创建/恢复、汇报贴出、私聊会话按需拉起 |
 | `apps/server/src/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
-| `packages/protocol/src/rpc.ts`、`apps/server/src/http/rpc.ts` | `/api/v1/rpc` 频道与稿子实时订阅契约与服务端挂载 |
+| `packages/protocol/src/rpc.ts`、`apps/server/src/http/rpc.ts` | `/api/v1/rpc` 频道与 Artifact 实时订阅契约与服务端挂载 |
 | `apps/server/src/connector/` | `connector.ts` 桥接协调器、`digest.ts`、`weixin.ts`、`feishu.ts`、`qq.ts` |
 | 表 `channel`、`channel_participant`、`channel_message`、`channel_attachment`、`channel_mention`、`channel_member`、`channel_read_cursor` | 频道与消息存储表 |
 | 表 `connector_account`、`connector_inbound`、`connector_outbox` | 外部聊天软件账号、入站去重与出站队列 |
@@ -42,7 +42,7 @@
 - **主动阅读与被动消费分开记账**：
   - 调读取接口推进 `channel_read_cursor.read_number`。
   - 模型实际消费投递推进 `mailbox_delivery.consumed_at` 并加 👀 反应，未读查询同时排除两者已覆盖的消息。
-- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话的人分的联合，`Owner`（用户）、`Tell`（对一个帮工说）、`Agent`（帮工、助手经说话工具）、`Announce`（带上做出来的稿子或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种都开同一个 `Channel.post` span，种类记在 span 的 `post` 属性上，最后都落进 `writing.ts` 的 `write`。
+- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话的人分的联合，`Owner`（用户）、`Tell`（对一个帮工说）、`Agent`（帮工、助手经说话工具）、`Announce`（带上做出来的 Artifact 或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种都开同一个 `Channel.post` span，种类记在 span 的 `post` 属性上，最后都落进 `writing.ts` 的 `write`。
 - **发送幂等键 `sendKey`**：用户发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞

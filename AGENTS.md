@@ -37,7 +37,7 @@ packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具
 packages/provider/         厂商接入：DeepSeek 目录/协议/显式连接、转写模型、MOSS wire/鉴权、声网 SDK/RTC token/字幕分片；不依赖 ai、agent、protocol 或应用
                            AI 能力调用、WAV 和 MOSS 无框架运行在 packages/ai；通话编排、页面中继、采集/播放设备归 apps 的 voice
 packages/pkm/              知识库与双链大纲引擎：Logseq 风格 Markdown 解析与打印、PARA 目录规则、双链图谱与嵌入展开、前端大纲键盘编辑与框选状态机
-packages/artifact/         稿子（块文档与 HTML 页）引擎：块操作并发状态机 Page、Markdown 双向互转、HTML CSP 沙箱与 AST 检查、前端协同编辑器 BlockEditor
+packages/artifact/         Artifact（块文档与 HTML 页）引擎：块操作并发状态机 Page、Markdown 双向互转、HTML CSP 沙箱与 AST 检查、前端协同编辑器 BlockEditor
 packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器
 packages/home/             农场的家目录在磁盘上的约定：在哪、服务端在哪个端口（server.json）、语言（settings.json）、桌面版的 socket；服务端、命令行、桌面版都用它
 packages/testkit/          测试共用的：在真实时间上等条件、测试金字塔（只在 devDependencies）

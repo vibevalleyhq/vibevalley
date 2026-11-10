@@ -207,12 +207,12 @@ Status: proposed
 | `Attachment` | 一条消息带的一个文件 | `channel_attachment.id` | | `CardAttachment`、媒体任务的 `attachment` 列 |
 | `Connector` | 一个聊天软件接到一个频道上的那条线 | 它的 id（`weixin`、`feishu`、`qq`） | `ConnectorState`、`ConnectorAccount` | 形状叫 `ConnectorStatus`（第二组） |
 
-**稿子和笔记**
+**Artifact 和笔记**
 
 | 概念 | 是什么 | 认它靠 | 属于它的 | 待理清 |
 |---|---|---|---|---|
 | `Artifact` | 留下来要人看的一篇：一块一块写的，或一稿一稿换的网页 | `artifact.id` | `ArtifactVersion`（网页的一稿）、`ArtifactCard`、`ArtifactBody` | `version`、`revision`、`rev`（第七组） |
-| `Block` | 块稿子里的一块 | `artifact_block.id`，在它的稿子里 | `BlockType`、`BlockOp`（对它的一次修改） | 不带 `Artifact` 前缀，`PkmBlock` 带（第八组） |
+| `Block` | 块 Artifact 里的一块 | `artifact_block.id`，在它的 Artifact 里 | `BlockType`、`BlockOp`（对它的一次修改） | 不带 `Artifact` 前缀，`PkmBlock` 带（第八组） |
 | `Suggestion` | 对一块提的一条修改建议，等人接受或拒绝 | `artifact_suggestion.id` | `SuggestionStatus` | 和 `PkmComment` 是不是同一样东西（第九组） |
 | `PkmPage` | 笔记里的一个页面，一个 Markdown 文件 | `slug` 或 `file`：两个都在形状上，哪个是键待核实 | `PkmBlock`、`PkmComment`、`PkmTier`、`PkmMarker` | |
 
@@ -269,7 +269,7 @@ Status: proposed
 | `Delivery` | `Mailbox.receive` 算出谁该听到，一个 Session 一行 | 到 `consumed`（模型真的读到）或 `dropped` | `handed` 以后没收到回执，退回 `pending` 再投 |
 | `Machine` | 服务端开机时没有就记下自己这台 | 没查 | |
 | `Participant` | 参与者加入（`joined_at`） | 离开（`left_at`），行留着 | |
-| `Artifact` | 没查 | 没查 | 网页稿子一稿一稿换，id 不变 |
+| `Artifact` | 没查 | 没查 | 网页 Artifact 一稿一稿换，id 不变 |
 
 这一列答出来的三件事，直接决定前面几组怎么改：
 
@@ -477,7 +477,7 @@ Status: proposed
 | `Voice`（`voice`） | OpenAI TTS 的六个音色；和服务 `Voice` 同名 | `OpenaiVoice` |
 | `Area`、`Language`（`voice`） | 声网的区域、通话的语言 | 带上 `Voice` 或 `Agora` |
 | `Repo`（`game`） | 一个仓库的路径和提交数 | `RepoCommits` |
-| `Block`、`BlockOp`、`BlockType`、`BlockInput`（`artifact`） | 稿子的块 | 和 `PkmBlock` 对称：`ArtifactBlock` |
+| `Block`、`BlockOp`、`BlockType`、`BlockInput`（`artifact`） | Artifact 的块 | 和 `PkmBlock` 对称：`ArtifactBlock` |
 | `Via`、`Balance`（`runtime`）、`Head`、`Build`（`agent`） | 装的方式、余额、长相的两部分 | 带上所属的概念 |
 
 取值和概念同名的：`ChannelType` 的 `channel`、`CronWhenKind` 的 `cron`、`PkmTier` 的 `inbox`、`MemoryKind` 的 `note` 和 `issue`。取值改成它说的事（`cron` 改 `expression`，`inbox` 留给 `Inbox`）。
@@ -493,8 +493,8 @@ Status: proposed
 | `check` 三个意思 | `CriterionCheck`、`BranchCheck`、`IssueConstraints.check`（一条命令）、`ingress_github` 的 CI check | 逐个换 |
 | `template` 两个意思 | `AgentTemplate`；`IssueTemplate`、`TemplateKind`（归 `repo`） | `TemplateKind` 带上 `Issue` |
 | `connection` 两个意思 | `ProviderConnection`、`ToolConnection`；`Connector` 是第三样 | 定义里写清 |
-| 修改稿子的词 | `BlockOp`（一个操作）、`artifact_change`（一批操作）、`Suggestion`（建议） | 表改 `artifact_batch`（它的键是 `batch_id`） |
-| 批注两个名字 | 稿子叫 `Suggestion`，笔记叫 `PkmComment`（状态里有 `suggested`） | 核实是不是同一样东西 |
+| 修改 Artifact 的词 | `BlockOp`（一个操作）、`artifact_change`（一批操作）、`Suggestion`（建议） | 表改 `artifact_batch`（它的键是 `batch_id`） |
+| 批注两个名字 | Artifact 叫 `Suggestion`，笔记叫 `PkmComment`（状态里有 `suggested`） | 核实是不是同一样东西 |
 | 故事两个名字 | `IssueTimeline`（里程碑加花费）、`IssueHistory`（工单加全部 Session） | `IssueHistory` 改成它装的 |
 | 拼写 | `ToolConnectionStatus` 写 `cancelled`，别处写 `canceled` | 改 |
 | 时刻的字段 | `Cron.created`、`PkmComment.created`、`Memory.at`、`SessionEvent.time`；别处是 `createdAt` | 统一成 `At` |

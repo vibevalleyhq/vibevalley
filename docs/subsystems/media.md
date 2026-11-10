@@ -47,7 +47,7 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 
 **助手在频道里生的图自动发回。** 用户在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的助手）发出去，只交给这个助手；助手读自带的 `imagegen` skill（`apps/server/src/orchestrator/skills/imagegen/SKILL.md`，随服务端打包），调 `media.image.create`。来源是助手、带来源频道的生图任务下载完成后，Media 以那个助手的名义用 `Channel.announce` 在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；用户在本页发起的任务不自动发。
 
-发布沿用 Channel 接口与附件 ID。页面用命名空间、任务 ID、目标频道的 JSON 元组计算 SHA256，作为 64 字符的 `sendKey`；刷新后再次发布到同一频道不会多发一条，不同频道各有自己的发布。稿子引用同一个本机附件地址，不复制资产。
+发布沿用 Channel 接口与附件 ID。页面用命名空间、任务 ID、目标频道的 JSON 元组计算 SHA256，作为 64 字符的 `sendKey`；刷新后再次发布到同一频道不会多发一条，不同频道各有自己的发布。Artifact 引用同一个本机附件地址，不复制资产。
 
 ## 本机输入
 
@@ -103,7 +103,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 
 ### 长音频转写
 
-`transcription` 独立绑定长转写模型，与输入框听写分开。用户上传本机音频、确认上传，选择支持的说话人区分与热词；服务端核对音频最长 3600 秒，再上传并发起异步任务。Diarize Pro 可用 SSE，逐步保存文本、带说话人与起止时间的分段及实际用量；正文上限 1,000,000 字符、分段上限 10,000。中断保留检查点，不自动续流或补写。页面显示分段，点击时间定位原音频，可把转写另存为稿子。
+`transcription` 独立绑定长转写模型，与输入框听写分开。用户上传本机音频、确认上传，选择支持的说话人区分与热词；服务端核对音频最长 3600 秒，再上传并发起异步任务。Diarize Pro 可用 SSE，逐步保存文本、带说话人与起止时间的分段及实际用量；正文上限 1,000,000 字符、分段上限 10,000。中断保留检查点，不自动续流或补写。页面显示分段，点击时间定位原音频，可把转写另存为 Artifact。
 
 ### 资源所有权
 
@@ -128,11 +128,11 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - `apps/server/src/infra/files.test.ts`：中断写入不暴露半文件，并发发布和已有文件不覆盖。
 - `apps/server/src/media/input.test.ts`、`inputs.test.ts`：分块签名、字节上限、磁盘失败、取消、配额竞争、引用事务、过期回收、删除恢复、真实数据库拒绝提交后的文件回滚，以及缺失或损坏输入的核对和修复。
 - `apps/server/src/http/media.test.ts`：真实本机 HTTP 上的输入预留、跨来源拒绝、二进制上传、26 MiB 流式容器传输与断线重试；大文件样例只验证传输和容器头，不代表视频解码或理解验收。
-- `apps/web/test/media.spec.ts`：真实隔离服务端上的文本与布局生成、状态流、PNG 预览和下载、频道去重发布、稿子引用、未知结果、取消、独立下载重试与表单拒绝。只由 `apps/server/src/testing/network.ts` 替换厂商请求与结果下载，任务、数据库、附件和 Core 都是真的；测试程序不读取用户的 Key、不访问厂商。
+- `apps/web/test/media.spec.ts`：真实隔离服务端上的文本与布局生成、状态流、PNG 预览和下载、频道去重发布、Artifact 引用、未知结果、取消、独立下载重试与表单拒绝。只由 `apps/server/src/testing/network.ts` 替换厂商请求与结果下载，任务、数据库、附件和 Core 都是真的；测试程序不读取用户的 Key、不访问厂商。
 - `apps/server/src/media/understanding.test.ts`：授权版本、跨类型 ID 冲突、上传状态、结果与用量、共享容量、取消、清理预览与重试、换 Key、清理断线和重启恢复；委托额外覆盖可信来源、频道、过期、参数不可变、并发重复执行及排队期间换 Key。
-- `apps/web/test/understanding.spec.ts`：合成 PNG 与可解码 MP4 的真实本机上传、授权、理解文本、稿子保存、刷新、截断、未知与取消。厂商传输仍是替身，不验证实际识别质量。
+- `apps/web/test/understanding.spec.ts`：合成 PNG 与可解码 MP4 的真实本机上传、授权、理解文本、Artifact 保存、刷新、截断、未知与取消。厂商传输仍是替身，不验证实际识别质量。
 - `apps/server/src/media/speech.test.ts`、`audio.test.ts`、`audioResult.test.ts`、`release.test.ts`：同步／异步、实际格式与用量、流式部分结果、账号隔离、恢复、下载与显式资源释放。
-- `apps/web/test/speech.spec.ts`、`flash.spec.ts`、`audio.spec.ts`：音频解码播放、流式播放、结构化对白、设计预览与克隆许可、转写分段定位与稿子保存，以及刷新和播放器释放。
+- `apps/web/test/speech.spec.ts`、`flash.spec.ts`、`audio.spec.ts`：音频解码播放、流式播放、结构化对白、设计预览与克隆许可、转写分段定位与 Artifact 保存，以及刷新和播放器释放。
 - `apps/web/test/a11y.spec.ts`：表单及成功、失败、截断、未知、取消状态的浅深主题、桌面与窄屏检查。开发版同时检查响应式诊断；共享浮层只在打开时读取选中项的快照，值后来变化不抢焦点，`packages/base-ui/test/select.test.tsx` 覆盖这个回归。
 
 `apps/server/src/media/remoteFiles.test.ts` 验证真实磁盘 Blob 经厂商协议替身上传、并发去重、凭据隔离、未知结果、重启及显式删除重试；它不代表真实厂商文件操作已经验收。

@@ -9,7 +9,7 @@
 ## 准备
 
 - 先跑定点测试，再跑 `vp run server:check`、`vp run web:check`。
-- 不使用用户的家目录、Key 或媒体。下面的 Playwright 自己起隔离服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下的 `apps/server/src/testing/network.ts` 只替换 MOSS 生图、理解、语音、音色、远端文件请求和结果下载，任务、数据库、文件、状态流、频道和稿子都走真的模块。不要手工拼成功帧。
+- 不使用用户的家目录、Key 或媒体。下面的 Playwright 自己起隔离服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下的 `apps/server/src/testing/network.ts` 只替换 MOSS 生图、理解、语音、音色、远端文件请求和结果下载，任务、数据库、文件、状态流、频道和 Artifact 都走真的模块。不要手工拼成功帧。
 - 区分三类证据：协议离线、隔离程序、真实厂商。这里的成功图片是确定的 PNG，音频是合成音调的 WAV／MP3，不证明账号权限、模型质量或实际费用。
 
 ## 步骤
@@ -23,7 +23,7 @@
    vp run --filter @vibevalley/web e2e:audit 'test/a11y.spec.ts$' --grep 'image task results'
    ```
 
-3. 核对文本和布局两条成功路径、任务 ID、来源与厂商用量、图片实际解码尺寸、下载 PNG 签名、刷新后重复发布只有一条消息、稿子读取到同一个附件地址。不要只等提交按钮变灰：那可能仍在发送，或请求已经失败。
+3. 核对文本和布局两条成功路径、任务 ID、来源与厂商用量、图片实际解码尺寸、下载 PNG 签名、刷新后重复发布只有一条消息、Artifact 读取到同一个附件地址。不要只等提交按钮变灰：那可能仍在发送，或请求已经失败。
 4. 核对 `unknown` 不提供重新提交的捷径、取消只停止本机等待、失败后按钮只重试下载。开发版不应有 Solid 响应式警告；拒绝用例的 HTTP 409 与响应式诊断分开报告。
 5. 读取 `apps/web/.screens/media-{ready,failed,unknown,canceled}-{light,dark}-{1280,390}.png`：文字与动作没有横向溢出，未知费用与取消含义清楚，图片能看见，截图主体没有被固定页头遮住。截图步骤见[页面分册](.agents/skills/vv-acceptance/references/page.md)。
 
@@ -38,9 +38,9 @@
 ## 图片与视频理解
 
 1. 在 `apps/server` 跑 `vp test src/media/understanding.test.ts src/media/remoteFiles.test.ts`；核对上传许可版本、输入保留、共享容量与 ID、实际用量、截断、取消、重启和删除重试。陌生上传状态不开始推理；失败但有文件 ID 的回执仍须真正删除。
-2. 跑 `vp run --filter @vibevalley/web e2e:integration 'test/understanding.spec.ts$'`，再加 `VIBEVALLEY_WEB_DEV=1` 跑同一项。测试选择仓库中的合成 PNG 和可解码 MP4，不用用户的媒体；确认未勾选许可不能提交，选择后文件先落本机，结果进入 Core、显示并存为稿子。重试同一 ID 和刷新不新建任务；截断正文不丢，清理重试不重复理解。
+2. 跑 `vp run --filter @vibevalley/web e2e:integration 'test/understanding.spec.ts$'`，再加 `VIBEVALLEY_WEB_DEV=1` 跑同一项。测试选择仓库中的合成 PNG 和可解码 MP4，不用用户的媒体；确认未勾选许可不能提交，选择后文件先落本机，结果进入 Core、显示并存为 Artifact。重试同一 ID 和刷新不新建任务；截断正文不丢，清理重试不重复理解。
 3. 跑 `vp run --filter @vibevalley/web e2e:audit 'test/a11y.spec.ts$' --grep 'understanding results'`。读取 `.screens/understanding-{form,ready,incomplete,unknown,canceled}-{light,dark}-{1280,390}.png`，核对许可、截断、费用未知与清理含义；不要只看空状态。
-4. 用 `verify-server.ts --scripted-helper -- <脚本>` 单独核对 JSON 接口与状态流：预留输入、二进制 PUT、带连接及 revision 的 `media.understanding.create`、查询至结果与清理完成、重试同一请求、保存稿子、删除已释放的本机输入后仍能读取结果。`media.understanding.previewCleanup` 不得修改文件或调用供应商。保留脚本输出与 `result.json`；测试 runtime 替换厂商传输，不是实际 MOSS 推理。
+4. 用 `verify-server.ts --scripted-helper -- <脚本>` 单独核对 JSON 接口与状态流：预留输入、二进制 PUT、带连接及 revision 的 `media.understanding.create`、查询至结果与清理完成、重试同一请求、保存 Artifact、删除已释放的本机输入后仍能读取结果。`media.understanding.previewCleanup` 不得修改文件或调用供应商。保留脚本输出与 `result.json`；测试 runtime 替换厂商传输，不是实际 MOSS 推理。
 5. 委托路径还需跑 `src/flows/media.test.ts`：用户登记 `media.understanding.authorize` 后应为 `authorized`、输入保留且没有厂商请求；可信助手只传 ID，必须在授权频道承接用户输入。错误频道、自主巡查、HTTP 用户绕过、过期、换 Key、改参数及其他档案重用均拒绝；并发重复开始只上传一次。排队期间换 Key 也必须在上传前拒绝。取消、过期与重启释放尚未执行的输入。
 6. 在真实页面选授权频道，刷新后授权仍在；「发送给助手」只发一条去重的用户消息，撤销后按钮和输入保留按服务端状态改变。用隔离程序核对 `authorize → start 被 HTTP 拒绝 → cancel` 及状态流；脚本模型的可信执行证明与 HTTP 拒绝证明分开保留。
 
@@ -63,7 +63,7 @@
 2. 核对 Flash 在完成前已有实际播放样本（`flash-player` 的 `data-played` 大于零），缓冲不超过页面上限，完成后 WAV 可解码。截断保留部分结果；停止、离开、设备故障关闭 AudioContext 并取消原任务，不重新连接厂商流。
 3. 核对多人对白使用结构化说话人和台词，设计预览可播放；保存音色必须另行确认克隆许可。更换输入、账号或 Key 后旧许可与音色列表不能继续使用。此步骤使用替身，不调用真实克隆接口。
 4. 核对异步任务刷新后仍读取同一任务；已保存任务 ID 的恢复只发状态 GET，已有 URL 的重试只下载。重启、超时、取消和换 Key 的证据应能区分「继续查询」「下载」「新提交」，不把三者混成重试。
-5. 核对长转写的增量正文与说话人分段在任务结束前出现，刷新后仍在；点击时间定位原音频，另存稿子保留正文。截断／取消的结果明确标为部分结果，不启用流式重连；普通转写不能误开 Diarize Pro 的 SSE。
+5. 核对长转写的增量正文与说话人分段在任务结束前出现，刷新后仍在；点击时间定位原音频，另存 Artifact 保留正文。截断／取消的结果明确标为部分结果，不启用流式重连；普通转写不能误开 Diarize Pro 的 SSE。
 6. 预览再确认释放任务资产，核对大音频、设计预览和转写原音频不再占用该任务的保留；刷新后状态一致，其他任务引用及已发布附件仍可读取。远端清理失败保留依据，不用本机释放冒充厂商删除。
 
 ## Live、Vision 与宿主

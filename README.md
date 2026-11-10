@@ -48,9 +48,9 @@ flowchart LR
   rt --> repo[(你的项目<br/>项目目录或工单的 worktree)]
 ```
 
-- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：助手、帮工、田头、项目和收获、稿子和笔记、语音、连接器都在这一个进程里，数据在 SQLite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
+- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：助手、帮工、田头、项目和收获、Artifact 和笔记、语音、连接器都在这一个进程里，数据在 SQLite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、稿子、笔记、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
+- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、Artifact、笔记、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
 - **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏、灵动岛和语音的快捷键。
 - **形状只写一次**：接口和数据形状按概念写在 `packages/protocol/src/<概念>/`（`shapes.ts`、`schema.ts`、`api.ts`），服务端、页面和命令行 import 同一份，两边不会对不上。
 
@@ -103,9 +103,9 @@ vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0
 ## 目录
 
 ```
-apps/server/       TypeScript 服务端（Effect v4、SQLite）：src/ 按概念分的服务（工单、帮工、信箱、项目、频道、稿子、笔记、助手、连接器、游戏……），db/ 表结构和查询
+apps/server/       TypeScript 服务端（Effect v4、SQLite）：src/ 按概念分的服务（工单、帮工、信箱、项目、频道、Artifact、笔记、助手、连接器、游戏……），db/ 表结构和查询
 apps/cli/          命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端
-apps/web/          页面（Solid 2）：农场、像素村、田头、工单、稿子、笔记、配置页、语音；服务端在 / 提供
+apps/web/          页面（Solid 2）：农场、像素村、田头、工单、Artifact、笔记、配置页、语音；服务端在 / 提供
 apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
 apps/site/         官网 vibevalley.dev（Solid 2 静态生成）
 packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、命令行、页面和两个壳都 import 它

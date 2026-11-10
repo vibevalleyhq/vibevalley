@@ -304,7 +304,7 @@ describe("mcp", () => {
       const outside = yield* artifacts.create(
         { from: userId, by: userId },
         {
-          title: "别处的稿子",
+          title: "别处的 Artifact",
           kind: "html",
           content: "outside",
           channel: chat.defaultChannel(),
@@ -315,10 +315,10 @@ describe("mcp", () => {
       yield* until(() => tokens.length > 0, "the channel context's token");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
-      const tool2 = yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的稿子", kind: "html", content: "inside" }));
+      const tool2 = yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的 Artifact", kind: "html", content: "inside" }));
       expect(tool2).toContain("做好了");
       const [inside] = yield* artifacts.list({ channel: direct });
-      expect(inside).toMatchObject({ title: "这里的稿子", channel: direct, by: "lab" });
+      expect(inside).toMatchObject({ title: "这里的 Artifact", channel: direct, by: "lab" });
       const listed = yield* Effect.promise(() => c.tool("artifact_list"));
       expect(listed).toContain(inside!.id);
       expect(listed).not.toContain(outside.id);

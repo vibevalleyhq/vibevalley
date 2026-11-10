@@ -53,7 +53,7 @@
 21. **开机加载**：场景图、单独绘制的品牌名和加载状态，准备好后直接进入农场；时段与退场条件见[客户端](docs/subsystems/app.md#怎么走)。
 22. **助手页**（`/orchestrator` 与 `/orchestrator/<档案 id>`）：分「记性」「轨迹」（支持标记「这一轮做错了」）「旧账」与默认助手专属的「声音」四个页签（[助手](docs/subsystems/orchestrator.md)、[语音](docs/subsystems/voice.md)）。
 
-**工作台外壳**（`apps/web/src/app/Shell.tsx`）：最左为安静的导航栏（助手头像回农场、聊天、工单、稿子 `/artifacts`、笔记 `/pkm`、仓库、帮工、农具、图鉴、设置）。
+**工作台外壳**（`apps/web/src/app/Shell.tsx`）：最左为安静的导航栏（助手头像回农场、聊天、工单、Artifact `/artifacts`、笔记 `/pkm`、仓库、帮工、农具、图鉴、设置）。
 
 ## 轨迹
 

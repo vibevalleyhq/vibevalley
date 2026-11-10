@@ -21,7 +21,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [resource.md](docs/subsystems/resource.md) | Resource：只读、分页、按会话权限裁剪的 `resource_read` |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测、地契 |
-| [artifact.md](docs/subsystems/artifact.md) | 稿子：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
+| [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
 | [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
@@ -76,7 +76,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是助手（`orchestrator`）或帮工（`worker`） | 帮工档案、角色（指档案时） |
 | 农机 | machine | runtime（`RuntimeInfo`） | 机器上的一种编码 agent 程序（pi、claude、codex……）；左栏和设置里也叫农机 | harness、引擎、runtime（中文界面） |
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
-| 稿子 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来一稿一稿换的网页（第 N 稿）；交上来的带卡片挂在频道和工单上 | 产出、文档（指稿子时）、doc（指稿子时） |
+| Artifact | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来一稿一稿换的网页（第 N 稿：一版网页叫一稿，一块的修订叫一版）；交上来的带卡片挂在频道和工单上 | 稿子、草稿（指 Artifact 时）、产出、文档（指 Artifact 时）、doc（指 Artifact 时） |
 | 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） | 你自己的知识库：PARA 几个文件夹里的大纲页面和每天的日记，工作台的「笔记」页（`/pkm`）；文件在笔记库里，别的编辑器也能改 | |
 | 仓库 | repo | repo（`RepoSummary`） | 空间 `repos/` 下的一个 git 仓库；农场里是一座岛，工作台的「仓库」页（`/repos`，「全部」是整张地图） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `ServerConfig` 的 `workRoot` | 一套独立的仓库、工作树、工单、频道和笔记；工作台「仓库」页的「全部」 | 世界、全图 |

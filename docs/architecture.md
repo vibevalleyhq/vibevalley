@@ -102,7 +102,7 @@ flowchart LR
 `packages/protocol/src/api.ts` 汇总各概念的 `endpoints`。每个接口定义 `op`（如 `issue.status.update`，对应 `POST /api/v1/issue/status/update`）、`about`、输入与输出的 Schema，以及权限集合 `can`（`user`、`remote`、`orchestrator`、`session`）。
 
 - 所有命令接口均使用 `POST /api/v1/<路径>`，参数统一放在 JSON 请求体中。
-- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（聊天附件）、`GET /api/v1/artifact/<id>/<version>`（网页稿子）、`GET /api/v1/rpc`（频道与稿子订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音助手入口）。
+- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（聊天附件）、`GET /api/v1/artifact/<id>/<version>`（网页 Artifact）、`GET /api/v1/rpc`（频道与 Artifact 订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音助手入口）。
 - 从外面来的只经「连接到本机」那道门：配对来的设备只放 `can` 含 `remote` 的接口与流，登录来的设备是用户本人（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 
 ## 存了什么
@@ -119,12 +119,12 @@ Host：
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、稿子、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
+| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、外部观察游标（`ingress_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
 | `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
 | `agent/<档案 id>/` | 助手对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
 | `logs/` | 帮工原始运行日志与桌面端服务端日志 |
-| `artifacts/<sha256>` | 网页稿子内容文件（按内容哈希去重，[稿子](docs/subsystems/artifact.md)） |
+| `artifacts/<sha256>` | 网页 Artifact 内容文件（按内容哈希去重，[Artifact](docs/subsystems/artifact.md)） |
 
 Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
 - `repos/`：仓库的 git 仓库。

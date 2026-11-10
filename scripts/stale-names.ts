@@ -49,9 +49,9 @@ const RULES: readonly Rule[] = [
     says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); 管家 is only the default assistant's name, which the user can change; the code name stays orchestrator (docs/README.md 用语)",
   },
   {
-    name: "产出 for an artifact",
-    pattern: /产出/u,
-    says: "the user and the prompts call an artifact 稿子, and its versions 第 N 稿 (docs/README.md 用语); 产出 named nothing a person would say",
+    name: "产出 or 稿子 for an artifact",
+    pattern: /产出|稿子/u,
+    says: "the page and the prompts call an artifact Artifact, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
   },
   {
     name: "a fact split from sessionPhase or gameProgress",

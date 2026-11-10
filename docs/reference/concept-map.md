@@ -21,7 +21,7 @@
 | 助手 | 助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"` 的会话）、`Channel.orchestrator`（这里的助手：私聊的对面或频道成员里的助手）、`Channel.members`（频道里的成员） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.assignments`（责任与执行历史） | `/api/v1/issue/…` |
 | 父子工单 | 图纸桌打开工单 | 工作台 `features/issue/FamilyDetail.tsx` | `Issue.parent`、`blockedBy`，父单与子单都是普通工单 | `/api/v1/issue/…` |
-| 稿子 | — | `/artifacts`（`features/artifact`） | `Artifact`、`ArtifactBlock` | `/api/v1/artifact/…` |
+| Artifact | — | `/artifacts`（`features/artifact`） | `Artifact`、`ArtifactBlock` | `/api/v1/artifact/…` |
 | 笔记 | — | `/pkm`（`features/pkm`） | `PkmPage`、`PkmBlock` | `/api/v1/pkm/…` |
 | 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`SpaceState.sessions`） | `/api/v1/session/stop`；别的按工单：`/api/v1/issue/…` |
 | 一轮（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每一轮」 | `Run`、`RunTrigger`；核心状态里是带着 `brief` 的 `sessionPhaseChanged` 到 `sessionReported` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issue/run/list` |
@@ -55,7 +55,7 @@
 | 助手 | `Orchestrator`（每个助手一个宿主） | `session` 表、`agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
 | 工单 | `Issue`（`issue/issue.ts`；派给助手的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_assignment`（责任关系）、`issue_assignment_execution`（执行上下文） | |
 | 父子依赖 | `Issue`（`issue/dependencies.ts`） | `issue.parent`、`blocked_by`、`constraints` | 通用 DAG 算法在 `packages/agent/src/dag.ts` |
-| 稿子 | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_revision`、`artifact_block`、`artifact_op` 表，`artifacts/<sha256>` | |
+| Artifact | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_revision`、`artifact_block`、`artifact_op` 表，`artifacts/<sha256>` | |
 | 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_undo` 表 | |
 | 执行上下文 | `Session`（`session/session.ts`），执行资源归 `Executor`；工单里的上下文画成帮工，私聊的通过 `channel` 关联频道 | `session` 表（工作目录、oar 会话 id、最后一轮原话、阶段和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
 | 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/reaction.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |

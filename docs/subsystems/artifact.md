@@ -1,14 +1,14 @@
-# 稿子
+# Artifact
 
-稿子（`Artifact`）是用户、助手和帮工共创或交付的文档产物，在 `/artifacts` 页和聊天旁栏 `ArtifactCanvas` 中查看与编辑。正文分两种：
+Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产物，在 `/artifacts` 页和聊天旁栏 `ArtifactCanvas` 中查看与编辑。正文分两种：
 - **协作块文档（`blocks`）**：由段落、标题、列表、待办、代码等块组成，按 `BlockOp` 协同修改，服务端为唯一权威。
-- **网页稿子（`html`）**：完整单页 HTML，按版本不可变存储，在严格沙箱 `iframe` 中隔离展示并支持划词改字。
+- **网页 Artifact（`html`）**：完整单页 HTML，按版本不可变存储，在严格沙箱 `iframe` 中隔离展示并支持划词改字。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 稿子元数据、频道卡片投递、块序列与 HTML 版本内容存储 | 对话中的卡片回复与唤醒（[频道](docs/subsystems/channel.md)） |
+| Artifact 元数据、频道卡片投递、块序列与 HTML 版本内容存储 | 对话中的卡片回复与唤醒（[频道](docs/subsystems/channel.md)） |
 | 块模型、分数顺序键（`keyBetween`）、`BlockOp` 管线、块修订与改写建议（`Suggestion`） | 消息普通文件附件（[频道](docs/subsystems/channel.md)） |
 | Markdown 与块互转、HTML 白名单检查与划词源码替换（`artifact.html.edit`） | 帮工 `/mcp` 鉴权与工单生命周期（[帮工](docs/subsystems/session.md)、[工单](docs/subsystems/issue.md)） |
 
@@ -16,18 +16,18 @@
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/artifact/`](packages/artifact/README.md) | 独立稿子纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML CSP 响应头与 `parse5` 白名单检查及划词改字（`html.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
-| `apps/server/src/artifact/artifact.ts`、`blocks.ts` | 稿子增删改查、块与建议的持久化、HTML 版本文件读写（`$VIBEVALLEY_HOME/artifacts/<sha256>`）与频道卡片发送 |
+| [`packages/artifact/`](packages/artifact/README.md) | 独立 Artifact 纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML CSP 响应头与 `parse5` 白名单检查及划词改字（`html.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
+| `apps/server/src/artifact/artifact.ts`、`blocks.ts` | Artifact 增删改查、块与建议的持久化、HTML 版本文件读写（`$VIBEVALLEY_HOME/artifacts/<sha256>`）与频道卡片发送 |
 | `apps/server/src/artifact/ops.ts`、`markdown.ts`、`policy.ts`、`check.ts`、`edit.ts`、`shell.ts` | 服务端薄消费出口（转发 `@vibevalley/artifact`） |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
-| 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | 稿子、HTML 版本、块、块修订、操作批次与改写建议表 |
+| 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | Artifact、HTML 版本、块、块修订、操作批次与改写建议表 |
 | `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及 `GET /api/v1/artifact/<id>/<version>`）。
 
 ## 模型和不变量
 
-### 网页稿子（`html`）
+### 网页 Artifact（`html`）
 
 - **内容寻址与版本不可变**：单版上限 5MB，按 SHA-256 存入 `$VIBEVALLEY_HOME/artifacts/<sha256>`；提交新版追加 `artifact_version` 记录，不覆盖旧版。
 - **双层沙箱隔离**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`。
@@ -44,11 +44,11 @@
 
 ## 怎么走
 
-**创建与交付稿子**
+**创建与交付 Artifact**
 
 1. 帮工或助手调用 `artifact_create`（传入 `html` 或 `markdown` 正文，或工作目录内相对路径 `file`）。
 2. 服务端校验内容（`html` 过 `check.ts`，`markdown` 转为初始 `BlockInput[]`），在对应工单串或频道发出带 `ArtifactCard` 的消息并落库。
-3. 用户在 `/artifacts` 点「新建」直接创建空的 `blocks` 稿子，不发频道消息。
+3. 用户在 `/artifacts` 点「新建」直接创建空的 `blocks` Artifact，不发频道消息。
 
 **块协同编辑与带话**
 
@@ -57,19 +57,19 @@
 
 ## 和谁打交道
 
-- **频道（`channel`）**：调用 `Channel.announce` 发稿子卡片；在消息中记录被引用的块快照。
+- **频道（`channel`）**：调用 `Channel.announce` 发 Artifact 卡片；在消息中记录被引用的块快照。
 - **工具（`tool`、`mcp`）**：向助手和帮工暴露 `artifact_*` 工具，自动绑定会话工单与档案身份。
 - **「连接到本机」（`lan`）**：放行配对设备访问 `GET /api/v1/artifact/<id>/<version>`。
 
 ## 为什么这样
 
-- **统一「文档」与「稿子」，Markdown 入库即转块**：只读交付物与协作文档集中管理，Markdown 交上来即可逐段协同修改，无需维护两套工具。
+- **统一「文档」与「Artifact」，Markdown 入库即转块**：只读交付物与协作文档集中管理，Markdown 交上来即可逐段协同修改，无需维护两套工具。
 - **HTML 走独立路由 + CSP 沙箱 + 提交前静态检查**：不用 `srcdoc`，使 `iframe` 与新标签页共享响应头隔离；提交前拦截外链让帮工当场修好，避免用户打开破损页面。
 - **按块操作 + 服务端定序，不上 CRDT**：文档协作以段落分工为主，按块 `baseRev` 判冲突并配合用户块 `Suggestion` 机制，用纯函数即可杜绝静默覆盖。
 
 ## 还没做的
 
-- 网页稿子元素锚点、锚点评论标记与自适应高度回报：[网页稿子的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)。
+- 网页 Artifact 元素锚点、锚点评论标记与自适应高度回报：[网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)。
 - 父子工单分节绑定与按节确认定稿：[几个帮工同时写一篇文章](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)。
 - 块编辑器在线光标、块内三方合并（`merged`）与修订历史找回。
 

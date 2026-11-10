@@ -17,7 +17,7 @@ Host（~/.vibevalley：密钥、农机、全局模板）
     │   ├── Assignment → Agent 档案
     │   └── IssueThread → Channel
     ├── Pkm（<space>/pkm，按 PARA 组织的笔记）
-    └── Artifact（稿子）
+    └── Artifact（Artifact）
 ```
 
 一个 Space 有若干个 **Repo**、若干个 **Issue** 和一份 **Pkm**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写笔记）；指了仓库且档案开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里干活的执行和协同实体。
@@ -61,7 +61,7 @@ Host（~/.vibevalley：密钥、农机、全局模板）
 | 父子工单 | `Issue.parent`、`blockedBy`（拆单输入 `IssueChildDraft`） | 一件大活拆成有先后的子工单：每张子工单是普通工单，前置做完后派发，过了检查先合进父工单分支，最后由父工单统一验收、合进主分支 |
 | 频道 | `Channel`（`type: channel`、`direct`、`thread`） | 说话的地方，照 Discord：频道、私聊和串都是 channel；有一个默认频道（`default`，农场画成田头），用户和助手有一个私聊（`peer`），串挂在一个频道（`parent`）的一条消息（`root`）下面；外面的聊天软件经连接器接到一个频道上 |
 | 工单串 | `type: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
-| 稿子 | `Artifact`（正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的块稿子，或交上来一稿一稿换的网页 |
+| Artifact | `Artifact`（正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的块 Artifact，或交上来一稿一稿换的网页 |
 | 笔记 | `Pkm`（`PkmPage`、`PkmBlock`） | 用户的大纲知识库：按 PARA 文件夹与日记组织的 Markdown 页面 |
 | 定时任务 | `Cron` | 一张工单的一种触发：一个定时任务一张工单，派给一个档案或助手，每次到点是它的一次 run |
 | Inbox | `InboxItem` | 要你处理的事，从核心状态现算 |

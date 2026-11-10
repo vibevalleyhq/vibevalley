@@ -57,7 +57,7 @@
   },
   "toasts": "提示",
   "runtime": "运行工具：{name}",
-  "user": "主",
+  "user": "你",
   "orchestrator": "助手",
   "unreachable": "暂时连不上服务端，请等它恢复后重试。",
   "query": { "invalidResponse": "返回的数据格式不符，已有的有效结果已保留。" },
