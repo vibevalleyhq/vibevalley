@@ -8,6 +8,7 @@ import { Attachment } from "#/attachment/attachment.ts";
 import { refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
+import { Storage } from "#/storage/storage.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 import * as q from "#db/media_input.sql.ts";
@@ -24,6 +25,7 @@ const notIn = (value: unknown, secret: string) =>
 
 const layer = () =>
   Attachment.layer.pipe(
+    Layer.provideMerge(Storage.layer),
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
     Layer.provideMerge(NodeServices.layer),
@@ -31,7 +33,7 @@ const layer = () =>
   );
 /** Inputs and the Attachment they keep bytes through, both on the given file system. */
 const inputsOn = Effect.fnUntraced(function* (fs: FileSystem.FileSystem) {
-  const built = yield* Layer.build(Layer.fresh(Attachment.layer)).pipe(Effect.provideService(FileSystem.FileSystem, fs));
+  const built = yield* Layer.build(Layer.fresh(Attachment.layer.pipe(Layer.provide(Storage.layer)))).pipe(Effect.provideService(FileSystem.FileSystem, fs));
   return yield* makeInputs.pipe(Effect.provideService(Attachment, Context.get(built, Attachment)), Effect.provideService(FileSystem.FileSystem, fs));
 });
 const keptAt = (home: string, ...parts: string[]) => [home, "attachments", ...parts].join("/");

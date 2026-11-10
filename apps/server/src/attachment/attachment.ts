@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
-import { join } from "node:path";
 
-import { Clock, Context, Effect, FileSystem, Layer, Stream } from "effect";
+import { Clock, Context, Effect, Layer, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -9,9 +8,8 @@ import { attachmentMax } from "@vibevalley/protocol";
 import type { ApiError } from "@vibevalley/protocol/api";
 
 import { missing, refused } from "#/base/errors.ts";
-import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
-import { writeOnce } from "#/infra/files.ts";
+import { Storage } from "#/storage/storage.ts";
 import * as q from "#db/attachment.sql.ts";
 
 /** A kept file as it is read back: where its bytes are, and what it is. */
@@ -21,8 +19,8 @@ export interface KeptFile {
   readonly name: string;
 }
 
-/** The files the farm keeps, once each by their sha256 under the home directory's attachments/: what a message says, a
- * media job made and the library holds. */
+/** The files the farm keeps, once each by their sha256: what a message says, a media job made, an artifact's page and
+ * the library holds. What a file is (name, type, size) is here; where its bytes live is Storage's. */
 export class Attachment extends Context.Service<
   Attachment,
   {
@@ -40,7 +38,9 @@ export class Attachment extends Context.Service<
     readonly get: (id: string) => Effect.Effect<KeptFile | undefined>;
     /** Each id's attachment, once each; one not kept fails Missing. */
     readonly of: (ids: readonly string[]) => Effect.Effect<T.Attachment[], ApiError>;
-    /** Where an attachment's bytes are, kept or not. */
+    /** An attachment's bytes, whole (an artifact's page). */
+    readonly bytes: (id: string) => Effect.Effect<Uint8Array, ApiError>;
+    /** Where an attachment's bytes are on this machine, kept or not (Storage.pathOf: the local disk's). */
     readonly pathOf: (id: string) => string;
   }
 >()("@vibevalley/server/attachment/attachment") {
@@ -51,17 +51,13 @@ export class Attachment extends Context.Service<
 }
 
 const make = Effect.gen(function* () {
-  const config = yield* ServerConfig;
   const db = yield* Db;
-  const fs = yield* FileSystem.FileSystem;
-  const filesDir = join(config.home, "attachments");
-  const pathOf = (id: string) => join(filesDir, id);
-  // Inside attachments/ so a staged file is renamed into place; kept files are named by their sha256, never "staging".
-  const staging = join(filesDir, "staging");
+  const storage = yield* Storage;
+  const unkept = (e: { readonly message: string }) => refused(e.message);
 
-  const sha256Of = (path: string) =>
+  const sha256Of = (key: string) =>
     Effect.map(
-      fs.stream(path).pipe(
+      storage.stream(key).pipe(
         Stream.runFold(
           () => createHash("sha256"),
           (hash, chunk) => hash.update(chunk),
@@ -80,16 +76,13 @@ const make = Effect.gen(function* () {
   const keep = Effect.fn("Attachment.keep")(function* (bytes: Uint8Array, name: string, type: string) {
     if (bytes.length === 0) return yield* Effect.fail(refused(t("server.attachment.emptyFile")));
     const id = createHash("sha256").update(bytes).digest("hex");
-    yield* writeOnce(pathOf(id), bytes).pipe(
-      Effect.mapError((e) => refused(e.message)),
-      Effect.provideService(FileSystem.FileSystem, fs),
-    );
+    yield* storage.put(id, bytes).pipe(Effect.mapError(unkept));
     return yield* record(id, name, type, bytes.length);
   });
 
   return Attachment.of({
-    pathOf,
-    staging,
+    pathOf: storage.pathOf,
+    staging: storage.scratch,
     attach: Effect.fn("Attachment.attach")(function* (upload) {
       const bytes = Buffer.from(upload.data, "base64");
       if (bytes.length > attachmentMax) return yield* Effect.fail(refused(t("server.attachment.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) })));
@@ -97,21 +90,21 @@ const make = Effect.gen(function* () {
     }),
     keep,
     keepStaged: Effect.fn("Attachment.keepStaged")(function* (staged, retain = false) {
-      const target = pathOf(staged.hash);
       yield* Effect.gen(function* () {
-        yield* fs.makeDirectory(filesDir, { recursive: true, mode: 0o700 });
-        // A kept file whose bytes no longer match its name (changed on disk) is replaced, not trusted.
-        if ((yield* fs.exists(target)) && (yield* sha256Of(target)) === staged.hash) return;
-        if (retain) {
-          yield* fs.remove(target, { force: true });
-          yield* fs.link(staged.path, target);
-        } else yield* fs.rename(staged.path, target);
-      }).pipe(Effect.mapError((e) => refused(e.message)));
+        // A kept file whose bytes no longer match its key (changed on disk) is replaced, not trusted.
+        if ((yield* storage.exists(staged.hash)) && (yield* sha256Of(staged.hash)) === staged.hash) return;
+        yield* storage.adopt(staged.hash, staged.path, retain);
+      }).pipe(Effect.mapError(unkept));
       return yield* record(staged.hash, staged.name, staged.type, staged.size);
     }),
     get: Effect.fn("Attachment.get")(function* (id) {
       const a = yield* db.one(q.attachmentByID({ id }));
-      return a ? { path: pathOf(a.id), type: a.type, name: a.name } : undefined;
+      return a ? { path: storage.pathOf(a.id), type: a.type, name: a.name } : undefined;
+    }),
+    bytes: Effect.fn("Attachment.bytes")(function* (id) {
+      const blob = yield* storage.open(id, "application/octet-stream").pipe(Effect.mapError(() => missing(t("server.attachment.noAttachment", { id }), [])));
+      const buffer = yield* Effect.tryPromise({ try: () => blob.arrayBuffer(), catch: () => missing(t("server.attachment.noAttachment", { id }), []) });
+      return new Uint8Array(buffer);
     }),
     of: Effect.fn("Attachment.of")(function* (ids) {
       const out: T.Attachment[] = [];

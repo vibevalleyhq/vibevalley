@@ -31,6 +31,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音助手 |
 | [lan.md](docs/subsystems/lan.md) | 「连接到本机」：从外面进农场的唯一一道门，按钥匙的来路放行 |
+| [storage.md](docs/subsystems/storage.md) | 存储：字节放在哪，按 SHA-256 存一次；现在是本机磁盘，换成对象存储只换它 |
 | [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按内容存一次；消息、媒体结果和素材库都引用它 |
 | [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |

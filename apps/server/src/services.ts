@@ -33,6 +33,7 @@ import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
 import { Session, ready as sessionReady } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
+import { Storage } from "./storage/storage.ts";
 import { Tool } from "./tool/tool.ts";
 import { User } from "./user/user.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
@@ -64,6 +65,7 @@ export const platform = (config: ServerConfig["Service"]) =>
     on(Core.layer),
     on(Setting.layer),
     on(User.layer),
+    on(Storage.layer),
     on(Attachment.layer),
     on(Provider.layer),
     on(Llm.layer),

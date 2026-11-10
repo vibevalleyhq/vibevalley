@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 字节存在家目录的 `attachments/<sha256>`，表 `attachment` 记名字、类型、大小 | 消息怎么带它、怎么画（[频道](docs/subsystems/channel.md)） |
+| 表 `attachment` 记名字、类型、大小；字节交给[存储](docs/subsystems/storage.md)（`Storage`），以 SHA-256 为键 | 消息怎么带它、怎么画（[频道](docs/subsystems/channel.md)） |
 | 上传（`attachment.create`）：空的、超过上限的拒绝 | 生成和下载结果的任务（[媒体](docs/subsystems/media.md)） |
 | 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（素材库，`apps/server/src/library`） |
 
@@ -24,7 +24,7 @@
 ## 模型和不变量
 
 - **按内容存一次**：id 是字节的 SHA-256；同样的字节再来是同一个附件，名字和类型记第一次的。文件写完整再发布，不留半个。
-- **上限**：经 `attachment.create` 上传的单个 25MB（`attachmentMax`），以 Base64 走请求体。用它的模块自己守自己的上限：网页 Artifact 一稿 5MB；媒体的输入流式写进 `attachments/staging/media/`、记在媒体的配额里，最大 512MB，写完经 `keepStaged` 改名进来。
+- **上限**：经 `attachment.create` 上传的单个 25MB（`attachmentMax`），以 Base64 走请求体。用它的模块自己守自己的上限：网页 Artifact 一稿 5MB；媒体的输入流式写进存储的暂存目录（`staging`，即 `Storage.scratch`）下的 `media/`、记在媒体的配额里，最大 512MB，写完经 `keepStaged`（`Storage.adopt`）放进来。
 - **放进来时核对**：`keepStaged` 遇到同名的文件先算它的哈希，对不上（磁盘上被改过）就用新写的替换，不信任坏掉的那份。
 - **读回带沙箱**：图、音频、视频和 PDF 在页面里显示，其余的下载；不是 PDF 的都带 `content-security-policy: sandbox`，不当农场自己的页面跑。按内容寻址，永久缓存。
 - **只增不改**：附件不随消息、任务、Artifact 或素材删除而删。现在没有回收：没人引用的附件留在磁盘上，要回收得先数清所有引用它的地方（消息、媒体的输入和结果、Artifact 的稿、素材）。

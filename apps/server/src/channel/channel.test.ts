@@ -27,6 +27,7 @@ import { summaryOf } from "#/session/report.ts";
 import { sessionOnIssue } from "#/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "#/session/session.ts";
 import type { Consumed, LaunchActivity } from "#/session/signals.ts";
+import { Storage } from "#/storage/storage.ts";
 import { testConfig, offline, testDatabase, until, waitFor } from "#/testing/layers.ts";
 import { allow, heard, refuse } from "#/testing/refuse.ts";
 import { Said, said } from "#/testing/world.ts";
@@ -156,7 +157,7 @@ const channelLayer = (x: FakeSessions) =>
       };
       return Channel.layer.pipe(
         Layer.provideMerge(Mailbox.layer),
-        Layer.provideMerge(Attachment.layer),
+        Layer.provideMerge(Attachment.layer.pipe(Layer.provideMerge(Storage.layer))),
         Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])),
       );
     }),

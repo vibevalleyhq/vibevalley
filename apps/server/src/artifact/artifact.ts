@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { Clock, Context, Effect, Layer, Semaphore, type Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -267,10 +265,12 @@ const make = () =>
         const row = yield* found(id);
         if (row.body === "blocks") return { version: row.seq, content: yield* blocks.markdown(id), body: "blocks" as const };
         const { v } = yield* versionOf(id, version);
-        const content = yield* Effect.tryPromise({
-          try: () => readFile(kept.pathOf(v.attachment_id), "utf8"),
-          catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
-        });
+        const content = yield* kept.bytes(v.attachment_id).pipe(
+          Effect.mapBoth({
+            onSuccess: (bytes) => new TextDecoder().decode(bytes),
+            onFailure: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
+          }),
+        );
         return { version: v.version, content, body: "html" as const };
       }),
       file: Effect.fn("Artifact.file")(function* (id, version) {
@@ -289,10 +289,12 @@ const make = () =>
         if (row.body !== "html") return yield* Effect.fail(refused(t("server.artifact.notHtml", { title: row.title })));
         // Over the latest only: a later version's changes would be lost under an edit of an older one.
         if (v.version !== row.version) return yield* Effect.fail(refused(t("server.artifact.edit.stale", { version: v.version, latest: row.version })));
-        const source = yield* Effect.tryPromise({
-          try: () => readFile(kept.pathOf(v.attachment_id), "utf8"),
-          catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
-        });
+        const source = yield* kept.bytes(v.attachment_id).pipe(
+          Effect.mapBoth({
+            onSuccess: (bytes) => new TextDecoder().decode(bytes),
+            onFailure: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
+          }),
+        );
         const edited = htmlEdit(source, req.anchor, req.text);
         if (!edited.ok) return yield* Effect.fail(refused(edited.why));
         const note = t("server.artifact.edit.note", { old: head(req.anchor.exact.trim(), 40), new: head(req.text.trim(), 40) });
