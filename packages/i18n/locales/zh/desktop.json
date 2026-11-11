@@ -9,6 +9,7 @@
   "waiting": "{n} 等你",
   "working": "{n} 在干",
   "idle": "没在干",
+  "updateGone": "下好的新版本不在了，再查一次更新",
   "menu": {
     "about": "关于 {app}",
     "hide": "隐藏 {app}",

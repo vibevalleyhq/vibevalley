@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { Effect } from "effect";
 import { app, dialog, globalShortcut, nativeImage } from "electron";
 
 import { t } from "@vibevalley/i18n";
@@ -20,6 +21,9 @@ import { devMode } from "./ui/dev";
 import { serveHost } from "./ui/host";
 import { menuBar, setAppMenu } from "./ui/menu";
 import { mainWindow } from "./ui/window";
+
+/** The least time the update cover shows its first step. */
+const coverAtLeastMs = 800;
 
 // Each channel is its own app: its name, and so its userData and single-instance lock, before anything reads them. A
 // --user-data-dir given (the tests) wins.
@@ -64,8 +68,25 @@ if (!app.requestSingleInstanceLock()) {
   const hostUpdates = {
     state: () => updates?.state() ?? { _tag: "idle" as const, version: app.getVersion() },
     check: async () => updates?.check(),
+    // Said over the window step by step (window.ts updating), so the restart is not a window that just vanishes.
     install: async () => {
-      if (updates) await quitAfterSave(() => updates?.installNow());
+      const ready = updates?.state();
+      if (!updates || ready?._tag !== "ready") return;
+      const cover = { next: ready.next, newFarm: ready.newFarm, page: ready.page };
+      await window.updating(cover, "stopping");
+      // Long enough to read: the server may stop at once.
+      await Promise.all([server?.stop(), Effect.runPromise(Effect.sleep(coverAtLeastMs))]);
+      stopped = true;
+      await window.updating(cover, "swapping");
+      let failed: string | undefined;
+      try {
+        if (!updates.installNow()) failed = t("desktop.updateGone");
+      } catch (e) {
+        failed = reasonOf(e);
+      }
+      // The server is stopped either way: the window keeps the cover, with the release page, until the app is quit.
+      if (failed !== undefined) return window.updating(cover, { failed });
+      app.quit();
     },
   };
   const page = serveHost({

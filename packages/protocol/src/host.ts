@@ -51,7 +51,14 @@ export type UpdateState =
   | { readonly _tag: "idle"; readonly version: string }
   | { readonly _tag: "checking"; readonly version: string }
   | { readonly _tag: "downloading"; readonly version: string; readonly next: string; readonly percent: number }
-  | { readonly _tag: "ready"; readonly version: string; readonly next: string; readonly notes: readonly string[]; readonly newFarm: boolean }
+  | {
+      readonly _tag: "ready";
+      readonly version: string;
+      readonly next: string;
+      readonly notes: readonly string[];
+      readonly newFarm: boolean;
+      readonly page: string;
+    }
   | { readonly _tag: "manual"; readonly version: string; readonly next: string; readonly why: UpdateManual; readonly page: string }
   | { readonly _tag: "failed"; readonly version: string; readonly why: string };
 
@@ -59,7 +66,13 @@ export const UpdateState: Schema.Codec<UpdateState> = Schema.Union([
   Schema.TaggedStruct("idle", { version: Schema.String }),
   Schema.TaggedStruct("checking", { version: Schema.String }),
   Schema.TaggedStruct("downloading", { version: Schema.String, next: Schema.String, percent: Schema.Finite }),
-  Schema.TaggedStruct("ready", { version: Schema.String, next: Schema.String, notes: Schema.Array(Schema.String), newFarm: Schema.Boolean }),
+  Schema.TaggedStruct("ready", {
+    version: Schema.String,
+    next: Schema.String,
+    notes: Schema.Array(Schema.String),
+    newFarm: Schema.Boolean,
+    page: Schema.String,
+  }),
   Schema.TaggedStruct("manual", { version: Schema.String, next: Schema.String, why: Schema.Literals(UpdateManualValues), page: Schema.String }),
   Schema.TaggedStruct("failed", { version: Schema.String, why: Schema.String }),
 ]);
