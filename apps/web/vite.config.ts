@@ -20,6 +20,13 @@ const openingKeys = {
   ready: "web.opening.ready",
   waiting: "web.opening.waiting",
   failed: "web.opening.failed",
+  updating: "web.opening.updating",
+  stopping: "web.opening.stopping",
+  swapping: "web.opening.swapping",
+  kept: "web.opening.kept",
+  keptNewFarm: "web.opening.keptNewFarm",
+  updateFailed: "web.opening.updateFailed",
+  download: "web.opening.download",
 } as const;
 const openingWords = () => {
   const locales = join(import.meta.dirname, "../../packages/i18n/locales");

@@ -106,7 +106,7 @@ for (const phase of ["waiting", "failed"]) {
   });
 }
 
-test("launch errors use the same localized alert on the existing cover and on direct navigation", async ({ page }) => {
+test("launch errors and a failed update use a localized alert on the cover", async ({ page }) => {
   const why = "server exited (1), log at /tmp/x.log";
   const alerts = [];
   for (const locale of ["zh", "en"]) {
@@ -127,6 +127,30 @@ test("launch errors use the same localized alert on the existing cover and on di
     await expect(page.getByRole("progressbar")).toHaveCount(0);
   }
   expect(alerts[0]).not.toBe(alerts[1]);
+  // The desktop update steps over the same cover; a failed one leaves the release page.
+  await page.setViewportSize({ width: 1152, height: 768 });
+  await page.goto("/opening.html");
+  const cover = page.locator("#opening");
+  const step = (data: Record<string, string>) =>
+    cover.evaluate((node, data) => {
+      Object.assign(node.dataset, data);
+      node.dispatchEvent(new Event("opening-update"));
+    }, data);
+  const release = { next: "0.42.0", newFarm: "false", page: "https://github.com/vibevalleyhq/vibevalley/releases/tag/v0.42.0" };
+  await step({ ...release, phase: "stopping", progress: "0" });
+  await expect(cover.locator(".note")).toBeVisible();
+  await expect(page.getByTestId("update-download")).toBeHidden();
+  await expect(page.getByRole("progressbar")).toBeVisible();
+  await settled(page);
+  await page.screenshot({ path: test.info().outputPath("update-stopping.png") });
+  await step({ phase: "swapping", progress: "95" });
+  await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "95");
+  await step({ phase: "updateFailed", why: "disk full" });
+  await expect(page.getByRole("alert")).toContainText("disk full");
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+  await expect(cover).toHaveAttribute("data-mood", "confused");
+  await expect(page.getByTestId("update-download")).toHaveAttribute("href", release.page);
+  await page.screenshot({ path: test.info().outputPath("update-failed.png") });
 });
 
 for (const end of ["removed", "pagehide"]) {

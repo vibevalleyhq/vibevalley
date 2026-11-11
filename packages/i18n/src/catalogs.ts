@@ -550,6 +550,7 @@ export const catalogs = {
       waiting: "{n} 等你",
       working: "{n} 在干",
       idle: "没在干",
+      updateGone: "下好的新版本不在了，再查一次更新",
       menu: {
         about: "关于 {app}",
         hide: "隐藏 {app}",
@@ -1757,6 +1758,13 @@ export const catalogs = {
         ready: "准备好了",
         waiting: "还在等待连接……",
         failed: "加载遇到问题",
+        updating: "正在更新到 {next}",
+        stopping: "停下帮工，存好农场……",
+        swapping: "换上新版本……",
+        kept: "农场的数据都在；干到一半的帮工停在原处，带句话就接着干",
+        keptNewFarm: "新版本从新的数据开始，旧的留在家目录里",
+        updateFailed: "没装上：{why}",
+        download: "去下载最新版",
       },
     },
     "web.agent": {
@@ -5287,6 +5295,7 @@ export const catalogs = {
       waiting: "{n} for you",
       working: "{n} working",
       idle: "idle",
+      updateGone: "The downloaded version is gone; check for updates again",
       menu: {
         about: "About {app}",
         hide: "Hide {app}",
@@ -6555,6 +6564,13 @@ export const catalogs = {
         ready: "Ready",
         waiting: "Still waiting for a connection…",
         failed: "Unable to finish loading",
+        updating: "Updating to {next}",
+        stopping: "Stopping helpers and saving the farm…",
+        swapping: "Putting the new version in place…",
+        kept: "Your farm's data stays; a helper cut off mid-task waits where it stopped, and one message sets it going again",
+        keptNewFarm: "The new version starts from new data; the old data stays in your home folder",
+        updateFailed: "Not installed: {why}",
+        download: "Download the latest version",
       },
     },
     "web.agent": {
@@ -10174,6 +10190,7 @@ export interface Messages {
   "desktop.open": undefined;
   "desktop.quit": undefined;
   "desktop.seeLog": { readonly log: string | number; readonly reason: string | number };
+  "desktop.updateGone": undefined;
   "desktop.waiting": { readonly n: string | number };
   "desktop.working": { readonly n: string | number };
   "mobile.agora": { readonly code: string | number; readonly what: string | number };
@@ -13346,13 +13363,20 @@ export interface Messages {
   "web.memory.memory.yours": undefined;
   "web.opening.cannotStart": { readonly why: string | number };
   "web.opening.connecting": undefined;
+  "web.opening.download": undefined;
   "web.opening.failed": undefined;
+  "web.opening.kept": undefined;
+  "web.opening.keptNewFarm": undefined;
   "web.opening.label": undefined;
   "web.opening.loading": undefined;
   "web.opening.name": undefined;
   "web.opening.reading": undefined;
   "web.opening.ready": undefined;
   "web.opening.starting": undefined;
+  "web.opening.stopping": undefined;
+  "web.opening.swapping": undefined;
+  "web.opening.updateFailed": { readonly why: string | number };
+  "web.opening.updating": { readonly next: string | number };
   "web.opening.waiting": undefined;
   "web.opening.waking": undefined;
   "web.orchestrator.looks.auntie.blurb": undefined;

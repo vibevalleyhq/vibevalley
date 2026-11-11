@@ -10,6 +10,13 @@
     "loading": "加载中……",
     "ready": "准备好了",
     "waiting": "还在等待连接……",
-    "failed": "加载遇到问题"
+    "failed": "加载遇到问题",
+    "updating": "正在更新到 {next}",
+    "stopping": "停下帮工，存好农场……",
+    "swapping": "换上新版本……",
+    "kept": "农场的数据都在；干到一半的帮工停在原处，带句话就接着干",
+    "keptNewFarm": "新版本从新的数据开始，旧的留在家目录里",
+    "updateFailed": "没装上：{why}",
+    "download": "去下载最新版"
   }
 }

@@ -9,6 +9,7 @@
   "waiting": "{n} for you",
   "working": "{n} working",
   "idle": "idle",
+  "updateGone": "The downloaded version is gone; check for updates again",
   "menu": {
     "about": "About {app}",
     "hide": "Hide {app}",

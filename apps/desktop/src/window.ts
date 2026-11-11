@@ -25,6 +25,17 @@ interface OpeningView {
   ending?: Promise<void>;
 }
 
+/** Where a restart into a new version is (main.ts): the cover says it over the window. */
+export type UpdateStep = "stopping" | "swapping" | { readonly failed: string };
+
+/** What the cover says of the version it restarts into. */
+export interface UpdateCover {
+  readonly next: string;
+  readonly newFarm: boolean;
+  /** The release's page: the way to install it by hand when the restart fails. */
+  readonly page: string;
+}
+
 export function mainWindow(o: {
   /** apps/web/dist, where opening.html is. */
   readonly web: string;
@@ -52,7 +63,11 @@ export function mainWindow(o: {
     if (cover?.owner === owner) return cover;
     const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
     view.setBackgroundColor("#00000000");
-    view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    // The cover's one link (the release page, when an update fails) opens in the browser.
+    view.webContents.setWindowOpenHandler(({ url: to }) => {
+      if (navigationOf(to, undefined) === "browser") void shell.openExternal(to);
+      return { action: "deny" };
+    });
     view.webContents.on("will-frame-navigate", (event) => event.preventDefault());
     view.webContents.on("will-redirect", (event) => event.preventDefault());
     owner.contentView.addChildView(view);
@@ -74,12 +89,12 @@ export function mainWindow(o: {
     );
     return made;
   };
-  const paint = async (current: OpeningView, update: Opening, problem?: string) => {
+  const paint = async (current: OpeningView, update: Readonly<Record<string, string | number | boolean>>) => {
     await current.ready;
     if (cover !== current || current.view.webContents.isDestroyed()) return;
     await current.view.webContents.executeJavaScript(`{
       const cover = document.getElementById("opening");
-      Object.assign(cover.dataset, ${JSON.stringify({ ...update, ...(problem === undefined ? {} : { problem }) })});
+      Object.assign(cover.dataset, ${JSON.stringify(update)});
       cover.dispatchEvent(new Event("opening-update"));
     }`);
   };
@@ -180,7 +195,15 @@ export function mainWindow(o: {
     /** The bar while the server comes up, or why it did not. */
     opening: (problem?: string) => {
       const current = opening(now());
-      if (problem !== undefined) void loaded(paint(current, { phase: "failed", progress: current.progress }, problem));
+      if (problem !== undefined) void loaded(paint(current, { phase: "failed", progress: current.progress, problem }));
+    },
+    /** Over the open window while the app restarts into a new version; nothing when no window is open. */
+    updating: (update: UpdateCover, step: UpdateStep): Promise<void> => {
+      if (window === undefined) return Promise.resolve();
+      const current = opening(window);
+      const phase = typeof step === "string" ? step : "updateFailed";
+      const progress = step === "swapping" ? 95 : 0;
+      return loaded(paint(current, { ...update, phase, progress, ...(typeof step === "string" ? {} : { why: step.failed }) }));
     },
     progress: (update: Opening): Promise<void> => {
       const current = cover;

@@ -96,6 +96,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 1. `vp run package:mac` 构建页面与桌面壳，用 `pnpm deploy --prod` 和 `vp pack` 打包服务端，产出 `.dmg`、`.zip` 与 `release.json`。
 2. 打包应用启动时及每 4 小时检查同渠道最新 Release，下载 `.zip` 并校验大小、SHA-512 与 `Info.plist` 版本。
 3. 若新版本 `dbSchema` 与本地一致，退出或点「重启更新」时自动替换 `.app`；若 `dbSchema` 变化，仅在「关于」页由用户确认后替换。
+4. 点「重启更新」后，窗口盖上开场的农场画面（`opening.html`），按步说：停下帮工、存好农场，再换上新版本；新版本打开时还是这幅画面。换不上时画面留着，说原因并给出 Release 页的链接「去下载最新版」。
 
 ## 和谁打交道
 
