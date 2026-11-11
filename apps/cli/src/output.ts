@@ -49,6 +49,12 @@ export const err = (text: string) => line("stderr", text);
 /** What stdin holds, to its end. */
 export const stdinText = Effect.flatMap(Stdio.Stdio, (io) => io.stdin.pipe(Stream.decodeText, Stream.mkString));
 
+/** Optional stdin input for commands that fall back to empty text when stdin cannot be read, recording the cause at debug level. */
+export const stdinTextOrEmpty = stdinText.pipe(
+  Effect.tapError((e) => Effect.logDebug("stdin could not be read", e)),
+  Effect.orElseSucceed(() => ""),
+);
+
 const oneLine = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const laidOut = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
 

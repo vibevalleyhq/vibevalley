@@ -377,10 +377,18 @@ const stylexOnly = defineRule({
         "declare styles in `stylex.create(...)` and spread `{...stylex.attrs(...)}` or `{...styleProps(...)}` on the element",
         "apps/web/src/ui/positioner.ts",
       ),
+      important: says(
+        "`!important` inside a StyleX declaration breaks last-rule-wins atomic composition",
+        "remove `!important` and rely on `@layer stylex` ordering or conditional StyleX style arguments",
+        "apps/web/src/ui/positioner.ts",
+      ),
     },
   },
   create(context) {
     return {
+      ...stylexValues(context, ({ node, property, value }) => {
+        if (property !== "content" && typeof value === "string" && /!\s*important\b/iu.test(value)) context.report({ node, messageId: "important" });
+      }),
       JSXAttribute(node) {
         if (node.name.type !== "JSXIdentifier" || !rawClassAttrs.has(node.name.name)) return;
         context.report({ node, messageId: "classAttr", data: { attr: node.name.name } });

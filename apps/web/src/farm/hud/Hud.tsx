@@ -512,9 +512,12 @@ function TopLeft() {
               />
             </span>
             <span {...stylex.attrs(styles.statusNote)}>
-              {next() !== undefined
-                ? t("web.farm.hud.toLevelNext", { xp: Math.round(lv().xp), need: need(), next: next()! })
-                : t("web.farm.hud.toLevel", { xp: Math.round(lv().xp), need: need() })}
+              {(() => {
+                const target = next();
+                return target !== undefined
+                  ? t("web.farm.hud.toLevelNext", { xp: Math.round(lv().xp), need: need(), next: target })
+                  : t("web.farm.hud.toLevel", { xp: Math.round(lv().xp), need: need() });
+              })()}
             </span>
           </span>
         </span>
@@ -782,7 +785,7 @@ function QuotaPill(props: { height: number }) {
         >
           <HudCard height={props.height} bright={open()}>
             <SpriteIcon
-              name={bottleSprite({ level: quotaLevel(lowest()), fill: lowest() === undefined ? 0 : lowest()! / 100, short: "", text: "" })}
+              name={bottleSprite({ level: quotaLevel(lowest()), fill: (lowest() ?? 0) / 100, short: "", text: "" })}
               size={28}
             />
             <span {...stylex.attrs(lowest() === undefined ? styles.inkBark900 : levelInk[quotaLevel(lowest())])}>

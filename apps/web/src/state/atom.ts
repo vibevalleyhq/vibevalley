@@ -23,31 +23,81 @@ export function useAtom<A>(atom: Atom.Atom<A>, registry: AtomRegistry.AtomRegist
   );
 }
 
-/** A value the page keeps for its life, in the page's registry: one way for a feature to keep what is not a component's. */
+type Registry = ReturnType<typeof createRegistry>;
+
+/** A value the page keeps for its life, in the page's registry (or an isolated `RegistryContext`): one way for a feature to keep what is not a component's. */
 export interface PageAtom<A> {
-  /** The value now; a computation or a component that reads it runs again when it changes. */
+  /** The value now; a computation or a component that reads it follows the active `RegistryContext` and runs again when it changes. */
   readonly get: () => A;
   readonly set: (value: A) => void;
   readonly update: (change: (value: A) => A) => void;
   /** Hears every change, for code outside Solid (the canvas, the sounds, another store). */
   readonly subscribe: (changed: () => void) => () => void;
+  /** The same atom bound to a specific registry instead of `pageRegistry`. */
+  readonly inRegistry: (registry: Registry) => PageAtom<A>;
 }
 
-/** The atom held for the page's life, with a signal that only counts its changes. */
+/** The atom held for the registry's life, built and subscribed lazily on first access rather than at module import. */
 export function onPage<A>(atom: Atom.Writable<A>): PageAtom<A> {
   const kept = Atom.keepAlive(atom);
-  const [changes, setChanges] = createSignal(0);
-  // At once: a node not read yet is not built, and an atom not built tells no one of a change.
-  pageRegistry.subscribe(kept, () => setChanges((n) => n + 1), { immediate: true });
-  return {
-    get: () => {
-      changes();
-      return pageRegistry.get(kept);
-    },
-    set: (value) => pageRegistry.set(kept, value),
-    update: (change) => pageRegistry.update(kept, change),
-    subscribe: (changed) => pageRegistry.subscribe(kept, changed),
+  const signals = new WeakMap<Registry, Accessor<number>>();
+  const handles = new WeakMap<Registry, PageAtom<A>>();
+  const track = (registry: Registry): Accessor<number> => {
+    const existing = signals.get(registry);
+    if (existing !== undefined) return existing;
+    const [changes, setChanges] = createSignal(0);
+    // At once: a node not read yet is not built, and an atom not built tells no one of a change.
+    registry.subscribe(kept, () => setChanges((n) => n + 1), { immediate: true });
+    signals.set(registry, changes);
+    return changes;
   };
+  const inRegistry = (registry: Registry): PageAtom<A> => {
+    const existing = handles.get(registry);
+    if (existing !== undefined) return existing;
+    const handle: PageAtom<A> = {
+      get: () => {
+        track(registry)();
+        return registry.get(kept);
+      },
+      set: (value) => {
+        track(registry);
+        registry.set(kept, value);
+      },
+      update: (change) => {
+        track(registry);
+        registry.update(kept, change);
+      },
+      subscribe: (changed) => registry.subscribe(kept, changed),
+      inRegistry,
+    };
+    handles.set(registry, handle);
+    return handle;
+  };
+  const page: PageAtom<A> = {
+    get: () => {
+      const active = useContext(RegistryContext);
+      track(active)();
+      return active.get(kept);
+    },
+    set: (value) => {
+      track(pageRegistry);
+      pageRegistry.set(kept, value);
+    },
+    update: (change) => {
+      track(pageRegistry);
+      pageRegistry.update(kept, change);
+    },
+    subscribe: (changed) => pageRegistry.subscribe(kept, changed),
+    inRegistry,
+  };
+  handles.set(pageRegistry, page);
+  return page;
+}
+
+/** Binds a page atom's reads and writes to the active `RegistryContext`, for component callbacks in tests and stories. */
+export function usePageAtom<A>(atom: PageAtom<A>): PageAtom<A> {
+  const registry = useRegistry();
+  return registry === pageRegistry ? atom : atom.inRegistry(registry);
 }
 
 /** A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). */

@@ -11,7 +11,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { ask, change, frames, given, nameArg, optionalText, ServerFlag, words } from "#/farm.ts";
 import { show, FormatFlag } from "#/format.ts";
 import { observeIssue } from "#/issue-watch.ts";
-import { err, exit, Failure, jsonText, stdinText } from "#/output.ts";
+import { err, exit, Failure, jsonText, stdinTextOrEmpty } from "#/output.ts";
 
 const issueArg = nameArg("issue", "cli.arg.issue");
 const priorityFlag = Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority")));
@@ -90,7 +90,7 @@ const listCommand = Command.make(
 );
 
 /** --description: as given, or `-` for what comes on stdin. */
-const descriptionOf = (said: string | undefined) => (said === "-" ? stdinText.pipe(Effect.orElseSucceed(() => "")) : Effect.succeed(said));
+const descriptionOf = (said: string | undefined) => (said === "-" ? stdinTextOrEmpty : Effect.succeed(said));
 
 const createCommand = Command.make(
   "create",

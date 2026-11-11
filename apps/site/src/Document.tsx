@@ -12,7 +12,7 @@ const sceneStyles = stylex.create({
     placeItems: "center",
     paddingInline: "calc(var(--spacing) * 4)",
     paddingBlock: "calc(var(--spacing) * 8)",
-    backgroundColor: "var(--color-cream-100) !important",
+    backgroundColor: "var(--color-cream-100)",
   },
 });
 

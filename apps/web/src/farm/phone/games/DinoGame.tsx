@@ -145,7 +145,8 @@ const bird = [
   ["            ", "            ", " ###### ##  ", "#########   ", "   ######   ", "    ####    ", "     ##     ", "      #     "],
 ] as const;
 
-const picture = (o: Obstacle, t: number): readonly string[] => (o.kind === "bird" ? bird[Math.floor(t / 180) % 2]! : o.kind === "cactus" ? cactus : cacti);
+const picture = (o: Obstacle, t: number): readonly string[] =>
+  o.kind === "bird" ? (Math.floor(t / 180) % 2 === 0 ? bird[0] : bird[1]) : o.kind === "cactus" ? cactus : cacti;
 
 const five = (n: number) => String(n).padStart(5, "0");
 
@@ -154,7 +155,7 @@ export function DinoGame(props: { big?: boolean }) {
   const [d, setD] = createSignal<Dino>();
   const [top, setTop] = best.use();
   let canvas: HTMLCanvasElement | undefined;
-  const playing = () => !!d() && !d()!.over;
+  const playing = () => !!d() && d()?.over !== true;
 
   const start = () => {
     setD(jump(newDino(Math.floor(Math.random() * 2 ** 31))));
@@ -200,7 +201,7 @@ export function DinoGame(props: { big?: boolean }) {
     const box = dinoBox(run0);
     const frame = Math.floor(run0.time / 110) % 2;
     const ducking = run0.ducking && run0.lift === 0;
-    drawPattern(ctx, ducking ? duckFrames[frame]! : runFrames[run0.lift > 0 ? 0 : frame]!, box.x, box.y);
+    drawPattern(ctx, ducking ? (frame === 0 ? duckFrames[0] : duckFrames[1]) : run0.lift > 0 || frame === 0 ? runFrames[0] : runFrames[1], box.x, box.y);
   });
 
   const score = () => {

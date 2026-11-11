@@ -150,7 +150,9 @@ const webRtc: Rtc = async (grant, on) => {
   const leave = async () => {
     gone = true;
     mic?.close();
-    await client.leave().catch(() => undefined);
+    await client.leave().catch((e: unknown) => {
+      if (!(e instanceof Error)) throw e;
+    });
   };
   let mic: Awaited<ReturnType<typeof AgoraRTC.createMicrophoneAudioTrack>> | undefined;
   try {
@@ -266,7 +268,12 @@ export class VoiceCall implements VoiceDriver<string | undefined, "user" | "orch
     const sent = c.user
       ? api.voice.call.hear({ agentId, text: c.text, ...(c.picked ? { agent: c.picked } : {}), ...(c.key ? { sendKey: c.key } : {}) })
       : api.voice.call.say({ agentId, text: c.text });
-    sent.catch(() => undefined);
+    sent.catch((e: unknown) => {
+      if (this.phase === "live" && this.agentId === agentId) {
+        this.problem = reasonOf(e);
+        this.changed();
+      }
+    });
   }
 
   /** about: what rang, when the call answers the phone: the orchestrator says it first. */
@@ -286,7 +293,9 @@ export class VoiceCall implements VoiceDriver<string | undefined, "user" | "orch
         reject(new Cancelled());
       };
     });
-    stop.catch(() => undefined);
+    stop.catch((e: unknown) => {
+      if (!(e instanceof Cancelled)) throw e;
+    });
     const until = <T>(p: Promise<T>) => Promise.race([p, stop]);
     this.set("connecting", "");
     try {
@@ -373,7 +382,9 @@ export class VoiceCall implements VoiceDriver<string | undefined, "user" | "orch
       if (this.phase === "idle") return;
       this.set("ending");
       this.cancel?.();
-      await this.starting?.catch(() => undefined);
+      await this.starting?.catch((e: unknown) => {
+        if (!(e instanceof Cancelled) && !(e instanceof Error)) throw e;
+      });
       await this.teardown();
       this.set("idle");
     })().finally(() => (this.ending = undefined));
@@ -381,7 +392,9 @@ export class VoiceCall implements VoiceDriver<string | undefined, "user" | "orch
   }
 
   private async stopAgent(agentId: string) {
-    await Promise.race([api.voice.call.stop({ agentId }), new Promise((r) => setTimeout(r, 3000))]).catch(() => undefined);
+    await Promise.race([api.voice.call.stop({ agentId }), new Promise((r) => setTimeout(r, 3000))]).catch((e: unknown) => {
+      if (!(e instanceof Error)) throw e;
+    });
   }
 
   private async teardown() {
@@ -396,7 +409,9 @@ export class VoiceCall implements VoiceDriver<string | undefined, "user" | "orch
     this.micLevel = 0;
     this.orchestratorLevel = 0;
     this.captions.clear();
-    await line?.leave().catch(() => undefined);
+    await line?.leave().catch((e: unknown) => {
+      if (!(e instanceof Error)) throw e;
+    });
   }
 }
 

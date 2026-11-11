@@ -302,8 +302,9 @@ function Copy(props: { text: string }) {
       await navigator.clipboard.writeText(text);
       setDone(true);
       later(() => setDone(false), 1200);
-    } catch {
+    } catch (e) {
       // No clipboard here: the text is on show to copy by hand.
+      if (!(e instanceof DOMException) && !(e instanceof TypeError)) throw e;
     }
   };
   return (

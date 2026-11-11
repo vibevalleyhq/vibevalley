@@ -16,7 +16,7 @@ const sceneStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-warn) !important",
+    backgroundColor: "var(--color-warn)",
     boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
     padding: "calc(var(--spacing) * 6)",
   },

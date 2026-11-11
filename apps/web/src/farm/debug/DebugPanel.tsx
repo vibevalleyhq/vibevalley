@@ -329,8 +329,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
               disabled={achievements().length === 0}
               onClick={() => {
                 const all = achievements();
-                const a = all[next() % all.length]!;
-                const t = a.tiers[0]!;
+                const a = all[next() % all.length];
+                const t = a?.tiers[0];
+                if (a === undefined || t === undefined) return;
                 setNext(next() + 1);
                 localEffects.add({
                   kind: "achievement",
@@ -412,14 +413,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 type="button"
                 {...btn()}
                 onClick={() =>
-                  void navigator.clipboard
-                    .writeText(
+                  void act.run(() =>
+                    navigator.clipboard.writeText(
                       props.log
                         .entries()
                         .map((e) => JSON.stringify(e.json))
                         .join("\n"),
-                    )
-                    .catch(() => undefined)
+                    ),
+                  )
                 }
               >
                 {t("web.farm.debug.copy")}

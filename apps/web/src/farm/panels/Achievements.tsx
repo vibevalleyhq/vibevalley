@@ -408,7 +408,7 @@ const day = (at: number) => {
 };
 
 /** The tier's name; the achievement's own before the first. */
-const tierTitle = (a: Achievement, tier: number) => (tier >= 1 && tier <= a.tiers.length ? a.tiers[tier - 1]!.title : a.title);
+const tierTitle = (a: Achievement, tier: number) => (tier >= 1 && tier <= a.tiers.length ? (a.tiers[tier - 1]?.title ?? a.title) : a.title);
 
 const reachedAt = (p: Progress, id: string, tier: number) => p.unlocked.find((u) => u.id === id && u.tier === tier)?.at;
 
@@ -490,10 +490,11 @@ export function Achievements() {
         <div {...stylex.attrs(styles.clearingList)}>
           <For each={beds.filter((b) => b.unlockLevel !== undefined)}>
             {(b) => {
-              const done = () => level() >= b.unlockLevel!;
+              const unlock = b.unlockLevel ?? 0;
+              const done = () => level() >= unlock;
               return (
                 <span {...stylex.attrs(styles.clearingChip, done() ? styles.clearingDone : styles.clearingLocked)}>
-                  {t("web.farm.achievements.clearAt", { level: b.unlockLevel! })}
+                  {t("web.farm.achievements.clearAt", { level: unlock })}
                   <Show when={done()}>
                     <SpriteIcon name="mark-check" size={12} />
                   </Show>
@@ -577,17 +578,28 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
         onClick={() => setOpen(!open())}
         {...stylex.attrs(styles.titlePickerButton)}
       >
-        <Show when={worn() && title() ? { a: worn()!, tier: Math.round(title()!.tier) } : undefined} fallback={<SpriteIcon name="banner-title" size={48} />}>
+        <Show
+          when={(() => {
+            const a = worn();
+            const cur = title();
+            return a && cur ? { a, tier: Math.round(cur.tier) } : undefined;
+          })()}
+          fallback={<SpriteIcon name="banner-title" size={48} />}
+        >
           {(w) => <Medal a={w().a} tier={w().tier} size={32} />}
         </Show>
         <span>
           <span {...stylex.attrs(styles.titlePickerCaption)}>{t("web.farm.achievements.title")}</span>
           <span {...stylex.attrs(styles.titlePickerCurrent)}>
-            {worn() && title()
-              ? tierTitle(worn()!, Math.round(title()!.tier))
-              : earned().length > 0
-                ? t("web.farm.achievements.pick")
-                : t("web.farm.achievements.earnFirst")}
+            {(() => {
+              const a = worn();
+              const cur = title();
+              return a && cur
+                ? tierTitle(a, Math.round(cur.tier))
+                : earned().length > 0
+                  ? t("web.farm.achievements.pick")
+                  : t("web.farm.achievements.earnFirst");
+            })()}
           </span>
         </span>
       </button>

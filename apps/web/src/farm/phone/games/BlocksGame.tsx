@@ -109,7 +109,7 @@ export function BlocksGame(props: { big?: boolean }) {
   };
 
   useTicks(
-    () => playing() && !!g() && !g()!.over,
+    () => playing() && !!g() && g()?.over !== true,
     (ms) => {
       const now = game.get();
       if (!now) return;
@@ -180,7 +180,7 @@ export function BlocksGame(props: { big?: boolean }) {
   return (
     <div
       data-testid="blocks"
-      data-state={!g() ? "ready" : g()!.over ? "over" : playing() ? "playing" : "paused"}
+      data-state={!g() ? "ready" : g()?.over === true ? "over" : playing() ? "playing" : "paused"}
       {...stylex.attrs(styles.root, props.big === true ? styles.rootBig : styles.rootCompact)}
     >
       <div {...stylex.attrs(styles.wellFrame)}>
@@ -192,13 +192,13 @@ export function BlocksGame(props: { big?: boolean }) {
           aria-label={t("web.farm.phone.blocks.well")}
           role="img"
         />
-        <Show when={!g() || g()!.over || !playing()}>
+        <Show when={!g() || g()?.over === true || !playing()}>
           <div {...stylex.attrs(styles.overlay)}>
             <span>
               {g()?.over === true ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
               <span {...styleProps(phoneAnimations.blink)}>
-                {t("web.farm.phone.pressA", { what: g() && !g()!.over ? t("web.farm.phone.resume") : t("web.farm.phone.start") })}
+                {t("web.farm.phone.pressA", { what: g() && g()?.over !== true ? t("web.farm.phone.resume") : t("web.farm.phone.start") })}
               </span>
             </span>
           </div>

@@ -269,7 +269,7 @@ const ink: Readonly<Record<string, string>> = { "#": lcd.ink, "+": lcd.dark, o: 
 const cellsOf = (rows: readonly string[]) => rows.flatMap((row, y) => [...row].flatMap((c, x) => (ink[c] ? [{ x, y, fill: ink[c] }] : [])));
 
 function Crop(props: { stage: number; size: number; faint?: boolean }) {
-  const cells = () => cellsOf(pictures[Math.min(props.stage, mergeGoal) - 1]!);
+  const cells = () => cellsOf(pictures[Math.min(props.stage, mergeGoal) - 1] ?? []);
   return (
     <svg
       width={props.size}

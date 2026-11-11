@@ -237,9 +237,10 @@ export const dispatchedNotice = (open: (id: string | undefined) => void) => (got
 
 /** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its refiner asked) and sends a helper to draft it. */
 export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined) => void }) {
-  const [d, setD] = createSignal(untrack(() => draftOf(props.item)));
   // Until the user edits a field, a draft coming back fills them.
-  const [edited, setEdited] = createSignal(false);
+  const [form, setForm] = createSignal({ draft: untrack(() => draftOf(props.item)), edited: false });
+  const d = () => form().draft;
+  const edited = () => form().edited;
   const act = createAct();
   const moves = useIntents(issueMove);
   const move = () => issueMoveOf(props.item.id, moves.list());
@@ -254,14 +255,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   createEffect(
     () => draftOf(props.item),
     (fresh) => {
-      if (!untrack(edited)) setD(fresh);
+      if (!untrack(edited)) setForm({ draft: fresh, edited: false });
     },
     { defer: true },
   );
 
   const edit = (change: Partial<Draft>) => {
-    setD((x) => ({ ...x, ...change }));
-    setEdited(true);
+    setForm((cur) => ({ draft: { ...cur.draft, ...change }, edited: true }));
   };
 
   const update = (x: Draft): IssueUpdate => ({
@@ -283,7 +283,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     return update(x);
   };
   const saved = <T,>(got: T) => {
-    setEdited(false);
+    setForm((cur) => ({ ...cur, edited: false }));
     return got;
   };
 

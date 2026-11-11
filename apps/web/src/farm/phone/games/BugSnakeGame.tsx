@@ -149,7 +149,7 @@ export function BugSnakeGame() {
   };
 
   useTicks(
-    () => playing() && !!g() && g()!.over === undefined,
+    () => playing() && !!g() && g()?.over === undefined,
     (ms) => {
       const now = game.get();
       if (!now) return;
@@ -184,8 +184,8 @@ export function BugSnakeGame() {
     const draw = (picture: readonly string[], c: number) => drawPattern(ctx, picture, (c % bugSnakeWidth) * cell, Math.floor(c / bugSnakeWidth) * cell);
     draw(seed, state.food);
     // It blinks its last ten ticks, before it flies off.
-    if (state.bug !== undefined && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(bug[state.bugLeft % 2]!, state.bug);
-    state.body.forEach((c, i) => draw(i === 0 ? heads[state.heading] : i === state.body.length - 1 ? tail : segment[i % 2]!, c));
+    if (state.bug !== undefined && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(state.bugLeft % 2 === 0 ? bug[0] : bug[1], state.bug);
+    state.body.forEach((c, i) => draw(i === 0 ? heads[state.heading] : i === state.body.length - 1 ? tail : i % 2 === 0 ? segment[0] : segment[1], c));
   });
 
   const score = () => g()?.score ?? 0;
@@ -210,14 +210,17 @@ export function BugSnakeGame() {
           aria-label={t("web.farm.phone.bugs.field")}
           {...stylex.attrs(styles.canvas)}
         />
-        <Show when={!g() || g()!.over !== undefined || !playing()}>
+        <Show when={!g() || g()?.over !== undefined || !playing()}>
           <div {...stylex.attrs(styles.overlay)}>
             <span>
-              {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
+              {(() => {
+                const over = g()?.over;
+                return over ? ended[over] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs");
+              })()}
               <br />
               <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", {
-                  what: g() && g()!.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
+                  what: g() && g()?.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
                 })}
               </span>
             </span>

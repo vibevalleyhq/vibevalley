@@ -187,7 +187,7 @@ function Report(props: { r: ChatMessage; issue?: Issue | undefined }) {
           <FarmTag text={outcomeTag[outcome()][0]} styles={outcomeTag[outcome()][1]} />
         </div>
         <Show when={props.issue}>
-          <p {...stylex.attrs(styles.issueTitle)}>{props.issue!.title}</p>
+          {(issue) => <p {...stylex.attrs(styles.issueTitle)}>{issue().title}</p>}
         </Show>
         <p {...stylex.attrs(styles.reportSummary, outcome() === "failed" ? styles.reportFailed : styles.reportNormal)}>{props.r.text}</p>
         <Show when={props.r.spent}>{(spent) => <p {...stylex.attrs(styles.spent)}>{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>

@@ -134,6 +134,7 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     justifyContent: "center",
+    gap: "calc(var(--spacing) * 6)",
   },
   gridDiv: {
     pointerEvents: "none",
@@ -401,7 +402,7 @@ function RepoMap() {
               // Keyed by the atlas, loaded once: a plain value, so the islands' queries never read a closed branch.
               <Show when={atlas()} keyed>
                 {(a) => (
-                  <div {...stylex.attrs(styles.repoMapDiv5)} style={{ gap: `${gap}px` }}>
+                  <div {...stylex.attrs(styles.repoMapDiv5)}>
                     <For each={islands()} keyed={(i) => i.repo}>
                       {(i) => (
                         <div style={{ width: `${cell().w * scale()}px` }}>

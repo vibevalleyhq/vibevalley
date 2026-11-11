@@ -260,7 +260,10 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
   const core = useCore();
   const c = () => props.channel;
   const unread = () => unreadUnder(core()?.chat, c());
-  const line = () => [c().description, c().repo ? t("web.farm.chat.repoTag", { repo: c().repo! }) : undefined].filter(Boolean).join(" · ");
+  const line = () => {
+    const repo = c().repo;
+    return [c().description, repo ? t("web.farm.chat.repoTag", { repo }) : undefined].filter(Boolean).join(" · ");
+  };
   const here = () => c().id === props.current?.id;
   return (
     <button

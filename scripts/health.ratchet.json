@@ -186,7 +186,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 2,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "packages/testkit": {
@@ -330,13 +330,13 @@
     "resultBranch": 0
   },
   "web: farm": {
-    "nonNull": 60,
+    "nonNull": 3,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: features/agent": {
@@ -366,7 +366,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: features/channel": {
@@ -396,7 +396,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 2,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: features/issue": {
@@ -506,7 +506,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: features/setting": {
@@ -536,7 +536,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 6,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: infra": {
@@ -576,7 +576,7 @@
     "lintOff": 6,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 2,
+    "swallowed": 0,
     "resultBranch": 0
   }
 }

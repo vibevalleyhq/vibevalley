@@ -836,9 +836,11 @@ function IssueBody(props: {
                 </Row>
               </Show>
               <Show when={agent()?.model}>
-                <Row label={t("web.farm.plot.model")}>
-                  <p {...stylex.attrs(styles.plotDetailP)}>{agent()!.model}</p>
-                </Row>
+                {(model) => (
+                  <Row label={t("web.farm.plot.model")}>
+                    <p {...stylex.attrs(styles.plotDetailP)}>{model()}</p>
+                  </Row>
+                )}
               </Show>
               <Show when={s().head.branch}>
                 <Row label={t("web.farm.plot.branch")}>

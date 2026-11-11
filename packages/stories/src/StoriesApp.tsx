@@ -376,8 +376,9 @@ const readToggled = () => {
 const writeToggled = (m: ReadonlyMap<string, boolean>) => {
   try {
     localStorage.setItem(toggledKey, JSON.stringify([...m]));
-  } catch {
-    // Not kept: the tree opens as it does by default next time.
+  } catch (e) {
+    // Not kept in restricted or full storage: the tree opens as it does by default next time.
+    if (!(e instanceof DOMException)) throw e;
   }
 };
 

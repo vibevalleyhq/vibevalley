@@ -367,7 +367,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
             <p {...stylex.attrs(styles.sowFormP22)}>
               {t("web.farm.sow.plantIn", { repo: p() })}
               <Show when={bag()?.stack.label}>
-                <span {...stylex.attrs(styles.sowFormSpan)}>{bag()!.stack.label}</span>
+                {(label) => <span {...stylex.attrs(styles.sowFormSpan)}>{label()}</span>}
               </Show>
             </p>
           </div>

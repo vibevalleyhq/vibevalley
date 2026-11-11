@@ -37,7 +37,10 @@ export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (conn
       .execute(request)
       .pipe(Effect.mapError((cause) => DeepSeekError.make({ reason: "network", message: `Connection error: ${cause.message}`, cause })));
     if (res.status >= 400) {
-      const text = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
+      const text = yield* res.text.pipe(
+        Effect.tapError((e) => Effect.logDebug("DeepSeek error body could not be read", e)),
+        Effect.orElseSucceed(() => ""),
+      );
       return yield* DeepSeekError.make({ reason: "status", status: res.status, message: statusMessage(res.status, text) });
     }
     const sse = new SseData();
@@ -56,7 +59,10 @@ export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (conn
             const message =
               Predicate.hasProperty(error, "message") && typeof error.message === "string"
                 ? Effect.succeed(error.message)
-                : encodeJson(error).pipe(Effect.orElseSucceed(() => "The stream reported an error that is not JSON"));
+                : encodeJson(error).pipe(
+                    Effect.tapError((e) => Effect.logDebug("DeepSeek stream error could not be serialized", e)),
+                    Effect.orElseSucceed(() => "The stream reported an error that is not JSON"),
+                  );
             return Effect.flatMap(message, (said) => Effect.fail(DeepSeekError.make({ reason: "stream", message: said })));
           }),
         ),

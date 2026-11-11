@@ -207,14 +207,16 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
   const pick = usePrefs((p) => p.pick);
   let input: HTMLTextAreaElement | undefined;
   const owner = () => (props.thread && props.channel ? threadOwnerOf(props.channel, core()?.sessions ?? []) : undefined);
-  const placeholder = () =>
-    props.thread
-      ? owner()
-        ? t("web.farm.chat.inThread", { name: owner()!.name })
+  const placeholder = () => {
+    const threadOwner = owner();
+    return props.thread
+      ? threadOwner
+        ? t("web.farm.chat.inThread", { name: threadOwner.name })
         : t("web.farm.chat.inThreadAnyone")
       : props.channel?.type === "direct"
         ? t("web.farm.chat.toOrchestratorAlone")
         : t("web.farm.chat.toOrchestrator");
+  };
 
   const router = useRouter();
 

@@ -69,8 +69,8 @@ export function SokobanGame() {
   const [g, setG] = warehouse.use();
   const done = () => warehouseDone(g());
   const last = () => g().level === warehouses.length - 1;
-  const level = () => warehouses[g().level]!;
-  const width = () => level().rows[0]!.length;
+  const level = () => warehouses[g().level] ?? warehouses[0];
+  const width = () => level().rows[0].length;
   const cells = () => level().rows.join("");
   const placed = () => g().boxes.filter((p) => cells()[p] === ".").length;
   const restart = () => setG(newWarehouse(warehouse.get().level));

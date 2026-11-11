@@ -40,6 +40,7 @@ import {
 const trajectoryStyles = stylex.create({
   bar: {
     position: "absolute",
+    height: "calc(var(--spacing) * 3)",
     cursor: "pointer",
     borderRadius: "var(--radius-sm)",
     backgroundColor: {
@@ -291,6 +292,7 @@ const styles = stylex.create({
   },
   waterfallViewDiv2: {
     display: "flex",
+    height: "calc(var(--spacing) * 10)",
   },
   waterfallViewSpan: {
     fontSize: "var(--text-2xs)",
@@ -306,6 +308,7 @@ const styles = stylex.create({
   waterfallViewDiv3: {
     position: "absolute",
     insetInline: "0",
+    height: "calc(var(--spacing) * 3)",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
   },
@@ -813,13 +816,13 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
     });
   });
   return (
-    <div {...stylex.attrs(styles.waterfallViewDiv2)} style={{ height: `${lane * 3 + gap * 2}px` }}>
+    <div {...stylex.attrs(styles.waterfallViewDiv2)}>
       <div {...stylex.attrs(styles.waterfallViewDiv)}>
         <For each={lanes}>{(l) => <span {...stylex.attrs(styles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
       </div>
       <div ref={(el) => (box = el)} {...stylex.attrs(styles.waterfallViewDiv22)}>
         <For each={[0, 1, 2]}>
-          {(i) => <div {...stylex.attrs(styles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
+          {(i) => <div {...stylex.attrs(styles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px` }} />}
         </For>
         <For each={bars()} keyed={false}>
           {(b) => (
@@ -829,7 +832,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
               aria-label={b().label}
               onClick={() => props.onPick(b().seq)}
               {...styleProps(trajectoryStyles.bar)}
-              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, "--timeline-color": b().color }}
+              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, "--timeline-color": b().color }}
             />
           )}
         </For>

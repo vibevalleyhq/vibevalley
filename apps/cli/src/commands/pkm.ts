@@ -8,7 +8,7 @@ import { PkmMarkerValues, PkmTierValues } from "@vibevalley/protocol";
 
 import { ask, change, given, nameArg, optionalText, optionalWords } from "#/farm.ts";
 import { show } from "#/format.ts";
-import { exit, Failure, out, stdinText } from "#/output.ts";
+import { exit, Failure, out, stdinTextOrEmpty } from "#/output.ts";
 
 const pageArgument = nameArg("page", "cli.arg.page");
 const tierFlag = Flag.Literals("tier", PkmTierValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.tier")));
@@ -30,7 +30,7 @@ const outline = (p: T.PkmPage) =>
 /** `pkm capture <text>`: into today's journal, or --page's end; with no words, what comes on stdin, read as an outline. */
 const captureCommand = Command.make("capture", { words: optionalWords("cli.arg.capture"), page: optionalText("page", "cli.flag.capturePage") }, (o) =>
   Effect.gen(function* () {
-    const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
+    const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinTextOrEmpty;
     const page = given(o.page);
     const written = yield* ask((api) => api.pkm.capture({ text, ...(page === undefined ? {} : { page }) }));
     yield* show(written, (w) => t("cli.pkm.captured", { page: w.title }));
@@ -133,7 +133,7 @@ const pageSave = Command.make(
   },
   (o) =>
     Effect.gen(function* () {
-      const markdown = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
+      const markdown = o.words.length > 0 ? o.words.join(" ") : yield* stdinTextOrEmpty;
       const tier = given(o.tier);
       yield* change({
         name: "pkm page save",

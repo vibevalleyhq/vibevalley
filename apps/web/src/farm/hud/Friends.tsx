@@ -320,7 +320,10 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
               </p>
               <p {...stylex.attrs(styles.cardStatus)}>
                 {status[props.st].label}
-                {tally() ? t("web.farm.friends.tally", { hired: Math.round(tally()!.hired), harvested: Math.round(tally()!.harvested) }) : ""}
+                {(() => {
+                  const counts = tally();
+                  return counts ? t("web.farm.friends.tally", { hired: Math.round(counts.hired), harvested: Math.round(counts.harvested) }) : "";
+                })()}
               </p>
             </div>
           </div>
@@ -389,7 +392,7 @@ export function Friends(props: { height: number }) {
           <HudCard>
             <span {...stylex.attrs(styles.list)}>
               <For each={sorted()} keyed={(a) => a.id}>
-                {(a, i) => <Friend agent={a()} st={statuses()[i()]!} />}
+                {(a, i) => <Friend agent={a()} st={statuses()[i()] ?? "away"} />}
               </For>
             </span>
           </HudCard>
