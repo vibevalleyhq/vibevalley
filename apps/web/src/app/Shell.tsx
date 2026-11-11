@@ -57,7 +57,9 @@ const styles = stylex.create({
   },
   namedSlot: {
     width: { default: "3rem", "@media (width>=40rem)": "3.5rem" },
-    height: { default: "3rem", "@media (width>=40rem)": "3.5rem" },
+    // Tall slots only where the rail has the height for all of them: the desktop window opens 768px tall, and the
+    // last place (the farm) must not scroll out of it.
+    height: { default: "3rem", "@media (width>=40rem) and (height>=52rem)": "3.5rem" },
   },
   currentSlot: {
     backgroundColor: "color-mix(in srgb, var(--color-on-rail) 9%, transparent)",

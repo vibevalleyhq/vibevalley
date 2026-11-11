@@ -144,8 +144,9 @@ export function serverKeeper(
   return {
     /** Where the running one answers; undefined until it is up. */
     url: () => running?.url,
-    start: async () => {
-      starting = start(files, env);
+    /** port: the one dev.ts chose for Vite's proxy; none picks a free one. */
+    start: async (port?: number) => {
+      starting = start(files, env, port);
       try {
         running = await starting;
         return running.url;

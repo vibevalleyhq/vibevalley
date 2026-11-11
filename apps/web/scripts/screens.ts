@@ -5,7 +5,7 @@ import { chromium } from "@playwright/test";
 
 const server = process.env.VIBEVALLEY_SERVER;
 if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
-const pages = (process.env.VIBEVALLEY_PAGES ?? "/,/issues,/chat,/library,/artifacts,/agents,/orchestrator,/runtimes,/repos,/catalog,/settings")
+const pages = (process.env.VIBEVALLEY_PAGES ?? "/farm,/issues,/chat,/library,/artifacts,/agents,/orchestrator,/runtimes,/repos,/catalog,/settings")
   .split(",")
   .filter(Boolean);
 const [width = 1440, height = 900] = (process.env.VIBEVALLEY_SCREEN ?? "1440x900").split("x").map(Number);
@@ -21,9 +21,9 @@ for (const path of pages) {
   await page.goto(server + path);
   // The state stream stays open, so the network is never idle: give the first frame and the pictures a moment.
   await page.waitForLoadState("load");
-  if (path === "/") await page.locator("canvas").first().waitFor();
+  if (path === "/farm") await page.locator("canvas").first().waitFor();
   await page.waitForTimeout(3000);
-  const name = path === "/" ? "farm" : path.replace(/^\//u, "").replace(/[/?=&]/gu, "-");
+  const name = path.replace(/^\//u, "").replace(/[/?=&]/gu, "-");
   const file = join(out, `${name}-${width}x${height}.png`);
   await page.screenshot({ path: file });
   /* oxlint-enable eslint/no-await-in-loop */

@@ -28,7 +28,7 @@
    `command.stdout.log` 列出截好的图，在 `apps/web/.screens/<页面>-<宽>x<高>.png`；页面里有脚本错误时命令失败，错误在 `command.stderr.log`。改别的页面时，在同一个子命令里造它要的数据，再换 `VIBEVALLEY_PAGES`；新农场没有上一轮的数据。
 
 2. 按需要设：
-   - `VIBEVALLEY_PAGES=/,/issues,/chat`：要截的路径，逗号分开；`/` 是农场（首页已经标成看过）。不设时是农场和工作台的每个地方。
+   - `VIBEVALLEY_PAGES=/farm,/issues,/chat`：要截的路径，逗号分开；`/farm` 是农场，`/` 跳到工作台的第一个地方。不设时是农场和工作台的每个地方。
    - `VIBEVALLEY_SCREEN=390x844`：手机大小；默认 1440×900。
    - 带 id 的详情页（`/issues/<id>`、`/agents/<id>`）用子命令里刚造出来的 id。
 3. 打开截图，对照改动检查内容、用语、溢出和重叠。空状态只能证明空状态，不能代替列表、卡片和详情的验收。
@@ -44,7 +44,7 @@
 ## 出错时
 
 - **页面是空的**：确认 `apps/web/dist` 是这次构建的；看 `command.stderr.log` 里的页面错误和 `server.stdout.log`。
-- **农场的画布是空的**：截图前要等图加载完，`screens.ts` 在 `/` 上等画布出现再等 3 秒；还空就看页面错误。
+- **农场的画布是空的**：截图前要等图加载完，`screens.ts` 在 `/farm` 上等画布出现再等 3 秒；还空就看页面错误。
 
 ## 收拾
 

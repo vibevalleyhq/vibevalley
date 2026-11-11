@@ -77,11 +77,11 @@ export function phaseWords(h: Session, conflict?: Conflict): string {
     case "failed":
       return t("shared.phase.failed");
     case "resting": {
+      // No last run is a session that has not finished one yet (a new orchestrator), not one that broke off.
       const outcome = h.lastRun?.outcome;
-      return t("shared.phase.resting", {
-        last: outcome === undefined ? t("shared.phase.unfinished") : t(`shared.outcome.${outcome}`),
-        conflict: conflictWords,
-      });
+      return outcome === undefined
+        ? t("shared.phase.rested", { conflict: conflictWords })
+        : t("shared.phase.resting", { last: t(`shared.outcome.${outcome}`), conflict: conflictWords });
     }
     default:
       return "";

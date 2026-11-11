@@ -1730,7 +1730,7 @@ export const catalogs = {
         done: "这一轮做完了，等你看{conflict}",
         failed: "这一轮没做成",
         resting: "歇着（上一轮{last}）{conflict}",
-        unfinished: "没做完",
+        rested: "歇着{conflict}",
         conflict: "，合进 {base} 会冲突（{files}）",
         working: "在{action}",
         workingOn: "在{action}：{label}",
@@ -2575,6 +2575,8 @@ export const catalogs = {
         },
         done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了", imagegen: "交给助手了，画好会发到这里" },
       },
+      lacks: "回不了话：{why}",
+      lacksFix: "去设置",
     },
     "web.connector": {
       connectors: {
@@ -6535,7 +6537,7 @@ export const catalogs = {
         done: "this round is done, for you to see{conflict}",
         failed: "this round failed",
         resting: "resting (last round {last}){conflict}",
-        unfinished: "unfinished",
+        rested: "resting{conflict}",
         conflict: "; merging into {base} would conflict ({files})",
         working: "{action}",
         workingOn: "{action}: {label}",
@@ -7413,6 +7415,8 @@ export const catalogs = {
         },
         done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped", imagegen: "Handed to the assistant; the image will be posted here" },
       },
+      lacks: "cannot answer: {why}",
+      lacksFix: "Settings",
     },
     "web.connector": {
       connectors: {
@@ -11284,10 +11288,10 @@ export interface Messages {
   "shared.phase.done": { readonly conflict: string | number };
   "shared.phase.failed": undefined;
   "shared.phase.quiet": { readonly span: string | number; readonly what: string | number };
+  "shared.phase.rested": { readonly conflict: string | number };
   "shared.phase.resting": { readonly conflict: string | number; readonly last: string | number };
   "shared.phase.retrying": { readonly attempt: string | number; readonly what: string | number };
   "shared.phase.retryingOf": { readonly attempt: string | number; readonly of: string | number; readonly what: string | number };
-  "shared.phase.unfinished": undefined;
   "shared.phase.working": { readonly action: string | number };
   "shared.phase.workingOn": { readonly action: string | number; readonly label: string | number };
   "shared.priority.high": undefined;
@@ -12032,6 +12036,8 @@ export interface Messages {
   "web.channel.inChannel": undefined;
   "web.channel.issues.empty": undefined;
   "web.channel.issues.thread": undefined;
+  "web.channel.lacks": { readonly why: string | number };
+  "web.channel.lacksFix": undefined;
   "web.channel.manage.archive": undefined;
   "web.channel.manage.archiveHint": undefined;
   "web.channel.manage.archivedTitle": undefined;

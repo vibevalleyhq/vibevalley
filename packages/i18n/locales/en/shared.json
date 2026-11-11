@@ -86,7 +86,7 @@
     "done": "this round is done, for you to see{conflict}",
     "failed": "this round failed",
     "resting": "resting (last round {last}){conflict}",
-    "unfinished": "unfinished",
+    "rested": "resting{conflict}",
     "conflict": "; merging into {base} would conflict ({files})",
     "working": "{action}",
     "workingOn": "{action}: {label}",

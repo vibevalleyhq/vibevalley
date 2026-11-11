@@ -346,7 +346,9 @@ describe("mcp", () => {
       yield* hired(core, { id: sessionId("resting"), name: "歇着的", phase: { _tag: "resting" } });
       yield* hired(core, { id: sessionId("done"), name: "交活的", phase: { _tag: "done" } });
       const text = yield* Effect.promise(() => client(mcp, "token").tool("session_list"));
-      for (const want of ["这一轮没做成", "歇着（上一轮没做完）", "交活的"]) expect(text).toContain(want);
+      for (const want of ["这一轮没做成", "歇着的", "交活的"]) expect(text).toContain(want);
+      // A session that has not finished a run yet rests; it did not break one off.
+      expect(text).not.toContain("没做完");
     }).pipe(Effect.scoped, Effect.provide(world({ who: () => "caller" }))),
   );
 

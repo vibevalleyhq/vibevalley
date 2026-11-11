@@ -71,7 +71,7 @@ vp run --filter @vibevalley/web e2e                              # 页面全量�
 vp run --filter @vibevalley/web stories                          # 改了零件（ui/、ui/pixel/）：开零件的故事，两种主题、几种宽度看它；改零件就改它旁边的 X.stories.tsx
 vp run --filter @vibevalley/web e2e:dev                          # 改了页面的响应式写法：Playwright 跑在 Solid 的开发版上，它的诊断（没被追踪的读、不该建的原语、追踪几千个源）连调用栈打出来
 vp run desktop:test                                             # 改完 apps/desktop 或页面：Playwright 起整个 Electron 应用（临时家目录），附截图
-vp run desktop:dev                                              # 桌面版：构建壳和页面，带着 apps/server 起来；改页面窗口自己刷新，改服务端或 protocol 服务端自己重启（有帮工在干活就等它们干完）
+vp run desktop:dev                                              # 桌面版：构建壳，页面由 Vite 的 dev server 给（127.0.0.1，/api 转给服务端），带着 apps/server 起来；改页面就地热替换，改服务端或 protocol 服务端自己重启（有帮工在干活就等它们干完）
 vp run --filter @vibevalley/island test                          # 改完灵动岛（swift test）：消息和位置的测试（macOS）；样子用它的 --snapshot 画出来看（apps/island/README.md）
 vp run --filter @vibevalley/mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
 vp run package:mac                                              # macOS 应用、.dmg 和更新用的 .zip、release.json（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
@@ -80,7 +80,7 @@ vp run --filter @vibevalley/desktop update-check                 # 改了桌面�
 vp run capabilities                                             # 改了 <概念>/api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
 vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键
-vp run effect:check                                             # 改了 Effect 代码：Effect 自己的诊断（@effect/tsgo，scripts/effect-check.ts）：tsconfig.base.json 的 plugins 里写了的规则有一处就失败，没写的进棘轮 scripts/effect.ratchet.json，只许减（变少了跑 vp run effect:write 降下来，一条规则归零就把它写成 error）；提交前的钩子、server:check 和 CI 都跑
+vp run effect:check                                             # 仓库在离开 Effect（[计划](.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md)）：tsconfig.base.json 的 plugins 里写成 error 的规则有一处就失败；引用 Effect 的文件数记在 scripts/audit/effect.ratchet.json，只许减（变少了跑 vp run effect:write 降下来）；提交前的钩子、server:check 和 CI 都跑
 vp run health                                                   # 看先改哪里：热点和逃生口；vp run health:verify 对棘轮（逃生口变少了跑 vp run health:write 降下来）
 vp run practice:check                                           # 评审列出、还没有 lint 管的测试和 Effect 写法（scripts/practice-audit.ts，按语法树读）：存量记在 scripts/practice.ratchet.json，只许减（变少了跑 vp run practice:write）；只在本机提交前的钩子里跑，vpx scripts/practice-audit.ts 列出全部
 vp run paths:check                                              # 服务端模块之间的路径（scripts/service-paths.ts，按语法树读）：哪个模块用了别的模块服务的哪个成员，记在 scripts/service-paths.json；多一条路就失败，要么走已有的门，要么 vp run paths:write 写下来并在 PR 里说明；只在本机提交前的钩子里跑，vpx scripts/service-paths.ts 列出整张表
@@ -105,18 +105,9 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 
 一条新规矩，先问能不能写成代码或检查；只有写不成的，才进下面的列表。
 
-## Learning more about Effect
+## 离开 Effect
 
-This repository uses the Effect Typescript library.
-
-Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
-**completely**, and follow the links in the file when required.
-
-If you need to learn more about particular Effect apis and concepts that the
-guide doesn't cover, search through the source code in `node_modules/effect/src`.
-
-This repository's own Effect conventions, the checks that hold them and a review
-list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
+仓库正在把 Effect 整个拿掉，改成普通 TypeScript（[计划](.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md)）。新代码不用 Effect：`async`/`await`、`AbortSignal`、`await using`、工厂函数；引用 Effect 的文件数由 `effect:check` 记着，只许减。还没改到的代码照旧读得懂：Effect 的用法在 `node_modules/effect/AGENTS.md`，这个仓库原来的写法在 [vv-effect](.agents/skills/vv-effect/SKILL.md)；下面规矩里写的 Effect 写法只管还没改的代码，改写时照计划的替换表换掉。
 
 ## 规矩
 
