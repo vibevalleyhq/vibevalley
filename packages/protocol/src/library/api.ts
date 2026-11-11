@@ -1,18 +1,18 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-const itemInput = input({ id: Schema.String });
+const itemInput = input({ id: z.string() });
 
-export interface LibraryHandlers<R = never> {
+export interface LibraryHandlers {
   /** Newest first. */
-  readonly "library.item.list": (a: T.LibraryListRequest) => Effect.Effect<T.LibraryItem[], ApiError, R>;
-  readonly "library.item.add": (a: T.LibraryAddRequest) => Effect.Effect<T.LibraryItem, ApiError, R>;
+  readonly "library.item.list": (a: T.LibraryListRequest) => Promise<T.LibraryItem[]>;
+  readonly "library.item.add": (a: T.LibraryAddRequest) => Promise<T.LibraryItem>;
   /** Only the item goes: a message that has the file still opens it. */
-  readonly "library.item.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
-  readonly "library.item.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "library.item.delete": (a: { readonly id: string }) => Promise<void>;
+  readonly "library.item.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
 }
 
 export const libraryEndpoints: readonly Endpoint[] = [

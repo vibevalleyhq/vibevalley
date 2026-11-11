@@ -48,30 +48,30 @@ export type { SettingHandlers } from "./setting/api";
 export type { VoiceHandlers } from "./voice/api";
 
 /** One answer per route: the server's Handlers. */
-export interface Handlers<R = never>
+export interface Handlers
   extends
-    CoreHandlers<R>,
-    OrchestratorHandlers<R>,
-    SettingHandlers<R>,
-    ProviderHandlers<R>,
-    MediaHandlers<R>,
-    ChannelHandlers<R>,
-    CronHandlers<R>,
-    VoiceHandlers<R>,
-    IssueHandlers<R>,
-    SessionHandlers<R>,
-    ArtifactHandlers<R>,
-    GameHandlers<R>,
-    RuntimeHandlers<R>,
-    RepoHandlers<R>,
-    AgentHandlers<R>,
-    PkmHandlers<R>,
-    MemoryHandlers<R>,
-    ConnectorHandlers<R>,
-    LanHandlers<R>,
-    UserHandlers<R>,
-    LibraryHandlers<R>,
-    AttachmentHandlers<R> {}
+    CoreHandlers,
+    OrchestratorHandlers,
+    SettingHandlers,
+    ProviderHandlers,
+    MediaHandlers,
+    ChannelHandlers,
+    CronHandlers,
+    VoiceHandlers,
+    IssueHandlers,
+    SessionHandlers,
+    ArtifactHandlers,
+    GameHandlers,
+    RuntimeHandlers,
+    RepoHandlers,
+    AgentHandlers,
+    PkmHandlers,
+    MemoryHandlers,
+    ConnectorHandlers,
+    LanHandlers,
+    UserHandlers,
+    LibraryHandlers,
+    AttachmentHandlers {}
 
 export const endpoints: readonly Endpoint[] = [
   ...coreEndpoints,

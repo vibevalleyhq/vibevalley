@@ -31,7 +31,7 @@
   "dependencies": {
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
-    "effect": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

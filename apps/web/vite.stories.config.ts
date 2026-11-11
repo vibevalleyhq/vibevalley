@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import solid from "@solidjs/vite-plugin";
 import stylex from "@stylexjs/unplugin";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
@@ -30,10 +31,11 @@ export default defineConfig({
   plugins:
     lazyPlugins(() => [
       stylex.vite({
-        useCSSLayers: { before: ["theme", "base", "components"], after: [], prefix: "stylex" },
+        useCSSLayers: { before: ["theme", "base", "components", "utilities"], after: [], prefix: "stylex" },
         sxPropName: false,
         aliases: { "#/*": [join(import.meta.dirname, "src/*")] },
       }),
+      tailwindcss(),
       solid(),
       atRoot(),
     ]) ?? [],

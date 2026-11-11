@@ -394,14 +394,6 @@ const RULES: readonly Rule[] = [
     says: "orchestrator (or the profile's id): manager is only the English page's word for 助手",
   },
   {
-    name: "a service not in Effect's default class form",
-    pattern: /= Context\.Service<|\b[A-Z][A-Za-z]*Shape\b|^export const layer\b/mu,
-    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("@vibevalley/server/issue/issue") { static readonly layer = … }; its type is Issue["Service"]',
-    // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
-    // cannot sit on the class.
-    except: /^apps\/server\/src\/gateway\/projection\/frame\.ts$/u,
-  },
-  {
     name: "a service under a plural name",
     pattern:
       /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,

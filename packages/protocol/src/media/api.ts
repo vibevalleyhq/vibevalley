@@ -1,41 +1,40 @@
-import type { Effect } from "effect";
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { Preview } from "../common/schema";
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import type * as T from "../shapes";
 import * as A from "./audio-schema";
 import * as S from "./schema";
 
-export interface MediaHandlers<R = never> {
-  readonly "media.dialogue.create": (a: T.MediaSpeakersRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
-  readonly "media.voiceDesign.create": (a: T.MediaVoiceDesignRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
-  readonly "media.clone.create": (a: T.MediaCloneRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
-  readonly "media.transcription.create": (a: T.MediaTranscriptionRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
-  readonly "media.audio.resume": (a: T.MediaJobRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
-  readonly "media.audio.previewCleanup": (a: T.MediaJobRequest) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "media.audio.cleanup": (a: T.MediaJobRequest) => Effect.Effect<T.MediaAudioJob, ApiError, R>;
-  readonly "media.input.create": (a: T.MediaInputRequest) => Effect.Effect<T.MediaInput, ApiError, R>;
+export interface MediaHandlers {
+  readonly "media.dialogue.create": (a: T.MediaSpeakersRequest) => Promise<T.MediaAudioJob>;
+  readonly "media.voiceDesign.create": (a: T.MediaVoiceDesignRequest) => Promise<T.MediaAudioJob>;
+  readonly "media.clone.create": (a: T.MediaCloneRequest) => Promise<T.MediaAudioJob>;
+  readonly "media.transcription.create": (a: T.MediaTranscriptionRequest) => Promise<T.MediaAudioJob>;
+  readonly "media.audio.resume": (a: T.MediaJobRequest) => Promise<T.MediaAudioJob>;
+  readonly "media.audio.previewCleanup": (a: T.MediaJobRequest) => Promise<T.Preview>;
+  readonly "media.audio.cleanup": (a: T.MediaJobRequest) => Promise<T.MediaAudioJob>;
+  readonly "media.input.create": (a: T.MediaInputRequest) => Promise<T.MediaInput>;
   /** A kept attachment (a library item) taken as an input, checked as an upload is. */
-  readonly "media.input.adopt": (a: { readonly attachment: string }) => Effect.Effect<T.MediaInput, ApiError, R>;
-  readonly "media.input.get": (a: T.MediaJobRequest) => Effect.Effect<T.MediaInput, ApiError, R>;
-  readonly "media.input.list": () => Effect.Effect<T.MediaInput[], ApiError, R>;
-  readonly "media.input.previewDelete": (a: T.MediaJobRequest) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "media.input.delete": (a: T.MediaJobRequest) => Effect.Effect<void, ApiError, R>;
-  readonly "media.image.create": (a: T.MediaImageRequest) => Effect.Effect<T.MediaImageJob, ApiError, R>;
-  readonly "media.understanding.create": (a: T.MediaUnderstandingRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError, R>;
-  readonly "media.understanding.authorize": (a: T.MediaUnderstandingAuthorizationRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError, R>;
-  readonly "media.understanding.start": (a: T.MediaJobRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError, R>;
-  readonly "media.speech.create": (a: T.MediaSpeechRequest) => Effect.Effect<T.MediaSpeechJob, ApiError, R>;
-  readonly "media.speech.resume": (a: T.MediaJobRequest) => Effect.Effect<T.MediaSpeechJob, ApiError, R>;
-  readonly "media.understanding.previewCleanup": (a: T.MediaJobRequest) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "media.understanding.cleanup": (a: T.MediaJobRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError, R>;
-  readonly "media.job.get": (a: T.MediaJobRequest) => Effect.Effect<T.MediaJob, ApiError, R>;
-  readonly "media.job.cancel": (a: T.MediaJobRequest) => Effect.Effect<T.MediaJob, ApiError, R>;
-  readonly "media.job.previewRelease": (a: T.MediaJobRequest) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "media.job.release": (a: T.MediaJobRequest) => Effect.Effect<T.MediaJob, ApiError, R>;
-  readonly "media.job.download": (a: T.MediaJobRequest) => Effect.Effect<T.MediaJob, ApiError, R>;
-  readonly "media.job.list": () => Effect.Effect<T.MediaJob[], ApiError, R>;
+  readonly "media.input.adopt": (a: { readonly attachment: string }) => Promise<T.MediaInput>;
+  readonly "media.input.get": (a: T.MediaJobRequest) => Promise<T.MediaInput>;
+  readonly "media.input.list": () => Promise<T.MediaInput[]>;
+  readonly "media.input.previewDelete": (a: T.MediaJobRequest) => Promise<T.Preview>;
+  readonly "media.input.delete": (a: T.MediaJobRequest) => Promise<void>;
+  readonly "media.image.create": (a: T.MediaImageRequest) => Promise<T.MediaImageJob>;
+  readonly "media.understanding.create": (a: T.MediaUnderstandingRequest) => Promise<T.MediaUnderstandingJob>;
+  readonly "media.understanding.authorize": (a: T.MediaUnderstandingAuthorizationRequest) => Promise<T.MediaUnderstandingJob>;
+  readonly "media.understanding.start": (a: T.MediaJobRequest) => Promise<T.MediaUnderstandingJob>;
+  readonly "media.speech.create": (a: T.MediaSpeechRequest) => Promise<T.MediaSpeechJob>;
+  readonly "media.speech.resume": (a: T.MediaJobRequest) => Promise<T.MediaSpeechJob>;
+  readonly "media.understanding.previewCleanup": (a: T.MediaJobRequest) => Promise<T.Preview>;
+  readonly "media.understanding.cleanup": (a: T.MediaJobRequest) => Promise<T.MediaUnderstandingJob>;
+  readonly "media.job.get": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
+  readonly "media.job.cancel": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
+  readonly "media.job.previewRelease": (a: T.MediaJobRequest) => Promise<T.Preview>;
+  readonly "media.job.release": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
+  readonly "media.job.download": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
+  readonly "media.job.list": () => Promise<T.MediaJob[]>;
 }
 
 export const mediaEndpoints: readonly Endpoint[] = [
@@ -47,9 +46,9 @@ export const mediaEndpoints: readonly Endpoint[] = [
   { op: "media.audio.previewCleanup", about: ["id"], input: S.MediaJobRequest, result: Preview, can: ["user"] },
   { op: "media.audio.cleanup", about: ["id"], input: S.MediaJobRequest, result: A.MediaAudioJob, can: ["user"], dryRun: "media.audio.previewCleanup" },
   { op: "media.input.create", about: [], input: S.MediaInputRequest, result: S.MediaInput, can: ["user"] },
-  { op: "media.input.adopt", about: [], input: input({ attachment: Schema.String }), result: S.MediaInput, can: ["user"] },
+  { op: "media.input.adopt", about: [], input: input({ attachment: z.string() }), result: S.MediaInput, can: ["user"] },
   { op: "media.input.get", about: ["id"], input: S.MediaJobRequest, result: S.MediaInput, can: ["user"] },
-  { op: "media.input.list", about: [], input: undefined, result: Schema.Array(S.MediaInput), can: ["user"] },
+  { op: "media.input.list", about: [], input: undefined, result: z.array(S.MediaInput), can: ["user"] },
   { op: "media.input.delete", about: ["id"], input: S.MediaJobRequest, result: undefined, can: ["user"], dryRun: "media.input.previewDelete" },
   { op: "media.input.previewDelete", about: ["id"], input: S.MediaJobRequest, result: Preview, can: ["user"] },
   { op: "media.image.create", about: [], input: S.MediaImageRequest, result: S.MediaImageJob, can: ["user", "orchestrator"] },
@@ -72,5 +71,5 @@ export const mediaEndpoints: readonly Endpoint[] = [
   { op: "media.job.previewRelease", about: ["id"], input: S.MediaJobRequest, result: Preview, can: ["user"] },
   { op: "media.job.release", about: ["id"], input: S.MediaJobRequest, result: S.MediaJob, can: ["user"], dryRun: "media.job.previewRelease" },
   { op: "media.job.download", about: ["id"], input: S.MediaJobRequest, result: S.MediaJob, can: ["user", "orchestrator"] },
-  { op: "media.job.list", about: [], input: undefined, result: Schema.Array(S.MediaJob), can: ["user", "orchestrator"] },
+  { op: "media.job.list", about: [], input: undefined, result: z.array(S.MediaJob), can: ["user", "orchestrator"] },
 ];

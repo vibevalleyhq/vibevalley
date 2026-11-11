@@ -1,8 +1,6 @@
 import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeSync } from "node:fs";
 import { join } from "node:path";
 
-import { Schema } from "effect";
-
 import { t } from "@vibevalley/i18n";
 
 import { errnoOf } from "#/base/errors.ts";
@@ -16,10 +14,14 @@ const alive = (pid: number) => {
   }
 };
 
-export class HomeTaken extends Schema.TaggedError<HomeTaken, { readonly brand: unique symbol }>()("HomeTaken", { message: Schema.String }) {}
+export class HomeTaken extends Error {
+  override readonly name = "HomeTaken";
+}
 
 /** The lock file could not be read or written for another reason (permissions, a missing home). */
-export class HomeUnavailable extends Schema.TaggedError<HomeUnavailable, { readonly brand: unique symbol }>()("HomeUnavailable", { cause: Schema.Defect() }) {}
+export class HomeUnavailable extends Error {
+  override readonly name = "HomeUnavailable";
+}
 
 /** Takes the home, or throws HomeTaken; the function it returns gives it back. */
 export function leaseHome(home: string): () => void {
@@ -42,9 +44,9 @@ export function leaseHome(home: string): () => void {
     } catch (e) {
       if (errnoOf(e) !== "EEXIST") throw e;
       const pid = Number(readFileSync(path, "utf8"));
-      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw HomeTaken.make({ message: t("server.base.homeTaken", { home }) });
+      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken(t("server.base.homeTaken", { home }));
       unlinkSync(path);
     }
   }
-  throw HomeTaken.make({ message: t("server.base.homeUnlocked", { home }) });
+  throw new HomeTaken(t("server.base.homeUnlocked", { home }));
 }

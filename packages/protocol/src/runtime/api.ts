@@ -1,13 +1,13 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-export interface RuntimeHandlers<R = never> {
-  readonly "runtime.list": () => Effect.Effect<T.RuntimeInfo[], ApiError, R>;
-  readonly "runtime.refresh": (a: { readonly id: string }) => Effect.Effect<T.RuntimeInfo, ApiError, R>;
-  readonly "runtime.setting.update": (a: { readonly id: string } & T.RuntimeSettings) => Effect.Effect<T.RuntimeInfo, ApiError, R>;
+export interface RuntimeHandlers {
+  readonly "runtime.list": () => Promise<T.RuntimeInfo[]>;
+  readonly "runtime.refresh": (a: { readonly id: string }) => Promise<T.RuntimeInfo>;
+  readonly "runtime.setting.update": (a: { readonly id: string } & T.RuntimeSettings) => Promise<T.RuntimeInfo>;
 }
 
 export const runtimeEndpoints: readonly Endpoint[] = [
@@ -15,20 +15,20 @@ export const runtimeEndpoints: readonly Endpoint[] = [
     op: "runtime.list",
     about: [],
     input: undefined,
-    result: Schema.mutable(Schema.Array(S.RuntimeInfo)),
+    result: z.array(S.RuntimeInfo),
     can: ["user", "remote"],
   },
   {
     op: "runtime.refresh",
     about: ["id"],
-    input: input({ id: Schema.String }),
+    input: input({ id: z.string() }),
     result: S.RuntimeInfo,
     can: ["user", "remote"],
   },
   {
     op: "runtime.setting.update",
     about: ["id"],
-    input: input({ id: Schema.String }, S.RuntimeSettings),
+    input: input({ id: z.string() }, S.RuntimeSettings),
     result: S.RuntimeInfo,
     can: ["user"],
   },

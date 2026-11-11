@@ -1,38 +1,38 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import type * as T from "./shapes";
 
-export const LanPaired: Codec<T.LanPaired> = Schema.Struct({
-  device: Schema.String,
-  key: Schema.String,
-  hostName: Schema.String,
-});
+export const LanPaired = z.object({
+  device: z.string(),
+  key: z.string(),
+  hostName: z.string(),
+}) satisfies Codec<T.LanPaired>;
 
-export const LanPairRequest: Codec<T.LanPairRequest> = Schema.Struct({
-  code: Schema.String,
-  name: Schema.String,
-});
+export const LanPairRequest = z.object({
+  code: z.string(),
+  name: z.string(),
+}) satisfies Codec<T.LanPairRequest>;
 
-const LanPairing: Codec<T.LanPairing> = Schema.Struct({
-  code: Schema.String,
-  link: Schema.String,
-  expiresAt: Schema.Finite,
-  asking: Schema.optionalKey(Schema.String),
-});
+const LanPairing = z.object({
+  code: z.string(),
+  link: z.string(),
+  expiresAt: z.number(),
+  asking: z.exactOptional(z.string()),
+}) satisfies Codec<T.LanPairing>;
 
-export const LanStatus: Codec<T.LanStatus> = Schema.Struct({
-  open: Schema.Boolean,
-  hostName: Schema.String,
-  url: Schema.optionalKey(Schema.String),
-  problem: Schema.String,
-  pairing: Schema.optionalKey(LanPairing),
-});
+export const LanStatus = z.object({
+  open: z.boolean(),
+  hostName: z.string(),
+  url: z.exactOptional(z.string()),
+  problem: z.string(),
+  pairing: z.exactOptional(LanPairing),
+}) satisfies Codec<T.LanStatus>;
 
-export const SetOpenRequest: Codec<T.SetOpenRequest> = Schema.Struct({
-  open: Schema.Boolean,
-});
+export const SetOpenRequest = z.object({
+  open: z.boolean(),
+}) satisfies Codec<T.SetOpenRequest>;
 
-export const AnswerPairingRequest: Codec<T.AnswerPairingRequest> = Schema.Struct({
-  allow: Schema.Boolean,
-});
+export const AnswerPairingRequest = z.object({
+  allow: z.boolean(),
+}) satisfies Codec<T.AnswerPairingRequest>;

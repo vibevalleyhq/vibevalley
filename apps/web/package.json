@@ -18,6 +18,7 @@
   "dependencies": {
     "@solidjs/web": "catalog:",
     "@stylexjs/stylex": "catalog:",
+    "@tailwindcss/vite": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",
@@ -40,6 +41,7 @@
     "remark-rehype": "catalog:",
     "shiki": "catalog:",
     "solid-js": "catalog:",
+    "tailwindcss": "catalog:",
     "unified": "catalog:",
     "uqr": "catalog:"
   },

@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 
 import { definePlugin, defineRule, type ESTree, type Context, type Scope } from "vite-plus/lint/plugins";
 
-import { hexColor, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
+import { classAdvice, hexColor, offClassTokens, offTokens, tokenAdvice, type ClassKind, type TokenKind } from "./design-tokens.ts";
 
 /** Diagnostics include a replacement rather than only a prohibition; the named See path is checked by tests. */
 export const says = (wrong: string, fix: string, see: string) => `${wrong}. Fix: ${fix}. See ${see}`;
@@ -343,12 +343,29 @@ function jsxStyleValues(
   }
 }
 
+/** Every string in the file read as Tailwind reads it, as possible classes (scripts/audit/design-tokens.ts, offClassTokens). */
+function classStrings(inspect: (node: ESTree.Node, found: { token: string; kind: ClassKind }) => void) {
+  return {
+    Literal(node: ESTree.StringLiteral | ESTree.Node) {
+      if (node.type === "Literal" && typeof node.value === "string") for (const found of offClassTokens(node.value)) inspect(node, found);
+    },
+    TemplateLiteral(node: ESTree.TemplateLiteral) {
+      for (const quasi of node.quasis) for (const found of offClassTokens(quasi.value.cooked ?? quasi.value.raw)) inspect(node, found);
+    },
+  };
+}
+
 const noHexColor = defineRule({
   meta: {
     messages: {
       hex: says(
         "a colour written into a style stays as it is when the theme changes (设置 › 外观)",
         "use a host palette reference such as var(--color-ok-soft) or var(--color-ink); a new purpose gets a name in style.css, in both themes",
+        "apps/web/src/style.css",
+      ),
+      hexClass: says(
+        "`{{token}}` writes a colour into a class, and it stays as it is when the theme changes (设置 › 外观)",
+        `use ${classAdvice.hex}`,
         "apps/web/src/style.css",
       ),
     },
@@ -359,6 +376,9 @@ const noHexColor = defineRule({
     };
     return {
       ...stylexValues(context, check),
+      ...classStrings((node, { token, kind }) => {
+        if (kind === "hex") context.report({ node, messageId: "hexClass", data: { token } });
+      }),
       JSXAttribute(node) {
         if (node.name.type !== "JSXIdentifier" || node.name.name !== "style" || node.value?.type !== "JSXExpressionContainer") return;
         jsxStyleValues(node.value.expression, undefined, check);
@@ -367,16 +387,9 @@ const noHexColor = defineRule({
   },
 });
 
-const rawClassAttrs = new Set(["class", "className", "classList"]);
-
 const stylexOnly = defineRule({
   meta: {
     messages: {
-      classAttr: says(
-        "a raw JSX `{{attr}}` bypasses StyleX composition and can drop atomic rules or CSS variables",
-        "declare styles in `stylex.create(...)` and spread `{...stylex.attrs(...)}` or `{...styleProps(...)}` on the element",
-        "apps/web/src/ui/positioner.ts",
-      ),
       important: says(
         "`!important` inside a StyleX declaration breaks last-rule-wins atomic composition",
         "remove `!important` and rely on `@layer stylex` ordering or conditional StyleX style arguments",
@@ -419,9 +432,47 @@ const stylexOnly = defineRule({
         if (property === "transitionProperty" && /^transform,\s*translate,\s*scale,\s*rotate$/u.test(value.trim()))
           context.report({ node, messageId: "tailwindTransform" });
       }),
+    };
+  },
+});
+
+/** A style object every value of which is written out: nothing in it is worked out at run time. */
+function fixedStyle(node: ESTree.Node): boolean {
+  if (node.type === "Literal") return typeof node.value === "string";
+  if (node.type !== "ObjectExpression" || node.properties.length === 0) return false;
+  return node.properties.every(
+    (entry) =>
+      entry.type === "Property" &&
+      !entry.computed &&
+      ((entry.value.type === "Literal" && (typeof entry.value.value === "string" || typeof entry.value.value === "number")) ||
+        (entry.value.type === "TemplateLiteral" && entry.value.expressions.length === 0)),
+  );
+}
+
+const styleAttrs = defineRule({
+  meta: {
+    messages: {
+      classAttr: says(
+        "`{{attr}}` is not how Solid 2 takes classes, so the element gets none",
+        "write `class`: a string, an array or `cx(...)` from ui/cx.ts (Tailwind utilities, vv-tailwind)",
+        "apps/web/src/ui/cx.ts",
+      ),
+      fixedStyle: says(
+        "a `style` with only written-out values is a class that skips the tokens and the lint on them",
+        "write the Tailwind utilities in `class` (vv-tailwind); `style` is for a value worked out at run time, such as a width in percent",
+        "apps/web/src/ui/cx.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
       JSXAttribute(node) {
-        if (node.name.type !== "JSXIdentifier" || !rawClassAttrs.has(node.name.name)) return;
-        context.report({ node, messageId: "classAttr", data: { attr: node.name.name } });
+        if (node.name.type !== "JSXIdentifier") return;
+        const attr = node.name.name;
+        if (attr === "className" || attr === "classList") context.report({ node, messageId: "classAttr", data: { attr } });
+        if (attr !== "style" || node.value === null) return;
+        const value = node.value.type === "JSXExpressionContainer" ? node.value.expression : node.value;
+        if (fixedStyle(value)) context.report({ node, messageId: "fixedStyle" });
       },
     };
   },
@@ -429,20 +480,40 @@ const stylexOnly = defineRule({
 
 const designTokens = defineRule({
   meta: {
-    messages: Object.fromEntries(
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tokenAdvice has one key per TokenKind and no more
-      (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [
-        kind,
-        says(`this ${kind} is off the workbench's ladder, so it matches nothing beside it`, `use ${tokenAdvice[kind]}`, "docs/style/design.md"),
-      ]),
-    ),
+    messages: {
+      ...Object.fromEntries(
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tokenAdvice has one key per TokenKind and no more
+        (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [
+          kind,
+          says(`this ${kind} is off the workbench's ladder, so it matches nothing beside it`, `use ${tokenAdvice[kind]}`, "docs/style/design.md"),
+        ]),
+      ),
+      ...Object.fromEntries(
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- classAdvice has one key per ClassKind and no more
+        (Object.keys(classAdvice) as ClassKind[])
+          .filter((kind) => kind !== "hex")
+          .map((kind) => [
+            `${kind}Class`,
+            says(
+              `\`{{token}}\` puts a ${kind} off the workbench's ladder into a class, so it matches nothing beside it`,
+              `use ${classAdvice[kind]}`,
+              ".agents/skills/vv-tailwind/SKILL.md",
+            ),
+          ]),
+      ),
+    },
   },
   create(context) {
-    return stylexValues(context, ({ node, property, value, disabled }) => {
-      if (property === undefined) return;
-      const kind = offTokens(property, value, disabled);
-      if (kind) context.report({ node, messageId: kind });
-    });
+    return {
+      ...stylexValues(context, ({ node, property, value, disabled }) => {
+        if (property === undefined) return;
+        const kind = offTokens(property, value, disabled);
+        if (kind) context.report({ node, messageId: kind });
+      }),
+      ...classStrings((node, { token, kind }) => {
+        if (kind !== "hex") context.report({ node, messageId: `${kind}Class`, data: { token } });
+      }),
+    };
   },
 });
 
@@ -1951,6 +2022,7 @@ export default definePlugin({
     "no-cjk-literal": noCjkLiteral,
     "no-hex-color": noHexColor,
     "stylex-only": stylexOnly,
+    "style-attrs": styleAttrs,
     "no-copy-selector": noCopySelector,
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,

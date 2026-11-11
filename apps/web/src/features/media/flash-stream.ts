@@ -47,7 +47,6 @@ export async function* flashEvents(body: ReadableStream<Uint8Array>, signal: Abo
   try {
     while (!eof) {
       signal.throwIfAborted();
-      // oxlint-disable-next-line eslint/no-await-in-loop -- each read advances the same ordered byte stream
       const chunk = await reader.read();
       eof = chunk.done;
       pending += chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true });
@@ -140,7 +139,6 @@ export async function playFlashStream(id: string, context: AudioContext, signal:
             const duration = count / format.sampleRate;
             while (queued.length >= 32 || (queued.length > 0 && through - context.currentTime + duration > 5)) {
               const first = queued[0];
-              // oxlint-disable-next-line eslint/no-await-in-loop -- playback must free buffer capacity before scheduling more PCM
               if (first) await untilEnded(first.ended, signal);
             }
             signal.throwIfAborted();
@@ -182,7 +180,6 @@ export async function playFlashStream(id: string, context: AudioContext, signal:
     }
     while (queued.length > 0) {
       const first = queued[0];
-      // oxlint-disable-next-line eslint/no-await-in-loop -- completion waits for the remaining scheduled audio in order
       if (first) await untilEnded(first.ended, signal);
     }
     signal.throwIfAborted();

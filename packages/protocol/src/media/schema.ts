@@ -1,7 +1,8 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
+import { codePoints } from "../common/schema";
 import { MediaAudioJob } from "./audio-schema";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 import * as T from "./shapes";
@@ -12,183 +13,184 @@ const MediaImageMimeValues = ["image/png", "image/jpeg", "image/webp", "image/gi
 const MediaVideoMimeValues = ["video/mp4", "video/x-m4v", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"] as const;
 const MediaAudioMimeValues = ["audio/wav", "audio/mpeg", "audio/mp4", "audio/flac", "audio/ogg", "audio/webm"] as const;
 
-const InputName = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/^[^\p{Cc}/\\]+$/u), Schema.isPattern(/\S/u));
-export const MediaInputRequest = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal("image"),
+const InputName = z
+  .string()
+  .check(codePoints(1, 256))
+  .regex(/^[^\p{Cc}/\\]+$/u)
+  .regex(/\S/u);
+const mediaInputLimits: Record<T.MediaInputRequest["kind"], { readonly mimes: readonly string[]; readonly max: number }> = {
+  image: { mimes: MediaImageMimeValues, max: 30_000_000 },
+  video: { mimes: MediaVideoMimeValues, max: 200_000_000 },
+  audio: { mimes: MediaAudioMimeValues, max: 512_000_000 },
+};
+// One object, its kind's mime types and size limit checked after: an endpoint's input is an object, whose fields the
+// command line takes.
+export const MediaInputRequest = z
+  .object({
+    kind: z.enum(T.MediaInputKindValues),
     name: InputName,
-    mime: Schema.Literals(MediaImageMimeValues),
-    size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 30_000_000 })),
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("video"),
-    name: InputName,
-    mime: Schema.Literals(MediaVideoMimeValues),
-    size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 200_000_000 })),
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("audio"),
-    name: InputName,
-    mime: Schema.Literals(MediaAudioMimeValues),
-    size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 512_000_000 })),
-  }),
-]) satisfies Codec<T.MediaInputRequest>;
-export const MediaInput: Codec<T.MediaInput> = Schema.Struct({
-  id: Schema.String,
-  kind: Schema.Literals(T.MediaInputKindValues),
-  name: Schema.String,
-  mime: Schema.String,
-  size: Schema.Int,
-  phase: Schema.Literals(T.MediaInputPhaseValues),
-  hash: Schema.NullOr(Schema.String),
-  createdAt: Schema.Finite,
-  expiresAt: Schema.Finite,
-  canDelete: Schema.Boolean,
-});
+    mime: z.string(),
+    size: z.number().int().min(16),
+  })
+  .superRefine((r, ctx) => {
+    const limits = mediaInputLimits[r.kind];
+    if (!limits.mimes.includes(r.mime)) ctx.addIssue({ code: "custom", path: ["mime"], message: `not one of ${limits.mimes.join(", ")}` });
+    if (r.size > limits.max) ctx.addIssue({ code: "custom", path: ["size"], message: `at most ${limits.max}` });
+  }) satisfies Codec<T.MediaInputRequest>;
+export const MediaInput = z.object({
+  id: z.string(),
+  kind: z.enum(T.MediaInputKindValues),
+  name: z.string(),
+  mime: z.string(),
+  size: z.number().int(),
+  phase: z.enum(T.MediaInputPhaseValues),
+  hash: z.string().nullable(),
+  createdAt: z.number(),
+  expiresAt: z.number(),
+  canDelete: z.boolean(),
+}) satisfies Codec<T.MediaInput>;
 
-export const MediaImageRequest = Schema.Struct({
-  id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u)),
-  prompt: Schema.String.check(Schema.isBetweenCodePoints(1, 4000)),
-  format: Schema.Literals(T.MediaImageFormatValues),
-  width: Schema.Int,
-  height: Schema.Int,
-  seed: Schema.optionalKey(Schema.Int),
-  steps: Schema.optionalKey(Schema.Int),
-  guidance: Schema.optionalKey(Schema.Finite),
-  negativePrompt: Schema.optionalKey(Schema.String.check(Schema.isBetweenCodePoints(0, 4000))),
-  enhance: Schema.Boolean,
-  watermark: Schema.Boolean,
+export const MediaImageRequest = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u),
+  prompt: z.string().check(codePoints(1, 4000)),
+  format: z.enum(T.MediaImageFormatValues),
+  width: z.number().int(),
+  height: z.number().int(),
+  seed: z.exactOptional(z.number().int()),
+  steps: z.exactOptional(z.number().int()),
+  guidance: z.exactOptional(z.number()),
+  negativePrompt: z.exactOptional(z.string().check(codePoints(0, 4000))),
+  enhance: z.boolean(),
+  watermark: z.boolean(),
 }) satisfies Codec<T.MediaImageRequest>;
-export const MediaImageUsage: Codec<T.MediaImageUsage> = Schema.Struct({
-  images: Schema.Literal(1),
-  width: Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 2048 })),
-  height: Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 2048 })),
-});
-export const MediaImageJob: Codec<T.MediaImageJob> = Schema.Struct({
-  kind: Schema.Literal("image"),
-  id: Schema.String,
-  prompt: Schema.String,
-  model: Schema.String,
-  connection: Schema.String,
-  revision: Schema.Int,
+export const MediaImageUsage = z.object({
+  images: z.literal(1),
+  width: z.number().int().min(256).max(2048),
+  height: z.number().int().min(256).max(2048),
+}) satisfies Codec<T.MediaImageUsage>;
+export const MediaImageJob = z.object({
+  kind: z.literal("image"),
+  id: z.string(),
+  prompt: z.string(),
+  model: z.string(),
+  connection: z.string(),
+  revision: z.number().int(),
   source: MediaSource,
-  usage: Schema.optionalKey(MediaImageUsage),
+  usage: z.exactOptional(MediaImageUsage),
   phase: MediaPhase,
-  phaseText: Schema.String,
-  problem: Schema.String,
-  attachment: Schema.optionalKey(Attachment),
-  canCancel: Schema.Boolean,
-  canRetryDownload: Schema.Boolean,
-  createdAt: Schema.Finite,
-  updatedAt: Schema.Finite,
-});
-export const MediaUnderstandingRequest = Schema.Struct({
-  id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u)),
-  prompt: Schema.String.check(Schema.isBetweenCodePoints(1, 64000), Schema.isPattern(/\S/u)),
-  inputs: Schema.mutable(
-    Schema.Array(Schema.NonEmptyString).check(
-      Schema.isMinLength(1),
-      Schema.isMaxLength(5),
-      Schema.makeFilter((ids) => new Set(ids).size === ids.length),
-    ),
-  ),
-  connection: Schema.NonEmptyString,
-  revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  allowUpload: Schema.Literal(true),
-  maxOutputTokens: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 8192 })),
+  phaseText: z.string(),
+  problem: z.string(),
+  attachment: z.exactOptional(Attachment),
+  canCancel: z.boolean(),
+  canRetryDownload: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+}) satisfies Codec<T.MediaImageJob>;
+export const MediaUnderstandingRequest = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u),
+  prompt: z.string().check(codePoints(1, 64000)).regex(/\S/u),
+  inputs: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(5)
+    .refine((ids) => new Set(ids).size === ids.length),
+  connection: z.string().min(1),
+  revision: z.number().int().min(0),
+  allowUpload: z.literal(true),
+  maxOutputTokens: z.number().int().min(1).max(8192),
 }) satisfies Codec<T.MediaUnderstandingRequest>;
-export const MediaUnderstandingAuthorizationRequest = Schema.Struct({
-  ...MediaUnderstandingRequest.fields,
-  channel: Schema.NonEmptyString,
+export const MediaUnderstandingAuthorizationRequest = z.object({
+  ...MediaUnderstandingRequest.shape,
+  channel: z.string().min(1),
 }) satisfies Codec<T.MediaUnderstandingAuthorizationRequest>;
-const MediaUnderstandingAuthorization: Codec<T.MediaUnderstandingAuthorization> = Schema.Struct({
-  channel: Schema.NonEmptyString,
-  expiresAt: Schema.Finite,
-});
-const Tokens = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
-export const MediaUnderstandingResult: Codec<T.MediaUnderstandingResult> = Schema.Struct({
-  model: Schema.NonEmptyString,
-  text: Schema.String,
-  status: Schema.Literals(T.MediaUnderstandingStatusValues),
-  incompleteReason: Schema.NullOr(Schema.Literal("max_output_tokens")),
-  usage: Schema.Struct({ inputTokens: Tokens, outputTokens: Tokens, totalTokens: Tokens }),
-});
-export const MediaUnderstandingJob: Codec<T.MediaUnderstandingJob> = Schema.Struct({
-  kind: Schema.Literal("understanding"),
-  id: Schema.String,
-  prompt: Schema.String,
-  inputs: Schema.mutable(Schema.Array(MediaInputReference)),
-  model: Schema.String,
-  connection: Schema.String,
-  revision: Schema.Int,
+const MediaUnderstandingAuthorization = z.object({
+  channel: z.string().min(1),
+  expiresAt: z.number(),
+}) satisfies Codec<T.MediaUnderstandingAuthorization>;
+const Tokens = z.number().int().min(0);
+export const MediaUnderstandingResult = z.object({
+  model: z.string().min(1),
+  text: z.string(),
+  status: z.enum(T.MediaUnderstandingStatusValues),
+  incompleteReason: z.literal("max_output_tokens").nullable(),
+  usage: z.object({ inputTokens: Tokens, outputTokens: Tokens, totalTokens: Tokens }),
+}) satisfies Codec<T.MediaUnderstandingResult>;
+export const MediaUnderstandingJob = z.object({
+  kind: z.literal("understanding"),
+  id: z.string(),
+  prompt: z.string(),
+  inputs: z.array(MediaInputReference),
+  model: z.string(),
+  connection: z.string(),
+  revision: z.number().int(),
   source: MediaSource,
-  authorization: Schema.NullOr(MediaUnderstandingAuthorization),
-  phase: Schema.Literals(T.MediaUnderstandingPhaseValues),
-  phaseText: Schema.String,
-  problem: Schema.String,
-  result: Schema.NullOr(MediaUnderstandingResult),
-  cleanup: Schema.Literals(T.MediaCleanupValues),
-  cleanupText: Schema.String,
-  canCancel: Schema.Boolean,
-  canCleanup: Schema.Boolean,
-  canRetryDownload: Schema.Literal(false),
-  createdAt: Schema.Finite,
-  updatedAt: Schema.Finite,
-});
-export const MediaSpeechEvent: Codec<T.MediaSpeechEvent> = Schema.Union([
-  Schema.Struct({
-    type: Schema.Literal("format"),
-    sampleRate: Schema.Int.check(Schema.isBetween({ minimum: 8000, maximum: 192000 })),
-    channels: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 8 })),
-    bitDepth: Schema.Literal(16),
+  authorization: MediaUnderstandingAuthorization.nullable(),
+  phase: z.enum(T.MediaUnderstandingPhaseValues),
+  phaseText: z.string(),
+  problem: z.string(),
+  result: MediaUnderstandingResult.nullable(),
+  cleanup: z.enum(T.MediaCleanupValues),
+  cleanupText: z.string(),
+  canCancel: z.boolean(),
+  canCleanup: z.boolean(),
+  canRetryDownload: z.literal(false),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+}) satisfies Codec<T.MediaUnderstandingJob>;
+export const MediaSpeechEvent = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("format"),
+    sampleRate: z.number().int().min(8000).max(192000),
+    channels: z.number().int().min(1).max(8),
+    bitDepth: z.literal(16),
   }),
-  Schema.Struct({
-    type: Schema.Literal("audio"),
-    sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    audio: Schema.String.check(Schema.isMaxLength(2_000_000)),
+  z.object({
+    type: z.literal("audio"),
+    sequence: z.number().int().min(0),
+    audio: z.string().max(2_000_000),
   }),
-  Schema.Struct({ type: Schema.Literal("done") }),
-  Schema.Struct({ type: Schema.Literal("failed") }),
-]);
-export const MediaSpeechRequest = Schema.Struct({
-  id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u)),
-  text: Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u)),
-  voice: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u)),
-  format: Schema.Literals(T.MediaAudioFormatValues),
-  asynchronous: Schema.optionalKey(Schema.Boolean),
-  streaming: Schema.optionalKey(Schema.Boolean),
-  connection: Schema.NonEmptyString,
-  revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  z.object({ type: z.literal("done") }),
+  z.object({ type: z.literal("failed") }),
+]) satisfies Codec<T.MediaSpeechEvent>;
+export const MediaSpeechRequest = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u),
+  text: z.string().check(codePoints(1, 10000)).regex(/\S/u),
+  voice: z.string().regex(/^[a-zA-Z0-9_-]{1,256}$/u),
+  format: z.enum(T.MediaAudioFormatValues),
+  asynchronous: z.exactOptional(z.boolean()),
+  streaming: z.exactOptional(z.boolean()),
+  connection: z.string().min(1),
+  revision: z.number().int().min(0),
 }) satisfies Codec<T.MediaSpeechRequest>;
-export const MediaSpeechJob: Codec<T.MediaSpeechJob> = Schema.Struct({
-  kind: Schema.Literal("speech"),
-  id: Schema.String,
-  prompt: Schema.String,
-  model: Schema.String,
-  connection: Schema.String,
-  revision: Schema.Int,
+export const MediaSpeechJob = z.object({
+  kind: z.literal("speech"),
+  id: z.string(),
+  prompt: z.string(),
+  model: z.string(),
+  connection: z.string(),
+  revision: z.number().int(),
   source: MediaSource,
-  voice: Schema.String,
-  format: Schema.Literals(T.MediaAudioFormatValues),
-  contentType: Schema.optionalKey(Schema.String),
-  metadata: Schema.optionalKey(MediaAudioMetadata),
-  usage: Schema.optionalKey(MediaAudioUsage),
-  canResume: Schema.optionalKey(Schema.Boolean),
-  canRelease: Schema.Boolean,
+  voice: z.string(),
+  format: z.enum(T.MediaAudioFormatValues),
+  contentType: z.exactOptional(z.string()),
+  metadata: z.exactOptional(MediaAudioMetadata),
+  usage: z.exactOptional(MediaAudioUsage),
+  canResume: z.exactOptional(z.boolean()),
+  canRelease: z.boolean(),
   phase: MediaPhase,
-  phaseText: Schema.String,
-  problem: Schema.String,
-  attachment: Schema.optionalKey(Attachment),
-  resultInput: Schema.NullOr(MediaInputReference),
-  canCancel: Schema.Boolean,
-  canRetryDownload: Schema.Boolean,
-  createdAt: Schema.Finite,
-  updatedAt: Schema.Finite,
-});
-export const MediaJob: Codec<T.MediaJob> = Schema.Union([MediaImageJob, MediaUnderstandingJob, MediaSpeechJob, MediaAudioJob]);
-export const MediaJobRequest = Schema.Struct({ id: Schema.String }) satisfies Codec<T.MediaJobRequest>;
-export const FactMediaChanged: Codec<T.FactMediaChanged> = Schema.Struct({
-  type: Schema.Literal("mediaChanged"),
-  at: Schema.Finite,
-  jobs: Schema.mutable(Schema.Array(MediaJob)),
-});
+  phaseText: z.string(),
+  problem: z.string(),
+  attachment: z.exactOptional(Attachment),
+  resultInput: MediaInputReference.nullable(),
+  canCancel: z.boolean(),
+  canRetryDownload: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+}) satisfies Codec<T.MediaSpeechJob>;
+export const MediaJob = z.union([MediaImageJob, MediaUnderstandingJob, MediaSpeechJob, MediaAudioJob]) satisfies Codec<T.MediaJob>;
+export const MediaJobRequest = z.object({ id: z.string() }) satisfies Codec<T.MediaJobRequest>;
+export const FactMediaChanged = z.object({
+  type: z.literal("mediaChanged"),
+  at: z.number(),
+  jobs: z.array(MediaJob),
+}) satisfies Codec<T.FactMediaChanged>;

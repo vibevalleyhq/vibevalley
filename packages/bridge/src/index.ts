@@ -1,7 +1,7 @@
-import { Result, Schema } from "effect";
+import { z } from "zod";
 
-/** Any Schema a contract may hold: its type and its encoded form, needing no services. */
-export type AnyCodec = Schema.Codec<unknown, unknown>;
+/** Any Schema a contract may hold: what is read is its output, and what is sent is checked by it before it goes. */
+export type AnyCodec = z.ZodType;
 
 export interface Call<I extends AnyCodec, O extends AnyCodec> {
   readonly kind: "call";
@@ -33,22 +33,22 @@ export const push = <P extends AnyCodec>(payload: P): Push<P> => ({ kind: "push"
 
 export type CallName<C extends Contract> = { [K in keyof C]: C[K] extends Call<AnyCodec, AnyCodec> ? K : never }[keyof C] & string;
 export type PushName<C extends Contract> = { [K in keyof C]: C[K] extends Push<AnyCodec> ? K : never }[keyof C] & string;
-export type InputOf<C extends Contract, K extends keyof C> = C[K] extends Call<infer I, AnyCodec> ? I["Type"] : never;
-export type OutputOf<C extends Contract, K extends keyof C> = C[K] extends Call<AnyCodec, infer O> ? O["Type"] : never;
-export type PayloadOf<C extends Contract, K extends keyof C> = C[K] extends Push<infer P> ? P["Type"] : never;
+export type InputOf<C extends Contract, K extends keyof C> = C[K] extends Call<infer I, AnyCodec> ? z.output<I> : never;
+export type OutputOf<C extends Contract, K extends keyof C> = C[K] extends Call<AnyCodec, infer O> ? z.output<O> : never;
+export type PayloadOf<C extends Contract, K extends keyof C> = C[K] extends Push<infer P> ? z.output<P> : never;
 
 export type Handlers<C extends Contract> = { readonly [K in CallName<C>]: (input: InputOf<C, K>) => OutputOf<C, K> | Promise<OutputOf<C, K>> };
 
 export type Calls<C extends Contract> = { readonly [K in CallName<C>]: (input: InputOf<C, K>) => Promise<OutputOf<C, K>> };
 
-/** Input, output and payload are encoded by the contract's Schemas; a void one is left out. */
-export const BridgeMessage = Schema.Union([
-  Schema.Struct({ id: Schema.Finite, call: Schema.String, input: Schema.optionalKey(Schema.Unknown) }),
-  Schema.Struct({ id: Schema.Finite, ok: Schema.Literal(true), output: Schema.optionalKey(Schema.Unknown) }),
-  Schema.Struct({ id: Schema.Finite, ok: Schema.Literal(false), error: Schema.String }),
-  Schema.Struct({ push: Schema.String, payload: Schema.optionalKey(Schema.Unknown) }),
+/** Input, output and payload as the contract's Schemas checked them; a void one is left out. */
+export const BridgeMessage = z.union([
+  z.object({ id: z.number(), call: z.string(), input: z.exactOptional(z.unknown()) }),
+  z.object({ id: z.number(), ok: z.literal(true), output: z.exactOptional(z.unknown()) }),
+  z.object({ id: z.number(), ok: z.literal(false), error: z.string() }),
+  z.object({ push: z.string(), payload: z.exactOptional(z.unknown()) }),
 ]);
-export type BridgeMessage = typeof BridgeMessage.Type;
+export type BridgeMessage = z.infer<typeof BridgeMessage>;
 
 /** A link that carries text (a WebView) does the JSON itself. */
 export interface Link {
@@ -57,13 +57,17 @@ export interface Link {
 }
 
 /** A call the other side refused, with its reason: its input did not decode, its handler failed, or the bridge closed. */
-// A call's Promise rejects with it, in the page and in the mobile shell, neither of which runs Effect.
-// @effect-diagnostics-next-line extendsNativeError:off
 export class BridgeError extends Error {
   override readonly name = "BridgeError";
 }
 
-const readMessage = Schema.decodeUnknownOption(BridgeMessage);
+const readMessage = (raw: unknown) => BridgeMessage.safeParse(raw);
+
+/** What goes out is the value itself, once its Schema takes it: the contracts' shapes are their own wire form (plain JSON). */
+const checked = (schema: AnyCodec, value: unknown): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: z.ZodError } => {
+  const got = schema.safeParse(value);
+  return got.success ? { ok: true, value } : { ok: false, error: got.error };
+};
 const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const entryOf = (contract: Contract, name: string) => (Object.hasOwn(contract, name) ? contract[name] : undefined);
@@ -78,16 +82,16 @@ export function serve<C extends Contract>(contract: C, link: Link, handlers: Han
     const byName = handlers as unknown as Readonly<Record<string, ((input: unknown) => unknown) | undefined>>;
     const handler = Object.hasOwn(byName, name) ? byName[name] : undefined;
     if (entry?.kind !== "call" || handler === undefined) return refuse(new BridgeError(`no call ${name}`));
-    const read = Schema.decodeUnknownResult(entry.input)(input);
-    if (Result.isFailure(read)) return refuse(read.failure);
+    const read = entry.input.safeParse(input);
+    if (!read.success) return refuse(read.error);
     let output: unknown;
     try {
-      output = await handler(read.success);
+      output = await handler(read.data);
     } catch (e) {
       return refuse(e);
     }
-    const encoded = Schema.encodeUnknownResult(entry.output)(output);
-    return Result.isFailure(encoded) ? refuse(encoded.failure) : { id, ok: true, output: encoded.success };
+    const sent = checked(entry.output, output);
+    return sent.ok ? { id, ok: true, output: sent.value } : refuse(sent.error);
   };
   const answer = async (id: number, name: string, input: unknown) => {
     const reply = await replyTo(id, name, input);
@@ -95,15 +99,17 @@ export function serve<C extends Contract>(contract: C, link: Link, handlers: Han
   };
   const stop = link.receive((raw) => {
     const m = readMessage(raw);
-    if (closed || m._tag === "None" || !("call" in m.value)) return;
-    void answer(m.value.id, m.value.call, m.value.input);
+    if (closed || !m.success || !("call" in m.data)) return;
+    void answer(m.data.id, m.data.call, m.data.input);
   });
   return {
     push: <K extends PushName<C>>(name: K, payload: PayloadOf<C, K>) => {
       const entry = entryOf(contract, name);
       if (closed || entry?.kind !== "push") return;
-      // A payload its own Schema cannot encode is the caller's mistake: it throws to the one pushing it.
-      link.send({ push: name, payload: Result.getOrThrow(Schema.encodeUnknownResult(entry.payload)(payload)) });
+      // A payload its own Schema does not take is the caller's mistake: it throws to the one pushing it.
+      const sent = checked(entry.payload, payload);
+      if (!sent.ok) throw sent.error;
+      link.send({ push: name, payload: sent.value });
     },
     close: () => {
       closed = true;
@@ -124,16 +130,16 @@ export function connect<C extends Contract>(contract: C, link: Link) {
 
   const stop = link.receive((raw) => {
     const read = readMessage(raw);
-    if (closed || read._tag === "None") return;
-    const m = read.value;
+    if (closed || !read.success) return;
+    const m = read.data;
     if ("push" in m) {
       const entry = entryOf(contract, m.push);
-      const decoded = entry?.kind === "push" ? Schema.decodeUnknownOption(entry.payload)(m.payload) : undefined;
-      if (decoded?._tag !== "Some") return;
+      const decoded = entry?.kind === "push" ? entry.payload.safeParse(m.payload) : undefined;
+      if (decoded?.success !== true) return;
       // One listener that throws does not keep the push from the others.
       for (const fn of listeners.get(m.push) ?? [])
         try {
-          fn(decoded.value);
+          fn(decoded.data);
         } catch (e) {
           queueMicrotask(() => {
             throw e;
@@ -147,16 +153,16 @@ export function connect<C extends Contract>(contract: C, link: Link) {
     waiting.delete(m.id);
     clearTimeout(w.timer);
     if (!m.ok) return w.reject(new BridgeError(m.error));
-    const output = Schema.decodeUnknownResult(w.output)(m.output);
-    if (Result.isFailure(output)) w.reject(new BridgeError(reasonOf(output.failure)));
-    else w.resolve(output.success);
+    const output = w.output.safeParse(m.output);
+    if (!output.success) w.reject(new BridgeError(reasonOf(output.error)));
+    else w.resolve(output.data);
   });
 
   const ask = (name: string, entry: Call<AnyCodec, AnyCodec>, input: unknown) =>
     new Promise<unknown>((resolve, reject) => {
       if (closed) return reject(new BridgeError("the bridge is closed"));
-      const encoded = Schema.encodeUnknownResult(entry.input)(input);
-      if (Result.isFailure(encoded)) return reject(encoded.failure);
+      const encoded = checked(entry.input, input);
+      if (!encoded.ok) return reject(encoded.error);
       const id = next++;
       const timeoutMs = entry.timeoutMs ?? callTimeoutMs;
       const timer =
@@ -167,7 +173,7 @@ export function connect<C extends Contract>(contract: C, link: Link) {
               reject(new BridgeError(`${name} was not answered in ${timeoutMs} ms`));
             }, timeoutMs);
       waiting.set(id, { output: entry.output, resolve, reject, ...(timer ? { timer } : {}) });
-      link.send({ id, call: name, input: encoded.success });
+      link.send({ id, call: name, input: encoded.value });
     });
 
   const methods = Object.fromEntries(

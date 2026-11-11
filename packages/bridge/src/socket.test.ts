@@ -3,15 +3,15 @@ import { createServer, connect as dial, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Schema } from "effect";
 import { afterEach, expect, test } from "vite-plus/test";
+import { z } from "zod";
 
 import { call, connect, push, serve } from "./index";
 import { socketLink } from "./socket";
 
 const contract = {
-  open: call({ input: Schema.String, output: Schema.String }),
-  opened: push(Schema.String),
+  open: call({ input: z.string(), output: z.string() }),
+  opened: push(z.string()),
 };
 
 let server: Server | undefined;

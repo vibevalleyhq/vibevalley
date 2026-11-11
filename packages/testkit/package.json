@@ -9,6 +9,7 @@
     }
   },
   "dependencies": {
+    "@vibevalley/async": "workspace:*",
     "effect": "catalog:",
     "vite": "catalog:"
   },

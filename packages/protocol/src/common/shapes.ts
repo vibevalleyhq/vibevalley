@@ -1,16 +1,18 @@
-import type { Brand } from "effect";
+declare const brand: unique symbol;
+/** A string that is one kind of id: two kinds do not mix, and a plain string becomes one only where the kind is known (schema.ts). */
+export type Branded<K extends string> = string & { readonly [brand]: K };
 
 /** An issue's id (not its number). */
-export type IssueId = string & Brand.Brand<"IssueId">;
+export type IssueId = Branded<"IssueId">;
 /** A session's id: w1, w2…, for the whole life of the farm. */
-export type SessionId = string & Brand.Brand<"SessionId">;
+export type SessionId = Branded<"SessionId">;
 /** An artifact's id. */
-export type ArtifactId = string & Brand.Brand<"ArtifactId">;
+export type ArtifactId = Branded<"ArtifactId">;
 /** A block's id, within its artifact: a block op names the block it is for, never its artifact. */
-export type BlockId = string & Brand.Brand<"BlockId">;
+export type BlockId = Branded<"BlockId">;
 /** A suggested change to a block. */
-export type SuggestionId = string & Brand.Brand<"SuggestionId">;
-export type MessageId = string & Brand.Brand<"MessageId">;
+export type SuggestionId = Branded<"SuggestionId">;
+export type MessageId = Branded<"MessageId">;
 
 /** The built-in orchestrator's profile id. */
 export const defaultOrchestrator = "orchestrator";

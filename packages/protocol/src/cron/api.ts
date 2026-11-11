@@ -1,19 +1,19 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-const cronDeleteInput = input({ id: Schema.String });
+const cronDeleteInput = input({ id: z.string() });
 
-export interface CronHandlers<R = never> {
-  readonly "cron.create": (a: T.CronRequest) => Effect.Effect<T.Cron, ApiError, R>;
-  readonly "cron.list": () => Effect.Effect<T.Cron[], ApiError, R>;
+export interface CronHandlers {
+  readonly "cron.create": (a: T.CronRequest) => Promise<T.Cron>;
+  readonly "cron.list": () => Promise<T.Cron[]>;
   /** Only what the body gives changes. */
-  readonly "cron.update": (a: { readonly id: string } & T.CronUpdate) => Effect.Effect<void, ApiError, R>;
-  readonly "cron.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  readonly "cron.update": (a: { readonly id: string } & T.CronUpdate) => Promise<void>;
+  readonly "cron.delete": (a: { readonly id: string }) => Promise<void>;
   /** What delete would do, refused as it would be; nothing changes. */
-  readonly "cron.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "cron.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
 }
 
 export const cronEndpoints: readonly Endpoint[] = [
@@ -28,13 +28,13 @@ export const cronEndpoints: readonly Endpoint[] = [
     op: "cron.list",
     about: [],
     input: undefined,
-    result: Schema.mutable(Schema.Array(S.Cron)),
+    result: z.array(S.Cron),
     can: ["user", "remote", "orchestrator"],
   },
   {
     op: "cron.update",
     about: ["id"],
-    input: input({ id: Schema.String }, S.CronUpdate),
+    input: input({ id: z.string() }, S.CronUpdate),
     result: undefined,
     can: ["user", "remote"],
   },

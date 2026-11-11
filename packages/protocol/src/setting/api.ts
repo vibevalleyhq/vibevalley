@@ -1,14 +1,12 @@
-import { type Effect } from "effect";
-
-import { type ApiError, type Endpoint } from "../endpoint";
+import { type Endpoint } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-export interface SettingHandlers<R = never> {
-  readonly "setting.get": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
+export interface SettingHandlers {
+  readonly "setting.get": () => Promise<T.SettingsStatus>;
   /** The first thing Save would refuse in these settings, without saving them. */
-  readonly "setting.validate": (a: T.SettingsUpdate) => Effect.Effect<T.Validation, ApiError, R>;
-  readonly "setting.update": (a: T.SettingsUpdate) => Effect.Effect<T.SettingsStatus, ApiError, R>;
+  readonly "setting.validate": (a: T.SettingsUpdate) => Promise<T.Validation>;
+  readonly "setting.update": (a: T.SettingsUpdate) => Promise<T.SettingsStatus>;
 }
 
 export const settingEndpoints: readonly Endpoint[] = [

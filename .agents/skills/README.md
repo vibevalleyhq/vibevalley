@@ -13,5 +13,6 @@
 | [vv-simplify](.agents/skills/vv-simplify/SKILL.md) | 想找一块代码里能简化的地方 | 一份核实过、排好序的清单：每处删掉什么、调用方少知道什么、靠哪个测试证明没变坏；用户点了再改 |
 | [vv-governance](.agents/skills/vv-governance/SKILL.md) | 要加一条规矩或一个检查；评审一块代码有没有在变坏；写计划前问清边界；做纯重构；一次机械的改动跨很多文件；用户提到白皮书、治理、五层金字塔、十条铁律 | 新检查用了最便宜的手段、失败时说得出怎么改；评审按六种病逐条查过；《AI 智能体时代的软件维护与工程治理白皮书》的每个要点在这里已有、已做、以后做还是不做，同目录的 `whitepaper.md` 逐条对照 |
 | [vv-stylex](.agents/skills/vv-stylex/SKILL.md) | 写、改、评审原生 StyleX 样式；设计组件样式接口与 `.stylex.ts` 令牌；排查动态变量、条件、主题、marker、关键帧动画和 CSS 层顺序 | 样式沿用宿主令牌与 `tokens.stylex.ts`，经 Solid 对象样式边界组合，无工具类或编译期残留；门禁与生产编译一次通过 |
+| [vv-typescript](.agents/skills/vv-typescript/SKILL.md) | 写、改、评审服务端和各个包的 TypeScript（没有 Effect）；把还没改的 Effect 代码改写掉；评审一段异步代码（打断、收尾、并发、错误） | 服务是工厂加接口、依赖从参数进来；拒绝抛 ApiError；长操作收 AbortSignal、后台任务进 TaskGroup、资源用 await using；运行时校验只用 Zod；库只经生成的函数 |
 | [vv-effect](.agents/skills/vv-effect/SKILL.md) | 写、改、评审用到 Effect 的代码；`effect:check` 报了 Effect 的诊断；不确定一个 API 在 v4 叫什么 | 照官方指南（`node_modules/effect/AGENTS.md`）和本仓库的约定写：服务、库、文件、时间、Promise 的交界、错误、命名、测试；评审时查出检查看不到的（错误的原因丢了、该说的错误变成了缺陷、fiber 不归服务的作用域） |
 | [effect-ts](.agents/skills/effect-ts/SKILL.md) | 给一个用 Effect 的仓库做准备：装 `effect`、在 AGENTS.md 里指到它自带的 `AGENTS.md` 和源码（照抄自 [Effect-TS/skills](https://github.com/Effect-TS/skills/tree/main/skills/effect-ts)，不改） | 写 Effect 的 agent 先读 Effect 自己的指南，再查 `node_modules/effect/src` |

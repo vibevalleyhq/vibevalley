@@ -57,6 +57,7 @@
     }
   },
   "dependencies": {
+    "@vibevalley/async": "workspace:*",
     "@vibevalley/provider": "workspace:*",
     "ai": "catalog:",
     "effect": "catalog:"

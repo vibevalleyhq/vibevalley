@@ -1,121 +1,122 @@
 import { randomUUID } from "node:crypto";
 import { openAsBlob } from "node:fs";
+import { link, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { Clock, Effect, FiberHandle, FileSystem, PlatformError, Schema, Semaphore } from "effect";
+import { type Clock, Semaphore } from "@vibevalley/async";
 
-import { Inconsistent, messageOf } from "#/base/errors.ts";
+import { errnoOf, Inconsistent, messageOf } from "#/base/errors.ts";
 
-// FileSystem has no Blob adapter; the native Blob keeps multipart uploads disk-backed rather than buffering the file.
-export const fileBlob = Effect.fn("Files.blob")((path: string, type: string) =>
-  Effect.tryPromise({
-    try: () => openAsBlob(path, { type }),
-    catch: (cause) => PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "openAsBlob", pathOrDescriptor: path, cause }),
-  }),
-);
+import type { Logger } from "./log.ts";
 
-export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand: unique symbol }>()("NotWritten", {
-  message: Schema.String,
-  cause: Schema.Defect(),
-}) {}
+// The native Blob keeps multipart uploads disk-backed rather than buffering the file.
+export const fileBlob = (path: string, type: string): Promise<Blob> => openAsBlob(path, { type });
 
-const notWritten = (cause: unknown) => NotWritten.make({ message: messageOf(cause), cause });
+export class NotWritten extends Error {
+  override readonly name = "NotWritten";
+}
+
+const notWritten = (cause: unknown) => new NotWritten(messageOf(cause), { cause });
 
 // Publish hash-named files only after writing all bytes; cancellation must not leave a partial file at the hash.
-export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, bytes: Uint8Array) {
-  const fs = yield* FileSystem.FileSystem;
-  yield* fs.makeDirectory(dirname(path), { recursive: true });
-  yield* Effect.scoped(
-    Effect.gen(function* () {
-      const directory = yield* fs.makeTempDirectoryScoped({ directory: dirname(path), prefix: ".upload-" });
+export async function writeOnce(path: string, bytes: Uint8Array): Promise<void> {
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    const directory = await mkdtemp(join(dirname(path), ".upload-"));
+    try {
       const temporary = join(directory, "asset");
-      yield* fs.writeFile(temporary, bytes, { mode: 0o600 });
-      yield* fs.link(temporary, path).pipe(
-        Effect.catchIf(
-          (error) => error.reason._tag === "AlreadyExists",
-          () => Effect.void,
-        ),
-      );
-    }),
-  );
-}, Effect.mapError(notWritten));
+      await writeFile(temporary, bytes, { mode: 0o600 });
+      await link(temporary, path).catch((e: unknown) => {
+        if (errnoOf(e) !== "EEXIST") throw e;
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  } catch (e) {
+    throw notWritten(e);
+  }
+}
 
 /** A user's file (config.json, settings.json); one whose read fails is set aside and read as undefined. */
-export const readOrSetAside = <A, E>(
+export async function readOrSetAside<A>(
   file: string,
-  read: (text: string) => Effect.Effect<A, E>,
+  read: (text: string) => A | Promise<A>,
   startsFrom: string,
-): Effect.Effect<A | undefined, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const text = yield* fs.readFileString(file).pipe(
-      Effect.map((t): string | undefined => t),
-      Effect.catchIf(
-        (e) => e.reason._tag === "NotFound",
-        () => Effect.undefined,
-      ),
-      Effect.orDie,
-    );
-    if (text === undefined) return undefined;
-    return yield* read(text).pipe(
-      Effect.catch(
-        Effect.fnUntraced(function* (e) {
-          const failure = messageOf(e);
-          const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
-          yield* fs
-            .rename(file, aside)
-            .pipe(
-              Effect.catch((moved) =>
-                Effect.die(Inconsistent.make({ message: `${file} cannot be read, and could not be kept aside as ${aside}: ${moved.message}` })),
-              ),
-            );
-          yield* Effect.logWarning(`${file} could not be read (${failure}): kept as ${aside}, ${startsFrom}`);
-          return undefined;
-        }),
-      ),
-    );
-  });
+  deps: { readonly clock: Clock; readonly log: Logger },
+): Promise<A | undefined> {
+  let text: string;
+  try {
+    text = await readFile(file, "utf8");
+  } catch (e) {
+    if (errnoOf(e) === "ENOENT") return undefined;
+    throw e;
+  }
+  try {
+    return await read(text);
+  } catch (e) {
+    const failure = messageOf(e);
+    const aside = `${file}.unreadable-${deps.clock.now()}`;
+    try {
+      await rename(file, aside);
+    } catch (moved) {
+      throw new Inconsistent(`${file} cannot be read, and could not be kept aside as ${aside}: ${messageOf(moved)}`, { cause: moved });
+    }
+    deps.log.warn(`${file} could not be read (${failure}): kept as ${aside}, ${startsFrom}`);
+    return undefined;
+  }
+}
 
 /** A file kept by the server: one write at a time, the last asked for wins. */
 export interface KeptFile {
   /** Writes body now, after the write in flight: what is kept only once it is on disk (a profile, a setting). */
-  readonly save: (body: string) => Effect.Effect<void, NotWritten>;
-  /** Writes the latest body soon (after the wait), the changes in between joining that write. and once more as the scope closes, so the last state is on disk. */
+  readonly save: (body: string) => Promise<void>;
+  /** Writes the latest body soon (after the wait), the changes in between joining that write. */
   readonly soon: (body: () => string) => void;
+  /** The write soon asked for, now: its service's close calls it last, so the last state is on disk. */
+  readonly close: () => Promise<void>;
 }
 
 /** soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. */
-export const keptFile = Effect.fn("Files.keptFile")(function* (path: string, options: { readonly mode?: number; readonly soonMs?: number } = {}) {
-  const fs = yield* FileSystem.FileSystem;
-  const one = yield* Semaphore.make(1);
+export function keptFile(
+  path: string,
+  deps: { readonly clock: Clock; readonly log: Logger },
+  options: { readonly mode?: number; readonly soonMs?: number } = {},
+): KeptFile {
+  const one = new Semaphore(1);
   const write = (data: string) =>
-    one.withPermits(1)(
-      Effect.gen(function* () {
-        yield* fs.makeDirectory(dirname(path), { recursive: true });
+    one.with(async () => {
+      try {
+        await mkdir(dirname(path), { recursive: true });
         const temp = join(dirname(path), `${basename(path)}.${randomUUID()}.tmp`);
-        yield* fs.writeFileString(temp, data, { mode: options.mode ?? 0o644 });
-        yield* fs.rename(temp, path);
-      }).pipe(Effect.mapError(notWritten)),
-    );
+        await writeFile(temp, data, { mode: options.mode ?? 0o644 });
+        await rename(temp, path);
+      } catch (e) {
+        throw notWritten(e);
+      }
+    });
   let pending: (() => string) | undefined;
-  const flush = Effect.suspend(() => {
+  let waiting: AbortController | undefined;
+  const flush = async () => {
+    waiting = undefined;
     const body = pending;
     pending = undefined;
-    return body ? write(body()) : Effect.void;
-  }).pipe(Effect.catch((e) => Effect.logError(`vibevalley: ${path} could not be saved`, e)));
-  const waiting = yield* FiberHandle.make();
-  const start = yield* FiberHandle.runtime(waiting)();
-  // Added before the finalizers of the service that keeps it, so it runs after them: its state as it leaves it.
-  yield* Effect.addFinalizer(() => Effect.andThen(FiberHandle.clear(waiting), flush));
+    if (body) await write(body()).catch((e: unknown) => deps.log.error(`${path} could not be saved`, e));
+  };
   return {
-    save: (body) =>
-      Effect.suspend(() => {
-        pending = undefined;
-        return write(body);
-      }),
+    save: (body) => {
+      pending = undefined;
+      return write(body);
+    },
     soon: (body) => {
       pending = body;
-      start(Effect.delay(flush, options.soonMs ?? 0), { onlyIfMissing: true });
+      if (waiting !== undefined) return;
+      const wait = new AbortController();
+      waiting = wait;
+      void deps.clock.sleep(options.soonMs ?? 0, wait.signal).then(flush, () => undefined);
     },
-  } satisfies KeptFile;
-});
+    close: async () => {
+      waiting?.abort();
+      await flush();
+    },
+  };
+}

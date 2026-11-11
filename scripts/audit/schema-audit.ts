@@ -252,7 +252,7 @@ export function reviewSchemaSources(sources: ReadonlyMap<string, string>): Findi
       }
     };
     if (path.startsWith("packages/protocol/src/") || path.startsWith("apps/server/src/"))
-      addMatches("inline-literals", /Schema\s*\.\s*Literals\s*\(\s*\[[^\]]+\]/gu);
+      addMatches("inline-literals", /(?:Schema\s*\.\s*Literals|z\s*\.\s*enum)\s*\(\s*\[[^\]]+\]/gu);
     if (path.startsWith("packages/protocol/src/") && path.endsWith("shapes.ts")) addMatches("inline-union", /:\s*"[^"]+"\s*\|\s*"[^"]+"/gu);
     if (path.startsWith("apps/server/src/")) {
       addMatches("db-schema-reuse", /\b(?:json(?:OrNone|Of)|storedJsonOrUndefined)\s*\(\s*S\.\w+/gu);

@@ -1,236 +1,236 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes";
 
-const pkmProps = Schema.Record(Schema.String, Schema.String);
-const PkmTier: Codec<T.PkmTier> = Schema.Literals(T.PkmTierValues);
-const PkmMarker: Codec<T.PkmMarker> = Schema.Literals(T.PkmMarkerValues);
-const PkmPriority: Codec<T.PkmPriority> = Schema.Literals(T.PkmPriorityValues);
+const pkmProps = z.record(z.string(), z.string());
+const PkmTier = z.enum(T.PkmTierValues) satisfies Codec<T.PkmTier>;
+const PkmMarker = z.enum(T.PkmMarkerValues) satisfies Codec<T.PkmMarker>;
+const PkmPriority = z.enum(T.PkmPriorityValues) satisfies Codec<T.PkmPriority>;
 
-const PkmBlock: Codec<T.PkmBlock> = Schema.Struct({
-  id: Schema.String,
-  parent: Schema.optionalKey(Schema.String),
-  depth: Schema.Int,
-  marker: Schema.optionalKey(PkmMarker),
-  priority: Schema.optionalKey(PkmPriority),
-  body: Schema.String,
+const PkmBlock = z.object({
+  id: z.string(),
+  parent: z.exactOptional(z.string()),
+  depth: z.number().int(),
+  marker: z.exactOptional(PkmMarker),
+  priority: z.exactOptional(PkmPriority),
+  body: z.string(),
   props: pkmProps,
-  path: Schema.String,
-});
+  path: z.string(),
+}) satisfies Codec<T.PkmBlock>;
 
-const PkmPageSummary: Codec<T.PkmPageSummary> = Schema.Struct({
-  slug: Schema.String,
-  title: Schema.String,
+const PkmPageSummary = z.object({
+  slug: z.string(),
+  title: z.string(),
   tier: PkmTier,
-  file: Schema.String,
-  tldr: Schema.String,
-  updated: Schema.Finite,
-  open: Schema.Int,
-  day: Schema.optionalKey(Schema.String),
-});
+  file: z.string(),
+  tldr: z.string(),
+  updated: z.number(),
+  open: z.number().int(),
+  day: z.exactOptional(z.string()),
+}) satisfies Codec<T.PkmPageSummary>;
 
-export const PkmVault: Codec<T.PkmVault> = Schema.Struct({
-  root: Schema.String,
-  pages: Schema.mutable(Schema.Array(PkmPageSummary)),
-});
+export const PkmVault = z.object({
+  root: z.string(),
+  pages: z.array(PkmPageSummary),
+}) satisfies Codec<T.PkmVault>;
 
-export const PkmPage: Codec<T.PkmPage> = Schema.Struct({
-  slug: Schema.String,
-  title: Schema.String,
+export const PkmPage = z.object({
+  slug: z.string(),
+  title: z.string(),
   tier: PkmTier,
-  file: Schema.String,
+  file: z.string(),
   props: pkmProps,
-  tldr: Schema.String,
-  blocks: Schema.mutable(Schema.Array(PkmBlock)),
-  updated: Schema.Finite,
-});
+  tldr: z.string(),
+  blocks: z.array(PkmBlock),
+  updated: z.number(),
+}) satisfies Codec<T.PkmPage>;
 
-const PkmTransclusion: Codec<T.PkmTransclusion> = Schema.Struct({
-  block: Schema.String,
-  found: Schema.Boolean,
-  circular: Schema.Boolean,
-  page: Schema.optionalKey(Schema.String),
-  pageTitle: Schema.optionalKey(Schema.String),
-  body: Schema.String,
-});
+const PkmTransclusion = z.object({
+  block: z.string(),
+  found: z.boolean(),
+  circular: z.boolean(),
+  page: z.exactOptional(z.string()),
+  pageTitle: z.exactOptional(z.string()),
+  body: z.string(),
+}) satisfies Codec<T.PkmTransclusion>;
 
-const PkmBacklink: Codec<T.PkmBacklink> = Schema.Struct({
-  block: Schema.String,
-  page: Schema.String,
-  pageTitle: Schema.String,
+const PkmBacklink = z.object({
+  block: z.string(),
+  page: z.string(),
+  pageTitle: z.string(),
   tier: PkmTier,
-  path: Schema.String,
-  body: Schema.String,
-});
+  path: z.string(),
+  body: z.string(),
+}) satisfies Codec<T.PkmBacklink>;
 
-const pkmBacklinks = Schema.mutable(Schema.Array(PkmBacklink));
-const PkmBacklinks: Codec<T.PkmBacklinks> = Schema.Struct({
+const pkmBacklinks = z.array(PkmBacklink);
+const PkmBacklinks = z.object({
   projects: pkmBacklinks,
   journals: pkmBacklinks,
   areas: pkmBacklinks,
   archives: pkmBacklinks,
-});
+}) satisfies Codec<T.PkmBacklinks>;
 
-export const PkmComment: Codec<T.PkmComment> = Schema.Struct({
-  id: Schema.String,
-  page: Schema.String,
-  block: Schema.String,
-  span: Schema.optionalKey(Schema.String),
-  by: Schema.String,
-  body: Schema.String,
-  status: Schema.Literals(T.PkmCommentStatusValues),
-  suggested: Schema.optionalKey(Schema.String),
-  rationale: Schema.optionalKey(Schema.String),
-  created: Schema.Finite,
-  resolved: Schema.optionalKey(Schema.Finite),
-});
+export const PkmComment = z.object({
+  id: z.string(),
+  page: z.string(),
+  block: z.string(),
+  span: z.exactOptional(z.string()),
+  by: z.string(),
+  body: z.string(),
+  status: z.enum(T.PkmCommentStatusValues),
+  suggested: z.exactOptional(z.string()),
+  rationale: z.exactOptional(z.string()),
+  created: z.number(),
+  resolved: z.exactOptional(z.number()),
+}) satisfies Codec<T.PkmComment>;
 
-export const PkmPageView: Codec<T.PkmPageView> = Schema.Struct({
+export const PkmPageView = z.object({
   page: PkmPage,
-  transclusions: Schema.mutable(Schema.Array(PkmTransclusion)),
+  transclusions: z.array(PkmTransclusion),
   backlinks: PkmBacklinks,
-  comments: Schema.mutable(Schema.Array(PkmComment)),
-});
+  comments: z.array(PkmComment),
+}) satisfies Codec<T.PkmPageView>;
 
-export const PkmPageRequest: Codec<T.PkmPageRequest> = Schema.Struct({
-  title: Schema.String,
-  tier: Schema.optionalKey(PkmTier),
-  props: Schema.optionalKey(pkmProps),
-  markdown: Schema.optionalKey(Schema.String),
-});
+export const PkmPageRequest = z.object({
+  title: z.string(),
+  tier: z.exactOptional(PkmTier),
+  props: z.exactOptional(pkmProps),
+  markdown: z.exactOptional(z.string()),
+}) satisfies Codec<T.PkmPageRequest>;
 
-export const PkmPageRef: Codec<T.PkmPageRef> = Schema.Struct({ page: Schema.String });
+export const PkmPageRef = z.object({ page: z.string() }) satisfies Codec<T.PkmPageRef>;
 
-export const PkmMoveRequest: Codec<T.PkmMoveRequest> = Schema.Struct({ page: Schema.String, tier: PkmTier });
+export const PkmMoveRequest = z.object({ page: z.string(), tier: PkmTier }) satisfies Codec<T.PkmMoveRequest>;
 
 const pkmNewBlock = {
-  id: Schema.optionalKey(Schema.String),
-  body: Schema.String,
-  marker: Schema.optionalKey(PkmMarker),
-  priority: Schema.optionalKey(PkmPriority),
-  props: Schema.optionalKey(pkmProps),
+  id: z.exactOptional(z.string()),
+  body: z.string(),
+  marker: z.exactOptional(PkmMarker),
+  priority: z.exactOptional(PkmPriority),
+  props: z.exactOptional(pkmProps),
 };
-const pkmOn = { block: Schema.String };
-const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
-  Schema.Struct({ op: Schema.tag("append"), ...pkmNewBlock }),
-  Schema.Struct({ op: Schema.tag("insert_before"), ...pkmOn, ...pkmNewBlock }),
-  Schema.Struct({ op: Schema.tag("insert_after"), ...pkmOn, ...pkmNewBlock }),
-  Schema.Struct({ op: Schema.tag("insert_child"), ...pkmOn, ...pkmNewBlock }),
-  Schema.Struct({
-    op: Schema.tag("update"),
+const pkmOn = { block: z.string() };
+const PkmBlockOp = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("append"), ...pkmNewBlock }),
+  z.object({ op: z.literal("insert_before"), ...pkmOn, ...pkmNewBlock }),
+  z.object({ op: z.literal("insert_after"), ...pkmOn, ...pkmNewBlock }),
+  z.object({ op: z.literal("insert_child"), ...pkmOn, ...pkmNewBlock }),
+  z.object({
+    op: z.literal("update"),
     ...pkmOn,
-    body: Schema.optionalKey(Schema.String),
-    priority: Schema.optionalKey(PkmPriority),
-    props: Schema.optionalKey(pkmProps),
+    body: z.exactOptional(z.string()),
+    priority: z.exactOptional(PkmPriority),
+    props: z.exactOptional(pkmProps),
   }),
-  Schema.Struct({ op: Schema.tag("set_marker"), ...pkmOn, marker: Schema.optionalKey(PkmMarker) }),
-  Schema.Struct({ op: Schema.tag("toggle_marker"), ...pkmOn }),
-  Schema.Struct({ op: Schema.tag("delete"), ...pkmOn }),
-  Schema.Struct({ op: Schema.tag("indent"), ...pkmOn }),
-  Schema.Struct({ op: Schema.tag("outdent"), ...pkmOn }),
-  Schema.Struct({ op: Schema.tag("move"), ...pkmOn, direction: Schema.Literals(PkmMoveDirectionValues) }),
-  Schema.Struct({ op: Schema.tag("move_to"), ...pkmOn, target: Schema.String, at: Schema.Literals(PkmMoveAtValues) }),
-]);
+  z.object({ op: z.literal("set_marker"), ...pkmOn, marker: z.exactOptional(PkmMarker) }),
+  z.object({ op: z.literal("toggle_marker"), ...pkmOn }),
+  z.object({ op: z.literal("delete"), ...pkmOn }),
+  z.object({ op: z.literal("indent"), ...pkmOn }),
+  z.object({ op: z.literal("outdent"), ...pkmOn }),
+  z.object({ op: z.literal("move"), ...pkmOn, direction: z.enum(PkmMoveDirectionValues) }),
+  z.object({ op: z.literal("move_to"), ...pkmOn, target: z.string(), at: z.enum(PkmMoveAtValues) }),
+]) satisfies Codec<T.PkmBlockOp>;
 
-export const PkmMutation: Codec<T.PkmMutation> = Schema.Struct({ page: Schema.String, ops: Schema.mutable(Schema.Array(PkmBlockOp)) });
+export const PkmMutation = z.object({ page: z.string(), ops: z.array(PkmBlockOp) }) satisfies Codec<T.PkmMutation>;
 
-export const PkmSearchRequest: Codec<T.PkmSearchRequest> = Schema.Struct({
-  text: Schema.optionalKey(Schema.String),
-  tier: Schema.optionalKey(PkmTier),
-  marker: Schema.optionalKey(PkmMarker),
-  linkedTo: Schema.optionalKey(Schema.String),
-  limit: Schema.optionalKey(Schema.Int),
-});
+export const PkmSearchRequest = z.object({
+  text: z.exactOptional(z.string()),
+  tier: z.exactOptional(PkmTier),
+  marker: z.exactOptional(PkmMarker),
+  linkedTo: z.exactOptional(z.string()),
+  limit: z.exactOptional(z.number().int()),
+}) satisfies Codec<T.PkmSearchRequest>;
 
-export const PkmSearchHit: Codec<T.PkmSearchHit> = Schema.Struct({
-  block: Schema.String,
-  page: Schema.String,
-  pageTitle: Schema.String,
+export const PkmSearchHit = z.object({
+  block: z.string(),
+  page: z.string(),
+  pageTitle: z.string(),
   tier: PkmTier,
-  marker: Schema.optionalKey(PkmMarker),
-  path: Schema.String,
-  body: Schema.String,
-  plain: Schema.String,
-  score: Schema.Finite,
-  children: Schema.mutable(Schema.Array(PkmBlock)),
-});
+  marker: z.exactOptional(PkmMarker),
+  path: z.string(),
+  body: z.string(),
+  plain: z.string(),
+  score: z.number(),
+  children: z.array(PkmBlock),
+}) satisfies Codec<T.PkmSearchHit>;
 
-export const PkmCaptureRequest: Codec<T.PkmCaptureRequest> = Schema.Struct({ text: Schema.String, page: Schema.optionalKey(Schema.String) });
+export const PkmCaptureRequest = z.object({ text: z.string(), page: z.exactOptional(z.string()) }) satisfies Codec<T.PkmCaptureRequest>;
 
-export const PkmSource: Codec<T.PkmSource> = Schema.Struct({ page: Schema.String, title: Schema.String, markdown: Schema.String, updated: Schema.Finite });
+export const PkmSource = z.object({ page: z.string(), title: z.string(), markdown: z.string(), updated: z.number() }) satisfies Codec<T.PkmSource>;
 
-export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: Schema.String, markdown: Schema.String, updated: Schema.Finite });
+export const PkmSourceUpdate = z.object({ page: z.string(), markdown: z.string(), updated: z.number() }) satisfies Codec<T.PkmSourceUpdate>;
 
-export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
+export const PkmJournalRequest = z.object({ day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u) }) satisfies Codec<T.PkmJournalRequest>;
 
-const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
-  slug: Schema.String,
-  title: Schema.String,
-  days: Schema.Int,
-  deadline: Schema.optionalKey(Schema.String),
-  todo: Schema.Int,
-  doing: Schema.Int,
-  done: Schema.Int,
-});
+const PkmStaleProject = z.object({
+  slug: z.string(),
+  title: z.string(),
+  days: z.number().int(),
+  deadline: z.exactOptional(z.string()),
+  todo: z.number().int(),
+  doing: z.number().int(),
+  done: z.number().int(),
+}) satisfies Codec<T.PkmStaleProject>;
 
-const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
-  block: Schema.String,
-  page: Schema.String,
-  body: Schema.String,
-  plain: Schema.String,
-  deadline: Schema.String,
-});
+const PkmOverdue = z.object({
+  block: z.string(),
+  page: z.string(),
+  body: z.string(),
+  plain: z.string(),
+  deadline: z.string(),
+}) satisfies Codec<T.PkmOverdue>;
 
-export const PkmRadar: Codec<T.PkmRadar> = Schema.Struct({
-  inbox: Schema.Int,
-  stale: Schema.mutable(Schema.Array(PkmStaleProject)),
-  overdue: Schema.mutable(Schema.Array(PkmOverdue)),
-});
+export const PkmRadar = z.object({
+  inbox: z.number().int(),
+  stale: z.array(PkmStaleProject),
+  overdue: z.array(PkmOverdue),
+}) satisfies Codec<T.PkmRadar>;
 
-export const PkmProposalRequest: Codec<T.PkmProposalRequest> = Schema.Struct({
-  block: Schema.String,
-  suggested: Schema.String,
-  rationale: Schema.optionalKey(Schema.String),
-  comment: Schema.optionalKey(Schema.String),
-});
+export const PkmProposalRequest = z.object({
+  block: z.string(),
+  suggested: z.string(),
+  rationale: z.exactOptional(z.string()),
+  comment: z.exactOptional(z.string()),
+}) satisfies Codec<T.PkmProposalRequest>;
 
-export const PkmProposal: Codec<T.PkmProposal> = Schema.Struct({
+export const PkmProposal = z.object({
   comment: PkmComment,
-  kept: Schema.mutable(Schema.Array(Schema.String)),
-  restored: Schema.mutable(Schema.Array(Schema.String)),
-});
+  kept: z.array(z.string()),
+  restored: z.array(z.string()),
+}) satisfies Codec<T.PkmProposal>;
 
-export const PkmResolveRequest: Codec<T.PkmResolveRequest> = Schema.Struct({ id: Schema.String, accept: Schema.Boolean });
+export const PkmResolveRequest = z.object({ id: z.string(), accept: z.boolean() }) satisfies Codec<T.PkmResolveRequest>;
 
-export const PkmClipRequest: Codec<T.PkmClipRequest> = Schema.Struct({
-  url: Schema.String,
-  title: Schema.String,
-  content: Schema.String,
-  author: Schema.optionalKey(Schema.String),
-  tldr: Schema.optionalKey(Schema.String),
-  highlights: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Struct({ text: Schema.String, anchor: Schema.String })))),
-  tags: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  tier: Schema.optionalKey(PkmTier),
-});
+export const PkmClipRequest = z.object({
+  url: z.string(),
+  title: z.string(),
+  content: z.string(),
+  author: z.exactOptional(z.string()),
+  tldr: z.exactOptional(z.string()),
+  highlights: z.exactOptional(z.array(z.object({ text: z.string(), anchor: z.string() }))),
+  tags: z.exactOptional(z.array(z.string())),
+  tier: z.exactOptional(PkmTier),
+}) satisfies Codec<T.PkmClipRequest>;
 
-export const PkmClip: Codec<T.PkmClip> = Schema.Struct({ duplicate: Schema.Boolean, page: Schema.String, snapshot: Schema.String });
+export const PkmClip = z.object({ duplicate: z.boolean(), page: z.string(), snapshot: z.string() }) satisfies Codec<T.PkmClip>;
 
-export const PkmClusterRequest: Codec<T.PkmClusterRequest> = Schema.Struct({ topic: Schema.String, title: Schema.String });
+export const PkmClusterRequest = z.object({ topic: z.string(), title: z.string() }) satisfies Codec<T.PkmClusterRequest>;
 
-export const PkmCluster: Codec<T.PkmCluster> = Schema.Struct({ page: Schema.String, blocks: Schema.mutable(Schema.Array(Schema.String)) });
+export const PkmCluster = z.object({ page: z.string(), blocks: z.array(z.string()) }) satisfies Codec<T.PkmCluster>;
 
-export const PkmRenameRequest: Codec<T.PkmRenameRequest> = Schema.Struct({ from: Schema.String, to: Schema.String });
+export const PkmRenameRequest = z.object({ from: z.string(), to: z.string() }) satisfies Codec<T.PkmRenameRequest>;
 
-export const PkmRename: Codec<T.PkmRename> = Schema.Struct({ pages: Schema.mutable(Schema.Array(Schema.String)), into: Schema.String });
+export const PkmRename = z.object({ pages: z.array(z.string()), into: z.string() }) satisfies Codec<T.PkmRename>;
 
-export const PkmMarkdown: Codec<T.PkmMarkdown> = Schema.Struct({ markdown: Schema.String });
+export const PkmMarkdown = z.object({ markdown: z.string() }) satisfies Codec<T.PkmMarkdown>;
 
-export const PkmUndo: Codec<T.PkmUndo> = Schema.Struct({
-  undone: Schema.Boolean,
-  page: Schema.optionalKey(Schema.String),
-  what: Schema.optionalKey(Schema.String),
-});
+export const PkmUndo = z.object({
+  undone: z.boolean(),
+  page: z.exactOptional(z.string()),
+  what: z.exactOptional(z.string()),
+}) satisfies Codec<T.PkmUndo>;
 
-export const PkmScan: Codec<T.PkmScan> = Schema.Struct({ scanned: Schema.Int, updated: Schema.Int, removed: Schema.Int });
+export const PkmScan = z.object({ scanned: z.number().int(), updated: z.number().int(), removed: z.number().int() }) satisfies Codec<T.PkmScan>;

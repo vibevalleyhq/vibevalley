@@ -320,7 +320,6 @@ export async function attachFiles(channel: string, files: readonly File[], faile
     const key = ++lastUpload;
     uploads.update((u) => [...u, { key, channel, name: file.name || "file", percent: 0 }]);
     try {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- one upload at a time, in the order picked: the drafts keep the files' order
       drafts.add(channel, await upload(file, (percent) => uploads.update((u) => u.map((x) => (x.key === key ? { ...x, percent } : x)))));
     } catch (e) {
       failed(reasonOf(e));

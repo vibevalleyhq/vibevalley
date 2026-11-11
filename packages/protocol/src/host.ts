@@ -1,7 +1,8 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { call, connect, type Link, push } from "@vibevalley/bridge";
 
+import type { Codec } from "./codec";
 import { AgoraGrant as AgoraGrantSchema, Locale as LocaleSchema } from "./schema";
 import type { AgoraGrant, Locale } from "./shapes";
 
@@ -9,13 +10,13 @@ export interface Notice {
   readonly title: string;
   readonly body: string;
 }
-export const Notice: Schema.Codec<Notice> = Schema.Struct({ title: Schema.String, body: Schema.String });
+export const Notice = z.object({ title: z.string(), body: z.string() }) satisfies Codec<Notice>;
 
 export interface TraySummary {
   readonly title: string;
   readonly lines: readonly string[];
 }
-export const TraySummary: Schema.Codec<TraySummary> = Schema.Struct({ title: Schema.String, lines: Schema.Array(Schema.String) });
+export const TraySummary = z.object({ title: z.string(), lines: z.array(z.string()) }) satisfies Codec<TraySummary>;
 
 export interface Shortcut {
   /** Electron accelerator notation (e.g. `Alt+Shift+Space`). */
@@ -62,20 +63,14 @@ export type UpdateState =
   | { readonly _tag: "manual"; readonly version: string; readonly next: string; readonly why: UpdateManual; readonly page: string }
   | { readonly _tag: "failed"; readonly version: string; readonly why: string };
 
-export const UpdateState: Schema.Codec<UpdateState> = Schema.Union([
-  Schema.TaggedStruct("idle", { version: Schema.String }),
-  Schema.TaggedStruct("checking", { version: Schema.String }),
-  Schema.TaggedStruct("downloading", { version: Schema.String, next: Schema.String, percent: Schema.Finite }),
-  Schema.TaggedStruct("ready", {
-    version: Schema.String,
-    next: Schema.String,
-    notes: Schema.Array(Schema.String),
-    newFarm: Schema.Boolean,
-    page: Schema.String,
-  }),
-  Schema.TaggedStruct("manual", { version: Schema.String, next: Schema.String, why: Schema.Literals(UpdateManualValues), page: Schema.String }),
-  Schema.TaggedStruct("failed", { version: Schema.String, why: Schema.String }),
-]);
+export const UpdateState = z.discriminatedUnion("_tag", [
+  z.object({ _tag: z.literal("idle"), version: z.string() }),
+  z.object({ _tag: z.literal("checking"), version: z.string() }),
+  z.object({ _tag: z.literal("downloading"), version: z.string(), next: z.string(), percent: z.number() }),
+  z.object({ _tag: z.literal("ready"), version: z.string(), next: z.string(), notes: z.array(z.string()), newFarm: z.boolean(), page: z.string() }),
+  z.object({ _tag: z.literal("manual"), version: z.string(), next: z.string(), why: z.enum(UpdateManualValues), page: z.string() }),
+  z.object({ _tag: z.literal("failed"), version: z.string(), why: z.string() }),
+]) satisfies Codec<UpdateState>;
 
 export interface Updates {
   readonly watch: (fn: (state: UpdateState) => void) => () => void;
@@ -91,13 +86,13 @@ export interface CommandLineState {
   readonly taken: boolean;
 }
 
-export const CommandLineState: Schema.Codec<CommandLineState> = Schema.Struct({
-  command: Schema.String,
-  link: Schema.String,
-  installed: Schema.Boolean,
-  onPath: Schema.Boolean,
-  taken: Schema.Boolean,
-});
+export const CommandLineState = z.object({
+  command: z.string(),
+  link: z.string(),
+  installed: z.boolean(),
+  onPath: z.boolean(),
+  taken: z.boolean(),
+}) satisfies Codec<CommandLineState>;
 
 interface CommandLine {
   readonly state: () => Promise<CommandLineState>;
@@ -110,10 +105,10 @@ export interface Opening {
   readonly progress: number;
 }
 
-export const Opening: Schema.Codec<Opening> = Schema.Struct({
-  phase: Schema.Literals(["connecting", "reading", "loading", "ready", "waiting", "failed"]),
-  progress: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
-});
+export const Opening = z.object({
+  phase: z.enum(["connecting", "reading", "loading", "ready", "waiting", "failed"]),
+  progress: z.number().min(0).max(100),
+}) satisfies Codec<Opening>;
 
 export interface Host {
   readonly name: "desktop" | "mobile" | "browser";
@@ -135,7 +130,7 @@ export interface Host {
 
 export const ThemeChoiceValues = ["light", "dark", "system"] as const;
 export type ThemeChoice = (typeof ThemeChoiceValues)[number];
-export const ThemeChoice: Schema.Codec<ThemeChoice> = Schema.Literals(ThemeChoiceValues);
+export const ThemeChoice = z.enum(ThemeChoiceValues) satisfies Codec<ThemeChoice>;
 
 declare global {
   interface Window {
@@ -150,38 +145,38 @@ export const hostKey = "vibevalleyHost" satisfies keyof Window;
 export const desktopVoiceShortcut = "Alt+Shift+Space";
 
 export const desktopBridge = {
-  notify: call({ input: Notice, output: Schema.Void }),
-  tray: call({ input: TraySummary, output: Schema.Void }),
-  locale: call({ input: LocaleSchema, output: Schema.Void }),
-  reveal: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
-  theme: call({ input: ThemeChoice, output: Schema.Void }),
-  opening: call({ input: Opening, output: Schema.Void }),
-  updateState: call({ input: Schema.Void, output: UpdateState }),
+  notify: call({ input: Notice, output: z.void() }),
+  tray: call({ input: TraySummary, output: z.void() }),
+  locale: call({ input: LocaleSchema, output: z.void() }),
+  reveal: call({ input: z.string().regex(/^\/[^\0]*$/u), output: z.void() }),
+  theme: call({ input: ThemeChoice, output: z.void() }),
+  opening: call({ input: Opening, output: z.void() }),
+  updateState: call({ input: z.void(), output: UpdateState }),
   // Unbounded: blocks while downloading an update.
-  updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
-  updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
-  cliState: call({ input: Schema.Void, output: CommandLineState }),
-  cliInstall: call({ input: Schema.Void, output: CommandLineState }),
-  cliRemove: call({ input: Schema.Void, output: CommandLineState }),
-  voiceShortcut: push(Schema.Void),
+  updateCheck: call({ input: z.void(), output: z.void(), timeoutMs: Infinity }),
+  updateInstall: call({ input: z.void(), output: z.void(), timeoutMs: Infinity }),
+  cliState: call({ input: z.void(), output: CommandLineState }),
+  cliInstall: call({ input: z.void(), output: CommandLineState }),
+  cliRemove: call({ input: z.void(), output: CommandLineState }),
+  voiceShortcut: push(z.void()),
   update: push(UpdateState),
 };
 
-const DesktopStatus = Schema.Struct({
-  name: Schema.String,
-  version: Schema.String,
-  channel: Schema.String,
-  server: Schema.optionalKey(Schema.String),
+const DesktopStatus = z.object({
+  name: z.string(),
+  version: z.string(),
+  channel: z.string(),
+  server: z.exactOptional(z.string()),
 });
 
 export const desktopControl = {
-  status: call({ input: Schema.Void, output: DesktopStatus }),
-  open: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
-  quit: call({ input: Schema.Void, output: Schema.Void }),
-  restart: call({ input: Schema.Void, output: Schema.Void }),
-  updateState: call({ input: Schema.Void, output: UpdateState }),
-  updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
-  updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
+  status: call({ input: z.void(), output: DesktopStatus }),
+  open: call({ input: z.string().regex(/^\/[^\0]*$/u), output: z.void() }),
+  quit: call({ input: z.void(), output: z.void() }),
+  restart: call({ input: z.void(), output: z.void() }),
+  updateState: call({ input: z.void(), output: UpdateState }),
+  updateCheck: call({ input: z.void(), output: z.void(), timeoutMs: Infinity }),
+  updateInstall: call({ input: z.void(), output: z.void(), timeoutMs: Infinity }),
 };
 
 /** Exhaustive map forcing every new `desktopBridge` member to declare whether CLI control may invoke it. */
@@ -202,21 +197,21 @@ export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control"
   update: "page",
 };
 
-const Line = { line: Schema.Finite };
+const Line = { line: z.number() };
 
 export const mobileBridge = {
   // First call awaits OS notification permission prompt.
-  notify: call({ input: Notice, output: Schema.Void, timeoutMs: Infinity }),
-  rtcJoin: call({ input: Schema.Struct({ ...Line, grant: AgoraGrantSchema }), output: Schema.Void, timeoutMs: 60_000 }),
-  rtcMute: call({ input: Schema.Struct({ ...Line, on: Schema.Boolean }), output: Schema.Void }),
-  rtcRenew: call({ input: Schema.Struct({ ...Line, token: Schema.String }), output: Schema.Void }),
-  rtcLeave: call({ input: Schema.Struct(Line), output: Schema.Void }),
-  rtcJoined: push(Schema.Struct(Line)),
-  rtcLeft: push(Schema.Struct(Line)),
-  rtcStream: push(Schema.Struct({ ...Line, text: Schema.String })),
-  rtcLevels: push(Schema.Struct({ ...Line, mine: Schema.Finite, theirs: Schema.Finite })),
-  rtcProblem: push(Schema.Struct({ ...Line, text: Schema.String })),
-  rtcExpiring: push(Schema.Struct(Line)),
+  notify: call({ input: Notice, output: z.void(), timeoutMs: Infinity }),
+  rtcJoin: call({ input: z.object({ ...Line, grant: AgoraGrantSchema }), output: z.void(), timeoutMs: 60_000 }),
+  rtcMute: call({ input: z.object({ ...Line, on: z.boolean() }), output: z.void() }),
+  rtcRenew: call({ input: z.object({ ...Line, token: z.string() }), output: z.void() }),
+  rtcLeave: call({ input: z.object(Line), output: z.void() }),
+  rtcJoined: push(z.object(Line)),
+  rtcLeft: push(z.object(Line)),
+  rtcStream: push(z.object({ ...Line, text: z.string() })),
+  rtcLevels: push(z.object({ ...Line, mine: z.number(), theirs: z.number() })),
+  rtcProblem: push(z.object({ ...Line, text: z.string() })),
+  rtcExpiring: push(z.object(Line)),
 };
 
 export const fromNativeKey = "vibevalleyFromHost" satisfies keyof Window;

@@ -1,55 +1,55 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
 import * as T from "./shapes";
 
-const InboxKind: Codec<T.InboxKind> = Schema.Literals(T.InboxKindValues);
+const InboxKind = z.enum(T.InboxKindValues) satisfies Codec<T.InboxKind>;
 
-const InboxFromSession: Codec<T.InboxFromSession> = Schema.Struct({
-  kind: Schema.Literal("session"),
+const InboxFromSession = z.object({
+  kind: z.literal("session"),
   id: SessionId,
-  name: Schema.String,
-  agent: Schema.String,
-});
+  name: z.string(),
+  agent: z.string(),
+}) satisfies Codec<T.InboxFromSession>;
 
-const InboxFromOrchestrator: Codec<T.InboxFromOrchestrator> = Schema.Struct({
-  kind: Schema.Literal("orchestrator"),
-});
+const InboxFromOrchestrator = z.object({
+  kind: z.literal("orchestrator"),
+}) satisfies Codec<T.InboxFromOrchestrator>;
 
-const InboxFrom: Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromOrchestrator]);
+const InboxFrom = z.discriminatedUnion("kind", [InboxFromSession, InboxFromOrchestrator]) satisfies Codec<T.InboxFrom>;
 
-const InboxTargetSession: Codec<T.InboxTargetSession> = Schema.Struct({
-  kind: Schema.Literal("session"),
+const InboxTargetSession = z.object({
+  kind: z.literal("session"),
   id: SessionId,
-});
+}) satisfies Codec<T.InboxTargetSession>;
 
-const InboxTargetIssue: Codec<T.InboxTargetIssue> = Schema.Struct({
-  kind: Schema.Literal("issue"),
+const InboxTargetIssue = z.object({
+  kind: z.literal("issue"),
   id: IssueId,
-});
+}) satisfies Codec<T.InboxTargetIssue>;
 
-const InboxTargetChat: Codec<T.InboxTargetChat> = Schema.Struct({
-  kind: Schema.Literal("chat"),
-  channel: Schema.String,
-});
+const InboxTargetChat = z.object({
+  kind: z.literal("chat"),
+  channel: z.string(),
+}) satisfies Codec<T.InboxTargetChat>;
 
-const InboxTarget: Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetIssue, InboxTargetChat]);
+const InboxTarget = z.discriminatedUnion("kind", [InboxTargetSession, InboxTargetIssue, InboxTargetChat]) satisfies Codec<T.InboxTarget>;
 
-const InboxWords: Codec<T.InboxWords> = Schema.Struct({
-  label: Schema.String,
-  title: Schema.String,
-  body: Schema.String,
-  tray: Schema.String,
-});
+const InboxWords = z.object({
+  label: z.string(),
+  title: z.string(),
+  body: z.string(),
+  tray: z.string(),
+}) satisfies Codec<T.InboxWords>;
 
-export const InboxItem: Codec<T.InboxItem> = Schema.Struct({
-  id: Schema.String,
+export const InboxItem = z.object({
+  id: z.string(),
   kind: InboxKind,
   from: InboxFrom,
-  who: Schema.String,
-  text: Schema.String,
-  at: Schema.Finite,
+  who: z.string(),
+  text: z.string(),
+  at: z.number(),
   target: InboxTarget,
   words: InboxWords,
-});
+}) satisfies Codec<T.InboxItem>;

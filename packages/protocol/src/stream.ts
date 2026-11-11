@@ -1,5 +1,6 @@
-import { Cause, Exit, Schema } from "effect";
+import type { z } from "zod";
 
+import { jsonString } from "./common/schema";
 import * as S from "./schema";
 import { eventsPath, livePath, statePath, type LiveEvent, type ServerEvent, type StateFrame } from "./shapes";
 
@@ -13,10 +14,10 @@ export interface Streams {
 
 /** Each payload is decoded with the Schema its stream is written with: a server of another version is told, not taken
  * for the shape. */
-const decoders: { readonly [P in keyof Streams]: (json: string) => Exit.Exit<Streams[P], Schema.SchemaError> } = {
-  [statePath]: Schema.decodeUnknownExit(Schema.fromJsonString(S.StateFrame)),
-  [eventsPath]: Schema.decodeUnknownExit(Schema.fromJsonString(S.ServerEvent)),
-  [livePath]: Schema.decodeUnknownExit(Schema.fromJsonString(S.LiveEvent)),
+const decoders: { readonly [P in keyof Streams]: z.ZodType<Streams[P], string> } = {
+  [statePath]: jsonString(S.StateFrame),
+  [eventsPath]: jsonString(S.ServerEvent),
+  [livePath]: jsonString(S.LiveEvent),
 };
 
 /** The server writes a comment line on every stream this often, however quiet it is (apps/server/src/http/streams.ts). */
@@ -65,7 +66,6 @@ export async function readStream<P extends keyof Streams>(
     request.signal.addEventListener("abort", () => void Promise.allSettled([reader?.cancel()]), { once: true });
     let buffer = "";
     for (;;) {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- a stream is read a chunk at a time
       const { value, done } = await reader.read();
       const why = stoppedFor();
       if (why) throw why;
@@ -82,9 +82,9 @@ export async function readStream<P extends keyof Streams>(
           .join("\n");
         buffer = buffer.slice(separator.index + separator[0].length);
         if (!data) continue;
-        const decoded = decoders[path](data);
-        if (Exit.isFailure(decoded)) throw new Error(`${url}: a frame not in its shape: ${Cause.pretty(decoded.cause)}`);
-        onEvent(decoded.value);
+        const decoded = decoders[path].safeParse(data);
+        if (!decoded.success) throw new Error(`${url}: a frame not in its shape: ${decoded.error.message}`);
+        onEvent(decoded.data);
       }
     }
   } finally {

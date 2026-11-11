@@ -130,6 +130,7 @@
   },
   "dependencies": {
     "@ai-sdk/provider": "catalog:",
+    "@vibevalley/async": "workspace:*",
     "agora-agents": "catalog:",
     "agora-token": "catalog:",
     "effect": "catalog:",

@@ -66,7 +66,8 @@ tester.run("no-hex-color", rule("no-hex-color"), {
   valid: [
     `${stylexImport} sx.create({card: {color: 'var(--color-ink)', boxShadow: 'inset 0 2px 0 var(--color-accent)'}})`,
     `${stylexImport} sx.create({card: {content: '"#abc"', backgroundImage: 'url(/art.svg#abc)'}})`,
-    `${stylexImport} const data = {color: '#abc'}; const note = 'bg-[#abc]';`,
+    `${stylexImport} const data = {color: '#abc'}; const note = 'see #abc';`,
+    { code: "const v = <div class='bg-page text-muted border-line bg-wheat/25 bg-[url(/a.svg#abc)]' />", filename: "a.tsx" },
     `${stylexImport} function other(sx) { return sx.create({card: {color: '#abc'}}) }`,
     `${stylexImport} const f = (sx) => sx.create({card: {color: '#abc'}});`,
     "import {create} from 'another-library'; create({card: {color: '#abc'}})",
@@ -133,6 +134,10 @@ tester.run("no-hex-color", rule("no-hex-color"), {
       filename: "a.tsx",
       errors: [{ messageId: "hex" }],
     },
+    { code: "const v = <div class='flex bg-[#abc]' />", filename: "a.tsx", errors: [{ messageId: "hexClass" }] },
+    { code: "const tones = { plain: 'hover:text-[#abcdef]' };", errors: [{ messageId: "hexClass" }] },
+    { code: "const v = <div class={cx('p-2', `shadow-[0_1px_#000a]`)} />", filename: "a.tsx", errors: [{ messageId: "hexClass" }] },
+    { code: "const v = <div class='[border-color:#abc]' />", filename: "a.tsx", errors: [{ messageId: "hexClass" }] },
   ],
 });
 
@@ -144,12 +149,9 @@ tester.run("stylex-only", rule("stylex-only"), {
     },
     { code: "const v = <div {...styleProps(styles.box)} />", filename: "a.tsx" },
     { code: "const appearance = { class: ['markdown', composed.class] }; const v = <div {...appearance} />", filename: "a.tsx" },
+    { code: "const v = <div class='flex gap-2' />", filename: "a.tsx" },
   ],
   invalid: [
-    { code: "const v = <div class='flex gap-2' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
-    { code: "const v = <Popup class={sx.attrs(styles.popup).class} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
-    { code: "const v = <div className='card' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
-    { code: "const v = <div classList={{ open: true }} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
     {
       code: `${stylexImport} sx.create({ warn: { backgroundColor: 'var(--color-warn) !important' } })`,
       filename: "a.tsx",
@@ -175,6 +177,23 @@ tester.run("stylex-only", rule("stylex-only"), {
   ],
 });
 
+tester.run("style-attrs", rule("style-attrs"), {
+  valid: [
+    { code: "const v = <div class='flex gap-2' />", filename: "a.tsx" },
+    { code: "const v = <div class={['flex', open() && 'bg-hover', props.class]} />", filename: "a.tsx" },
+    { code: "const v = <div style={{ width: `${percent()}%` }} />", filename: "a.tsx" },
+    { code: "const v = <div style={{ '--x': `${x}px`, display: 'grid' }} />", filename: "a.tsx" },
+    { code: "const v = <div style={props.style} />", filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "const v = <div className='card' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
+    { code: "const v = <div classList={{ open: true }} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
+    { code: "const v = <div style={{ 'margin-left': '12px' }} />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
+    { code: "const v = <div style={{ height: 48, color: `red` }} />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
+    { code: "const v = <div style='display: grid' />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
+  ],
+});
+
 tester.run("no-copy-selector", rule("no-copy-selector"), {
   valid: ["page.getByTestId('issue-card')", "page.getByText(fixtures.title)", "page.getByRole('button', { name: 'Add paging' })"],
   invalid: [
@@ -191,7 +210,11 @@ tester.run("design-tokens", rule("design-tokens"), {
     `${stylexImport} sx.create({card: {opacity: {default: 0.4, ':disabled': 0.5}}})`,
     `${stylexImport} sx.create({card: (width) => ({width, height: 37, top: -13, translate: \`\${width}px 0\`})})`,
     `${stylexImport} sx.keyframes({from: {translate: '0 37px', opacity: 0}, to: {translate: '0 0', opacity: 1}})`,
-    `${stylexImport} const data = {fontSize: 37}; const note = 'rounded-[7px]';`,
+    `${stylexImport} const data = {fontSize: 37}; const note = 'rounded 7px';`,
+    {
+      code: "const v = <div class='rounded-md text-sm leading-xs p-1.25 gap-2.5 z-30 duration-120 ease-out shadow-float disabled:opacity-50 w-[37px] h-[calc(100%-2px)] text-[var(--text-sm)] p-[var(--gutter)] data-[state=open]:bg-hover rounded-full text-ink' />",
+      filename: "a.tsx",
+    },
     `${stylexImport} function other(sx) { return sx.create({card: {fontSize: 37}}) }`,
     `${stylexImport} sx.positionTry({top: 37, left: 19, width: 143})`,
     `${stylexImport} sx.create({card: {opacity: {default: 1, ':not(:disabled)': 0.4}}})`,
@@ -242,6 +265,19 @@ tester.run("design-tokens", rule("design-tokens"), {
       filename: "tokens.ts",
       errors: [{ messageId: "type" }],
     },
+    { code: "const v = <div class='flex text-[13px]' />", filename: "a.tsx", errors: [{ messageId: "typeClass" }] },
+    { code: "const v = <div class='sm:leading-[17px]' />", filename: "a.tsx", errors: [{ messageId: "typeClass" }] },
+    { code: "const v = <div class='p-[7px]' />", filename: "a.tsx", errors: [{ messageId: "spacingClass" }] },
+    { code: "const v = <div class='hover:-mt-[3px]' />", filename: "a.tsx", errors: [{ messageId: "spacingClass" }] },
+    { code: "const v = <div class='[padding-left:7px]' />", filename: "a.tsx", errors: [{ messageId: "spacingClass" }] },
+    { code: "const tones = { card: 'rounded-[5px]' };", errors: [{ messageId: "radiusClass" }] },
+    { code: "const v = <div class={`z-15 ${x}`} />", filename: "a.tsx", errors: [{ messageId: "layerClass" }] },
+    { code: "const v = <div class='z-[999]' />", filename: "a.tsx", errors: [{ messageId: "layerClass" }] },
+    { code: "const v = <div class='duration-150' />", filename: "a.tsx", errors: [{ messageId: "motionClass" }] },
+    { code: "const v = <div class='ease-[cubic-bezier(0.1,0,0,1)]' />", filename: "a.tsx", errors: [{ messageId: "motionClass" }] },
+    { code: "const v = <div class='shadow-[0_1px_2px_black]' />", filename: "a.tsx", errors: [{ messageId: "shadowClass" }] },
+    { code: "const v = <button class='disabled:opacity-40' />", filename: "a.tsx", errors: [{ messageId: "disabledClass" }] },
+    { code: "const v = <div class='[font-size:13px]' />", filename: "a.tsx", errors: [{ messageId: "typeClass" }] },
   ],
 });
 

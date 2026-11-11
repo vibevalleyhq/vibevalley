@@ -71,6 +71,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/ai": "workspace:*",
+    "@vibevalley/async": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

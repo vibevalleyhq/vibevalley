@@ -1,13 +1,13 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint } from "../endpoint";
+import { type Endpoint } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-export interface GameHandlers<R = never> {
+export interface GameHandlers {
   /** Every achievement, as the board has them. */
-  readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
-  readonly "game.title.set": (a: T.ChooseTitleRequest) => Effect.Effect<void, ApiError, R>;
+  readonly "game.achievement.list": () => Promise<T.Achievement[]>;
+  readonly "game.title.set": (a: T.ChooseTitleRequest) => Promise<void>;
 }
 
 export const gameEndpoints: readonly Endpoint[] = [
@@ -15,7 +15,7 @@ export const gameEndpoints: readonly Endpoint[] = [
     op: "game.achievement.list",
     about: [],
     input: undefined,
-    result: Schema.mutable(Schema.Array(S.Achievement)),
+    result: z.array(S.Achievement),
     can: ["user", "remote"],
   },
   {

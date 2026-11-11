@@ -1,75 +1,75 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-const UserDevice: Codec<T.UserDevice> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  came: Schema.Literals(T.DeviceCameValues),
-  addedAt: Schema.Finite,
-  lastSeen: Schema.optionalKey(Schema.Finite),
-});
+const UserDevice = z.object({
+  id: z.string(),
+  name: z.string(),
+  came: z.enum(T.DeviceCameValues),
+  addedAt: z.number(),
+  lastSeen: z.exactOptional(z.number()),
+}) satisfies Codec<T.UserDevice>;
 
-export const UserStatus: Codec<T.UserStatus> = Schema.Struct({
-  name: Schema.String,
-  password: Schema.Boolean,
-  here: Schema.Boolean,
-  device: Schema.optionalKey(UserDevice),
-});
+export const UserStatus = z.object({
+  name: z.string(),
+  password: z.boolean(),
+  here: z.boolean(),
+  device: z.exactOptional(UserDevice),
+}) satisfies Codec<T.UserStatus>;
 
-export const UserUpdateRequest: Codec<T.UserUpdateRequest> = Schema.Struct({
-  name: Schema.String,
-});
+export const UserUpdateRequest = z.object({
+  name: z.string(),
+}) satisfies Codec<T.UserUpdateRequest>;
 
-export const UserPasswordRequest: Codec<T.UserPasswordRequest> = Schema.Struct({
-  password: Schema.String,
-});
+export const UserPasswordRequest = z.object({
+  password: z.string(),
+}) satisfies Codec<T.UserPasswordRequest>;
 
-export const UserLoginRequest: Codec<T.UserLoginRequest> = Schema.Struct({
-  password: Schema.String,
-  device: Schema.String,
-});
+export const UserLoginRequest = z.object({
+  password: z.string(),
+  device: z.string(),
+}) satisfies Codec<T.UserLoginRequest>;
 
-export const UserLogin: Codec<T.UserLogin> = Schema.Struct({
-  device: Schema.String,
-  key: Schema.String,
-});
+export const UserLogin = z.object({
+  device: z.string(),
+  key: z.string(),
+}) satisfies Codec<T.UserLogin>;
 
-export const UserDevices = Schema.mutable(Schema.Array(UserDevice));
+export const UserDevices = z.array(UserDevice);
 
-const Approval: Codec<T.Approval> = Schema.Struct({
-  id: Schema.String,
-  code: Schema.String,
-  name: Schema.String,
-  from: Schema.String,
-  askedAt: Schema.Finite,
-  expiresAt: Schema.Finite,
-});
+const Approval = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  from: z.string(),
+  askedAt: z.number(),
+  expiresAt: z.number(),
+}) satisfies Codec<T.Approval>;
 
-export const Approvals = Schema.mutable(Schema.Array(Approval));
+export const Approvals = z.array(Approval);
 
-export const ApprovalCreateRequest: Codec<T.ApprovalCreateRequest> = Schema.Struct({
-  name: Schema.String,
-});
+export const ApprovalCreateRequest = z.object({
+  name: z.string(),
+}) satisfies Codec<T.ApprovalCreateRequest>;
 
-export const ApprovalCreated: Codec<T.ApprovalCreated> = Schema.Struct({
-  code: Schema.String,
-  claim: Schema.String,
-  expiresAt: Schema.Finite,
-  every: Schema.Finite,
-});
+export const ApprovalCreated = z.object({
+  code: z.string(),
+  claim: z.string(),
+  expiresAt: z.number(),
+  every: z.number(),
+}) satisfies Codec<T.ApprovalCreated>;
 
-export const ApprovalCollectRequest: Codec<T.ApprovalCollectRequest> = Schema.Struct({
-  claim: Schema.String,
-});
+export const ApprovalCollectRequest = z.object({
+  claim: z.string(),
+}) satisfies Codec<T.ApprovalCollectRequest>;
 
-export const ApprovalCollected: Codec<T.ApprovalCollected> = Schema.Struct({
-  login: Schema.optionalKey(UserLogin),
-  every: Schema.optionalKey(Schema.Finite),
-});
+export const ApprovalCollected = z.object({
+  login: z.exactOptional(UserLogin),
+  every: z.exactOptional(z.number()),
+}) satisfies Codec<T.ApprovalCollected>;
 
-export const ApprovalAnswerRequest: Codec<T.ApprovalAnswerRequest> = Schema.Struct({
-  id: Schema.String,
-  allow: Schema.Boolean,
-});
+export const ApprovalAnswerRequest = z.object({
+  id: z.string(),
+  allow: z.boolean(),
+}) satisfies Codec<T.ApprovalAnswerRequest>;

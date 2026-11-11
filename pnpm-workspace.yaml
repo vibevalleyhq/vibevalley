@@ -76,6 +76,14 @@ catalog:
   lightningcss: "1.33.0"
   parse5: 8.1.0
   undici: "8.12.3"
+  zod: ^4.6.7
+  '@hono/node-server': ^2.1.6
+  hono: ^4.13.17
+  pg: ^8.23.1
+  '@types/pg': ^8.23.1
+  commander: ^15.1.0
+  '@tailwindcss/vite': ^4.3.5
+  tailwindcss: ^4.3.5
 
 # What the Expo SDK pins for apps/mobile, moved together when the SDK moves: `vp exec expo install --check` in apps/mobile
 # says to what (its --fix would write the versions into package.json instead).

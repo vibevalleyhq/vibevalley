@@ -1,4 +1,3 @@
-import { Result, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { BizCode } from "./api";
@@ -47,13 +46,11 @@ describe("the API client envelope and error boundary", () => {
   });
 
   it("decodes a six-digit BizCode error envelope and its remediation detail", async () => {
-    const body = Result.getOrThrow(
-      Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))({
-        bizCode: BizCode.IssueNotFound,
-        message: "没有这张工单",
-        error: { next: [{ say: "看工单", run: ["issue", "list"] }] },
-      }),
-    );
+    const body = JSON.stringify({
+      bizCode: BizCode.IssueNotFound,
+      message: "没有这张工单",
+      error: { next: [{ say: "看工单", run: ["issue", "list"] }] },
+    });
     const error = await failure(404, body);
     expect([error.status, error.bizCode, error.tag, error.reason, error.body]).toEqual([404, BizCode.IssueNotFound, "Missing", "没有这张工单", body]);
     expect(error.error).toEqual({

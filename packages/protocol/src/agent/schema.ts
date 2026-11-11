@@ -1,111 +1,111 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-const AgentProblemLevel: Codec<T.AgentProblemLevel> = Schema.Literals(T.AgentIssueLevelValues);
+const AgentProblemLevel = z.enum(T.AgentIssueLevelValues) satisfies Codec<T.AgentProblemLevel>;
 
-const AgentProblem: Codec<T.AgentProblem> = Schema.Struct({
-  field: Schema.String,
+const AgentProblem = z.object({
+  field: z.string(),
   level: AgentProblemLevel,
-  text: Schema.String,
-});
+  text: z.string(),
+}) satisfies Codec<T.AgentProblem>;
 
-export const PersonaMode: Codec<T.PersonaMode> = Schema.Literals(T.PersonaModeValues);
+export const PersonaMode = z.enum(T.PersonaModeValues) satisfies Codec<T.PersonaMode>;
 
-const MCPServerStdio: Codec<T.MCPServerStdio> = Schema.Struct({
-  type: Schema.Literal("stdio"),
-  name: Schema.String,
-  command: Schema.String,
-  args: Schema.mutable(Schema.Array(Schema.String)),
-  env: Schema.Record(Schema.String, Schema.String),
-});
+const MCPServerStdio = z.object({
+  type: z.literal("stdio"),
+  name: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  env: z.record(z.string(), z.string()),
+}) satisfies Codec<T.MCPServerStdio>;
 
-const MCPServerHTTP: Codec<T.MCPServerHTTP> = Schema.Struct({
-  type: Schema.Literal("http"),
-  name: Schema.String,
-  url: Schema.String,
-  headers: Schema.Record(Schema.String, Schema.String),
-});
+const MCPServerHTTP = z.object({
+  type: z.literal("http"),
+  name: z.string(),
+  url: z.string(),
+  headers: z.record(z.string(), z.string()),
+}) satisfies Codec<T.MCPServerHTTP>;
 
-const MCPServer: Codec<T.MCPServer> = Schema.Union([MCPServerStdio, MCPServerHTTP]);
+const MCPServer = z.discriminatedUnion("type", [MCPServerStdio, MCPServerHTTP]) satisfies Codec<T.MCPServer>;
 
-export const Species: Codec<T.Species> = Schema.Literals(T.SpeciesValues);
+export const Species = z.enum(T.SpeciesValues) satisfies Codec<T.Species>;
 
-export const Outfit: Codec<T.Outfit> = Schema.Literals(T.OutfitValues);
+export const Outfit = z.enum(T.OutfitValues) satisfies Codec<T.Outfit>;
 
-export const Build: Codec<T.Build> = Schema.Literals(T.BuildValues);
+export const Build = z.enum(T.BuildValues) satisfies Codec<T.Build>;
 
-export const Head: Codec<T.Head> = Schema.Literals(T.HeadValues);
+export const Head = z.enum(T.HeadValues) satisfies Codec<T.Head>;
 
-export const Look: Codec<T.Look> = Schema.Struct({
-  species: Schema.NullOr(Species),
-  outfit: Schema.NullOr(Outfit),
-  orchestrator: Schema.NullOr(Schema.Literals(T.OrchestratorLookValues)),
+export const Look = z.object({
+  species: Species.nullable(),
+  outfit: Outfit.nullable(),
+  orchestrator: z.enum(T.OrchestratorLookValues).nullable(),
   build: Build,
   head: Head,
-  body: Schema.String,
-  trim: Schema.String,
-  hat: Schema.String,
-  eye: Schema.String,
-});
+  body: z.string(),
+  trim: z.string(),
+  hat: z.string(),
+  eye: z.string(),
+}) satisfies Codec<T.Look>;
 
-const AgentFrom: Codec<T.AgentFrom> = Schema.Struct({ template: Schema.String, version: Schema.Finite });
+const AgentFrom = z.object({ template: z.string(), version: z.number() }) satisfies Codec<T.AgentFrom>;
 
-export const Agent: Codec<T.Agent> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  role: Schema.Literals(T.AgentRoleValues),
-  duty: Schema.String,
-  enabled: Schema.Boolean,
-  runtime: Schema.String,
-  model: Schema.String,
-  effort: Schema.String,
-  persona: Schema.String,
+export const Agent = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.enum(T.AgentRoleValues),
+  duty: z.string(),
+  enabled: z.boolean(),
+  runtime: z.string(),
+  model: z.string(),
+  effort: z.string(),
+  persona: z.string(),
   personaMode: PersonaMode,
-  skills: Schema.mutable(Schema.Array(Schema.String)),
-  mcpServers: Schema.mutable(Schema.Array(MCPServer)),
-  disallowedTools: Schema.mutable(Schema.Array(Schema.String)),
-  env: Schema.Record(Schema.String, Schema.String),
-  workdir: Schema.String,
-  worktree: Schema.Boolean,
-  tags: Schema.mutable(Schema.Array(Schema.String)),
+  skills: z.array(z.string()),
+  mcpServers: z.array(MCPServer),
+  disallowedTools: z.array(z.string()),
+  env: z.record(z.string(), z.string()),
+  workdir: z.string(),
+  worktree: z.boolean(),
+  tags: z.array(z.string()),
   look: Look,
-  from: Schema.optionalKey(AgentFrom),
-});
+  from: z.exactOptional(AgentFrom),
+}) satisfies Codec<T.Agent>;
 
-export const AgentTemplate: Codec<T.AgentTemplate> = Schema.Struct({
-  id: Schema.String,
-  version: Schema.Finite,
-  role: Schema.Literals(T.AgentRoleValues),
-  name: Schema.String,
-  duty: Schema.String,
-  tags: Schema.mutable(Schema.Array(Schema.String)),
-  runtime: Schema.String,
-  model: Schema.String,
-  effort: Schema.String,
+export const AgentTemplate = z.object({
+  id: z.string(),
+  version: z.number(),
+  role: z.enum(T.AgentRoleValues),
+  name: z.string(),
+  duty: z.string(),
+  tags: z.array(z.string()),
+  runtime: z.string(),
+  model: z.string(),
+  effort: z.string(),
   personaMode: PersonaMode,
-  worktree: Schema.Boolean,
+  worktree: z.boolean(),
   look: Look,
-  persona: Schema.String,
-  source: Schema.Literals(T.AgentTemplateSourceValues),
-  skills: Schema.mutable(Schema.Array(Schema.String)),
-  installed: Schema.mutable(Schema.Array(Schema.String)),
-});
+  persona: z.string(),
+  source: z.enum(T.AgentTemplateSourceValues),
+  skills: z.array(z.string()),
+  installed: z.array(z.string()),
+}) satisfies Codec<T.AgentTemplate>;
 
-export const AgentValidateRequest: Codec<T.AgentValidateRequest> = Schema.Struct({
-  agents: Schema.mutable(Schema.Array(Agent)),
-});
+export const AgentValidateRequest = z.object({
+  agents: z.array(Agent),
+}) satisfies Codec<T.AgentValidateRequest>;
 
-export const AgentValidation: Codec<T.AgentValidation> = Schema.Struct({
-  id: Schema.String,
-  problems: Schema.mutable(Schema.Array(AgentProblem)),
-});
+export const AgentValidation = z.object({
+  id: z.string(),
+  problems: z.array(AgentProblem),
+}) satisfies Codec<T.AgentValidation>;
 
-export const Skill: Codec<T.Skill> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  description: Schema.String,
-  body: Schema.String,
-  builtIn: Schema.optionalKey(Schema.Boolean),
-});
+export const Skill = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  body: z.string(),
+  builtIn: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.Skill>;

@@ -136,7 +136,7 @@ describe("core", () => {
           yield* activity(core, "orchestrator", "thinking");
           yield* activity(core, "orchestrator", "thinking");
           yield* core.apply({ type: "progressChanged", progress: emptyProgress() });
-          yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
+          yield* core.setCommits({ total: 1, today: 0, week: 0 });
           const got = yield* Fiber.join(seen);
           expect(got.map((e) => e.type)).toEqual(["snapshot", "sessionChanged", "sessionChanged", "sessionPhaseChanged", "progressChanged", "progressChanged"]);
           expect(got[2]!.at).toBeGreaterThan(0);
@@ -156,7 +156,7 @@ describe("core", () => {
       );
       expect((yield* Queue.take(frames)).state.sessions).toEqual([]);
       yield* activity(core, "orchestrator", "speaking");
-      yield* core.setCommits({ total: 2 } as never);
+      yield* core.setCommits({ total: 2 });
       yield* TestClock.adjust(stateEveryMs);
       const next = yield* Queue.take(frames);
       expect([next.state.sessions.find((s) => s.id === "orchestrator")?.phase, next.state.commits?.total]).toMatchObject([

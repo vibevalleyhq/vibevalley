@@ -1,4 +1,3 @@
-import { Result, Schema } from "effect";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { livePath, statePath } from "./shapes";
@@ -17,7 +16,7 @@ function serverStream() {
 
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
-const json = (value: unknown) => Result.getOrThrow(Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(value));
+const json = (value: unknown) => JSON.stringify(value);
 
 const notice = { type: "notice", at: 1, level: "info", text: "hi" };
 
@@ -40,7 +39,6 @@ test.each([false, true])("regression: LF and CRLF frames arrive once in order ac
       for (const [index, frame] of frames.entries()) {
         for (const [offset, character] of [...frame].entries()) {
           server.write(character);
-          // oxlint-disable-next-line eslint/no-await-in-loop -- verify delivery before the next network chunk arrives
           await settle();
           expect(heard).toEqual(events.slice(0, index + Number(offset === frame.length - 1)));
         }

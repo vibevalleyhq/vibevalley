@@ -2,12 +2,14 @@ import { fileURLToPath } from "node:url";
 
 import solid from "@solidjs/vite-plugin";
 import stylex from "@stylexjs/unplugin";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
 export default defineConfig({
   plugins:
     lazyPlugins(() => [
-      stylex.vite({ useCSSLayers: { before: ["theme", "base", "components"], after: [], prefix: "stylex" }, sxPropName: false }),
+      stylex.vite({ useCSSLayers: { before: ["theme", "base", "components", "utilities"], after: [], prefix: "stylex" }, sxPropName: false }),
+      tailwindcss(),
       solid({ ssr: true, start: { renderMode: "async" } }),
     ]) ?? [],
   resolve: { alias: { "@game": fileURLToPath(new URL("../web/public", import.meta.url)) } },

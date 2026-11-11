@@ -1,42 +1,42 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
+const ConnectorID = z.enum(T.ConnectorIDValues) satisfies Codec<T.ConnectorID>;
 
-const ConnectorState: Codec<T.ConnectorState> = Schema.Literals(T.ConnectorStateValues);
+const ConnectorState = z.enum(T.ConnectorStateValues) satisfies Codec<T.ConnectorState>;
 
-export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
+export const ConnectorStatus = z.object({
   id: ConnectorID,
   state: ConnectorState,
-  qr: Schema.String,
-  pairCode: Schema.String,
-  channel: Schema.optionalKey(Schema.String),
-  user: Schema.optionalKey(Schema.String),
-  since: Schema.optionalKey(Schema.Finite),
-  lastInbound: Schema.optionalKey(Schema.Finite),
-  pausedUntil: Schema.optionalKey(Schema.Finite),
-  pending: Schema.Finite,
-  error: Schema.String,
-});
+  qr: z.string(),
+  pairCode: z.string(),
+  channel: z.exactOptional(z.string()),
+  user: z.exactOptional(z.string()),
+  since: z.exactOptional(z.number()),
+  lastInbound: z.exactOptional(z.number()),
+  pausedUntil: z.exactOptional(z.number()),
+  pending: z.number(),
+  error: z.string(),
+}) satisfies Codec<T.ConnectorStatus>;
 
-export const ConnectorLogin: Codec<T.ConnectorLogin> = Schema.Struct({
-  force: Schema.optionalKey(Schema.Boolean),
-  appId: Schema.optionalKey(Schema.String),
-  secret: Schema.optionalKey(Schema.String),
-});
+export const ConnectorLogin = z.object({
+  force: z.exactOptional(z.boolean()),
+  appId: z.exactOptional(z.string()),
+  secret: z.exactOptional(z.string()),
+}) satisfies Codec<T.ConnectorLogin>;
 
-export const VerifyRequest: Codec<T.VerifyRequest> = Schema.Struct({
-  code: Schema.String,
-});
+export const VerifyRequest = z.object({
+  code: z.string(),
+}) satisfies Codec<T.VerifyRequest>;
 
-export const ConnectorsChannelRequest: Codec<T.ConnectorsChannelRequest> = Schema.Struct({
-  channel: Schema.String,
-});
+export const ConnectorsChannelRequest = z.object({
+  channel: z.string(),
+}) satisfies Codec<T.ConnectorsChannelRequest>;
 
-export const FactConnectorChanged: Codec<T.FactConnectorChanged> = Schema.Struct({
-  type: Schema.Literal("connectorChanged"),
-  at: Schema.Finite,
+export const FactConnectorChanged = z.object({
+  type: z.literal("connectorChanged"),
+  at: z.number(),
   status: ConnectorStatus,
-});
+}) satisfies Codec<T.FactConnectorChanged>;

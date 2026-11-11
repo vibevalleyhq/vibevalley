@@ -1,161 +1,161 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
-  installed: Schema.Boolean,
-  version: Schema.optionalKey(Schema.String),
-  loggedIn: Schema.Boolean,
-  account: Schema.optionalKey(Schema.String),
-  reason: Schema.String,
-  checkedAt: Schema.Finite,
-});
+export const GitHubStatus = z.object({
+  installed: z.boolean(),
+  version: z.exactOptional(z.string()),
+  loggedIn: z.boolean(),
+  account: z.exactOptional(z.string()),
+  reason: z.string(),
+  checkedAt: z.number(),
+}) satisfies Codec<T.GitHubStatus>;
 
-const DayCount: Codec<T.DayCount> = Schema.Struct({
-  day: Schema.String,
-  commits: Schema.Finite,
-});
+const DayCount = z.object({
+  day: z.string(),
+  commits: z.number(),
+}) satisfies Codec<T.DayCount>;
 
-const Author: Codec<T.Author> = Schema.Struct({
-  name: Schema.String,
-  commits: Schema.Finite,
-});
+const Author = z.object({
+  name: z.string(),
+  commits: z.number(),
+}) satisfies Codec<T.Author>;
 
-export const RepoActivity: Codec<T.RepoActivity> = Schema.Struct({
-  repo: Schema.String,
-  at: Schema.Finite,
-  days: Schema.mutable(Schema.Array(DayCount)),
-  authors: Schema.mutable(Schema.Array(Author)),
-  total: Schema.Finite,
-  first: Schema.optionalKey(Schema.Finite),
-  last: Schema.optionalKey(Schema.Finite),
-});
+export const RepoActivity = z.object({
+  repo: z.string(),
+  at: z.number(),
+  days: z.array(DayCount),
+  authors: z.array(Author),
+  total: z.number(),
+  first: z.exactOptional(z.number()),
+  last: z.exactOptional(z.number()),
+}) satisfies Codec<T.RepoActivity>;
 
-const LanguageCount: Codec<T.LanguageCount> = Schema.Struct({
-  name: Schema.String,
-  files: Schema.Finite,
-  code: Schema.Finite,
-  comments: Schema.Finite,
-  blanks: Schema.Finite,
-});
+const LanguageCount = z.object({
+  name: z.string(),
+  files: z.number(),
+  code: z.number(),
+  comments: z.number(),
+  blanks: z.number(),
+}) satisfies Codec<T.LanguageCount>;
 
-export const RepoLanguages: Codec<T.RepoLanguages> = Schema.Struct({
-  repo: Schema.String,
-  at: Schema.Finite,
-  languages: Schema.mutable(Schema.Array(LanguageCount)),
-});
+export const RepoLanguages = z.object({
+  repo: z.string(),
+  at: z.number(),
+  languages: z.array(LanguageCount),
+}) satisfies Codec<T.RepoLanguages>;
 
-const RepoStack: Codec<T.RepoStack> = Schema.Struct({
-  name: Schema.String,
-  label: Schema.String,
-  test: Schema.optionalKey(Schema.String),
-  lint: Schema.optionalKey(Schema.String),
-  build: Schema.optionalKey(Schema.String),
-});
+const RepoStack = z.object({
+  name: z.string(),
+  label: z.string(),
+  test: z.exactOptional(z.string()),
+  lint: z.exactOptional(z.string()),
+  build: z.exactOptional(z.string()),
+}) satisfies Codec<T.RepoStack>;
 
-const TemplateBlank: Codec<T.TemplateBlank> = Schema.Struct({
-  start: Schema.Finite,
-  end: Schema.Finite,
-});
+const TemplateBlank = z.object({
+  start: z.number(),
+  end: z.number(),
+}) satisfies Codec<T.TemplateBlank>;
 
-const IssueTemplate: Codec<T.IssueTemplate> = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  done: Schema.String,
-  text: Schema.String,
-  blank: Schema.optionalKey(TemplateBlank),
-});
+const IssueTemplate = z.object({
+  id: z.string(),
+  title: z.string(),
+  done: z.string(),
+  text: z.string(),
+  blank: z.exactOptional(TemplateBlank),
+}) satisfies Codec<T.IssueTemplate>;
 
-const TemplateKind: Codec<T.TemplateKind> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  icon: Schema.String,
-  templates: Schema.mutable(Schema.Array(IssueTemplate)),
-});
+const TemplateKind = z.object({
+  id: z.string(),
+  name: z.string(),
+  icon: z.string(),
+  templates: z.array(IssueTemplate),
+}) satisfies Codec<T.TemplateKind>;
 
-export const RepoTemplates: Codec<T.RepoTemplates> = Schema.Struct({
-  repo: Schema.String,
+export const RepoTemplates = z.object({
+  repo: z.string(),
   stack: RepoStack,
-  recent: Schema.mutable(Schema.Array(Schema.String)),
-  kinds: Schema.mutable(Schema.Array(TemplateKind)),
-});
+  recent: z.array(z.string()),
+  kinds: z.array(TemplateKind),
+}) satisfies Codec<T.RepoTemplates>;
 
-const PullRequestCapability: Codec<T.PullRequestCapability> = Schema.Struct({
-  available: Schema.Boolean,
-  reason: Schema.String,
-});
+const PullRequestCapability = z.object({
+  available: z.boolean(),
+  reason: z.string(),
+}) satisfies Codec<T.PullRequestCapability>;
 
-export const RepoSummary: Codec<T.RepoSummary> = Schema.Struct({
-  name: Schema.String,
-  path: Schema.String,
-  git: Schema.Boolean,
-  last: Schema.optionalKey(Schema.Finite),
-  maxSessions: Schema.Finite,
+export const RepoSummary = z.object({
+  name: z.string(),
+  path: z.string(),
+  git: z.boolean(),
+  last: z.exactOptional(z.number()),
+  maxSessions: z.number(),
   pullRequest: PullRequestCapability,
-});
+}) satisfies Codec<T.RepoSummary>;
 
-export const NewRepo: Codec<T.NewRepo> = Schema.Struct({
-  name: Schema.String,
-  github: Schema.optionalKey(Schema.String),
-});
+export const NewRepo = z.object({
+  name: z.string(),
+  github: z.exactOptional(z.string()),
+}) satisfies Codec<T.NewRepo>;
 
-const Commit: Codec<T.Commit> = Schema.Struct({
-  hash: Schema.String,
-  subject: Schema.String,
-  at: Schema.Finite,
-});
+const Commit = z.object({
+  hash: z.string(),
+  subject: z.string(),
+  at: z.number(),
+}) satisfies Codec<T.Commit>;
 
-const UncommittedItem: Codec<T.UncommittedItem> = Schema.Struct({
-  path: Schema.String,
-  status: Schema.String,
-});
+const UncommittedItem = z.object({
+  path: z.string(),
+  status: z.string(),
+}) satisfies Codec<T.UncommittedItem>;
 
-export const SubmitBranch: Codec<T.SubmitBranch> = Schema.Struct({
-  cwd: Schema.String,
-  branch: Schema.String,
-  sha: Schema.String,
-  base: Schema.String,
-  title: Schema.String,
-  body: Schema.String,
-  dryRun: Schema.optionalKey(Schema.Boolean),
-});
+export const SubmitBranch = z.object({
+  cwd: z.string(),
+  branch: z.string(),
+  sha: z.string(),
+  base: z.string(),
+  title: z.string(),
+  body: z.string(),
+  dryRun: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.SubmitBranch>;
 
-export const BranchPublication: Codec<T.BranchPublication> = Schema.Struct({
-  platform: Schema.Literals(T.PublishPlatformValues),
-  repository: Schema.String,
-  branch: Schema.String,
-  sha: Schema.String,
-  base: Schema.String,
-  check: Schema.Literals(T.BranchCheckValues),
-  pushed: Schema.Boolean,
-  url: Schema.optionalKey(Schema.String),
-  number: Schema.optionalKey(Schema.Int),
-  reused: Schema.optionalKey(Schema.Boolean),
-  state: Schema.optionalKey(Schema.Literals(T.BranchPublicationStateValues)),
-});
-export const Repo: Codec<T.Repo> = Schema.Struct({
-  path: Schema.String,
-  commits: Schema.Finite,
-});
-export const Conflict: Codec<T.Conflict> = Schema.Struct({
-  base: Schema.String,
-  files: Schema.mutable(Schema.Array(Schema.String)),
-});
-const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
-  path: Schema.String,
-  status: Schema.String,
-  added: Schema.Finite,
-  removed: Schema.Finite,
-  patch: Schema.optionalKey(Schema.String),
-});
-export const Changes: Codec<T.Changes> = Schema.Struct({
-  repo: Schema.String,
-  base: Schema.String,
-  branch: Schema.optionalKey(Schema.String),
-  commits: Schema.mutable(Schema.Array(Commit)),
-  files: Schema.mutable(Schema.Array(ChangedFile)),
-  uncommitted: Schema.mutable(Schema.Array(UncommittedItem)),
-  conflicts: Schema.mutable(Schema.Array(Schema.String)),
-  behind: Schema.Finite,
-});
+export const BranchPublication = z.object({
+  platform: z.enum(T.PublishPlatformValues),
+  repository: z.string(),
+  branch: z.string(),
+  sha: z.string(),
+  base: z.string(),
+  check: z.enum(T.BranchCheckValues),
+  pushed: z.boolean(),
+  url: z.exactOptional(z.string()),
+  number: z.exactOptional(z.number().int()),
+  reused: z.exactOptional(z.boolean()),
+  state: z.exactOptional(z.enum(T.BranchPublicationStateValues)),
+}) satisfies Codec<T.BranchPublication>;
+export const Repo = z.object({
+  path: z.string(),
+  commits: z.number(),
+}) satisfies Codec<T.Repo>;
+export const Conflict = z.object({
+  base: z.string(),
+  files: z.array(z.string()),
+}) satisfies Codec<T.Conflict>;
+const ChangedFile = z.object({
+  path: z.string(),
+  status: z.string(),
+  added: z.number(),
+  removed: z.number(),
+  patch: z.exactOptional(z.string()),
+}) satisfies Codec<T.ChangedFile>;
+export const Changes = z.object({
+  repo: z.string(),
+  base: z.string(),
+  branch: z.exactOptional(z.string()),
+  commits: z.array(Commit),
+  files: z.array(ChangedFile),
+  uncommitted: z.array(UncommittedItem),
+  conflicts: z.array(z.string()),
+  behind: z.number(),
+}) satisfies Codec<T.Changes>;

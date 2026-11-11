@@ -10,11 +10,14 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
+    "@vibevalley/async": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "effect": "catalog:"
+    "commander": "catalog:",
+    "effect": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

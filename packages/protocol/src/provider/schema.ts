@@ -1,78 +1,78 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
-import { KeyStatus } from "../common/schema";
+import { codePoints, KeyStatus } from "../common/schema";
 import type * as T from "./shapes";
 
-const ProviderModel: Codec<T.ProviderModel> = Schema.Struct({ id: Schema.String, owner: Schema.String });
-const ProviderConnection: Codec<T.ProviderConnection> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  adapter: Schema.Literal("moss"),
-  enabled: Schema.Boolean,
+const ProviderModel = z.object({ id: z.string(), owner: z.string() }) satisfies Codec<T.ProviderModel>;
+const ProviderConnection = z.object({
+  id: z.string(),
+  name: z.string(),
+  adapter: z.literal("moss"),
+  enabled: z.boolean(),
   key: KeyStatus,
-});
-const ProviderBinding: Codec<T.ProviderBinding> = Schema.Struct({ connection: Schema.String, model: Schema.String });
-export const ProviderStatus: Codec<T.ProviderStatus> = Schema.Struct({
-  revision: Schema.Int,
-  connections: Schema.mutable(Schema.Array(ProviderConnection)),
-  dictation: Schema.NullOr(ProviderBinding),
-  image: Schema.NullOr(ProviderBinding),
-  live: Schema.NullOr(ProviderBinding),
-  liveModels: Schema.mutable(Schema.Array(Schema.String)),
-  speakers: Schema.NullOr(ProviderBinding),
-  speakersModels: Schema.mutable(Schema.Array(Schema.String)),
-  voiceDesign: Schema.NullOr(ProviderBinding),
-  voiceDesignModels: Schema.mutable(Schema.Array(Schema.String)),
-  transcription: Schema.NullOr(ProviderBinding),
-  transcriptionModels: Schema.mutable(Schema.Array(Schema.String)),
-  vision: Schema.NullOr(ProviderBinding),
-  visionModels: Schema.mutable(Schema.Array(Schema.String)),
-  dictationModels: Schema.mutable(Schema.Array(Schema.String)),
-  imageModels: Schema.mutable(Schema.Array(Schema.String)),
-  understanding: Schema.NullOr(ProviderBinding),
-  understandingModels: Schema.mutable(Schema.Array(Schema.String)),
-  speech: Schema.NullOr(ProviderBinding),
-  speechModels: Schema.mutable(Schema.Array(Schema.String)),
-});
-const ProviderConnectionUpdate: Codec<T.ProviderConnectionUpdate> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  adapter: Schema.Literal("moss"),
-  enabled: Schema.Boolean,
-  key: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export const ProviderUpdate: Codec<T.ProviderUpdate> = Schema.Struct({
-  speech: Schema.NullOr(ProviderBinding),
-  revision: Schema.Int,
-  connections: Schema.mutable(Schema.Array(ProviderConnectionUpdate)),
-  understanding: Schema.NullOr(ProviderBinding),
-  dictation: Schema.NullOr(ProviderBinding),
-  image: Schema.NullOr(ProviderBinding),
-  live: Schema.NullOr(ProviderBinding),
-  speakers: Schema.NullOr(ProviderBinding),
-  voiceDesign: Schema.NullOr(ProviderBinding),
-  transcription: Schema.NullOr(ProviderBinding),
-  vision: Schema.NullOr(ProviderBinding),
-});
-export const ProviderModelRequest: Codec<T.ProviderModelRequest> = Schema.Struct({ connection: Schema.String, revision: Schema.Int });
-export const ProviderVoiceRequest: Codec<T.ProviderVoiceRequest> = Schema.Struct({
-  connection: Schema.String,
-  revision: Schema.Int,
-  limit: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 150 }))),
-  offset: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100000 }))),
-  after: Schema.optionalKey(Schema.String.check(Schema.isBetweenCodePoints(1, 8192))),
-  status: Schema.optionalKey(Schema.String.check(Schema.isBetweenCodePoints(1, 128))),
-});
-export const ProviderVoiceListing: Codec<T.ProviderVoiceListing> = Schema.Struct({
-  connection: Schema.String,
-  revision: Schema.Int,
-  voices: Schema.mutable(Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, createdAtSeconds: Schema.Int }))),
-  hasMore: Schema.Boolean,
-  nextCursor: Schema.NullOr(Schema.String),
-});
-export const ProviderModelListing: Codec<T.ProviderModelListing> = Schema.Struct({
-  connection: Schema.String,
-  revision: Schema.Int,
-  models: Schema.mutable(Schema.Array(ProviderModel)),
-});
+}) satisfies Codec<T.ProviderConnection>;
+const ProviderBinding = z.object({ connection: z.string(), model: z.string() }) satisfies Codec<T.ProviderBinding>;
+export const ProviderStatus = z.object({
+  revision: z.number().int(),
+  connections: z.array(ProviderConnection),
+  dictation: ProviderBinding.nullable(),
+  image: ProviderBinding.nullable(),
+  live: ProviderBinding.nullable(),
+  liveModels: z.array(z.string()),
+  speakers: ProviderBinding.nullable(),
+  speakersModels: z.array(z.string()),
+  voiceDesign: ProviderBinding.nullable(),
+  voiceDesignModels: z.array(z.string()),
+  transcription: ProviderBinding.nullable(),
+  transcriptionModels: z.array(z.string()),
+  vision: ProviderBinding.nullable(),
+  visionModels: z.array(z.string()),
+  dictationModels: z.array(z.string()),
+  imageModels: z.array(z.string()),
+  understanding: ProviderBinding.nullable(),
+  understandingModels: z.array(z.string()),
+  speech: ProviderBinding.nullable(),
+  speechModels: z.array(z.string()),
+}) satisfies Codec<T.ProviderStatus>;
+const ProviderConnectionUpdate = z.object({
+  id: z.string(),
+  name: z.string(),
+  adapter: z.literal("moss"),
+  enabled: z.boolean(),
+  key: z.exactOptional(z.string().nullable()),
+}) satisfies Codec<T.ProviderConnectionUpdate>;
+export const ProviderUpdate = z.object({
+  speech: ProviderBinding.nullable(),
+  revision: z.number().int(),
+  connections: z.array(ProviderConnectionUpdate),
+  understanding: ProviderBinding.nullable(),
+  dictation: ProviderBinding.nullable(),
+  image: ProviderBinding.nullable(),
+  live: ProviderBinding.nullable(),
+  speakers: ProviderBinding.nullable(),
+  voiceDesign: ProviderBinding.nullable(),
+  transcription: ProviderBinding.nullable(),
+  vision: ProviderBinding.nullable(),
+}) satisfies Codec<T.ProviderUpdate>;
+export const ProviderModelRequest = z.object({ connection: z.string(), revision: z.number().int() }) satisfies Codec<T.ProviderModelRequest>;
+export const ProviderVoiceRequest = z.object({
+  connection: z.string(),
+  revision: z.number().int(),
+  limit: z.exactOptional(z.number().int().min(1).max(150)),
+  offset: z.exactOptional(z.number().int().min(0).max(100000)),
+  after: z.exactOptional(z.string().check(codePoints(1, 8192))),
+  status: z.exactOptional(z.string().check(codePoints(1, 128))),
+}) satisfies Codec<T.ProviderVoiceRequest>;
+export const ProviderVoiceListing = z.object({
+  connection: z.string(),
+  revision: z.number().int(),
+  voices: z.array(z.object({ id: z.string(), name: z.string(), createdAtSeconds: z.number().int() })),
+  hasMore: z.boolean(),
+  nextCursor: z.string().nullable(),
+}) satisfies Codec<T.ProviderVoiceListing>;
+export const ProviderModelListing = z.object({
+  connection: z.string(),
+  revision: z.number().int(),
+  models: z.array(ProviderModel),
+}) satisfies Codec<T.ProviderModelListing>;

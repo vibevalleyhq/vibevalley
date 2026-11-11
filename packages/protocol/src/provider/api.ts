@@ -1,14 +1,12 @@
-import type { Effect } from "effect";
-
-import type { ApiError, Endpoint } from "../endpoint";
+import type { Endpoint } from "../endpoint";
 import * as S from "./schema";
 import type * as T from "./shapes";
 
-export interface ProviderHandlers<R = never> {
-  readonly "provider.get": () => Effect.Effect<T.ProviderStatus, ApiError, R>;
-  readonly "provider.update": (a: T.ProviderUpdate) => Effect.Effect<T.ProviderStatus, ApiError, R>;
-  readonly "provider.voice.list": (a: T.ProviderVoiceRequest) => Effect.Effect<T.ProviderVoiceListing, ApiError, R>;
-  readonly "provider.model.list": (a: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, ApiError, R>;
+export interface ProviderHandlers {
+  readonly "provider.get": () => Promise<T.ProviderStatus>;
+  readonly "provider.update": (a: T.ProviderUpdate) => Promise<T.ProviderStatus>;
+  readonly "provider.voice.list": (a: T.ProviderVoiceRequest) => Promise<T.ProviderVoiceListing>;
+  readonly "provider.model.list": (a: T.ProviderModelRequest) => Promise<T.ProviderModelListing>;
 }
 
 export const providerEndpoints: readonly Endpoint[] = [

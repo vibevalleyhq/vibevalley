@@ -1,6 +1,6 @@
 // Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
-import { Cause, Exit, Option, Predicate, Schema } from "effect";
+import type { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -18,8 +18,6 @@ import {
 import type * as T from "./shapes";
 
 /** A refusal from the server: its business code, semantic kind (Refused, VoiceUnavailable…), reason, and optional remediation detail. */
-// The client is Promise-based and its callers (the page, the shells) reject and catch plain Errors, not Effect failures.
-// @effect-diagnostics-next-line extendsNativeError:off
 export class VibeValleyApiError extends Error {
   readonly status: number;
   readonly bizCode: BizErrorCode | undefined;
@@ -41,14 +39,16 @@ export class VibeValleyApiError extends Error {
   }
 }
 
-const decodeApiError = Schema.decodeUnknownOption(ApiErrorEnvelope);
-const resultDecoders = new Map<string, { readonly hasData: boolean; readonly decode: (u: unknown) => Exit.Exit<unknown, Schema.SchemaError> }>();
+const decodeApiError = (u: unknown) => {
+  const r = ApiErrorEnvelope.safeParse(u);
+  return r.success ? r.data : undefined;
+};
+const resultDecoders = new Map<string, { readonly hasData: boolean; readonly envelope: z.ZodType }>();
 for (const e of endpoints) {
-  resultDecoders.set(pathOf(e.op), {
-    hasData: e.result !== undefined,
-    decode: Schema.decodeUnknownExit(e.result ? apiSuccessEnvelope(e.result) : ApiVoidEnvelope),
-  });
+  resultDecoders.set(pathOf(e.op), { hasData: e.result !== undefined, envelope: e.result ? apiSuccessEnvelope(e.result) : ApiVoidEnvelope });
 }
+
+const isObject = (u: unknown): u is Record<string, unknown> => typeof u === "object" && u !== null;
 
 /** The server's HTTP API, one object per module and noun, a method per op: `api.issue.status.update({ id, status })`. */
 export class VibeValleyApi {
@@ -681,27 +681,27 @@ export class VibeValleyApi {
       } catch {
         parsed = undefined;
       }
-      const env = Option.getOrUndefined(decodeApiError(parsed));
+      const env = decodeApiError(parsed);
       if (env) {
         const meta = bizCodeMeta[env.bizCode];
         throw new VibeValleyApiError(res.status, meta.kind, env.message, env.error, text, env.bizCode);
       }
-      const j = Predicate.isObject(parsed) ? parsed : {};
+      const j = isObject(parsed) ? parsed : {};
       const reason = typeof j.message === "string" && j.message !== "" ? j.message : text.trim() || t("shared.serverAnswered", { status: res.status });
       throw new VibeValleyApiError(res.status, undefined, reason, undefined, text);
     }
     const raw: unknown = text === "" ? undefined : JSON.parse(text);
     const entry = resultDecoders.get(path);
-    const checked = entry ? entry.decode(raw) : undefined;
-    if (checked && Exit.isFailure(checked)) {
-      const env = Option.getOrUndefined(decodeApiError(raw));
+    const checked = entry ? entry.envelope.safeParse(raw) : undefined;
+    if (checked && !checked.success) {
+      const env = decodeApiError(raw);
       if (env) {
         const meta = bizCodeMeta[env.bizCode];
         throw new VibeValleyApiError(meta.status, meta.kind, env.message, env.error, text, env.bizCode);
       }
-      throw new Error(`${path}: a response not in its shape: ${Cause.pretty(checked.cause)}`);
+      throw new Error(`${path}: a response not in its shape: ${checked.error.message}`);
     }
-    const value = checked && entry?.hasData === true && Predicate.hasProperty(checked.value, "data") ? checked.value.data : undefined;
+    const value = checked && entry?.hasData === true && isObject(checked.data) ? checked.data.data : undefined;
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked above with the endpoint's own result Schema from api.ts
     return value as R;
   }

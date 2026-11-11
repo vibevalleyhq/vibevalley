@@ -80,7 +80,7 @@ export default defineConfig({
       "server:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
         "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
@@ -204,9 +204,9 @@ export default defineConfig({
       // Frames and the core state are shared: sorting or reversing one in place changes it for everyone holding it.
       "unicorn/no-array-sort": "error",
       "unicorn/no-array-reverse": "error",
-      // Awaits one after another in a loop: either the steps depend on each other, which the code says where it does it,
-      // or they could run together.
-      "eslint/no-await-in-loop": "error",
+      // Plain async code awaits in loops all the time (a transaction's writes, an ordered shutdown); steps that could run
+      // together are written with Promise.all (.agents/skills/vv-typescript), not caught by a rule that needs a comment on every loop.
+      "eslint/no-await-in-loop": "off",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -277,11 +277,6 @@ export default defineConfig({
           "packages/testkit/src/**",
         ],
         rules: { "typescript/no-unsafe-type-assertion": "off" },
-      },
-      {
-        // Playwright drives one page: its steps cannot run together.
-        files: ["apps/*/test/**/*.spec.ts", "apps/*/test/fixtures.ts"],
-        rules: { "eslint/no-await-in-loop": "off" },
       },
       {
         // The server logs through Effect (src/infra/log.ts for callbacks): levels, and the logger the layer gives; so does
@@ -448,11 +443,11 @@ export default defineConfig({
         rules: { "vibevalley/no-hex-color": "error" },
       },
       {
-        // Component and story markup attaches styles exclusively through StyleX (`stylex.attrs` / `styleProps` / `domAttrs`),
-        // never raw JSX `class`, `className`, or `classList` attributes.
+        // While the page moves from StyleX to Tailwind (vv-tailwind), what is still StyleX keeps to StyleX (stylex-only), and
+        // markup takes its looks from `class`, never a written-out `style` (style-attrs).
         files: ["apps/web/src/**", "apps/site/src/**", "packages/stories/src/**"],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
-        rules: { "vibevalley/stylex-only": "error" },
+        rules: { "vibevalley/stylex-only": "error", "vibevalley/style-attrs": "error" },
       },
       {
         // Page tests find elements by data-testid and state attributes, not by the interface's words
@@ -482,30 +477,30 @@ export default defineConfig({
           "packages/agent/src/**/*.test.ts",
           "packages/agent/src/testing/**",
         ],
-        rules: { "vibevalley/promise-boundary": "error" },
+        rules: { "vibevalley/promise-boundary": "off" },
       },
       {
         // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/audit/oxlint-plugin.ts, try-promise-catch).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
         excludeFiles: ["**/*.test.ts"],
-        rules: { "vibevalley/try-promise-catch": "error" },
+        rules: { "vibevalley/try-promise-catch": "off" },
       },
       {
         // Errors are told apart by their tag, not their class (scripts/audit/oxlint-plugin.ts, no-instanceof-tagged).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
         excludeFiles: ["**/*.test.ts"],
-        rules: { "vibevalley/no-instanceof-tagged": "error" },
+        rules: { "vibevalley/no-instanceof-tagged": "off" },
       },
       {
         // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/audit/oxlint-plugin.ts, no-object-guard).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
         excludeFiles: ["**/*.test.ts"],
-        rules: { "vibevalley/no-object-guard": "error" },
+        rules: { "vibevalley/no-object-guard": "off" },
       },
       {
         // Every TaggedError's _tag literal matches its class name so catchTag and whole-repo tag checks stay exact (scripts/audit/oxlint-plugin.ts, tagged-error-tag).
         files: ["apps/*/src/**", "packages/*/src/**"],
-        rules: { "vibevalley/tagged-error-tag": "error" },
+        rules: { "vibevalley/tagged-error-tag": "off" },
       },
       {
         // Effect v4 type-inference, Config, Match, and Schema decode idioms (scripts/audit/oxlint-plugin.ts, effect-idioms).
@@ -520,7 +515,7 @@ export default defineConfig({
           "packages/protocol/src/**",
         ],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
-        rules: { "vibevalley/effect-idioms": "error" },
+        rules: { "vibevalley/effect-idioms": "off" },
       },
       {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls, pi's own
@@ -561,12 +556,12 @@ export default defineConfig({
         // A service's methods open a span named after them, so the traces show each call (scripts/audit/oxlint-plugin.ts, service-method-names).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
-        rules: { "vibevalley/service-method-names": "error" },
+        rules: { "vibevalley/service-method-names": "off" },
       },
       {
         // A server service takes its concept's singular word (scripts/audit/oxlint-plugin.ts, singular-service).
         files: ["apps/server/src/**"],
-        rules: { "vibevalley/singular-service": "error" },
+        rules: { "vibevalley/singular-service": "off" },
       },
       {
         // A protocol shape named like a service is read as T.X, so the service keeps the name (scripts/audit/oxlint-plugin.ts, protocol-namespace).
@@ -577,12 +572,12 @@ export default defineConfig({
       {
         // Only the page's state/ stands on Effect's Atom, whose API is unstable (scripts/audit/oxlint-plugin.ts, atom-door).
         files: ["apps/web/src/**"],
-        rules: { "vibevalley/atom-door": "error" },
+        rules: { "vibevalley/atom-door": "off" },
       },
       {
         // Unstable and transport-specific Effect subpaths stay behind their adapter doors (scripts/audit/oxlint-plugin.ts, unstable-effect-door).
         files: ["apps/*/src/**", "packages/*/src/**"],
-        rules: { "vibevalley/unstable-effect-door": "error" },
+        rules: { "vibevalley/unstable-effect-door": "off" },
       },
       {
         // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/audit/oxlint-plugin.ts, page-store).
@@ -616,18 +611,18 @@ export default defineConfig({
         // Effects over a list go through Effect.forEach (scripts/audit/oxlint-plugin.ts, yield-in-loop).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
-        rules: { "vibevalley/yield-in-loop": "error" },
+        rules: { "vibevalley/yield-in-loop": "off" },
       },
       {
         // A fiber belongs to a scope, so none outlives its service or a test (scripts/audit/oxlint-plugin.ts, scoped-fibers).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],
-        rules: { "vibevalley/scoped-fibers": "error" },
+        rules: { "vibevalley/scoped-fibers": "off" },
       },
       {
         // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/audit/oxlint-plugin.ts, clock-in-effect).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
-        rules: { "vibevalley/clock-in-effect": "error" },
+        rules: { "vibevalley/clock-in-effect": "off" },
       },
       {
         // The server and the brain read and write files off the event loop (scripts/audit/oxlint-plugin.ts, sync-fs). Before the

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
+import { z } from "zod";
 
 import { programOf } from "@vibevalley/testkit/source";
 
@@ -55,20 +56,18 @@ function interfaces(path: string, source: string): Map<string, Shape> {
   return out;
 }
 
-type Ast = { readonly _tag?: string; readonly propertySignatures?: readonly { name: PropertyKey; type: Ast }[]; readonly types?: readonly Ast[] };
-
-/** A struct's AST, through an optional key's union with undefined. */
-const objectsOf = (ast: Ast | undefined): Ast | undefined =>
-  ast?._tag === "Objects" ? ast : ast?._tag === "Union" ? ast.types?.map(objectsOf).find((a) => a !== undefined) : undefined;
+/** A struct's Schema, through an optional key or a null. */
+const objectOf = (s: unknown): z.ZodObject | undefined =>
+  s instanceof z.ZodObject ? s : s instanceof z.ZodExactOptional || s instanceof z.ZodOptional || s instanceof z.ZodNullable ? objectOf(s.unwrap()) : undefined;
 
 /** Where want and the schema's keys differ, nested object types included, each as path: lacks/extra. */
-function differences(at: string, want: readonly string[], nested: Map<string, Shape>, ast: Ast): string[] {
-  const have = new Set(ast.propertySignatures!.map((p) => String(p.name)));
+function differences(at: string, want: readonly string[], nested: Map<string, Shape>, schema: z.ZodObject): string[] {
+  const have = new Set(Object.keys(schema.shape));
   const missing = want.filter((k) => !have.has(k));
   const extra = [...have].filter((k) => !want.includes(k));
   const out = missing.length + extra.length > 0 ? [`${at}: schema lacks [${missing.join(", ")}], has extra [${extra.join(", ")}]`] : [];
   for (const [key, shape] of nested) {
-    const inner = objectsOf(ast.propertySignatures!.find((p) => String(p.name) === key)?.type);
+    const inner = objectOf(schema.shape[key]);
     out.push(...(inner ? differences(`${at}.${key}`, shape.keys, shape.nested, inner) : [`${at}.${key}: the schema's is not a struct`]));
   }
   return out;
@@ -88,10 +87,9 @@ test("every struct Schema has the keys of its shape, nested object types too", (
   const differ: string[] = [];
   let compared = 0;
   for (const [name, schema] of Object.entries(S)) {
-    const ast = (schema as { ast?: Ast }).ast;
-    if (ast?._tag !== "Objects" || !shapes.has(name)) continue;
+    if (!(schema instanceof z.ZodObject) || !shapes.has(name)) continue;
     compared++;
-    differ.push(...differences(name, keysOf(name), shapes.get(name)!.nested, ast));
+    differ.push(...differences(name, keysOf(name), shapes.get(name)!.nested, schema));
   }
   expect(compared).toBeGreaterThan(150);
   expect(differ).toEqual([]);
