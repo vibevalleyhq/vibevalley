@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-export const UserDevice: Codec<T.UserDevice> = Schema.Struct({
+const UserDevice: Codec<T.UserDevice> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   came: Schema.Literals(T.DeviceCameValues),
@@ -38,7 +38,7 @@ export const UserLogin: Codec<T.UserLogin> = Schema.Struct({
 
 export const UserDevices = Schema.mutable(Schema.Array(UserDevice));
 
-export const Approval: Codec<T.Approval> = Schema.Struct({
+const Approval: Codec<T.Approval> = Schema.Struct({
   id: Schema.String,
   code: Schema.String,
   name: Schema.String,

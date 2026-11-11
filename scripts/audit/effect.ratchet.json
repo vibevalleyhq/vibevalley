@@ -1,8 +1,8 @@
 {
   "apiStabilityLeak": {
-    "apps/server": 125,
-    "apps/cli": 36,
-    "packages/agent": 24,
+    "apps/server": 124,
+    "apps/cli": 35,
+    "packages/agent": 22,
     "packages/ai": 3,
     "packages/provider": 24,
     "packages/protocol": 1,
@@ -79,7 +79,7 @@
   "missingPipeableSignature": {
     "apps/server": 203,
     "apps/cli": 7,
-    "packages/agent": 44,
+    "packages/agent": 43,
     "packages/ai": 19,
     "packages/provider": 8,
     "packages/pkm": 43,

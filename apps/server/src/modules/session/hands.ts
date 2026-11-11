@@ -5,7 +5,6 @@ import { Effect, type Scope, type Semaphore } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
-import type { ExecutionInput } from "#/modules/machine/executor.ts";
 import type { Workplace } from "#/modules/repo/workplace.ts";
 
 import type { Journal } from "./journal.ts";
@@ -36,8 +35,6 @@ export interface Hand {
   report: T.IssueReport | undefined;
   settling?: { readonly report: SubagentReport; readonly completedBefore: number };
 }
-
-export type PendingInputEffect = ExecutionInput;
 
 /** Owns live `Hand` entries, MCP bearer tokens, and the `hand.access -> admission` lock order. */
 export function makeHandRoster(admission: Semaphore.Semaphore) {
@@ -90,5 +87,3 @@ export function makeHandRoster(admission: Semaphore.Semaphore) {
     who: (token: string) => tokens.get(token) ?? "",
   };
 }
-
-export type HandRoster = ReturnType<typeof makeHandRoster>;

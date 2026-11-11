@@ -34,7 +34,7 @@ const mtimeMsOf = (mtime: Option.Option<Date>): number => (Option.isSome(mtime) 
 
 const readNodeText = (path: string): Effect.Effect<string, AgentFailed> => Effect.tryPromise({ try: () => readFile(path, "utf8"), catch: agentFailed });
 
-export const nodeAgentFs: AgentFs = {
+const nodeAgentFs: AgentFs = {
   readText: readNodeText,
   readTextIfExists: (path) =>
     readNodeText(path).pipe(
@@ -54,7 +54,7 @@ export const nodeAgentFs: AgentFs = {
     Effect.map(Effect.tryPromise({ try: () => stat(path), catch: agentFailed }), (info) => ({ isDirectory: info.isDirectory(), mtimeMs: info.mtimeMs })),
 };
 
-export function fromFileSystem(fs: FileSystem.FileSystem): AgentFs {
+function fromFileSystem(fs: FileSystem.FileSystem): AgentFs {
   return {
     readText: (path) => Effect.mapError(fs.readFileString(path), agentFailed),
     readTextIfExists: (path) =>

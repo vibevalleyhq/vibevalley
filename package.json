@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",
-    "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/desktop": "workspace:*",
     "@vibevalley/health": "workspace:*",
@@ -33,7 +32,6 @@
     "knip": "catalog:",
     "lightningcss": "catalog:",
     "parse5": "catalog:",
-    "sharp": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",

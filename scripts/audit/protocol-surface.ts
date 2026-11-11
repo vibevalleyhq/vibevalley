@@ -179,7 +179,7 @@ if (import.meta.main) {
   }
 
   if (!existsSync(ratchetPath)) {
-    problems.push(`missing ${ratchetPath}; run \`node scripts/protocol-surface.ts --write\``);
+    problems.push(`missing ${ratchetPath}; run \`vpx scripts/audit/protocol-surface.ts --write\``);
   } else {
     const kept = Schema.decodeUnknownSync(Schema.fromJsonString(RatchetSchema))(readFileSync(ratchetPath, "utf8"));
     for (const key of ratchetKeys) {
@@ -189,7 +189,7 @@ if (import.meta.main) {
         );
       } else if (metrics[key] < kept[key] && !write) {
         problems.push(
-          `protocol surface ${key} shrank from ${kept[key]} to ${metrics[key]}. Fix: run \`node scripts/protocol-surface.ts --write\` to lock in the smaller baseline.`,
+          `protocol surface ${key} shrank from ${kept[key]} to ${metrics[key]}. Fix: run \`vpx scripts/audit/protocol-surface.ts --write\` to lock in the smaller baseline.`,
         );
       }
     }

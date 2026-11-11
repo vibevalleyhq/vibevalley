@@ -5,16 +5,16 @@ import type { Codec } from "../codec";
 import { IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes";
 
-export const SessionAction: Codec<T.SessionAction> = Schema.Literals(T.SessionActionValues);
+const SessionAction: Codec<T.SessionAction> = Schema.Literals(T.SessionActionValues);
 
 export const doingFields = {
   action: SessionAction,
   label: Schema.String,
 };
 
-export const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
+const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
 
-export const DoingView: Codec<T.DoingView> = Schema.Struct({ ...doingFields, actionText: Schema.String });
+const DoingView: Codec<T.DoingView> = Schema.Struct({ ...doingFields, actionText: Schema.String });
 
 const workingFields = {
   since: Schema.Finite,
@@ -32,7 +32,7 @@ const PhaseFailed: Codec<T.PhaseFailed> = Schema.TaggedStruct("failed", {});
 
 export const PhaseResting: Codec<T.PhaseResting> = Schema.TaggedStruct("resting", {});
 
-export const SessionClose: Codec<T.SessionClose> = Schema.Literals(T.SessionCloseValues);
+const SessionClose: Codec<T.SessionClose> = Schema.Literals(T.SessionCloseValues);
 
 const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
   at: Schema.Finite,
@@ -41,7 +41,7 @@ const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
 
 export const Phase: Codec<T.Phase> = Schema.Union([PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
-export const PhaseView: Codec<T.PhaseView> = Schema.Union([PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
+const PhaseView: Codec<T.PhaseView> = Schema.Union([PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
 export const IssueAnswer: Codec<T.IssueAnswer> = Schema.Struct({
   conclusion: Schema.String,
@@ -58,7 +58,7 @@ export const LastRun: Codec<T.LastRun> = Schema.Struct({
   answer: Schema.optionalKey(IssueAnswer),
 });
 
-export const ToolConnection: Codec<T.ToolConnection> = Schema.Struct({
+const ToolConnection: Codec<T.ToolConnection> = Schema.Struct({
   server: Schema.String,
   status: Schema.Literals(T.ToolConnectionStatusValues),
   reason: Schema.optionalKey(Schema.String),
@@ -93,11 +93,11 @@ export const SessionView: Codec<T.SessionView> = Schema.Struct({
   phaseText: Schema.String,
 });
 
-export const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.SessionEventTypeValues);
+const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.SessionEventTypeValues);
 
-export const ToolAction: Codec<T.ToolAction> = Schema.Literals(T.ToolActionValues);
+const ToolAction: Codec<T.ToolAction> = Schema.Literals(T.ToolActionValues);
 
-export const EventTokens: Codec<T.EventTokens> = Schema.Struct({
+const EventTokens: Codec<T.EventTokens> = Schema.Struct({
   input: Schema.Finite,
   cacheRead: Schema.Finite,
   output: Schema.Finite,
@@ -122,7 +122,7 @@ export const SessionEvent: Codec<T.SessionEvent> = Schema.Struct({
   connection: Schema.optionalKey(ToolConnection),
 });
 
-export const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
+const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
 
 export const RunTrigger: Codec<T.RunTrigger> = Schema.Struct({
   kind: RunTriggerKind,

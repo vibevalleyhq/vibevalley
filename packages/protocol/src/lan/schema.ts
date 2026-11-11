@@ -14,7 +14,7 @@ export const LanPairRequest: Codec<T.LanPairRequest> = Schema.Struct({
   name: Schema.String,
 });
 
-export const LanPairing: Codec<T.LanPairing> = Schema.Struct({
+const LanPairing: Codec<T.LanPairing> = Schema.Struct({
   code: Schema.String,
   link: Schema.String,
   expiresAt: Schema.Finite,

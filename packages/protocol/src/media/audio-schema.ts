@@ -10,7 +10,7 @@ const Id = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u));
 const VoiceId = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u));
 const SpeakerId = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/\S/u));
 const MediaAudioFormat = Schema.Literals(MediaAudioFormatValues);
-export const MediaAudioAccountRequest = Schema.Struct({
+const MediaAudioAccountRequest = Schema.Struct({
   id: Id,
   connection: Schema.NonEmptyString,
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -70,12 +70,12 @@ export const MediaAudioRequest: Codec<T.MediaAudioRequest> = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("clone"), ...MediaCloneRequest.fields }),
   Schema.Struct({ kind: Schema.Literal("transcription"), ...MediaTranscriptionRequest.fields }),
 ]);
-export const MediaAudioVoice: Codec<T.MediaAudioVoice> = Schema.Struct({
+const MediaAudioVoice: Codec<T.MediaAudioVoice> = Schema.Struct({
   id: Schema.NonEmptyString,
   name: Schema.String,
   createdAtSeconds: Schema.Finite,
 });
-export const MediaAudioSegment: Codec<T.MediaAudioSegment> = Schema.Struct({
+const MediaAudioSegment: Codec<T.MediaAudioSegment> = Schema.Struct({
   speaker: Schema.String,
   text: Schema.String,
   start: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),

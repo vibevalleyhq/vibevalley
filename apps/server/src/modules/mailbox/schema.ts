@@ -19,7 +19,7 @@ const ParentPreviewSchema: Schema.Codec<T.ParentPreview, Wire<T.ParentPreview>> 
   readUri: Schema.String,
 });
 
-export const CompactCard: Schema.Codec<T.CompactCard, Wire<T.CompactCard>> = Schema.Struct({
+const CompactCard: Schema.Codec<T.CompactCard, Wire<T.CompactCard>> = Schema.Struct({
   summary: Schema.String,
   totalChars: Schema.Finite,
   truncated: Schema.Boolean,
@@ -42,7 +42,7 @@ export const TriggerContext: Schema.Codec<T.TriggerContext, Wire<T.TriggerContex
   voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
-export const TriggerMeta: Schema.Codec<T.TriggerMeta, Wire<T.TriggerMeta>> = Schema.Struct({
+const TriggerMeta: Schema.Codec<T.TriggerMeta, Wire<T.TriggerMeta>> = Schema.Struct({
   issue: Schema.optionalKey(IssueId),
   ingressRecipient: Schema.optionalKey(Schema.String),
   trigger: Schema.optionalKey(RunTrigger),

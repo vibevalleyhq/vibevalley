@@ -87,7 +87,7 @@ export class TextCache {
   }
 }
 
-export const ResourceRequest = Schema.Struct({
+const ResourceRequest = Schema.Struct({
   uri: Schema.String.annotate({ description: resourceWords.uri }),
   offset: Schema.optionalKey(Schema.Int.annotate({ description: resourceWords.offset })),
   limit: Schema.optionalKey(Schema.Int.annotate({ description: resourceWords.limit })),

@@ -41,7 +41,7 @@ const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
 const afterAll = "\uffff";
 
-export type { Info, Spoken, SayMore, UserInput, Delivered } from "./contracts.ts";
+export type { Spoken, Delivered } from "./contracts.ts";
 
 export class Channel extends Context.Service<Channel, ChannelService>()("@vibevalley/server/modules/channel/channel") {
   static readonly layer = Layer.effect(

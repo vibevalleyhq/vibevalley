@@ -29,15 +29,15 @@ export const AgoraAppID: Codec<T.AgoraAppID> = Schema.Struct({
   value: Schema.optionalKey(Schema.String),
 });
 
-export const Area: Codec<T.Area> = Schema.Literals(T.AreaValues);
+const Area: Codec<T.Area> = Schema.Literals(T.AreaValues);
 
-export const Language: Codec<T.Language> = Schema.Literals(T.LanguageValues);
+const Language: Codec<T.Language> = Schema.Literals(T.LanguageValues);
 
 const VoiceASRAres: Codec<T.VoiceASRAres> = Schema.Struct({
   vendor: Schema.Literal("ares"),
 });
 
-export const Model: Codec<T.Model> = Schema.Literals(T.ModelValues);
+const Model: Codec<T.Model> = Schema.Literals(T.ModelValues);
 
 const VoiceASRDeepgram: Codec<T.VoiceASRDeepgram> = Schema.Struct({
   vendor: Schema.Literal("deepgram"),
@@ -49,7 +49,7 @@ const VoiceASRMicrosoft: Codec<T.VoiceASRMicrosoft> = Schema.Struct({
   region: Schema.String,
 });
 
-export const VoiceASR: Codec<T.VoiceASR> = Schema.Union([VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]);
+const VoiceASR: Codec<T.VoiceASR> = Schema.Union([VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]);
 
 const VoiceAnswerOrchestrator: Codec<T.VoiceAnswerOrchestrator> = Schema.Struct({
   vendor: Schema.Literal("orchestrator"),
@@ -77,13 +77,7 @@ const VoiceAnswerOpenai: Codec<T.VoiceAnswerOpenai> = Schema.Struct({
   model: Schema.String,
 });
 
-export const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([
-  VoiceAnswerOrchestrator,
-  VoiceAnswerMoss,
-  VoiceAnswerAgora,
-  VoiceAnswerDeepseek,
-  VoiceAnswerOpenai,
-]);
+const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerOrchestrator, VoiceAnswerMoss, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
 
 const VoiceTTSMinimaxModel: Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
 
@@ -93,7 +87,7 @@ const VoiceTTSMinimax: Codec<T.VoiceTTSMinimax> = Schema.Struct({
   voiceId: Schema.String,
 });
 
-export const Voice: Codec<T.Voice> = Schema.Literals(T.VoiceValues);
+const Voice: Codec<T.Voice> = Schema.Literals(T.VoiceValues);
 
 const VoiceTTSOpenai: Codec<T.VoiceTTSOpenai> = Schema.Struct({
   vendor: Schema.Literal("openai"),
@@ -106,7 +100,7 @@ const VoiceTTSMicrosoft: Codec<T.VoiceTTSMicrosoft> = Schema.Struct({
   voiceName: Schema.String,
 });
 
-export const VoiceTTS: Codec<T.VoiceTTS> = Schema.Union([VoiceTTSMinimax, VoiceTTSOpenai, VoiceTTSMicrosoft]);
+const VoiceTTS: Codec<T.VoiceTTS> = Schema.Union([VoiceTTSMinimax, VoiceTTSOpenai, VoiceTTSMicrosoft]);
 
 export const VoiceSettings: Codec<T.VoiceSettings> = Schema.Struct({
   area: Area,

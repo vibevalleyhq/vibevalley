@@ -3,9 +3,9 @@ import { Schema } from "effect";
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-export const AgentProblemLevel: Codec<T.AgentProblemLevel> = Schema.Literals(T.AgentIssueLevelValues);
+const AgentProblemLevel: Codec<T.AgentProblemLevel> = Schema.Literals(T.AgentIssueLevelValues);
 
-export const AgentProblem: Codec<T.AgentProblem> = Schema.Struct({
+const AgentProblem: Codec<T.AgentProblem> = Schema.Struct({
   field: Schema.String,
   level: AgentProblemLevel,
   text: Schema.String,
@@ -28,7 +28,7 @@ const MCPServerHTTP: Codec<T.MCPServerHTTP> = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
 });
 
-export const MCPServer: Codec<T.MCPServer> = Schema.Union([MCPServerStdio, MCPServerHTTP]);
+const MCPServer: Codec<T.MCPServer> = Schema.Union([MCPServerStdio, MCPServerHTTP]);
 
 export const Species: Codec<T.Species> = Schema.Literals(T.SpeciesValues);
 

@@ -35,7 +35,7 @@ export const ProviderStatus: Codec<T.ProviderStatus> = Schema.Struct({
   speech: Schema.NullOr(ProviderBinding),
   speechModels: Schema.mutable(Schema.Array(Schema.String)),
 });
-export const ProviderConnectionUpdate: Codec<T.ProviderConnectionUpdate> = Schema.Struct({
+const ProviderConnectionUpdate: Codec<T.ProviderConnectionUpdate> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   adapter: Schema.Literal("moss"),

@@ -36,20 +36,20 @@ const spaceFields = {
   machines: Schema.mutable(Schema.Array(Machine)),
 };
 
-export const SpaceState: Codec<T.SpaceState> = Schema.Struct({
+const SpaceState: Codec<T.SpaceState> = Schema.Struct({
   ...spaceFields,
   sessions: Schema.mutable(Schema.Array(Session)),
   crons: Schema.mutable(Schema.Array(Cron)),
   plays: Schema.optionalKey(Schema.Record(Schema.String, SessionPlay)),
 });
 
-export const SpaceView: Codec<T.SpaceView> = Schema.Struct({
+const SpaceView: Codec<T.SpaceView> = Schema.Struct({
   ...spaceFields,
   sessions: Schema.mutable(Schema.Array(SessionView)),
   crons: Schema.mutable(Schema.Array(CronView)),
 });
 
-export const NoticeLevel: Codec<T.NoticeLevel> = Schema.Literals(T.NoticeLevelValues);
+const NoticeLevel: Codec<T.NoticeLevel> = Schema.Literals(T.NoticeLevelValues);
 
 export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
   seq: Schema.Finite,
@@ -86,7 +86,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactMediaChanged,
 ]);
 
-export const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
+const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
   type: Schema.Literal("snapshot"),
   at: Schema.Finite,
   state: SpaceState,
@@ -99,7 +99,7 @@ const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
   activity: SessionEvent,
 });
 
-export const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
+const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
   type: Schema.Literal("notice"),
   at: Schema.Finite,
   level: NoticeLevel,

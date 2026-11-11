@@ -84,5 +84,3 @@ export const makeIssueStore = Effect.gen(function* () {
     }),
   };
 });
-
-export type IssueStore = Effect.Success<typeof makeIssueStore>;

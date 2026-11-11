@@ -63,7 +63,7 @@ export const appendSession = (file: string, message: BrainMessage, fs?: FileSyst
     yield* io.appendText(file, line + "\n");
   });
 
-export const clearSession = (file: string, fs?: FileSystem.FileSystem): Effect.Effect<void, AgentFailed> =>
+const clearSession = (file: string, fs?: FileSystem.FileSystem): Effect.Effect<void, AgentFailed> =>
   Effect.gen(function* () {
     const io = agentFsOf(fs);
     yield* io.makeDir(dirname(file));

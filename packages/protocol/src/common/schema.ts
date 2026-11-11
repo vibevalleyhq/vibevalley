@@ -23,7 +23,7 @@ export const Validation: Codec<T.Validation> = Schema.Struct({
 
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
-export const AgentRole: Codec<T.AgentRole> = Schema.Literals(T.AgentRoleValues);
+const AgentRole: Codec<T.AgentRole> = Schema.Literals(T.AgentRoleValues);
 
 export const Actor: Codec<T.Actor> = Schema.Union([
   Schema.Struct({

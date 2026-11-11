@@ -4,7 +4,7 @@ import { Look } from "../agent/schema";
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-export const RuntimeQuota: Codec<T.RuntimeQuota> = Schema.Struct({
+const RuntimeQuota: Codec<T.RuntimeQuota> = Schema.Struct({
   left: Schema.optionalKey(Schema.Finite),
   text: Schema.String,
 });
@@ -16,7 +16,7 @@ export const RuntimePreset: Codec<T.RuntimePreset> = Schema.Struct({
   look: Look,
 });
 
-export const RuntimeCapability: Codec<T.RuntimeCapability> = Schema.Literals(T.RuntimeCapabilityValues);
+const RuntimeCapability: Codec<T.RuntimeCapability> = Schema.Literals(T.RuntimeCapabilityValues);
 
 export const RuntimeSupport: Codec<T.RuntimeSupport> = Schema.Struct({
   steer: Schema.Boolean,
@@ -47,7 +47,7 @@ const InstallationUnsupported: Codec<T.InstallationUnsupported> = Schema.Struct(
   reason: Schema.String,
 });
 
-export const Installation: Codec<T.Installation> = Schema.Union([InstallationAvailable, InstallationNotFound, InstallationChecking, InstallationUnsupported]);
+const Installation: Codec<T.Installation> = Schema.Union([InstallationAvailable, InstallationNotFound, InstallationChecking, InstallationUnsupported]);
 
 export const ModelEntry: Codec<T.ModelEntry> = Schema.Struct({
   id: Schema.String,
@@ -56,13 +56,13 @@ export const ModelEntry: Codec<T.ModelEntry> = Schema.Struct({
   isDefault: Schema.Boolean,
 });
 
-export const UsageWindow: Codec<T.UsageWindow> = Schema.Struct({
+const UsageWindow: Codec<T.UsageWindow> = Schema.Struct({
   label: Schema.String,
   usedPercent: Schema.Finite,
   resetsAt: Schema.NullOr(Schema.Finite),
 });
 
-export const Balance: Codec<T.Balance> = Schema.Struct({
+const Balance: Codec<T.Balance> = Schema.Struct({
   currency: Schema.String,
   amount: Schema.Finite,
 });
@@ -89,9 +89,9 @@ const AccountUsageUnavailable: Codec<T.AccountUsageUnavailable> = Schema.Struct(
   reason: Schema.String,
 });
 
-export const AccountUsage: Codec<T.AccountUsage> = Schema.Union([AccountUsageOk, AccountUsageBalance, AccountUsageLoginRequired, AccountUsageUnavailable]);
+const AccountUsage: Codec<T.AccountUsage> = Schema.Union([AccountUsageOk, AccountUsageBalance, AccountUsageLoginRequired, AccountUsageUnavailable]);
 
-export const InventoryEntry: Codec<T.InventoryEntry> = Schema.Struct({
+const InventoryEntry: Codec<T.InventoryEntry> = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
   source: Schema.String,

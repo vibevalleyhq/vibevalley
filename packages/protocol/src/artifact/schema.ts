@@ -4,11 +4,11 @@ import type { Codec } from "../codec";
 import { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/schema";
 import * as T from "./shapes";
 
-export const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBodyValues);
+const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBodyValues);
 
 const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
 
-export const ArtifactDisplay: Codec<T.ArtifactDisplay> = Schema.Literals(T.ArtifactDisplayValues);
+const ArtifactDisplay: Codec<T.ArtifactDisplay> = Schema.Literals(T.ArtifactDisplayValues);
 
 export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
   id: ArtifactId,
@@ -19,7 +19,7 @@ export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
   display: Schema.optionalKey(ArtifactDisplay),
 });
 
-export const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
+const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
   version: Schema.Finite,
   size: Schema.Finite,
   note: Schema.String,
@@ -63,7 +63,7 @@ export const ArtifactVersionRequest: Codec<T.ArtifactVersionRequest> = Schema.St
   note: Schema.optionalKey(Schema.String),
 });
 
-export const HtmlAnchor: Codec<T.HtmlAnchor> = Schema.Struct({
+const HtmlAnchor: Codec<T.HtmlAnchor> = Schema.Struct({
   kind: Schema.Literal("text"),
   exact: Schema.String,
   prefix: Schema.String,
@@ -100,13 +100,6 @@ export const HtmlShellMessage: Codec<T.HtmlShellMessage> = Schema.Union([
   Schema.Struct({ vibevalley: Schema.Literal("at"), page: Schema.optionalKey(shellCount), time: Schema.optionalKey(shellTime) }),
 ]);
 
-export const HtmlShellCommand: Codec<T.HtmlShellCommand> = Schema.Union([
-  Schema.Struct({ vibevalley: Schema.Literal("goto"), page: shellCount }),
-  Schema.Struct({ vibevalley: Schema.Literal("seek"), time: shellTime }),
-  Schema.Struct({ vibevalley: Schema.Literal("play") }),
-  Schema.Struct({ vibevalley: Schema.Literal("pause") }),
-]);
-
 export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
   channel: Schema.optionalKey(Schema.String),
   issue: Schema.optionalKey(Schema.String),
@@ -136,7 +129,7 @@ export const QuotedBlock: Codec<T.QuotedBlock> = Schema.Struct({
   deleted: Schema.optionalKey(Schema.Boolean),
 });
 
-export const SpanMarks: Codec<T.SpanMarks> = Schema.Struct({
+const SpanMarks: Codec<T.SpanMarks> = Schema.Struct({
   bold: Schema.optionalKey(Schema.Boolean),
   italic: Schema.optionalKey(Schema.Boolean),
   code: Schema.optionalKey(Schema.Boolean),
@@ -161,7 +154,7 @@ export const BlockAttrs: Codec<T.BlockAttrs> = Schema.Struct({
   memoryId: Schema.optionalKey(Schema.String),
 });
 
-export const BlockType: Codec<T.BlockType> = Schema.Literals(T.BlockTypeValues);
+const BlockType: Codec<T.BlockType> = Schema.Literals(T.BlockTypeValues);
 
 const blockInputFields = {
   id: BlockId,
@@ -172,9 +165,9 @@ const blockInputFields = {
   text: Schema.mutable(Schema.Array(TextSpan)),
 };
 
-export const BlockInput: Codec<T.BlockInput> = Schema.Struct(blockInputFields);
+const BlockInput: Codec<T.BlockInput> = Schema.Struct(blockInputFields);
 
-export const Block: Codec<T.Block> = Schema.Struct({
+const Block: Codec<T.Block> = Schema.Struct({
   ...blockInputFields,
   artifactId: ArtifactId,
   rev: Schema.Finite,
@@ -197,7 +190,7 @@ const BlockOpInsertBlock: Codec<T.BlockOpInsertBlock> = Schema.Struct({
   block: BlockInput,
 });
 
-export const BlockOpUpdateText: Codec<T.BlockOpUpdateText> = Schema.Struct({
+const BlockOpUpdateText: Codec<T.BlockOpUpdateText> = Schema.Struct({
   op: Schema.Literal("update_text"),
   blockId: BlockId,
   baseRev: Schema.Finite,
@@ -218,7 +211,7 @@ const BlockOpSetType: Codec<T.BlockOpSetType> = Schema.Struct({
   attrs: BlockAttrs,
 });
 
-export const BlockOpMoveBlock: Codec<T.BlockOpMoveBlock> = Schema.Struct({
+const BlockOpMoveBlock: Codec<T.BlockOpMoveBlock> = Schema.Struct({
   op: Schema.Literal("move_block"),
   blockId: BlockId,
   parentId: Schema.optionalKey(BlockId),
@@ -235,7 +228,7 @@ const BlockOpRestoreBlock: Codec<T.BlockOpRestoreBlock> = Schema.Struct({
   blockId: BlockId,
 });
 
-export const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
+const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
   op: Schema.Literal("split_block"),
   blockId: BlockId,
   baseRev: Schema.Finite,
@@ -243,13 +236,13 @@ export const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
   newBlock: BlockInput,
 });
 
-export const BlockOpMergeBlocks: Codec<T.BlockOpMergeBlocks> = Schema.Struct({
+const BlockOpMergeBlocks: Codec<T.BlockOpMergeBlocks> = Schema.Struct({
   op: Schema.Literal("merge_blocks"),
   targetId: BlockId,
   sourceId: BlockId,
 });
 
-export const BlockOp: Codec<T.BlockOp> = Schema.Union([
+const BlockOp: Codec<T.BlockOp> = Schema.Union([
   BlockOpInsertBlock,
   BlockOpUpdateText,
   BlockOpSetAttrs,
@@ -267,7 +260,7 @@ export const BlockSubmit: Codec<T.BlockSubmit> = Schema.Struct({
   ops: Schema.mutable(Schema.Array(BlockOp)),
 });
 
-export const BlockOpStatus: Codec<T.BlockOpStatus> = Schema.Literals(T.BlockOpStatusValues);
+const BlockOpStatus: Codec<T.BlockOpStatus> = Schema.Literals(T.BlockOpStatusValues);
 
 export const BlockCreate: Codec<T.BlockCreate> = Schema.Struct({
   type: Schema.optionalKey(Schema.String),

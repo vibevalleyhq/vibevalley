@@ -8,7 +8,7 @@ import * as T from "./shapes";
 
 export const AchievementCategory: Codec<T.AchievementCategory> = Schema.Literals(T.AchievementCategoryValues);
 
-export const AchievementTier: Codec<T.AchievementTier> = Schema.Struct({
+const AchievementTier: Codec<T.AchievementTier> = Schema.Struct({
   need: Schema.Finite,
   title: Schema.String,
   coins: Schema.Finite,
@@ -25,14 +25,14 @@ export const Achievement: Codec<T.Achievement> = Schema.Struct({
   tiers: Schema.mutable(Schema.Array(AchievementTier)),
 });
 
-export const AchievementStanding: Codec<T.AchievementStanding> = Schema.Struct({
+const AchievementStanding: Codec<T.AchievementStanding> = Schema.Struct({
   id: Schema.String,
   tier: Schema.Finite,
   count: Schema.Finite,
   next: Schema.optionalKey(Schema.Finite),
 });
 
-export const PlayAction: Codec<T.PlayAction> = Schema.Struct({ at: Schema.Finite, ...doingFields });
+const PlayAction: Codec<T.PlayAction> = Schema.Struct({ at: Schema.Finite, ...doingFields });
 
 const PlayActionView: Codec<T.PlayActionView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
 
@@ -47,20 +47,20 @@ const playFields = {
 
 export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayAction)) });
 
-export const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayActionView)) });
+const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayActionView)) });
 
 export const CommitCount: Codec<T.CommitCount> = Schema.Struct({
   total: Schema.Finite,
   repos: Schema.mutable(Schema.Array(Repo)),
 });
 
-export const Unlock: Codec<T.Unlock> = Schema.Struct({
+const Unlock: Codec<T.Unlock> = Schema.Struct({
   id: Schema.String,
   tier: Schema.Finite,
   at: Schema.Finite,
 });
 
-export const AgentTally: Codec<T.AgentTally> = Schema.Struct({
+const AgentTally: Codec<T.AgentTally> = Schema.Struct({
   hired: Schema.Finite,
   harvested: Schema.Finite,
   failed: Schema.Finite,
@@ -82,28 +82,28 @@ export const Progress: Codec<T.Progress> = Schema.Struct({
   multiplier: Schema.optionalKey(Schema.Finite),
 });
 
-export const ProgressNews: Codec<T.ProgressNews> = Schema.Struct({
+const ProgressNews: Codec<T.ProgressNews> = Schema.Struct({
   coins: Schema.optionalKey(Schema.Finite),
   session: Schema.optionalKey(SessionId),
   unlocked: Schema.mutable(Schema.Array(Unlock)),
 });
 
-export const FarmLevel: Codec<T.FarmLevel> = Schema.Struct({
+const FarmLevel: Codec<T.FarmLevel> = Schema.Struct({
   level: Schema.Finite,
   xp: Schema.Finite,
   need: Schema.Finite,
 });
 
-export const Crop: Codec<T.Crop> = Schema.Literals(T.CropValues);
+const Crop: Codec<T.Crop> = Schema.Literals(T.CropValues);
 
-export const BadgeTone: Codec<T.BadgeTone> = Schema.Literals(T.BadgeToneValues);
+const BadgeTone: Codec<T.BadgeTone> = Schema.Literals(T.BadgeToneValues);
 
-export const Badge: Codec<T.Badge> = Schema.Struct({
+const Badge: Codec<T.Badge> = Schema.Struct({
   text: Schema.String,
   tone: BadgeTone,
 });
 
-export const PlotView: Codec<T.PlotView> = Schema.Struct({
+const PlotView: Codec<T.PlotView> = Schema.Struct({
   crop: Crop,
   badge: Schema.optionalKey(Badge),
 });
@@ -115,7 +115,7 @@ export const FarmView: Codec<T.FarmView> = Schema.Struct({
   achievements: Schema.mutable(Schema.Array(AchievementStanding)),
 });
 
-export const GameEffectReward: Codec<T.GameEffectReward> = Schema.Struct({
+const GameEffectReward: Codec<T.GameEffectReward> = Schema.Struct({
   kind: Schema.Literal("reward"),
   sessionId: Schema.optionalKey(SessionId),
   coins: Schema.Finite,
@@ -132,7 +132,7 @@ const GameEffectLevelUp: Codec<T.GameEffectLevelUp> = Schema.Struct({
   level: Schema.Finite,
 });
 
-export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Struct({
+const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Struct({
   kind: Schema.Literal("achievement"),
   achievement: Schema.String,
   tier: Schema.Finite,

@@ -87,16 +87,6 @@ export const durations = stylex.defineConsts({
   panel: "280ms",
 });
 
-export const containers = stylex.defineConsts({
-  sm: "var(--container-sm)",
-  md: "var(--container-md)",
-  lg: "var(--container-lg)",
-  xl: "var(--container-xl)",
-  "2xl": "var(--container-2xl)",
-  "3xl": "var(--container-3xl)",
-  "4xl": "var(--container-4xl)",
-});
-
 export const media = stylex.defineConsts({
   hover: "@media (hover: hover)",
   reducedMotion: "@media (prefers-reduced-motion: reduce)",

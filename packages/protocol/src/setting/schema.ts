@@ -17,7 +17,7 @@ export const MemorySourceInfo: Codec<T.MemorySourceInfo> = Schema.Struct({
 
 export const MemorySourceKind: Codec<T.MemorySourceKind> = Schema.Literals(T.MemorySourceKindValues);
 
-export const MemorySource: Codec<T.MemorySource> = Schema.Struct({
+const MemorySource: Codec<T.MemorySource> = Schema.Struct({
   kind: MemorySourceKind,
   url: Schema.String,
   enabled: Schema.Boolean,
@@ -34,7 +34,7 @@ const SpacePaths: Codec<T.SpacePaths> = Schema.Struct({
   pkm: Schema.String,
 });
 
-export const Readiness: Codec<T.Readiness> = Schema.Union([
+const Readiness: Codec<T.Readiness> = Schema.Union([
   Schema.Struct({ ready: Schema.Literal(true) }),
   Schema.Struct({ ready: Schema.Literal(false), missing: Schema.Literals(T.MissingValues) }),
 ]);
@@ -59,7 +59,7 @@ export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   memorySources: Schema.mutable(Schema.Array(MemorySource)),
 });
 
-export const MemorySourceUpdate: Codec<T.MemorySourceUpdate> = Schema.Struct({
+const MemorySourceUpdate: Codec<T.MemorySourceUpdate> = Schema.Struct({
   kind: MemorySourceKind,
   url: Schema.String,
   enabled: Schema.Boolean,

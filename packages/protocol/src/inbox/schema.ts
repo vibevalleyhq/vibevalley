@@ -4,7 +4,7 @@ import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
 import * as T from "./shapes";
 
-export const InboxKind: Codec<T.InboxKind> = Schema.Literals(T.InboxKindValues);
+const InboxKind: Codec<T.InboxKind> = Schema.Literals(T.InboxKindValues);
 
 const InboxFromSession: Codec<T.InboxFromSession> = Schema.Struct({
   kind: Schema.Literal("session"),
@@ -17,7 +17,7 @@ const InboxFromOrchestrator: Codec<T.InboxFromOrchestrator> = Schema.Struct({
   kind: Schema.Literal("orchestrator"),
 });
 
-export const InboxFrom: Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromOrchestrator]);
+const InboxFrom: Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromOrchestrator]);
 
 const InboxTargetSession: Codec<T.InboxTargetSession> = Schema.Struct({
   kind: Schema.Literal("session"),
@@ -36,7 +36,7 @@ const InboxTargetChat: Codec<T.InboxTargetChat> = Schema.Struct({
 
 const InboxTarget: Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetIssue, InboxTargetChat]);
 
-export const InboxWords: Codec<T.InboxWords> = Schema.Struct({
+const InboxWords: Codec<T.InboxWords> = Schema.Struct({
   label: Schema.String,
   title: Schema.String,
   body: Schema.String,

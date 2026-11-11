@@ -58,22 +58,6 @@ export const effectTool = (spec: EffectToolSpec): Tool => ({
   execute: (params) => Effect.map(spec.run(params), answered),
 });
 
-interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<TextToolSpec, "parameters" | "run"> {
-  readonly parameters: S;
-  readonly run: (params: S["Type"], tc: ToolContext) => string | Promise<string>;
-}
-
-/** A tool whose parameters are a Schema. */
-export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields> & Schema.Codec<S["Type"]>>(spec: SchemaToolSpec<S>): Tool {
-  const read = Schema.decodeUnknownEffect(spec.parameters);
-  return {
-    name: spec.name,
-    description: spec.description,
-    parameters: parametersOf(spec.parameters),
-    execute: (params, call) => Effect.flatMap(Effect.mapError(read(params), toolFailed), (p) => ranText((signal) => spec.run(p, { callId: call.id, signal }))),
-  };
-}
-
 interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec, "parameters" | "run"> {
   readonly parameters: S;
   readonly run: (params: S["Type"]) => Effect.Effect<string, ToolFailed>;

@@ -7,14 +7,14 @@ import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/sch
 import * as T from "./shapes";
 import { IssueReportMemoryScopeValues } from "./shapes";
 
-export const Landing: Codec<T.Landing> = Schema.Literals(T.LandingValues);
-export const IssueCanceled: Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanceledValues);
+const Landing: Codec<T.Landing> = Schema.Literals(T.LandingValues);
+const IssueCanceled: Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanceledValues);
 
 export const Priority: Codec<T.Priority> = Schema.Literals(T.PriorityValues);
 
 export const IssueStatus: Codec<T.IssueStatus> = Schema.Literals(T.IssueStatusValues);
 
-export const PullRequestState: Codec<T.PullRequestState> = Schema.Literals(T.PullRequestStateValues);
+const PullRequestState: Codec<T.PullRequestState> = Schema.Literals(T.PullRequestStateValues);
 
 export const PullRequest: Codec<T.PullRequest> = Schema.Struct({
   url: Schema.String,
@@ -29,7 +29,7 @@ export const Finding: Codec<T.Finding> = Schema.Struct({
   resolved: Schema.Boolean,
 });
 
-export const IssueRefining: Codec<T.IssueRefining> = Schema.Struct({
+const IssueRefining: Codec<T.IssueRefining> = Schema.Struct({
   session: SessionId,
   name: Schema.String,
 });
@@ -39,7 +39,7 @@ export const Question: Codec<T.Question> = Schema.Struct({
   options: Schema.mutable(Schema.Array(Schema.String)),
 });
 
-export const CheckResult: Codec<T.CheckResult> = Schema.Literals(T.CheckResultValues);
+const CheckResult: Codec<T.CheckResult> = Schema.Literals(T.CheckResultValues);
 
 export const CriterionCheck: Codec<T.CriterionCheck> = Schema.Struct({
   criterion: Schema.Finite,
@@ -48,18 +48,18 @@ export const CriterionCheck: Codec<T.CriterionCheck> = Schema.Struct({
 });
 
 export const IssueStageKind: Codec<T.IssueStageKind> = Schema.Literals(T.IssueStageKindValues);
-export const StuckReason: Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
-export const IssueAct: Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
+const StuckReason: Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
+const IssueAct: Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
 
-export const ActWords: Codec<T.ActWords> = Schema.Literals(T.ActWordsValues);
+const ActWords: Codec<T.ActWords> = Schema.Literals(T.ActWordsValues);
 
-export const IssueAction: Codec<T.IssueAction> = Schema.Union([
+const IssueAction: Codec<T.IssueAction> = Schema.Union([
   Schema.Struct({ act: IssueAct, does: Schema.Literal("move"), status: IssueStatus, words: ActWords }),
   Schema.Struct({ act: IssueAct, does: Schema.Literal("say") }),
   Schema.Struct({ act: IssueAct, does: Schema.Literal("stop") }),
 ]);
 
-export const IssueStage: Codec<T.IssueStage> = Schema.Struct({
+const IssueStage: Codec<T.IssueStage> = Schema.Struct({
   state: IssueStageKind,
   since: Schema.optionalKey(Schema.Finite),
   stuck: Schema.optionalKey(StuckReason),
@@ -67,9 +67,9 @@ export const IssueStage: Codec<T.IssueStage> = Schema.Struct({
   acts: Schema.mutable(Schema.Array(IssueAction)),
 });
 
-export const MilestoneKind: Codec<T.MilestoneKind> = Schema.Literals(T.MilestoneKindValues);
+const MilestoneKind: Codec<T.MilestoneKind> = Schema.Literals(T.MilestoneKindValues);
 
-export const Milestone: Codec<T.Milestone> = Schema.Struct({
+const Milestone: Codec<T.Milestone> = Schema.Struct({
   at: Schema.Finite,
   kind: MilestoneKind,
   who: Schema.optionalKey(Schema.String),
@@ -81,9 +81,9 @@ export const IssueTimeline: Codec<T.IssueTimeline> = Schema.Struct({
   spent: Schema.optionalKey(Spent),
 });
 
-export const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
+const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
 
-export const Assignment: Codec<T.Assignment> = Schema.Struct({
+const Assignment: Codec<T.Assignment> = Schema.Struct({
   id: Schema.String,
   issue: IssueId,
   agent: Schema.String,
@@ -99,9 +99,9 @@ export const Assignment: Codec<T.Assignment> = Schema.Struct({
   ),
 });
 
-export const MandateStrength: Codec<T.MandateStrength> = Schema.Literals(T.MandateStrengthValues);
+const MandateStrength: Codec<T.MandateStrength> = Schema.Literals(T.MandateStrengthValues);
 
-export const IssueMandate: Codec<T.IssueMandate> = Schema.Struct({
+const IssueMandate: Codec<T.IssueMandate> = Schema.Struct({
   originTriggerId: Schema.optionalKey(Schema.String),
   strength: MandateStrength,
   maxBotReviewRounds: Schema.Int,
@@ -228,7 +228,7 @@ export const IssueFilter: Codec<T.IssueFilter> = Schema.Struct({
   wantsUser: Schema.optionalKey(Schema.Boolean),
 });
 
-export const IssueChildDraft: Codec<T.IssueChildDraft> = Schema.Struct({
+const IssueChildDraft: Codec<T.IssueChildDraft> = Schema.Struct({
   id: Schema.String,
   title: Schema.optionalKey(Schema.String),
   brief: Schema.String,

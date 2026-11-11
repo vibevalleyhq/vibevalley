@@ -6,7 +6,7 @@ import { MediaAudioJob } from "./audio-schema";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 import * as T from "./shapes";
 
-export { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
+export { MediaAudioMetadata, MediaInputReference, MediaSource, MediaAudioUsage } from "./common-schema";
 
 const MediaImageMimeValues = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff"] as const;
 const MediaVideoMimeValues = ["video/mp4", "video/x-m4v", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"] as const;

@@ -17,7 +17,7 @@ import { type ExecutionInput } from "#/modules/machine/executor.ts";
 import { Machine } from "#/modules/machine/machine.ts";
 import * as qs from "#db/session.sql.ts";
 
-import { type Hand, type HandRoster, makeHandRoster } from "./hands.ts";
+import { type Hand, makeHandRoster } from "./hands.ts";
 import { restoredSession, sessionState } from "./history.ts";
 import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
@@ -26,7 +26,7 @@ import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdent
 
 const refused = refuseIn(BizCode.SessionRefused);
 
-export type { Hand, HandRoster };
+export type { Hand };
 
 const saveAfterMs = 300;
 

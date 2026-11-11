@@ -18,7 +18,7 @@ export const Embed: Codec<T.Embed> = Schema.Struct({
   image: Schema.String,
 });
 
-export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
+const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
 
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: MessageId,
@@ -82,7 +82,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   at: Schema.Finite,
 });
 
-export const UserMention: Codec<T.UserMention> = Schema.Struct({
+const UserMention: Codec<T.UserMention> = Schema.Struct({
   message: ChatMessage,
   channel: Schema.String,
   address: Schema.String,
