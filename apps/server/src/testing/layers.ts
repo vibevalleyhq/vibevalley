@@ -7,14 +7,14 @@ import { FetchHttpClient, HttpClient } from "effect/http";
 import { type Agent, defaultOrchestrator, type SpaceState } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { withCast } from "#/agent/agent.ts";
-import { builtInDir, profileOf, templateFrom } from "#/agent/template.ts";
-import builtInIndex from "#/agent/templates/index.json" with { type: "json" };
 import { Core } from "#/core/core.ts";
 import { defaults, ServerConfig } from "#/infra/config.ts";
 import { Database } from "#/infra/db.ts";
 import { PublicHttp } from "#/infra/publicHttp.ts";
 import { afterRealTime } from "#/infra/time.ts";
+import { withCast } from "#/modules/agent/agent.ts";
+import { builtInDir, profileOf, templateFrom } from "#/modules/agent/template.ts";
+import builtInIndex from "#/modules/agent/templates/index.json" with { type: "json" };
 
 export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
 

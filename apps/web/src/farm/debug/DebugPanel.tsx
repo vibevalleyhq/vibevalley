@@ -412,16 +412,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
               <button
                 type="button"
                 {...btn()}
-                onClick={() =>
-                  void act.run(() =>
-                    navigator.clipboard.writeText(
-                      props.log
-                        .entries()
-                        .map((e) => JSON.stringify(e.json))
-                        .join("\n"),
-                    ),
-                  )
-                }
+                onClick={() => {
+                  const text = props.log
+                    .entries()
+                    .map((e) => JSON.stringify(e.json))
+                    .join("\n");
+                  void act.run(() => navigator.clipboard.writeText(text));
+                }}
               >
                 {t("web.farm.debug.copy")}
               </button>

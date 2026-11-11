@@ -1,6 +1,6 @@
 /**
  * What is dead: files nothing reaches, exports nothing imports, dependencies nothing uses (`vp run deadcode`, through
- * scripts/deadcode.ts, which says what to do about each). A file is alive when an entry reaches it. knip finds most
+ * scripts/audit/deadcode.ts, which says what to do about each). A file is alive when an entry reaches it. knip finds most
  * entries itself (package.json's scripts, index.html, the Vite, Vitest, Playwright and Expo configs); the ones listed
  * below are run some other way: scripts by vpx, the stories' page, the desktop shell's main and preload. A package's
  * exports are entries too, and includeEntryExports reports the ones no other workspace imports: the packages are ours,
@@ -15,7 +15,7 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: { interface: true, type: true },
   workspaces: {
     ".": {
-      entry: ["scripts/*.ts"],
+      entry: ["scripts/*/*.ts"],
       project: ["scripts/**/*.ts"],
       // Named by tools, not imports: effect-tsgo runs in vite.config.ts's effect:check, effect is the version it checks
       // against, tsconfig.base.json names the editor plugin @effect/language-service, and lightningcss/parse5 stay in the
@@ -25,7 +25,7 @@ const config: KnipConfig = {
     "apps/server": {
       // main.ts and chat.ts run through vpx (`vp run start`, `vp run chat`, the desktop app and the e2e), which knip does
       // not read in a script; both are the pack block's entries, and chat.ts is what the command line runs.
-      entry: ["scripts/*.ts", "src/main.ts", "src/chat.ts"],
+      entry: ["scripts/*.ts", "src/main.ts", "src/chat/main.ts"],
       project: ["src/**/*.ts", "scripts/**/*.ts"],
     },
     "apps/cli": {
@@ -40,11 +40,11 @@ const config: KnipConfig = {
     },
     "apps/site": {
       // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
-      entry: ["src/{App,Document}.tsx", "src/lib/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
+      entry: ["src/{App,Document}.tsx", "src/base/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
     },
     "apps/desktop": {
-      entry: ["src/main.ts", "src/preload.ts", "scripts/*.ts", "test/**/*.ts"],
+      entry: ["src/main.ts", "src/preload/preload.ts", "scripts/*.ts", "test/**/*.ts"],
       project: ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
     },
     "apps/mobile": {

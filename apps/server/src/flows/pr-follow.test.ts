@@ -8,13 +8,13 @@ import { SqlClient } from "effect/sql";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { Repo } from "#/repo/repo.ts";
-import { repository } from "#/repo/repository.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
+import { Session } from "#/modules/session/session.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab, until } from "./farm.ts";
@@ -98,7 +98,7 @@ for (const submittedReport of [false, true]) {
       const event = (key: string) => ({
         source: "github" as const,
         key,
-        actor: { kind: "ci" as const, id: "checks" },
+        actor: { kind: "system" as const, id: "checks" },
         addressed: "thread_owner" as const,
         threads: [`issue:${issue.id}`],
         text: key,

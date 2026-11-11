@@ -147,10 +147,7 @@ export function PxField(props: {
       </div>
       {typeof props.children === "function" ? props.children(target()) : props.children}
       <Show when={note() != null && note() !== ""}>
-        <div
-          {...stylex.attrs(pxStyle.xs, styles.pxFieldNote, props.error ? styles.pxFieldError : styles.pxFieldHint)}
-          role={props.error ? "alert" : undefined}
-        >
+        <div {...stylex.attrs(pxStyle.xs, styles.pxFieldNote, props.error ? styles.pxFieldError : styles.pxFieldHint)} role={props.error ? "alert" : undefined}>
           {note()}
         </div>
       </Show>

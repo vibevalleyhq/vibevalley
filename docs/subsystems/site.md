@@ -19,9 +19,9 @@
 | `apps/site/vite.config.ts` | Solid 的公开 SSR/start 入口、StyleX 编译与构建任务 |
 | `apps/site/scripts/build.ts`、`prerender.ts` | 构建客户端和临时服务端，调用页面处理函数，写出 HTML 与站点地图 |
 | `apps/site/src/Document.tsx`、`App.tsx`、`components/` | 文档、路由选择与页面区块 |
-| `apps/site/src/animation/` | 滚动、可见性、进入退出、图片展开和订阅清理 |
+| `apps/site/src/ui/` | 滚动、可见性、进入退出、图片展开和订阅清理 |
 | `apps/site/scripts/images.ts`、`prepare.ts`、`card.ts` | 转图、字体子集、图标和分享卡片 |
-| `apps/site/src/lib/`、`i18n/` | 场景与叙事规则、展示数字、双语文案和生成的图片清单 |
+| `apps/site/src/base/`、`i18n/` | 场景与叙事规则、展示数字、双语文案和生成的图片清单 |
 | `apps/site/wrangler.jsonc`、`public/_headers` | 静态部署与响应头 |
 
 ## 模型和不变量

@@ -48,7 +48,7 @@ import { useCore, useFrames } from "#/infra/frame.ts";
 import { ready } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { sendReplacing, useIntents } from "#/state/intent.ts";
-import { castPrefix, outfitLabel, speciesLabel } from "#/ui/cast.ts";
+import { castPrefix, outfitLabel, speciesLabel } from "#/ui/domain/cast.ts";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -579,11 +579,7 @@ function IssueBody(props: {
 
         <Show when={s().ask}>
           {(ask) => (
-            <div
-              {...styleProps([styles.issueBodyDiv3, askTones[ask().tone] ?? styles.askFaint])}
-              aria-label={t("web.farm.plot.yours")}
-              role="region"
-            >
+            <div {...styleProps([styles.issueBodyDiv3, askTones[ask().tone] ?? styles.askFaint])} aria-label={t("web.farm.plot.yours")} role="region">
               <p {...stylex.attrs(styles.issueBodyP6)}>{ask().head}</p>
               <Show when={ask().line}>
                 <p {...stylex.attrs(styles.issueBodyP)}>{ask().line}</p>
@@ -644,13 +640,7 @@ function IssueBody(props: {
         <Show when={move()}>
           {(m) => (
             <div data-testid="issue-move" data-state={m().state} {...stylex.attrs(styles.issueMove)}>
-              <span
-                {...stylex.attrs(
-                  styles.issueBodySpan3,
-                  m().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt,
-                )}
-                title={m().reason}
-              >
+              <span {...stylex.attrs(styles.issueBodySpan3, m().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt)} title={m().reason}>
                 {m().state === "moving" ? t("web.farm.plot.moving") : (m().reason ?? t("web.farm.plot.notMoved"))}
               </span>
               <Show when={m().state === "failed"}>
@@ -668,13 +658,7 @@ function IssueBody(props: {
           {(w) => (
             <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(styles.issueMove)}>
               <span {...stylex.attrs(styles.issueBodySpan22)}>{w().text}</span>
-              <span
-                {...stylex.attrs(
-                  styles.issueBodySpan23,
-                  w().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt,
-                )}
-                title={w().reason}
-              >
+              <span {...stylex.attrs(styles.issueBodySpan23, w().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt)} title={w().reason}>
                 {w().state === "sending" ? t("web.farm.plot.sending") : (w().reason ?? t("web.farm.plot.notSaid"))}
               </span>
               <Show when={w().state === "failed"}>
@@ -763,9 +747,7 @@ function IssueBody(props: {
           <Fold label={t("web.farm.plot.story")}>
             <Show
               when={timeline()}
-              fallback={
-                <p {...stylex.attrs(styles.issueBodySpan2)}>{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>
-              }
+              fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>}
             >
               {(line) => (
                 <For each={line().milestones}>

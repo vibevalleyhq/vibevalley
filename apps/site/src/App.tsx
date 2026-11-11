@@ -1,9 +1,9 @@
+import { page } from "./i18n/page";
 /** @jsxImportSource @solidjs/web */
-import Home from "./components/Home";
-import NotFound from "./components/NotFound";
-import { page } from "./lib/page";
+import Home from "./sections/Home";
+import NotFound from "./sections/NotFound";
 
-import "./styles/global.css";
+import "./ui/global.css";
 
 export default function App() {
   const route = page();

@@ -267,10 +267,7 @@ export function PxSegmented<T extends string | number | boolean>(props: {
             aria-pressed={aria(o.value === props.value)}
             disabled={o.disabled}
             onClick={() => props.onChange(o.value)}
-            {...stylex.attrs(
-              styles.pxSegmentedButton,
-              o.value === props.value ? styles.pxSegmentedButtonSecondary : styles.pxSegmentedButtonPrimary,
-            )}
+            {...stylex.attrs(styles.pxSegmentedButton, o.value === props.value ? styles.pxSegmentedButtonSecondary : styles.pxSegmentedButtonPrimary)}
           >
             {o.label}
           </button>
@@ -354,9 +351,7 @@ export function PxPick(props: {
         }}
         {...stylex.attrs(pxStyle.sm, pxStyle.ring, pxStyle.focus, styles.pxPickButton)}
       >
-        <span {...stylex.attrs(styles.pxPickValue, current().value === "" ? styles.pxPickPlaceholder : styles.pxPickSelected)}>
-          {current().label}
-        </span>
+        <span {...stylex.attrs(styles.pxPickValue, current().value === "" ? styles.pxPickPlaceholder : styles.pxPickSelected)}>{current().label}</span>
         <SpriteIcon name="button-next" size={12} styles={styles.pickChevron} />
       </button>
       <Show when={open()}>
@@ -380,11 +375,7 @@ export function PxPick(props: {
                   <span
                     {...stylex.attrs(
                       styles.pxPickSpan,
-                      o.value === ""
-                        ? styles.pxPickSpanState3
-                        : o.value === props.value
-                          ? styles.pxPickSpanState2
-                          : styles.pxPickSpanState,
+                      o.value === "" ? styles.pxPickSpanState3 : o.value === props.value ? styles.pxPickSpanState2 : styles.pxPickSpanState,
                     )}
                   >
                     {o.label}

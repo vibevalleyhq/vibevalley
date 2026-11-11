@@ -9,17 +9,17 @@ import { SqlClient } from "effect/sql";
 import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { Repo } from "#/repo/repo.ts";
-import { repository } from "#/repo/repository.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
+import { Session } from "#/modules/session/session.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { gitIn } from "#/testing/git.ts";
-import { Tool } from "#/tool/tool.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab, until, watch } from "./farm.ts";
@@ -266,7 +266,7 @@ describe("a pull request", () => {
           yield* mailbox.record({
             source: "github",
             key: "clock#7:review:R1",
-            actor: { kind: "bot", id: "review-bot[bot]", name: "review-bot[bot]" },
+            actor: { kind: "system", id: "review-bot[bot]", name: "review-bot[bot]" },
             addressed: "thread_owner",
             threads: [`issue:${restored.id}`, "github:clock#7"],
             text: "review-bot[bot] CHANGES_REQUESTED\nround 1",

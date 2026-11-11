@@ -493,9 +493,7 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           />
           <Show when={k()}>
-            {(ratio) => (
-              <span {...stylex.attrs(styles.cursorTileSpan2)} style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }} />
-            )}
+            {(ratio) => <span {...stylex.attrs(styles.cursorTileSpan2)} style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }} />}
           </Show>
         </span>
       </span>

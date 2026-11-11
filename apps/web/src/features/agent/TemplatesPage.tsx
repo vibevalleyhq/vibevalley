@@ -13,9 +13,9 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
+import { runtimeName } from "#/ui/domain/RuntimeBadge.tsx";
 import { TextInput } from "#/ui/Field.tsx";
-import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 

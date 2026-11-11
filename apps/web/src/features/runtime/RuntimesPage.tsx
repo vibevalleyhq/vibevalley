@@ -12,7 +12,7 @@ import { runtimesQuery, useQueryClient, ready, useRuntimes } from "#/infra/query
 import { Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Card, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { styleProps } from "#/ui/positioner.ts";
@@ -247,11 +247,7 @@ export function RuntimesPage(props: { rest: string }) {
                           <span
                             {...stylex.attrs(
                               styles.runtimesPageSpan,
-                              ok()
-                                ? r.settings.enabled
-                                  ? styles.runtimesPageSpanState3
-                                  : styles.runtimesPageSpanState2
-                                : styles.runtimesPageSpanState,
+                              ok() ? (r.settings.enabled ? styles.runtimesPageSpanState3 : styles.runtimesPageSpanState2) : styles.runtimesPageSpanState,
                             )}
                             aria-hidden="true"
                           />
@@ -289,12 +285,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
     <div {...stylex.attrs(styles.detailDiv2)}>
       <div {...stylex.attrs(styles.detailDiv22)}>
         <span {...styleProps([styles.detailSpan, styles.portrait(props.info.preset.look.hat)])}>
-          <span
-            {...stylex.attrs(
-              styles.runtimesPageSpan2,
-              inst().status !== "available" ? styles.runtimesPageSpanTone : styles.runtimesPageSpan2,
-            )}
-          >
+          <span {...stylex.attrs(styles.runtimesPageSpan2, inst().status !== "available" ? styles.runtimesPageSpanTone : styles.runtimesPageSpan2)}>
             <RuntimeIcon runtime={props.info.id} size={60} />
           </span>
         </span>

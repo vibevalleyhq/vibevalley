@@ -637,23 +637,14 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
                             aria-current={a().id === open() ? "page" : undefined}
                             {...stylex.attrs(
                               styles.artifactsPageA,
-                              a().id === id()
-                                ? styles.artifactsPageAState3
-                                : a().id === open()
-                                  ? styles.artifactsPageAState2
-                                  : styles.artifactsPageAState,
+                              a().id === id() ? styles.artifactsPageAState3 : a().id === open() ? styles.artifactsPageAState2 : styles.artifactsPageAState,
                             )}
                           >
                             <Icon name={bodyIcon[a().body]} size={16} styles={[styles.artifactsPageIcon2]} />
                             <span {...stylex.attrs(styles.artifactsPageSpan22)}>
                               <span {...stylex.attrs(styles.artifactsPageSpan3)}>{a().title}</span>
                               {/* On the selected row's darker ground the line takes more ink, to stay readable. */}
-                              <span
-                                {...stylex.attrs(
-                                  styles.artifactsPageSpan,
-                                  a().id === open() ? styles.artifactsPageSpanTone : styles.artifactsPageSpanAlt,
-                                )}
-                              >
+                              <span {...stylex.attrs(styles.artifactsPageSpan, a().id === open() ? styles.artifactsPageSpanTone : styles.artifactsPageSpanAlt)}>
                                 {a().byName} · {ago(a().updated, now())}
                               </span>
                             </span>
@@ -864,12 +855,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               </Show>
             </div>
             <Show when={asking()}>
-              <div
-                role="group"
-                data-testid="artifact-delete"
-                {...stylex.attrs(styles.shownDiv2)}
-                onKeyDown={(e) => e.key === "Escape" && setAsking(false)}
-              >
+              <div role="group" data-testid="artifact-delete" {...stylex.attrs(styles.shownDiv2)} onKeyDown={(e) => e.key === "Escape" && setAsking(false)}>
                 <span {...stylex.attrs(styles.shownSpan)}>{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>
                 <Button
                   tone="danger"
@@ -928,10 +914,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
                         data-key={v().version}
                         aria-pressed={v().version === version()?.version ? "true" : "false"}
                         onClick={() => pick(v().version)}
-                        {...stylex.attrs(
-                          styles.shownButton,
-                          v().version === version()?.version ? styles.shownButtonSecondary : styles.shownButtonPrimary,
-                        )}
+                        {...stylex.attrs(styles.shownButton, v().version === version()?.version ? styles.shownButtonSecondary : styles.shownButtonPrimary)}
                       >
                         <span {...stylex.attrs(styles.shownSpan2)}>
                           {t("web.artifact.card.version", { version: v().version })}{" "}

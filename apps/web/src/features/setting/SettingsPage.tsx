@@ -11,10 +11,10 @@ import { SkillsPage } from "#/features/runtime/index.ts";
 import { Account, Approvals, Devices } from "#/features/user/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
 import { Link as A, Navigate } from "#/infra/router.ts";
+import { SettingsPage as Page, SettingsSearch } from "#/ui/domain/settings.tsx";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
-import { SettingsPage as Page, SettingsSearch } from "#/ui/settings.tsx";
 import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 
 import { AboutPage } from "./AboutPage";

@@ -9,8 +9,9 @@ import { Otlp, OtlpSerialization } from "effect/observability";
 import { announce } from "@vibevalley/home";
 import type { ServerReady } from "@vibevalley/protocol";
 
+import { app } from "#/gateway/http/app.ts";
+
 import { redactOutput } from "./base/redact.ts";
-import { app } from "./http/app.ts";
 import { loadConfig, pkmDir, reposDir, worktreesDir } from "./infra/config.ts";
 import { HomeTaken, HomeUnavailable, leaseHome } from "./infra/lease.ts";
 import { PublicHttp } from "./infra/publicHttp.ts";
@@ -30,7 +31,7 @@ redactOutput(process.stderr);
 // The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents. Never set otherwise.
 const testRuntimes = Effect.gen(function* () {
   const { helper, installedOnly } = yield* Effect.promise(() => import("./testing/worker.ts"));
-  const { registryOf } = yield* Effect.promise(() => import("./runtime/runtime.ts"));
+  const { registryOf } = yield* Effect.promise(() => import("#/modules/runtime/runtime.ts"));
   const given = [helper()];
   return { registry: registryOf(given), probe: installedOnly(given), background: false };
 });

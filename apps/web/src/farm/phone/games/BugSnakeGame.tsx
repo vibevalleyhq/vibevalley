@@ -71,12 +71,12 @@ const styles = stylex.create({
     marginTop: "0.5rem",
     boxShadow: "0 0 0 2px var(--color-lcd-ink)",
   },
-  canvas: {
+  canvas: (w: number, h: number) => ({
     display: "block",
-    width: width * zoom,
-    height: height * zoom,
+    width: w,
+    height: h,
     imageRendering: "pixelated",
-  },
+  }),
   help: {
     marginTop: "auto",
     marginBottom: "0.5rem",
@@ -95,14 +95,14 @@ const head = [" #### ", "####.#", "######", "######", "####.#", " #### "];
 const segment = [
   [" #### ", "#++++#", "#++++#", "#++++#", "#++++#", " #### "],
   [" #### ", "#....#", "#....#", "#....#", "#....#", " #### "],
-];
+] as const;
 const tail = ["      ", "  ##  ", " #++# ", " #++# ", "  ##  ", "      "];
 const seed = ["   #  ", "  #+# ", " #++# ", " #++# ", "  ##  ", "      "];
 /** The bug, its legs in two frames. */
 const bug = [
   [" #  # ", "# ## #", " #### ", "######", " #### ", "#    #"],
   [" #  # ", "  ##  ", "######", " #### ", "######", "      "],
-];
+] as const;
 
 /** Rows turned a quarter clockwise. */
 const turned = (rows: readonly string[]) =>
@@ -208,7 +208,7 @@ export function BugSnakeGame() {
           height={height}
           role="img"
           aria-label={t("web.farm.phone.bugs.field")}
-          {...stylex.attrs(styles.canvas)}
+          {...stylex.attrs(styles.canvas(width * zoom, height * zoom))}
         />
         <Show when={!g() || g()?.over !== undefined || !playing()}>
           <div {...stylex.attrs(styles.overlay)}>

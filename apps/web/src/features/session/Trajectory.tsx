@@ -719,13 +719,7 @@ function ToolLine(props: { step: SessionEvent }) {
         <span {...stylex.attrs(styles.toolLineSpan2)}> {args()}</span>
       </Show>
       {" → "}
-      <Switch
-        fallback={
-          <span {...stylex.attrs(styles.toolLineSpan, props.step.ok === false ? styles.rowSpanTone : styles.rowSpanAlt)}>
-            {out()}
-          </span>
-        }
-      >
+      <Switch fallback={<span {...stylex.attrs(styles.toolLineSpan, props.step.ok === false ? styles.rowSpanTone : styles.rowSpanAlt)}>{out()}</span>}>
         <Match when={props.step.ok === undefined}>{t("web.session.trajectory.pending")}</Match>
         <Match when={!out()}>{t("web.session.trajectory.noOutput")}</Match>
       </Switch>
@@ -821,9 +815,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
         <For each={lanes}>{(l) => <span {...stylex.attrs(styles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
       </div>
       <div ref={(el) => (box = el)} {...stylex.attrs(styles.waterfallViewDiv22)}>
-        <For each={[0, 1, 2]}>
-          {(i) => <div {...stylex.attrs(styles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px` }} />}
-        </For>
+        <For each={[0, 1, 2]}>{(i) => <div {...stylex.attrs(styles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px` }} />}</For>
         <For each={bars()} keyed={false}>
           {(b) => (
             <button
@@ -941,10 +933,7 @@ export function TrajectoryList(props: { agent: string }) {
                         type="button"
                         aria-current={h().id === open()?.id ? "true" : undefined}
                         onClick={() => setPicked(h().id)}
-                        {...stylex.attrs(
-                          styles.trajectoryListButton,
-                          h().id === open()?.id ? styles.trajectoryListButtonTone : styles.rowDivAlt,
-                        )}
+                        {...stylex.attrs(styles.trajectoryListButton, h().id === open()?.id ? styles.trajectoryListButtonTone : styles.rowDivAlt)}
                       >
                         <span {...stylex.attrs(styles.trajectoryListSpan)}>
                           <span {...stylex.attrs(styles.trajectoryListSpan2)}>{h().name}</span>

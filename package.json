@@ -5,18 +5,18 @@
   "scripts": {
     "prepare": "vp config --hooks --no-agent && vp run packages:build",
     "desktop:dev": "vp run --filter @vibevalley/desktop dev",
-    "notes:catalog": "vpx scripts/agent-notes.ts --write",
+    "notes:catalog": "vpx scripts/docs/agent-notes.ts --write",
     "site:deploy": "vp run --filter @vibevalley/site deploy",
     "package:mac": "vp run --filter @vibevalley/desktop package",
-    "release": "vpx scripts/release.ts",
-    "capabilities": "vpx scripts/capabilities.ts",
-    "api:client": "vpx scripts/api-client.ts",
-    "i18n:gen": "vpx scripts/i18n.ts gen",
-    "health": "vpx packages/health/src/cli.ts --config scripts/health.config.ts",
-    "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write",
-    "effect:write": "vpx scripts/effect-check.ts --write",
-    "practice:write": "vpx scripts/practice-audit.ts --write",
-    "paths:write": "vpx scripts/service-paths.ts --write"
+    "release": "vpx scripts/release/release.ts",
+    "capabilities": "vpx scripts/gen/capabilities.ts",
+    "api:client": "vpx scripts/gen/api-client.ts",
+    "i18n:gen": "vpx scripts/gen/i18n.ts gen",
+    "health": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts",
+    "health:write": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --write",
+    "effect:write": "vpx scripts/audit/effect-check.ts --write",
+    "practice:write": "vpx scripts/audit/practice-audit.ts --write",
+    "paths:write": "vpx scripts/audit/service-paths.ts --write"
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",

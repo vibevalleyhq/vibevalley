@@ -11,8 +11,8 @@ import { api } from "#/infra/api.ts";
 import { useLatest } from "#/state/atom.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
+import { typeMarks } from "#/ui/markInput.ts";
 import { styleProps } from "#/ui/positioner.ts";
-import { typeMarks } from "#/ui/typedMarks.ts";
 
 import { Body } from "./Body";
 import { dayKey } from "./days";

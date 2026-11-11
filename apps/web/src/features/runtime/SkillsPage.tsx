@@ -15,13 +15,13 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
+import { runtimeName } from "#/ui/domain/RuntimeBadge.tsx";
 import { TextArea, TextInput } from "#/ui/Field.tsx";
 import { Form, FormField, formControl, formMessages } from "#/ui/Form.tsx";
 import { Card, Empty } from "#/ui/layout.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
-import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 
 import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";

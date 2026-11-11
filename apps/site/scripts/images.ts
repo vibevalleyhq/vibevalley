@@ -25,7 +25,7 @@ export async function prepareImages() {
     optimizeDeps: { noDiscovery: true },
   });
   try {
-    const scene = await server.ssrLoadModule("/src/lib/scene.ts");
+    const scene = await server.ssrLoadModule("/src/base/scene.ts");
     const shown = imageNames(scene.SHOWN);
     const scenes = imageNames(scene.SCENES);
     const convert = async (file: string, quality: number, width?: number) => {
@@ -55,7 +55,7 @@ export async function prepareImages() {
         }),
       ),
     );
-    await writeFile(resolve(root, "src/lib/images.generated.json"), JSON.stringify({ title, backgrounds, shots }, null, 2) + "\n");
+    await writeFile(resolve(root, "src/base/images.generated.json"), JSON.stringify({ title, backgrounds, shots }, null, 2) + "\n");
   } finally {
     await server.close();
   }

@@ -10,7 +10,7 @@ import { farmGroup, phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { type CallPhase, createCall, voiceCall } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import type { GlyphCell } from "#/ui/pixel/PixelCard.tsx";
 import { styleProps } from "#/ui/positioner.ts";
@@ -480,12 +480,7 @@ export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; 
   };
   const on = () => props.phase === "live" || props.phase === "connecting";
   return (
-    <div
-      data-testid="orchestrator-line"
-      data-state={props.phase}
-      data-problem={props.problem ? "" : undefined}
-      {...stylex.attrs(styles.screenBody)}
-    >
+    <div data-testid="orchestrator-line" data-state={props.phase} data-problem={props.problem ? "" : undefined} {...stylex.attrs(styles.screenBody)}>
       <BigFace shake={props.phase === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>

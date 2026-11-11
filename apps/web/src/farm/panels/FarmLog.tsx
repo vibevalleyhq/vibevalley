@@ -9,7 +9,7 @@ import { spentText } from "#/base/format.ts";
 import { useFollowed, useReports } from "#/features/channel/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { DashedLine, PxMarkdown } from "#/ui/pixel/index.ts";
 
 import { clockOf, FarmEmpty, FarmTag } from "./rows";
@@ -186,9 +186,7 @@ function Report(props: { r: ChatMessage; issue?: Issue | undefined }) {
           <span {...stylex.attrs(styles.author)}>{props.r.name}</span>
           <FarmTag text={outcomeTag[outcome()][0]} styles={outcomeTag[outcome()][1]} />
         </div>
-        <Show when={props.issue}>
-          {(issue) => <p {...stylex.attrs(styles.issueTitle)}>{issue().title}</p>}
-        </Show>
+        <Show when={props.issue}>{(issue) => <p {...stylex.attrs(styles.issueTitle)}>{issue().title}</p>}</Show>
         <p {...stylex.attrs(styles.reportSummary, outcome() === "failed" ? styles.reportFailed : styles.reportNormal)}>{props.r.text}</p>
         <Show when={props.r.spent}>{(spent) => <p {...stylex.attrs(styles.spent)}>{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
       </div>

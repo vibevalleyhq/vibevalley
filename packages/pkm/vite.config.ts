@@ -10,6 +10,7 @@ export default defineConfig({
       "src/editing.ts",
       "src/graph.ts",
       "src/markdown.ts",
+      "src/outline.ts",
       "src/para.ts",
       "src/selection.ts",
       "src/view.ts",

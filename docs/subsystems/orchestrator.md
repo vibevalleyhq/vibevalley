@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 助手输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[Mailbox](docs/subsystems/mailbox.md)） |
-| 助手与帮工的工具表声明（`apps/server/src/tool/`）及用户授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
+| 助手与帮工的工具表声明（`apps/server/src/modules/tool/`）及用户授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
 | 按档案管理多个助手实例、将回复写回频道或语音响应端口 | 对话循环、前缀缓存、上下文压缩与断点续跑（[VibeValley 自己的 agent](docs/subsystems/brain.md)、[帮工](docs/subsystems/session.md)） |
 | 挑档案算法（`Runtime.choose`）与错轮评测录制（`orchestrator.eval.create`） | 农机可用性检查（[档案和农机](docs/subsystems/agent.md)）与语音通话传输（[语音](docs/subsystems/voice.md)） |
 
@@ -15,12 +15,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/orchestrator/orchestrator.ts` | 管理各助手 `AgentHost` 实例、消费 `Mailbox.news` 的 `Handed`、拼装输入并写回回复 |
-| `apps/server/src/orchestrator/situation.ts` | 农场现状增量 `situationDelta` 与长汇报截断 |
-| `apps/server/src/orchestrator/response.ts`、`openai.ts` | 电话与 `POST /v1/chat/completions` 的进程内流式响应端口（`Caller`） |
-| `apps/server/src/orchestrator/prompts.ts` | 助手系统提示词 |
-| `apps/server/src/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 助手和帮工 `/mcp` 的工具；参数与接口权限对应，媒体流程由脚本模型验证 |
-| `apps/server/src/tool/resource.ts` | `resource_read`（`Tool.readResource`）：解析 `vv://` URI，执行会话级只读权限裁剪与 UTF-16 快照分页（`TextCache`） |
+| `apps/server/src/modules/orchestrator/orchestrator.ts` | 管理各助手 `AgentHost` 实例、消费 `Mailbox.news` 的 `Handed`、拼装输入并写回回复 |
+| `apps/server/src/modules/orchestrator/situation.ts` | 农场现状增量 `situationDelta` 与长汇报截断 |
+| `apps/server/src/modules/orchestrator/response.ts`、`openai.ts` | 电话与 `POST /v1/chat/completions` 的进程内流式响应端口（`Caller`） |
+| `apps/server/src/modules/orchestrator/prompts.ts` | 助手系统提示词 |
+| `apps/server/src/modules/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 助手和帮工 `/mcp` 的工具；参数与接口权限对应，媒体流程由脚本模型验证 |
+| `apps/server/src/modules/tool/resource.ts` | `resource_read`（`Tool.readResource`）：解析 `vv://` URI，执行会话级只读权限裁剪与 UTF-16 快照分页（`TextCache`） |
 | `$VIBEVALLEY_HOME/agent/<档案 id>/` | 对话文件 `<档案 id>.jsonl`、压缩归档 `archive/` 与错轮评测 `evals/` |
 | `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台助手页（记性、轨迹、旧账、声音） |
 
@@ -78,6 +78,6 @@
 
 ## 怎么验证
 
-- `apps/server/src/orchestrator/orchestrator.test.ts`、`situation.test.ts`、`apps/server/src/session/host.test.ts`：多助手路由、现状增量、长文截断與 `forUser` 授权测试。
-- `apps/server/src/tool/tool.test.ts`、`resource.test.ts`、`textCache.test.ts`：工具名、权限与参数 Schema 一致性，`vv://` 跨工单越权拦截与 LRU 快照分页测试。
-- `apps/server/src/orchestrator/evals.test.ts`、`evals.live.test.ts`：评测断言与真模型回放测试。
+- `apps/server/src/modules/orchestrator/orchestrator.test.ts`、`situation.test.ts`、`apps/server/src/modules/session/host.test.ts`：多助手路由、现状增量、长文截断與 `forUser` 授权测试。
+- `apps/server/src/modules/tool/tool.test.ts`、`resource.test.ts`、`textCache.test.ts`：工具名、权限与参数 Schema 一致性，`vv://` 跨工单越权拦截与 LRU 快照分页测试。
+- `apps/server/src/modules/orchestrator/evals.test.ts`、`evals.live.test.ts`：评测断言与真模型回放测试。

@@ -12,8 +12,8 @@ import { ready, useQuery, useQueryClient } from "#/infra/query.ts";
 import { useSearch } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
+import { SettingsPage as Page } from "#/ui/domain/settings.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
-import { SettingsPage as Page } from "#/ui/settings.tsx";
 
 import { approvalsQuery } from "./signIns";
 

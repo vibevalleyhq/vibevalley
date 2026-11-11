@@ -525,31 +525,16 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   aria-pressed={aria(active())}
                   aria-label={info.preset.label}
                   onClick={() => choose(info)}
-                  {...stylex.attrs(
-                    styles.runtimeChoiceButton,
-                    active() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt,
-                  )}
+                  {...stylex.attrs(styles.runtimeChoiceButton, active() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt)}
                 >
                   <span {...stylex.attrs(styles.runtimeChoiceSpan, !ok() ? styles.runtimeChoiceSpanTone : styles.runtimeChoiceSpan)}>
                     <RuntimeIcon runtime={info.id} size={32} />
                   </span>
                   <span {...stylex.attrs(styles.runtimeChoiceSpan22)}>
-                    <span
-                      {...stylex.attrs(
-                        styles.runtimeChoiceSpan2,
-                        active() ? styles.runtimeChoiceSpanAlt : styles.runtimeChoiceSpanAccent,
-                      )}
-                    >
+                    <span {...stylex.attrs(styles.runtimeChoiceSpan2, active() ? styles.runtimeChoiceSpanAlt : styles.runtimeChoiceSpanAccent)}>
                       {info.preset.label}
                     </span>
-                    <span
-                      {...stylex.attrs(
-                        styles.runtimeChoiceSpan3,
-                        ok() ? styles.runtimeChoiceSpanMuted : styles.runtimeChoiceSpanKind5,
-                      )}
-                    >
-                      {status()}
-                    </span>
+                    <span {...stylex.attrs(styles.runtimeChoiceSpan3, ok() ? styles.runtimeChoiceSpanMuted : styles.runtimeChoiceSpanKind5)}>{status()}</span>
                   </span>
                 </button>
               );
@@ -699,10 +684,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
                   aria-checked={aria(on())}
                   aria-label={s.name}
                   onClick={() => toggle(s.id)}
-                  {...stylex.attrs(
-                    styles.skillPickerButton,
-                    on() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt,
-                  )}
+                  {...stylex.attrs(styles.skillPickerButton, on() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt)}
                 >
                   <span {...stylex.attrs(styles.skillPickerSpan, on() ? styles.skillPickerSpanTone : styles.skillPickerSpanAlt)}>
                     <Show when={on()}>
@@ -856,11 +838,7 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
           <For each={props.entries}>
             {(e) => (
               <li {...stylex.attrs(styles.inventoryLi)}>
-                <span
-                  {...stylex.attrs(styles.inventorySpan, e.enabled === false ? styles.inventorySpanTone : styles.runtimeChoiceSpan)}
-                >
-                  {e.name}
-                </span>
+                <span {...stylex.attrs(styles.inventorySpan, e.enabled === false ? styles.inventorySpanTone : styles.runtimeChoiceSpan)}>{e.name}</span>
                 <span {...stylex.attrs(styles.inventorySpan2)}>{e.description}</span>
                 <Show when={e.source}>
                   <span {...stylex.attrs(styles.inventorySpan22)}>{e.source}</span>

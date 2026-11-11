@@ -13,9 +13,9 @@ import { useCore } from "#/infra/frame.ts";
 import { useRouter } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
 import { setPick, usePrefs } from "#/state/prefs.ts";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
+import { typeMarks } from "#/ui/markInput.ts";
 import { createPixelAct, SpriteIcon, toasts } from "#/ui/pixel/index.ts";
-import { typeMarks } from "#/ui/typedMarks.ts";
 
 const styles = stylex.create({
   farmComposerDiv: {
@@ -185,13 +185,7 @@ function PickChip(props: { named: boolean }) {
           <Show when={props.named}>
             <span {...stylex.attrs(styles.pickChipSpan2)}>{t("web.farm.chat.sendTo", { name: a().name })}</span>
           </Show>
-          <button
-            type="button"
-            data-testid="unpick"
-            aria-label={t("web.farm.chat.anyone")}
-            onClick={() => setPick("auto")}
-            {...stylex.attrs(styles.unpick)}
-          >
+          <button type="button" data-testid="unpick" aria-label={t("web.farm.chat.anyone")} onClick={() => setPick("auto")} {...stylex.attrs(styles.unpick)}>
             <SpriteIcon name="button-close" size={12} />
           </button>
         </span>
@@ -274,10 +268,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
                   aria-selected={aria(i() === box.active())}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => box.choose(n())}
-                  {...stylex.attrs(
-                    styles.farmComposerButton,
-                    i() === box.active() ? styles.farmComposerButtonSecondary : styles.farmComposerButtonPrimary,
-                  )}
+                  {...stylex.attrs(styles.farmComposerButton, i() === box.active() ? styles.farmComposerButtonSecondary : styles.farmComposerButtonPrimary)}
                 >
                   <span {...stylex.attrs(styles.farmComposerSpan2)}>{n().name}</span>
                   <span {...stylex.attrs(styles.farmComposerSpan3)}>{n().note}</span>

@@ -1,0 +1,295 @@
+import { describe, expect, it } from "@effect/vitest";
+import { Clock, Effect, Schema, Stream } from "effect";
+import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
+import { test } from "vite-plus/test";
+
+import type * as T from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
+import { CronWhenWeekly } from "@vibevalley/protocol/schema";
+
+import { orchestrator, user } from "#/base/actor.ts";
+import { Core } from "#/core/core.ts";
+import { type ServerConfig } from "#/infra/config.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { testConfig, aTurn } from "#/testing/layers.ts";
+import { allow, refuse } from "#/testing/refuse.ts";
+import { world } from "#/testing/world.ts";
+import * as q from "#db/cron.sql.ts";
+
+import { type Due, Cron } from "./cron.ts";
+import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
+
+const at = (iso: string) => Date.parse(iso + "+08:00");
+
+test("due once, missed, and run", () => {
+  const s = {
+    id: "x1",
+    name: "测试",
+    text: "跑一遍测试",
+    channel: "c1",
+    when: { kind: "daily", time: "09:00" },
+    tz: "Asia/Shanghai",
+    enabled: true,
+    created: at("2026-10-01T08:00:00"),
+    lastRun: at("2026-10-09T09:00:00"),
+    by: "user",
+  } as T.Cron;
+  const now = at("2026-10-12T11:00:00");
+  expect(dueCrons([s], now)).toEqual([s]);
+  expect(isMissed(s, now)).toBe(true);
+  expect(dueCrons([afterRun(s, now)], now)).toEqual([]);
+  expect(isMissed(s, at("2026-10-10T09:00:20"))).toBe(false);
+  expect(afterRun({ ...s, when: { kind: "once", at: at("2026-10-12T12:00:00") } }, now).enabled).toBe(false);
+});
+
+test("what waits for the user's yes", () => {
+  const once: T.CronWhen = { kind: "once", at: at("2026-10-12T12:00:00") };
+  const daily: T.CronWhen = { kind: "daily", time: "09:00" };
+  const req = (when: T.CronWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as T.CronRequest;
+  expect(needsOK(req(daily, "lab"), user)).toBe(false);
+  expect(needsOK(req(daily, "lab"), orchestrator(true))).toBe(false);
+  expect(needsOK(req(once), orchestrator(false))).toBe(false);
+  expect(needsOK(req(daily), orchestrator(false))).toBe(true);
+  expect(needsOK(req(once, "lab"), orchestrator(false))).toBe(true);
+  expect(needsOK(req(once, " "), orchestrator(false))).toBe(false);
+});
+
+/** The farm with crons on a clock turned by hand. */
+const farm = (config: ServerConfig["Service"]) => world({ config });
+
+const collect = Effect.gen(function* () {
+  const got: Due[] = [];
+  const due2 = yield* (yield* Cron).due;
+  yield* Effect.forkScoped(Stream.runForEach(due2, (d) => Effect.sync(() => got.push(d))));
+  return got;
+});
+
+/** What a tick makes due is published before the tick returns: a turn lets the collecting fiber take it. */
+const drained = aTurn;
+
+const req = (name: string, text: string, when: T.CronWhen, more: Partial<T.CronRequest> = {}): T.CronRequest => ({ name, text, when, ...more });
+
+describe("crons", () => {
+  it.effect("come due, are kept, and come back on", () => {
+    const config = { ...testConfig(), db: "" };
+    const now = Date.UTC(2026, 9, 13, 8);
+    let everyId = "";
+    return Effect.gen(function* () {
+      yield* TestClock.setTime(now);
+      yield* Effect.gen(function* () {
+        const s = yield* Cron;
+        const core = yield* Core;
+        const chat = yield* Channel;
+        const due = yield* collect;
+        const general = chat.defaultChannel();
+        const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: now + 150 }), user);
+        expect([made.channel, made.name, made.enabled, made.tz !== ""]).toEqual([general, "看进度", true, true]);
+        expect(core.state().crons.map((x) => x.id)).toEqual([made.id]);
+        yield* s.tick;
+        yield* drained;
+        expect(due).toEqual([]);
+        yield* TestClock.adjust(200);
+        yield* s.tick;
+        yield* drained;
+        expect(due.map((d) => [d.cron.id, d.missed, d.cron.enabled])).toEqual([[made.id, false, false]]);
+        expect((yield* chat.history(general)).some((message) => message.text.includes("⏰"))).toBe(false);
+        expect(s.list()[0]!.enabled).toBe(false);
+        yield* s.tick;
+        const addedFailure = yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), user));
+        expect(addedFailure).toMatchObject({
+          reason: expect.stringContaining("默认仓库"),
+        });
+        const addedFailure2 = yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "nobody" }), user));
+        expect(addedFailure2).toMatchObject({
+          reason: expect.stringContaining("没有叫 nobody"),
+        });
+        const addedFailure3 = yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { channel: "elsewhere" }), user));
+        // A channel is named as the user names it: one there is not is not found.
+        expect(addedFailure3).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ChannelNotFound, message: expect.stringContaining("elsewhere") });
+        const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", repo: "demo" }), user);
+        expect([every.agent, every.repo]).toEqual(["lab", "demo"]);
+        everyId = every.id;
+        yield* s.setEnabled(every.id, false);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+
+      yield* Effect.gen(function* () {
+        const s = yield* Cron;
+        const core = yield* Core;
+        const due = yield* collect;
+        const got = core.state().crons;
+        expect([got.length, got[1]?.enabled, got[1]?.agent]).toEqual([2, false, "lab"]);
+        yield* TestClock.adjust(60 * 60_000);
+        const on = yield* s.setEnabled(everyId, true);
+        const now = yield* Clock.currentTimeMillis;
+        expect(on.lastRun).toBe(now);
+        yield* s.tick;
+        yield* TestClock.adjust(60 * 60_000);
+        yield* s.tick;
+        yield* drained;
+        expect(due.map((d) => [d.cron.id, d.missed])).toEqual([[everyId, true]]);
+        yield* s.remove(everyId);
+        expect((yield* Effect.flip(s.remove(everyId))).bizCode).toBe(BizCode.CronNotFound);
+        expect(core.state().crons).toHaveLength(1);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    });
+  });
+
+  it.effect("weekly days are integers from zero to six", () => {
+    const now = 1_800_000_000_000;
+    return Effect.andThen(
+      TestClock.setTime(now),
+      Effect.gen(function* () {
+        const s = yield* Cron;
+        const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
+        expect((yield* Effect.flip(s.add(bad, user))).bizCode).toBe(BizCode.CronRefused);
+        expect(s.list()).toEqual([]);
+        expect(Schema.decodeUnknownExit(CronWhenWeekly)(bad.when)._tag).toBe("Failure");
+        expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), user)).when).toEqual({
+          kind: "weekly",
+          days: [0, 6],
+          time: "09:00",
+        });
+      }).pipe(Effect.scoped, Effect.provide(farm(testConfig()))),
+    );
+  });
+
+  it.effect("a cron cron is kept, and a bad one is refused", () => {
+    const config = { ...testConfig(), db: "" };
+    const now = 1_800_000_000_000;
+    let id = "";
+    return Effect.gen(function* () {
+      yield* TestClock.setTime(now);
+      yield* Effect.gen(function* () {
+        const s = yield* Cron;
+        id = (yield* s.add(req("早会", "看看昨天的活", { kind: "cron", expr: "0 9 * * 1-5" }, { tz: "Asia/Shanghai" }), user)).id;
+        expect((yield* Effect.flip(s.add(req("坏的", "t", { kind: "cron", expr: "0 9 * *" }), user))).bizCode).toBe(BizCode.CronRefused);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+      yield* Effect.gen(function* () {
+        expect((yield* Cron).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    });
+  });
+
+  it.effect("a stored cron with the wrong spec is not restored beside a valid one", () => {
+    const config = { ...testConfig(), db: "" };
+    const now = 1_800_000_000_000;
+    return Effect.gen(function* () {
+      yield* TestClock.setTime(now);
+      yield* Effect.gen(function* () {
+        const channel = (yield* Channel).defaultChannel();
+        for (const [id, spec] of [
+          ["bad-spec", `{"kind":"weekly","days":[1.5],"time":"09:00"}`],
+          ["good", `{"kind":"daily","time":"09:00"}`],
+        ] as const)
+          yield* Effect.orDie(
+            q.addCron({
+              id,
+              name: id,
+              body: "",
+              channel_id: channel,
+              agent: null,
+              repo: null,
+              spec,
+              tz: "UTC",
+              pending: false,
+              set_by: "user",
+              created_at: 0,
+            }),
+          );
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+      yield* Effect.gen(function* () {
+        expect((yield* Cron).list().map((r) => [r.id, r.when, r.by])).toEqual([["good", { kind: "daily", time: "09:00" }, "user"]]);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    });
+  });
+
+  it.effect("one the orchestrator set alone waits for the user's yes, through restarts", () => {
+    const config = { ...testConfig(), db: "" };
+    const now = 1_800_000_000_000;
+    let id = "";
+    return Effect.gen(function* () {
+      yield* TestClock.setTime(now);
+      yield* Effect.gen(function* () {
+        const s = yield* Cron;
+        const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), orchestrator(false));
+        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "agent", "等你同意"]);
+        id = made.id;
+        const due = yield* collect;
+        yield* TestClock.adjust(10 * 60_000);
+        yield* s.tick;
+        yield* drained;
+        expect(due).toEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+      yield* Effect.gen(function* () {
+        const s = yield* Cron;
+        expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "agent"]]);
+        const on = yield* s.setEnabled(id, true);
+        expect([on.enabled, on.pending]).toEqual([true, false]);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+      yield* Effect.gen(function* () {
+        const s = yield* Cron;
+        const due = yield* collect;
+        expect(s.list().map((x) => [x.enabled, x.pending])).toEqual([[true, false]]);
+        yield* TestClock.adjust(5 * 60_000);
+        yield* s.tick;
+        yield* drained;
+        expect(due.map((d) => d.cron.id)).toEqual([id]);
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    });
+  });
+});
+
+it.effect("regression: a cron occurrence and its schedule advance commit together", () => {
+  const config = testConfig();
+  return Effect.gen(function* () {
+    const now = 1_800_000_000_000;
+    yield* TestClock.setTime(now);
+    yield* Effect.gen(function* () {
+      const crons = yield* Cron;
+      const sql = yield* SqlClient.SqlClient;
+      const item = yield* crons.add(req("atomic", "work", { kind: "once", at: now + 1 }), user);
+      yield* refuse(sql, "reject_cron_input", "before insert on mailbox_trigger", "new.source = 'cron'", "rejected input");
+      yield* TestClock.adjust(2);
+      yield* crons.tick;
+      const rows = yield* sql`select enabled, last_run from cron where id = ${item.id}`;
+      expect(rows).toEqual([{ enabled: true, last_run: null }]);
+      const rows2 = yield* sql`select id from mailbox_trigger where source = 'cron'`;
+      expect(rows2).toEqual([]);
+      yield* allow(sql, "reject_cron_input");
+      yield* crons.tick;
+      expect((yield* sql`select id from mailbox_trigger where source = 'cron'`).length).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(farm(config)));
+  });
+});
+
+it.effect("regression: a one-off cron resumes committed input after restart without a second issue", () => {
+  const config = { ...testConfig(), db: "" };
+  return Effect.gen(function* () {
+    const now = 1_800_000_000_000;
+    yield* TestClock.setTime(now);
+    yield* Effect.gen(function* () {
+      const crons = yield* Cron;
+      const sql = yield* SqlClient.SqlClient;
+      yield* crons.add(req("restart-once", "work", { kind: "once", at: now + 1 }), user);
+      yield* refuse(sql, "reject_cron_issue", "before insert on issue", "", "rejected issue");
+      yield* TestClock.adjust(2);
+      yield* crons.tick;
+      const rows = yield* sql`select enabled from cron`;
+      expect(rows).toEqual([{ enabled: false }]);
+      const rows2 = yield* sql`select routed_at from mailbox_trigger where source = 'cron'`;
+      expect(rows2).toEqual([{ routed_at: null }]);
+      yield* allow(sql, "reject_cron_issue");
+    }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    yield* Effect.gen(function* () {
+      const crons = yield* Cron;
+      const sql = yield* SqlClient.SqlClient;
+      yield* crons.tick;
+      yield* crons.tick;
+      const rows = yield* sql`select title from issue`;
+      expect(rows).toEqual([{ title: "restart-once" }]);
+      const rows2 = yield* sql`select routed_at is not null as routed from mailbox_trigger where source = 'cron'`;
+      expect(rows2).toEqual([{ routed: true }]);
+    }).pipe(Effect.scoped, Effect.provide(farm(config)));
+  });
+});

@@ -6,9 +6,9 @@ import { t } from "@vibevalley/i18n";
 import { reasonOf } from "#/infra/api.ts";
 import { currentHost } from "#/infra/host.ts";
 import { ready, useSettings } from "#/infra/query.ts";
+import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/domain/settings.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 import { Quiet } from "#/ui/layout.tsx";
-import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/settings.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { CommandLineRow, UpdateRow } from "./UpdateRow";

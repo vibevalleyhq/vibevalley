@@ -280,16 +280,16 @@ export const FactIssueRemoved: Codec<T.FactIssueRemoved> = Schema.Struct({
 });
 
 export const IssueWatch: Codec<T.IssueWatch> = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("history"), session: Schema.String, events: Schema.mutable(Schema.Array(SessionEvent)) }),
+  Schema.Struct({ kind: Schema.Literal("history"), session: SessionId, events: Schema.mutable(Schema.Array(SessionEvent)) }),
   Schema.Struct({
     kind: Schema.Literal("state"),
     issue: Issue,
     sessions: Schema.mutable(Schema.Array(Session)),
-    sessionIds: Schema.mutable(Schema.Array(Schema.String)),
+    sessionIds: Schema.mutable(Schema.Array(SessionId)),
     settled: Schema.Boolean,
     omittedSessions: Schema.Int,
   }),
-  Schema.Struct({ kind: Schema.Literal("event"), session: Schema.String, event: SessionEvent }),
-  Schema.Struct({ kind: Schema.Literal("gap"), session: Schema.String, before: Schema.optionalKey(Schema.Int) }),
-  Schema.Struct({ kind: Schema.Literal("missing"), issue: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal("event"), session: SessionId, event: SessionEvent }),
+  Schema.Struct({ kind: Schema.Literal("gap"), session: SessionId, before: Schema.optionalKey(Schema.Int) }),
+  Schema.Struct({ kind: Schema.Literal("missing"), issue: IssueId }),
 ]);

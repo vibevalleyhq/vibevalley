@@ -34,7 +34,8 @@ export function createAct(say: (reason: string) => void = (reason) => toast(reas
       const message = reasonOf(error);
       say(message);
       const fault = faultOf(error);
-      return error instanceof VibeValleyApiError && (error.error !== undefined || [400, 401, 403, 404, 409, 422].includes(error.status))
+      return error instanceof VibeValleyApiError &&
+        ((error.tag !== undefined && error.tag !== "InternalError" && error.tag !== "BadGateway") || [400, 401, 403, 404, 409, 422].includes(error.status))
         ? { kind: "rejected", message: fault.reason }
         : { kind: "unknown", message: t("web.base.form.deliveryUnknown") };
     } finally {

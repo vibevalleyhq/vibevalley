@@ -19,13 +19,13 @@ import { api, reasonOf } from "#/infra/api.ts";
 import { defineQuery, retryRead, ready, useQuery, useSettings } from "#/infra/query.ts";
 import { useSaveSettings } from "#/infra/settings.ts";
 import { createAct } from "#/ui/act.ts";
+import { SettingRow, SettingsGroup } from "#/ui/domain/settings.tsx";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { Quiet, SecretInput, Toggle } from "#/ui/layout.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
-import { SettingRow, SettingsGroup } from "#/ui/settings.tsx";
 import { Hint, Tip } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
@@ -294,11 +294,7 @@ function SourceMark(props: { draft: SourceDraft }) {
         <span
           {...stylex.attrs(
             styles.sourceMarkSpan,
-            !props.draft.saved
-              ? styles.sourceMarkSpanState3
-              : props.draft.saved.enabled
-                ? styles.sourceMarkSpanState2
-                : styles.sourceMarkSpanState,
+            !props.draft.saved ? styles.sourceMarkSpanState3 : props.draft.saved.enabled ? styles.sourceMarkSpanState2 : styles.sourceMarkSpanState,
           )}
         />
       </span>

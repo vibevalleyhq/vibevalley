@@ -1,4 +1,4 @@
-import { pcm16RmsLevel } from "../audio.ts";
+import { pcm16RmsLevel } from "../audio/audio.ts";
 import { appendVoiceTurn, type VoiceTurn } from "./turns.ts";
 
 export type MossTurn = VoiceTurn<"user" | "moss">;

@@ -27,7 +27,10 @@ test("the REST reads are read again when the state stream comes back, not while 
 
 test("regression: a wrapped API connection failure still gets its single classified read retry", async () => {
   vi.useFakeTimers();
-  const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("offline")).mockResolvedValueOnce(Response.json([]));
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockRejectedValueOnce(new TypeError("offline"))
+    .mockResolvedValueOnce(Response.json({ bizCode: 0, message: "ok", data: [] }));
   const query = defineQuery({
     schema: Schema.Array(S.Agent),
     key: () => ["retry-transport"],

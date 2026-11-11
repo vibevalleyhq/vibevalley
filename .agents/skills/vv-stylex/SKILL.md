@@ -16,7 +16,7 @@ description: 在 VibeValley 的 Solid 2 页面、官网和故事查看器里写�
 | 宿主或边界 | 读哪里 |
 |---|---|
 | 工作台、农场、记忆树 | [工作台令牌](apps/web/src/ui/tokens.stylex.ts)、[主题样式表](apps/web/src/style.css)、[styleProps / positionerAttrs](apps/web/src/ui/positioner.ts)、[Button](apps/web/src/ui/Button.tsx) |
-| 官网 | [官网令牌](apps/site/src/styles/tokens.stylex.ts)、[全局样式表](apps/site/src/styles/global.css)、[domAttrs](apps/site/src/components/ui.tsx)、[官网约定](apps/site/README.md) |
+| 官网 | [官网令牌](apps/site/src/ui/tokens.stylex.ts)、[全局样式表](apps/site/src/ui/global.css)、[domAttrs](apps/site/src/ui/ui.tsx)、[官网约定](apps/site/README.md) |
 | 故事查看器 | [包约定](packages/stories/README.md)、[查看器](packages/stories/src/StoriesApp.tsx)；只用宿主公开的 CSS 属性，不引用私有 `--wb-*` 色板 |
 | 无样式组件 | [Base UI](packages/base-ui/README.md) 保持无样式；外观放在应用的 UI 层 |
 
@@ -125,7 +125,7 @@ const styles = stylex.create({
 
 ## 5. 关系、动画和定位
 
-- 关系样式用 `stylex.when.ancestor`、`descendant`、`anySibling`、`siblingBefore`、`siblingAfter`。观察对象用 marker 标识；跨模块的自定义 marker 用专用 `.stylex.ts` 文件命名导出，见 [频道 marker](apps/web/src/features/channel/message.stylex.ts)。
+- 关系样式用 `stylex.when.ancestor`、`descendant`、`anySibling`、`siblingBefore`、`siblingAfter`。观察对象用 marker 标识；跨模块的自定义 marker 用专用 `.stylex.ts` 文件命名导出，见 [频道 marker](apps/web/src/features/channel/views/message.stylex.ts)。
 - `ancestor` 不等于直接父元素，兄弟关系也有方向。应核实 marker 覆盖范围、嵌套行、hover 与键盘焦点。
 - 组件自有动画统一用 `stylex.keyframes()` 定义，再用 `animationName`、`animationDuration`、`animationTimingFunction`、`animationFillMode` 引用（相同关键帧对象由编译器自动按哈希去重），并显式保留 reduced-motion 停法；不让 CSS 和 Motion、Pixi 或定位器同时写同一个 transform。
 - `firstThatWorks()` 用于同一属性的浏览器回退；候选按优先顺序写。保留 `@supports` 条件和默认值，不只留下现代浏览器分支。

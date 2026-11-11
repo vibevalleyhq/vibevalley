@@ -37,7 +37,7 @@ const answered = (text: string) => ({ content: [{ type: "text" as const, text: c
 
 /** run's thrown or rejected error is the failed result. */
 const ranText = (run: (signal: AbortSignal) => string | Promise<string>) =>
-  Effect.map(Effect.tryPromise({ try: async (signal) => run(signal), catch: toolFailed }), answered);
+  Effect.map(Effect.tryPromise({ try: (signal) => Promise.resolve(run(signal)), catch: toolFailed }), answered);
 
 export const textTool = (spec: TextToolSpec): Tool => ({
   name: spec.name,

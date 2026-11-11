@@ -1,10 +1,10 @@
-export { ChatPage } from "./ChatPage";
-export { QuickSwitcher, switcher } from "./QuickSwitcher";
-export { createChannelForm } from "./Dialogs";
-export { chatMarks, chatSay, createComposer, drafts, pendingLines, useReplying } from "./composing";
-export { reactionSet, sameReaction, setMark, useMarkedFollowed, useMarkRead } from "./marks";
-export { EmojiPicker, quickReactions, reactionOn } from "./EmojiPicker";
-export { followed, useFollowed, useMessage, useReports } from "./follow";
+export { ChatPage } from "#/features/channel/views/ChatPage.tsx";
+export { QuickSwitcher, switcher } from "#/features/channel/views/QuickSwitcher.tsx";
+export { createChannelForm } from "#/features/channel/views/Dialogs.tsx";
+export { chatMarks, chatSay, createComposer, drafts, pendingLines, useReplying } from "#/features/channel/model/composing.ts";
+export { reactionSet, sameReaction, setMark, useMarkedFollowed, useMarkRead } from "#/features/channel/model/marks.ts";
+export { EmojiPicker, quickReactions, reactionOn } from "#/features/channel/views/EmojiPicker.tsx";
+export { followed, useFollowed, useMessage, useReports } from "#/features/channel/model/follow.ts";
 export {
   channelLabel,
   messagePath,
@@ -19,6 +19,6 @@ export {
   unreadIn,
   unreadTotal,
   unreadUnder,
-} from "./places";
-export { feedOf, orchestratorTyping } from "./places";
-export { phaseText } from "./presence";
+} from "#/features/channel/model/places.ts";
+export { feedOf, orchestratorTyping } from "#/features/channel/model/places.ts";
+export { phaseText } from "#/features/channel/views/presence.tsx";

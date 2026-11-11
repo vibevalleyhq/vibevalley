@@ -1,9 +1,9 @@
 import { defineConfig } from "vite-plus";
 
-import { says } from "./scripts/oxlint-plugin.ts";
+import { says } from "./scripts/audit/oxlint-plugin.ts";
 
 // What no-restricted-imports says, each written once: what is wrong, how to fix it, and where to look
-// (scripts/oxlint-plugin.ts, says; its test reads these too).
+// (scripts/audit/oxlint-plugin.ts, says; its test reads these too).
 export const refused = {
   bunTest: says(
     "tests run on vitest, not bun",
@@ -57,25 +57,25 @@ export default defineConfig({
     tasks: {
       "scripts:test": "vp test run",
       "docs:verify": [
-        "vpx scripts/agent-notes.ts",
-        "vpx scripts/skills.ts",
-        "vpx scripts/doc-links.ts",
-        "vpx scripts/stale-names.ts",
-        "vpx scripts/glossary.ts",
-        "vpx scripts/protocol-surface.ts --check",
-        "vpx scripts/service-paths.ts --check",
-        "vpx scripts/i18n.ts check",
-        "vpx scripts/capabilities.ts --check",
-        "vpx scripts/api-client.ts --check",
-        "vpx scripts/primitives.ts --check",
+        "vpx scripts/docs/agent-notes.ts",
+        "vpx scripts/docs/skills.ts",
+        "vpx scripts/docs/doc-links.ts",
+        "vpx scripts/docs/stale-names.ts",
+        "vpx scripts/docs/glossary.ts",
+        "vpx scripts/audit/protocol-surface.ts --check",
+        "vpx scripts/audit/service-paths.ts --check",
+        "vpx scripts/gen/i18n.ts check",
+        "vpx scripts/gen/capabilities.ts --check",
+        "vpx scripts/gen/api-client.ts --check",
+        "vpx scripts/gen/primitives.ts --check",
       ],
-      "notes:verify": "vpx scripts/agent-notes.ts",
+      "notes:verify": "vpx scripts/docs/agent-notes.ts",
       "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
       "site:build": { command: "vp run --filter @vibevalley/site build", cache: false },
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
-      "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/built-types.ts"],
-      "names:verify": "vpx scripts/stale-names.ts",
+      "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
+      "names:verify": "vpx scripts/docs/stale-names.ts",
       // db:check is a script: it reads db/migrations and db/queries through PGlite.
       "server:check": [
         "vp run packages:build",
@@ -93,21 +93,21 @@ export default defineConfig({
         "vp run --filter @vibevalley/web build",
         "vp run --filter @vibevalley/web build:stories",
       ],
-      // The health package's tests, then the escape ratchet (scripts/health.config.ts); the report is `vp run health`.
-      "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/health.config.ts --check"],
+      // The health package's tests, then the escape ratchet (scripts/audit/health.config.ts); the report is `vp run health`.
+      "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --check"],
       // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
-      // Effect's diagnostics: the rules tsconfig.base.json names fail on any hit; the rest may only go down (scripts/effect.ratchet.json).
-      "effect:check": ["vp run packages:build", "vpx scripts/effect-check.ts"],
-      // The test and Effect practices the review lists (scripts/practice-audit.ts): the findings may only go down
-      // (scripts/practice.ratchet.json).
-      "practice:check": "vpx scripts/practice-audit.ts --check",
-      // Which server module uses which member of another module's service (scripts/service-paths.ts): a new path fails until
-      // it is written down on purpose (scripts/service-paths.json).
-      "paths:check": "vpx scripts/service-paths.ts --check",
-      // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
-      deadcode: "vpx scripts/deadcode.ts",
+      // Effect's diagnostics: the rules tsconfig.base.json names fail on any hit; the rest may only go down (scripts/audit/effect.ratchet.json).
+      "effect:check": ["vp run packages:build", "vpx scripts/audit/effect-check.ts"],
+      // The test and Effect practices the review lists (scripts/audit/practice-audit.ts): the findings may only go down
+      // (scripts/audit/practice.ratchet.json).
+      "practice:check": "vpx scripts/audit/practice-audit.ts --check",
+      // Which server module uses which member of another module's service (scripts/audit/service-paths.ts): a new path fails until
+      // it is written down on purpose (scripts/audit/service-paths.json).
+      "paths:check": "vpx scripts/audit/service-paths.ts --check",
+      // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
+      deadcode: "vpx scripts/audit/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
-      // What a beta and a release must pass before scripts/release.ts tags them (alphas are tagged on CI being green).
+      // What a beta and a release must pass before scripts/release/release.ts tags them (alphas are tagged on CI being green).
       "release:verify": ["vp run server:check", "vp run web:check", "vp run docs:verify", "vp run desktop:test"],
     },
   },
@@ -132,12 +132,12 @@ export default defineConfig({
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "solid", specifier: "eslint-plugin-solid" },
-      { name: "vibevalley", specifier: "./scripts/oxlint-plugin.ts" },
+      { name: "vibevalley", specifier: "./scripts/audit/oxlint-plugin.ts" },
     ],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "vibevalley/no-comment-divider": "error",
-      // A package reaches another only by its name (scripts/oxlint-plugin.ts, no-cross-package-path).
+      // A package reaches another only by its name (scripts/audit/oxlint-plugin.ts, no-cross-package-path).
       "vibevalley/no-cross-package-path": "error",
       // [...text] splits by code point, on purpose (docs/style/code.md).
       "typescript/no-misused-spread": "off",
@@ -249,8 +249,8 @@ export default defineConfig({
           "**/*.test.ts",
           "**/*.test.tsx",
           "apps/server/src/testing/**",
-          "apps/cli/src/testing.ts",
-          "packages/*/src/testing.ts",
+          "apps/cli/src/testing/**",
+          "packages/*/src/testing/**",
           "packages/testkit/src/**",
         ],
         rules: {
@@ -272,8 +272,8 @@ export default defineConfig({
           "apps/*/test/**",
           "packages/*/test/**",
           "apps/server/src/testing/**",
-          "apps/cli/src/testing.ts",
-          "packages/*/src/testing.ts",
+          "apps/cli/src/testing/**",
+          "packages/*/src/testing/**",
           "packages/testkit/src/**",
         ],
         rules: { "typescript/no-unsafe-type-assertion": "off" },
@@ -294,16 +294,16 @@ export default defineConfig({
         // deadlines); tests drive time as they need.
         files: [
           "apps/server/src/infra/time.ts",
-          "packages/agent/src/realTime.ts",
+          "packages/agent/src/infra/realTime.ts",
           "apps/server/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "apps/server/src/testing/**",
-          "packages/*/src/testing.ts",
+          "packages/*/src/testing/**",
         ],
         rules: { "vibevalley/no-wall-clock": "off" },
       },
       {
-        // The tests wait on conditions, not on the clock (scripts/oxlint-plugin.ts); testing/ and the pages' fixtures are
+        // The tests wait on conditions, not on the clock (scripts/audit/oxlint-plugin.ts); testing/ and the pages' fixtures are
         // where the waiting itself is written.
         files: ["apps/*/src/**/*.test.ts", "apps/*/src/**/*.test.tsx", "apps/web/test/**", "apps/desktop/test/**", "packages/*/src/**/*.test.ts"],
         rules: { "vibevalley/no-test-sleep": "error" },
@@ -314,13 +314,13 @@ export default defineConfig({
       },
       {
         // What the shipped code says to the owner is in the catalogs (packages/i18n/locales, read as t("key");
-        // scripts/oxlint-plugin.ts, no-cjk-literal): Chinese is written only there, in what is said to models, and in the tests.
+        // scripts/audit/oxlint-plugin.ts, no-cjk-literal): Chinese is written only there, in what is said to models, and in the tests.
         files: ["apps/*/src/**", "packages/*/src/**", "apps/mobile/App.tsx"],
         rules: { "vibevalley/no-cjk-literal": "error" },
       },
       {
         files: [
-          // Written by scripts/i18n.ts gen from the catalogs.
+          // Written by scripts/gen/i18n.ts gen from the catalogs.
           "packages/i18n/src/catalogs.ts",
           // Astro's bilingual marketing copy has its own typed dictionaries.
           "apps/site/src/i18n/**",
@@ -334,14 +334,14 @@ export default defineConfig({
           "apps/web/src/storyLevels.ts",
           "apps/server/src/testing/**",
           "apps/server/src/**/testing.ts",
-          "packages/*/src/testing.ts",
+          "packages/*/src/testing/**",
           // Made-up memories shown until the server sums them up.
           "apps/web/src/tree/mock.ts",
         ],
         rules: { "vibevalley/no-cjk-literal": "off" },
       },
       {
-        files: ["apps/cli/src/**", "apps/server/src/chat.ts", "apps/server/src/chat/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        files: ["apps/cli/src/**", "apps/server/src/chat/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "no-console": "off" },
       },
       {
@@ -428,17 +428,23 @@ export default defineConfig({
         },
       },
       {
-        // The workbench's values are on the design ladders (scripts/oxlint-plugin.ts: design-tokens; docs/style/design.md);
+        // The workbench's values are on the design ladders (scripts/audit/oxlint-plugin.ts: design-tokens; docs/style/design.md);
         // the pixel skin and the avatars are drawn to their own sizes.
         files: ["apps/web/src/**"],
-        excludeFiles: ["apps/web/src/farm/**", "apps/web/src/tree/**", "apps/web/src/ui/pixel/**", "apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
+        excludeFiles: [
+          "apps/web/src/farm/**",
+          "apps/web/src/tree/**",
+          "apps/web/src/ui/pixel/**",
+          "apps/web/src/ui/domain/Face.tsx",
+          "apps/web/src/**/*.test.ts",
+        ],
         rules: { "vibevalley/design-tokens": "error", "vibevalley/native-control": "error" },
       },
       {
         // Every colour of the page is named in style.css, the pixel skin's too: its palette does not follow the theme, but
         // a drawn colour has a name like any other. The avatars' colours are data (ui/cast.ts) and keep their values.
         files: ["apps/web/src/**"],
-        excludeFiles: ["apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
+        excludeFiles: ["apps/web/src/ui/domain/Face.tsx", "apps/web/src/**/*.test.ts"],
         rules: { "vibevalley/no-hex-color": "error" },
       },
       {
@@ -450,196 +456,223 @@ export default defineConfig({
       },
       {
         // Page tests find elements by data-testid and state attributes, not by the interface's words
-        // (scripts/oxlint-plugin.ts, no-copy-selector; docs/subsystems/foundation.md).
+        // (scripts/audit/oxlint-plugin.ts, no-copy-selector; docs/subsystems/foundation.md).
         files: ["apps/web/test/**", "apps/desktop/test/**"],
         rules: { "vibevalley/no-copy-selector": "error" },
       },
       {
-        // The page's layers and its features' indexes (scripts/oxlint-plugin.ts, page-layers).
+        // Second-level directory purity across subpackages (src/base pure ground, desktop preload sandbox).
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: { "vibevalley/subpackage-layers": "error" },
+      },
+      {
+        // The page's layers and its features' indexes (scripts/audit/oxlint-plugin.ts, page-layers).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/page-layers": "error" },
       },
       {
-        // The server is Effect; a Promise is only a library's one call (scripts/oxlint-plugin.ts, promise-boundary).
-        files: ["apps/server/src/**", "apps/cli/src/**"],
+        // The server and the agent are Effect; a Promise is only a library's one call (scripts/audit/oxlint-plugin.ts, promise-boundary).
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: [
           "apps/server/src/**/*.test.ts",
           "apps/cli/src/**/*.test.ts",
-          "apps/cli/src/testing.ts",
+          "apps/cli/src/testing/**",
           "apps/server/src/testing/**",
           "apps/server/src/flows/**",
+          "packages/agent/src/**/*.test.ts",
+          "packages/agent/src/testing/**",
         ],
         rules: { "vibevalley/promise-boundary": "error" },
       },
       {
-        // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/oxlint-plugin.ts, try-promise-catch).
+        // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/audit/oxlint-plugin.ts, try-promise-catch).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
         excludeFiles: ["**/*.test.ts"],
         rules: { "vibevalley/try-promise-catch": "error" },
       },
       {
-        // Errors are told apart by their tag, not their class (scripts/oxlint-plugin.ts, no-instanceof-tagged).
+        // Errors are told apart by their tag, not their class (scripts/audit/oxlint-plugin.ts, no-instanceof-tagged).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
         excludeFiles: ["**/*.test.ts"],
         rules: { "vibevalley/no-instanceof-tagged": "error" },
       },
       {
-        // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/oxlint-plugin.ts, no-object-guard).
+        // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/audit/oxlint-plugin.ts, no-object-guard).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
         excludeFiles: ["**/*.test.ts"],
         rules: { "vibevalley/no-object-guard": "error" },
+      },
+      {
+        // Every TaggedError's _tag literal matches its class name so catchTag and whole-repo tag checks stay exact (scripts/audit/oxlint-plugin.ts, tagged-error-tag).
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: { "vibevalley/tagged-error-tag": "error" },
+      },
+      {
+        // Effect v4 type-inference, Config, Match, and Schema decode idioms (scripts/audit/oxlint-plugin.ts, effect-idioms).
+        files: [
+          "apps/server/src/**",
+          "apps/cli/src/**",
+          "packages/agent/src/**",
+          "packages/ai/src/**",
+          "packages/provider/src/**",
+          "packages/pkm/src/**",
+          "packages/artifact/src/**",
+          "packages/protocol/src/**",
+        ],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
+        rules: { "vibevalley/effect-idioms": "error" },
       },
       {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls, pi's own
         // files), the MCP SDK's request handlers, and time.ts, the service's Clock as Promises for the code on those
         // interfaces (oar's vibevalley runtime, the journal).
         files: [
-          "apps/server/src/runtime/vibevalley.ts",
-          "apps/server/src/runtime/dsh.ts",
-          "apps/server/src/runtime/pi.ts",
-          "apps/server/src/runtime/runtime.ts",
-          "apps/server/src/mcp/mcp.ts",
+          "apps/server/src/modules/runtime/vibevalley.ts",
+          "apps/server/src/modules/runtime/dsh.ts",
+          "apps/server/src/modules/runtime/pi.ts",
+          "apps/server/src/modules/runtime/runtime.ts",
+          "apps/server/src/gateway/mcp/mcp.ts",
           "apps/server/src/infra/time.ts",
         ],
         rules: { "vibevalley/promise-boundary": "off" },
       },
       {
-        // A global is declared once in its door and read with its type (scripts/oxlint-plugin.ts, global-doors).
+        // A global is declared once in its door and read with its type (scripts/audit/oxlint-plugin.ts, global-doors).
         files: ["apps/**", "packages/**", "scripts/**"],
         rules: { "vibevalley/global-doors": "error" },
       },
       {
         // The doors: the page and its shells (protocol's host.ts), the desktop's test probe, the page's test marks.
-        files: ["packages/protocol/src/host.ts", "apps/desktop/src/probe.ts", "apps/web/test/marks.ts"],
+        files: ["packages/protocol/src/host.ts", "apps/desktop/src/infra/probe.ts", "apps/web/test/marks.ts"],
         rules: { "vibevalley/global-doors": ["error", { door: true }] },
       },
       {
-        // One word for none (scripts/oxlint-plugin.ts, one-absent).
+        // One word for none (scripts/audit/oxlint-plugin.ts, one-absent).
         files: ["apps/**", "packages/**"],
         excludeFiles: ["apps/server/db/generated/**"],
         rules: { "vibevalley/one-absent": "error" },
       },
       {
         // Doors to the outside, where null comes in and is turned into undefined: a stored column's text, the DOM's body.
-        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/composing.ts"],
+        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/model/composing.ts"],
         rules: { "vibevalley/one-absent": "off" },
       },
       {
-        // A service's methods open a span named after them, so the traces show each call (scripts/oxlint-plugin.ts, service-method-names).
+        // A service's methods open a span named after them, so the traces show each call (scripts/audit/oxlint-plugin.ts, service-method-names).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/service-method-names": "error" },
       },
       {
-        // A server service takes its concept's singular word (scripts/oxlint-plugin.ts, singular-service).
+        // A server service takes its concept's singular word (scripts/audit/oxlint-plugin.ts, singular-service).
         files: ["apps/server/src/**"],
         rules: { "vibevalley/singular-service": "error" },
       },
       {
-        // A protocol shape named like a service is read as T.X, so the service keeps the name (scripts/oxlint-plugin.ts, protocol-namespace).
+        // A protocol shape named like a service is read as T.X, so the service keeps the name (scripts/audit/oxlint-plugin.ts, protocol-namespace).
         files: ["apps/server/src/**", "apps/cli/src/**"],
-        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/cli/src/**/*.test.ts", "apps/cli/src/testing.ts", "apps/server/src/testing/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/cli/src/**/*.test.ts", "apps/cli/src/testing/**", "apps/server/src/testing/**"],
         rules: { "vibevalley/protocol-namespace": "error" },
       },
       {
-        // Only the page's state/ stands on Effect's Atom, whose API is unstable (scripts/oxlint-plugin.ts, atom-door).
+        // Only the page's state/ stands on Effect's Atom, whose API is unstable (scripts/audit/oxlint-plugin.ts, atom-door).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/atom-door": "error" },
       },
       {
-        // Unstable and transport-specific Effect subpaths stay behind their adapter doors (scripts/oxlint-plugin.ts, unstable-effect-door).
+        // Unstable and transport-specific Effect subpaths stay behind their adapter doors (scripts/audit/oxlint-plugin.ts, unstable-effect-door).
         files: ["apps/*/src/**", "packages/*/src/**"],
         rules: { "vibevalley/unstable-effect-door": "error" },
       },
       {
-        // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/oxlint-plugin.ts, page-store).
+        // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/audit/oxlint-plugin.ts, page-store).
         files: ["apps/web/src/features/**", "apps/web/src/farm/**", "apps/web/src/ui/**"],
         excludeFiles: ["apps/web/src/**/*.test.ts"],
         rules: { "vibevalley/page-store": "error" },
       },
       {
-        // The browser's storage only through state/stored.ts (scripts/oxlint-plugin.ts, stored-door).
+        // The browser's storage only through state/stored.ts (scripts/audit/oxlint-plugin.ts, stored-door).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/stored-door": "error" },
       },
       {
-        // What the owner does from a component goes through an Act or an intent (scripts/oxlint-plugin.ts, act-door).
+        // What the owner does from a component goes through an Act or an intent (scripts/audit/oxlint-plugin.ts, act-door).
         files: ["apps/web/src/features/**/*.tsx", "apps/web/src/farm/**/*.tsx"],
         excludeFiles: ["apps/web/src/**/*.stories.tsx"],
         rules: { "vibevalley/act-door": "error" },
       },
       {
-        // A refusal is said in the error tone (scripts/oxlint-plugin.ts, failure-tone).
+        // A refusal is said in the error tone (scripts/audit/oxlint-plugin.ts, failure-tone).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/failure-tone": "error" },
       },
       {
-        // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
+        // The server reaches the database through Db, which decides what a failed query becomes (scripts/audit/oxlint-plugin.ts, db-door).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/db-door": "error" },
       },
       {
-        // Effects over a list go through Effect.forEach (scripts/oxlint-plugin.ts, yield-in-loop).
+        // Effects over a list go through Effect.forEach (scripts/audit/oxlint-plugin.ts, yield-in-loop).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
         rules: { "vibevalley/yield-in-loop": "error" },
       },
       {
-        // A fiber belongs to a scope, so none outlives its service or a test (scripts/oxlint-plugin.ts, scoped-fibers).
+        // A fiber belongs to a scope, so none outlives its service or a test (scripts/audit/oxlint-plugin.ts, scoped-fibers).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/scoped-fibers": "error" },
       },
       {
-        // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/oxlint-plugin.ts, clock-in-effect).
+        // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/audit/oxlint-plugin.ts, clock-in-effect).
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         rules: { "vibevalley/clock-in-effect": "error" },
       },
       {
-        // The server and the brain read and write files off the event loop (scripts/oxlint-plugin.ts, sync-fs). Before the
+        // The server and the brain read and write files off the event loop (scripts/audit/oxlint-plugin.ts, sync-fs). Before the
         // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
         // starts in; and the evals' cases are read by a tool, not the server.
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: [
           "**/*.test.ts",
           "apps/server/src/testing/**",
-          "packages/agent/src/testing.ts",
+          "packages/agent/src/testing/**",
           "apps/server/src/infra/lease.ts",
           "apps/server/src/infra/db.ts",
           "apps/server/src/infra/baseline.ts",
-          "apps/server/src/setting/setting.ts",
+          "apps/server/src/modules/setting/setting.ts",
         ],
         rules: { "vibevalley/sync-fs": "error" },
       },
       {
-        // A page timer keeps its handle, to be cleared when its part goes (scripts/oxlint-plugin.ts, dropped-timer).
+        // A page timer keeps its handle, to be cleared when its part goes (scripts/audit/oxlint-plugin.ts, dropped-timer).
         files: ["apps/web/src/**"],
         excludeFiles: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.stories.tsx"],
         rules: { "vibevalley/dropped-timer": "error" },
       },
       {
-        // A process is started only by its door: one per kind, which kills the group on a timeout (scripts/oxlint-plugin.ts, child-process-door).
+        // A process is started only by its door: one per kind, which kills the group on a timeout (scripts/audit/oxlint-plugin.ts, child-process-door).
         files: ["apps/**", "packages/**"],
         excludeFiles: [
           "**/scripts/**",
-          "apps/server/src/repo/git.ts",
-          "apps/server/src/runtime/dsh.ts",
-          "apps/server/src/voice/line.ts",
+          "apps/server/src/modules/repo/git.ts",
+          "apps/server/src/modules/runtime/dsh.ts",
+          "apps/server/src/gateway/voice/line.ts",
           "apps/server/src/testing/git.ts",
           "apps/server/src/testing/worker.ts",
-          "apps/desktop/src/island.ts",
-          "apps/desktop/src/server.ts",
-          "apps/desktop/src/update.ts",
+          "apps/desktop/src/infra/island.ts",
+          "apps/desktop/src/infra/server.ts",
+          "apps/desktop/src/infra/update.ts",
           "apps/web/test/fixtures.ts",
           "apps/web/test/global-setup.ts",
-          "packages/agent/src/coding.ts",
+          "packages/agent/src/tools/coding.ts",
           "packages/health/src/collect.ts",
         ],
         rules: { "vibevalley/child-process-door": "error" },
       },
       {
-        // An import from outside its folder is written from src, as #/… (scripts/oxlint-plugin.ts, parent-import).
+        // An import from outside its folder is written from src, as #/… (scripts/audit/oxlint-plugin.ts, parent-import).
         files: ["apps/web/src/**", "apps/server/src/**", "apps/cli/src/**"],
         rules: { "vibevalley/parent-import": "error" },
       },

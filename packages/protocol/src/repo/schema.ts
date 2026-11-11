@@ -132,7 +132,7 @@ export const BranchPublication: Codec<T.BranchPublication> = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
   number: Schema.optionalKey(Schema.Int),
   reused: Schema.optionalKey(Schema.Boolean),
-  state: Schema.optionalKey(Schema.Literals(["open"])),
+  state: Schema.optionalKey(Schema.Literals(T.BranchPublicationStateValues)),
 });
 export const Repo: Codec<T.Repo> = Schema.Struct({
   path: Schema.String,

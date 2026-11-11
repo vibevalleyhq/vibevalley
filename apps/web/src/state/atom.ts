@@ -1,5 +1,5 @@
 import { Atom, AtomRegistry } from "effect/reactivity";
-import { type Accessor, createContext, createEffect, createSignal, useContext } from "solid-js";
+import { type Accessor, createContext, createEffect, createSignal, getOwner, useContext } from "solid-js";
 
 import { createExternal } from "#/base/external.ts";
 import { reasonOf } from "#/infra/api.ts";
@@ -42,14 +42,19 @@ export function onPage<A>(atom: Atom.Writable<A>): PageAtom<A> {
   const kept = Atom.keepAlive(atom);
   const signals = new WeakMap<Registry, Accessor<number>>();
   const handles = new WeakMap<Registry, PageAtom<A>>();
+  const counted = (registry: Registry): Accessor<number> => {
+    // Written from wherever the registry changes, a computation included: the count is a clock, not state the computation owns.
+    const [changes, setChanges] = createSignal(0, { ownedWrite: true });
+    // At once: a node not read yet is not built, and an atom not built tells no one of a change.
+    registry.subscribe(kept, () => setChanges((n) => n + 1), { immediate: true });
+    return changes;
+  };
   const track = (registry: Registry): Accessor<number> => {
     const existing = signals.get(registry);
     if (existing !== undefined) return existing;
-    const [changes, setChanges] = createSignal(0);
-    // At once: a node not read yet is not built, and an atom not built tells no one of a change.
-    registry.subscribe(kept, () => setChanges((n) => n + 1), { immediate: true });
-    signals.set(registry, changes);
-    return changes;
+    const made = counted(registry);
+    signals.set(registry, made);
+    return made;
   };
   const inRegistry = (registry: Registry): PageAtom<A> => {
     const existing = handles.get(registry);
@@ -75,7 +80,8 @@ export function onPage<A>(atom: Atom.Writable<A>): PageAtom<A> {
   };
   const page: PageAtom<A> = {
     get: () => {
-      const active = useContext(RegistryContext);
+      // Outside any owner (a store, a test) there is no context to read: that is the page's registry.
+      const active = getOwner() === null ? pageRegistry : useContext(RegistryContext);
       track(active)();
       return active.get(kept);
     },

@@ -5,6 +5,10 @@ import { FetchHttpClient } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 
+import { DryRunFlag, FormatFlag } from "#/base/format.ts";
+import { Ended, err, exit, Failure, out, printFailure } from "#/base/output.ts";
+import { ServerFlag } from "#/infra/farm.ts";
+
 import { agentCommand } from "./commands/agent.ts";
 import { appCommand } from "./commands/app.ts";
 import { artifactCommand } from "./commands/artifact.ts";
@@ -20,9 +24,6 @@ import { repoCommand } from "./commands/repo.ts";
 import { runtimeCommand } from "./commands/runtime.ts";
 import { sessionCommand } from "./commands/session.ts";
 import { WorkerAccessFlag, workerCommand } from "./commands/worker.ts";
-import { ServerFlag } from "./farm.ts";
-import { DryRunFlag, FormatFlag } from "./format.ts";
-import { Ended, err, exit, Failure, out, printFailure } from "./output.ts";
 
 const version = "0.1.0";
 

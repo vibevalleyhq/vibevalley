@@ -470,10 +470,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                   data-key={p.name}
                                   aria-current={selected()?.name === p.name ? "true" : undefined}
                                   onClick={() => router.navigate(`/catalog/${encodeURIComponent(p.name)}`)}
-                                  {...stylex.attrs(
-                                    styles.spritesButton2,
-                                    selected()?.name === p.name ? styles.spritesButtonAccent : styles.spritesButtonAlt,
-                                  )}
+                                  {...stylex.attrs(styles.spritesButton2, selected()?.name === p.name ? styles.spritesButtonAccent : styles.spritesButtonAlt)}
                                 >
                                   <span {...styleProps([styles.spritesSpan3, groundStyle(ground())])}>
                                     <Img p={p} scale={fitScale(p, 72)} />

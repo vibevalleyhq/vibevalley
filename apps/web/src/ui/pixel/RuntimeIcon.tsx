@@ -1,8 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
+import { RuntimeBadge } from "#/ui/domain/RuntimeBadge.tsx";
 import { styleProps } from "#/ui/positioner.ts";
-import { RuntimeBadge } from "#/ui/RuntimeBadge.tsx";
 
 import { SpriteIcon } from "./icons";
 

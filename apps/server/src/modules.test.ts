@@ -1,19 +1,23 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 
+import { Array as Arr, String as Str } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { analyzeSource, type Edge } from "@vibevalley/testkit/source";
 
-import { moduleOf, modules, outside } from "./modules.ts";
+import { conceptOf, containers, moduleOf, modules, outside } from "./modules.ts";
 
 const src = import.meta.dirname;
-const pending: Readonly<Record<string, string>> = {};
+const pending: Readonly<Record<string, string>> = {
+  "modules/session/session.ts -> modules/mailbox/shapes.ts":
+    "a session's first inputs are mailbox triggers; the trigger shapes left the protocol package for the mailbox and wait for a home before session",
+};
 
 function files(dir: string): string[] {
-  return readdirSync(dir).flatMap((f) => {
+  return Arr.flatMap(readdirSync(dir), (f) => {
     const p = join(dir, f);
-    return statSync(p).isDirectory() ? files(p) : p.endsWith(".ts") ? [p] : [];
+    return statSync(p).isDirectory() ? files(p) : Str.endsWith(".ts")(p) ? [p] : [];
   });
 }
 
@@ -30,18 +34,23 @@ const users: Readonly<Record<string, string>> = {
   machines: "Agent Sessions",
 };
 const reads: Readonly<Record<string, string>> = {
-  "mailbox/mailbox.ts -> issues": "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
+  "modules/mailbox/mailbox.ts -> issues":
+    "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
 };
 
 const localEdges = (file: string, edges: readonly Edge[]) =>
-  edges.flatMap(({ from: spec }) =>
-    spec.startsWith("#/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
+  Arr.flatMap(edges, ({ from: spec }) =>
+    Str.startsWith("#/")(spec)
+      ? [normalize(spec.slice(2))]
+      : Str.startsWith("./")(spec) || Str.startsWith("../")(spec)
+        ? [rel(normalize(join(dirname(file), spec)))]
+        : [],
   );
 
 function inspect(file: string, text: string) {
   const source = analyzeSource(file, text);
   const local = localEdges(file, source.edges);
-  const sessionSnapshot = source.calls("core", "state") && local.includes("session/roster.ts");
+  const sessionSnapshot = source.calls("core", "state") && local.includes("modules/session/roster.ts");
   const parts = source.reads("core", "state");
   if (source.calls("core", "session") || sessionSnapshot) parts.push("sessions");
   return { file, from: rel(file), edges: source.edges, local, parts: [...new Set(parts)], sessionSnapshot };
@@ -58,15 +67,15 @@ const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly str
   mailbox: { "channel.sql.ts": ["defaultID", "topPlace", "unreadOf"], "channel_member.sql.ts": ["membersOf"], "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "userReadReports"] },
 };
-const folders = readdirSync(src).filter((name) => statSync(join(src, name)).isDirectory());
+const folders = Arr.flatMap(containers, (c) => Arr.filter(readdirSync(join(src, c)), (name) => statSync(join(src, c, name)).isDirectory()));
 const tableModule = (name: string) => {
   const table = name.replace(/\.sql\.ts$/u, "");
   return folders.find((module) => table === module || table.startsWith(`${module}_`));
 };
 const foreignQueries = (file: string, edges: readonly Edge[]) => {
-  const module = rel(file).split("/")[0]!;
-  return edges.flatMap((edge) => {
-    if (!edge.from.startsWith("#db/")) return [];
+  const module = conceptOf(rel(file));
+  return Arr.flatMap(edges, (edge) => {
+    if (!Str.startsWith("#db/")(edge.from)) return [];
     const name = edge.from.split("/").at(-1) ?? "";
     if (name === "types.ts" || tableModule(name) === module) return [];
     const allowed = foreignReads[module]?.[name] ?? [];
@@ -74,10 +83,17 @@ const foreignQueries = (file: string, edges: readonly Edge[]) => {
   });
 };
 
-const mailboxContracts = new Set(["mailbox/envelope.ts", "mailbox/payload.ts", "mailbox/prompts.ts"]);
+const mailboxContracts = new Set([
+  "modules/mailbox/envelope.ts",
+  "modules/mailbox/payload.ts",
+  "modules/mailbox/prompts.ts",
+  "modules/mailbox/schema.ts",
+  "modules/mailbox/shapes.ts",
+]);
 const mailboxLeaks = (source: ReturnType<typeof inspect>) => {
   const privateImports = source.local.filter(
-    (to) => !source.from.startsWith("mailbox/") && to.startsWith("mailbox/") && to !== "mailbox/mailbox.ts" && !mailboxContracts.has(to),
+    (to) =>
+      !source.from.startsWith("modules/mailbox/") && to.startsWith("modules/mailbox/") && to !== "modules/mailbox/mailbox.ts" && !mailboxContracts.has(to),
   );
   if (mailboxContracts.has(source.from)) {
     privateImports.push(...source.local.filter((to) => !to.startsWith("base/") && !mailboxContracts.has(to)));
@@ -87,11 +103,17 @@ const mailboxLeaks = (source: ReturnType<typeof inspect>) => {
 };
 
 describe("the modules", () => {
-  it("hold every folder and file under src", () => {
+  it("hold every folder and file under src, with domain slices under modules/ and protocol doors under gateway/", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
+    const unownedTops = tops.filter((t) => !outside.includes(t) && !(containers as readonly string[]).includes(t) && moduleOf(t) === undefined);
+    const unownedUnits = containers.flatMap((c) =>
+      readdirSync(join(src, c))
+        .map((sub) => `${c}/${sub}`)
+        .filter((unit) => moduleOf(unit) === undefined),
+    );
     expect(
-      tops.filter((t) => !outside.includes(t) && moduleOf(t) === undefined),
-      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: move it into the module whose concept it is, or add it to that module's folders in modules.ts. See apps/server/src/modules.ts",
+      [...unownedTops, ...unownedUnits],
+      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: place domain concepts under src/modules/<concept> and ingress adapters under src/gateway/<adapter>, and register the unit in modules.ts. See apps/server/src/modules.ts",
     ).toEqual([]);
   });
 
@@ -118,13 +140,13 @@ describe("the modules", () => {
   });
 
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
-    const file = join(src, "mailbox/mailbox.ts");
+    const file = join(src, "modules/mailbox/mailbox.ts");
     const queries = (text: string) => foreignQueries(file, inspect(file, text).edges);
     expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual([]);
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
     expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
     expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
-    const github = join(src, "issue/github.ts");
+    const github = join(src, "modules/issue/github.ts");
     expect(foreignQueries(github, inspect(github, 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";').edges)).toEqual([
       "mailbox_trigger.sql.ts:recordTrigger",
     ]);
@@ -144,8 +166,7 @@ describe("the modules", () => {
 
   it("read only their own part of the core state", () => {
     const found = sources().flatMap(({ from, parts }) => {
-      const top = from.split("/")[0];
-      if (top === "core" || top === "projection") return [];
+      if (from.startsWith("core/") || from.startsWith("gateway/projection/")) return [];
       return parts.filter((part) => users[part] !== undefined && users[part] !== moduleOf(from)?.name).map((part) => `${from} -> ${part}`);
     });
     expect(
@@ -159,11 +180,13 @@ describe("the modules", () => {
   });
 
   it("regression: session snapshot helpers cannot hide a service's cross-module read", () => {
-    const file = join(src, "issue/issue.ts");
+    const file = join(src, "modules/issue/issue.ts");
     const readsSessionSnapshot = (text: string) => inspect(file, text).sessionSnapshot;
-    expect(readsSessionSnapshot('import { sessionOf } from "#/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
+    expect(readsSessionSnapshot('import { sessionOf } from "#/modules/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
     expect(readsSessionSnapshot('import { sessionOf } from "../session/roster.ts"; sessionOf(core.state(), id);')).toBe(true);
-    expect(readsSessionSnapshot('import { sessionOf } from "#/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
+    expect(readsSessionSnapshot('import { sessionOf } from "#/modules/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(
+      false,
+    );
     expect(readsSessionSnapshot("const state = core.state(); live.sessionOf(id); state.issues.find(item => item.id === id);")).toBe(false);
   });
 
@@ -176,14 +199,14 @@ describe("the modules", () => {
   });
 
   it("regression: a mailbox helper or re-export cannot bypass its service", () => {
-    const channel = join(src, "channel/writing.ts");
-    expect(mailboxLeaks(inspect(channel, 'import { Mailbox } from "#/mailbox/mailbox.ts";'))).toEqual([]);
-    expect(mailboxLeaks(inspect(channel, 'import { triggerOf } from "#/mailbox/payload.ts";'))).toEqual([]);
-    expect(mailboxLeaks(inspect(channel, 'export * from "../mailbox/triggers.ts";'))).toEqual(["mailbox/triggers.ts"]);
-    expect(mailboxLeaks(inspect(channel, 'const journal = import("#/mailbox/triggers.ts");'))).toEqual(["mailbox/triggers.ts"]);
-    const payload = join(src, "mailbox/payload.ts");
-    expect(mailboxLeaks(inspect(payload, 'export { triggerJournal } from "./triggers.ts";'))).toEqual(["mailbox/triggers.ts"]);
+    const channel = join(src, "modules/channel/writing.ts");
+    expect(mailboxLeaks(inspect(channel, 'import { Mailbox } from "#/modules/mailbox/mailbox.ts";'))).toEqual([]);
+    expect(mailboxLeaks(inspect(channel, 'import { triggerOf } from "#/modules/mailbox/payload.ts";'))).toEqual([]);
+    expect(mailboxLeaks(inspect(channel, 'export * from "../mailbox/triggers.ts";'))).toEqual(["modules/mailbox/triggers.ts"]);
+    expect(mailboxLeaks(inspect(channel, 'const journal = import("#/modules/mailbox/triggers.ts");'))).toEqual(["modules/mailbox/triggers.ts"]);
+    const payload = join(src, "modules/mailbox/payload.ts");
+    expect(mailboxLeaks(inspect(payload, 'export { triggerJournal } from "./triggers.ts";'))).toEqual(["modules/mailbox/triggers.ts"]);
     expect(mailboxLeaks(inspect(payload, 'import { Db } from "#/infra/db.ts";'))).toEqual(["infra/db.ts"]);
-    expect(mailboxLeaks(inspect(payload, 'import * as q from "#db/mailbox_trigger.sql.ts";'))).toEqual(["#db/mailbox_trigger.sql.ts"]);
+    expect(mailboxLeaks(inspect(payload, 'import * as q from "#db/mailbox_trigger.sql.ts";')).toSorted()).toEqual(["#db/mailbox_trigger.sql.ts"]);
   });
 });

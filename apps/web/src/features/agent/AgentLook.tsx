@@ -8,9 +8,9 @@ import { type Agent, OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { aria } from "#/base/dom.tsx";
 import { ready, useSprites } from "#/infra/query.ts";
 import { Button } from "#/ui/Button.tsx";
-import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "#/ui/cast.ts";
-import { AgentFace } from "#/ui/Face.tsx";
-import { PoseSprite } from "#/ui/PoseSprite.tsx";
+import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "#/ui/domain/cast.ts";
+import { AgentFace } from "#/ui/domain/Face.tsx";
+import { PoseSprite } from "#/ui/domain/PoseSprite.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
 const styles = stylex.create({

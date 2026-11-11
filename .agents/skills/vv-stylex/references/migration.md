@@ -38,7 +38,7 @@
 | 检查项 | 命令 |
 |---|---|
 | 格式、类型与 StyleX 门禁规则 | `vp check` |
-| lint 插件规则单测 | `vp test run scripts/oxlint-plugin.test.ts` |
+| lint 插件规则单测 | `vp test run scripts/audit/oxlint-plugin.test.ts` |
 | 工作台与故事生产构建 | `vp run --filter @vibevalley/web build && vp run --filter @vibevalley/web build:stories` |
 | 官网生产构建与静态验收 | `vp run site:check && vp run site:build` |
 | 真程序与宿主端到端验收 | 按 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 执行对应入口 |

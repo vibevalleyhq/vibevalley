@@ -23,6 +23,28 @@ export const Validation: Codec<T.Validation> = Schema.Struct({
 
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
+export const AgentRole: Codec<T.AgentRole> = Schema.Literals(T.AgentRoleValues);
+
+export const Actor: Codec<T.Actor> = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("user"),
+    id: Schema.String,
+    name: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("agent"),
+    id: Schema.String,
+    role: AgentRole,
+    name: Schema.optionalKey(Schema.String),
+    forUser: Schema.optionalKey(Schema.Boolean),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("system"),
+    id: Schema.String,
+    name: Schema.optionalKey(Schema.String),
+  }),
+]);
+
 export const Outcome: Codec<T.Outcome> = Schema.Literals(T.OutcomeValues);
 
 export const Spent: Codec<T.Spent> = Schema.Struct({

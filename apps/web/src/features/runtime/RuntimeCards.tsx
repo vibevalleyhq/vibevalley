@@ -379,12 +379,7 @@ export function SupportCard(props: { info: RuntimeInfo }) {
         <div {...stylex.attrs(styles.supportCardDiv2)}>
           <For each={RuntimeCapabilityValues}>
             {(c) => (
-              <span
-                {...stylex.attrs(
-                  styles.supportCardSpan,
-                  support().capabilities.includes(c) ? styles.supportCardSpanTone : styles.supportCardSpanAlt,
-                )}
-              >
+              <span {...stylex.attrs(styles.supportCardSpan, support().capabilities.includes(c) ? styles.supportCardSpanTone : styles.supportCardSpanAlt)}>
                 {capabilityLabel[c]}
               </span>
             )}
@@ -563,9 +558,7 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
   return (
     <Card
       title={t("web.runtime.models")}
-      action={
-        <Show when={props.info.models}>{(m) => <span {...stylex.attrs(styles.usageP22)}>{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>
-      }
+      action={<Show when={props.info.models}>{(m) => <span {...stylex.attrs(styles.usageP22)}>{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>}
     >
       <Show
         when={props.info.models}
@@ -586,14 +579,7 @@ export function InventoryCard(props: { title: string; entries: InventoryEntry[] 
             <For each={props.entries}>
               {(e) => (
                 <li {...stylex.attrs(styles.inventoryCardLi)}>
-                  <span
-                    {...stylex.attrs(
-                      styles.inventoryCardSpan,
-                      e.enabled === false ? styles.inventoryCardSpanTone : styles.usagePAlt,
-                    )}
-                  >
-                    {e.name}
-                  </span>
+                  <span {...stylex.attrs(styles.inventoryCardSpan, e.enabled === false ? styles.inventoryCardSpanTone : styles.usagePAlt)}>{e.name}</span>
                   <Show when={e.description}>
                     <span {...stylex.attrs(styles.inventoryCardSpan2)}>{e.description}</span>
                   </Show>

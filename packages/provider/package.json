@@ -76,12 +76,12 @@
       "default": "./src/agora/captions.ts"
     },
     "./transcription": {
-      "types": "./dist/transcription.d.ts",
-      "default": "./src/transcription.ts"
+      "types": "./dist/base/transcription.d.ts",
+      "default": "./src/base/transcription.ts"
     },
     "./moss": {
-      "types": "./dist/moss.d.ts",
-      "default": "./src/moss.ts"
+      "types": "./dist/moss/index.d.ts",
+      "default": "./src/moss/index.ts"
     },
     "./moss/speech": {
       "types": "./dist/moss/speech.d.ts",

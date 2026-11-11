@@ -6,15 +6,16 @@ import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
+import { BizCode } from "@vibevalley/protocol/api";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
-import { inbox } from "#/inbox/items.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Repo } from "#/repo/repo.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { inbox } from "#/modules/inbox/items.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { Session } from "#/modules/session/session.ts";
 import { gitSync } from "#/testing/git.ts";
 import { refuse } from "#/testing/refuse.ts";
 import { testIssues } from "#/testing/world.ts";
@@ -156,7 +157,7 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
         user,
       ),
     );
-    expect(result._tag).toBe("Refused");
+    expect(result.bizCode).toBe(BizCode.IssueRefused);
     expect((yield* issues.list()).map((item) => [item.id, item.title])).toEqual([[parent.id, "parent"]]);
     expect((yield* Core).state().issues.map((item) => item.id)).toEqual([parent.id]);
     expect((yield* Session).hired()).toEqual([]);

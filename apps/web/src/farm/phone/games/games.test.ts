@@ -40,7 +40,7 @@ describe("推箱子", () => {
 
   test("boxes cannot be pushed through walls or each other; walking does not push", () => {
     const g = newWarehouse(2);
-    const width = warehouses[2]!.rows[0]!.length;
+    const width = warehouses[2]!.rows[0].length;
     const blocked: WarehouseGame = { level: 2, player: width + 2, boxes: [width + 1, width + 3, width + 4], moves: 0, pushes: 0, history: [] };
     expect(moveWarehouse(blocked, "left")).toBe(blocked);
     expect(moveWarehouse(blocked, "right")).toBe(blocked);
@@ -53,8 +53,8 @@ describe("推箱子", () => {
   test("every authored warehouse is rectangular, enclosed, and solvable", () => {
     warehouses.forEach((w, level) => {
       const rows = w.rows;
-      expect(rows.every((r) => r.length === rows[0]!.length)).toBe(true);
-      expect([...rows[0]!].every((c) => c === "#")).toBe(true);
+      expect(rows.every((r) => r.length === rows[0].length)).toBe(true);
+      expect([...rows[0]].every((c) => c === "#")).toBe(true);
       expect([...rows.at(-1)!].every((c) => c === "#")).toBe(true);
       expect(rows.every((r) => r.startsWith("#") && r.endsWith("#"))).toBe(true);
       expect(rows.join("").split("@").length - 1).toBe(1);

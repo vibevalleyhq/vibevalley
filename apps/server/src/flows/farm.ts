@@ -6,8 +6,8 @@ import type * as T from "@vibevalley/protocol";
 
 import { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
+import { type Hired } from "#/modules/session/session.ts";
 import { agentSessionsStart, collaborationStart, gamification, inboxStart, mailboxReady } from "#/services.ts";
-import { type Hired } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until as untilHeld, waitFor } from "#/testing/layers.ts";
 import { helper } from "#/testing/worker.ts";
@@ -61,9 +61,13 @@ export const watch = Effect.gen(function* () {
   let taken = 0;
   /** The next report not cut off by a stop, in order. */
   const nextReport = until(
-    () => facts.filter((f): f is T.FactSessionReported => f.type === "sessionReported" && f.outcome !== "interrupted").length > taken,
+    () => facts.filter((f): f is Extract<T.Fact, { type: "sessionReported" }> => f.type === "sessionReported" && f.outcome !== "interrupted").length > taken,
     "the next report",
-  ).pipe(Effect.map(() => facts.filter((f): f is T.FactSessionReported => f.type === "sessionReported" && f.outcome !== "interrupted")[taken++]!));
+  ).pipe(
+    Effect.map(
+      () => facts.filter((f): f is Extract<T.Fact, { type: "sessionReported" }> => f.type === "sessionReported" && f.outcome !== "interrupted")[taken++]!,
+    ),
+  );
   return { facts, notes, nextReport };
 });
 
@@ -82,9 +86,6 @@ export const await_ = <A, E>(get: () => Effect.Effect<A, E> | A, ok: (a: A) => b
     10_000,
   );
 
-export const mustHire = (h: Hired): T.Session => {
-  if (!h.session) throw new Error("refused: " + h.refused);
-  return h.session;
-};
+export const mustHire = (h: Hired): T.Session => h.session;
 
 export const git = gitIn;

@@ -16,7 +16,8 @@
 | 工具 | 跑法 | 拦什么 |
 |---|---|---|
 | Effect 的语言服务 | `vp run effect:check`（`@effect/tsgo`，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）；编辑器里经 `packages/tsrs/tsdk` 显示同一张表 | 漂着没运行的 Effect、gen 里的 `try/catch`、少了 `return yield*`、v3 的旧 API、Effect 里 `run*`、方法签名漏出依赖、`process.env`、`setTimeout`、`fetch`、`Math.random`、Effect 里同步解码、原生 `Error` 当失败……一共 48 条，开着哪些看那张表 |
-| oxlint（带类型） | `vp check` | TypeScript 的不安全写法（`any`、不安全的断言、漂着的 Promise）和这个仓库的 `vibevalley/*` 规则：`promise-boundary`、`try-promise-catch`、`service-method-names`、`no-instanceof-tagged`、`no-object-guard`、`no-wall-clock`、`clock-in-effect`、`scoped-fibers`、`yield-in-loop`、`db-door`、`child-process-door`、`sync-fs`、`no-test-sleep`、`atom-door` 等，每条在 `scripts/oxlint-plugin.ts` 里，失败时说错在哪、`Fix:` 怎么改、`See` 哪个文件 |
+| oxlint（带类型） | `vp check` | TypeScript 的不安全写法（`any`、不安全的断言、漂着的 Promise）和这个仓库的 `vibevalley/*` 规则：`promise-boundary`、`try-promise-catch`、`service-method-names`、`no-instanceof-tagged`、`tagged-error-tag`、`no-object-guard`、`effect-idioms`、`no-wall-clock`、`clock-in-effect`、`scoped-fibers`、`yield-in-loop`、`db-door`、`child-process-door`、`sync-fs`、`no-test-sleep`、`atom-door` 等，每条在 `scripts/audit/oxlint-plugin.ts` 里，失败时说错在哪、`Fix:` 怎么改、`See` 哪个文件 |
+| 全仓实践与契约审计 | `vp run practice:check`（`scripts/audit/practice-audit.ts`，基线在 `scripts/audit/practice.ratchet.json`）与 `scripts/audit/schema-audit.ts` | 跨文件与语法结构问题：全仓重复的 `TaggedError` `_tag`（`duplicate-error-tag`）、循环内局部 `Effect.provide`（`provide-in-loop`）、每次调用新建的 `Effect.cached`（`cached-per-call`）、无上限重试（`unbounded-retry`）、重复构建同参 layer（`layer-built-twice`）、松散布尔标志（`loose-flags`），以及协议枚举与 SQL `CHECK` 漂移、`Schema.Redacted` 漏配 `disallowJsonEncode: true`（`redacted-json-exposure`） |
 | 逃生口的棘轮 | `vp run health:verify`（报告是 `vp run health`，降了用 `vp run health:write` 固定下来） | `as`、`!`、关 lint 的注释、`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch`、`Effect.result` 的分支：按区只许减不许增 |
 | 测试的分层和预算 | `vp run server:check` 里的 `pyramid.test.ts` 和预算报告 | 测试放对层（规则、模块、流程），慢的测试报出来 |
 
@@ -43,9 +44,9 @@
 ## 加一条检查
 
 - **先问能不能写成代码**（更好的结构、更强的类型），再写检查，最后才写进文字（`AGENTS.md` 的「怎么让 agent 做对」）。
-- **lint 规则**写在 `scripts/oxlint-plugin.ts`，用 `says(错在哪, Fix, See)` 写报错，测试写在 `scripts/oxlint-plugin.test.ts`（`vp run scripts:test`），在根目录 `vite.config.ts` 的 `lint` 里打开；能机械改对的写自动修复。这个仓库不另加 ast-grep：oxlint 已经在 `vp check` 里跑、带类型（[vv-governance](.agents/skills/vv-governance/SKILL.md)）。
+- **lint 规则**写在 `scripts/audit/oxlint-plugin.ts`，用 `says(错在哪, Fix, See)` 写报错，测试写在 `scripts/audit/oxlint-plugin.test.ts`（`vp run scripts:test`），在根目录 `vite.config.ts` 的 `lint` 里打开；能机械改对的写自动修复。这个仓库不另加 ast-grep：oxlint 已经在 `vp check` 里跑、带类型（[vv-governance](.agents/skills/vv-governance/SKILL.md)）。
 - **存量太多一次改不完的**，先进逃生口的棘轮（`packages/health`），只许减；新写的照规则来。
-- **Effect 自己的诊断**能开就开：在 `tsconfig.base.json` 的 `plugins` 里把它调成 `error`，`vp run effect:check` 会报。`@effect/tsgo` 的规则没写进配置的，`scripts/effect-check.ts` 按「规则 × 项目」数命中，记在 `scripts/effect.ratchet.json`：多了失败（报出这次改到的文件里的命中），少了也失败，跑 `vp run effect:write` 降下来；一条规则归零就写成 `error`、退出棘轮。提交前的钩子（`.vite-hooks/pre-commit`）跑它，所以新代码加不进这些问题。不为让检查过而关规则或写 `@effect-diagnostics…:off`：要修。
+- **Effect 自己的诊断**能开就开：在 `tsconfig.base.json` 的 `plugins` 里把它调成 `error`，`vp run effect:check` 会报。`@effect/tsgo` 的规则没写进配置的，`scripts/audit/effect-check.ts` 按「规则 × 项目」数命中，记在 `scripts/audit/effect.ratchet.json`：多了失败（报出这次改到的文件里的命中），少了也失败，跑 `vp run effect:write` 降下来；一条规则归零就写成 `error`、退出棘轮。提交前的钩子（`.vite-hooks/pre-commit`）跑它，所以新代码加不进这些问题。不为让检查过而关规则或写 `@effect-diagnostics…:off`：要修。
 - 打包类型声明（`vp pack`）用的 tsgo 带的 Effect 语言服务可能比 `@effect/tsgo` 旧，认不得新规则时会报 unknown-rule 的警告；所以插件写了 `ignoreEffectWarningsInTscExitCode: true`，警告不让构建失败。门禁是 `effect:check`，它自己读每条诊断的级别，不看这个退出码。
 
 ## 外面的工具

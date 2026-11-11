@@ -657,9 +657,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
           <Show
             when={props.step.output}
             fallback={
-              <span {...stylex.attrs(styles.toolStepSpan5)}>
-                {props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}
-              </span>
+              <span {...stylex.attrs(styles.toolStepSpan5)}>{props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}</span>
             }
           >
             {(out) => <pre {...stylex.attrs(styles.toolStepPre2)}>{out()}</pre>}

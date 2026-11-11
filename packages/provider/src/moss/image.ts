@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/http";
 
 import { mossImageModels } from "./image-models.ts";
-import { readMossResponse } from "./response.ts";
+import { MossErrorOutcome, MossErrorReason, readMossResponse } from "./response.ts";
 
 const Text = Schema.String.check(Schema.isBetweenCodePoints(1, 4000), Schema.isPattern(/\S/u));
 const Dimension = Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 2048 }), Schema.isMultipleOf(16));
@@ -63,8 +63,8 @@ const ImageResponse = Schema.fromJsonString(
 );
 
 class MossImageError extends Schema.TaggedError<MossImageError, { readonly brand: unique symbol }>()("MossImageError", {
-  reason: Schema.Literals(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
-  outcome: Schema.Literals(["NotSubmitted", "Rejected", "Unknown"]),
+  reason: MossErrorReason,
+  outcome: MossErrorOutcome,
   status: Schema.optionalKey(Schema.Int),
   code: Schema.optionalKey(ErrorCode),
 }) {}

@@ -7,11 +7,11 @@ import { answer } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "#/channel/channel.ts";
 import { ServerConfig } from "#/infra/config.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { Session } from "#/session/session.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
 import { waitFor } from "#/testing/layers.ts";
 import { moduleWorld, testIssues } from "#/testing/world.ts";
 

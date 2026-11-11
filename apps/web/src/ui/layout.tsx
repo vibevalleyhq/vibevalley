@@ -283,7 +283,13 @@ export function ListCard(props: { title: string; label?: string; action?: JSX.El
 export function ListRow(props: { to: string; item?: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
   return (
     <li>
-      <A href={props.to} data-testid="list-row" data-key={props.item} aria-current={props.active === true ? "page" : undefined} {...stylex.attrs(styles.listRow)}>
+      <A
+        href={props.to}
+        data-testid="list-row"
+        data-key={props.item}
+        aria-current={props.active === true ? "page" : undefined}
+        {...stylex.attrs(styles.listRow)}
+      >
         {props.leading}
         <span {...stylex.attrs(styles.rowText)}>
           <span {...stylex.attrs(styles.rowTitle)}>{props.title}</span>

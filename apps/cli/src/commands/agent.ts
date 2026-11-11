@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { AgentRoleValues } from "@vibevalley/protocol";
 
-import { ask, change, nameArg } from "#/farm.ts";
-import { show } from "#/format.ts";
+import { show } from "#/base/format.ts";
+import { ask, change, nameArg } from "#/infra/farm.ts";
 
 const agentLine = (a: T.Agent) => [a.id, a.name, a.role, a.runtime, a.enabled ? "" : "off"].filter((x) => x !== "").join("  ");
 

@@ -1,6 +1,6 @@
 # 素材库
 
-「素材库」（`Library`，`apps/server/src/library/library.ts`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里，理解从选中的那一份发起。
+「素材库」（`Library`，`apps/server/src/modules/library/library.ts`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里，理解从选中的那一份发起。
 
 ## 管什么，不管什么
 
@@ -17,8 +17,8 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/library/library.ts` | 服务 `Library`：`list`、`add`、`delete`；听核心状态的变化记下生成的和聊天里发的 |
-| `apps/server/src/http/handlers/library.ts`、`apps/server/src/tool/library.ts` | `library.item.*` 接口；助手和帮工的 `library_item_add`、`library_item_list` 工具 |
+| `apps/server/src/modules/library/library.ts` | 服务 `Library`：`list`、`add`、`delete`；听核心状态的变化记下生成的和聊天里发的 |
+| `apps/server/src/gateway/http/handlers/library.ts`、`apps/server/src/modules/tool/library.ts` | `library.item.*` 接口；助手和帮工的 `library_item_add`、`library_item_list` 工具 |
 | `packages/protocol/src/library/` | `LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest` |
 | `apps/server/db/queries/library_item.sql` | 表 `library_item` 的查询 |
 | `apps/web/src/features/library/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘的落点是 `items.ts` 的纯函数 |
@@ -64,8 +64,8 @@
 
 ## 怎么验证
 
-- `apps/server/src/library/library.test.ts`：三种来路、去重、筛选、拿掉不删附件；没有来源、两个来源、用户给网址、帮工给附件、内网和 `file:` 地址被拒。
-- `apps/server/src/mcp/mcp.test.ts`：帮工经工具按路径放一个文件，工作目录外的路径和逃出去的符号链接被拒。
-- `apps/server/src/media/inputs.test.ts`：附件当作理解的输入，不是图、视频、音频的被拒。
+- `apps/server/src/modules/library/library.test.ts`：三种来路、去重、筛选、拿掉不删附件；没有来源、两个来源、用户给网址、帮工给附件、内网和 `file:` 地址被拒。
+- `apps/server/src/gateway/mcp/mcp.test.ts`：帮工经工具按路径放一个文件，工作目录外的路径和逃出去的符号链接被拒。
+- `apps/server/src/modules/media/inputs.test.ts`：附件当作理解的输入，不是图、视频、音频的被拒。
 - `apps/web/src/features/library/items.test.ts`：种类、筛选和两组计数、按比例排满一行、方向键的落点、Shift 选一段、扩展名和时长、来路的说法、在做的任务、理解的结果。
 - `apps/web/test/library.spec.ts`：选文件上传和拖进来上传、按来路和种类筛、选中后详情栏发到频道、Delete 原地确认后拿掉，带一次 axe；`understanding.spec.ts` 从详情栏发起理解，结果回到详情栏；`narrow.spec.ts` 查 400px 不出界。

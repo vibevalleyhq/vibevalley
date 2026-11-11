@@ -1,3 +1,5 @@
+import type { IssueId, SessionId } from "../common/shapes";
+
 export const InboxKindValues = ["review", "ask", "fix", "interrupted", "conflict", "quiet", "mention", "cron-ask"] as const;
 export type InboxKind = (typeof InboxKindValues)[number];
 
@@ -29,7 +31,7 @@ export interface InboxItem {
 
 export interface InboxFromSession {
   kind: "session";
-  id: string;
+  id: SessionId;
   name: string;
   agent: string;
 }
@@ -40,12 +42,12 @@ export interface InboxFromOrchestrator {
 
 export interface InboxTargetSession {
   kind: "session";
-  id: string;
+  id: SessionId;
 }
 
 export interface InboxTargetIssue {
   kind: "issue";
-  id: string;
+  id: IssueId;
 }
 
 export interface InboxTargetChat {

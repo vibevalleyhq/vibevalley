@@ -4,11 +4,11 @@ import { Effect } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "#/agent/agent.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox, type SourceEvent } from "#/mailbox/mailbox.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox, type SourceEvent } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
@@ -17,7 +17,7 @@ import { farm, lab, until } from "./farm.ts";
 const signal = (key: string, kind: "user" | "agent" = "agent", threads: readonly string[] = [], at = 0): SourceEvent => ({
   source: "channel",
   key,
-  actor: { kind, id: kind === "user" ? "user" : "other-session" },
+  actor: kind === "user" ? { kind: "user", id: "user" } : { kind: "agent", id: "other-session", role: "worker" },
   addressed: "mention",
   threads,
   text: key,
@@ -107,7 +107,7 @@ it.live("regression: queued triggers enter the first model request in receipt or
       yield* mailbox.record({
         source: "github",
         key: text,
-        actor: { kind: "ci", id: "checks" },
+        actor: { kind: "system", id: "checks" },
         addressed: "thread_owner",
         threads: [`issue:${issue.id}`],
         text,
@@ -158,7 +158,7 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     const queued = (yield* mailbox.accept({
       source: "github",
       key: "queued-ci",
-      actor: { kind: "ci", id: "checks" },
+      actor: { kind: "system", id: "checks" },
       addressed: "thread_owner",
       threads,
       text: "queued-ci",

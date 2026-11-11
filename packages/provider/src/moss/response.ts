@@ -1,6 +1,9 @@
 import { Effect, Schema, Stream } from "effect";
 import type { HttpClientResponse } from "effect/http";
 
+export const MossErrorReason = Schema.Literals(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]);
+export const MossErrorOutcome = Schema.Literals(["NotSubmitted", "Rejected", "Unknown"]);
+
 class MossResponseTooLarge extends Schema.TaggedError<MossResponseTooLarge, { readonly brand: unique symbol }>()("MossResponseTooLarge", {}) {}
 
 export const readMossResponse = Effect.fn("Provider.readMossResponse")(function* (response: HttpClientResponse.HttpClientResponse) {

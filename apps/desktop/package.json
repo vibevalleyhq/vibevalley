@@ -4,7 +4,7 @@
   "type": "module",
   "main": "build/main.cjs",
   "exports": {
-    "./releases": "./src/releases.ts"
+    "./releases": "./src/base/releases.ts"
   },
   "scripts": {
     "build": "vpx scripts/build.ts",

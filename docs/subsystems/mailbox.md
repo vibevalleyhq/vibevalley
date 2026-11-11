@@ -15,14 +15,14 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/mailbox/mailbox.ts` | 对外 `Mailbox` 服务接口（含 `record`、`accept`、`recordTrigger`、`receive`、`withdraw`、`news` 等） |
-| `apps/server/src/mailbox/shapes.ts`、`schema.ts` | 服务端私有的 `Trigger`、`Envelope` 与投递编码契约 |
-| `apps/server/src/mailbox/payload.ts`、`envelope.ts` | 来源载荷编码、共享形状与纯转换，不读写数据库 |
-| `apps/server/src/mailbox/triggers.ts` | 触发器幂等写入、原始载荷读取、来源查询与 cron 重放 |
-| `apps/server/src/mailbox/routing.ts` | 受众计算与四档紧急度排序 |
-| `apps/server/src/mailbox/brakes.ts`、`deliveries.ts` | 三道刹车计算与未终结投递缓存 |
-| `apps/server/src/mailbox/work.ts` | 工单蓄水池（Tier 1）、退回转交（`handback`）与投递写入（`forward`） |
-| `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与助手流推送 |
+| `apps/server/src/modules/mailbox/mailbox.ts` | 对外 `Mailbox` 服务接口（含 `record`、`accept`、`recordTrigger`、`receive`、`withdraw`、`news` 等） |
+| `apps/server/src/modules/mailbox/shapes.ts`、`schema.ts` | 服务端私有的 `Trigger`、`Envelope` 与投递编码契约 |
+| `apps/server/src/modules/mailbox/payload.ts`、`envelope.ts` | 来源载荷编码、共享形状与纯转换，不读写数据库 |
+| `apps/server/src/modules/mailbox/triggers.ts` | 触发器幂等写入、原始载荷读取、来源查询与 cron 重放 |
+| `apps/server/src/modules/mailbox/routing.ts` | 受众计算与四档紧急度排序 |
+| `apps/server/src/modules/mailbox/brakes.ts`、`deliveries.ts` | 三道刹车计算与未终结投递缓存 |
+| `apps/server/src/modules/mailbox/work.ts` | 工单蓄水池（Tier 1）、退回转交（`handback`）与投递写入（`forward`） |
+| `apps/server/src/modules/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与助手流推送 |
 
 ## 模型和不变量
 
@@ -72,5 +72,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/mailbox/triggers.test.ts`、`apps/server/src/mailbox/source.test.ts`：`(source, key)` 幂等去重、来源游标与触发器共同回滚、重复来源保留原文。
-- `apps/server/src/mailbox/*.test.ts`、`apps/server/src/flows/ingress.test.ts`、`flows/mailbox-order.test.ts`、`flows/returns.test.ts`、`flows/handoff.test.ts`：投递顺序、三道刹车、工单蓄水、换人退回与重启重放测试。
+- `apps/server/src/modules/mailbox/triggers.test.ts`、`apps/server/src/modules/mailbox/source.test.ts`：`(source, key)` 幂等去重、来源游标与触发器共同回滚、重复来源保留原文。
+- `apps/server/src/modules/mailbox/*.test.ts`、`apps/server/src/flows/ingress.test.ts`、`flows/mailbox-order.test.ts`、`flows/returns.test.ts`、`flows/handoff.test.ts`：投递顺序、三道刹车、工单蓄水、换人退回与重启重放测试。

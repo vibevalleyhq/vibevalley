@@ -2,7 +2,7 @@ import { Schema } from "effect";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
-import * as T from "./audio-shapes";
+import type * as T from "./audio-shapes";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 import { MediaAudioFormatValues } from "./shapes";
 
@@ -15,7 +15,6 @@ export const MediaAudioAccountRequest = Schema.Struct({
   connection: Schema.NonEmptyString,
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }) satisfies Codec<T.MediaAudioAccountRequest>;
-const MediaAudioKind: Codec<T.MediaAudioKind> = Schema.Literals(T.MediaAudioKindValues);
 const SpeakersFields = {
   ...MediaAudioAccountRequest.fields,
   speakers: Schema.mutable(Schema.Array(Schema.Struct({ id: SpeakerId, voice: VoiceId })).check(Schema.isMinLength(1), Schema.isMaxLength(100))),

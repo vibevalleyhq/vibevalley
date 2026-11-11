@@ -123,6 +123,7 @@ export const PublishPlatformValues = ["github", "gitlab"] as const;
 export type PublishPlatform = (typeof PublishPlatformValues)[number];
 export const BranchCheckValues = ["preview", "passed", "not-run"] as const;
 type BranchCheck = (typeof BranchCheckValues)[number];
+export const BranchPublicationStateValues = ["open"] as const;
 
 export interface BranchPublication {
   readonly platform: PublishPlatform;
@@ -135,7 +136,7 @@ export interface BranchPublication {
   readonly url?: string;
   readonly number?: number;
   readonly reused?: boolean;
-  readonly state?: "open";
+  readonly state?: (typeof BranchPublicationStateValues)[number];
 }
 
 /** A repo the farm works in, and how many commits helpers made in it. */

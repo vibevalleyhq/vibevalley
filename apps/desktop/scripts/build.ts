@@ -7,7 +7,7 @@ const desktop = join(import.meta.dirname, "..");
 const out = join(desktop, "build");
 
 await build({
-  entryPoints: { main: join(desktop, "src/main.ts"), preload: join(desktop, "src/preload.ts") },
+  entryPoints: { main: join(desktop, "src/main.ts"), preload: join(desktop, "src/preload/preload.ts") },
   outdir: out,
   outExtension: { ".js": ".cjs" },
   bundle: true,

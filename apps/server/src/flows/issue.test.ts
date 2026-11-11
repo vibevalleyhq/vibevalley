@@ -7,20 +7,21 @@ import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { Cron } from "#/cron/cron.ts";
-import { viewOf } from "#/game/view.ts";
-import { Issue } from "#/issue/issue.ts";
-import { openFindings } from "#/issue/status.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { Runtime } from "#/runtime/runtime.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Cron } from "#/modules/cron/cron.ts";
+import { viewOf } from "#/modules/game/view.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { openFindings } from "#/modules/issue/status.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Runtime } from "#/modules/runtime/runtime.ts";
+import { Session } from "#/modules/session/session.ts";
 import { write } from "#/testing/git.ts";
 import { helper } from "#/testing/worker.ts";
 import { Said, testIssues } from "#/testing/world.ts";
@@ -28,8 +29,8 @@ import { Said, testIssues } from "#/testing/world.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
 const refusedWith = (e: unknown, words = "") => {
-  const tagged = e as { _tag?: string; reason?: string };
-  expect(tagged._tag).toBe("Refused");
+  const tagged = e as { _tag?: string; bizCode?: unknown; reason?: string };
+  expect(tagged.bizCode).toBe(BizCode.IssueRefused);
   if (words) expect(tagged.reason).toContain(words);
 };
 
@@ -149,7 +150,7 @@ describe("an issue", () => {
       expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/u);
       const setStatusFailure2 = yield* Effect.flip(issues.setStatus(session.issue!, "todo", "", "", user));
       refusedWith(setStatusFailure2);
-      expect((yield* Effect.flip(issues.setStatus("w404", "todo", "", "", user)))._tag).toBe("Missing");
+      expect((yield* Effect.flip(issues.setStatus("w404", "todo", "", "", user))).bizCode).toBe(BizCode.IssueNotFound);
       yield* sessions.dismiss(again);
       yield* closedAs("dismissed");
       yield* sql`update issue set delivered = 'merged_into_parent', canceled = null, closed_at = ${Date.now()} where id = ${issue.id}`.pipe(Effect.orDie);
@@ -765,7 +766,11 @@ describe("an issue", () => {
       const issues = yield* Issue;
       const runtimes = yield* Runtime;
       const agents = yield* Agent;
-      const hire = () => Effect.map(issues.hire(lab(), "随便做点什么", "money"), (h) => h.refused ?? "");
+      const hire = () =>
+        issues.hire(lab(), "随便做点什么", "money").pipe(
+          Effect.as(""),
+          Effect.catchTag("HireRefused", (e) => Effect.succeed(e.reason)),
+        );
       const settings = agents.settings("pi");
 
       usage = {

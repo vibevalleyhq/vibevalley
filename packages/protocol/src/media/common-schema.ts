@@ -10,14 +10,14 @@ export const MediaSource: Codec<T.MediaSource> = Schema.Union([
 ]);
 export const MediaInputReference: Codec<T.MediaInputReference> = Schema.Struct({
   id: Schema.NonEmptyString,
-  kind: Schema.Literals(["image", "video", "audio"]),
+  kind: Schema.Literals(T.MediaInputKindValues),
   name: Schema.String,
   mime: Schema.String,
   size: Schema.Int,
   hash: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
 });
 export const MediaAudioMetadata: Codec<T.MediaAudioMetadata> = Schema.Struct({
-  source: Schema.Literals(["file", "provider"]),
+  source: Schema.Literals(T.MediaAudioMetadataSourceValues),
   sampleRate: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   duration: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   channels: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),

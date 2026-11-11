@@ -7,16 +7,16 @@ import { Context, Effect, Layer, Stream } from "effect";
 import type { AccountUsage, ChatMessage, IssueRequest } from "@vibevalley/protocol";
 
 import { Core } from "#/core/core.ts";
-import { Inbox } from "#/inbox/inbox.ts";
+import { Mcp } from "#/gateway/mcp/mcp.ts";
 import { type ServerConfig } from "#/infra/config.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import type { Issue } from "#/issue/issue.ts";
-import { Mcp } from "#/mcp/mcp.ts";
-import { type GitHubRun, type RepoHooks } from "#/repo/repo.ts";
-import { registryOf } from "#/runtime/runtime.ts";
+import { Inbox } from "#/modules/inbox/inbox.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
+import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
+import { registryOf } from "#/modules/runtime/runtime.ts";
+import { WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { agentSessions, agents, collaboration, issues, mailbox, platform, type ServiceOptions, sourceControl } from "#/services.ts";
-import { WorkerAccess, type workerAccess } from "#/session/worker.ts";
-import { Tool } from "#/tool/tool.ts";
 
 import { repo } from "./git.ts";
 import { offlineNetwork, testConfig } from "./layers.ts";

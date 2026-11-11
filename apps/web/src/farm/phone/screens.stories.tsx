@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 
 import type { InboxItem, InboxKind } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 import { stories, story } from "@vibevalley/stories";
 
 import type { CallPhase } from "#/features/voice/index.ts";
@@ -31,11 +32,11 @@ function Screen(props: { children: JSX.Element }) {
 const ring = (kind: InboxKind, label: string, text: string): InboxItem => ({
   id: `c-${kind}`,
   kind,
-  from: { kind: "session", id: "w1", name: "老周", agent: "老周" },
+  from: { kind: "session", id: sessionId("w1"), name: "老周", agent: "老周" },
   who: "老周",
   text,
   at: Date.now(),
-  target: { kind: "session", id: "w1" },
+  target: { kind: "session", id: sessionId("w1") },
   words: { label, title: label, body: text, tray: "" },
 });
 

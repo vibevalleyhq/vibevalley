@@ -8,9 +8,9 @@ import type { SettingsStatus } from "@vibevalley/protocol";
 import { useForm, type Submission } from "#/infra/form.ts";
 import { useSaveSettings } from "#/infra/settings.ts";
 import { createAct } from "#/ui/act.ts";
+import { KeyRow, SettingsGroup } from "#/ui/domain/settings.tsx";
 import { Form, formControl, formMessages } from "#/ui/Form.tsx";
 import { SaveBar } from "#/ui/KeyField.tsx";
-import { KeyRow, SettingsGroup } from "#/ui/settings.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 const styles = stylex.create({ form: { display: "flex", flexDirection: "column", gap: "1rem" } });

@@ -2,8 +2,8 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { KeyStatus, Locale } from "../common/schema";
-import * as T from "./shapes";
 import { AgoraAppID, Dictation, SettingsUpdateVoice, VoiceSettings } from "../voice/schema";
+import * as T from "./shapes";
 
 export const MemorySourceInfo: Codec<T.MemorySourceInfo> = Schema.Struct({
   name: Schema.String,

@@ -21,7 +21,7 @@ import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { Link as A } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
-import { AgentFace, OrchestratorFace, UserFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace, UserFace } from "#/ui/domain/Face.tsx";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -781,9 +781,7 @@ export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.El
     <ChatRow mine={false} first={props.first} face={props.face} name={<SenderName m={props.m} />} title={farmClock(props.m.at)}>
       <span {...styleProps([styles.chatReportSpan, tag()[1]])}>{tag()[0]}</span>
       <ChatText text={props.m.text} />
-      <Show when={props.m.spent}>
-        {(spent) => <p {...stylex.attrs(styles.chatReportP)}>{t("web.farm.chat.spent", { spent: spentText(spent()) })}</p>}
-      </Show>
+      <Show when={props.m.spent}>{(spent) => <p {...stylex.attrs(styles.chatReportP)}>{t("web.farm.chat.spent", { spent: spentText(spent()) })}</p>}</Show>
       {props.steps}
     </ChatRow>
   );

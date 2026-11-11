@@ -39,7 +39,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 - **Atom 是唯一状态中间层**：跨组件状态 `defineAtom`、本地存储 `defineStored` 和乐观意图 `defineIntent` 统一建在 `state/` 的 `AtomRegistry` 上（由 `vibevalley/*-door` 规则检查）。
 - **乐观意图（`Intent`）按阶段联合建模，等帧 `seq` 追上后结算**：
   - `Intent` 为按 `phase` 区分的判别联合（`IntentAt`），写操作带 `requestKey` 或 `sendKey` 叠加到当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息时才结算。
-  - 错误经 `infra/api.ts` 的 `faultOf` 转为结构化 `UiFault`（识别全部 `ApiError`，含 `502 VoiceCallFailed` 与 `503 VoiceUnavailable`，保留 `next`、`settings` 与 `retryable`），只挂在失败或降级分支上；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
+  - `VibeValleyApi` 自动解包 `{ bizCode, message, data?, error? }` 信封；错误经 `infra/api.ts` 的 `faultOf` 转为结构化 `UiFault`（携带六位 `bizCode`、语义 `tag`、`reason`、`next`、`settings` 以及由 `bizCodeMeta` 决定的 `retryable`），只挂在失败或降级分支上；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
 - **一次性读取走 `infra/query.ts`**：自有 Query client 管缓存与失效，结果先经 Schema 解码，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
 - **颜色收进语义调色板**：浅色/深色主题通过 `<html data-theme>` 切换，只用 `style.css` 语义色变量（`vibevalley/no-hex-color` 检查）；像素皮固定 `data-theme="light"`。
 - **组件样式统一由 StyleX 编译并受门禁保护**：组件对外收有类型的 `styles?: stylex.StyleXStyles`，不收 `class` 字符串；`stylex.attrs` 与 `styleProps` 在 DOM 边界挂载样式，`vibevalley/stylex-only` 禁止 JSX 直接书写 `class` / `className` / `classList`。动态几何坐标、Canvas 数据、Motion 动画与 Shiki 语法高亮等外部计算值通过原生对象 `style` 保持单一所有者，且 `vibevalley/no-hex-color` 同时拦截 StyleX 定义与 JSX 内联 `style` 中的硬编码十六进制色值。
@@ -49,11 +49,11 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 - **宿主接口封闭，缺省能力为 `null`**：页面通过 `currentHost()` 检测能力是否存在，不分支判断宿主类型。跨进程调用经 `@vibevalley/bridge` 按 Schema 校验。
 - **远端浏览器先拿钥匙**：非回环地址打开页面时先问 `user.get`（钥匙可能在 HttpOnly 的 Cookie 里，页面读不到）；没有钥匙的，设过密码就去 `/login`，没设去 `/pair`（`features/user/entry.ts`）。配对把钥匙写进 `SameSite=Strict` 的 cookie，登录由门写进 HttpOnly 的 cookie（[连接到本机](docs/subsystems/lan.md)）。
-- **手机壳单连接串行切换**：`FarmConnection` 串行管理农场选择与系统钥匙串写入，切农场时取消在途入线；手机通话走原生声网 SDK（`apps/mobile/src/rtc.ts`）保持锁屏不断线。
+- **手机壳单连接串行切换**：`FarmConnection` 串行管理农场选择与系统钥匙串写入，切农场时取消在途入线；手机通话走原生声网 SDK（`apps/mobile/src/infra/rtc.ts`）保持锁屏不断线。
 
 ### 发布渠道
 
-桌面版按构建版本拆分为四个独立渠道（`apps/desktop/src/channel.ts`），可同机并排运行：
+桌面版按构建版本拆分为四个独立渠道（`apps/desktop/src/base/channel.ts`），可同机并排运行：
 
 | 渠道 | 版本形态 | 应用名 / Bundle ID | 家目录 | 工作目录 | CLI 命令 |
 |---|---|---|---|---|---|
@@ -62,7 +62,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | Alpha（`alpha`） | `v0.4.0-alpha.1` | VibeValley Alpha / `dev.vibevalley.app.alpha` | `~/.vibevalley-alpha` | `~/vibevalley-alpha` | `vibevalley-alpha` |
 | 开发（`dev`） | `0.0.0` / 源码 | VibeValley Dev / `dev.vibevalley.app.dev` | `~/.vibevalley-dev` | `~/vibevalley-dev` | `vp run cli` |
 
-- **渠道独立隔离，机器级资源抢占**：各渠道有独立的单实例锁、家目录、工作目录和相隔 10 的默认端口；全局快捷键与灵动岛归先启动的渠道持有（`apps/desktop/src/machine.ts`）。
+- **渠道独立隔离，机器级资源抢占**：各渠道有独立的单实例锁、家目录、工作目录和相隔 10 的默认端口；全局快捷键与灵动岛归先启动的渠道持有（`apps/desktop/src/infra/machine.ts`）。
 - **发版阶段与表结构锁死**：
   - `alpha` 在 `main` 打 tag；首个 `beta` 从 `main` 切出 `release/X.Y` 分支。
   - 同一条 `X.Y` 线的后续 `beta` 与 `stable` 必须保持 `db.schema` 与 `beta.1` 一致（`vp run release:verify` 检查），且 `stable` 与最后一个 `beta` 指向同一提交。
@@ -119,4 +119,4 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 - `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、StyleX 编译与令牌/门禁规则（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
 - `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
-- `vp run desktop:test`、`apps/desktop/src/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。
+- `vp run desktop:test`、`apps/desktop/src/base/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。

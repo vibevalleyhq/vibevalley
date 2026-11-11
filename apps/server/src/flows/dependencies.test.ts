@@ -4,11 +4,11 @@ import { Effect } from "effect";
 
 import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { Issue } from "#/issue/issue.ts";
-import { issueBranch, Repo } from "#/repo/repo.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { issueBranch, Repo } from "#/modules/repo/repo.ts";
+import { Session } from "#/modules/session/session.ts";
 import { gitSync } from "#/testing/git.ts";
 import { testIssues } from "#/testing/world.ts";
 

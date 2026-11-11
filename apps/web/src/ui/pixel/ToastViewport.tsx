@@ -81,7 +81,7 @@ const styles = stylex.create({
     position: "fixed",
     insetInline: "0",
     top,
-    zIndex: "50",
+    zIndex: 50,
     display: "flex",
     justifyContent: "center",
   }),

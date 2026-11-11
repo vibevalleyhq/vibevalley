@@ -2,8 +2,8 @@
 import { HydrationScript, type JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 
-import { backgrounds } from "./lib/images";
-import { page } from "./lib/page";
+import { backgrounds } from "./base/images";
+import { page } from "./i18n/page";
 
 const sceneStyles = stylex.create({
   lost: {

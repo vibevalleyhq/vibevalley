@@ -424,7 +424,10 @@ const standingsOf = (list: readonly AchievementStanding[]): Standings => {
 
 /** An emblem in its frame: wood before the first tier, then bronze, silver, gold (one tier alone is gold). */
 function Medal(props: { a: Achievement; tier: number; size: number }) {
-  const earned = () => props.tier > 0;
+  // A function declaration: StyleX evaluates an arrow used in `stylex.attrs` at build time and fails on its body.
+  function earned() {
+    return props.tier > 0;
+  }
   const frame = () => {
     const frameTier = props.a.tiers.length === 1 ? 3 : props.tier;
     return !earned() ? "medal-wood" : frameTier === 1 ? "medal-bronze" : frameTier === 2 ? "medal-silver" : "medal-gold";
@@ -667,7 +670,10 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
         <div {...stylex.attrs(styles.starterGrid)}>
           <For each={props.list}>
             {(a) => {
-              const ok = () => props.st(a).tier > 0;
+              // A function declaration: StyleX evaluates an arrow used in `stylex.attrs` at build time and fails on its body.
+              function ok() {
+                return props.st(a).tier > 0;
+              }
               return (
                 <div {...stylex.attrs(styles.starterCard, ok() ? styles.starterCardDone : styles.starterCardPending)}>
                   <span {...stylex.attrs(styles.starterIconBox)}>

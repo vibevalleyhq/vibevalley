@@ -6,9 +6,9 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { PkmMarkerValues, PkmTierValues } from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, optionalText, optionalWords } from "#/farm.ts";
-import { show } from "#/format.ts";
-import { exit, Failure, out, stdinTextOrEmpty } from "#/output.ts";
+import { show } from "#/base/format.ts";
+import { exit, Failure, out, stdinTextOrEmpty } from "#/base/output.ts";
+import { ask, change, given, nameArg, optionalText, optionalWords } from "#/infra/farm.ts";
 
 const pageArgument = nameArg("page", "cli.arg.page");
 const tierFlag = Flag.Literals("tier", PkmTierValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.tier")));

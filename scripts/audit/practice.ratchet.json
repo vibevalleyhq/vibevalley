@@ -1,0 +1,40 @@
+{
+  "turn-as-absence": {
+    "apps/server": 4
+  },
+  "unreleased-gate": {},
+  "duplicated-setup": {
+    "apps/server": 5
+  },
+  "expect-in-unjoined-fiber": {},
+  "failure-without-reason": {
+    "apps/server": 25
+  },
+  "run-in-effect-test": {
+    "apps/server": 29
+  },
+  "shared-runtime-in-test": {
+    "apps/server": 5
+  },
+  "live-with-test-clock": {},
+  "fork-then-join": {},
+  "span-after-result": {},
+  "unbounded-retry": {},
+  "ref-read-modify-write": {
+    "apps/server": 2
+  },
+  "pipe-on-effect-fn": {},
+  "logic-in-pipe": {},
+  "option-get-or-throw": {},
+  "die-with-plain-error": {},
+  "swallow-without-record": {
+    "apps/server": 34
+  },
+  "cause-as-string": {},
+  "uninterruptible-wait": {},
+  "layer-built-twice": {},
+  "loose-flags": {},
+  "duplicate-error-tag": {},
+  "provide-in-loop": {},
+  "cached-per-call": {}
+}

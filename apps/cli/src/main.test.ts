@@ -4,7 +4,7 @@ import { Effect, Schema } from "effect";
 import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 
-import { cli, farm, lookIn, memoriesOf, workingFarm } from "./testing.ts";
+import { cli, farm, lookIn, memoriesOf, workingFarm } from "#/testing/testing.ts";
 
 const json = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 

@@ -2,7 +2,7 @@ import { Effect } from "effect";
 
 import { jsonText } from "#/base/json.ts";
 import { Db } from "#/infra/db.ts";
-import type { InsertDelivery } from "#/mailbox/mailbox.ts";
+import type { InsertDelivery } from "#/modules/mailbox/mailbox.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
 import * as qr from "#db/mailbox_trigger.sql.ts";
 

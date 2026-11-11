@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 与 `apps/web/src/ui/tokens.stylex.ts` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 与 `apps/web/src/ui/tokens.stylex.ts` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -27,13 +27,13 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
 | 令牌的检查 | `stylex-only`、`no-hex-color`、`design-tokens` | `stylex-only`、`no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
 
-头像（`ui/Face.tsx`）、农机的 logo、仓库的岛、额度瓶在工作台里也是画，照像素皮。
+头像（`ui/domain/Face.tsx`）、农机的 logo、仓库的岛、额度瓶在工作台里也是画，照像素皮。
 
 ### 像素皮的令牌
 
 像素皮不跟着主题换，但它的值和工作台一样有名字、只写在一处：
 
-- **颜色**按家族起名（`style.css` 的 CSS 自定义属性）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/cast.ts`），照原样。
+- **颜色**按家族起名（`style.css` 的 CSS 自定义属性）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/domain/cast.ts`），照原样。
 - **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxStyle` 给；读的长文字（汇报、说明）用 `pxStyle.read`，是系统字体。
 - **框和影**：`pxStyle.window`（窗）、`frame`（厚框）、`ring`（框里一圈 2px）、`drop`（浮在板子上的投影）、`shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
 - **焦点**只有一种：`pxStyle.focus`，叶色的 2px 外框，离边一个像素。
@@ -180,13 +180,13 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - **标签页**（`ui/Tabs.tsx`）：一页里的几个视图。窗格里用 `pills`（选中的是 `--color-selected`），页面的头下面用 `line`（选中的下面一道墨色的线，可以带图标）；一个标签页是去一个地址时给它 `href`。
 - **更多**（`ui/MoreMenu.tsx`，base-ui 的 `Menu`）：一处不是主要的动作收进右上角的 ⋯（新标签页打开、复制链接、删掉……）；每项一个 16px 以内的图标加一句话，危险的放最后、前面一条分隔线、字是莓色。删掉这类收不回的，选了以后在原处问一遍（莓色的浅底一行、危险按钮、「算了」），不弹窗。
 - **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `--color-hover`，页面色加 `--shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
-- **状态点**（`ui/Tag.tsx` 的 `Dot`，`features/channel/presence.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
+- **状态点**（`ui/Tag.tsx` 的 `Dot`，`features/channel/views/presence.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
 - **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/Dialog.tsx` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
 - **标签和计数**：`Tag`（`ui/Tag.tsx`）只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`"9999px"`、`--text-xs`）。
-- **附件**（`ui/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `16rem` 高，一圈 `--color-line`、`--radius-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
+- **附件**（`ui/domain/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `16rem` 高，一圈 `--color-line`、`--radius-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
 - **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `--text-xs` 加 `--color-faint`；悬停的工具条在右上，`zIndex: 10`。
 - **在想和在写**：只在服务端说它在想、在写的那个频道里画三个点（`ThinkingDots`），带着是谁和这一轮过了多久（「在想… · 12 秒」，从服务端记的 `since` 起算，不猜）；侧栏底下这里的助手也写着过了多久。答完，回答下面折成一行「想了 40 秒 · 用了 3 个工具」，点开是干活的经过；没用工具的回答不加这一行。
-- **输入框**（`features/channel/Composer.tsx`）：回车发，Shift+回车换行，`@` 出名单，开头打 `/` 出命令（`features/channel/commands.ts`：`/issue` 记工单、`/remember` 让助手记住、`/stop` 叫停、`/dm` 私聊）；一条命令就是一个接口，成了在 toast 里说一句，没成那行字留在框里。拖文件进来整块变成落点。
+- **输入框**（`features/channel/views/Composer.tsx`）：回车发，Shift+回车换行，`@` 出名单，开头打 `/` 出命令（`features/channel/model/commands.ts`：`/issue` 记工单、`/remember` 让助手记住、`/stop` 叫停、`/dm` 私聊）；一条命令就是一个接口，成了在 toast 里说一句，没成那行字留在框里。拖文件进来整块变成落点。
 - **代码**（`ui/code/highlight.ts`）：补丁和代码块按文件的后缀或代码块的标记着色，在 Web Worker 里做，一种语言一个按需加载的包；颜色回来以前、认不得的语言、太长的块（3000 行以上）都是不着色的原样。
 - **干活的经过**（`features/session/WorkLog.tsx`）：每一步一个块，底色说它是什么（交给它的话麦色 14%、想起的叶色 15%、它说的 `--color-hover`、出错莓色 10%，用 `color-mix()` 调配），长的先折起来。
 - **分栏**（`ui/Splitter.tsx`）：侧面板和导航的边能拖宽窄，指针放上去出一条 `--color-focus` 色的线，← → 每次 16px，双击回默认；宽窄按面板记在本机的偏好里（`state/prefs.ts` 的 `widths`），有上下限。窄屏上面板盖住页面时不给拖。

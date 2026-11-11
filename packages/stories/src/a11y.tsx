@@ -151,9 +151,7 @@ export function A11yPanel(props: { result: AxeResults | undefined; onAgain: () =
         {(r) => (
           <Show
             when={r().violations.length > 0}
-            fallback={
-              <p {...stylex.attrs(styles.muted)}>{`Nothing found; ${r().passes.length} rules pass, ${r().incomplete.length} need a look by eye.`}</p>
-            }
+            fallback={<p {...stylex.attrs(styles.muted)}>{`Nothing found; ${r().passes.length} rules pass, ${r().incomplete.length} need a look by eye.`}</p>}
           >
             <ul {...stylex.attrs(styles.list)}>
               <For each={r().violations}>{(v) => <Violation v={v} />}</For>

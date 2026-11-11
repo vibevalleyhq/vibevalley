@@ -6,14 +6,14 @@ Status: proposed
 
 `<space>/{repos,worktrees,pkm}` 目录收敛与 `.vibevalley/{setup,check}` 自举门禁已上线（见 [概念](docs/concepts.md)、[仓库](docs/subsystems/repo.md)），但 `Space` 作为完整隔离单元还剩两处缺口：
 - **空间状态未随 `Space` 隔离**：切换 `work_root` 时，`repos/`、`worktrees/` 与 `pkm/` 随之切换，但工单、频道、会话与 Artifact 状态仍混在宿主全局库（`$VIBEVALLEY_HOME/db` 或同一个 `database.url`）中，看板与聊天未随空间隔离。
-- **仓库仅支持单层短名**：`apps/server/src/repo/repo.ts` 的 `repoName` 仅允许单层目录名，同空间克隆不同组织的同名仓库或按 GitHub `<owner>/<repo>` 全名寻址时会冲突。
+- **仓库仅支持单层短名**：`apps/server/src/modules/repo/repo.ts` 的 `repoName` 仅允许单层目录名，同空间克隆不同组织的同名仓库或按 GitHub `<owner>/<repo>` 全名寻址时会冲突。
 
 ## Proposal
 
 1. **按 `Space` 隔离空间状态**：
    - 本地单机默认模式下，空间业务数据随 `<space>` 隔离（仅 API 密钥 `settings.json`、全局档案模板与农机探测留在宿主 `$VIBEVALLEY_HOME`）；在[多机共享服务端](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)的 Postgres 模式下，明确以独立库/schema 或空间标识隔离，保证切换 `Space` 时看板、频道、仓库与笔记一致切换。
 2. **支持 `<owner>/<repo>` 两级仓库寻址**：
-   - 扩展 `packages/protocol/src/repo/schema.ts` 与 `apps/server/src/repo/repo.ts` 的仓库名校验，兼容本地单层 `<repo>` 与 GitHub 两级 `<owner>/<repo>`（禁止 `..` 与符号链接越界）。
+   - 扩展 `packages/protocol/src/repo/schema.ts` 与 `apps/server/src/modules/repo/repo.ts` 的仓库名校验，兼容本地单层 `<repo>` 与 GitHub 两级 `<owner>/<repo>`（禁止 `..` 与符号链接越界）。
    - 克隆 `https://github.com/<owner>/<repo>` 时支持落盘至 `<space>/repos/<owner>/<repo>`，工单 worktree 对应 `<space>/worktrees/<owner>/<repo>.<工单号>`。
 
 ## Alternatives considered

@@ -4,11 +4,11 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Platform, Settings } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { FarmConnection } from "./src/farm";
-import { FarmScreen } from "./src/FarmScreen";
-import { followDevice } from "./src/intl";
-import { deviceName } from "./src/pairing";
-import { PairScreen } from "./src/PairScreen";
+import { followDevice } from "./src/base/intl";
+import { FarmConnection } from "./src/infra/farm";
+import { deviceName } from "./src/infra/pairing";
+import { FarmScreen } from "./src/screens/FarmScreen";
+import { PairScreen } from "./src/screens/PairScreen";
 
 followDevice();
 

@@ -8,14 +8,14 @@ import { answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator, worker } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Media } from "#/media/media.ts";
-import { Orchestrator } from "#/orchestrator/orchestrator.ts";
-import { Provider } from "#/provider/provider.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Media } from "#/modules/media/media.ts";
+import { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import { Provider } from "#/modules/provider/provider.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import { network } from "#/testing/network.ts";
 import { world } from "#/testing/world.ts";
-import { Tool } from "#/tool/tool.ts";
 
 const dialogue = {
   id: "tool-speakers",

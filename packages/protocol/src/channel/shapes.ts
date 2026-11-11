@@ -1,7 +1,6 @@
-import type { AgentRole } from "../agent/shapes";
 import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes";
 import type { Attachment } from "../attachment/shapes";
-import type { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
+import type { Actor, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
 export type MessageKind = (typeof MessageKindValues)[number];
@@ -11,8 +10,7 @@ export interface ChatMessage {
   number: number;
   channel: string;
   from: string;
-  fromKind: ActorKind;
-  fromRole?: AgentRole;
+  actor: Actor;
   name: string;
   agent?: string;
   kind: MessageKind;

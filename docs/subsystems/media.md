@@ -18,17 +18,17 @@
 |---|---|
 | `packages/provider/src/moss/image.ts` | 固定端点、参数与布局校验、URL 响应、安全错误 |
 | `packages/protocol/src/media/` | 任务、请求、事实、Schema 与接口权限 |
-| `apps/server/src/media/` | Media 服务、任务、下载与文件校验 |
+| `apps/server/src/modules/media/` | Media 服务、任务、下载与文件校验 |
 | `apps/server/src/infra/publicHttp.ts` | 只拨号已校验公网 IPv4 的独立 HTTP 客户端 |
-| `apps/server/src/media/machine.ts`、`job.ts`、`apps/server/db/queries/media_job.sql` | 所有种类共用的一台任务机：表 `media_job`（按 `kind` 分）、收任务、锁、执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、接续、重启；查询除音频的远端清理外都是共用的 |
-| `apps/server/src/media/image.ts` | 生图：请求、出图后存成附件、发回请它画图的频道 |
-| `apps/server/src/media/understanding.ts` | 理解的授权核对、输入保留、持久化、恢复与清理 |
-| `apps/server/src/media/speech.ts`、`speechStream.ts`、`audioResult.ts` | 单人语音、Flash 流式、音频下载与落盘 |
-| `apps/server/src/media/audio.ts`、`transcriptionStream.ts` | 多人对白、音色设计／克隆、长转写与异步恢复 |
-| `apps/server/src/media/input.ts`、`inputs.ts` | 流式输入、配额、任务保留与本机回收 |
+| `apps/server/src/modules/media/machine.ts`、`job.ts`、`apps/server/db/queries/media_job.sql` | 所有种类共用的一台任务机：表 `media_job`（按 `kind` 分）、收任务、锁、执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、接续、重启；查询除音频的远端清理外都是共用的 |
+| `apps/server/src/modules/media/image.ts` | 生图：请求、出图后存成附件、发回请它画图的频道 |
+| `apps/server/src/modules/media/understanding.ts` | 理解的授权核对、输入保留、持久化、恢复与清理 |
+| `apps/server/src/modules/media/speech.ts`、`speechStream.ts`、`audioResult.ts` | 单人语音、Flash 流式、构建期注入依赖端口的音频下载与落盘 |
+| `apps/server/src/modules/media/audio.ts`、`transcriptionStream.ts` | 多人对白、音色设计／克隆、长转写与异步恢复 |
+| `apps/server/src/modules/media/input.ts`、`inputs.ts` | 流式输入校验、`Scope` 托管的并发上传槽与生成配额预留、任务保留与本机回收 |
 | `apps/server/db/queries/media_input.sql`、`media_input_pin.sql` | 输入、删除标记与任务保留记录 |
-| `apps/server/src/http/media.ts` | 本机专用的二进制上传入口 |
-| `apps/server/src/tool/media.ts` | 助手调用同一 Media 服务 |
+| `apps/server/src/gateway/http/media.ts` | 本机专用的二进制上传入口 |
+| `apps/server/src/modules/tool/media.ts` | 助手调用同一 Media 服务 |
 | `apps/web/src/features/media/` | 素材库「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
 
 Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)。生图、语音及任务读取对 owner 与 orchestrator 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 owner 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
@@ -48,7 +48,7 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 - **可用意味着落盘**：小音频与图片经 `Attachment.attach` 存成附件；超过附件上限的音频由 Media 输入存储持有，不强塞 Base64 附件。内容以 SHA256 寻址，完整写临时文件后原子发布，取消或写失败不暴露半文件。
 - **页面不折事实**：每次状态变化由 `Core.apply(mediaChanged)` 投影；`phaseText`、可取消和可重试下载均由服务端给出。页面不在本地猜任务是否完成。
 
-**助手在频道里生的图自动发回。** 用户在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的助手）发出去，只交给这个助手；助手读自带的 `imagegen` skill（`apps/server/src/orchestrator/skills/imagegen/SKILL.md`，随服务端打包），调 `media.image.create`。来源是助手、带来源频道的生图任务下载完成后，Media 以那个助手的名义用 `Channel.announce` 在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；用户在本页发起的任务不自动发。
+**助手在频道里生的图自动发回。** 用户在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的助手）发出去，只交给这个助手；助手读自带的 `imagegen` skill（`apps/server/src/modules/orchestrator/skills/imagegen/SKILL.md`，随服务端打包），调 `media.image.create`。来源是助手、带来源频道的生图任务下载完成后，Media 以那个助手的名义用 `Channel.announce` 在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；用户在本页发起的任务不自动发。
 
 发布沿用 Channel 接口与附件 ID。页面用命名空间、任务 ID、目标频道的 JSON 元组计算 SHA256，作为 64 字符的 `sendKey`；刷新后再次发布到同一频道不会多发一条，不同频道各有自己的发布。Artifact 引用同一个本机附件地址，不复制资产。
 
@@ -130,19 +130,19 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 ## 怎么验证
 
 - `packages/provider/src/moss/image.test.ts`：固定端点、模型与参数、布局、响应、未知结果和安全错误。
-- `apps/server/src/media/media.test.ts`：去重、来源与用量的持久化和投影、磁盘失败后的独立下载、提交者断线、取消与重试竞争、排队后换 Key、容量、未知结果与重启恢复。
+- `apps/server/src/modules/media/media.test.ts`：去重、来源与用量的持久化和投影、磁盘失败后的独立下载、提交者断线、取消与重试竞争、排队后换 Key、容量、未知结果与重启恢复。
 - `apps/server/src/flows/media.test.ts`：脚本模型经真实工具生成图片、执行限时理解授权、合成语音并读取同一任务结果；自主巡查被拒绝，帮工工具表不暴露媒体能力。
-- `apps/server/src/media/download.test.ts`、`infra/publicHttp.test.ts`：PNG 校验、不跟随跳转、无凭据下载、超时、地址与实际拨号检查。
+- `apps/server/src/modules/media/download.test.ts`、`infra/publicHttp.test.ts`：PNG 校验、不跟随跳转、无凭据下载、超时、地址与实际拨号检查。
 - `apps/server/src/infra/files.test.ts`：中断写入不暴露半文件，并发发布和已有文件不覆盖。
-- `apps/server/src/media/input.test.ts`、`inputs.test.ts`：分块签名、字节上限、磁盘失败、取消、配额竞争、引用事务、过期回收、删除恢复、真实数据库拒绝提交后的文件回滚，以及缺失或损坏输入的核对和修复。
-- `apps/server/src/http/media.test.ts`：真实本机 HTTP 上的输入预留、跨来源拒绝、二进制上传、26 MiB 流式容器传输与断线重试；大文件样例只验证传输和容器头，不代表视频解码或理解验收。
+- `apps/server/src/modules/media/input.test.ts`、`inputs.test.ts`：分块签名、字节上限、磁盘失败、取消、配额竞争、引用事务、过期回收、删除恢复、真实数据库拒绝提交后的文件回滚，以及缺失或损坏输入的核对和修复。
+- `apps/server/src/gateway/http/media.test.ts`：真实本机 HTTP 上的输入预留、跨来源拒绝、二进制上传、26 MiB 流式容器传输与断线重试；大文件样例只验证传输和容器头，不代表视频解码或理解验收。
 - `apps/web/test/media.spec.ts`：真实隔离服务端上的文本与布局生成、状态流、PNG 预览和下载、频道去重发布、Artifact 引用、未知结果、取消、独立下载重试与表单拒绝。只由 `apps/server/src/testing/network.ts` 替换厂商请求与结果下载，任务、数据库、附件和 Core 都是真的；测试程序不读取用户的 Key、不访问厂商。
-- `apps/server/src/media/understanding.test.ts`：授权版本、跨类型 ID 冲突、上传状态、结果与用量、共享容量、取消、清理预览与重试、换 Key、清理断线和重启恢复；委托额外覆盖可信来源、频道、过期、参数不可变、并发重复执行及排队期间换 Key。
+- `apps/server/src/modules/media/understanding.test.ts`：授权版本、跨类型 ID 冲突、上传状态、结果与用量、共享容量、取消、清理预览与重试、换 Key、清理断线和重启恢复；委托额外覆盖可信来源、频道、过期、参数不可变、并发重复执行及排队期间换 Key。
 - `apps/web/test/understanding.spec.ts`：合成 PNG 与可解码 MP4 的真实本机上传、授权、理解文本、Artifact 保存、刷新、截断、未知与取消。厂商传输仍是替身，不验证实际识别质量。
-- `apps/server/src/media/speech.test.ts`、`audio.test.ts`、`audioResult.test.ts`、`release.test.ts`：同步／异步、实际格式与用量、流式部分结果、账号隔离、恢复、下载与显式资源释放。
+- `apps/server/src/modules/media/speech.test.ts`、`audio.test.ts`、`audioResult.test.ts`、`release.test.ts`：同步／异步、实际格式与用量、流式部分结果、账号隔离、恢复、下载与显式资源释放。
 - `apps/web/test/speech.spec.ts`、`flash.spec.ts`、`audio.spec.ts`：音频解码播放、流式播放、结构化对白、设计预览与克隆许可、转写分段定位与 Artifact 保存，以及刷新和播放器释放。
 - `apps/web/test/a11y.spec.ts`：表单及成功、失败、截断、未知、取消状态的浅深主题、桌面与窄屏检查。开发版同时检查响应式诊断；共享浮层只在打开时读取选中项的快照，值后来变化不抢焦点，`packages/base-ui/test/select.test.tsx` 覆盖这个回归。
 
-`apps/server/src/media/remoteFiles.test.ts` 验证真实磁盘 Blob 经厂商协议替身上传、并发去重、凭据隔离、未知结果、重启及显式删除重试；它不代表真实厂商文件操作已经验收。
+`apps/server/src/modules/media/remoteFiles.test.ts` 验证真实磁盘 Blob 经厂商协议替身上传、并发去重、凭据隔离、未知结果、重启及显式删除重试；它不代表真实厂商文件操作已经验收。
 
 真实厂商、真实播放与宿主权限的验收方法见[媒体验收](.agents/skills/vv-acceptance/references/media.md)。协议替身通过不代表真实账号、音色克隆或设备已验收。

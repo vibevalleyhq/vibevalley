@@ -1,6 +1,6 @@
 # 仓库
 
-仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
+仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/modules/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
 
 ## 管什么，不管什么
 
@@ -16,11 +16,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
-| `apps/server/src/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
-| `apps/server/src/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
-| `apps/server/src/repo/pullSnapshot.ts` | GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照（`Repo.githubSnapshot`）及失败 Actions 日志提取 |
-| `apps/server/src/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
+| `apps/server/src/modules/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
+| `apps/server/src/modules/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
+| `apps/server/src/modules/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
+| `apps/server/src/modules/repo/pullSnapshot.ts` | GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照（`Repo.githubSnapshot`）及失败 Actions 日志提取 |
+| `apps/server/src/modules/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
 | `apps/web/src/features/repo/ReposPage.tsx` | 工作台仓库页（新建、概况、语言占比、提交日历） |
 | `apps/web/src/farm/map/RepoMap.tsx`、`islands.ts` | 像素农场群岛地图与岛屿空位计算 |
 
@@ -74,7 +74,7 @@
 - **按工单隔离 git worktree，锁外跑检查、锁内验引用**：每个工单在独立目录修改互不踩踏；耗时测试放锁外，进锁复核 commit 未变再合并，兼顾并发开单与主分支质量。
 - **用 git 底层树操作实现无检出预检与父分支合入**：`merge-tree` 和 `commit-tree` 不碰工作区文件，父工单无需维持常驻 worktree 即可接收子工单合入。
 - **GitHub 检测与克隆收紧边界**：克隆仅收标准 GitHub 主页地址并禁用终端交互弹窗，PR 权限统一走后台缓存，避免网络抖动阻塞看板操作。
-- **不让服务端代写提交**：自动生成的单行提交说明过不了仓库自己的提交门禁（`scripts/commit-msg.ts`）；退回帮工自己提交，每个 commit 和 PR 才都符合仓库规范。
+- **不让服务端代写提交**：自动生成的单行提交说明过不了仓库自己的提交门禁（`scripts/docs/commit-msg.ts`）；退回帮工自己提交，每个 commit 和 PR 才都符合仓库规范。
 
 ## 还没做的
 
@@ -83,5 +83,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/repo/repo.test.ts`、`github.test.ts`、`stack.test.ts`：仓库创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
+- `apps/server/src/modules/repo/repo.test.ts`、`github.test.ts`、`stack.test.ts`：仓库创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
 - `apps/server/src/flows/pull_request.test.ts`、`apps/server/src/flows/pr-follow.test.ts`、`apps/web/test/repos.spec.ts`：PR 提交与合入全流程、CI 回流、工作台仓库新建与群岛地图测试。

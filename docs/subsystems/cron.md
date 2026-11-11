@@ -8,14 +8,14 @@
 |---|---|
 | 定时任务模型、五种时间规格（`CronWhen`）、时区解析与下次运行时间计算（`nextRun`） | 到期后工单如何创建、排队、重开或启动会话（[工单](docs/subsystems/issue.md)） |
 | 助手创建定时任务时的用户授权门禁（`needsOK`：是否进入 `pending` 待批） | 触发信封如何排队、受阻暂存与唤醒（[Mailbox](docs/subsystems/mailbox.md)） |
-| 周期性到期扫描（`tick`）、关机错过任务的单次补跑（`isMissed`）与未路由重放 | CLI 独立对话的本地提醒（`packages/agent/src/reminders.ts`） |
+| 周期性到期扫描（`tick`）、关机错过任务的单次补跑（`isMissed`）与未路由重放 | CLI 独立对话的本地提醒（`packages/agent/src/tools/reminders.ts`） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/cron/cron.ts` | `Cron` 服务：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放 |
-| `apps/server/src/cron/when.ts` | 五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
+| `apps/server/src/modules/cron/cron.ts` | `Cron` 服务：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放 |
+| `apps/server/src/modules/cron/when.ts` | 五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
 | `apps/web/src/features/chat/` | 频道菜单与聊天页「定时任务」标签页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放）。
@@ -54,5 +54,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/cron/cron.test.ts`、`when.test.ts`：五种时间规格与夏令时、错过合并补跑、`needsOK` 门禁与事务恢复测试。
+- `apps/server/src/modules/cron/cron.test.ts`、`when.test.ts`：五种时间规格与夏令时、错过合并补跑、`needsOK` 门禁与事务恢复测试。
 - `apps/web/test/chat.spec.ts`：定时任务列表、开关与删除端到端测试。

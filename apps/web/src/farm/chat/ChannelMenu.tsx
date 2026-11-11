@@ -226,12 +226,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
                   <SpriteIcon name="button-add" size={12} />
                   {t("web.farm.chat.newChannel")}
                 </button>
-                <button
-                  type="button"
-                  data-testid="channel-page"
-                  onClick={() => router.navigate(chatPath(props.current))}
-                  {...stylex.attrs(styles.newChannel)}
-                >
+                <button type="button" data-testid="channel-page" onClick={() => router.navigate(chatPath(props.current))} {...stylex.attrs(styles.newChannel)}>
                   <SpriteIcon name="button-open" size={12} />
                   {t("web.farm.chat.pageAndSchedules")}
                 </button>

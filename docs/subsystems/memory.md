@@ -17,11 +17,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/memory/memory.ts` | `Memory` 服务、`MemoryPort` 实现、`memory` 表与它的全文索引（`term_vector`）读写 |
-| `apps/server/src/memory/recall.ts` | 纯函数评分挑选（`pick`）与检索排序 |
-| `apps/server/src/memory/gse.ts` | 简体中文分词与英文整词提取（`termsList`） |
-| `apps/server/src/memory/sources.ts` | 多记忆来源聚合、2 秒读超时与后台异步写队列 |
-| `apps/server/src/memory/nowledge.ts`、`everos.ts` | Nowledge Mem（MCP）与 EverOS（HTTP）外部来源适配器 |
+| `apps/server/src/modules/memory/memory.ts` | `Memory` 服务、`MemoryPort` 实现、`memory` 表与它的全文索引（`term_vector`）读写 |
+| `apps/server/src/modules/memory/recall.ts` | 纯函数评分挑选（`pick`）与检索排序 |
+| `apps/server/src/modules/memory/gse.ts` | 简体中文分词与英文整词提取（`termsList`） |
+| `apps/server/src/modules/memory/sources.ts` | 多记忆来源聚合、2 秒读超时与后台异步写队列 |
+| `apps/server/src/modules/memory/nowledge.ts`、`everos.ts` | Nowledge Mem（MCP）与 EverOS（HTTP）外部来源适配器 |
 | `apps/web/src/features/memory/Memory.tsx`、`tree/` | 工作台「记忆」页与记忆树视图 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`、`orchestrator.archive.*`）。
@@ -65,5 +65,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/memory/*.test.ts`：分词与召回、重合去重、容量淘汰、多来源超时隔离与出站脱敏测试。
+- `apps/server/src/modules/memory/*.test.ts`：分词与召回、重合去重、容量淘汰、多来源超时隔离与出站脱敏测试。
 - `apps/server/src/flows/memory.test.ts`：跨会话、跨仓库、跨重启的记忆写入与不重复召回流程测试。

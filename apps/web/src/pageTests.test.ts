@@ -6,10 +6,18 @@ import { expect, test } from "vite-plus/test";
 import { edgesOf } from "@vibevalley/testkit/source";
 
 const dir = join(import.meta.dirname, "../test");
-const allowed = /^(\.\/[\w-]+|@playwright\/test(\/reporter)?|@axe-core\/playwright|@vibevalley\/protocol(\/schema)?|node:[\w/]+)$/u;
+const allowed = /^(\.\/[\w-]+|@playwright\/test(\/reporter)?|@axe-core\/playwright|@vibevalley\/protocol(\/schema|\/api|\/rules)?|node:[\w/]+)$/u;
 
 test("browser imports accept fixtures but refuse product and test-runner shortcuts", () => {
-  for (const spec of ["./stories-fixtures", "./fixtures", "@playwright/test", "@vibevalley/protocol/schema"]) expect(allowed.test(spec), spec).toBe(true);
+  for (const spec of [
+    "./stories-fixtures",
+    "./fixtures",
+    "@playwright/test",
+    "@vibevalley/protocol/schema",
+    "@vibevalley/protocol/api",
+    "@vibevalley/protocol/rules",
+  ])
+    expect(allowed.test(spec), spec).toBe(true);
   for (const spec of ["#/features/issue/IssuesPage", "../src/infra/query", "vite-plus/test", "./projects.test", "./projects.test.ts"])
     expect(allowed.test(spec), spec).toBe(false);
 });

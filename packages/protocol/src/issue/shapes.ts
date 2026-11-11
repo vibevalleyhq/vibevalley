@@ -312,8 +312,8 @@ export interface FactIssueRemoved {
 }
 
 export type IssueWatch =
-  | { kind: "history"; session: string; events: SessionEvent[] }
-  | { kind: "state"; issue: Issue; sessions: Session[]; sessionIds: string[]; settled: boolean; omittedSessions: number }
-  | { kind: "event"; session: string; event: SessionEvent }
-  | { kind: "gap"; session: string; before?: number }
-  | { kind: "missing"; issue: string };
+  | { kind: "history"; session: SessionId; events: SessionEvent[] }
+  | { kind: "state"; issue: Issue; sessions: Session[]; sessionIds: SessionId[]; settled: boolean; omittedSessions: number }
+  | { kind: "event"; session: SessionId; event: SessionEvent }
+  | { kind: "gap"; session: SessionId; before?: number }
+  | { kind: "missing"; issue: IssueId };

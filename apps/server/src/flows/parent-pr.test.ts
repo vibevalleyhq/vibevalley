@@ -6,12 +6,12 @@ import { Effect, Formatter } from "effect";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Repo } from "#/repo/repo.ts";
-import { repository } from "#/repo/repository.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab } from "./farm.ts";

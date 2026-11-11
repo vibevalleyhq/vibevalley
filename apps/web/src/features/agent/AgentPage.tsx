@@ -13,10 +13,10 @@ import { agentsQuery, useQueryClient, ready, useAgents, useRuntimes } from "#/in
 import { useRouter, useSearch, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { type Pose, randomLook, stagePoses } from "#/ui/cast.ts";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { type Pose, randomLook, stagePoses } from "#/ui/domain/cast.ts";
+import { runtimeName } from "#/ui/domain/RuntimeBadge.tsx";
 import { Icon } from "#/ui/Icon.tsx";
-import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 
 import { ConfigTabs, supportOf } from "./AgentConfig";
 import { LookPanel, Stage } from "./AgentLook";

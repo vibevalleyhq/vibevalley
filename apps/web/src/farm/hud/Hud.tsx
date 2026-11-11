@@ -506,10 +506,7 @@ function TopLeft() {
               <span data-testid="farm-clock">{clockText(tod())}</span>
             </span>
             <span {...stylex.attrs(styles.xpTrack)}>
-              <span
-                {...stylex.attrs(styles.barFill, styles.xpFill)}
-                style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%` }}
-              />
+              <span {...stylex.attrs(styles.barFill, styles.xpFill)} style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%` }} />
             </span>
             <span {...stylex.attrs(styles.statusNote)}>
               {(() => {
@@ -696,10 +693,7 @@ function UsageLines(props: { usage: AccountUsage | null }) {
                       <span {...stylex.attrs(levelInk[quotaLevel(left())])}>{Math.round(left())}%</span>
                     </div>
                     <span {...stylex.attrs(styles.usageTrack)}>
-                      <span
-                        {...stylex.attrs(styles.barFill, levelFill[quotaLevel(left())])}
-                        style={{ width: `${Math.max(0, Math.min(100, left()))}%` }}
-                      />
+                      <span {...stylex.attrs(styles.barFill, levelFill[quotaLevel(left())])} style={{ width: `${Math.max(0, Math.min(100, left()))}%` }} />
                     </span>
                     <Show when={w.resetsAt}>{(at) => <span {...stylex.attrs(styles.usageReset)}>{resetText(at())}</span>}</Show>
                   </div>
@@ -714,7 +708,10 @@ function UsageLines(props: { usage: AccountUsage | null }) {
 }
 
 function Machine(props: { info: RuntimeInfo }) {
-  const quota = () => quotaOf(props.info);
+  // A function declaration: StyleX evaluates an arrow used in `stylex.attrs` at build time and fails on its body.
+  function quota() {
+    return quotaOf(props.info);
+  }
   const usage = () => props.info.usage;
   const subscription = () => {
     const u = usage();
@@ -746,10 +743,7 @@ function Machine(props: { info: RuntimeInfo }) {
       <div {...stylex.attrs(styles.machineBottle)}>
         <SpriteIcon name={bottleSprite(quota())} size={40} label={quota().text} />
         <span
-          {...stylex.attrs(
-            styles.smallText,
-            quota().level === "unknown" ? styles.inkBark400 : quota().level === "empty" ? styles.inkBerry : styles.inkBark800,
-          )}
+          {...stylex.attrs(styles.smallText, quota().level === "unknown" ? styles.inkBark400 : quota().level === "empty" ? styles.inkBerry : styles.inkBark800)}
         >
           {quota().short || "—"}
         </span>
@@ -784,10 +778,7 @@ function QuotaPill(props: { height: number }) {
           {...stylex.attrs(styles.quotaPillButton)}
         >
           <HudCard height={props.height} bright={open()}>
-            <SpriteIcon
-              name={bottleSprite({ level: quotaLevel(lowest()), fill: (lowest() ?? 0) / 100, short: "", text: "" })}
-              size={28}
-            />
+            <SpriteIcon name={bottleSprite({ level: quotaLevel(lowest()), fill: (lowest() ?? 0) / 100, short: "", text: "" })} size={28} />
             <span {...stylex.attrs(lowest() === undefined ? styles.inkBark900 : levelInk[quotaLevel(lowest())])}>
               {shown() === undefined ? t("web.farm.quota.quota") : `${shown()}%`}
             </span>

@@ -1,0 +1,467 @@
+import { createHash } from "node:crypto";
+import { createServer, type IncomingMessage, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+
+import { NodeServices } from "@effect/platform-node";
+import { afterEach, describe, expect, it } from "@effect/vitest";
+import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Effect, Fiber, Layer, Schema } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { TestClock } from "effect/testing";
+
+import { asTransport } from "@vibevalley/agent/mcpTransport";
+import type { SettingsUpdate } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
+
+import { user, worker } from "#/base/actor.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Setting } from "#/modules/setting/setting.ts";
+import { testConfig, until } from "#/testing/layers.ts";
+
+import { foundText, Memory, make } from "./memory.ts";
+import { nowledge, nowledgeLabels } from "./nowledge.ts";
+import { localName } from "./recall.ts";
+
+/** How EverOS names a farm repo's scope (everos.ts): ASCII, and never the same as global. */
+const everosRepo = (repo: string) => "repo-" + createHash("sha256").update(repo).digest("hex");
+
+const servers: Server[] = [];
+afterEach(() => {
+  for (const s of servers.splice(0)) {
+    s.closeAllConnections();
+    s.close();
+  }
+});
+
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+
+const bodyOf = (req: IncomingMessage) =>
+  Effect.callback<unknown, Schema.SchemaError>((resume) => {
+    let text = "";
+    req.on("data", (c: Buffer) => (text += c.toString("utf8")));
+    req.on("end", () => resume(text ? decodeJson(text) : Effect.undefined));
+  });
+
+const listen = (server: Server) =>
+  Effect.callback<string>((resume) => {
+    servers.push(server);
+    server.listen(0, "127.0.0.1", () => resume(Effect.succeed(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)));
+  });
+
+interface NowledgeMemory {
+  id: string;
+  title: string;
+  content: string;
+  labels: string[];
+}
+
+/** Nowledge Mem played over MCP: memory_search and memory_add as its tools/list gives them (2026-10-18, 0.10.103). */
+class FakeNowledge {
+  memories: NowledgeMemory[] = [];
+  searches: Record<string, unknown>[] = [];
+  adds: Record<string, unknown>[] = [];
+  others: string[] = [];
+  details: string[] = [];
+  searchResult: unknown;
+  /** What memory_add answers instead of the memory it made, when set. */
+  addResult: unknown;
+
+  private server() {
+    // A fake server listing plain JSON Schema tools, as mcp.ts serves them.
+    // oxlint-disable-next-line typescript/no-deprecated
+    const server = new McpServer({ name: "nowledge-mem", version: "0.10.103" }, { capabilities: { tools: {} } });
+    const object = { type: "object" as const };
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: ["memory_search", "memory_add", "get_memory_by_id", "memory_delete"].map((name) => ({ name, inputSchema: object })),
+    }));
+    server.setRequestHandler(CallToolRequestSchema, async (req) => {
+      const a = req.params.arguments ?? {};
+      const text = async (v: unknown) => ({ content: [{ type: "text" as const, text: await Effect.runPromise(encodeJson(v)) }] });
+      switch (req.params.name) {
+        case "get_memory_by_id": {
+          const id = String(a.memory_id);
+          this.details.push(id);
+          const memory = this.memories.find((m) => m.id === id);
+          return text(memory ?? {});
+        }
+        case "memory_search": {
+          this.searches.push(a);
+          if (this.searchResult !== undefined) return text(this.searchResult);
+          const query = (a.query as string) ?? "";
+          const label = (a.filter_labels as string) ?? "";
+          const results = [...this.memories]
+            .toReversed()
+            .filter(
+              (m) => (label === "" || m.labels.includes(label)) && query !== "" && (query === "*" || m.content.includes(query) || m.title.includes(query)),
+            )
+            .map((m) => ({ id: m.id, memory_id: m.id, title: m.title, content: m.content, content_preview: m.content, relevance_score: 0.9 }));
+          return text({ results, total: results.length, query });
+        }
+        case "memory_add": {
+          this.adds.push(a);
+          if (this.addResult !== undefined) return text(this.addResult);
+          const m = { id: `nm-${this.memories.length + 1}`, title: a.title as string, content: a.content as string, labels: (a.labels as string).split(",") };
+          this.memories.push(m);
+          return text({ id: m.id, title: m.title });
+        }
+        default:
+          this.others.push(req.params.name);
+          return text({ deleted: true });
+      }
+    });
+    return server;
+  }
+
+  serve() {
+    return listen(
+      createServer(
+        (req, res) =>
+          void (async () => {
+            const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
+            await this.server().connect(asTransport(transport));
+            await transport.handleRequest(req, res, req.method === "POST" ? await Effect.runPromise(bodyOf(req)) : undefined);
+          })(),
+      ),
+    ).pipe(Effect.map((url) => url + "/mcp/"));
+  }
+}
+
+interface EverosRequest {
+  path: string;
+  auth: string;
+  body: Record<string, unknown>;
+}
+
+/** EverOS's /api/v2 played: every request as it came, and a search that answers with one case and one episode. */
+class FakeEveros {
+  requests: EverosRequest[] = [];
+  searchData: unknown;
+  serve() {
+    return listen(
+      createServer(
+        (req, res) =>
+          void (async () => {
+            const body = ((await Effect.runPromise(bodyOf(req))) ?? {}) as Record<string, unknown>;
+            this.requests.push({ path: req.url ?? "", auth: req.headers.authorization ?? "", body });
+            res.setHeader("Content-Type", "application/json");
+            if (req.url === "/api/v2/memory/search") {
+              const data =
+                body.user_id !== undefined
+                  ? {
+                      episodes: [
+                        {
+                          id: "ep-1",
+                          subject: "登录页",
+                          summary: "用户让修登录页，改完了",
+                          score: 0.7,
+                          app_id: body.app_id ?? "default",
+                          repo_id: body.repo_id ?? "default",
+                        },
+                      ],
+                    }
+                  : {
+                      agent_cases: [
+                        {
+                          id: "case-1",
+                          task_intent: "给打卡接口加分页",
+                          approach: "先跑 pnpm test",
+                          key_insight: "分页参数从 1 开始",
+                          score: 0.8,
+                          app_id: body.app_id ?? "default",
+                          repo_id: body.repo_id ?? "default",
+                        },
+                      ],
+                    };
+              res.end(await Effect.runPromise(encodeJson(this.searchData === undefined ? { request_id: "r1", data } : this.searchData)));
+            } else if (req.url === "/api/v2/memory/add" || req.url === "/api/v2/memory/flush") res.end(`{"request_id":"r2","data":{}}`);
+            else res.writeHead(404).end();
+          })(),
+      ),
+    );
+  }
+  seen(path: string) {
+    return this.requests.filter((r) => r.path === "/api/v2/memory/" + path);
+  }
+}
+
+// The fake source answers on this machine, but under a full parallel run it can take longer than the real 2 s.
+const world = (timeoutMs = 20_000) =>
+  Layer.effect(Memory, make(undefined, timeoutMs)).pipe(
+    Layer.provideMerge(Agent.layer),
+    Layer.provideMerge(Setting.layer),
+    Layer.provideMerge(Db.layer),
+    Layer.provideMerge(Database),
+    Layer.provideMerge(FetchHttpClient.layer),
+    Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
+    Layer.provideMerge(NodeServices.layer),
+  );
+
+const save = (s: NonNullable<SettingsUpdate["memorySources"]>[number]) =>
+  Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] })).pipe(Effect.orDie);
+
+describe("Nowledge Mem", () => {
+  it.effect("a repo search proves source scope even when reading everything was requested", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      fake.memories = [
+        { id: "a", title: "", content: "测试 repo-a", labels: nowledgeLabels("lab", "demo").split(",") },
+        { id: "b", title: "", content: "测试 repo-b", labels: nowledgeLabels("lab", "other").split(",") },
+        { id: "g", title: "", content: "测试 global", labels: nowledgeLabels("lab", "").split(",") },
+        { id: "u", title: "", content: "测试 unknown", labels: [] },
+      ];
+      yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: false, everything: true });
+      const m = yield* Memory;
+      const q = { agent: "lab", repo: "demo", text: "测试", kind: "" as const, limit: 10 };
+      const ms = yield* m.search(q);
+      const text = foundText(ms, q);
+      expect(text).toContain("测试 repo-a");
+      expect(text).toContain("测试 global");
+      expect(text).not.toContain("测试 repo-b");
+      expect(text).not.toContain("测试 unknown");
+      expect(text).toContain("范围");
+      expect(fake.details.toSorted()).toEqual(["a", "b", "g", "u"]);
+      const all = { ...q, repo: "" };
+      const ms2 = yield* m.search(all);
+      expect(foundText(ms2, all)).toContain("测试 unknown");
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("a run's notes reach Nowledge and come back", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: true });
+      const m = yield* Memory;
+      yield* m.write({ agent: "lab", text: "测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234", repo: "demo", by: worker("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: worker("w1") });
+      yield* until(() => fake.adds.length === 2);
+      expect([fake.adds[0]!.content, fake.adds[0]!.labels, fake.adds[0]!.source_app]).toEqual([
+        "测试前要 export DEEPSEEK_API_KEY=[redacted]",
+        nowledgeLabels("lab", "demo"),
+        "vibevalley",
+      ]);
+      expect(fake.adds[1]!.labels).toBe(nowledgeLabels("lab", ""));
+
+      const got = yield* m.recall({ agent: "lab", session: "w2", repo: "demo", text: "测试" });
+      expect(got.ids).toContain("nowledge:nm-1");
+      expect(got.lines.some((l) => l.startsWith("- （Nowledge）测试前要"))).toBe(true);
+      const last = fake.searches.at(-1)!;
+      expect([last.filter_labels, last.query]).toEqual(["vibevalley-agent-lab", "测试"]);
+
+      const both = (yield* m.search({ agent: "lab", repo: "", text: "提交", kind: "", limit: 0 })).found;
+      expect(both.map((f) => f.source)).toEqual([localName]);
+      fake.memories.push({ id: "nm-9", title: "部署", content: "部署用 make deploy", labels: ["vibevalley-agent-lab"] });
+      const q = { agent: "lab", repo: "", text: "部署", kind: "" as const, limit: 0 };
+      const found = yield* m.search(q);
+      expect(found.found.map((f) => [f.source, f.id])).toEqual([["nowledge", "nowledge:nm-9"]]);
+      expect(foundText(found, q)).toContain("- （Nowledge Mem，仓库范围未知）部署用 make deploy〔nowledge:nm-9〕");
+
+      const listed = yield* m.memoriesOf("lab");
+      const outside = listed.memories.find((x) => x.source === "nowledge");
+      expect(outside).toBeDefined();
+      expect([listed.sources.length, listed.sources[1]!.canList, listed.sources[1]!.canForget]).toEqual([2, true, false]);
+      expect((yield* Effect.flip(m.forget("lab", outside!.id))).bizCode).toBe(BizCode.MemoryRefused);
+      expect(fake.others).toEqual([]);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("Nowledge reads everything only when told, and writes only when told", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      fake.memories = [{ id: "own-1", title: "用户的偏好", content: "测试要写成可观察的结果", labels: [] }];
+      const url = yield* fake.serve();
+      yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
+      const m = yield* Memory;
+      const q = { agent: "lab", repo: "", text: "测试", kind: "" as const, limit: 0 };
+      expect((yield* m.search(q)).found).toEqual([]);
+      yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
+      expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["用户的偏好：测试要写成可观察的结果"]);
+      yield* m.write({ agent: "lab", text: "不写进去", repo: "", by: user });
+      // A write would go out in the background; nothing to wait on shows that none does.
+      yield* TestClock.adjust(50);
+      expect(fake.adds).toEqual([]);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("a Nowledge that does not answer is skipped", () =>
+    Effect.gen(function* () {
+      const url = yield* listen(createServer(() => {}));
+      yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
+      const m = yield* Memory;
+      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", repo: "demo", by: user });
+      const recall = yield* Effect.forkChild(m.recall({ agent: "lab", repo: "demo", text: "迁移" }));
+      yield* TestClock.adjust(100);
+      expect((yield* Fiber.join(recall)).lines).toHaveLength(1);
+    }).pipe(Effect.provide(world(100))),
+  );
+
+  it.effect("malformed Nowledge responses degrade to no outside memories and can recover", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      yield* save({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: true, write: false });
+      const m = yield* Memory;
+      const q = { agent: "lab", repo: "", text: "有效", kind: "" as const, limit: 10 };
+      fake.searchResult = { results: {} };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchResult = { results: [{ id: 42, content: "bad" }] };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchResult = undefined;
+      fake.memories = [{ id: "nm-1", title: "有效", content: "有效的记忆", labels: nowledgeLabels("lab", "").split(",") }];
+      expect((yield* m.search(q)).found.map((f) => f.id)).toEqual(["nowledge:nm-1"]);
+    }).pipe(Effect.provide(world())),
+  );
+});
+
+describe("EverOS", () => {
+  it.effect("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      const source = nowledge({ kind: "nowledge", url: yield* fake.serve(), enabled: true, read: false, write: true });
+      const note = { agent: "lab", text: "记住：苹果", repo: "", by: worker("w1") };
+      fake.addResult = { title: "已经有了" };
+      expect((yield* source.add(note))?.id).toBe("");
+      fake.addResult = { id: 42 };
+      const failed = yield* Effect.flip(source.add(note));
+      expect(failed.message).toContain("memory_add answered what it should not");
+      yield* source.stop;
+    }),
+  );
+
+  it.effect("a repo query asks the farm's repo and global scopes and does not claim cross-repo coverage", () =>
+    Effect.gen(function* () {
+      const fake = new FakeEveros();
+      yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: false });
+      const m = yield* Memory;
+      const q = { agent: "lab", repo: "demo", text: "分页", kind: "" as const, limit: 10 };
+      const ms = yield* m.search(q);
+      expect(foundText(ms, q)).toContain("给打卡接口加分页");
+      expect(
+        fake
+          .seen("search")
+          .map((r): [string, string] => [String(r.body.app_id), String(r.body.repo_id)])
+          .toSorted(([, a], [, b]) => a.localeCompare(b)),
+      ).toEqual([
+        ["vibevalley", "global"],
+        ["vibevalley", everosRepo("demo")],
+      ]);
+      const all = { ...q, repo: "" };
+      const ms2 = yield* m.search(all);
+      const text = foundText(ms2, all);
+      expect(text).toContain("EverOS");
+      expect(text).toContain("不支持跨仓库");
+      expect(fake.seen("search")).toHaveLength(2);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("malformed EverOS responses degrade to no outside memories and can recover", () =>
+    Effect.gen(function* () {
+      const fake = new FakeEveros();
+      yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: false });
+      const m = yield* Memory;
+      const q = { agent: "lab", repo: "demo", text: "分页", kind: "" as const, limit: 10 };
+      fake.searchData = { data: { agent_cases: {} } };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchData = { data: { agent_cases: [{ id: 42 }] } };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchData = undefined;
+      expect((yield* m.search(q)).found.some((f) => f.text.includes("给打卡接口加分页"))).toBe(true);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("EverOS gets runs and extracts when the session ends", () =>
+    Effect.gen(function* () {
+      const fake = new FakeEveros();
+      yield* save({
+        kind: "everos",
+        url: (yield* fake.serve()) + "/",
+        enabled: true,
+        read: true,
+        write: true,
+        user: "lucas",
+        key: "ev-key-1234",
+      });
+      const m = yield* Memory;
+      yield* m.keep({
+        agent: "lab",
+        session: "w1",
+        repo: "demo",
+        brief: "修登录页，token 是 sk-abcdefghijklmnop1234",
+        outcome: "completed",
+        said: "改好了。\n记住：登录态统一走 refreshSession()",
+        summary: "改好了",
+      });
+      yield* m.keep({ agent: "lab", session: "w1", repo: "demo", brief: "修登录页", outcome: "failed", said: "测试没过", summary: "测试没过" });
+      yield* m.keep({ agent: "lab", session: "w1", repo: "demo", brief: "修登录页", outcome: "interrupted", said: "停下了", summary: "" });
+      yield* until(() => fake.seen("add").length === 2);
+      const adds = fake.seen("add");
+      expect(adds[0]!.body).toMatchObject({ session_id: "vibevalley-w1", app_id: "vibevalley", repo_id: everosRepo("demo") });
+      expect(adds[0]!.body.messages).toMatchObject([
+        { role: "user", sender_id: "lucas", content: "修登录页，token 是 [redacted]" },
+        { role: "assistant", sender_id: "vibevalley-lab", content: "改好了。\n记住：登录态统一走 refreshSession()" },
+      ]);
+      expect(adds[0]!.auth).toBe("Bearer ev-key-1234");
+      const second = adds[1]!.body.messages as { role: string; content: string }[];
+      expect(second.map((x) => x.role)).not.toContain("user");
+      expect(second.map((x) => x.content).join("\n")).toContain("（这一轮没做成）测试没过");
+      expect(fake.seen("flush")).toEqual([]);
+
+      yield* m.endSession({ agent: "lab", session: "w1", repo: "demo" });
+      yield* m.endSession({ agent: "lab", session: "w2", repo: "demo" });
+      yield* until(() => fake.seen("flush").length === 1);
+      // The second session has nothing to flush; nothing to wait on shows it does not.
+      yield* TestClock.adjust(50);
+      const flushes = fake.seen("flush");
+      expect(flushes).toHaveLength(1);
+      expect([flushes[0]!.body.session_id, flushes[0]!.body.repo_id]).toEqual(["vibevalley-w1", everosRepo("demo")]);
+
+      const got = yield* m.recall({ agent: "lab", session: "w3", repo: "demo", text: "分页" });
+      expect(got.ids).toContain(`everos:${everosRepo("demo")}:case-1`);
+      expect(got.lines).toContain("- （EverOS）给打卡接口加分页；先跑 pnpm test；分页参数从 1 开始");
+      const asked = fake.seen("search")[0]!.body;
+      expect([asked.agent_id, asked.query, asked.user_id]).toEqual(["vibevalley-lab", "分页", undefined]);
+      const found = (yield* m.search({ agent: "lab", repo: "demo", text: "登录", kind: "issue", limit: 0 })).found;
+      expect(found.some((f) => f.id === `everos:${everosRepo("demo")}:ep-1` && f.text === "登录页：用户让修登录页，改完了")).toBe(true);
+      expect((yield* m.search({ agent: "", repo: "", text: "登录", kind: "", limit: 0 })).found.some((f) => f.source === "everos")).toBe(false);
+      const sources = yield* m.sources;
+      expect([sources.length, sources[1]!.label, sources[1]!.canList, sources[1]!.canForget, sources[1]!.transcripts]).toEqual([
+        2,
+        "EverOS",
+        false,
+        false,
+        true,
+      ]);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("a note outside a run is extracted at once", () =>
+    Effect.gen(function* () {
+      const fake = new FakeEveros();
+      yield* save({ kind: "everos", url: yield* fake.serve(), enabled: true, read: true, write: true });
+      const m = yield* Memory;
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: user });
+      yield* until(() => fake.seen("flush").length === 1);
+      const add = fake.seen("add")[0]!;
+      expect(add.body.session_id).toBe(fake.seen("flush")[0]!.body.session_id);
+      expect(add.body.messages).toMatchObject([{ role: "user", sender_id: "owner", content: "记住（所有仓库）：提交信息写中文" }, {}]);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.effect("EverOS is told what is left when the farm stops", () =>
+    Effect.gen(function* () {
+      const fake = new FakeEveros();
+      const url = yield* fake.serve();
+      yield* Effect.gen(function* () {
+        yield* save({ kind: "everos", url, enabled: true, read: false, write: true });
+        const m = yield* Memory;
+        yield* m.keep({ agent: "lab", session: "w7", repo: "demo", brief: "写文档", outcome: "completed", said: "写好了", summary: "" });
+        yield* until(() => fake.seen("add").length === 1);
+      }).pipe(Effect.provide(world()));
+      const flushes = fake.seen("flush");
+      expect(flushes.map((f) => f.body.session_id)).toEqual(["vibevalley-w7"]);
+    }),
+  );
+});

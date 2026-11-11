@@ -3,7 +3,7 @@ import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { compareText, or, spelled } from "#/base/search.ts";
-import { outfitLabel, speciesLabel } from "#/ui/cast.ts";
+import { outfitLabel, speciesLabel } from "#/ui/domain/cast.ts";
 
 export interface Picture {
   readonly name: string;

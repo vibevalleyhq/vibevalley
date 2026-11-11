@@ -13,7 +13,7 @@ import { useCore, useFrames } from "#/infra/frame.ts";
 import { ready, useAgents, useRuntimes } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { setPick, usePrefs } from "#/state/prefs.ts";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -288,7 +288,14 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
   const tally = () => core()?.progress?.agents[props.agent.id];
   const box = useClickAway(open, () => setOpen(false));
   return (
-    <div ref={box} {...stylex.attrs(styles.friend)} data-testid="friend" data-key={props.agent.id} data-state={props.st} data-picked={picked() ? "" : undefined}>
+    <div
+      ref={box}
+      {...stylex.attrs(styles.friend)}
+      data-testid="friend"
+      data-key={props.agent.id}
+      data-state={props.st}
+      data-picked={picked() ? "" : undefined}
+    >
       <button
         type="button"
         data-testid="friend-open"

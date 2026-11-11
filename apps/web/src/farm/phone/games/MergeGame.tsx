@@ -53,18 +53,18 @@ const styles = stylex.create({
   reachedLabel: {
     marginLeft: "auto",
   },
-  board: {
+  board: (side: number, columns: string) => ({
     position: "relative",
     display: "grid",
     width: side,
     height: side,
     flexShrink: "0",
     touchAction: "none",
-    gridTemplateColumns: `repeat(${mergeSize}, ${tile}px)`,
+    gridTemplateColumns: columns,
     gap,
     backgroundColor: "var(--color-lcd-dark)",
     padding: gap,
-  },
+  }),
   cell: {
     display: "flex",
     flexDirection: "column",
@@ -383,9 +383,7 @@ export function MergeGame() {
         <span {...stylex.attrs(styles.scoreValue)}>
           {t("web.farm.phone.blocks.score")} {score()}
         </span>
-        <span {...stylex.attrs(styles.reachedLabel)}>
-          {reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}
-        </span>
+        <span {...stylex.attrs(styles.reachedLabel)}>{reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
       </div>
       <div
         role="img"
@@ -396,7 +394,7 @@ export function MergeGame() {
             ? t("web.farm.phone.merge.field", { n: board().filter((c) => c !== 0).length, top: mergeStageName(Math.max(reached(), 1)) })
             : t("web.farm.phone.game.merge")
         }
-        {...stylex.attrs(styles.board)}
+        {...stylex.attrs(styles.board(side, `repeat(${mergeSize}, ${tile}px)`))}
         onPointerDown={(e) => (touch = { x: e.clientX, y: e.clientY })}
         onPointerUp={(e) => swiped(e.clientX, e.clientY)}
         onPointerCancel={() => (touch = undefined)}

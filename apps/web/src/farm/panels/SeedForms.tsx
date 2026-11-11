@@ -18,7 +18,7 @@ import { useCore } from "#/infra/frame.ts";
 import { defineQuery, retryRead, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { usePrefs } from "#/state/prefs.ts";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
@@ -366,9 +366,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
           <div {...stylex.attrs(styles.sowFormDiv)}>
             <p {...stylex.attrs(styles.sowFormP22)}>
               {t("web.farm.sow.plantIn", { repo: p() })}
-              <Show when={bag()?.stack.label}>
-                {(label) => <span {...stylex.attrs(styles.sowFormSpan)}>{label()}</span>}
-              </Show>
+              <Show when={bag()?.stack.label}>{(label) => <span {...stylex.attrs(styles.sowFormSpan)}>{label()}</span>}</Show>
             </p>
           </div>
           <div {...stylex.attrs(styles.sowFormDiv2)}>
@@ -408,10 +406,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                       data-key={k().kind.id}
                       aria-selected={aria(k().kind.id === kind()?.kind.id)}
                       onClick={() => setKindId(k().kind.id)}
-                      {...stylex.attrs(
-                        styles.sowFormButton,
-                        k().kind.id === kind()?.kind.id ? styles.sowFormButtonSecondary : styles.sowFormButtonPrimary,
-                      )}
+                      {...stylex.attrs(styles.sowFormButton, k().kind.id === kind()?.kind.id ? styles.sowFormButtonSecondary : styles.sowFormButtonPrimary)}
                     >
                       <SpriteIcon name={k().kind.icon} size={20} />
                       {k().kind.name}

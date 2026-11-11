@@ -11,7 +11,7 @@ import { api, reasonOf } from "#/infra/api.ts";
 import { type QueryResult, useQueryClient, ready } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Field, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
@@ -20,6 +20,9 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
 import { langIcon, languageShares, number, percent } from "./repos";
+
+const tile = 12;
+const tileGap = 3;
 
 const styles = stylex.create({
   statSpan: {
@@ -239,9 +242,6 @@ const styles = stylex.create({
     paddingTop: "0.5rem",
   },
 });
-
-const tile = 12;
-const tileGap = 3;
 
 export type Asked<A> = QueryResult<A>;
 

@@ -1,28 +1,39 @@
 // Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
-import { Predicate } from "effect";
+import { Cause, Exit, Option, Predicate, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
-import type { ApiError } from "./api";
-import { VoiceFixValues } from "./shapes";
+import {
+  type ApiErrorDetail,
+  ApiErrorEnvelope,
+  type ApiErrorKind,
+  apiSuccessEnvelope,
+  ApiVoidEnvelope,
+  bizCodeMeta,
+  type BizErrorCode,
+  endpoints,
+  pathOf,
+} from "./api";
 import type * as T from "./shapes";
 
-/** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
+/** A refusal from the server: its business code, semantic kind (Refused, VoiceUnavailable…), reason, and optional remediation detail. */
 // The client is Promise-based and its callers (the page, the shells) reject and catch plain Errors, not Effect failures.
 // @effect-diagnostics-next-line extendsNativeError:off
 export class VibeValleyApiError extends Error {
   readonly status: number;
-  readonly tag: string | undefined;
+  readonly bizCode: BizErrorCode | undefined;
+  readonly tag: ApiErrorKind | undefined;
   readonly reason: string;
-  /** The error as the server wrote it, for what it carries besides the reason. */
-  readonly error: ApiError | undefined;
+  /** Structured remediation detail inside the envelope's error field (next steps, settings section). */
+  readonly error: ApiErrorDetail | undefined;
   /** The response exactly as received, including plain text that was not JSON. */
   readonly body: string | undefined;
 
-  constructor(status: number, tag: string | undefined, reason: string, error?: ApiError, body?: string) {
+  constructor(status: number, tag: ApiErrorKind | undefined, reason: string, error?: ApiErrorDetail, body?: string, bizCode?: BizErrorCode) {
     super(reason);
     this.status = status;
+    this.bizCode = bizCode;
     this.tag = tag;
     this.reason = reason;
     this.error = error;
@@ -30,36 +41,13 @@ export class VibeValleyApiError extends Error {
   }
 }
 
-const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string");
-const validNext = (value: unknown): boolean =>
-  value === undefined ||
-  (Array.isArray(value) && value.every((item) => Predicate.isObject(item) && typeof item.say === "string" && (item.run === undefined || strings(item.run))));
-const validReason = (value: unknown): boolean => Predicate.isObject(value) && typeof value.reason === "string";
-
-// Kept free of Schema: the page does not load the endpoint Schemas just to read an error.
-function apiErrorOf(value: unknown): ApiError | undefined {
-  if (!Predicate.isObject(value) || typeof value._tag !== "string") return undefined;
-  let valid: boolean;
-  switch (value._tag) {
-    case "Refused":
-    case "ConnectorRefused":
-    case "LanRefused":
-      valid = validReason(value) && validNext(value.next);
-      break;
-    case "Missing":
-      valid = typeof value.what === "string" && validNext(value.next);
-      break;
-    case "VoiceUnavailable":
-      valid = validReason(value) && (value.settings === undefined || VoiceFixValues.some((fix) => fix === value.settings));
-      break;
-    case "VoiceCallFailed":
-      valid = validReason(value);
-      break;
-    default:
-      valid = false;
-  }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every field the page reads is checked above; it reads them, not the class's methods
-  return valid ? (value as unknown as ApiError) : undefined;
+const decodeApiError = Schema.decodeUnknownOption(ApiErrorEnvelope);
+const resultDecoders = new Map<string, { readonly hasData: boolean; readonly decode: (u: unknown) => Exit.Exit<unknown, Schema.SchemaError> }>();
+for (const e of endpoints) {
+  resultDecoders.set(pathOf(e.op), {
+    hasData: e.result !== undefined,
+    decode: Schema.decodeUnknownExit(e.result ? apiSuccessEnvelope(e.result) : ApiVoidEnvelope),
+  });
 }
 
 /** The server's HTTP API, one object per module and noun, a method per op: `api.issue.status.update({ id, status })`. */
@@ -687,26 +675,34 @@ export class VibeValleyApi {
     });
     const text = await res.text();
     if (!res.ok) {
-      let decoded: unknown;
+      let parsed: unknown;
       try {
-        decoded = text === "" ? undefined : JSON.parse(text);
+        parsed = text === "" ? undefined : JSON.parse(text);
       } catch {
-        decoded = undefined;
+        parsed = undefined;
       }
-      const error = apiErrorOf(decoded);
-      const j = Predicate.isObject(decoded) ? decoded : {};
-      const reason = error
-        ? error._tag === "Missing"
-          ? error.what
-          : error.reason
-        : typeof j.reason === "string"
-          ? j.reason
-          : typeof j.what === "string"
-            ? j.what
-            : text.trim() || t("shared.serverAnswered", { status: res.status });
-      throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason, error, text);
+      const env = Option.getOrUndefined(decodeApiError(parsed));
+      if (env) {
+        const meta = bizCodeMeta[env.bizCode];
+        throw new VibeValleyApiError(res.status, meta.kind, env.message, env.error, text, env.bizCode);
+      }
+      const j = Predicate.isObject(parsed) ? parsed : {};
+      const reason = typeof j.message === "string" && j.message !== "" ? j.message : text.trim() || t("shared.serverAnswered", { status: res.status });
+      throw new VibeValleyApiError(res.status, undefined, reason, undefined, text);
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server answers each path with what api.ts says (its handlers are typed by the same Handlers); the page trusts its own server rather than load every Schema
-    return (text === "" ? undefined : JSON.parse(text)) as R;
+    const raw: unknown = text === "" ? undefined : JSON.parse(text);
+    const entry = resultDecoders.get(path);
+    const checked = entry ? entry.decode(raw) : undefined;
+    if (checked && Exit.isFailure(checked)) {
+      const env = Option.getOrUndefined(decodeApiError(raw));
+      if (env) {
+        const meta = bizCodeMeta[env.bizCode];
+        throw new VibeValleyApiError(meta.status, meta.kind, env.message, env.error, text, env.bizCode);
+      }
+      throw new Error(`${path}: a response not in its shape: ${Cause.pretty(checked.cause)}`);
+    }
+    const value = checked && entry?.hasData === true && Predicate.hasProperty(checked.value, "data") ? checked.value.data : undefined;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked above with the endpoint's own result Schema from api.ts
+    return value as R;
   }
 }

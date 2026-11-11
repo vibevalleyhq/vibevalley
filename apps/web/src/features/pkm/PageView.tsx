@@ -532,9 +532,7 @@ function Props(props: { view: PkmPageView }) {
               <span
                 data-testid="pkm-prop"
                 data-key="deadline"
-                {...stylex.attrs(
-                  (d().left ?? 1) < 0 ? styles.propsSpanState3 : (d().left ?? 99) <= 3 ? styles.propsSpanState2 : styles.propsSpanState,
-                )}
+                {...stylex.attrs((d().left ?? 1) < 0 ? styles.propsSpanState3 : (d().left ?? 99) <= 3 ? styles.propsSpanState2 : styles.propsSpanState)}
               >
                 <Switch fallback={t("web.pkm.props.deadline", { day: d().day })}>
                   <Match when={d().left !== undefined && (d().left ?? 0) < 0}>{t("web.pkm.props.overdue", { day: d().day, n: -(d().left ?? 0) })}</Match>

@@ -1,4 +1,5 @@
 import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/shapes";
+import type { SessionId } from "../common/shapes";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes";
 import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
@@ -113,7 +114,7 @@ export type LiveEvent = LiveEventSession | LiveEventNotice | LiveEventRuntime;
 export interface LiveEventSession {
   type: "event";
   at: number;
-  id: string;
+  id: SessionId;
   activity: SessionEvent;
 }
 

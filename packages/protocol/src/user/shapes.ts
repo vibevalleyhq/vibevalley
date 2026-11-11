@@ -2,7 +2,8 @@
 export const deviceKeyCookie = "vibevalley_device_key";
 
 /** paired: remote-only endpoints approved at the LAN gate; login: password/approval sign-in (all endpoints except password change). */
-export type DeviceCame = "paired" | "login";
+export const DeviceCameValues = ["paired", "login"] as const;
+export type DeviceCame = (typeof DeviceCameValues)[number];
 
 export interface UserDevice {
   id: string;

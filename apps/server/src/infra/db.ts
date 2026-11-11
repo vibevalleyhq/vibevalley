@@ -138,8 +138,8 @@ export class Db extends Context.Service<
     readonly afterCommit: (effect: Effect.Effect<void>) => Effect.Effect<void>;
     /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
     readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-    /** work in one transaction, its queries' failures and the commit's kept: what a caller tells as a refusal. */
-    readonly attemptTx: <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E | SqlError.SqlError>;
+    /** work in one transaction, its queries' failures (via `db.attempt`) and the commit's kept: what a caller tells as a refusal. */
+    readonly attemptTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, E | SqlError.SqlError>;
   }
 >()("@vibevalley/server/infra/db") {
   static readonly layer = Layer.effect(
@@ -181,10 +181,7 @@ export class Db extends Context.Service<
             for (const hook of hooks) outer.value(hook);
             return a;
           }
-          return yield* commitTail(
-            runTx(Effect.provideService(work, TxCommit, (effect) => void hooks.push(effect))),
-            hooks,
-          );
+          return yield* commitTail(runTx(Effect.provideService(work, TxCommit, (effect) => void hooks.push(effect))), hooks);
         });
       return Db.of({
         run,
@@ -205,8 +202,8 @@ export class Db extends Context.Service<
             Exclude<E, { _tag: "SqlError" }>
           >;
         }),
-        attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E | SqlError.SqlError> {
-          return yield* withHooks((w) => sql.withTransaction(w).pipe(held, attempt), work);
+        attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E>): Effect.fn.Return<A, E | SqlError.SqlError> {
+          return yield* withHooks((w) => held(sql.withTransaction(w)), work);
         }),
       });
     }),

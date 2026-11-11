@@ -5,11 +5,11 @@ import { SqlClient } from "effect/sql";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox, type SourceEvent } from "#/mailbox/mailbox.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox, type SourceEvent } from "#/modules/mailbox/mailbox.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";

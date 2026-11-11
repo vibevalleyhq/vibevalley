@@ -9,7 +9,7 @@ import { TrajectoryLog } from "#/features/session/index.ts";
 import { VoiceForm } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useRouter, Link as A } from "#/infra/router.ts";
-import { OrchestratorFace } from "#/ui/Face.tsx";
+import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";

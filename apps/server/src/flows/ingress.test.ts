@@ -5,15 +5,15 @@ import { SqlClient } from "effect/sql";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "#/agent/agent.ts";
-import { Channel } from "#/channel/channel.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox, type InsertDelivery } from "#/mailbox/mailbox.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox, type InsertDelivery } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
-import { Tool } from "#/tool/tool.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
 
@@ -113,7 +113,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     const trigger = (yield* mailbox.record({
       source: "github",
       key: "ci:1",
-      actor: { kind: "ci", id: "checks" },
+      actor: { kind: "system", id: "checks" },
       addressed: "thread_owner",
       text: "machine-only-detail ".repeat(100),
       threads: [`issue:${issue.id}`],
@@ -206,7 +206,7 @@ it.live("regression: issue input waits without a session and a user followup rel
     const automatic = (yield* mailbox.accept({
       source: "github",
       key: "ci-failure",
-      actor: { kind: "ci", id: "checks" },
+      actor: { kind: "system", id: "checks" },
       text: "frozen-ci-detail",
       threads: ["github:source-routing#7"],
       addressed: "thread_owner",

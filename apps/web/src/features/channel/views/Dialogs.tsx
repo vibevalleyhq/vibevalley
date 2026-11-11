@@ -1,0 +1,385 @@
+import type { JSX } from "@solidjs/web";
+import * as stylex from "@stylexjs/stylex";
+import { Array as Arr, Order } from "effect";
+import { createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import { type Channel, type Notify } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { autofocus } from "#/base/dom.tsx";
+import { channelName } from "#/features/channel/model/places.ts";
+import { useOrchestrators } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useRepos } from "#/infra/query.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Checkbox } from "#/ui/Checkbox.tsx";
+import { Dialog } from "#/ui/Dialog.tsx";
+import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+
+const viewStyles = stylex.create({
+  formForm: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+  },
+  formP: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--leading-sm)",
+    color: "var(--color-berry)",
+  },
+  formDiv: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "0.75rem",
+    paddingTop: "0.5rem",
+  },
+  channelSettingsFormDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1.25rem",
+  },
+  channelDangerDiv: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.5rem",
+    borderTopStyle: "solid",
+    borderTopWidth: "1px",
+    borderColor: "var(--color-line)",
+    paddingTop: "1rem",
+  },
+  channelDangerDiv2: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "0.5rem",
+  },
+  channelDangerDiv3: {
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--leading-sm)",
+  },
+  channelDangerP: {
+    color: "var(--color-muted)",
+  },
+  channelDangerUl: {
+    listStyleType: "disc",
+    paddingLeft: "1.25rem",
+  },
+});
+
+function RepoInput(props: { value: string; onChange: (v: string) => void }) {
+  const repos = useRepos();
+  return (
+    <>
+      <TextInput
+        data-testid="channel-repo"
+        value={props.value}
+        onInput={(e) => props.onChange(e.currentTarget.value)}
+        placeholder={t("web.channel.dialog.repoExample")}
+        list="chat-repos"
+      />
+      <datalist id="chat-repos">
+        <For each={ready(repos, [])}>{(p) => <option value={p.name} />}</For>
+      </datalist>
+    </>
+  );
+}
+
+function Form(props: {
+  submit: string;
+  onSubmit: () => Promise<void>;
+  onCancel: () => void;
+  busy: boolean;
+  error?: string | undefined;
+  ready?: boolean;
+  children: JSX.Element;
+}) {
+  const ok = () => props.ready ?? true;
+  return (
+    <form
+      {...stylex.attrs(viewStyles.formForm)}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ok() && !props.busy) void props.onSubmit();
+      }}
+    >
+      {props.children}
+      <Show when={props.error}>
+        {(error) => (
+          <p role="alert" {...stylex.attrs(viewStyles.formP)}>
+            {error()}
+          </p>
+        )}
+      </Show>
+      <div {...stylex.attrs(viewStyles.formDiv)}>
+        <Button data-testid="cancel" onClick={() => props.onCancel()}>
+          {t("web.channel.dialog.cancel")}
+        </Button>
+        <Button type="submit" tone="primary" data-testid="submit" disabled={props.busy || !ok()}>
+          {props.submit}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (here) and the farm's menu (farm/chat/ChannelMenu.tsx).
+/** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
+export function createChannelForm(channel?: Channel) {
+  const was = untrack(() => ({
+    name: channel?.name ?? "",
+    description: channel?.description ?? "",
+    repo: channel?.repo ?? "",
+    category: channel?.category ?? "",
+    notify: channel?.notify ?? "all",
+    members: Arr.sort(channel?.members ?? [], Order.String),
+  }));
+  const [name, setName] = createSignal(was.name);
+  const [description, setDescription] = createSignal(was.description);
+  const [repo, setRepo] = createSignal(was.repo);
+  const [category, setCategory] = createSignal(was.category);
+  const [notify, setNotify] = createSignal<Notify>(was.notify);
+  const [members, setMembers] = createSignal<readonly string[]>(was.members);
+  const [error, setError] = createSignal<string>();
+  // A refusal is said in the form, beside what it refuses, rather than in a toast.
+  const act = createAct(setError);
+  const busy = act.busy;
+
+  /** The channel's id once it went through; undefined, with the reason in error, when refused. */
+  const save = (): Promise<string | undefined> => {
+    setError(undefined);
+    // Read as the user saves: the form may change while the call waits.
+    const now = {
+      name: name().trim(),
+      description: description(),
+      repo: repo(),
+      category: category().trim(),
+      notify: notify(),
+      members: Arr.sort(members(), Order.String),
+    };
+    return act.run(async () => {
+      if (!channel)
+        return api.channel.create(omitUndefined({ name: now.name, description: now.description.trim() || undefined, repo: now.repo.trim() || undefined }));
+      // A direct channel has only its notifications to change.
+      if (channel.type === "channel")
+        await api.channel.update({
+          id: channel.id,
+          description: now.description,
+          repo: now.repo,
+          category: now.category,
+          ...(now.name !== was.name ? { name: now.name } : {}),
+          ...(Arr.join(now.members, "\n") !== Arr.join(was.members, "\n") ? { members: now.members } : {}),
+        });
+      if (now.notify !== was.notify) await api.channel.notify.set({ id: channel.id, notify: now.notify });
+      return channel.id;
+    });
+  };
+
+  return {
+    name,
+    setName: (v: string) => {
+      setName(v);
+      setError(undefined);
+    },
+    description,
+    setDescription,
+    repo,
+    setRepo,
+    category,
+    setCategory,
+    notify,
+    setNotify,
+    /** The orchestrators in the channel, by profile id. */
+    members,
+    /** Puts one in the channel, or takes it out. */
+    setMember: (id: string, on: boolean) => setMembers((m) => (on ? Arr.dedupe([...m, id]) : Arr.filter(m, (x) => x !== id))),
+    busy,
+    error,
+    /** Pressing save now would be sent: not busy, and a new channel has a name. */
+    ready: () => !busy() && (channel !== undefined || name().trim() !== ""),
+    save,
+  };
+}
+
+/** onCreated gets the new channel's id. */
+export function NewChannelDialog(props: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
+  return (
+    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.newChannel")} testid="new-channel-dialog">
+      <NewChannelForm onClose={() => props.onClose()} onCreated={(id) => props.onCreated(id)} />
+    </Dialog>
+  );
+}
+
+function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) => void }) {
+  const form = createChannelForm();
+  const submit = async () => {
+    const id = await form.save();
+    if (id === undefined) return;
+    props.onCreated(id);
+    props.onClose();
+  };
+  return (
+    <Form submit={t("web.channel.newChannel")} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()} ready={form.ready()}>
+      <Field label={t("web.channel.dialog.name")} hint={t("web.channel.dialog.nameHint")}>
+        <TextInput
+          ref={autofocus()}
+          data-testid="channel-name"
+          required
+          value={form.name()}
+          placeholder={t("web.channel.dialog.nameExample")}
+          onInput={(e) => form.setName(e.currentTarget.value)}
+        />
+      </Field>
+      <Field label={t("web.channel.dialog.description")}>
+        <TextArea
+          data-testid="channel-description"
+          rows={3}
+          value={form.description()}
+          onInput={(e) => form.setDescription(e.currentTarget.value)}
+          placeholder={t("web.channel.dialog.descriptionHint")}
+        />
+      </Field>
+      <Field label={t("web.channel.dialog.repo")} hint={t("web.channel.dialog.repoHint")}>
+        <RepoInput value={form.repo()} onChange={form.setRepo} />
+      </Field>
+    </Form>
+  );
+}
+
+export function ChannelSettingsDialog(props: { channel: Channel; open: boolean; onClose: () => void; onGone: () => void }) {
+  return (
+    <Dialog
+      open={props.open}
+      onClose={() => props.onClose()}
+      title={t("web.channel.dialog.settingsOf", { name: channelName(props.channel) })}
+      testid="channel-settings-dialog"
+    >
+      <ChannelSettingsForm channel={props.channel} onClose={() => props.onClose()} onGone={() => props.onGone()} />
+    </Dialog>
+  );
+}
+
+export const notifyOptions = (): { value: Notify; label: string }[] => [
+  { value: "all", label: t("web.channel.manage.notifyAll") },
+  { value: "mentions", label: t("web.channel.manage.notifyMentions") },
+  { value: "none", label: t("web.channel.manage.notifyNone") },
+];
+
+function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onGone: () => void }) {
+  // The dialog mounts the form when it opens: it starts from the channel as it is then.
+  const form = createChannelForm(untrack(() => props.channel));
+  const core = useCore();
+  const orchestrators = useOrchestrators();
+  const top = () => props.channel.type === "channel";
+  // The groups the farm's channels are in, for the field to offer.
+  const categories = () => [...new Set((core()?.chat?.channels ?? []).flatMap((c) => (c.category ? [c.category] : [])))];
+  const submit = async () => {
+    if ((await form.save()) !== undefined) props.onClose();
+  };
+  return (
+    <div {...stylex.attrs(viewStyles.channelSettingsFormDiv)}>
+      <Form submit={t("web.channel.dialog.save")} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
+        <Show when={top()}>
+          <Field label={t("web.channel.manage.name")} hint={t("web.channel.dialog.nameHint")}>
+            <TextInput data-testid="channel-name" required value={form.name()} onInput={(e) => form.setName(e.currentTarget.value)} />
+          </Field>
+          <Field label={t("web.channel.dialog.description")}>
+            <TextArea
+              data-testid="channel-description"
+              rows={3}
+              value={form.description()}
+              onInput={(e) => form.setDescription(e.currentTarget.value)}
+              placeholder={t("web.channel.dialog.descriptionHint")}
+            />
+          </Field>
+          <Field label={t("web.channel.dialog.repo")} hint={t("web.channel.dialog.repoNone")}>
+            <RepoInput value={form.repo()} onChange={form.setRepo} />
+          </Field>
+          <Field label={t("web.channel.manage.members")} hint={t("web.channel.manage.membersHint")}>
+            <For each={orchestrators()}>
+              {(a) => (
+                <Checkbox
+                  testid="channel-member"
+                  data-key={a.id}
+                  label={a.name}
+                  checked={form.members().includes(a.id)}
+                  onChange={(on) => form.setMember(a.id, on)}
+                />
+              )}
+            </For>
+          </Field>
+          <Field label={t("web.channel.manage.category")} hint={t("web.channel.manage.categoryHint")}>
+            <TextInput data-testid="channel-category" value={form.category()} onInput={(e) => form.setCategory(e.currentTarget.value)} list="chat-categories" />
+            <datalist id="chat-categories">
+              <For each={categories()}>{(c) => <option value={c} />}</For>
+            </datalist>
+          </Field>
+        </Show>
+        <Field label={t("web.channel.manage.notify")} hint={t("web.channel.manage.notifyHint")}>
+          <Segmented label={t("web.channel.manage.notify")} testid="channel-notify" value={form.notify()} options={notifyOptions()} onChange={form.setNotify} />
+        </Field>
+      </Form>
+      <Show when={top() && !props.channel.default}>
+        <ChannelDanger channel={props.channel} onDone={() => props.onClose()} onGone={() => props.onGone()} />
+      </Show>
+    </div>
+  );
+}
+
+/** Archiving, and deleting once the user has read what it does: the server's dry run, or why it refuses. */
+function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: () => void }) {
+  const [does, setDoes] = createSignal<readonly string[]>();
+  const [error, setError] = createSignal<string>();
+  // The refusal is said under the buttons, where the user pressed.
+  const steps = createAct(setError);
+  const busy = steps.busy;
+  const act = (step: "archive" | "preview" | "delete") => {
+    const { id, archived } = untrack(() => props.channel);
+    setError(undefined);
+    return steps.run(async () => {
+      if (step === "archive") {
+        await api.channel.archive.set({ id, on: archived === undefined });
+        untrack(() => props.onDone)();
+      } else if (step === "preview") setDoes((await api.channel.previewDelete({ id })).does);
+      else {
+        await api.channel.delete({ id });
+        untrack(() => props.onGone)();
+      }
+    });
+  };
+  return (
+    <div {...stylex.attrs(viewStyles.channelDangerDiv)}>
+      <div {...stylex.attrs(viewStyles.channelDangerDiv2)}>
+        <Button data-testid="channel-archive" disabled={busy()} onClick={() => void act("archive")} title={t("web.channel.manage.archiveHint")}>
+          {props.channel.archived !== undefined ? t("web.channel.manage.unarchive") : t("web.channel.manage.archive")}
+        </Button>
+        <Show
+          when={does()}
+          fallback={
+            <Button tone="danger" data-testid="channel-remove" disabled={busy()} onClick={() => void act("preview")}>
+              {t("web.channel.manage.remove")}
+            </Button>
+          }
+        >
+          <Button tone="danger" data-testid="channel-remove-sure" disabled={busy()} onClick={() => void act("delete")}>
+            {t("web.channel.manage.removeSure")}
+          </Button>
+        </Show>
+      </div>
+      <Show when={does()}>
+        {(lines) => (
+          <div {...stylex.attrs(viewStyles.channelDangerDiv3)}>
+            <p {...stylex.attrs(viewStyles.channelDangerP)}>{t("web.channel.manage.removeWill")}</p>
+            <ul {...stylex.attrs(viewStyles.channelDangerUl)}>
+              <For each={lines()}>{(line) => <li>{line}</li>}</For>
+            </ul>
+          </div>
+        )}
+      </Show>
+      <Show when={error()}>{(e) => <p {...stylex.attrs(viewStyles.formP)}>{e()}</p>}</Show>
+    </div>
+  );
+}

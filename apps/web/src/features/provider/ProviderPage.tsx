@@ -12,11 +12,11 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { SettingsPage } from "#/ui/domain/settings.tsx";
 import { Field, Select, TextInput } from "#/ui/Field.tsx";
 import { OutLink } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { Card, Quiet, SecretInput } from "#/ui/layout.tsx";
-import { SettingsPage } from "#/ui/settings.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
 const viewStyles = stylex.create({

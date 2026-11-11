@@ -1,13 +1,14 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
+import { IssueId, SessionId } from "../common/schema";
 import * as T from "./shapes";
 
 export const InboxKind: Codec<T.InboxKind> = Schema.Literals(T.InboxKindValues);
 
 const InboxFromSession: Codec<T.InboxFromSession> = Schema.Struct({
   kind: Schema.Literal("session"),
-  id: Schema.String,
+  id: SessionId,
   name: Schema.String,
   agent: Schema.String,
 });
@@ -20,12 +21,12 @@ export const InboxFrom: Codec<T.InboxFrom> = Schema.Union([InboxFromSession, Inb
 
 const InboxTargetSession: Codec<T.InboxTargetSession> = Schema.Struct({
   kind: Schema.Literal("session"),
-  id: Schema.String,
+  id: SessionId,
 });
 
 const InboxTargetIssue: Codec<T.InboxTargetIssue> = Schema.Struct({
   kind: Schema.Literal("issue"),
-  id: Schema.String,
+  id: IssueId,
 });
 
 const InboxTargetChat: Codec<T.InboxTargetChat> = Schema.Struct({

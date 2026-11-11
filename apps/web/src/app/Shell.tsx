@@ -11,7 +11,7 @@ import { NotesSearch } from "#/features/pkm/index.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
 import { Link as A, NavLink, useMatches } from "#/infra/router.ts";
 import { useUpdates } from "#/infra/settings.ts";
-import { OrchestratorFace } from "#/ui/Face.tsx";
+import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 import { titleBar } from "#/ui/layout.tsx";
@@ -398,7 +398,10 @@ export function Shell(props: { children: JSX.Element }) {
   const matches = useMatches();
   const meta = () => matches().at(-1)?.meta;
   const here = () => places.find((place) => place.id === meta()?.place);
-  const inFarm = () => meta()?.skin === "farm";
+  // A function declaration: StyleX evaluates an arrow used in `stylex.attrs` at build time and fails on its body.
+  function inFarm() {
+    return meta()?.skin === "farm";
+  }
   // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {

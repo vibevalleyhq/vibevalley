@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
 import type { Codec } from "../codec";
+import { SessionId } from "../common/schema";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
 import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
@@ -20,8 +21,8 @@ import {
   SessionEvent,
   SessionView,
 } from "../session/schema";
-import * as T from "./shapes";
 import { CallState, FactCallChanged } from "../voice/schema";
+import * as T from "./shapes";
 
 const spaceFields = {
   call: CallState,
@@ -94,7 +95,7 @@ export const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
 const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
   type: Schema.Literal("event"),
   at: Schema.Finite,
-  id: Schema.String,
+  id: SessionId,
   activity: SessionEvent,
 });
 

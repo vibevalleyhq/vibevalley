@@ -13,7 +13,7 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
-import { OrchestratorFace } from "#/ui/Face.tsx";
+import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -239,12 +239,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
           <span {...stylex.attrs(styles.orchestratorProfileSpan22)}>
             <span {...stylex.attrs(styles.orchestratorProfileSpan3)}>{draft().name || t("web.agent.unnamed")}</span>
             <span {...stylex.attrs(styles.orchestratorProfileSpan4)}>{t("web.agent.role.orchestrator")}</span>
-            <span
-              {...stylex.attrs(
-                styles.orchestratorProfileSpan,
-                dirty() ? styles.orchestratorProfileSpanTone : styles.orchestratorProfileSpanAlt,
-              )}
-            >
+            <span {...stylex.attrs(styles.orchestratorProfileSpan, dirty() ? styles.orchestratorProfileSpanTone : styles.orchestratorProfileSpanAlt)}>
               {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
             </span>
           </span>

@@ -4,8 +4,8 @@ import { HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 
-import { DryRunFlag, show } from "#/format.ts";
-import { exit, Failure } from "#/output.ts";
+import { DryRunFlag, show } from "#/base/format.ts";
+import { exit, Failure } from "#/base/output.ts";
 
 export const WorkerAccessFlag = GlobalFlag.Setting("worker-access-file")({
   flag: Flag.String("worker-access-file").pipe(Flag.withFallbackConfig(Config.String("VIBEVALLEY_WORKER_ACCESS_FILE")), Flag.withDefault("")),

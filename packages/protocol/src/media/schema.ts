@@ -8,30 +8,34 @@ import * as T from "./shapes";
 
 export { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 
+const MediaImageMimeValues = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff"] as const;
+const MediaVideoMimeValues = ["video/mp4", "video/x-m4v", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"] as const;
+const MediaAudioMimeValues = ["audio/wav", "audio/mpeg", "audio/mp4", "audio/flac", "audio/ogg", "audio/webm"] as const;
+
 const InputName = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/^[^\p{Cc}/\\]+$/u), Schema.isPattern(/\S/u));
 export const MediaInputRequest = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("image"),
     name: InputName,
-    mime: Schema.Literals(["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff"]),
+    mime: Schema.Literals(MediaImageMimeValues),
     size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 30_000_000 })),
   }),
   Schema.Struct({
     kind: Schema.Literal("video"),
     name: InputName,
-    mime: Schema.Literals(["video/mp4", "video/x-m4v", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"]),
+    mime: Schema.Literals(MediaVideoMimeValues),
     size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 200_000_000 })),
   }),
   Schema.Struct({
     kind: Schema.Literal("audio"),
     name: InputName,
-    mime: Schema.Literals(["audio/wav", "audio/mpeg", "audio/mp4", "audio/flac", "audio/ogg", "audio/webm"]),
+    mime: Schema.Literals(MediaAudioMimeValues),
     size: Schema.Int.check(Schema.isBetween({ minimum: 16, maximum: 512_000_000 })),
   }),
 ]) satisfies Codec<T.MediaInputRequest>;
 export const MediaInput: Codec<T.MediaInput> = Schema.Struct({
   id: Schema.String,
-  kind: Schema.Literals(["image", "video", "audio"]),
+  kind: Schema.Literals(T.MediaInputKindValues),
   name: Schema.String,
   mime: Schema.String,
   size: Schema.Int,
@@ -45,7 +49,7 @@ export const MediaInput: Codec<T.MediaInput> = Schema.Struct({
 export const MediaImageRequest = Schema.Struct({
   id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u)),
   prompt: Schema.String.check(Schema.isBetweenCodePoints(1, 4000)),
-  format: Schema.Literals(["text", "layout"]),
+  format: Schema.Literals(T.MediaImageFormatValues),
   width: Schema.Int,
   height: Schema.Int,
   seed: Schema.optionalKey(Schema.Int),
@@ -105,7 +109,7 @@ const Tokens = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 export const MediaUnderstandingResult: Codec<T.MediaUnderstandingResult> = Schema.Struct({
   model: Schema.NonEmptyString,
   text: Schema.String,
-  status: Schema.Literals(["completed", "incomplete"]),
+  status: Schema.Literals(T.MediaUnderstandingStatusValues),
   incompleteReason: Schema.NullOr(Schema.Literal("max_output_tokens")),
   usage: Schema.Struct({ inputTokens: Tokens, outputTokens: Tokens, totalTokens: Tokens }),
 });

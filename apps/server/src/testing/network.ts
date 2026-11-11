@@ -2,8 +2,8 @@ import { Effect, Formatter, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 
 import { PublicHttp } from "#/infra/publicHttp.ts";
-import { mp3, wav } from "#/media/testdata/audio.ts";
-import { png } from "#/media/testdata/png.ts";
+import { mp3, wav } from "#/modules/media/testdata/audio.ts";
+import { png } from "#/modules/media/testdata/png.ts";
 
 import { offlineNetwork } from "./layers.ts";
 

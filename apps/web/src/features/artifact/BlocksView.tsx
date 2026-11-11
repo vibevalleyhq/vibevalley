@@ -10,9 +10,9 @@ import { api } from "#/infra/api.ts";
 import { followArtifact, followSuggestions } from "#/infra/gateway.ts";
 import { ready, useAgents } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
-import { hexColor, swatches } from "#/ui/cast.ts";
 import { Checkbox } from "#/ui/Checkbox.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { hexColor, swatches } from "#/ui/domain/cast.ts";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -534,10 +534,7 @@ export function BlocksView(props: {
       </Show>
       <p
         role="status"
-        {...stylex.attrs(
-          viewStyles.blocksViewP,
-          (version(), editor.error !== undefined) ? viewStyles.blocksViewPTone : viewStyles.blocksViewPAlt,
-        )}
+        {...stylex.attrs(viewStyles.blocksViewP, (version(), editor.error !== undefined) ? viewStyles.blocksViewPTone : viewStyles.blocksViewPAlt)}
       >
         {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
       </p>

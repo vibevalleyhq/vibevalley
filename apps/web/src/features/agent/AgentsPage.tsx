@@ -13,8 +13,8 @@ import { useCore } from "#/infra/frame.ts";
 import { useQueryClient, ready, useRuntimes } from "#/infra/query.ts";
 import { Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
-import { hexColor } from "#/ui/cast.ts";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { hexColor } from "#/ui/domain/cast.ts";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -619,10 +619,7 @@ export function AgentCard(props: {
           </span>
           <span {...stylex.attrs(styles.orchestratorCardSpan)}>{props.agent.duty}</span>
           <span {...stylex.attrs(styles.agentCardSpan5)}>
-            <span
-              {...stylex.attrs(styles.agentCardSpan, available() ? styles.agentCardSpanTone : styles.agentCardSpanAlt)}
-              aria-hidden="true"
-            />
+            <span {...stylex.attrs(styles.agentCardSpan, available() ? styles.agentCardSpanTone : styles.agentCardSpanAlt)} aria-hidden="true" />
             <span {...stylex.attrs(styles.agentCardSpan6)}>
               {[props.runtime?.preset.label ?? props.agent.runtime, props.agent.model, props.agent.effort].filter(Boolean).join(" · ")}
             </span>

@@ -18,15 +18,15 @@ import { useRouter } from "#/infra/router.ts";
 import { sendOnce, useIntents } from "#/state/intent.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { castOf, castSprite, cropSprite } from "#/ui/cast.ts";
 import { Dialog } from "#/ui/Dialog.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { castOf, castSprite, cropSprite } from "#/ui/domain/cast.ts";
+import { AgentFace } from "#/ui/domain/Face.tsx";
+import { PoseSprite } from "#/ui/domain/PoseSprite.tsx";
 import { TextArea } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { type SpriteAtlas, type SpriteInfo, useAtlas } from "#/ui/pixel/atlas.ts";
 import { PixelCard, SpriteIcon } from "#/ui/pixel/index.ts";
 import { badgeColors, CardColors } from "#/ui/pixel/PixelCard.tsx";
-import { PoseSprite } from "#/ui/PoseSprite.tsx";
 import { styleProps } from "#/ui/positioner.ts";
 import { toast } from "#/ui/toasts.ts";
 

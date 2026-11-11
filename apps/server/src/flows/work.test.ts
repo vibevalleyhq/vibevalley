@@ -8,12 +8,12 @@ import { SqlClient } from "effect/sql";
 import type * as T from "@vibevalley/protocol";
 import { needOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { orchestrator, user } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Session } from "#/session/session.ts";
-import type { DeliveryInput } from "#/session/signals.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Session } from "#/modules/session/session.ts";
+import type { DeliveryInput } from "#/modules/session/signals.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { releaseHeld } from "#/testing/worker.ts";
 
@@ -54,9 +54,9 @@ describe("a session's work", () => {
     const f = farm();
     return Effect.gen(function* () {
       const issues = yield* Issue;
-      expect((yield* issues.hire({ ...lab(), enabled: false }, "随便做点什么", "demo")).refused).toBe(lab().name + " 被停用了");
-      expect((yield* issues.hire(lab(), "随便做点什么", "../../etc")).refused).toMatch(/不能当仓库名/u);
-      expect((yield* issues.hire(lab(), "随便做点什么", "")).refused).toBeTruthy();
+      expect((yield* Effect.flip(issues.hire({ ...lab(), enabled: false }, "随便做点什么", "demo"))).reason).toBe(lab().name + " 被停用了");
+      expect((yield* Effect.flip(issues.hire(lab(), "随便做点什么", "../../etc"))).reason).toMatch(/不能当仓库名/u);
+      expect((yield* Effect.flip(issues.hire(lab(), "随便做点什么", ""))).reason).toBeTruthy();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -341,10 +341,10 @@ describe("a session's work", () => {
         const idle = yield* issues.hire(lab(), "发呆 " + i, "crowded");
         busy.push(mustHire(idle));
       }
-      expect((yield* issues.hire(lab(), "发呆 4", "crowded")).refused).toMatch(/仓库 crowded 里已经有 3 个帮工在干活/u);
+      expect((yield* Effect.flip(issues.hire(lab(), "发呆 4", "crowded"))).reason).toMatch(/仓库 crowded 里已经有 3 个帮工在干活/u);
       const settings = agents.settings("pi");
       yield* agents.saveSettings("pi", { ...settings, maxWorking: 3 });
-      expect((yield* issues.hire(lab(), "发呆 5", "roomy")).refused).toMatch(/最多同时 3 个/u);
+      expect((yield* Effect.flip(issues.hire(lab(), "发呆 5", "roomy"))).reason).toMatch(/最多同时 3 个/u);
       yield* agents.saveSettings("pi", settings);
       yield* releaseHeld(3);
       for (let i = 0; i < 3; i++) yield* w.nextReport;

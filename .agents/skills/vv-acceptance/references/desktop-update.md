@@ -4,7 +4,7 @@
 
 ## 什么时候用
 
-- 改了 `apps/desktop/src/update.ts`、`releases.ts`，或 `main.ts` 里退出和更新的先后。
+- 改了 `apps/desktop/src/infra/update.ts`、`releases.ts`，或 `main.ts` 里退出和更新的先后。
 - 改了 `apps/desktop/scripts/package.ts`（打包、`release.json`、服务端的依赖）。
 - 改了 `.github/workflows/release.yml` 之前，确认它跑的打包在本机是好的。
 

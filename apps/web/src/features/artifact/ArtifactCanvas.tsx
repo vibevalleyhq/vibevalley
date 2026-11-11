@@ -143,12 +143,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
   };
   const pageHref = () => `/artifacts/${encodeURIComponent(props.id)}${(pageVersion() ?? 0) > 0 ? `?v=${pageVersion()}` : ""}`;
   return (
-    <section
-      aria-label={t("web.artifact.canvas.label")}
-      data-testid="artifact-canvas"
-      data-key={props.id}
-      {...stylex.attrs(styles.artifactCanvasSection)}
-    >
+    <section aria-label={t("web.artifact.canvas.label")} data-testid="artifact-canvas" data-key={props.id} {...stylex.attrs(styles.artifactCanvasSection)}>
       <header {...stylex.attrs(styles.artifactCanvasHeader)}>
         <Show when={shown()}>
           {(a) => (

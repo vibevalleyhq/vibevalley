@@ -781,9 +781,7 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
       data-faded={props.faded === true ? "" : undefined}
     >
       <div {...stylex.attrs(styles.memoryItemDiv)}>
-        <span {...stylex.attrs(styles.memoryItemSpan, !(props.faded !== true) ? styles.memoryItemSpanTone : styles.sourcesSpan)}>
-          {props.memory.text}
-        </span>
+        <span {...stylex.attrs(styles.memoryItemSpan, !(props.faded !== true) ? styles.memoryItemSpanTone : styles.sourcesSpan)}>{props.memory.text}</span>
         <span {...stylex.attrs(styles.memoryItemSpan2)}>
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>

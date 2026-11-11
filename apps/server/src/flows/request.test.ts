@@ -2,16 +2,17 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Queue, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 
-import { Agent } from "#/agent/agent.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Connector } from "#/connector/connector.ts";
 import { Core } from "#/core/core.ts";
-import { handlers } from "#/http/handlers.ts";
-import { Lan } from "#/lan/lan.ts";
-import { Orchestrator } from "#/orchestrator/orchestrator.ts";
-import { User } from "#/user/user.ts";
-import { Voice } from "#/voice/voice.ts";
+import { Connector } from "#/gateway/connector/connector.ts";
+import { handlers } from "#/gateway/http/handlers.ts";
+import { Lan } from "#/gateway/lan/lan.ts";
+import { Voice } from "#/gateway/voice/voice.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import { User } from "#/modules/user/user.ts";
 
 import { farm, lab } from "./farm.ts";
 
@@ -48,7 +49,7 @@ describe("a request the page may send again", () => {
       const statusUpdate = yield* h["issue.status.update"]({ id: made.id, status: "canceled", requestKey: "move-1" });
       expect(statusUpdate).toEqual(moved);
       const statusUpdateFailure = yield* Effect.flip(h["issue.status.update"]({ id: made.id, status: "canceled" }));
-      expect(statusUpdateFailure).toMatchObject({ _tag: "Refused" });
+      expect(statusUpdateFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.IssueRefused });
 
       const said = (yield* (yield* Channel).post({ _tag: "User", text: "开个串", sendKey: "" })).message;
       const thread = yield* h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });

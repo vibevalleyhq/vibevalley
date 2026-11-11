@@ -8,8 +8,8 @@ import { attachmentPath, type Channel, type LibraryItem } from "@vibevalley/prot
 import { useNow } from "#/base/dom.tsx";
 import { ago, momentText } from "#/base/format.ts";
 import { Link } from "#/infra/router.ts";
-import { sizeText } from "#/ui/AttachmentTile.tsx";
 import { Button } from "#/ui/Button.tsx";
+import { sizeText } from "#/ui/domain/AttachmentTile.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 import { MoreMenu } from "#/ui/MoreMenu.tsx";

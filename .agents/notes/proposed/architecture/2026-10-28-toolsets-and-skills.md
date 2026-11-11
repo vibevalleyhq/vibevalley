@@ -4,9 +4,9 @@ Status: proposed
 
 ## Problem
 
-内置只读技能（`apps/server/src/agent/skills/`）、助手内置技能（`apps/server/src/orchestrator/skills/`）及输入框固定斜杠命令（`/stop`、`/issue`、`/remember`、`/imagegen`）已上线（见 [档案和农机](docs/subsystems/agent.md)），但还剩三处能力缺口：
+内置只读技能（`apps/server/src/modules/agent/skills/`）、助手内置技能（`apps/server/src/modules/orchestrator/skills/`）及输入框固定斜杠命令（`/stop`、`/issue`、`/remember`、`/imagegen`）已上线（见 [档案和农机](docs/subsystems/agent.md)），但还剩三处能力缺口：
 - **用户技能仍存单字符串并整段拼入提示词**：`config.json` 的用户自定义技能每勾一个就每轮全量拼进人设（`session/briefing.ts`），不能携带附属参考文件，且未与仓库 `.agents/skills/`、本机 `~/.agents/skills/` 统一按需加载。
-- **工具按角色硬编码二分**：`apps/server/src/tool/` 固定按 `orchestrator` 与 `session` 两张表切分，无法给领班帮工档案开放 `issue` 拆单工具，也无法裁剪某个助手档案的工具。
+- **工具按角色硬编码二分**：`apps/server/src/modules/tool/` 固定按 `orchestrator` 与 `session` 两张表切分，无法给领班帮工档案开放 `issue` 拆单工具，也无法裁剪某个助手档案的工具。
 - **输入框 `/` 不能直接点名调用技能**：用户无法在频道输入 `/<技能名> <说明>` 让目标 agent 在当轮按指定技能执行。
 
 ## Proposal

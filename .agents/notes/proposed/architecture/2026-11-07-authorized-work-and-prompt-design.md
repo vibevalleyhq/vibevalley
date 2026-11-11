@@ -5,9 +5,9 @@ Status: proposed
 ## Problem
 
 用户授权后，帮工应在范围内自主完成调查、实现、验证与交付，仅把需用户拍板的决定交回。当前代码仍有三处破坏连续推进的接缝：
-- **提示词鼓励递归拆单交回**：`apps/server/src/session/prompts.ts` 与 `apps/server/src/tool/prompts.ts` 引导帮工把较大工作拆成 3–6 张子工单立即派发并结束本轮，子工单也读到同一规则。
-- **长标题在冒号处被静默截断**：`apps/server/src/issue/brief.ts` 的 `shortTitle` 与 `apps/server/src/issue/lifecycle.ts` 会将带冒号的长标题截成 `test(issue)` 等前缀存入正式标题，原句退入正文。
-- **只读与起草靠提示词豁免而非权限收窄**：`apps/server/src/issue/prompts.ts` 追加「不用提交」与通用执行规则相互抵消，且不等同于工具或文件写权限隔离。
+- **提示词鼓励递归拆单交回**：`apps/server/src/modules/session/prompts.ts` 与 `apps/server/src/modules/tool/prompts.ts` 引导帮工把较大工作拆成 3–6 张子工单立即派发并结束本轮，子工单也读到同一规则。
+- **长标题在冒号处被静默截断**：`apps/server/src/modules/issue/brief.ts` 的 `shortTitle` 与 `apps/server/src/modules/issue/lifecycle.ts` 会将带冒号的长标题截成 `test(issue)` 等前缀存入正式标题，原句退入正文。
+- **只读与起草靠提示词豁免而非权限收窄**：`apps/server/src/modules/issue/prompts.ts` 追加「不用提交」与通用执行规则相互抵消，且不等同于工具或文件写权限隔离。
 
 参考对照基线为 [dsh-superagent-prototype (`8c32a9dc`)](https://github.com/deepseek-ai/dsh-superagent-prototype/tree/8c32a9dc5d72c033816c6a8110b37f40cf94fba4)。[助手](docs/subsystems/orchestrator.md)、[工单](docs/subsystems/issue.md)与[Mailbox](docs/subsystems/mailbox.md)已有 `Trigger`、`IssueMandate`、`Assignment` 与结构化 `issue_report`，应在现有模块上对齐职责，不另建平行概念。
 

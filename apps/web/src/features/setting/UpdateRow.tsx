@@ -12,7 +12,7 @@ import { currentHost } from "#/infra/host.ts";
 import { useUpdates } from "#/infra/settings.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
-import { SettingRow } from "#/ui/settings.tsx";
+import { SettingRow } from "#/ui/domain/settings.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 const viewStyles = stylex.create({

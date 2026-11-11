@@ -1,6 +1,6 @@
 # 共用的原语
 
-由 `scripts/primitives.ts` 从各地基文件夹的导出和它们文档注释的第一行写出，不手改；`vp run docs:verify` 查它是不是最新。写一个帮手之前先在这里找一找：已经有的就用，不再写一份。类型不列。
+由 `scripts/gen/primitives.ts` 从各地基文件夹的导出和它们文档注释的第一行写出，不手改；`vp run docs:verify` 查它是不是最新。写一个帮手之前先在这里找一找：已经有的就用，不再写一份。类型不列。
 
 ## `packages/protocol/src/rules`
 
@@ -8,10 +8,9 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `sameMarks` | `artifact.ts` | A mark not set and a mark set false are the same. |
-| `normalSpans` | `artifact.ts` | Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. |
 | `defaultOf` | `channel.ts` | The channel words go to when none is named. |
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
+| `actorRoleOf` | `channel.ts` | The agent's role when an actor is an agent; undefined for the user or the system. |
 | `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while cjk@w3 does (Chinese runs on without spaces). |
 | `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD. |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
@@ -35,12 +34,6 @@
 | `needOf` | `phase.ts` |  |
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
-| `slugOf` | `pkm.ts` | A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". |
-| `pkmTag` | `pkm.ts` | Every #tag in a text (read it with matchAll): the name is group 1. The page draws them, the server links them. |
-| `pkmTagTyped` | `pkm.ts` | A #tag being typed, ending where the text ends (the caret): its name so far is group 1. |
-| `applyBlockOps` | `pkm.ts` | The blocks after the ops in order (a copy: blocks is not changed). an op on a block not on the page changes nothing. |
-| `flatBlocks` | `pkm.ts` | The outline as the wire has it: in order, each with its parent and the path of first lines above it. |
-| `treeOfBlocks` | `pkm.ts` |  |
 | `plainText` | `plain.ts` |  |
 | `farmOf` | `play.ts` | The farm a session's bed is on: each repo has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
@@ -64,7 +57,9 @@
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
 | `head` | `clip.ts` | The first n UTF-16 units of s, never half a surrogate pair. |
 | `compactCard` | `clip.ts` |  |
+| `bizError` | `errors.ts` | Builds a yieldable ApiError with a six-digit business error code, message, and optional remediation detail. |
 | `refused` | `errors.ts` |  |
+| `refuseIn` | `errors.ts` | Module-scoped refusal builder bound to a specific six-digit BizCode. |
 | `missing` | `errors.ts` | Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). |
 | `lookIn` | `errors.ts` |  |
 | `memoriesOf` | `errors.ts` | Where an agent's memories are listed. |
@@ -76,8 +71,10 @@
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
+| `storedJsonOrUndefined` | `json.ts` | Read a nullable JSON column written by this server: null stays undefined, while corrupt JSON fails fast as Inconsistent. |
+| `valueOf` | `json.ts` | Validate an in-memory row or value that must fit schema; a mismatch fails fast as Inconsistent. |
 | `jsonText` | `json.ts` | As JSON.stringify writes it; a cycle or a bigint fails instead of throws. |
-| `jsonOrNone` | `json.ts` | Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. |
+| `jsonOrNone` | `json.ts` | Read untrusted external JSON where unreadable or misfit input is taken as none. |
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
 | `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. |
 | `misfitField` | `json.ts` | The field a decoding first failed on, undefined when the value itself was not an object. |
@@ -348,7 +345,8 @@
 | `RegistryContext` | `atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
 | `useRegistry` | `atom.ts` |  |
 | `useAtom` | `atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
-| `onPage` | `atom.ts` | The atom held for the page's life, with a signal that only counts its changes. |
+| `onPage` | `atom.ts` | The atom held for the registry's life, built and subscribed lazily on first access rather than at module import. |
+| `usePageAtom` | `atom.ts` | Binds a page atom's reads and writes to the active `RegistryContext`, for component callbacks in tests and stories. |
 | `defineAtom` | `atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
 | `framesSource` | `atom.ts` |  |
 | `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. |
